@@ -1,6 +1,12 @@
 export enum DBType {
-  MYSQL = 'mysql',
-  POSTGRES = 'postgres',
+	MYSQL = 'mysql',
+	POSTGRES = 'postgres',
 }
 
-export type TypeID = number;
+export enum DatabaseConstant {
+	ID_DEFAULT_LENGTH = 36,
+	ID_SHORT_LENGTH = 10,
+	ID_LONG_LENGTH = 36,
+}
+
+export type TypeID = string;
