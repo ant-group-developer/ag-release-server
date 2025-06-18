@@ -18,5 +18,5 @@ export class Dsp extends BaseEntityLongId {
 	canLinkArtistProfile: boolean;
 
 	@OneToMany(() => OrganizationDsp, (OrganizationDsp) => OrganizationDsp.dsp)
-	OrganizationDsps: OrganizationDsp[];
+	organizationDsps: OrganizationDsp[];
 }

@@ -20,7 +20,7 @@ export class UserEntity extends BaseEntityUserCreatorLongId {
 	isActive: boolean;
 
 	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
-	userPermission: UserPermission[];
+	userPermissions: UserPermission[];
 
 	@OneToOne(() => Organization, (organization) => organization.owner)
 	organization: Organization;

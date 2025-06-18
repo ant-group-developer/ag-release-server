@@ -48,5 +48,5 @@ export class Country extends BaseEntityShortId {
 		() => ReleaseLanguage,
 		(releaseLanguage) => releaseLanguage.metadataLanguageCountry,
 	)
-	releaseLanguage: ReleaseLanguage[];
+	releaseLanguages: ReleaseLanguage[];
 }

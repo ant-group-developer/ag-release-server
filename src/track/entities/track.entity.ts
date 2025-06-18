@@ -1,3 +1,4 @@
+import { AudioFile } from 'src/audio-file/entities/audio-file.entity';
 import { BaseEntityShortId } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Release } from 'src/release/entities/release.entity';
@@ -59,4 +60,7 @@ export class Track extends BaseEntityShortId {
 
 	@OneToMany(() => TrackLocalize, (trackLocalize) => trackLocalize.track)
 	trackLocalizes: TrackLocalize[];
+
+	@OneToOne(() => AudioFile, (audioFile) => audioFile.track)
+	audioFile: AudioFile;
 }

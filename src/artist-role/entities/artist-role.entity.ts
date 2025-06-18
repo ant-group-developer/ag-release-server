@@ -8,5 +8,5 @@ export class ArtistRole extends BaseEntityUserCreatorLongId {
 	name: string;
 
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
-	releaseArtist: ReleaseArtist[];
+	releaseArtists: ReleaseArtist[];
 }

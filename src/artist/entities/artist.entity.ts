@@ -14,5 +14,5 @@ export class Artist extends BaseEntityUserCreatorShortId {
 	biography: string;
 
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
-	releaseArtist: ReleaseArtist[];
+	releaseArtists: ReleaseArtist[];
 }
