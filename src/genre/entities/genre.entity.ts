@@ -1,4 +1,4 @@
-import { BaseEntityShortId } from 'src/database/dto/database.dto';
+import { BaseEntityShortId } from 'src/database/entities/database.entity';
 import { Column, Entity } from 'typeorm';
 
 @Entity('genres')

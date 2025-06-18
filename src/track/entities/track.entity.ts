@@ -1,4 +1,4 @@
-import { BaseEntityShortId } from 'src/database/dto/database.dto';
+import { BaseEntityShortId } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Release } from 'src/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';

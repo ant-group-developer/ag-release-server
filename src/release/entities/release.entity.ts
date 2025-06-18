@@ -1,4 +1,4 @@
-import { BaseEntityUserCreatorLongId } from 'src/database/dto/database.dto';
+import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
@@ -53,9 +53,9 @@ export class Release extends BaseEntityUserCreatorLongId {
 	@Column({ type: 'varchar', length: 150, nullable: true })
 	version: string;
 
-	@Column({ type: 'enum', default: ReleaseStatus.DRAFT })
+	@Column({ type: 'enum', enum: ReleaseStatus, default: ReleaseStatus.DRAFT })
 	status: ReleaseStatus;
 
-	@Column({ type: 'enum' })
+	@Column({ type: 'enum', enum: ReleaseType })
 	type: ReleaseType;
 }

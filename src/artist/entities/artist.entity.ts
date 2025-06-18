@@ -1,4 +1,4 @@
-import { BaseEntityUserCreatorShortId } from 'src/database/dto/database.dto';
+import { BaseEntityUserCreatorShortId } from 'src/database/entities/database.entity';
 import { Column, Entity } from 'typeorm';
 
 @Entity('artists')
