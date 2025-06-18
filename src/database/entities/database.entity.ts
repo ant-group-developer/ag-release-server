@@ -10,12 +10,12 @@ import {
 	PrimaryColumn,
 	UpdateDateColumn,
 } from 'typeorm';
-import { DBConst } from '../enum/database.type.enum';
+import { LENGTH_ID } from '../const/database.const';
 
 export class BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: DBConst.LENGTH_ID.DEFAULT,
+		length: LENGTH_ID.BASE_DEFAULT,
 	})
 	id: string;
 
@@ -27,7 +27,7 @@ export class BaseEntityDefault {
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.DEFAULT);
+		this.id = this.generateIdByLength(LENGTH_ID.BASE_DEFAULT);
 	}
 
 	public generateIdByLength(length: number): string {
@@ -38,134 +38,68 @@ export class BaseEntityDefault {
 export class BaseEntityShortId extends BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: DBConst.LENGTH_ID.SHORT,
+		length: LENGTH_ID.BASE_SHORT,
 	})
 	id: string;
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.SHORT);
+		this.id = this.generateIdByLength(LENGTH_ID.BASE_SHORT);
 	}
 }
 
 export class BaseEntityLongId extends BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: DBConst.LENGTH_ID.LONG,
+		length: LENGTH_ID.BASE_LONG,
 	})
 	id: string;
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.LONG);
+		this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
 	}
 }
 
-// export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
-// 	@Column({ name: 'creator_id', length: DBConst.LENGTH_ID.DEFAULT })
-// 	creatorId: string;
-
-// 	@ManyToOne(() => UserEntity)
-// 	@JoinColumn({ name: 'creator_id' })
-// 	creator: IUserSchema;
-
-// 	@Column({ name: 'modifier_id', length: DBConst.LENGTH_ID.DEFAULT })
-// 	modifierId: string;
-
-// 	@ManyToOne(() => UserEntity)
-// 	@JoinColumn({ name: 'modifier_id' })
-// 	modifier: IUserSchema;
-// }
-
-// export class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
-// 	@PrimaryColumn({
-// 		type: 'varchar',
-// 		length: DBConst.LENGTH_ID.SHORT,
-// 	})
-// 	id: string;
-
-// 	@BeforeInsert()
-// 	generateId() {
-// 		this.id = this.generateIdByLength(DBConst.LENGTH_ID.SHORT);
-// 	}
-// }
-
 @Entity('users')
-export class BaseUser {
-	@PrimaryColumn({
-		type: 'varchar',
-		length: DBConst.LENGTH_ID.DEFAULT,
-	})
-	id: string;
-
-	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-	createdAt: Date;
-
-	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
-	updatedAt: Date;
-
-	@Column({ name: 'creator_id', length: DBConst.LENGTH_ID.DEFAULT })
+export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
+	@Column({ name: 'creator_id', length: LENGTH_ID.USER })
 	creatorId: string;
 
-	@ManyToOne(() => BaseUser)
+	@ManyToOne(() => BaseEntityUserCreatorDefaultId)
 	@JoinColumn({ name: 'creator_id' })
 	creator: IUserSchema;
 
-	@Column({ name: 'modifier_id', length: DBConst.LENGTH_ID.DEFAULT })
+	@Column({ name: 'modifier_id', length: LENGTH_ID.USER })
 	modifierId: string;
 
-	@ManyToOne(() => BaseUser)
+	@ManyToOne(() => BaseEntityUserCreatorDefaultId)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: IUserSchema;
-
-	@BeforeInsert()
-	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.DEFAULT);
-	}
-
-	public generateIdByLength(length: number): string {
-		return nanoid(length);
-	}
 }
 
-// export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
-// 	@Column({ name: 'creator_id', length: DBConst.LENGTH_ID.DEFAULT })
-// 	creatorId: string;
-
-// 	@ManyToOne(() => UserEntity)
-// 	@JoinColumn({ name: 'creator_id' })
-// 	creator: IUserSchema;
-
-// 	@Column({ name: 'modifier_id', length: DBConst.LENGTH_ID.DEFAULT })
-// 	modifierId: string;
-
-// 	@ManyToOne(() => UserEntity)
-// 	@JoinColumn({ name: 'modifier_id' })
-// 	modifier: IUserSchema;
-// }
-
-export class BaseEntityUserCreatorShortId extends BaseUser {
+export class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: DBConst.LENGTH_ID.SHORT,
+		length: LENGTH_ID.BASE_SHORT,
 	})
 	id: string;
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.SHORT);
+		this.id = this.generateIdByLength(LENGTH_ID.BASE_SHORT);
 	}
 }
 
-export class BaseEntityUserCreatorLongId extends BaseUser {
+export class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: DBConst.LENGTH_ID.LONG,
+		length: LENGTH_ID.BASE_LONG,
 	})
 	id: string;
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(DBConst.LENGTH_ID.LONG);
+		this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
 	}
 }

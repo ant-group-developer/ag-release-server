@@ -1,9 +1,11 @@
 import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
-import { Column, Entity } from 'typeorm';
+import { Organization } from 'src/organization/entitites/organization.entity';
+import { OrganizationUser } from 'src/organizitaion-user/entities/organizitaion-user.entity';
+import { UserPermission } from 'src/user-permission/entities/user-permission.entity';
+import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 import { UserType } from '../enum/user.enum';
 
 @Entity('users')
-// extends BaseEntityUserCreatorLongId
 export class UserEntity extends BaseEntityUserCreatorLongId {
 	@Column({ type: 'varchar', length: 100 })
 	name: string;
@@ -17,38 +19,15 @@ export class UserEntity extends BaseEntityUserCreatorLongId {
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive: boolean;
 
-	// @Column({ name: 'creator_id', length: DBConst.LENGTH_ID.DEFAULT })
-	// creatorId: string;
+	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
+	userPermission: UserPermission[];
 
-	// @ManyToOne(() => UserEntity)
-	// @JoinColumn({ name: 'creator_id' })
-	// creator: IUserSchema;
+	@OneToOne(() => Organization, (organization) => organization.owner)
+	organization: Organization;
 
-	// @Column({ name: 'modifier_id', length: DBConst.LENGTH_ID.DEFAULT })
-	// modifierId: string;
-
-	// @ManyToOne(() => UserEntity)
-	// @JoinColumn({ name: 'modifier_id' })
-	// modifier: IUserSchema;
-
-	// @PrimaryColumn({
-	// 	type: 'varchar',
-	// 	length: DBConst.LENGTH_ID.DEFAULT,
-	// })
-	// id: string;
-
-	// @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-	// createdAt: Date;
-
-	// @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
-	// updatedAt: Date;
-
-	// @BeforeInsert()
-	// generateId() {
-	// 	this.id = this.generateIdByLength(DBConst.LENGTH_ID.DEFAULT);
-	// }
-
-	// public generateIdByLength(length: number): string {
-	// 	return nanoid(length);
-	// }
+	@OneToOne(
+		() => OrganizationUser,
+		(organizationUser) => organizationUser.user,
+	)
+	organizationUser: OrganizationUser;
 }

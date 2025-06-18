@@ -1,30 +1,9 @@
 import { BaseEntityUserCreatorShortId } from 'src/database/entities/database.entity';
-import { Column, Entity } from 'typeorm';
+import { ReleaseArtist } from 'src/release-artist/entities/release-artist.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('artists')
 export class Artist extends BaseEntityUserCreatorShortId {
-	// @Column({
-	// 	name: 'creator_id',
-	// 	type: 'varchar',
-	// 	length: DatabaseConstant.ID_LONG_LENGTH,
-	// })
-	// creatorId: string;
-
-	// // @ManyToOne(() => User)
-	// // @JoinColumn({ name: 'creator_id' })
-	// // creator: User;
-
-	// @Column({
-	// 	name: 'modifier_id',
-	// 	type: 'varchar',
-	// 	length: DatabaseConstant.ID_LONG_LENGTH,
-	// })
-	// modifierId: string;
-
-	// // @ManyToOne(() => User)
-	// // @JoinColumn({ name: 'modifier_id' })
-	// // modifier: User;
-
 	@Column({ type: 'varchar', length: 100 })
 	name: string;
 
@@ -33,4 +12,7 @@ export class Artist extends BaseEntityUserCreatorShortId {
 
 	@Column({ type: 'varchar', length: 250, nullable: true })
 	biography: string;
+
+	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
+	releaseArtist: ReleaseArtist[];
 }

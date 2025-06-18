@@ -1,1 +1,17 @@
 user.email: unique
+language.code: unique
+permission.name: unique chưa sửa
+
+artist_role.id length = uuid
+track_artist oke
+release_artist
+
+release.id => uuid
+track
+release_artist
+release_localize
+release_language
+ 
+countries
+phonecode => phone_code
+

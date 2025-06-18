@@ -1,5 +1,7 @@
 import { BaseEntityShortId } from 'src/database/entities/database.entity';
-import { Column, Entity } from 'typeorm';
+import { Release } from 'src/release/entities/release.entity';
+import { Track } from 'src/track/entities/track.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('genres')
 export class Genre extends BaseEntityShortId {
@@ -11,4 +13,18 @@ export class Genre extends BaseEntityShortId {
 
 	@Column({ type: 'varchar', length: 200, nullable: true })
 	description: string;
+
+	// releases
+	@OneToMany(() => Release, (release) => release.primaryGenre)
+	primaryGenreReleases: Release[];
+
+	@OneToMany(() => Release, (release) => release.subGenre)
+	subGenreReleases: Release[];
+
+	// tracks
+	@OneToMany(() => Track, (track) => track.primaryGenre)
+	primaryGenreTracks: Release[];
+
+	@OneToMany(() => Track, (track) => track.subGenre)
+	subGenreTracks: Release[];
 }

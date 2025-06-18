@@ -1,7 +1,17 @@
 import { BaseEntityShortId } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Release } from 'src/release/entities/release.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { TrackArtist } from 'src/track-artist/entities/track-artist.entity';
+import { TrackLanguage } from 'src/track-language/entities/track-language.entity';
+import { TrackLocalize } from 'src/track-localize/entities/track-localize.entity';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 
 @Entity('tracks')
 export class Track extends BaseEntityShortId {
@@ -25,19 +35,28 @@ export class Track extends BaseEntityShortId {
 
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })
-	releases: Release[];
+	release: Release;
 
 	@Column({ name: 'primary_genre_id', type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'primary_genre_id' })
-	primaryGenres: Genre[];
+	primaryGenre: Genre;
 
 	@Column({ name: 'sub_genre_id', type: 'varchar', length: 10 })
 	subGenreId: string;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
-	subGenres: Genre[];
+	subGenre: Genre;
+
+	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.track)
+	trackArtists: TrackArtist[];
+
+	@OneToOne(() => TrackLanguage, (trackLanguage) => trackLanguage.track)
+	trackLanguage: TrackLanguage;
+
+	@OneToMany(() => TrackLocalize, (trackLocalize) => trackLocalize.track)
+	trackLocalizes: TrackLocalize[];
 }
