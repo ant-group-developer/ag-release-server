@@ -8,7 +8,7 @@ export class Dsp extends BaseEntityLongId {
 	name: string;
 
 	@Column({ name: 'picture', type: 'varchar', length: 100, nullable: true })
-	picture: string;
+	picture: string | null;
 
 	@Column({
 		name: 'can_link_artist_profile',

@@ -4,7 +4,7 @@ import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('artist_roles')
 export class ArtistRole extends BaseEntityUserCreatorLongId {
-	@Column({ type: 'varchar', length: 100 })
+	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)

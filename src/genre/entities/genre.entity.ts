@@ -9,10 +9,10 @@ export class Genre extends BaseEntityShortId {
 	name: string;
 
 	@Column({ type: 'varchar', length: 100, nullable: true })
-	picture: string;
+	picture: string | null;
 
 	@Column({ type: 'varchar', length: 200, nullable: true })
-	description: string;
+	description: string | null;
 
 	// releases
 	@OneToMany(() => Release, (release) => release.primaryGenre)

@@ -20,16 +20,17 @@ export class Track extends BaseEntityShortId {
 	title: string;
 
 	@Column({ type: 'varchar', length: 100, nullable: true })
-	picture: string;
+	picture: string | null;
 
+	// This will appear next to the track title excluding artist name. For example. 'Extended Version'
 	@Column({ type: 'varchar', length: 50, nullable: true })
-	version: string;
+	version: string | null;
 
 	@Column({ type: 'varchar', length: 20, nullable: true })
-	isrc: string;
+	isrc: string | null;
 
 	@Column({ type: 'varchar', length: 20, nullable: true })
-	iswc: string;
+	iswc: string | null;
 
 	@Column({ name: 'release_id', type: 'varchar', length: 10 })
 	releaseId: string;
@@ -45,12 +46,17 @@ export class Track extends BaseEntityShortId {
 	@JoinColumn({ name: 'primary_genre_id' })
 	primaryGenre: Genre;
 
-	@Column({ name: 'sub_genre_id', type: 'varchar', length: 10 })
-	subGenreId: string;
+	@Column({
+		name: 'sub_genre_id',
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+	})
+	subGenreId: string | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
-	subGenre: Genre;
+	subGenre: Genre | null;
 
 	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.track)
 	trackArtists: TrackArtist[];

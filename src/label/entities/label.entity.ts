@@ -7,11 +7,11 @@ export class Label extends BaseEntityUserCreatorShortId {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 100 })
-	picture: string;
+	@Column({ type: 'varchar', length: 100, nullable: true })
+	picture: string | null;
 
-	@Column({ type: 'varchar', length: 200 })
-	description: string;
+	@Column({ type: 'varchar', length: 200, nullable: true })
+	description: string | null;
 
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];

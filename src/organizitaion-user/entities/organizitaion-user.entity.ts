@@ -6,7 +6,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('organization_user')
 export class OrganizationUser extends BaseEntityLongId {
-	@Column({ name: 'user_id', type: 'uuid' })
+	@Column({ name: 'user_id', type: 'varchar', length: LENGTH_ID.USER })
 	userId: string;
 
 	@OneToOne(() => UserEntity)

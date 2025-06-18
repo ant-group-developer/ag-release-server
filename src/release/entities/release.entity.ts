@@ -19,7 +19,7 @@ import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
 @Entity('releases')
 export class Release extends BaseEntityUserCreatorLongId {
 	@Column({ type: 'varchar', length: 20, nullable: true })
-	upc: string;
+	upc: string | null;
 
 	@Column({
 		name: 'primary_genre_id',
@@ -32,12 +32,12 @@ export class Release extends BaseEntityUserCreatorLongId {
 	@JoinColumn({ name: 'primary_genre_id' })
 	primaryGenre: Genre;
 
-	@Column({ name: 'sub_genre_id', type: 'varchar', length: LENGTH_ID.GENRE })
-	subGenreId: string;
+	@Column({ type: 'varchar', length: LENGTH_ID.GENRE, nullable: true })
+	subGenreId: string | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
-	subGenre: Genre;
+	subGenre: Genre | null;
 
 	@Column({ name: 'label_id', type: 'varchar', length: LENGTH_ID.RELEASE })
 	labelId: string;
@@ -50,7 +50,7 @@ export class Release extends BaseEntityUserCreatorLongId {
 	title: string;
 
 	@Column({ type: 'varchar', length: 150, nullable: true })
-	version: string;
+	version: string | null;
 
 	@Column({ type: 'enum', enum: ReleaseStatus, default: ReleaseStatus.DRAFT })
 	status: ReleaseStatus;

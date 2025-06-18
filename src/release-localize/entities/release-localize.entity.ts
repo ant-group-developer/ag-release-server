@@ -24,9 +24,9 @@ export class ReleaseLocalize extends BaseEntityLongId {
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
-	@Column({ type: 'varchar', length: 150, nullable: true })
+	@Column({ type: 'varchar', length: 150 })
 	title: string;
 
-	@Column({ type: 'varchar', length: 150 })
-	version: string;
+	@Column({ type: 'varchar', length: 150, nullable: true })
+	version: string | null;
 }

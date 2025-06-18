@@ -22,9 +22,9 @@ export class TrackLocalize extends BaseEntityLongId {
 	@ManyToOne(() => Track, (track) => track.trackLocalizes)
 	track: Track;
 
-	@Column({ type: 'varchar', length: 150, nullable: true })
+	@Column({ type: 'varchar', length: 150 })
 	title: string;
 
 	@Column({ type: 'varchar', length: 150, nullable: true })
-	version: string;
+	version: string | null;
 }

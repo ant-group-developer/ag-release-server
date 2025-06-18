@@ -28,7 +28,7 @@ export class AudioFile extends BaseEntityLongId {
 	extension: string;
 
 	// store in bytes
-	@Column({ type: 'bigint', nullable: true })
+	@Column({ type: 'bigint' })
 	fileSize: number;
 
 	@Column({ type: 'varchar', length: 30 })
