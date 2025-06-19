@@ -1,10 +1,9 @@
 import { nanoid } from 'nanoid';
-import { IUserSchema } from 'src/user/interface/user.interface';
+import { User } from 'src/user/entities/user.entity';
 import {
 	BeforeInsert,
 	Column,
 	CreateDateColumn,
-	Entity,
 	JoinColumn,
 	ManyToOne,
 	PrimaryColumn,
@@ -61,21 +60,30 @@ export class BaseEntityLongId extends BaseEntityDefault {
 	}
 }
 
-@Entity('users')
 export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
 	@Column({ name: 'creator_id', length: LENGTH_ID.USER })
 	creatorId: string;
 
-	@ManyToOne(() => BaseEntityUserCreatorDefaultId)
+	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
-	creator: IUserSchema;
+	creator: User;
 
 	@Column({ name: 'modifier_id', length: LENGTH_ID.USER })
 	modifierId: string;
 
-	@ManyToOne(() => BaseEntityUserCreatorDefaultId)
+	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
-	modifier: IUserSchema;
+	modifier: User;
+
+	@BeforeInsert()
+	setDefaultIds() {
+		if (!this.creatorId) {
+			this.creatorId = this.id;
+		}
+		if (!this.modifierId) {
+			this.modifierId = this.id;
+		}
+	}
 }
 
 export class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
@@ -100,6 +108,8 @@ export class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId 
 
 	@BeforeInsert()
 	generateId() {
-		this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
+		if (!this.modifierId) {
+			this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
+		}
 	}
 }

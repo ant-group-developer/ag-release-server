@@ -1,7 +1,7 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
 import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { Organization } from 'src/organization/entities/organization.entity';
-import { UserEntity } from 'src/user/entities/user.entity';
+import { User } from 'src/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('organization_user')
@@ -9,9 +9,9 @@ export class OrganizationUser extends BaseEntityLongId {
 	@Column({ name: 'user_id', type: 'varchar', length: LENGTH_ID.USER })
 	userId: string;
 
-	@OneToOne(() => UserEntity)
+	@OneToOne(() => User)
 	@JoinColumn({ name: 'user_id' })
-	user: UserEntity;
+	user: User;
 
 	@Column({
 		name: 'organization_id',

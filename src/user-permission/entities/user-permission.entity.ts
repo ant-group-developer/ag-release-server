@@ -1,7 +1,7 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
 import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { Permission } from 'src/permission/entities/permission.entity';
-import { UserEntity } from 'src/user/entities/user.entity';
+import { User } from 'src/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('user_permissions')
@@ -9,9 +9,9 @@ export class UserPermission extends BaseEntityLongId {
 	@Column({ name: 'user_id', type: 'varchar', length: LENGTH_ID.USER })
 	userId: string;
 
-	@ManyToOne(() => UserEntity)
+	@ManyToOne(() => User)
 	@JoinColumn({ name: 'user_id' })
-	user: UserEntity;
+	user: User;
 
 	@Column({
 		name: 'permission_id',

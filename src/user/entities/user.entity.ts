@@ -6,7 +6,7 @@ import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 import { UserType } from '../enum/user.enum';
 
 @Entity('users')
-export class UserEntity extends BaseEntityUserCreatorLongId {
+export class User extends BaseEntityUserCreatorLongId {
 	@Column({ type: 'varchar', length: 100 })
 	name: string;
 

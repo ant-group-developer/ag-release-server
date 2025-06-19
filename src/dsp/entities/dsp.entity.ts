@@ -2,6 +2,8 @@ import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { OrganizationDsp } from 'src/organization-dsp/entities/organization-dsp.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log(BaseEntityLongId);
+
 @Entity('dsps')
 export class Dsp extends BaseEntityLongId {
 	@Column({ name: 'name', type: 'varchar', unique: true, length: 100 })
