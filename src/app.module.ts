@@ -5,8 +5,8 @@ import { ConfigCustomModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 
 @Module({
-  imports: [ConfigCustomModule, DatabaseModule],
-  controllers: [AppController],
-  providers: [AppService],
+	imports: [ConfigCustomModule, DatabaseModule],
+	controllers: [AppController],
+	providers: [AppService],
 })
 export class AppModule {}
