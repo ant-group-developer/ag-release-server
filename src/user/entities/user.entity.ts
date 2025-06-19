@@ -1,6 +1,6 @@
 import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
-import { Organization } from 'src/organization/entitites/organization.entity';
-import { OrganizationUser } from 'src/organizitaion-user/entities/organizitaion-user.entity';
+import { OrganizationUser } from 'src/organization-user/entities/organization-user.entity';
+import { Organization } from 'src/organization/entities/organization.entity';
 import { UserPermission } from 'src/user-permission/entities/user-permission.entity';
 import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 import { UserType } from '../enum/user.enum';

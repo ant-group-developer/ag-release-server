@@ -1,7 +1,7 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
 import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { OrganizationDsp } from 'src/organization-dsp/entities/organization-dsp.entity';
-import { OrganizationUser } from 'src/organizitaion-user/entities/organizitaion-user.entity';
+import { OrganizationUser } from 'src/organization-user/entities/organization-user.entity';
 import { UserEntity } from 'src/user/entities/user.entity';
 import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 

@@ -1,6 +1,6 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
 import { BaseEntityLongId } from 'src/database/entities/database.entity';
-import { Organization } from 'src/organization/entitites/organization.entity';
+import { Organization } from 'src/organization/entities/organization.entity';
 import { UserEntity } from 'src/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
