@@ -5,7 +5,9 @@ import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { Release } from 'src/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
-@Entity('release-artist')
+console.log('release_artist')
+
+@Entity('release_artist')
 export class ReleaseArtist extends BaseEntityLongId {
 	@Column({
 		name: 'artist_role_id',

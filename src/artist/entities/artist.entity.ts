@@ -2,6 +2,8 @@ import { BaseEntityUserCreatorShortId } from 'src/database/entities/database.ent
 import { ReleaseArtist } from 'src/release-artist/entities/release-artist.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('artists')
+
 @Entity('artists')
 export class Artist extends BaseEntityUserCreatorShortId {
 	@Column({ type: 'varchar', length: 100, unique: true })

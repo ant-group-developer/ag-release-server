@@ -3,6 +3,8 @@ import { Release } from 'src/release/entities/release.entity';
 import { Track } from 'src/track/entities/track.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('Genre')
+
 @Entity('genres')
 export class Genre extends BaseEntityShortId {
 	@Column({ type: 'varchar', length: 100, unique: true })

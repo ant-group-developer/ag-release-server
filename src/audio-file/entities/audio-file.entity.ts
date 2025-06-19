@@ -3,6 +3,8 @@ import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { Track } from 'src/track/entities/track.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 
+console.log('AudioFile')
+
 @Entity('audio_files')
 export class AudioFile extends BaseEntityLongId {
 	@Column({ type: 'varchar', length: 100 })

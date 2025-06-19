@@ -3,6 +3,8 @@ import { ReleaseLanguage } from 'src/release-language/entities/release-language.
 import { TrackLanguage } from 'src/track-language/entities/track-language.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('Country')
+
 @Entity('countries')
 export class Country extends BaseEntityShortId {
 	@Column({ name: 'name', type: 'varchar', length: 100, unique: true })

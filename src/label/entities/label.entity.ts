@@ -2,6 +2,8 @@ import { BaseEntityUserCreatorShortId } from 'src/database/entities/database.ent
 import { Release } from 'src/release/entities/release.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('labels')
+
 @Entity('labels')
 export class Label extends BaseEntityUserCreatorShortId {
 	@Column({ type: 'varchar', length: 100, unique: true })

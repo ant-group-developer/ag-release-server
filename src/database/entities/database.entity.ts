@@ -11,7 +11,10 @@ import {
 } from 'typeorm';
 import { LENGTH_ID } from '../const/database.const';
 
-export class BaseEntityDefault {
+
+console.log('BaseEntityDefault')
+
+class BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
 		length: LENGTH_ID.BASE_DEFAULT,
@@ -34,7 +37,7 @@ export class BaseEntityDefault {
 	}
 }
 
-export class BaseEntityShortId extends BaseEntityDefault {
+class BaseEntityShortId extends BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
 		length: LENGTH_ID.BASE_SHORT,
@@ -47,7 +50,7 @@ export class BaseEntityShortId extends BaseEntityDefault {
 	}
 }
 
-export class BaseEntityLongId extends BaseEntityDefault {
+class BaseEntityLongId extends BaseEntityDefault {
 	@PrimaryColumn({
 		type: 'varchar',
 		length: LENGTH_ID.BASE_LONG,
@@ -60,7 +63,7 @@ export class BaseEntityLongId extends BaseEntityDefault {
 	}
 }
 
-export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
+class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
 	@Column({ name: 'creator_id', length: LENGTH_ID.USER })
 	creatorId: string;
 
@@ -86,7 +89,7 @@ export class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
 	}
 }
 
-export class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
+class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
 	@PrimaryColumn({
 		type: 'varchar',
 		length: LENGTH_ID.BASE_SHORT,
@@ -99,7 +102,7 @@ export class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId
 	}
 }
 
-export class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId {
+class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId {
 	@PrimaryColumn({
 		type: 'varchar',
 		length: LENGTH_ID.BASE_LONG,
@@ -113,3 +116,13 @@ export class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId 
 		}
 	}
 }
+
+
+export {
+	BaseEntityDefault,
+	BaseEntityShortId,
+	BaseEntityLongId,
+	BaseEntityUserCreatorDefaultId,
+	BaseEntityUserCreatorShortId,
+	BaseEntityUserCreatorLongId,
+};

@@ -4,6 +4,8 @@ import { TrackLanguage } from 'src/track-language/entities/track-language.entity
 import { TrackLocalize } from 'src/track-localize/entities/track-localize.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('Language')
+
 @Entity('languages')
 export class Language extends BaseEntityLongId {
 	@Column({ type: 'varchar', length: 100, unique: true })

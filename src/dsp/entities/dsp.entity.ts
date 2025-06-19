@@ -2,6 +2,7 @@ import { BaseEntityLongId } from 'src/database/entities/database.entity';
 import { OrganizationDsp } from 'src/organization-dsp/entities/organization-dsp.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
+console.log('dsps')
 console.log(BaseEntityLongId);
 
 @Entity('dsps')
@@ -19,6 +20,6 @@ export class Dsp extends BaseEntityLongId {
 	})
 	canLinkArtistProfile: boolean;
 
-	@OneToMany(() => OrganizationDsp, (OrganizationDsp) => OrganizationDsp.dsp)
-	organizationDsps: OrganizationDsp[];
+	// @OneToMany(() => OrganizationDsp, (OrganizationDsp) => OrganizationDsp.dsp)
+	// organizationDsps: OrganizationDsp[];
 }

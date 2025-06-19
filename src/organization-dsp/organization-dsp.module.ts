@@ -5,4 +5,4 @@ import { OrganizationDsp } from './entities/organization-dsp.entity';
 @Module({
 	imports: [TypeOrmModule.forFeature([OrganizationDsp])],
 })
-export class OrganizationDspModule {}
+export class OrganizationDspModule { }

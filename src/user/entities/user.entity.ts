@@ -22,12 +22,12 @@ export class User extends BaseEntityUserCreatorLongId {
 	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
 	userPermissions: UserPermission[];
 
-	@OneToOne(() => Organization, (organization) => organization.owner)
+	// @OneToOne(() => Organization, (organization) => organization.owner)
 	organization: Organization;
 
-	@OneToOne(
-		() => OrganizationUser,
-		(organizationUser) => organizationUser.user,
-	)
+	// @OneToOne(
+	// 	() => OrganizationUser,
+	// 	(organizationUser) => organizationUser.user,
+	// )
 	organizationUser: OrganizationUser;
 }
