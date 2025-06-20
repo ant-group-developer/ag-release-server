@@ -1,11 +1,11 @@
-import { BaseEntityLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUUID } from 'src/database/entities/database.entity';
 import { ReleaseLocalize } from 'src/release-localize/entities/release-localize.entity';
 import { TrackLanguage } from 'src/track-language/entities/track-language.entity';
 import { TrackLocalize } from 'src/track-localize/entities/track-localize.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('languages')
-export class Language extends BaseEntityLongId {
+export class Language extends BaseEntityUUID {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 

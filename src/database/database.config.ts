@@ -8,6 +8,7 @@
 
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { DBType } from './enum/database.type.enum';
 
 //   createTypeOrmOptions(): TypeOrmModuleOptions {
@@ -39,6 +40,7 @@ export const getTypeOrmConfig = (
 	entities: [__dirname + '/../**/*.entity{.ts,.js}'],
 	synchronize: true,
 	autoLoadEntities: true,
+	namingStrategy: new SnakeNamingStrategy(),
 	// timezone: DBConst.UTC_OFFSET,
 	logging: true,
 });

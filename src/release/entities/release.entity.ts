@@ -1,11 +1,12 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
-import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUserCreatorUUID } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Label } from 'src/label/entities/label.entity';
 import { ReleaseArtist } from 'src/release-artist/entities/release-artist.entity';
 import { ReleaseLanguage } from 'src/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/release-localize/entities/release-localize.entity';
 import { Track } from 'src/track/entities/track.entity';
+import { User } from 'src/user/entities/user.entity';
 import {
 	Column,
 	Entity,
@@ -17,9 +18,9 @@ import {
 import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
 
 @Entity('releases')
-export class Release extends BaseEntityUserCreatorLongId {
+export class Release extends BaseEntityUserCreatorUUID {
 	@Column({ type: 'varchar', length: 20, nullable: true })
-	upc: string;
+	upc: string | null;
 
 	@Column({
 		name: 'primary_genre_id',
@@ -32,12 +33,12 @@ export class Release extends BaseEntityUserCreatorLongId {
 	@JoinColumn({ name: 'primary_genre_id' })
 	primaryGenre: Genre;
 
-	@Column({ name: 'sub_genre_id', type: 'varchar', length: LENGTH_ID.GENRE })
-	subGenreId: string;
+	@Column({ type: 'varchar', length: LENGTH_ID.GENRE, nullable: true })
+	subGenreId: string | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
-	subGenre: Genre;
+	subGenre: Genre | null;
 
 	@Column({ name: 'label_id', type: 'varchar', length: LENGTH_ID.RELEASE })
 	labelId: string;
@@ -50,7 +51,7 @@ export class Release extends BaseEntityUserCreatorLongId {
 	title: string;
 
 	@Column({ type: 'varchar', length: 150, nullable: true })
-	version: string;
+	version: string | null;
 
 	@Column({ type: 'enum', enum: ReleaseStatus, default: ReleaseStatus.DRAFT })
 	status: ReleaseStatus;
@@ -76,4 +77,12 @@ export class Release extends BaseEntityUserCreatorLongId {
 		(releaseLocalize) => releaseLocalize.release,
 	)
 	releaseLocalizes: ReleaseLocalize[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

@@ -1,12 +1,21 @@
-import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUserCreatorUUID } from 'src/database/entities/database.entity';
 import { ReleaseArtist } from 'src/release-artist/entities/release-artist.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { User } from 'src/user/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('artist_roles')
-export class ArtistRole extends BaseEntityUserCreatorLongId {
-	@Column({ type: 'varchar', length: 100 })
+export class ArtistRole extends BaseEntityUserCreatorUUID {
+	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
-	releaseArtist: ReleaseArtist[];
+	releaseArtists: ReleaseArtist[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

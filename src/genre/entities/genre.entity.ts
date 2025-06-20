@@ -1,18 +1,18 @@
-import { BaseEntityShortId } from 'src/database/entities/database.entity';
+import { BaseEntityCustomId } from 'src/database/entities/database.entity';
 import { Release } from 'src/release/entities/release.entity';
 import { Track } from 'src/track/entities/track.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('genres')
-export class Genre extends BaseEntityShortId {
+export class Genre extends BaseEntityCustomId {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
 	@Column({ type: 'varchar', length: 100, nullable: true })
-	picture: string;
+	picture: string | null;
 
 	@Column({ type: 'varchar', length: 200, nullable: true })
-	description: string;
+	description: string | null;
 
 	// releases
 	@OneToMany(() => Release, (release) => release.primaryGenre)

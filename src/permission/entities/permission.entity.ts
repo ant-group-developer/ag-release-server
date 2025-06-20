@@ -1,9 +1,9 @@
-import { BaseEntityUserCreatorLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUserCreatorUUID } from 'src/database/entities/database.entity';
 import { UserPermission } from 'src/user-permission/entities/user-permission.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('permissions')
-export class Permission extends BaseEntityUserCreatorLongId {
+export class Permission extends BaseEntityUserCreatorUUID {
 	@Column({ type: 'varchar', length: 50 })
 	name: string;
 

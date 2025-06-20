@@ -1,10 +1,9 @@
-import { BaseEntityShortId } from 'src/database/entities/database.entity';
+import { BaseEntityCustomId } from 'src/database/entities/database.entity';
 import { ReleaseLanguage } from 'src/release-language/entities/release-language.entity';
 import { TrackLanguage } from 'src/track-language/entities/track-language.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
-
 @Entity('countries')
-export class Country extends BaseEntityShortId {
+export class Country extends BaseEntityCustomId {
 	@Column({ name: 'name', type: 'varchar', length: 100, unique: true })
 	name: string;
 
@@ -48,5 +47,5 @@ export class Country extends BaseEntityShortId {
 		() => ReleaseLanguage,
 		(releaseLanguage) => releaseLanguage.metadataLanguageCountry,
 	)
-	releaseLanguage: ReleaseLanguage[];
+	releaseLanguages: ReleaseLanguage[];
 }

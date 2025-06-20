@@ -1,12 +1,12 @@
 import { ArtistRole } from 'src/artist-role/entities/artist-role.entity';
 import { Artist } from 'src/artist/entities/artist.entity';
 import { LENGTH_ID } from 'src/database/const/database.const';
-import { BaseEntityLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUUID } from 'src/database/entities/database.entity';
 import { Release } from 'src/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
-@Entity('release-artist')
-export class ReleaseArtist extends BaseEntityLongId {
+@Entity('release_artist')
+export class ReleaseArtist extends BaseEntityUUID {
 	@Column({
 		name: 'artist_role_id',
 		type: 'varchar',
