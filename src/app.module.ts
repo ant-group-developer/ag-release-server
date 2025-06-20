@@ -13,6 +13,7 @@
 // export class AppModule {}
 
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { ArtistRoleModule } from './artist-role/artist-role.module';
 import { ArtistModule } from './artist/artist.module';
 import { AudioFileModule } from './audio-file/audio-file.module';
@@ -22,7 +23,6 @@ import { CountryModule } from './country/country.module';
 import { DatabaseModule } from './database/database.module';
 import { DspModule } from './dsp/dsp.module';
 import { GenreModule } from './genre/genre.module';
-import { JwtModule } from './jwt/jwt.module';
 import { LabelModule } from './label/label.module';
 import { LanguageModule } from './language/language.module';
 import { OrganizationDspModule } from './organization-dsp/organization-dsp.module';
@@ -43,31 +43,32 @@ import { UserModule } from './user/user.module';
 	imports: [
 		DatabaseModule,
 		ConfigCustomModule,
+
 		//
-		// ArtistModule,
-		// ArtistRoleModule,
-		// AudioFileModule,
-		// AuthModule,
-		// ConfigCustomModule,
-		// CountryModule,
-		// DspModule,
-		// GenreModule,
-		// JwtModule,
-		// LabelModule,
-		// LanguageModule,
-		// OrganizationModule,
-		// PermissionModule,
-		// ReleaseModule,
-		// ReleaseArtistModule,
-		// ReleaseLanguageModule,
-		// ReleaseLocalizeModule,
-		// TrackModule,
-		// TrackArtistModule,
-		// TrackLanguageModule,
-		// TrackLocalizeModule,
-		// UserModule,
+		ArtistModule,
+		ArtistRoleModule,
+		AudioFileModule,
+		AuthModule,
+		ConfigCustomModule,
+		CountryModule,
+		DspModule,
+		GenreModule,
+		JwtModule,
+		LabelModule,
+		LanguageModule,
+		OrganizationModule,
+		PermissionModule,
+		ReleaseModule,
+		ReleaseArtistModule,
+		ReleaseLanguageModule,
+		ReleaseLocalizeModule,
+		TrackModule,
+		TrackArtistModule,
+		TrackLanguageModule,
+		TrackLocalizeModule,
+		UserModule,
 		OrganizationDspModule,
-		// OrganizationUserModule,
+		OrganizationUserModule,
 	],
 })
-export class AppModule { }
+export class AppModule {}

@@ -1,15 +1,12 @@
 import { LENGTH_ID } from 'src/database/const/database.const';
-import { BaseEntityLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUUID } from 'src/database/entities/database.entity';
 import { OrganizationDsp } from 'src/organization-dsp/entities/organization-dsp.entity';
 import { OrganizationUser } from 'src/organization-user/entities/organization-user.entity';
 import { User } from 'src/user/entities/user.entity';
 import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 
-
-console.log('organizations1')
-
 @Entity('organizations')
-export class Organization extends BaseEntityLongId {
+export class Organization extends BaseEntityUUID {
 	@Column({ name: 'logo', type: 'varchar', length: 100 })
 	logo: string;
 
@@ -39,18 +36,18 @@ export class Organization extends BaseEntityLongId {
 	@Column({ name: 'owner_id', type: 'varchar', length: LENGTH_ID.USER })
 	ownerId: string;
 
-	// @OneToOne(() => User, (User) => User.organization)
+	@OneToOne(() => User, (User) => User.organization)
 	owner: User;
 
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive: boolean;
 
-	// @OneToMany(() => OrganizationDsp, (OrganizationDsp) => OrganizationDsp.dsp)
-	// organizationDsps: OrganizationDsp[];
+	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
+	organizationDsps: OrganizationDsp[];
 
-	// @OneToMany(
-	// 	() => OrganizationUser,
-	// 	(organizationUser) => organizationUser.organization,
-	// )
-	// organizationUsers: OrganizationUser[];
+	@OneToMany(
+		() => OrganizationUser,
+		(organizationUser) => organizationUser.organization,
+	)
+	organizationUsers: OrganizationUser[];
 }

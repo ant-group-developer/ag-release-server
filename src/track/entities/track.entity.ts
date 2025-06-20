@@ -1,5 +1,5 @@
 import { AudioFile } from 'src/audio-file/entities/audio-file.entity';
-import { BaseEntityShortId } from 'src/database/entities/database.entity';
+import { BaseEntityCustomId } from 'src/database/entities/database.entity';
 import { Genre } from 'src/genre/entities/genre.entity';
 import { Release } from 'src/release/entities/release.entity';
 import { TrackArtist } from 'src/track-artist/entities/track-artist.entity';
@@ -15,7 +15,7 @@ import {
 } from 'typeorm';
 
 @Entity('tracks')
-export class Track extends BaseEntityShortId {
+export class Track extends BaseEntityCustomId {
 	@Column({ type: 'varchar', length: 100 })
 	title: string;
 

@@ -1,12 +1,12 @@
 import { Country } from 'src/country/entities/country.entity';
 import { LENGTH_ID } from 'src/database/const/database.const';
-import { BaseEntityLongId } from 'src/database/entities/database.entity';
+import { BaseEntityUUID } from 'src/database/entities/database.entity';
 import { Language } from 'src/language/entities/language.entity';
 import { Track } from 'src/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('track_language')
-export class TrackLanguage extends BaseEntityLongId {
+export class TrackLanguage extends BaseEntityUUID {
 	@Column({
 		name: 'metadata_language_country_id',
 		length: LENGTH_ID.COUNTRY,
@@ -17,14 +17,16 @@ export class TrackLanguage extends BaseEntityLongId {
 	@JoinColumn({ name: 'metadata_language_country_id' })
 	metadataLanguageCountry: Country;
 
-	@Column({ name: 'audio_language_id', length: LENGTH_ID.LANGUAGE })
+	// @Column({ name: 'audio_language_id', length: LENGTH_ID.LANGUAGE })
+	@Column('uuid')
 	audioLanguageId: string;
 
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'audio_language_id' })
 	audioLanguage: Language;
 
-	@Column({ name: 'metadata_language_id', length: LENGTH_ID.LANGUAGE })
+	// @Column({ name: 'metadata_language_id', length: LENGTH_ID.LANGUAGE })
+	@Column('uuid')
 	metadataLanguageId: string;
 
 	@ManyToOne(() => Language)

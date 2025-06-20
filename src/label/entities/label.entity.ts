@@ -1,11 +1,10 @@
-import { BaseEntityUserCreatorShortId } from 'src/database/entities/database.entity';
+import { BaseEntityUserCreatorCustomId } from 'src/database/entities/database.entity';
 import { Release } from 'src/release/entities/release.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
-
-console.log('labels')
+import { User } from 'src/user/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('labels')
-export class Label extends BaseEntityUserCreatorShortId {
+export class Label extends BaseEntityUserCreatorCustomId {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
@@ -17,4 +16,12 @@ export class Label extends BaseEntityUserCreatorShortId {
 
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

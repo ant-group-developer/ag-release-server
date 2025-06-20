@@ -1,24 +1,35 @@
 import { nanoid } from 'nanoid';
-import { User } from 'src/user/entities/user.entity';
 import {
 	BeforeInsert,
 	Column,
 	CreateDateColumn,
-	JoinColumn,
-	ManyToOne,
 	PrimaryColumn,
+	PrimaryGeneratedColumn,
 	UpdateDateColumn,
 } from 'typeorm';
 import { LENGTH_ID } from '../const/database.const';
 
-
-console.log('BaseEntityDefault')
-
-class BaseEntityDefault {
+class BaseEntityCustomId {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: LENGTH_ID.BASE_DEFAULT,
+		length: LENGTH_ID.BASE_CUSTOM,
 	})
+	id: string;
+
+	@BeforeInsert()
+	generateId() {
+		this.id = nanoid(LENGTH_ID.BASE_CUSTOM);
+	}
+
+	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+	createdAt: Date;
+
+	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+	updatedAt: Date;
+}
+
+class BaseEntityUUID {
+	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
@@ -26,60 +37,26 @@ class BaseEntityDefault {
 
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
 	updatedAt: Date;
-
-	@BeforeInsert()
-	generateId() {
-		this.id = this.generateIdByLength(LENGTH_ID.BASE_DEFAULT);
-	}
-
-	public generateIdByLength(length: number): string {
-		return nanoid(length);
-	}
 }
 
-class BaseEntityShortId extends BaseEntityDefault {
+class BaseEntityUserCreatorCustomId {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: LENGTH_ID.BASE_SHORT,
+		length: LENGTH_ID.BASE_CUSTOM,
 	})
 	id: string;
 
 	@BeforeInsert()
-	generateId() {
-		this.id = this.generateIdByLength(LENGTH_ID.BASE_SHORT);
-	}
-}
-
-class BaseEntityLongId extends BaseEntityDefault {
-	@PrimaryColumn({
-		type: 'varchar',
-		length: LENGTH_ID.BASE_LONG,
-	})
-	id: string;
-
-	@BeforeInsert()
-	generateId() {
-		this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
-	}
-}
-
-class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
 	@Column({ name: 'creator_id', length: LENGTH_ID.USER })
 	creatorId: string;
-
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'creator_id' })
-	creator: User;
 
 	@Column({ name: 'modifier_id', length: LENGTH_ID.USER })
 	modifierId: string;
 
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'modifier_id' })
-	modifier: User;
-
 	@BeforeInsert()
-	setDefaultIds() {
+	generateId() {
+		this.id = nanoid(LENGTH_ID.BASE_CUSTOM);
+
 		if (!this.creatorId) {
 			this.creatorId = this.id;
 		}
@@ -87,42 +64,47 @@ class BaseEntityUserCreatorDefaultId extends BaseEntityDefault {
 			this.modifierId = this.id;
 		}
 	}
+
+	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+	createdAt: Date;
+
+	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+	updatedAt: Date;
 }
 
-class BaseEntityUserCreatorShortId extends BaseEntityUserCreatorDefaultId {
+class BaseEntityUserCreatorUUID {
 	@PrimaryColumn({
 		type: 'varchar',
-		length: LENGTH_ID.BASE_SHORT,
+		length: LENGTH_ID.BASE_UUID,
 	})
 	id: string;
 
-	@BeforeInsert()
-	generateId() {
-		this.id = this.generateIdByLength(LENGTH_ID.BASE_SHORT);
-	}
-}
+	@Column({ name: 'creator_id', length: LENGTH_ID.USER })
+	creatorId: string;
 
-class BaseEntityUserCreatorLongId extends BaseEntityUserCreatorDefaultId {
-	@PrimaryColumn({
-		type: 'varchar',
-		length: LENGTH_ID.BASE_LONG,
-	})
-	id: string;
+	@Column({ name: 'modifier_id', length: LENGTH_ID.USER })
+	modifierId: string;
 
 	@BeforeInsert()
 	generateId() {
+		if (!this.creatorId) {
+			this.creatorId = this.id;
+		}
 		if (!this.modifierId) {
-			this.id = this.generateIdByLength(LENGTH_ID.BASE_LONG);
+			this.modifierId = this.id;
 		}
 	}
+
+	@CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+	createdAt: Date;
+
+	@UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+	updatedAt: Date;
 }
 
-
 export {
-	BaseEntityDefault,
-	BaseEntityShortId,
-	BaseEntityLongId,
-	BaseEntityUserCreatorDefaultId,
-	BaseEntityUserCreatorShortId,
-	BaseEntityUserCreatorLongId,
+	BaseEntityCustomId,
+	BaseEntityUserCreatorCustomId,
+	BaseEntityUserCreatorUUID,
+	BaseEntityUUID,
 };
