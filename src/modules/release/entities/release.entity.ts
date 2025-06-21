@@ -20,7 +20,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 20, nullable: true })
 	upc: string | null;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
 	@ManyToOne(() => Genre)

@@ -6,7 +6,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('release_language')
 export class ReleaseLanguage extends BaseUUIDEntity {
-	@Column({ type: 'varchar' })
+	@Column({ type: 'uuid' })
 	metadataLanguageCountryId: string;
 
 	@ManyToOne(() => Country)

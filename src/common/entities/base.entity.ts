@@ -1,8 +1,14 @@
-import { generateId } from 'src/utils/generate-id';
-import { CreateDateColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+	CreateDateColumn,
+	PrimaryColumn,
+	PrimaryGeneratedColumn,
+	UpdateDateColumn,
+} from 'typeorm';
 
 export abstract class BaseUUIDEntity {
-	@PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
+	// @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
+	// @PrimaryColumn('uuid')
+	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@CreateDateColumn({ type: 'timestamptz' })
@@ -13,7 +19,8 @@ export abstract class BaseUUIDEntity {
 }
 
 export abstract class BaseCustomIDEntity {
-	@PrimaryColumn({ default: generateId(), length: 10 })
+	// @PrimaryColumn({ default: generateId(), length: 10 })
+	@PrimaryColumn({ type: 'varchar', length: 10 })
 	id: string;
 
 	@CreateDateColumn({ type: 'timestamptz' })

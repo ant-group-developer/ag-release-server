@@ -27,7 +27,7 @@ export class TrackLanguage extends BaseUUIDEntity {
 	@JoinColumn({ name: 'metadata_language_id' })
 	metadataLanguage: Language;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
 
 	@OneToOne(() => Track, (track) => track.trackLanguage)

@@ -6,39 +6,79 @@ import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 
 @Entity('organizations')
 export class Organization extends BaseUUIDEntity {
-	@Column({ name: 'logo', type: 'varchar', length: 100 })
+	@Column({
+		name: 'logo',
+		type: 'varchar',
+		length: 100,
+		comment: 'Logo of the organization',
+	})
 	logo: string;
 
-	@Column({ name: 'icon', type: 'varchar', length: 100 })
+	@Column({
+		name: 'icon',
+		type: 'varchar',
+		length: 100,
+		comment: 'Icon of the organization',
+	})
 	icon: string;
 
-	// Example: ANT Music
-	@Column({ name: 'name', type: 'varchar', length: 100 })
+	@Column({
+		name: 'name',
+		type: 'varchar',
+		length: 100,
+		comment: 'Example: ANT Music',
+	})
 	name: string;
 
-	// Example: ANT Music - Distribution Unlimited Music All Platform
-	@Column({ name: 'title', type: 'varchar', length: 100 })
+	@Column({
+		name: 'title',
+		type: 'varchar',
+		length: 100,
+		comment:
+			'Example: ANT Music - Distribution Unlimited Music All Platform',
+	})
 	title: string;
 
-	// The domain must be without http:// or https://
-	@Column({ name: 'domain', type: 'varchar', length: 50 })
+	@Column({
+		name: 'domain',
+		type: 'varchar',
+		length: 50,
+		comment: 'The domain must be without http:// or https://',
+	})
 	domain: string;
 
-	// This email will be used to send notifications
-	@Column({ name: 'email', type: 'varchar', length: 50 })
+	@Column({
+		name: 'email',
+		type: 'varchar',
+		length: 50,
+		comment: 'This email will be used to send notifications',
+	})
 	email: string;
 
-	// Example: #4540BF
-	@Column({ name: 'primary_color', type: 'varchar', length: 10 })
+	@Column({
+		name: 'primary_color',
+		type: 'varchar',
+		length: 10,
+		comment: 'Example: #4540BF',
+	})
 	primaryColor: string;
 
-	@Column({ name: 'owner_id', type: 'uuid' })
+	@Column({
+		name: 'owner_id',
+		type: 'uuid',
+		comment: 'ID of the organization owner',
+	})
 	ownerId: string;
 
-	@OneToOne(() => User, (User) => User.organization)
+	@OneToOne(() => User, (user) => user.organization)
 	owner: User;
 
-	@Column({ name: 'is_active', type: 'boolean', default: true })
+	@Column({
+		name: 'is_active',
+		type: 'boolean',
+		default: true,
+		comment: 'Indicates if the organization is active',
+	})
 	isActive: boolean;
 
 	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
