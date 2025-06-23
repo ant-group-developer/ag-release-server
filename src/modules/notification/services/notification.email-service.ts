@@ -17,7 +17,7 @@ export class EmailService {
 		});
 	}
 
-	async sendMail(data: { to: string[]; subject: string; html: string }) {
+	async sendMessage(data: { to: string[]; subject: string; html: string }) {
 		const { to, subject, html } = data;
 
 		try {

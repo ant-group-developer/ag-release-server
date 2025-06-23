@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from './notification.email-service';
 import { TelegramService } from './notification.telegram-service';
+import { NotificationUserService } from './notification.user-service';
 
 @Injectable()
 export class NotificationService {
@@ -9,6 +10,7 @@ export class NotificationService {
 		private readonly emailService: EmailService,
 		private readonly telegramService: TelegramService,
 		private readonly configService: ConfigService,
+		private readonly notificationUserService: NotificationUserService,
 	) {}
 
 	async sendNotificationBackup(data: {
@@ -45,10 +47,27 @@ export class NotificationService {
 			<pre style="background:#eee;padding:10px;">${error}</pre>
 		`;
 
-		await this.emailService.sendMail({
-			to: [this.configService.get<string>('EMAIL_USER')!],
+		const listUserDev = await this.notificationUserService.getListUserDev();
+		let listEmails: string[] = [];
+		let listTelegramIds: string[] = [];
+
+		listUserDev.forEach((user) => {
+			listEmails.push(user.email);
+
+			if (user.telegramId) {
+				listTelegramIds.push(user.telegramId);
+			}
+		});
+
+		await this.emailService.sendMessage({
+			to: listEmails,
 			subject,
 			html,
+		});
+
+		await this.telegramService.sendMessages({
+			telegramIds: listTelegramIds,
+			message: html,
 		});
 	}
 }

@@ -20,6 +20,9 @@ export class User extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 50, unique: true })
 	email: string;
 
+	@Column({ type: 'varchar', nullable: true })
+	telegramId: string | null;
+
 	@Column({ type: 'enum', enum: UserType, default: UserType.USER })
 	type: UserType;
 
