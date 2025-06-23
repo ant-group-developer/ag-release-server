@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseConfigService } from 'src/common/config/database.config';
+import { NotificationModule } from '../notification/notification.module';
 import { DatabaseController } from './database.controller';
 import { DatabaseBackupService } from './services/database.backup-service';
 import { DatabaseInitService } from './services/database.init-service';
@@ -13,6 +14,8 @@ import { DatabaseInitService } from './services/database.init-service';
 			inject: [ConfigService],
 			useClass: DatabaseConfigService,
 		}),
+
+		NotificationModule,
 	],
 	controllers: [DatabaseController],
 	providers: [DatabaseInitService, DatabaseBackupService],

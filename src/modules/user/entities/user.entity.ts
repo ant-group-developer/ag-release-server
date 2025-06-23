@@ -1,12 +1,19 @@
-import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { OrganizationUser } from 'src/modules/organization-user/entities/organization-user.entity';
 import { Organization } from 'src/modules/organization/entities/organization.entity';
 import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
-import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 import { UserType } from '../enum/user.enum';
 
 @Entity('users')
-export class User extends BaseUserTrackedUUIDEntity {
+export class User extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 100 })
 	name: string;
 
@@ -30,4 +37,18 @@ export class User extends BaseUserTrackedUUIDEntity {
 		(organizationUser) => organizationUser.user,
 	)
 	organizationUser: OrganizationUser;
+
+	@Column({ type: 'uuid', nullable: true })
+	creatorId: string;
+
+	@Column({ type: 'uuid', nullable: true })
+	modifierId: string;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User | null;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User | null;
 }

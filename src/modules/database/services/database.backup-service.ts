@@ -1,6 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { exec } from 'child_process';
+import { exec as execCallback } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { NotificationService } from 'src/modules/notification/services/notification.service';
+import { promisify } from 'util';
 
 @Injectable()
 export class DatabaseBackupService {
@@ -13,7 +18,10 @@ export class DatabaseBackupService {
 		database: string;
 	};
 
-	constructor(private readonly configService: ConfigService) {
+	constructor(
+		private readonly configService: ConfigService,
+		private readonly notificationService: NotificationService,
+	) {
 		this.configDB = {
 			type: 'postgres',
 			host: this.configService.get<string>('DB_HOST')!,
@@ -25,55 +33,52 @@ export class DatabaseBackupService {
 	}
 
 	async exportBackup() {
-		const backupPath = 'C:\\path\\to\\backup\\my.sql';
+		const exec = promisify(execCallback);
 
-		const setPasswordCommand = `set PGPASSWORD=${this.configDB.password}`;
-		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > ${backupPath}`;
-		// const compressBackupCommand = `gzip ${backupPath}`;
-		// const deleteUncompressedBackupCommand = `del  ${backupPath}`;
+		const now = new Date().toISOString().replace(/[:.]/g, '-');
+		const filename = `${now}_backup_ant_release.sql`;
 
-		const commands = [
-			setPasswordCommand,
-			exportDatabaseCommand,
-			// compressBackupCommand,
-			// deleteUncompressedBackupCommand,
-		];
+		const backupDir = path.join(os.homedir(), 'backups');
+		const backupPath = path.join(backupDir, filename);
 
-		const command = commands.join('&&');
+		if (!fs.existsSync(backupDir)) {
+			fs.mkdirSync(backupDir, { recursive: true });
+		}
 
-		exec(command, (err, stdout, stderr) => {
-			if (err) {
-				console.error(`exec error: ${err}`);
-				return;
-			}
+		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
 
-			// Upload to Google Drive
-			const uploadCommand = `rclone copy "C:\\path\\to\\backup\\my.sql" gdrive:/backups/ --progress`;
-			exec(uploadCommand, (uploadErr, uploadStdout, uploadStderr) => {
-				if (uploadErr) {
-					console.error(`Upload to GDrive failed: ${uploadErr}`);
-					return;
-				}
-				if (uploadStderr) {
-					console.error(`stderr during upload: ${uploadStderr}`);
-					return;
-				}
-				console.log(`Upload to GDrive successful: ${uploadStdout}`);
+		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+
+		try {
+			// Backup database
+			await exec(exportDatabaseCommand, {
+				env: { ...process.env, PGPASSWORD: this.configDB.password },
+				shell: shellPath,
 			});
 
-			// Upload to Google Cloud Storage (GCS)
-			// const gcsUploadCommand = `rclone copy "C:\\path\\to\\backup\\my.sql" gcs:/your-bucket-name/backups/ --progress`;
-			// exec(gcsUploadCommand, (gcsErr, gcsStdout, gcsStderr) => {
-			// 	if (gcsErr) {
-			// 		console.error(`Upload to GCS failed: ${gcsErr}`);
-			// 		return;
-			// 	}
-			// 	if (gcsStderr) {
-			// 		console.error(`stderr during GCS upload: ${gcsStderr}`);
-			// 		return;
-			// 	}
-			// 	console.log(`Upload to GCS successful: ${gcsStdout}`);
-			// });
-		});
+			// Upload
+			const gdriveUploadCommand = `rclone copy "${backupPath}" gdrive:/backups/ --progress`;
+			await exec(gdriveUploadCommand, { shell: shellPath });
+
+			const gcsUploadCommand = `rclone copy "${backupPath}" gcs:/your-bucket-name/backups/ --progress`;
+			await exec(gcsUploadCommand, {
+				shell: shellPath,
+			});
+
+			this.notificationService.sendNotificationBackup({
+				status: true,
+				filename,
+			});
+
+			return 'Database Backup Successful';
+		} catch (err) {
+			this.notificationService.sendNotificationBackup({
+				status: false,
+				filename,
+				error: err instanceof Error ? err.message : String(err),
+			});
+
+			throw new BadRequestException('Database backup failed');
+		}
 	}
 }

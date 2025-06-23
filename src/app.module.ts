@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import appConfig from './common/config/app.config';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
@@ -67,5 +69,7 @@ import { UserModule } from './modules/user/user.module';
 		UserPermissionModule,
 		ScheduleModule,
 	],
+	controllers: [AppController],
+	providers: [AppService],
 })
 export class AppModule {}

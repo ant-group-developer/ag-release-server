@@ -13,12 +13,13 @@ export class ScheduleService {
 	handleTest() {
 		// console.log('This task runs every second');
 		// this.databaseBackupService.exportBackup();
+		// this.notificationService.sendNotificationBackup();
 	}
 
 	@Cron(CronExpression.EVERY_MINUTE)
 	handleCron() {
 		console.log('This task runs every minute');
-		this.databaseBackupService.exportBackup();
+		// this.databaseBackupService.exportBackup();
 	}
 
 	@Cron('0 3 * * *')

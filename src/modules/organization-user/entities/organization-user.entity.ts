@@ -18,4 +18,12 @@ export class OrganizationUser extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => Organization)
 	@JoinColumn({ name: 'organization_id' })
 	organization: Organization;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

@@ -2,7 +2,14 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
 import { OrganizationUser } from 'src/modules/organization-user/entities/organization-user.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 
 @Entity('organizations')
 export class Organization extends BaseUUIDEntity {
@@ -89,4 +96,12 @@ export class Organization extends BaseUUIDEntity {
 		(organizationUser) => organizationUser.organization,
 	)
 	organizationUsers: OrganizationUser[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }
