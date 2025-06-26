@@ -1,4 +1,6 @@
+import { nanoid } from 'nanoid';
 import {
+	BeforeInsert,
 	CreateDateColumn,
 	PrimaryColumn,
 	PrimaryGeneratedColumn,
@@ -28,4 +30,9 @@ export abstract class BaseCustomIDEntity {
 
 	@UpdateDateColumn({ type: 'timestamptz' })
 	updatedAt: Date;
+
+	@BeforeInsert()
+	generateId() {
+		this.id = nanoid(10);
+	}
 }

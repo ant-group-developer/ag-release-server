@@ -1,68 +1,58 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
-	NotFoundException,
 	Param,
 	Post,
+	Put,
+	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateUserDto } from './dto/user.dto';
+import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import {
+	CreateUserDto,
+	QueryGetListUserDto,
+	UpdateUserDto,
+} from './dto/user.dto';
+import { User } from './entities/user.entity';
 import { UserService } from './user.service';
 
-@ApiTags('User')
-@Controller('user')
+@Controller('User')
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new user' })
-	@ApiResponse({
-		status: 201,
-		description: 'User successfully created',
-	})
-	@ApiResponse({
-		status: 400,
-		description: 'Invalid input data',
-	})
-	async createUser(@Body() data: CreateUserDto) {
-		await this.userService.createUser(data);
+	async create(
+		@Body() createUserDto: CreateUserDto,
+	): Promise<ResponseSuccessDto<User>> {
+		const result = await this.userService.create(createUserDto);
+		return new ResponseSuccessDto({ data: result });
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a user by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved user',
-	})
-	@ApiResponse({
-		status: 404,
-		description: 'User not found',
-	})
-	@ApiParam({ name: 'id', type: String, description: 'The ID of the user' })
-	async findOne(@Param('id') id: string) {
-		const user = await this.userService.findUserById(id);
-		if (!user) {
-			throw new NotFoundException('User not found');
-		}
-		return user;
+	async findOne(@Param('id') id: string): Promise<ResponseSuccessDto<User>> {
+		const result = await this.userService.findOne(id);
+		return new ResponseSuccessDto({ data: result });
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of all users' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved list of users',
-	})
-	@ApiResponse({
-		status: 404,
-		description: 'No users found',
-	})
-	async getList() {
-		const users = await this.userService.getList();
-		if (!users || users.length === 0) {
-			throw new NotFoundException('No users found');
-		}
-		return users;
+	async getList(
+		@Query() query: QueryGetListUserDto,
+	): Promise<ResponseSuccessDto<PageDto<User>>> {
+		const result = await this.userService.getList(query);
+		return new ResponseSuccessDto({ data: result });
+	}
+
+	@Put(':id')
+	async update(
+		@Param('id') id: string,
+		@Body() updateUserDto: UpdateUserDto,
+	): Promise<User> {
+		return await this.userService.update(id, updateUserDto);
+	}
+
+	@Delete(':id')
+	async remove(@Param('id') id: string): Promise<void> {
+		return await this.userService.remove(id);
 	}
 }

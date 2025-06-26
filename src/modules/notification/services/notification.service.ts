@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from './notification.email-service';
-import { TelegramService } from './notification.telegram-service';
 import { NotificationUserService } from './notification.user-service';
 
 @Injectable()
 export class NotificationService {
 	constructor(
 		private readonly emailService: EmailService,
-		private readonly telegramService: TelegramService,
+		// private readonly telegramService: TelegramService,
 		private readonly configService: ConfigService,
 		private readonly notificationUserService: NotificationUserService,
 	) {}
@@ -65,9 +64,9 @@ export class NotificationService {
 			html,
 		});
 
-		await this.telegramService.sendMessages({
-			telegramIds: listTelegramIds,
-			message: html,
-		});
+		// await this.telegramService.sendMessages({
+		// 	telegramIds: listTelegramIds,
+		// 	message: html,
+		// });
 	}
 }

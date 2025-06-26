@@ -33,13 +33,13 @@ export class User extends BaseUUIDEntity {
 	userPermissions: UserPermission[];
 
 	@OneToOne(() => Organization, (organization) => organization.owner)
-	organization: Organization;
+	organization: Organization | null;
 
 	@OneToOne(
 		() => OrganizationUser,
 		(organizationUser) => organizationUser.user,
 	)
-	organizationUser: OrganizationUser;
+	organizationUser: OrganizationUser | null;
 
 	@Column({ type: 'uuid', nullable: true })
 	creatorId: string;

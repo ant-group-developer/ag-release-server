@@ -1,7 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import axios from 'axios';
 import * as dotenv from 'dotenv';
 import basicAuth from 'express-basic-auth';
 dotenv.config();
@@ -46,29 +45,29 @@ export const setupSwagger = (app: INestApplication): void => {
 		swaggerOptions: { persistAuthorization: true },
 	});
 
-	const postmanJson = convertSwaggerToPostman(document);
+	// const postmanJson = convertSwaggerToPostman(document);
 
-	axios
-		.put(
-			`https://api.getpostman.com/collections/${process.env.POSTMAN_COLLECTION_UID}`,
-			{
-				collection: postmanJson,
-			},
-			{
-				headers: {
-					'x-api-key': process.env.POSTMAN_API_KEY,
-				},
-			},
-		)
-		.then((response) => {
-			console.log('Postman sync successful!', response.data);
-		})
-		.catch((err) => {
-			console.error(
-				'Error syncing with Postman:',
-				err.response?.data || err.message,
-			);
-		});
+	// axios
+	// 	.put(
+	// 		`https://api.getpostman.com/collections/${process.env.POSTMAN_COLLECTION_UID}`,
+	// 		{
+	// 			collection: postmanJson,
+	// 		},
+	// 		{
+	// 			headers: {
+	// 				'x-api-key': process.env.POSTMAN_API_KEY,
+	// 			},
+	// 		},
+	// 	)
+	// 	.then((response) => {
+	// 		console.log('Postman sync successful!', response.data);
+	// 	})
+	// 	.catch((err) => {
+	// 		console.error(
+	// 			'Error syncing with Postman:',
+	// 			err.response?.data || err.message,
+	// 		);
+	// 	});
 };
 
 // function convertSwaggerToPostman(swaggerJson: any) {
