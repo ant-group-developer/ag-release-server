@@ -8,7 +8,7 @@ export class Genre extends BaseCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 100, nullable: true })
+	@Column({ type: 'varchar', length: 1000, nullable: true })
 	picture: string | null;
 
 	@Column({ type: 'varchar', length: 200, nullable: true })

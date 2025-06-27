@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import { GenreError } from './constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -17,6 +18,8 @@ export class GenreService {
 	) {}
 
 	async create(createGenreDto: CreateGenreDto): Promise<Genre> {
+		await this.validate({ name: createGenreDto.name });
+
 		const genre = this.genreRepo.create(createGenreDto);
 		return await this.genreRepo.save(genre);
 	}
@@ -55,5 +58,15 @@ export class GenreService {
 
 	async remove(id: string): Promise<void> {
 		await this.genreRepo.delete(id);
+	}
+
+	async validate({ name }: { name: string }) {
+		const genre = await this.genreRepo.findOne({ where: { name } });
+
+		if (genre) {
+			throw new ResponseError({
+				messageCode: GenreError.duplicateNameGenre,
+			});
+		}
 	}
 }
