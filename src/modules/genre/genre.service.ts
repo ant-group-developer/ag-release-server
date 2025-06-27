@@ -40,7 +40,7 @@ export class GenreService {
 
 		return new PageDto({
 			items: genres,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

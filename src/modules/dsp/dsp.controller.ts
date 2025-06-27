@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { DspService } from './dsp.service';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
 import { Dsp } from './entities/dsp.entity';
@@ -20,23 +20,23 @@ export class DspController {
 	@Post()
 	async create(
 		@Body() createDspDto: CreateDspDto,
-	): Promise<ResponseSuccessDto<Dsp>> {
+	): Promise<ResponseSuccess<Dsp>> {
 		const result = await this.dspService.create(createDspDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccessDto<Dsp>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
 		const result = await this.dspService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListDspDto,
-	): Promise<ResponseSuccessDto<PageDto<Dsp>>> {
+	): Promise<ResponseSuccess<PageDto<Dsp>>> {
 		const result = await this.dspService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')

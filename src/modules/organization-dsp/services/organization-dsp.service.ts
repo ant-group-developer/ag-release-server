@@ -59,7 +59,7 @@ export class OrganizationDspService {
 
 		return new PageDto({
 			items: organizationDsps,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

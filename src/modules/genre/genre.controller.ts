@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -24,23 +24,23 @@ export class GenreController {
 	@Post()
 	async create(
 		@Body() createGenreDto: CreateGenreDto,
-	): Promise<ResponseSuccessDto<Genre>> {
+	): Promise<ResponseSuccess<Genre>> {
 		const result = await this.genreService.create(createGenreDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccessDto<Genre>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Genre>> {
 		const result = await this.genreService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListGenreDto,
-	): Promise<ResponseSuccessDto<PageDto<Genre>>> {
+	): Promise<ResponseSuccess<PageDto<Genre>>> {
 		const result = await this.genreService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')

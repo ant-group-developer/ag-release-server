@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
@@ -24,23 +24,23 @@ export class LabelController {
 	@Post()
 	async create(
 		@Body() createLabelDto: CreateLabelDto,
-	): Promise<ResponseSuccessDto<Label>> {
+	): Promise<ResponseSuccess<Label>> {
 		const result = await this.labelService.create(createLabelDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccessDto<Label>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Label>> {
 		const result = await this.labelService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListLabelDto,
-	): Promise<ResponseSuccessDto<PageDto<Label>>> {
+	): Promise<ResponseSuccess<PageDto<Label>>> {
 		const result = await this.labelService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')

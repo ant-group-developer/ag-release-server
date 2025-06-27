@@ -40,7 +40,7 @@ export class UserService {
 
 		return new PageDto({
 			items: users,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

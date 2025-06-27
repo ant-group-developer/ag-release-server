@@ -4,57 +4,58 @@ import {
 	Delete,
 	Get,
 	Param,
+	Patch,
 	Post,
-	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
-import { ArtistService } from './artist.service';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
 	UpdateArtistDto,
 } from './dto/artist.dto';
 import { Artist } from './entities/artist.entity';
+import { ArtistService } from './services/artist.service';
 
-@Controller('asrtist')
+@Controller('artist')
 export class ArtistController {
 	constructor(private readonly artistService: ArtistService) {}
 
 	@Post()
 	async create(
 		@Body() createArtistDto: CreateArtistDto,
-	): Promise<ResponseSuccessDto<Artist>> {
+	): Promise<ResponseSuccess<Artist>> {
 		const result = await this.artistService.create(createArtistDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(
-		@Param('id') id: string,
-	): Promise<ResponseSuccessDto<Artist>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Artist>> {
 		const result = await this.artistService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListArtistDto,
-	): Promise<ResponseSuccessDto<PageDto<Artist>>> {
+	): Promise<ResponseSuccess<PageDto<Artist>>> {
 		const result = await this.artistService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
-	@Put(':id')
+	@Patch(':id')
 	async update(
 		@Param('id') id: string,
 		@Body() updateArtistDto: UpdateArtistDto,
-	): Promise<Artist> {
-		return await this.artistService.update(id, updateArtistDto);
+	): Promise<ResponseSuccess<Artist>> {
+		const result = await this.artistService.update(id, updateArtistDto);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')
-	async remove(@Param('id') id: string): Promise<void> {
-		return await this.artistService.remove(id);
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.artistService.remove(id);
+
+		return new ResponseSuccess();
 	}
 }

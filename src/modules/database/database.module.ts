@@ -4,8 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseConfigService } from 'src/common/config/database.config';
 import { NotificationModule } from '../notification/notification.module';
 import { DatabaseController } from './database.controller';
-import { DatabaseBackupService } from './services/database.backup-service';
-import { DatabaseInitService } from './services/database.init-service';
+import { DatabaseBackupService } from './services/database.backup.service';
+import { DatabaseInitService } from './services/database.init.service';
 
 @Module({
 	imports: [

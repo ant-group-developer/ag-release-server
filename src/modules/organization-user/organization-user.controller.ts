@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateOrganizationUserDto,
 	QueryGetListOrganizationUserDto,
@@ -26,27 +26,27 @@ export class OrganizationUserController {
 	@Post()
 	async create(
 		@Body() createOrganizationUserDto: CreateOrganizationUserDto,
-	): Promise<ResponseSuccessDto<OrganizationUser>> {
+	): Promise<ResponseSuccess<OrganizationUser>> {
 		const result = await this.organizationUserService.create(
 			createOrganizationUserDto,
 		);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
 	async findOne(
 		@Param('id') id: string,
-	): Promise<ResponseSuccessDto<OrganizationUser>> {
+	): Promise<ResponseSuccess<OrganizationUser>> {
 		const result = await this.organizationUserService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListOrganizationUserDto,
-	): Promise<ResponseSuccessDto<PageDto<OrganizationUser>>> {
+	): Promise<ResponseSuccess<PageDto<OrganizationUser>>> {
 		const result = await this.organizationUserService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')

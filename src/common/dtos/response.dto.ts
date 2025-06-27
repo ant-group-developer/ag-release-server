@@ -1,9 +1,13 @@
 // src/common/dtos/response.dto.ts
 
+import { HttpException } from '@nestjs/common';
 import {
-	DEFAULT_CODE_SUCCESS_MESSAGE,
-	DEFAULT_SUCCESS_MESSAGE,
-	DEFAULT_SUCCESS_STATUS_CODE,
+	ERROR_MESSAGE_CODE_DEFAULT,
+	ERROR_MESSAGE_DEFAULT,
+	ERROR_STATUS_CODE_DEFAULT,
+	SUCCESS_MESSAGE_CODE_DEFAULT,
+	SUCCESS_MESSAGE_DEFAULT,
+	SUCCESS_STATUS_CODE_DEFAULT,
 } from '../constants/message.constants';
 
 /**
@@ -19,7 +23,7 @@ import {
 // }
 
 /**
- * Metadata for paginated responses.
+ * metadata for paginated responses.
  */
 // export class PaginationMeta {
 // 	/** Total number of items across all pages. */
@@ -63,16 +67,16 @@ import {
 // 	}
 // }
 
-export class ResponseSuccessDto<T> {
+export class ResponseSuccess<T> {
 	statusCode: number;
 	message: string;
 	messageCode: string;
 	data?: T;
 
 	constructor({
-		statusCode = DEFAULT_SUCCESS_STATUS_CODE,
-		message = DEFAULT_SUCCESS_MESSAGE,
-		messageCode = DEFAULT_CODE_SUCCESS_MESSAGE,
+		statusCode = SUCCESS_STATUS_CODE_DEFAULT,
+		message = SUCCESS_MESSAGE_DEFAULT,
+		messageCode = SUCCESS_MESSAGE_CODE_DEFAULT,
 		data,
 	}: {
 		statusCode?: number;
@@ -87,7 +91,7 @@ export class ResponseSuccessDto<T> {
 	}
 }
 
-export class MetaData {
+export class Metadata {
 	currentPage: number;
 	pageSize: number;
 	totalItems: number;
@@ -97,7 +101,7 @@ export class MetaData {
 		currentPage = 1,
 		pageSize = 0,
 		totalItems = 0,
-	}: Partial<MetaData> = {}) {
+	}: Partial<Metadata> = {}) {
 		this.currentPage = currentPage;
 		this.pageSize = pageSize;
 		this.totalItems = totalItems;
@@ -107,20 +111,52 @@ export class MetaData {
 
 export class PageDto<T> {
 	items: T[];
-	metaData: MetaData;
+	metadata: Metadata;
 
 	constructor({
 		items,
-		metaData,
+		metadata,
 	}: {
 		items: T[];
-		metaData?: Partial<MetaData>;
+		metadata?: Partial<Metadata>;
 	}) {
 		this.items = items;
-		this.metaData = new MetaData({
-			currentPage: metaData?.currentPage ?? 1,
-			pageSize: metaData?.pageSize ?? items.length,
-			totalItems: metaData?.totalItems ?? items.length,
+		this.metadata = new Metadata({
+			currentPage: metadata?.currentPage ?? 1,
+			pageSize: metadata?.pageSize ?? items.length,
+			totalItems: metadata?.totalItems ?? items.length,
 		});
+	}
+}
+
+export class ResponseError extends HttpException {
+	statusCode: number;
+	message: string;
+	messageCode: string;
+	// data?: T;
+
+	constructor({
+		statusCode = ERROR_STATUS_CODE_DEFAULT,
+		message = ERROR_MESSAGE_DEFAULT,
+		messageCode = ERROR_MESSAGE_CODE_DEFAULT,
+		// data,
+	}: {
+		statusCode?: number;
+		message?: string;
+		messageCode?: string;
+		// data?: T;
+	}) {
+		const response = {
+			statusCode,
+			message,
+			messageCode,
+			// data,
+		};
+
+		super(response, statusCode);
+
+		// this.statusCode = statusCode;
+		// this.message = message;
+		// this.data = data;
 	}
 }

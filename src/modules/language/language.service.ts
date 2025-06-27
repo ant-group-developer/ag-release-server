@@ -40,7 +40,7 @@ export class LanguageService {
 
 		return new PageDto({
 			items: languages,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

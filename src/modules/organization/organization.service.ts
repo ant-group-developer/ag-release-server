@@ -50,7 +50,7 @@ export class OrganizationService {
 
 		return new PageDto({
 			items: organizations,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

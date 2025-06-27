@@ -45,7 +45,7 @@ export class PermissionService {
 
 		return new PageDto({
 			items: permissions,
-			metaData: {
+			metadata: {
 				currentPage: page,
 				pageSize,
 				totalItems,

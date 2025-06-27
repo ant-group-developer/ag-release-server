@@ -1,7 +1,7 @@
-export const DEFAULT_SUCCESS_MESSAGE = 'success';
-export const DEFAULT_ERROR_MESSAGE = 'error';
+export const SUCCESS_STATUS_CODE_DEFAULT = 200;
+export const SUCCESS_MESSAGE_DEFAULT = 'Success';
+export const SUCCESS_MESSAGE_CODE_DEFAULT = 'success';
 
-export const DEFAULT_CODE_SUCCESS_MESSAGE = 'success';
-
-export const DEFAULT_SUCCESS_STATUS_CODE = 200;
-export const DEFAULT_ERROR_STATUS_CODE = 500;
+export const ERROR_STATUS_CODE_DEFAULT = 400;
+export const ERROR_MESSAGE_DEFAULT = 'Error';
+export const ERROR_MESSAGE_CODE_DEFAULT = 'error';

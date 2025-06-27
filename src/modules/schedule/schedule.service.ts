@@ -1,7 +1,7 @@
 // schedule.service.ts
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DatabaseBackupService } from '../database/services/database.backup-service';
+import { DatabaseBackupService } from '../database/services/database.backup.service';
 
 @Injectable()
 export class ScheduleService {

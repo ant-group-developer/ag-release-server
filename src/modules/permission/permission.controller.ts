@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreatePermissionDto,
 	QueryGetListPermissionDto,
@@ -24,25 +24,25 @@ export class PermissionController {
 	@Post()
 	async create(
 		@Body() createPermissionDto: CreatePermissionDto,
-	): Promise<ResponseSuccessDto<Permission>> {
+	): Promise<ResponseSuccess<Permission>> {
 		const result = await this.PermissionService.create(createPermissionDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
 	async findOne(
 		@Param('id') id: string,
-	): Promise<ResponseSuccessDto<Permission>> {
+	): Promise<ResponseSuccess<Permission>> {
 		const result = await this.PermissionService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListPermissionDto,
-	): Promise<ResponseSuccessDto<PageDto<Permission>>> {
+	): Promise<ResponseSuccess<PageDto<Permission>>> {
 		const result = await this.PermissionService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')

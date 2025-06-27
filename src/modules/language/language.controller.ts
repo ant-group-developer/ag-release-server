@@ -8,7 +8,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateLanguageDto,
 	QueryGetListLanguageDto,
@@ -24,25 +24,23 @@ export class LanguageController {
 	@Post()
 	async create(
 		@Body() createLanguageDto: CreateLanguageDto,
-	): Promise<ResponseSuccessDto<Language>> {
+	): Promise<ResponseSuccess<Language>> {
 		const result = await this.languageService.create(createLanguageDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(
-		@Param('id') id: string,
-	): Promise<ResponseSuccessDto<Language>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Language>> {
 		const result = await this.languageService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListLanguageDto,
-	): Promise<ResponseSuccessDto<PageDto<Language>>> {
+	): Promise<ResponseSuccess<PageDto<Language>>> {
 		const result = await this.languageService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')
