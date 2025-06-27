@@ -23,8 +23,8 @@ export class Genre extends BaseCustomIDEntity {
 
 	// tracks
 	@OneToMany(() => Track, (track) => track.primaryGenre)
-	primaryGenreTracks: Release[];
+	primaryGenreTracks: Track[];
 
 	@OneToMany(() => Track, (track) => track.subGenre)
-	subGenreTracks: Release[];
+	subGenreTracks: Track[];
 }

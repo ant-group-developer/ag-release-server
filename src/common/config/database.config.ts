@@ -25,6 +25,8 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 
 			// Tắt synchronize, dùng migration hoặc sql khi cần thay đổi db
 			synchronize: true,
+
+			// logging: true,
 		};
 	}
 }

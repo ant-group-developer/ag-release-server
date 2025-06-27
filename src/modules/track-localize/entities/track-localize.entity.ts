@@ -11,7 +11,7 @@ export class TrackLocalize extends BaseUUIDEntity {
 	@ManyToOne(() => Language, (language) => language.trackLocalizes)
 	language: Language;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
 
 	@ManyToOne(() => Track, (track) => track.trackLocalizes)

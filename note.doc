@@ -15,3 +15,17 @@ release_language
 countries
 phonecode => phone_code
 
+21/6
+
+export abstract class BaseCustomIDEntity {
+	@PrimaryColumn({ default: generateId(), length: 10 })
+	id: string;
+
+	@CreateDateColumn({ type: 'timestamptz' })
+	createdAt: Date;
+
+	@UpdateDateColumn({ type: 'timestamptz' })
+	updatedAt: Date;
+}
+
+default phai la hang so khi init db

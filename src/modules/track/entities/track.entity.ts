@@ -22,8 +22,12 @@ export class Track extends BaseCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, nullable: true })
 	picture: string | null;
 
-	// This will appear next to the track title excluding artist name. For example. 'Extended Version'
-	@Column({ type: 'varchar', length: 50, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: `This will appear next to the track title excluding artist name. For example. 'Extended Version'This will appear next to the track title excluding artist name. For example. 'Extended Version'`,
+	})
 	version: string | null;
 
 	@Column({ type: 'varchar', length: 20, nullable: true })
@@ -39,7 +43,7 @@ export class Track extends BaseCustomIDEntity {
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
 	@ManyToOne(() => Genre)

@@ -5,6 +5,7 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import {
 	Column,
 	Entity,
@@ -20,7 +21,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 20, nullable: true })
 	upc: string | null;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
 	@ManyToOne(() => Genre)
@@ -71,4 +72,12 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		(releaseLocalize) => releaseLocalize.release,
 	)
 	releaseLocalizes: ReleaseLocalize[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

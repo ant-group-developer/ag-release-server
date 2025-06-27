@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import appConfig from './common/config/app.config';
-import { DatabaseConfigService } from './common/config/database.config';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
 import { ArtistModule } from './modules/artist/artist.module';
 import { AudioFileModule } from './modules/audio-file/audio-file.module';
 import { CountryModule } from './modules/country/country.module';
+import { DatabaseModule } from './modules/database/database.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
 import { LabelModule } from './modules/label/label.module';
@@ -35,10 +36,12 @@ import { UserModule } from './modules/user/user.module';
 			load: [appConfig],
 			validationSchema: envValidationSchema,
 		}),
-		TypeOrmModule.forRootAsync({
-			imports: [ConfigModule],
-			useClass: DatabaseConfigService,
-		}),
+		// TypeOrmModule.forRootAsync({
+		// 	imports: [ConfigModule],
+		// 	useClass: DatabaseConfigService,
+		// }),
+
+		DatabaseModule,
 		// ... other modules
 		ArtistModule,
 		ArtistRoleModule,
@@ -63,6 +66,9 @@ import { UserModule } from './modules/user/user.module';
 		OrganizationDspModule,
 		OrganizationUserModule,
 		UserPermissionModule,
+		// ScheduleModule,
 	],
+	controllers: [AppController],
+	providers: [AppService],
 })
 export class AppModule {}

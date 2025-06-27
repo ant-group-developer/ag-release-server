@@ -13,14 +13,14 @@ export class ReleaseArtist extends BaseUUIDEntity {
 	@JoinColumn({ name: 'artist_role_id' })
 	artistRole: ArtistRole;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'uuid' })
 	artistId: string;
 
 	@ManyToOne(() => Artist)
 	@JoinColumn({ name: 'artist_id' })
 	artist: Artist;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'uuid' })
 	releaseId: string;
 
 	@ManyToOne(() => Release)

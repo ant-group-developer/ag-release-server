@@ -1,6 +1,7 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { User } from 'src/modules/user/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('permissions')
 export class Permission extends BaseUserTrackedUUIDEntity {
@@ -15,4 +16,12 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 		(userPermission) => userPermission.permission,
 	)
 	userPermissions: UserPermission[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

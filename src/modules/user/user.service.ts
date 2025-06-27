@@ -1,61 +1,59 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PageDto } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { CreateUserDto } from './dto/user.dto';
+import {
+	CreateUserDto,
+	QueryGetListUserDto,
+	UpdateUserDto,
+} from './dto/user.dto';
 import { User } from './entities/user.entity';
-import { IUserService } from './interface/user.interface';
 
 @Injectable()
-export class UserService implements IUserService {
-	constructor(
-		@InjectRepository(User)
-		private readonly userRepository: Repository<User>,
-	) {}
+export class UserService {
+	@InjectRepository(User)
+	private readonly userRepo: Repository<User>;
 
-	async createUser(data: CreateUserDto): Promise<User> {
-		// data.password = await hashPassword(data.password);
-		// const newUser = await this.saveToDatabase(data);
-		// const { password, ...otherData } = newUser;
-		// return otherData;
-		const newUser = await this.saveToDatabase(data);
-
-		return newUser;
+	async create(createUserDto: CreateUserDto): Promise<User> {
+		const user = this.userRepo.create(createUserDto);
+		return await this.userRepo.save(user);
 	}
 
-	// async findOne(data: LoginDto): Promise<User> {
-	// 	const { userName } = data;
-
-	// 	const user = await this.userRepository.findOne({
-	// 		where: { userName },
-	// 	});
-
-	// 	if (!user) {
-	// 		throw new NotFoundException('User not found');
-	// 	}
-
-	// 	return user;
-	// }
-
-	async findUserById(id: string): Promise<User> {
-		const user = await this.userRepository.findOne({
-			where: { id },
-		});
-
+	async findOne(id: string): Promise<User> {
+		const user = await this.userRepo.findOne({ where: { id } });
 		if (!user) {
-			throw new NotFoundException('User not found');
+			throw new BadRequestException('Not found');
 		}
+
+		console.log(user.organization);
 
 		return user;
 	}
 
-	async getList(): Promise<User[]> {
-		const users = await this.userRepository.find();
+	async getList(query: QueryGetListUserDto): Promise<PageDto<User>> {
+		const { page, pageSize, skip } = query;
 
-		return users;
+		const [users, totalItems] = await this.userRepo.findAndCount({
+			skip,
+			take: pageSize,
+		});
+
+		return new PageDto({
+			items: users,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
 	}
 
-	async saveToDatabase(data: CreateUserDto): Promise<User> {
-		const user = this.userRepository.create(data);
-		return await this.userRepository.save(user);
+	async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+		await this.userRepo.update(id, updateUserDto);
+		return await this.findOne(id);
+	}
+
+	async remove(id: string): Promise<void> {
+		await this.userRepo.delete(id);
 	}
 }

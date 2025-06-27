@@ -10,8 +10,7 @@ export class AudioFile extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 20 })
 	sampleRate: string;
 
-	// Mbps
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', comment: 'Mbps' })
 	bitrate: string;
 
 	@Column({ type: 'smallint' })
@@ -26,19 +25,20 @@ export class AudioFile extends BaseUUIDEntity {
 	@Column({ type: 'varchar' })
 	extension: string;
 
-	// store in bytes
-	@Column({ type: 'bigint' })
+	@Column({ type: 'bigint', comment: 'store in bytes' })
 	fileSize: number;
 
 	@Column({ type: 'varchar', length: 30 })
 	bucket: string;
 
-	// store in seconds
-	@Column({ type: 'int' })
+	@Column({ type: 'int', comment: 'store in seconds' })
 	duration: number;
 
-	// This is where the track will begin playing when listeners are previewing the sample
-	@Column({ type: 'int' })
+	@Column({
+		type: 'int',
+		comment:
+			'This is where the track will begin playing when listeners are previewing the sample',
+	})
 	hook: number;
 
 	@Column({ type: 'varchar' })

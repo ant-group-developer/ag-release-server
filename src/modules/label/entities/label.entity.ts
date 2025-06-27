@@ -1,6 +1,7 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { User } from 'src/modules/user/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('labels')
 export class Label extends BaseUserTrackedCustomIDEntity {
@@ -15,4 +16,12 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }
