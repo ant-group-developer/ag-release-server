@@ -1,7 +1,7 @@
 export const COUNTRY_SUCCESS = {
-	create: 'country.message.createSuccess',
-	update: 'country.message.updateSuccess',
-	delete: 'country.message.deleteSuccess',
+	create: 'country.message.success.createSuccess',
+	update: 'country.message.success.updateSuccess',
+	delete: 'country.message.success.deleteSuccess',
 };
 
 export const COUNTRY_ERRORS = {
