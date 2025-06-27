@@ -1,10 +1,9 @@
-export const COUNTRY_SUCCESS = {
-	create: 'country.message.success.createSuccess',
-	update: 'country.message.success.updateSuccess',
-	delete: 'country.message.success.deleteSuccess',
+export const CountrySuccess = {
+	create: 'country.message.success.create',
+	update: 'country.message.success.update',
+	delete: 'country.message.success.delete',
 };
 
-export const COUNTRY_ERRORS = {
+export const CountryError = {
 	duplicateNameCountry: 'country.message.error.duplicateNameCountry',
-	notFound: 'country.message.error.notFound',
 };

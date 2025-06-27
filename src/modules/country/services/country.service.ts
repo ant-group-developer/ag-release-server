@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { COUNTRY_ERRORS } from '../constants/country.constants';
+import { CountryError } from '../constants/country.constants';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -30,6 +30,7 @@ export class CountryService {
 		if (!country) {
 			throw new ResponseError({
 				message: 'Not found',
+				statusCode: 404,
 			});
 		}
 
@@ -76,7 +77,8 @@ export class CountryService {
 			if (artist) {
 				throw new ResponseError({
 					message: 'Duplicate country name',
-					messageCode: COUNTRY_ERRORS.duplicateNameCountry,
+					messageCode: CountryError.duplicateNameCountry,
+					statusCode: 409,
 				});
 			}
 		}
