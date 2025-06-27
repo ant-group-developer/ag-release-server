@@ -28,5 +28,5 @@
     EXPOSE 3000
     
     # 3. Chạy ứng dụng
-    CMD ["node", "dist/src/main.js"]
+    CMD ["node", "dist/main.js"]
     
