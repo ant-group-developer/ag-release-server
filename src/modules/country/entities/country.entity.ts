@@ -8,28 +8,28 @@ export class Country extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	iso3: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	iso2: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	numericCode: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	phoneCode: string;
 
 	@Column({ type: 'varchar', length: 30 })
 	capital: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	currency: string;
 
 	@Column({ type: 'varchar', length: 30 })
 	currencyName: string;
 
-	@Column({ type: 'varchar' })
+	@Column({ type: 'varchar', length: 10 })
 	currencySymbol: string;
 
 	@Column({ type: 'int' })

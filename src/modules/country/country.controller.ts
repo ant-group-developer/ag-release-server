@@ -4,57 +4,61 @@ import {
 	Delete,
 	Get,
 	Param,
-	Patch,
 	Post,
+	Put,
 	Query,
 } from '@nestjs/common';
-import { PageDto, ResponseSuccessDto } from 'src/common/dtos/response.dto';
-import { CountryService } from './country.service';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
 	UpdateCountryDto,
 } from './dto/country.dto';
 import { Country } from './entities/country.entity';
+import { CountryService } from './services/country.service';
 
-@Controller('country')
+@Controller('countries')
 export class CountryController {
 	constructor(private readonly countryService: CountryService) {}
 
 	@Post()
 	async create(
 		@Body() createCountryDto: CreateCountryDto,
-	): Promise<ResponseSuccessDto<Country>> {
+	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.create(createCountryDto);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({
+			data: result,
+			message: 'Create new country success',
+			messageCode: 'country.message.createSuccess',
+		});
 	}
 
 	@Get(':id')
-	async findOne(
-		@Param('id') id: string,
-	): Promise<ResponseSuccessDto<Country>> {
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.findOne(id);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
 	async getList(
 		@Query() query: QueryGetListCountryDto,
-	): Promise<ResponseSuccessDto<PageDto<Country>>> {
+	): Promise<ResponseSuccess<PageDto<Country>>> {
 		const result = await this.countryService.getList(query);
-		return new ResponseSuccessDto({ data: result });
+		return new ResponseSuccess({ data: result });
 	}
 
-	@Patch(':id')
+	@Put(':id')
 	async update(
 		@Param('id') id: string,
 		@Body() updateCountryDto: UpdateCountryDto,
-	): Promise<Country> {
-		return await this.countryService.update(id, updateCountryDto);
+	): Promise<ResponseSuccess<Country>> {
+		const result = await this.countryService.update(id, updateCountryDto);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')
-	async remove(@Param('id') id: string): Promise<void> {
-		return await this.countryService.remove(id);
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.countryService.remove(id);
+		return new ResponseSuccess();
 	}
 }
