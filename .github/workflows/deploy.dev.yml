@@ -1,0 +1,39 @@
+name: Deploy development
+
+on:
+    push:
+        branches:
+            - dev
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repo
+              uses: actions/checkout@v4
+
+            - name: Start SSH agent
+              uses: webfactory/ssh-agent@v0.9.0
+              with:
+                  ssh-private-key: ${{ secrets.VPS_SSH_KEY_DEV }}
+
+            - name: Deploy via SSH
+              env:
+                  HOST: ${{ secrets.VPS_HOST_DEV }}
+                  USER: ${{ secrets.VPS_USER_DEV }}
+                  PORT: ${{ secrets.VPS_PORT_DEV }} # omit or set to 22
+              run: |
+                  # disable host checking (only if you trust the server)
+                  # run each step with sudo
+                    ssh -o StrictHostKeyChecking=no -p ${PORT:-22} ${USER}@${HOST} '
+                        git config --global --add safe.directory /www/wwwroot/dev/ag-music-server
+
+                        cd /www/wwwroot/dev/ag-music-server || exit 1
+                        sudo git pull origin dev
+
+                        TAG=$(git rev-parse --short HEAD || echo "latest")
+
+                        echo "Build và chạy Docker Compose với tag: $TAG"
+                        sudo TAG=$TAG docker compose -f docker-compose.dev.yml up --build -d
+                    '
