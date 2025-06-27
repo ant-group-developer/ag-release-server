@@ -9,6 +9,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { COUNTRY_SUCCESS } from './constants/country.constants';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -28,8 +29,7 @@ export class CountryController {
 		const result = await this.countryService.create(createCountryDto);
 		return new ResponseSuccess({
 			data: result,
-			message: 'Create new country success',
-			messageCode: 'country.message.createSuccess',
+			messageCode: COUNTRY_SUCCESS.create,
 		});
 	}
 
@@ -44,7 +44,9 @@ export class CountryController {
 		@Query() query: QueryGetListCountryDto,
 	): Promise<ResponseSuccess<PageDto<Country>>> {
 		const result = await this.countryService.getList(query);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			data: result,
+		});
 	}
 
 	@Put(':id')
@@ -53,12 +55,15 @@ export class CountryController {
 		@Body() updateCountryDto: UpdateCountryDto,
 	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.update(id, updateCountryDto);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			messageCode: COUNTRY_SUCCESS.update,
+			data: result,
+		});
 	}
 
 	@Delete(':id')
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.countryService.remove(id);
-		return new ResponseSuccess();
+		return new ResponseSuccess({ messageCode: COUNTRY_SUCCESS.delete });
 	}
 }

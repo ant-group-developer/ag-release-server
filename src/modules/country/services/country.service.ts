@@ -75,8 +75,8 @@ export class CountryService {
 
 			if (artist) {
 				throw new ResponseError({
-					message: 'name should not be null',
-					messageCode: COUNTRY_ERRORS.duplicateNameArtist,
+					message: 'Duplicate country name',
+					messageCode: COUNTRY_ERRORS.duplicateNameCountry,
 				});
 			}
 		}
