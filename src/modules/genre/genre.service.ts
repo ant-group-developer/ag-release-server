@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { GenreError } from './constants/genre.constant';
+import { BucketGcsService } from '../bucket/services/bucket.gcs.service';
+import {
+	GenreMessageCodeError,
+	GenreMessageError,
+} from './constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -15,6 +19,8 @@ export class GenreService {
 	constructor(
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
+
+		private readonly bucketGcsService: BucketGcsService,
 	) {}
 
 	async create(createGenreDto: CreateGenreDto): Promise<Genre> {
@@ -27,7 +33,10 @@ export class GenreService {
 	async findOne(id: string): Promise<Genre> {
 		const genre = await this.genreRepo.findOne({ where: { id } });
 		if (!genre) {
-			throw new BadRequestException('Not found');
+			throw new ResponseError({
+				message: GenreMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
 		}
 
 		return genre;
@@ -52,20 +61,39 @@ export class GenreService {
 	}
 
 	async update(id: string, updateGenreDto: UpdateGenreDto): Promise<Genre> {
+		const { name, picture } = updateGenreDto;
+		const genre = await this.findOne(id);
+
+		if (name && name !== genre.name) {
+			await this.validate({ name });
+		}
+
+		if (
+			picture !== undefined &&
+			picture !== genre.picture &&
+			genre.picture
+		) {
+			await this.bucketGcsService.deletePublicFile(genre.picture);
+		}
+
 		await this.genreRepo.update(id, updateGenreDto);
 		return await this.findOne(id);
 	}
 
 	async remove(id: string): Promise<void> {
+		const genre = await this.findOne(id);
+		if (genre.picture)
+			await this.bucketGcsService.deletePublicFile(genre.picture);
 		await this.genreRepo.delete(id);
 	}
 
-	async validate({ name }: { name: string }) {
+	async validate({ name }: { name?: string }) {
 		const genre = await this.genreRepo.findOne({ where: { name } });
 
 		if (genre) {
 			throw new ResponseError({
-				messageCode: GenreError.duplicateNameGenre,
+				messageCode: GenreMessageCodeError.DUPLICATE_NAME_GENRE,
+				message: GenreMessageError.DUPLICATE_NAME_GENRE,
 			});
 		}
 	}
