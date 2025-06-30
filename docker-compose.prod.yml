@@ -1,0 +1,18 @@
+services:
+    app-prod:
+        # image: ag-music-server/prod:latest
+        image: ag-music-server/prod:${TAG:-latest}
+        build: .
+        # pull the port number from $PORT for both host and container
+        ports:
+            - '${HOST_PORT:-4042}:${APP_PORT}'
+        env_file:
+            - .env
+        environment:
+            - TZ=${TZ:-Asia/Ho_Chi_Minh}
+        command: yarn start:prod
+        restart: unless-stopped
+        volumes:
+            - ./credential.json:/app/credential.json:ro
+        mem_limit: 2g # Set max memory to 2 GB
+        cpus: 2 # Set max CPU to 2 CPU core
