@@ -23,10 +23,5 @@ export function generateFileNameWithTimestamp(
 
 	const timestamp = `${yyyy}-${MM}-${dd}_${HH}-${mm}-${ss}`;
 
-	// const dotIndex = originalFileName.lastIndexOf('.');
-	// const baseName =
-	// 	dotIndex >= 0 ? originalFileName.slice(0, dotIndex) : originalFileName;
-	// const extension = dotIndex >= 0 ? originalFileName.slice(dotIndex) : '';
-
 	return `${timestamp}-${originalFileName}`;
 }

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { UserType } from 'src/modules/user/enum/user.enum';
 import { DataSource } from 'typeorm';
-import { listCountries } from '../constants/database.constant';
+import { listCountries, listLanguages } from '../constants/database.constant';
 
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {
@@ -86,5 +86,30 @@ export class DatabaseInitService implements OnModuleInit {
 		}
 	}
 
-	private initLanguage() {}
+	private async initLanguage() {
+		const countQuery = `SELECT COUNT(*) FROM languages`;
+		const result = await this.dataSource.query(countQuery);
+
+		if (result[0].count === '0') {
+			const query = `
+			INSERT INTO languages (
+				id, name, code
+			) VALUES (
+				uuid_generate_v4(), $1, $2
+			)
+		`;
+
+			const dataInitLanguage = listLanguages;
+
+			for (const language of dataInitLanguage) {
+				await this.dataSource.query(query, language);
+			}
+
+			console.log('Languages inserted successfully');
+		} else {
+			console.log(
+				'Languages table already has data, skipping initialization',
+			);
+		}
+	}
 }

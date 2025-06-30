@@ -91,7 +91,8 @@ export class LanguageService {
 			if (language) {
 				throw new ResponseError({
 					message: LanguageMessageError.DUPLICATE_NAME_LANGUAGE,
-					messageCode: LanguageMessageError.DUPLICATE_NAME_LANGUAGE,
+					messageCode:
+						LanguageMessageCodeError.DUPLICATE_NAME_LANGUAGE,
 					statusCode: 409,
 				});
 			}

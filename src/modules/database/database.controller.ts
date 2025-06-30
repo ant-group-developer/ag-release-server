@@ -7,6 +7,6 @@ export class DatabaseController {
 
 	@Get()
 	async exportBackup() {
-		await this.databaseService.exportBackup();
+		await this.databaseService.backup();
 	}
 }
