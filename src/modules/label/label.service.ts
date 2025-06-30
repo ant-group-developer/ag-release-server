@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import { BucketGcsService } from '../bucket/services/bucket.gcs.service';
 import {
 	LabelMessageCodeError,
 	LabelMessageError,
@@ -18,6 +19,8 @@ export class LabelService {
 	constructor(
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
+
+		private readonly bucketGcsService: BucketGcsService,
 	) {}
 
 	async create(createLabelDto: CreateLabelDto): Promise<Label> {
@@ -30,7 +33,10 @@ export class LabelService {
 	async findOne(id: string): Promise<Label> {
 		const label = await this.labelRepo.findOne({ where: { id } });
 		if (!label) {
-			throw new BadRequestException('Not found');
+			throw new ResponseError({
+				message: LabelMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
 		}
 
 		return label;
@@ -55,22 +61,37 @@ export class LabelService {
 	}
 
 	async update(id: string, updateLabelDto: UpdateLabelDto): Promise<Label> {
+		const { name, picture } = updateLabelDto;
+
 		const label = await this.findOne(id);
 
-		if (label.name !== updateLabelDto.name) {
+		if (name && name !== label.name) {
 			await this.validate({ name: updateLabelDto.name });
 		}
 
-		await this.labelRepo.update(id, updateLabelDto);
+		if (
+			picture !== undefined &&
+			picture !== label.picture &&
+			label.picture
+		) {
+			await this.bucketGcsService.deletePublicFile(label.picture);
+		}
 
+		await this.labelRepo.update(id, updateLabelDto);
 		return await this.findOne(id);
 	}
 
 	async remove(id: string): Promise<void> {
+		const label = await this.findOne(id);
+
+		if (label.picture) {
+			await this.bucketGcsService.deletePublicFile(label.picture);
+		}
+
 		await this.labelRepo.delete(id);
 	}
 
-	async validate({ name }: { name: string }) {
+	async validate({ name }: { name?: string }) {
 		if (name) {
 			const artist = await this.labelRepo.findOne({ where: { name } });
 

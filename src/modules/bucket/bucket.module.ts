@@ -5,5 +5,6 @@ import { BucketGcsService } from './services/bucket.gcs.service';
 @Module({
 	providers: [BucketGcsService],
 	controllers: [BucketGcsController],
+	exports: [BucketGcsService],
 })
 export class BucketModule {}

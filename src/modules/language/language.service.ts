@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
@@ -32,7 +32,10 @@ export class LanguageService {
 	async findOne(id: string): Promise<Language> {
 		const language = await this.languageRepo.findOne({ where: { id } });
 		if (!language) {
-			throw new BadRequestException('Not found');
+			throw new ResponseError({
+				message: LanguageMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
 		}
 
 		return language;
