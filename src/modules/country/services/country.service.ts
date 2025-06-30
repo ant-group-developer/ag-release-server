@@ -63,7 +63,10 @@ export class CountryService {
 		id: string,
 		updateCountryDto: UpdateCountryDto,
 	): Promise<Country> {
-		await this.validate({ name: updateCountryDto.name });
+		const country = await this.findOne(id);
+		if (country?.name !== updateCountryDto.name) {
+			await this.validate({ name: updateCountryDto.name });
+		}
 
 		await this.countryRepo.update(id, updateCountryDto);
 		return await this.findOne(id);

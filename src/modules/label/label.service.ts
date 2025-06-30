@@ -1,7 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import {
+	LabelMessageCodeError,
+	LabelMessageError,
+} from './constants/LABEL.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
@@ -17,6 +21,8 @@ export class LabelService {
 	) {}
 
 	async create(createLabelDto: CreateLabelDto): Promise<Label> {
+		await this.validate({ name: createLabelDto.name });
+
 		const label = this.labelRepo.create(createLabelDto);
 		return await this.labelRepo.save(label);
 	}
@@ -49,11 +55,32 @@ export class LabelService {
 	}
 
 	async update(id: string, updateLabelDto: UpdateLabelDto): Promise<Label> {
+		const label = await this.findOne(id);
+
+		if (label.name !== updateLabelDto.name) {
+			await this.validate({ name: updateLabelDto.name });
+		}
+
 		await this.labelRepo.update(id, updateLabelDto);
+
 		return await this.findOne(id);
 	}
 
 	async remove(id: string): Promise<void> {
 		await this.labelRepo.delete(id);
+	}
+
+	async validate({ name }: { name: string }) {
+		if (name) {
+			const artist = await this.labelRepo.findOne({ where: { name } });
+
+			if (artist) {
+				throw new ResponseError({
+					message: LabelMessageError.DUPLICATE_NAME_LABEL,
+					messageCode: LabelMessageCodeError.DUPLICATE_NAME_LABEL,
+					statusCode: 409,
+				});
+			}
+		}
 	}
 }
