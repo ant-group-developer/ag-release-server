@@ -22,7 +22,7 @@ export class BucketGcsService {
 			this.configService.get<string>('PUBLIC_BUCKET')!;
 		this.privateBucketName =
 			this.configService.get<string>('PROTECTED_BUCKET')!;
-		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}`;
+		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}/`;
 	}
 
 	async getUrlUploadPublicBucket(data: GetUrlUploadDto): Promise<string> {
@@ -74,6 +74,6 @@ export class BucketGcsService {
 	}
 
 	private getUrlPublic(entityType: string, fileName: string) {
-		return `https://storage.googleapis.com/ant-music-assets/${entityType}/${fileName}`;
+		return `${this.baseUrlPublic}${entityType}/${fileName}`;
 	}
 }

@@ -30,6 +30,8 @@ export class BucketGcsController {
 
 	// @Post('delete')
 	// async generateUploadUrl() {
-	// 	return await this.bucketGcsService.deleteFile();
+	// 	return await this.bucketGcsService.deletePublicFile(
+	// 		'https://storage.googleapis.com/ant-music-assets/labels/2025-06-30_07-57-52-our-story-2.webp',
+	// 	);
 	// }
 }
