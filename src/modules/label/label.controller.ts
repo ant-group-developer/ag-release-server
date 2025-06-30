@@ -17,7 +17,7 @@ import {
 import { Label } from './entities/label.entity';
 import { LabelService } from './label.service';
 
-@Controller('Label')
+@Controller('labels')
 export class LabelController {
 	constructor(private readonly labelService: LabelService) {}
 

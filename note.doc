@@ -29,3 +29,5 @@ export abstract class BaseCustomIDEntity {
 }
 
 default phai la hang so khi init db
+
+ant-music-assets/labels/

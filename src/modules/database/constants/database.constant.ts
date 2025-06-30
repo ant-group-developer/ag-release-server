@@ -325,3 +325,5 @@ export const listCountries = [
 		'Bruneian',
 	],
 ];
+
+export const maxLengthPicture = 100;

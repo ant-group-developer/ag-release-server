@@ -10,7 +10,11 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import { CountrySuccess } from './constants/country.constants';
+import {
+	CountryMessageCodeSuccess,
+	CountryMessageError,
+	CountryMessageSuccess,
+} from './constants/country.constant';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -28,11 +32,11 @@ export class CountryController {
 	@ApiOperation({ summary: 'Create a new country' })
 	@ApiResponse({
 		status: 200,
-		description: 'Create a new country',
+		description: CountryMessageSuccess.CREATE,
 	})
 	@ApiResponse({
 		status: 409,
-		description: 'Duplicate country name',
+		description: CountryMessageError.DUPLICATE_NAME_COUNTRY,
 	})
 	async create(
 		@Body() createCountryDto: CreateCountryDto,
@@ -40,7 +44,7 @@ export class CountryController {
 		const result = await this.countryService.create(createCountryDto);
 		return new ResponseSuccess({
 			data: result,
-			messageCode: CountrySuccess.create,
+			messageCode: CountryMessageCodeSuccess.CREATE,
 		});
 	}
 
@@ -50,7 +54,7 @@ export class CountryController {
 		status: 200,
 		description: 'Successfully retrieved country',
 	})
-	@ApiResponse({ status: 404, description: 'Country not found' })
+	@ApiResponse({ status: 404, description: CountryMessageError.NOT_FOUND })
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -75,11 +79,11 @@ export class CountryController {
 	@ApiOperation({ summary: 'Update a country by ID' })
 	@ApiResponse({
 		status: 200,
-		description: 'Successfully updated country',
+		description: CountryMessageSuccess.UPDATE,
 	})
 	@ApiResponse({
 		status: 409,
-		description: 'Duplicate country name',
+		description: CountryMessageError.DUPLICATE_NAME_COUNTRY,
 	})
 	async update(
 		@Param('id') id: string,
@@ -87,16 +91,18 @@ export class CountryController {
 	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.update(id, updateCountryDto);
 		return new ResponseSuccess({
-			messageCode: CountrySuccess.update,
+			messageCode: CountryMessageCodeSuccess.UPDATE,
 			data: result,
 		});
 	}
 
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a country by ID' })
-	@ApiResponse({ status: 200, description: 'Successfully deleted country' })
+	@ApiResponse({ status: 200, description: CountryMessageSuccess.DELETE })
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.countryService.remove(id);
-		return new ResponseSuccess({ messageCode: CountrySuccess.delete });
+		return new ResponseSuccess({
+			messageCode: CountryMessageCodeSuccess.DELETE,
+		});
 	}
 }
