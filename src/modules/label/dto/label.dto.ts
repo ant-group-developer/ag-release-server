@@ -29,7 +29,7 @@ export class CreateLabelDto {
 	@IsString()
 	@IsOptional()
 	@MaxLength(100)
-	picture?: string;
+	picture?: string | null;
 
 	@ApiProperty({
 		description: 'A short description of the label',
@@ -41,7 +41,7 @@ export class CreateLabelDto {
 	@IsString()
 	@IsOptional()
 	@MaxLength(200)
-	description?: string;
+	description?: string | null;
 }
 export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	@IsString()

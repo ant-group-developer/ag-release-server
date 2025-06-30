@@ -14,7 +14,7 @@ import {
 	LabelMessageCodeSuccess,
 	LabelMessageError,
 	LabelMessageSuccess,
-} from './constants/LABEL.constant';
+} from './constants/label.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,

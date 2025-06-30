@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import {
 	LabelMessageCodeError,
 	LabelMessageError,
-} from './constants/LABEL.constant';
+} from './constants/label.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
