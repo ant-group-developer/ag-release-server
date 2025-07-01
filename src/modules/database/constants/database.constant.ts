@@ -1,6 +1,6 @@
 export const listCountries = [
 	[
-		'AFGHANISTAN',
+		'Afghanistan',
 		'AFG',
 		'AF',
 		'4',
@@ -13,7 +13,7 @@ export const listCountries = [
 		'Afghan',
 	],
 	[
-		'ALBANIA',
+		'Albania',
 		'ALB',
 		'AL',
 		'8',
@@ -26,7 +26,7 @@ export const listCountries = [
 		'Albanian',
 	],
 	[
-		'ALGERIA',
+		'Algeria',
 		'DZA',
 		'DZ',
 		'12',
@@ -39,7 +39,7 @@ export const listCountries = [
 		'Algerian',
 	],
 	[
-		'AMERICAN SAMOA',
+		'American Samoa',
 		'ASM',
 		'AS',
 		'16',
@@ -52,7 +52,7 @@ export const listCountries = [
 		'American Samoan',
 	],
 	[
-		'ANDORRA',
+		'Andorra',
 		'AND',
 		'AD',
 		'20',
@@ -65,7 +65,7 @@ export const listCountries = [
 		'Andorran',
 	],
 	[
-		'ANGOLA',
+		'Angola',
 		'AGO',
 		'AO',
 		'24',
@@ -78,7 +78,7 @@ export const listCountries = [
 		'Angolan',
 	],
 	[
-		'ANGUILLA',
+		'Anguilla',
 		'AIA',
 		'AI',
 		'660',
@@ -91,7 +91,7 @@ export const listCountries = [
 		'Anguillan',
 	],
 	[
-		'ANTIGUA AND BARBUDA',
+		'Antigua and Barbuda',
 		'ATG',
 		'AG',
 		'28',
@@ -104,7 +104,7 @@ export const listCountries = [
 		'Antiguan and Barbudan',
 	],
 	[
-		'ARGENTINA',
+		'Argentina',
 		'ARG',
 		'AR',
 		'32',
@@ -117,7 +117,7 @@ export const listCountries = [
 		'Argentine',
 	],
 	[
-		'ARMENIA',
+		'Armenia',
 		'ARM',
 		'AM',
 		'51',
@@ -130,7 +130,7 @@ export const listCountries = [
 		'Armenian',
 	],
 	[
-		'ARUBA',
+		'Aruba',
 		'ABW',
 		'AW',
 		'533',
@@ -143,7 +143,7 @@ export const listCountries = [
 		'Aruban',
 	],
 	[
-		'AUSTRALIA',
+		'Australia',
 		'AUS',
 		'AU',
 		'36',
@@ -156,7 +156,7 @@ export const listCountries = [
 		'Australian',
 	],
 	[
-		'AUSTRIA',
+		'Austria',
 		'AUT',
 		'AT',
 		'40',
@@ -169,7 +169,7 @@ export const listCountries = [
 		'Austrian',
 	],
 	[
-		'AZERBAIJAN',
+		'Azerbaijan',
 		'AZE',
 		'AZ',
 		'31',
@@ -182,7 +182,7 @@ export const listCountries = [
 		'Azerbaijani',
 	],
 	[
-		'BAHAMAS',
+		'Bahamas',
 		'BHS',
 		'BS',
 		'44',
@@ -195,7 +195,7 @@ export const listCountries = [
 		'Bahamian',
 	],
 	[
-		'BAHRAIN',
+		'Bahrain',
 		'BHR',
 		'BH',
 		'48',
@@ -208,7 +208,7 @@ export const listCountries = [
 		'Bahraini',
 	],
 	[
-		'BANGLADESH',
+		'Bangladesh',
 		'BGD',
 		'BD',
 		'50',
@@ -221,7 +221,7 @@ export const listCountries = [
 		'Bangladeshi',
 	],
 	[
-		'BARBADOS',
+		'Barbados',
 		'BRB',
 		'BB',
 		'52',
@@ -234,7 +234,7 @@ export const listCountries = [
 		'Barbadian',
 	],
 	[
-		'BELARUS',
+		'Belarus',
 		'BLR',
 		'BY',
 		'112',
@@ -247,7 +247,7 @@ export const listCountries = [
 		'Belarusian',
 	],
 	[
-		'BELGIUM',
+		'Belgium',
 		'BEL',
 		'BE',
 		'56',
@@ -260,7 +260,7 @@ export const listCountries = [
 		'Belgian',
 	],
 	[
-		'BELIZE',
+		'Belize',
 		'BLZ',
 		'BZ',
 		'84',
@@ -273,7 +273,7 @@ export const listCountries = [
 		'Belizean',
 	],
 	[
-		'BENIN',
+		'Benin',
 		'BEN',
 		'BJ',
 		'204',
@@ -286,7 +286,7 @@ export const listCountries = [
 		'Beninese',
 	],
 	[
-		'BERMUDA',
+		'Bermuda',
 		'BMU',
 		'BM',
 		'60',
@@ -299,7 +299,7 @@ export const listCountries = [
 		'Bermudian',
 	],
 	[
-		'BHUTAN',
+		'Bhutan',
 		'BTN',
 		'BT',
 		'64',
@@ -312,7 +312,7 @@ export const listCountries = [
 		'Bhutanese',
 	],
 	[
-		'BOLIVIA',
+		'Bolivia',
 		'BOL',
 		'BO',
 		'68',
@@ -325,7 +325,7 @@ export const listCountries = [
 		'Bolivian',
 	],
 	[
-		'BOSNIA AND HERZEGOVINA',
+		'Bosnia and Herzegovina',
 		'BIH',
 		'BA',
 		'70',
@@ -338,7 +338,7 @@ export const listCountries = [
 		'Bosnian',
 	],
 	[
-		'BOTSWANA',
+		'Botswana',
 		'BWA',
 		'BW',
 		'72',
@@ -351,7 +351,7 @@ export const listCountries = [
 		'Motswana',
 	],
 	[
-		'BRAZIL',
+		'Brazil',
 		'BRA',
 		'BR',
 		'76',
@@ -364,7 +364,7 @@ export const listCountries = [
 		'Brazilian',
 	],
 	[
-		'BRUNEI',
+		'Brunei',
 		'BRN',
 		'BN',
 		'96',
@@ -377,7 +377,7 @@ export const listCountries = [
 		'Bruneian',
 	],
 	[
-		'BULGARIA',
+		'Bulgaria',
 		'BGR',
 		'BG',
 		'100',
@@ -390,7 +390,7 @@ export const listCountries = [
 		'Bulgarian',
 	],
 	[
-		'BURKINA FASO',
+		'Burkina Faso',
 		'BFA',
 		'BF',
 		'854',
@@ -403,7 +403,7 @@ export const listCountries = [
 		'Burkinabe',
 	],
 	[
-		'BURUNDI',
+		'Burundi',
 		'BDI',
 		'BI',
 		'108',
@@ -416,7 +416,7 @@ export const listCountries = [
 		'Burundian',
 	],
 	[
-		'CABO VERDE',
+		'Cabo Verde',
 		'CPV',
 		'CV',
 		'132',
@@ -429,7 +429,7 @@ export const listCountries = [
 		'Cape Verdean',
 	],
 	[
-		'CAMBODIA',
+		'Cambodia',
 		'KHM',
 		'KH',
 		'116',
@@ -442,7 +442,7 @@ export const listCountries = [
 		'Cambodian',
 	],
 	[
-		'CAMEROON',
+		'Cameroon',
 		'CMR',
 		'CM',
 		'120',
@@ -455,7 +455,7 @@ export const listCountries = [
 		'Cameroonian',
 	],
 	[
-		'CANADA',
+		'Canada',
 		'CAN',
 		'CA',
 		'124',
@@ -465,10 +465,11 @@ export const listCountries = [
 		'Canadian Dollar',
 		'$',
 		1,
+		'CanadianFuse',
 		'Canadian',
 	],
 	[
-		'CAYMAN ISLANDS',
+		'Cayman Islands',
 		'CYM',
 		'KY',
 		'136',
@@ -481,7 +482,7 @@ export const listCountries = [
 		'Caymanian',
 	],
 	[
-		'CENTRAL AFRICAN REPUBLIC',
+		'Central African Republic',
 		'CAF',
 		'CF',
 		'140',
@@ -494,7 +495,7 @@ export const listCountries = [
 		'Central African',
 	],
 	[
-		'CHAD',
+		'Chad',
 		'TCD',
 		'TD',
 		'148',
@@ -507,7 +508,7 @@ export const listCountries = [
 		'Chadian',
 	],
 	[
-		'CHILE',
+		'Chile',
 		'CHL',
 		'CL',
 		'152',
@@ -520,7 +521,7 @@ export const listCountries = [
 		'Chilean',
 	],
 	[
-		'CHINA',
+		'China',
 		'CHN',
 		'CN',
 		'156',
@@ -533,7 +534,7 @@ export const listCountries = [
 		'Chinese',
 	],
 	[
-		'COLOMBIA',
+		'Colombia',
 		'COL',
 		'CO',
 		'170',
@@ -546,7 +547,7 @@ export const listCountries = [
 		'Colombian',
 	],
 	[
-		'COMOROS',
+		'Comoros',
 		'COM',
 		'KM',
 		'174',
@@ -559,7 +560,7 @@ export const listCountries = [
 		'Comorian',
 	],
 	[
-		'CONGO, DEMOCRATIC REPUBLIC OF THE',
+		'Congo, Democratic Republic of the',
 		'COD',
 		'CD',
 		'180',
@@ -572,7 +573,7 @@ export const listCountries = [
 		'Congolese',
 	],
 	[
-		'CONGO, REPUBLIC OF THE',
+		'Congo, Republic of the',
 		'COG',
 		'CG',
 		'178',
@@ -585,7 +586,7 @@ export const listCountries = [
 		'Congolese',
 	],
 	[
-		'COSTA RICA',
+		'Costa Rica',
 		'CRI',
 		'CR',
 		'188',
@@ -598,7 +599,7 @@ export const listCountries = [
 		'Costa Rican',
 	],
 	[
-		"CÔTE D'IVOIRE",
+		"Côte d'Ivoire",
 		'CIV',
 		'CI',
 		'384',
@@ -611,7 +612,7 @@ export const listCountries = [
 		'Ivorian',
 	],
 	[
-		'CROATIA',
+		'Croatia',
 		'HRV',
 		'HR',
 		'191',
@@ -624,7 +625,7 @@ export const listCountries = [
 		'Croatian',
 	],
 	[
-		'CUBA',
+		'Cuba',
 		'CUB',
 		'CU',
 		'192',
@@ -637,7 +638,7 @@ export const listCountries = [
 		'Cuban',
 	],
 	[
-		'CYPRUS',
+		'Cyprus',
 		'CYP',
 		'CY',
 		'196',
@@ -650,7 +651,7 @@ export const listCountries = [
 		'Cypriot',
 	],
 	[
-		'CZECH REPUBLIC',
+		'Czech Republic',
 		'CZE',
 		'CZ',
 		'203',
@@ -663,7 +664,7 @@ export const listCountries = [
 		'Czech',
 	],
 	[
-		'DENMARK',
+		'Denmark',
 		'DNK',
 		'DK',
 		'208',
@@ -676,7 +677,7 @@ export const listCountries = [
 		'Danish',
 	],
 	[
-		'DJIBOUTI',
+		'Djibouti',
 		'DJI',
 		'DJ',
 		'262',
@@ -689,7 +690,7 @@ export const listCountries = [
 		'Djiboutian',
 	],
 	[
-		'DOMINICA',
+		'Dominica',
 		'DMA',
 		'DM',
 		'212',
@@ -702,7 +703,7 @@ export const listCountries = [
 		'Dominican',
 	],
 	[
-		'DOMINICAN REPUBLIC',
+		'Dominican Republic',
 		'DOM',
 		'DO',
 		'214',
@@ -715,7 +716,7 @@ export const listCountries = [
 		'Dominican',
 	],
 	[
-		'ECUADOR',
+		'Ecuador',
 		'ECU',
 		'EC',
 		'218',
@@ -728,7 +729,7 @@ export const listCountries = [
 		'Ecuadorian',
 	],
 	[
-		'EGYPT',
+		'Egypt',
 		'EGY',
 		'EG',
 		'818',
@@ -741,7 +742,7 @@ export const listCountries = [
 		'Egyptian',
 	],
 	[
-		'EL SALVADOR',
+		'El Salvador',
 		'SLV',
 		'SV',
 		'222',
@@ -754,7 +755,7 @@ export const listCountries = [
 		'Salvadoran',
 	],
 	[
-		'EQUATORIAL GUINEA',
+		'Equatorial Guinea',
 		'GNQ',
 		'GQ',
 		'226',
@@ -767,7 +768,7 @@ export const listCountries = [
 		'Equatorial Guinean',
 	],
 	[
-		'ERITREA',
+		'Eritrea',
 		'ERI',
 		'ER',
 		'232',
@@ -780,7 +781,7 @@ export const listCountries = [
 		'Eritrean',
 	],
 	[
-		'ESTONIA',
+		'Estonia',
 		'EST',
 		'EE',
 		'233',
@@ -793,7 +794,7 @@ export const listCountries = [
 		'Estonian',
 	],
 	[
-		'ESWATINI',
+		'Eswatini',
 		'SWZ',
 		'SZ',
 		'748',
@@ -806,7 +807,7 @@ export const listCountries = [
 		'Swazi',
 	],
 	[
-		'ETHIOPIA',
+		'Ethiopia',
 		'ETH',
 		'ET',
 		'231',
@@ -819,7 +820,7 @@ export const listCountries = [
 		'Ethiopian',
 	],
 	[
-		'FIJI',
+		'Fiji',
 		'FJI',
 		'FJ',
 		'242',
@@ -832,7 +833,7 @@ export const listCountries = [
 		'Fijian',
 	],
 	[
-		'FINLAND',
+		'Finland',
 		'FIN',
 		'FI',
 		'246',
@@ -845,7 +846,7 @@ export const listCountries = [
 		'Finnish',
 	],
 	[
-		'FRANCE',
+		'France',
 		'FRA',
 		'FR',
 		'250',
@@ -858,7 +859,7 @@ export const listCountries = [
 		'French',
 	],
 	[
-		'GABON',
+		'Gabon',
 		'GAB',
 		'GA',
 		'266',
@@ -871,7 +872,7 @@ export const listCountries = [
 		'Gabonese',
 	],
 	[
-		'GAMBIA',
+		'Gambia',
 		'GMB',
 		'GM',
 		'270',
@@ -884,7 +885,7 @@ export const listCountries = [
 		'Gambian',
 	],
 	[
-		'GEORGIA',
+		'Georgia',
 		'GEO',
 		'GE',
 		'268',
@@ -897,7 +898,7 @@ export const listCountries = [
 		'Georgian',
 	],
 	[
-		'GERMANY',
+		'Germany',
 		'DEU',
 		'DE',
 		'276',
@@ -910,7 +911,7 @@ export const listCountries = [
 		'German',
 	],
 	[
-		'GHANA',
+		'Ghana',
 		'GHA',
 		'GH',
 		'288',
@@ -923,7 +924,7 @@ export const listCountries = [
 		'Ghanaian',
 	],
 	[
-		'GREECE',
+		'Greece',
 		'GRC',
 		'GR',
 		'300',
@@ -936,7 +937,7 @@ export const listCountries = [
 		'Greek',
 	],
 	[
-		'GRENADA',
+		'Grenada',
 		'GRD',
 		'GD',
 		'308',
@@ -949,7 +950,7 @@ export const listCountries = [
 		'Grenadian',
 	],
 	[
-		'GUATEMALA',
+		'Guatemala',
 		'GTM',
 		'GT',
 		'320',
@@ -962,7 +963,7 @@ export const listCountries = [
 		'Guatemalan',
 	],
 	[
-		'GUINEA',
+		'Guinea',
 		'GIN',
 		'GN',
 		'324',
@@ -975,7 +976,7 @@ export const listCountries = [
 		'Guinean',
 	],
 	[
-		'GUINEA-BISSAU',
+		'Guinea-Bissau',
 		'GNB',
 		'GW',
 		'624',
@@ -988,7 +989,7 @@ export const listCountries = [
 		'Bissau-Guinean',
 	],
 	[
-		'GUYANA',
+		'Guyana',
 		'GUY',
 		'GY',
 		'328',
@@ -1001,7 +1002,7 @@ export const listCountries = [
 		'Guyanese',
 	],
 	[
-		'HAITI',
+		'Haiti',
 		'HTI',
 		'HT',
 		'332',
@@ -1014,7 +1015,7 @@ export const listCountries = [
 		'Haitian',
 	],
 	[
-		'HONDURAS',
+		'Honduras',
 		'HND',
 		'HN',
 		'340',
@@ -1027,7 +1028,7 @@ export const listCountries = [
 		'Honduran',
 	],
 	[
-		'HUNGARY',
+		'Hungary',
 		'HUN',
 		'HU',
 		'348',
@@ -1040,7 +1041,7 @@ export const listCountries = [
 		'Hungarian',
 	],
 	[
-		'ICELAND',
+		'Iceland',
 		'ISL',
 		'IS',
 		'352',
@@ -1053,7 +1054,7 @@ export const listCountries = [
 		'Icelandic',
 	],
 	[
-		'INDIA',
+		'India',
 		'IND',
 		'IN',
 		'356',
@@ -1066,7 +1067,7 @@ export const listCountries = [
 		'Indian',
 	],
 	[
-		'INDONESIA',
+		'Indonesia',
 		'IDN',
 		'ID',
 		'360',
@@ -1079,7 +1080,7 @@ export const listCountries = [
 		'Indonesian',
 	],
 	[
-		'IRAN',
+		'Iran',
 		'IRN',
 		'IR',
 		'364',
@@ -1092,7 +1093,7 @@ export const listCountries = [
 		'Iranian',
 	],
 	[
-		'IRAQ',
+		'Iraq',
 		'IRQ',
 		'IQ',
 		'368',
@@ -1105,7 +1106,7 @@ export const listCountries = [
 		'Iraqi',
 	],
 	[
-		'IRELAND',
+		'Ireland',
 		'IRL',
 		'IE',
 		'372',
@@ -1118,7 +1119,7 @@ export const listCountries = [
 		'Irish',
 	],
 	[
-		'ISRAEL',
+		'Israel',
 		'ISR',
 		'IL',
 		'376',
@@ -1131,7 +1132,7 @@ export const listCountries = [
 		'Israeli',
 	],
 	[
-		'ITALY',
+		'Italy',
 		'ITA',
 		'IT',
 		'380',
@@ -1144,7 +1145,7 @@ export const listCountries = [
 		'Italian',
 	],
 	[
-		'JAMAICA',
+		'Jamaica',
 		'JAM',
 		'JM',
 		'388',
@@ -1157,7 +1158,7 @@ export const listCountries = [
 		'Jamaican',
 	],
 	[
-		'JAPAN',
+		'Japan',
 		'JPN',
 		'JP',
 		'392',
@@ -1170,7 +1171,7 @@ export const listCountries = [
 		'Japanese',
 	],
 	[
-		'JORDAN',
+		'Jordan',
 		'JOR',
 		'JO',
 		'400',
@@ -1183,7 +1184,7 @@ export const listCountries = [
 		'Jordanian',
 	],
 	[
-		'KAZAKHSTAN',
+		'Kazakhstan',
 		'KAZ',
 		'KZ',
 		'398',
@@ -1196,7 +1197,7 @@ export const listCountries = [
 		'Kazakhstani',
 	],
 	[
-		'KENYA',
+		'Kenya',
 		'KEN',
 		'KE',
 		'404',
@@ -1209,7 +1210,7 @@ export const listCountries = [
 		'Kenyan',
 	],
 	[
-		'KIRIBATI',
+		'Kiribati',
 		'KIR',
 		'KI',
 		'296',
@@ -1222,7 +1223,7 @@ export const listCountries = [
 		'I-Kiribati',
 	],
 	[
-		'KOREA, NORTH',
+		'Korea, North',
 		'PRK',
 		'KP',
 		'408',
@@ -1235,7 +1236,7 @@ export const listCountries = [
 		'North Korean',
 	],
 	[
-		'KOREA, SOUTH',
+		'Korea, South',
 		'KOR',
 		'KR',
 		'410',
@@ -1248,7 +1249,7 @@ export const listCountries = [
 		'South Korean',
 	],
 	[
-		'KUWAIT',
+		'Kuwait',
 		'KWT',
 		'KW',
 		'414',
@@ -1261,7 +1262,7 @@ export const listCountries = [
 		'Kuwaiti',
 	],
 	[
-		'KYRGYZSTAN',
+		'Kyrgyzstan',
 		'KGZ',
 		'KG',
 		'417',
@@ -1274,7 +1275,7 @@ export const listCountries = [
 		'Kyrgyzstani',
 	],
 	[
-		'LAOS',
+		'Laos',
 		'LAO',
 		'LA',
 		'418',
@@ -1287,7 +1288,7 @@ export const listCountries = [
 		'Lao',
 	],
 	[
-		'LATVIA',
+		'Latvia',
 		'LVA',
 		'LV',
 		'428',
@@ -1300,7 +1301,7 @@ export const listCountries = [
 		'Latvian',
 	],
 	[
-		'LEBANON',
+		'Lebanon',
 		'LBN',
 		'LB',
 		'422',
@@ -1313,7 +1314,7 @@ export const listCountries = [
 		'Lebanese',
 	],
 	[
-		'LESOTHO',
+		'Lesotho',
 		'LSO',
 		'LS',
 		'426',
@@ -1326,7 +1327,7 @@ export const listCountries = [
 		'Basotho',
 	],
 	[
-		'LIBERIA',
+		'Liberia',
 		'LBR',
 		'LR',
 		'430',
@@ -1339,7 +1340,7 @@ export const listCountries = [
 		'Liberian',
 	],
 	[
-		'LIBYA',
+		'Libya',
 		'LBY',
 		'LY',
 		'434',
@@ -1352,7 +1353,7 @@ export const listCountries = [
 		'Libyan',
 	],
 	[
-		'LIECHTENSTEIN',
+		'Liechtenstein',
 		'LIE',
 		'LI',
 		'438',
@@ -1365,7 +1366,7 @@ export const listCountries = [
 		'Liechtensteiner',
 	],
 	[
-		'LITHUANIA',
+		'Lithuania',
 		'LTU',
 		'LT',
 		'440',
@@ -1378,7 +1379,7 @@ export const listCountries = [
 		'Lithuanian',
 	],
 	[
-		'LUXEMBOURG',
+		'Luxembourg',
 		'LUX',
 		'LU',
 		'442',
@@ -1391,7 +1392,7 @@ export const listCountries = [
 		'Luxembourger',
 	],
 	[
-		'MADAGASCAR',
+		'Madagascar',
 		'MDG',
 		'MG',
 		'450',
@@ -1404,7 +1405,7 @@ export const listCountries = [
 		'Malagasy',
 	],
 	[
-		'MALAWI',
+		'Malawi',
 		'MWI',
 		'MW',
 		'454',
@@ -1417,7 +1418,7 @@ export const listCountries = [
 		'Malawian',
 	],
 	[
-		'MALAYSIA',
+		'Malaysia',
 		'MYS',
 		'MY',
 		'458',
@@ -1430,7 +1431,7 @@ export const listCountries = [
 		'Malaysian',
 	],
 	[
-		'MALDIVES',
+		'Maldives',
 		'MDV',
 		'MV',
 		'462',
@@ -1443,7 +1444,7 @@ export const listCountries = [
 		'Maldivian',
 	],
 	[
-		'MALI',
+		'Mali',
 		'MLI',
 		'ML',
 		'466',
@@ -1456,7 +1457,7 @@ export const listCountries = [
 		'Malian',
 	],
 	[
-		'MALTA',
+		'Malta',
 		'MLT',
 		'MT',
 		'470',
@@ -1469,7 +1470,7 @@ export const listCountries = [
 		'Maltese',
 	],
 	[
-		'MARSHALL ISLANDS',
+		'Marshall Islands',
 		'MHL',
 		'MH',
 		'584',
@@ -1482,7 +1483,7 @@ export const listCountries = [
 		'Marshallese',
 	],
 	[
-		'MAURITANIA',
+		'Mauritania',
 		'MRT',
 		'MR',
 		'478',
@@ -1495,7 +1496,7 @@ export const listCountries = [
 		'Mauritanian',
 	],
 	[
-		'MAURITIUS',
+		'Mauritius',
 		'MUS',
 		'MU',
 		'480',
@@ -1508,7 +1509,7 @@ export const listCountries = [
 		'Mauritian',
 	],
 	[
-		'MEXICO',
+		'Mexico',
 		'MEX',
 		'MX',
 		'484',
@@ -1521,7 +1522,7 @@ export const listCountries = [
 		'Mexican',
 	],
 	[
-		'MICRONESIA',
+		'Micronesia',
 		'FSM',
 		'FM',
 		'583',
@@ -1534,7 +1535,7 @@ export const listCountries = [
 		'Micronesian',
 	],
 	[
-		'MOLDOVA',
+		'Moldova',
 		'MDA',
 		'MD',
 		'498',
@@ -1547,7 +1548,7 @@ export const listCountries = [
 		'Moldovan',
 	],
 	[
-		'MONACO',
+		'Monaco',
 		'MCO',
 		'MC',
 		'492',
@@ -1560,7 +1561,7 @@ export const listCountries = [
 		'Monegasque',
 	],
 	[
-		'MONGOLIA',
+		'Mongolia',
 		'MNG',
 		'MN',
 		'496',
@@ -1573,7 +1574,7 @@ export const listCountries = [
 		'Mongolian',
 	],
 	[
-		'MONTENEGRO',
+		'Montenegro',
 		'MNE',
 		'ME',
 		'499',
@@ -1586,7 +1587,7 @@ export const listCountries = [
 		'Montenegrin',
 	],
 	[
-		'MOROCCO',
+		'Morocco',
 		'MAR',
 		'MA',
 		'504',
@@ -1599,7 +1600,7 @@ export const listCountries = [
 		'Moroccan',
 	],
 	[
-		'MOZAMBIQUE',
+		'Mozambique',
 		'MOZ',
 		'MZ',
 		'508',
@@ -1612,7 +1613,7 @@ export const listCountries = [
 		'Mozambican',
 	],
 	[
-		'MYANMAR',
+		'Myanmar',
 		'MMR',
 		'MM',
 		'104',
@@ -1625,7 +1626,7 @@ export const listCountries = [
 		'Burman',
 	],
 	[
-		'NAMIBIA',
+		'Namibia',
 		'NAM',
 		'NA',
 		'516',
@@ -1638,7 +1639,7 @@ export const listCountries = [
 		'Namibian',
 	],
 	[
-		'NAURU',
+		'Nauru',
 		'NRU',
 		'NR',
 		'520',
@@ -1651,7 +1652,7 @@ export const listCountries = [
 		'Nauruan',
 	],
 	[
-		'NEPAL',
+		'Nepal',
 		'NPL',
 		'NP',
 		'524',
@@ -1664,7 +1665,7 @@ export const listCountries = [
 		'Nepalese',
 	],
 	[
-		'NETHERLANDS',
+		'Netherlands',
 		'NLD',
 		'NL',
 		'528',
@@ -1677,7 +1678,7 @@ export const listCountries = [
 		'Dutch',
 	],
 	[
-		'NEW ZEALAND',
+		'New Zealand',
 		'NZL',
 		'NZ',
 		'554',
@@ -1690,7 +1691,7 @@ export const listCountries = [
 		'New Zealander',
 	],
 	[
-		'NICARAGUA',
+		'Nicaragua',
 		'NIC',
 		'NI',
 		'558',
@@ -1703,7 +1704,7 @@ export const listCountries = [
 		'Nicaraguan',
 	],
 	[
-		'NIGER',
+		'Niger',
 		'NER',
 		'NE',
 		'562',
@@ -1716,7 +1717,7 @@ export const listCountries = [
 		'Nigerien',
 	],
 	[
-		'NIGERIA',
+		'Nigeria',
 		'NGA',
 		'NG',
 		'566',
@@ -1729,7 +1730,7 @@ export const listCountries = [
 		'Nigerian',
 	],
 	[
-		'NORTH MACEDONIA',
+		'North Macedonia',
 		'MKD',
 		'MK',
 		'807',
@@ -1742,7 +1743,7 @@ export const listCountries = [
 		'Macedonian',
 	],
 	[
-		'NORWAY',
+		'Norway',
 		'NOR',
 		'NO',
 		'578',
@@ -1755,7 +1756,7 @@ export const listCountries = [
 		'Norwegian',
 	],
 	[
-		'OMAN',
+		'Oman',
 		'OMN',
 		'OM',
 		'512',
@@ -1768,7 +1769,7 @@ export const listCountries = [
 		'Omani',
 	],
 	[
-		'PAKISTAN',
+		'Pakistan',
 		'PAK',
 		'PK',
 		'586',
@@ -1781,7 +1782,7 @@ export const listCountries = [
 		'Pakistani',
 	],
 	[
-		'PALAU',
+		'Palau',
 		'PLW',
 		'PW',
 		'585',
@@ -1794,7 +1795,7 @@ export const listCountries = [
 		'Palauan',
 	],
 	[
-		'PANAMA',
+		'Panama',
 		'PAN',
 		'PA',
 		'591',
@@ -1807,7 +1808,7 @@ export const listCountries = [
 		'Panamanian',
 	],
 	[
-		'PAPUA NEW GUINEA',
+		'Papua New Guinea',
 		'PNG',
 		'PG',
 		'598',
@@ -1820,7 +1821,7 @@ export const listCountries = [
 		'Papua New Guinean',
 	],
 	[
-		'PARAGUAY',
+		'Paraguay',
 		'PRY',
 		'PY',
 		'600',
@@ -1833,7 +1834,7 @@ export const listCountries = [
 		'Paraguayan',
 	],
 	[
-		'PERU',
+		'Peru',
 		'PER',
 		'PE',
 		'604',
@@ -1846,7 +1847,7 @@ export const listCountries = [
 		'Peruvian',
 	],
 	[
-		'PHILIPPINES',
+		'Philippines',
 		'PHL',
 		'PH',
 		'608',
@@ -1859,7 +1860,7 @@ export const listCountries = [
 		'Filipino',
 	],
 	[
-		'POLAND',
+		'Poland',
 		'POL',
 		'PL',
 		'616',
@@ -1872,7 +1873,7 @@ export const listCountries = [
 		'Polish',
 	],
 	[
-		'PORTUGAL',
+		'Portugal',
 		'PRT',
 		'PT',
 		'620',
@@ -1885,7 +1886,7 @@ export const listCountries = [
 		'Portuguese',
 	],
 	[
-		'QATAR',
+		'Qatar',
 		'QAT',
 		'QA',
 		'634',
@@ -1898,7 +1899,7 @@ export const listCountries = [
 		'Qatari',
 	],
 	[
-		'ROMANIA',
+		'Romania',
 		'ROU',
 		'RO',
 		'642',
@@ -1911,7 +1912,7 @@ export const listCountries = [
 		'Romanian',
 	],
 	[
-		'RUSSIA',
+		'Russia',
 		'RUS',
 		'RU',
 		'643',
@@ -1924,7 +1925,7 @@ export const listCountries = [
 		'Russian',
 	],
 	[
-		'RWANDA',
+		'Rwanda',
 		'RWA',
 		'RW',
 		'646',
@@ -1937,7 +1938,7 @@ export const listCountries = [
 		'Rwandan',
 	],
 	[
-		'SAINT KITTS AND NEVIS',
+		'Saint Kitts and Nevis',
 		'KNA',
 		'KN',
 		'659',
@@ -1950,7 +1951,7 @@ export const listCountries = [
 		'Kittitian or Nevisian',
 	],
 	[
-		'SAINT LUCIA',
+		'Saint Lucia',
 		'LCA',
 		'LC',
 		'662',
@@ -1963,7 +1964,7 @@ export const listCountries = [
 		'Saint Lucian',
 	],
 	[
-		'SAINT VINCENT AND THE GRENADINES',
+		'Saint Vincent and the Grenadines',
 		'VCT',
 		'VC',
 		'670',
@@ -1976,7 +1977,7 @@ export const listCountries = [
 		'Vincentian',
 	],
 	[
-		'SAMOA',
+		'Samoa',
 		'WSM',
 		'WS',
 		'882',
@@ -1989,7 +1990,7 @@ export const listCountries = [
 		'Samoan',
 	],
 	[
-		'SAN MARINO',
+		'San Marino',
 		'SMR',
 		'SM',
 		'674',
@@ -2002,7 +2003,7 @@ export const listCountries = [
 		'Sammarinese',
 	],
 	[
-		'SAO TOME AND PRINCIPE',
+		'Sao Tome and Principe',
 		'STP',
 		'ST',
 		'678',
@@ -2015,7 +2016,7 @@ export const listCountries = [
 		'São Toméan',
 	],
 	[
-		'SAUDI ARABIA',
+		'Saudi Arabia',
 		'SAU',
 		'SA',
 		'682',
@@ -2028,7 +2029,7 @@ export const listCountries = [
 		'Saudi',
 	],
 	[
-		'SENEGAL',
+		'Senegal',
 		'SEN',
 		'SN',
 		'686',
@@ -2041,7 +2042,7 @@ export const listCountries = [
 		'Senegalese',
 	],
 	[
-		'SERBIA',
+		'Serbia',
 		'SRB',
 		'RS',
 		'688',
@@ -2054,7 +2055,7 @@ export const listCountries = [
 		'Serbian',
 	],
 	[
-		'SEYCHELLES',
+		'Seychelles',
 		'SYC',
 		'SC',
 		'690',
@@ -2067,7 +2068,7 @@ export const listCountries = [
 		'Seychellois',
 	],
 	[
-		'SIERRA LEONE',
+		'Sierra Leone',
 		'SLE',
 		'SL',
 		'694',
@@ -2080,7 +2081,7 @@ export const listCountries = [
 		'Sierra Leonean',
 	],
 	[
-		'SINGAPORE',
+		'Singapore',
 		'SGP',
 		'SG',
 		'702',
@@ -2093,7 +2094,7 @@ export const listCountries = [
 		'Singaporean',
 	],
 	[
-		'SLOVAKIA',
+		'Slovakia',
 		'SVK',
 		'SK',
 		'703',
@@ -2106,7 +2107,7 @@ export const listCountries = [
 		'Slovak',
 	],
 	[
-		'SLOVENIA',
+		'Slovenia',
 		'SVN',
 		'SI',
 		'705',
@@ -2119,7 +2120,7 @@ export const listCountries = [
 		'Slovenian',
 	],
 	[
-		'SOLOMON ISLANDS',
+		'Solomon Islands',
 		'SLB',
 		'SB',
 		'90',
@@ -2132,7 +2133,7 @@ export const listCountries = [
 		'Solomon Islander',
 	],
 	[
-		'SOMALIA',
+		'Somalia',
 		'SOM',
 		'SO',
 		'706',
@@ -2145,7 +2146,7 @@ export const listCountries = [
 		'Somali',
 	],
 	[
-		'SOUTH AFRICA',
+		'South Africa',
 		'ZAF',
 		'ZA',
 		'710',
@@ -2158,7 +2159,7 @@ export const listCountries = [
 		'South African',
 	],
 	[
-		'SOUTH SUDAN',
+		'South Sudan',
 		'SSD',
 		'SS',
 		'728',
@@ -2171,7 +2172,7 @@ export const listCountries = [
 		'South Sudanese',
 	],
 	[
-		'SPAIN',
+		'Spain',
 		'ESP',
 		'ES',
 		'724',
@@ -2184,7 +2185,7 @@ export const listCountries = [
 		'Spanish',
 	],
 	[
-		'SRI LANKA',
+		'Sri Lanka',
 		'LKA',
 		'LK',
 		'144',
@@ -2197,7 +2198,7 @@ export const listCountries = [
 		'Sri Lankan',
 	],
 	[
-		'SUDAN',
+		'Sudan',
 		'SDN',
 		'SD',
 		'729',
@@ -2210,7 +2211,7 @@ export const listCountries = [
 		'Sudanese',
 	],
 	[
-		'SURINAME',
+		'Suriname',
 		'SUR',
 		'SR',
 		'740',
@@ -2223,7 +2224,7 @@ export const listCountries = [
 		'Surinamese',
 	],
 	[
-		'SWEDEN',
+		'Sweden',
 		'SWE',
 		'SE',
 		'752',
@@ -2236,7 +2237,7 @@ export const listCountries = [
 		'Swedish',
 	],
 	[
-		'SWITZERLAND',
+		'Switzerland',
 		'CHE',
 		'CH',
 		'756',
@@ -2249,7 +2250,7 @@ export const listCountries = [
 		'Swiss',
 	],
 	[
-		'SYRIA',
+		'Syria',
 		'SYR',
 		'SY',
 		'760',
@@ -2262,7 +2263,7 @@ export const listCountries = [
 		'Syrian',
 	],
 	[
-		'TAIWAN',
+		'Taiwan',
 		'TWN',
 		'TW',
 		'158',
@@ -2275,7 +2276,7 @@ export const listCountries = [
 		'Taiwanese',
 	],
 	[
-		'TAJIKISTAN',
+		'Tajikistan',
 		'TJK',
 		'TJ',
 		'762',
@@ -2288,7 +2289,7 @@ export const listCountries = [
 		'Tajikistani',
 	],
 	[
-		'TANZANIA',
+		'Tanzania',
 		'TZA',
 		'TZ',
 		'834',
@@ -2301,7 +2302,7 @@ export const listCountries = [
 		'Tanzanian',
 	],
 	[
-		'THAILAND',
+		'Thailand',
 		'THA',
 		'TH',
 		'764',
@@ -2314,7 +2315,7 @@ export const listCountries = [
 		'Thai',
 	],
 	[
-		'TIMOR-LESTE',
+		'Timor-Leste',
 		'TLS',
 		'TL',
 		'626',
@@ -2327,7 +2328,7 @@ export const listCountries = [
 		'Timorese',
 	],
 	[
-		'TOGO',
+		'Togo',
 		'TGO',
 		'TG',
 		'768',
@@ -2340,7 +2341,7 @@ export const listCountries = [
 		'Togolese',
 	],
 	[
-		'TONGA',
+		'Tonga',
 		'TON',
 		'TO',
 		'776',
@@ -2353,7 +2354,7 @@ export const listCountries = [
 		'Tongan',
 	],
 	[
-		'TRINIDAD AND TOBAGO',
+		'Trinidad and Tobago',
 		'TTO',
 		'TT',
 		'780',
@@ -2366,7 +2367,7 @@ export const listCountries = [
 		'Trinidadian or Tobagonian',
 	],
 	[
-		'TUNISIA',
+		'Tunisia',
 		'TUN',
 		'TN',
 		'788',
@@ -2379,7 +2380,7 @@ export const listCountries = [
 		'Tunisian',
 	],
 	[
-		'TURKEY',
+		'Turkey',
 		'TUR',
 		'TR',
 		'792',
@@ -2392,7 +2393,7 @@ export const listCountries = [
 		'Turkish',
 	],
 	[
-		'TURKMENISTAN',
+		'Turkmenistan',
 		'TKM',
 		'TM',
 		'795',
@@ -2405,7 +2406,7 @@ export const listCountries = [
 		'Turkmen',
 	],
 	[
-		'TUVALU',
+		'Tuvalu',
 		'TUV',
 		'TV',
 		'798',
@@ -2418,7 +2419,7 @@ export const listCountries = [
 		'Tuvaluan',
 	],
 	[
-		'UGANDA',
+		'Uganda',
 		'UGA',
 		'UG',
 		'800',
@@ -2431,7 +2432,7 @@ export const listCountries = [
 		'Ugandan',
 	],
 	[
-		'UKRAINE',
+		'Ukraine',
 		'UKR',
 		'UA',
 		'804',
@@ -2444,7 +2445,7 @@ export const listCountries = [
 		'Ukrainian',
 	],
 	[
-		'UNITED ARAB EMIRATES',
+		'United Arab Emirates',
 		'ARE',
 		'AE',
 		'784',
@@ -2457,7 +2458,7 @@ export const listCountries = [
 		'Emirati',
 	],
 	[
-		'UNITED KINGDOM',
+		'United Kingdom',
 		'GBR',
 		'GB',
 		'826',
@@ -2470,7 +2471,7 @@ export const listCountries = [
 		'British',
 	],
 	[
-		'UNITED STATES',
+		'United States',
 		'USA',
 		'US',
 		'840',
@@ -2483,7 +2484,7 @@ export const listCountries = [
 		'American',
 	],
 	[
-		'URUGUAY',
+		'Uruguay',
 		'URY',
 		'UY',
 		'858',
@@ -2496,7 +2497,7 @@ export const listCountries = [
 		'Uruguayan',
 	],
 	[
-		'UZBEKISTAN',
+		'Uzbekistan',
 		'UZB',
 		'UZ',
 		'860',
@@ -2509,7 +2510,7 @@ export const listCountries = [
 		'Uzbekistani',
 	],
 	[
-		'VANUATU',
+		'Vanuatu',
 		'VUT',
 		'VU',
 		'548',
@@ -2522,7 +2523,7 @@ export const listCountries = [
 		'Ni-Vanuatu',
 	],
 	[
-		'VENEZUELA',
+		'Venezuela',
 		'VEN',
 		'VE',
 		'862',
@@ -2535,7 +2536,7 @@ export const listCountries = [
 		'Venezuelan',
 	],
 	[
-		'VIETNAM',
+		'Vietnam',
 		'VNM',
 		'VN',
 		'704',
@@ -2548,7 +2549,7 @@ export const listCountries = [
 		'Vietnamese',
 	],
 	[
-		'YEMEN',
+		'Yemen',
 		'YEM',
 		'YE',
 		'887',
@@ -2561,7 +2562,7 @@ export const listCountries = [
 		'Yemeni',
 	],
 	[
-		'ZAMBIA',
+		'Zambia',
 		'ZMB',
 		'ZM',
 		'894',
@@ -2574,7 +2575,7 @@ export const listCountries = [
 		'Zambian',
 	],
 	[
-		'ZIMBABWE',
+		'Zimbabwe',
 		'ZWE',
 		'ZW',
 		'716',
