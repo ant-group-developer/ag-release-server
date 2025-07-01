@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsEnum,
 	IsNotEmpty,
 	IsNumber,
 	IsString,
@@ -9,6 +10,7 @@ import {
 	MaxLength,
 } from 'class-validator';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
+import { EntityTypePicture } from '../enum/bucket.enum';
 
 export class GetUrlUploadDto {
 	@IsNotEmpty()
@@ -27,14 +29,13 @@ export class GetUrlUploadDto {
 export class GenerateGcsPictureUploadUrlDto {
 	@ApiProperty({
 		description:
-			'Entity type related to the picture (e.g., artist, label, genre)',
-		example: 'artist',
-		maxLength: 20,
+			'Entity type related to the picture (e.g., artists, genres)',
+		example: EntityTypePicture.ARTIST,
+		enum: EntityTypePicture,
 	})
 	@IsNotEmpty()
-	@MaxLength(20)
-	@IsString()
-	entityType: string;
+	@IsEnum(EntityTypePicture)
+	entityType: EntityTypePicture;
 
 	@ApiProperty({
 		description: 'File name of the image to be uploaded',

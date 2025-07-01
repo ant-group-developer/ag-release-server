@@ -5,7 +5,7 @@ import {
 	GenerateGcsPictureUploadUrlDto,
 	GetUrlUploadDto,
 } from '../dto/bucket.gcs.dto';
-import { BucketGcsAction } from '../enum/bucket.action.gsc';
+import { BucketGcsAction } from '../enum/bucket.enum';
 
 @Injectable()
 export class BucketGcsService {
