@@ -27,24 +27,14 @@ export class NotificationService {
 			? `[🟢 BACKUP] Success at ${time}`
 			: `[🔴 BACKUP] Failed at ${time}`;
 
-		const html = status
-			? `
-			<h3>✅ Database Backup Successful</h3>
-			<ul>
-				<li><b>Time:</b> ${time}</li>
-				<li><b>Filename:</b> ${filename}</li>
-				<li><b>Upload status:</b> GDrive ✅ & GCS ✅</li>
-			</ul>
-		`
-			: `
-			<h3>❌ Database Backup Failed</h3>
-			<ul>
-				<li><b>Time:</b> ${time}</li>
-				<li><b>Filename:</b> ${filename}</li>
-			</ul>
-			<p><b>Error:</b></p>
-			<pre style="background:#eee;padding:10px;">${error}</pre>
-		`;
+		// const html = renderTemplate(
+		// 	status
+		// 		? 'src/modules/notification/templates/notification-backup-success.hbs'
+		// 		: 'src/modules/notification/templates/notification-backup-fail.hbs',
+		// 	{ time, filename, error: error ?? '' },
+		// );
+
+		const html = '';
 
 		const listUserDev = await this.notificationUserService.getListUserDev();
 		let listEmails: string[] = [];

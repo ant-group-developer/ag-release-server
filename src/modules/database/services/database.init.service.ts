@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { UserType } from 'src/modules/user/enum/user.enum';
 import { DataSource } from 'typeorm';
-import { listCountries } from '../constants/database.constant';
+import { v4 as uuidv4 } from 'uuid';
+import { listCountries, listLanguages } from '../constants/database.constant';
 
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {
@@ -59,6 +60,60 @@ export class DatabaseInitService implements OnModuleInit {
 		}
 	}
 
+	// private async initCountry() {
+	// 	const countQuery = `SELECT COUNT(*) FROM countries`;
+	// 	const result = await this.dataSource.query(countQuery);
+
+	// 	const dataInit = listCountries;
+
+	// 	if (result[0].count === '0') {
+	// 		const query = `
+	// 		INSERT INTO countries (
+	// 		  id, name, iso3, iso2, numeric_code, phone_code, capital, currency, currency_name, currency_symbol, region_id, nationality
+	// 		) VALUES (
+	// 		  uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	// 		)
+	// 	  `;
+
+	// 		for (const country of dataInit) {
+	// 			await this.dataSource.query(query, country);
+	// 		}
+
+	// 		console.log('Countries inserted successfully');
+	// 	} else {
+	// 		console.log(
+	// 			'Countries table already has data, skipping initialization',
+	// 		);
+	// 	}
+	// }
+
+	// private async initLanguage() {
+	// 	const countQuery = SELECT COUNT(*) FROM languages;
+	// 	const result = await this.dataSource.query(countQuery);
+
+	// 	if (result[0].count === '0') {
+	// 		const query =
+	// 		INSERT INTO languages (
+	// 			id, name, code
+	// 		) VALUES (
+	// 			uuid_generate_v4(), $1, $2
+	// 		)
+	// 	;
+
+	// 		const dataInitLanguage = listLanguages;
+
+	// 		for (const language of dataInitLanguage) {
+	// 			await this.dataSource.query(query, language);
+	// 		}
+
+	// 		console.log('Languages inserted successfully');
+	// 	} else {
+	// 		console.log(
+	// 			'Languages table already has data, skipping initialization',
+	// 		);
+	// 	}
+	// }
+
 	private async initCountry() {
 		const countQuery = `SELECT COUNT(*) FROM countries`;
 		const result = await this.dataSource.query(countQuery);
@@ -66,18 +121,32 @@ export class DatabaseInitService implements OnModuleInit {
 		const dataInit = listCountries;
 
 		if (result[0].count === '0') {
+			console.log('Initializing country');
 			const query = `
-			INSERT INTO countries (
-			  id, name, iso3, iso2, numeric_code, phone_code, capital, currency, currency_name, currency_symbol, region_id, nationality
-			) VALUES (
-			  uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-			)
-		  `;
+				INSERT INTO countries (
+					id, name, iso3, iso2, numeric_code, phone_code, capital,
+					currency, currency_name, currency_symbol, region_id, nationality
+				) VALUES (
+					$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+				)
+			`;
 
-			for (const country of dataInit) {
-				await this.dataSource.query(query, country);
+			for (const item of dataInit) {
+				await this.dataSource.query(query, [
+					uuidv4(),
+					item[0],
+					item[1],
+					item[2],
+					item[3],
+					item[4],
+					item[5],
+					item[6],
+					item[7],
+					item[8],
+					item[9],
+					item[10],
+				]);
 			}
-
 			console.log('Countries inserted successfully');
 		} else {
 			console.log(
@@ -86,5 +155,35 @@ export class DatabaseInitService implements OnModuleInit {
 		}
 	}
 
-	private initLanguage() {}
+	private async initLanguage() {
+		const countQuery = `SELECT COUNT(*) FROM languages`;
+		const result = await this.dataSource.query(countQuery);
+
+		if (result[0].count === '0') {
+			console.log('Initializing language');
+			const query = `
+				INSERT INTO languages (
+					id, name, code
+				) VALUES (
+					$1, $2, $3
+				)
+			`;
+
+			const dataInitLanguage = listLanguages;
+
+			for (const language of dataInitLanguage) {
+				await this.dataSource.query(query, [
+					uuidv4(),
+					language[0],
+					language[1],
+				]);
+			}
+
+			console.log('Languages inserted successfully');
+		} else {
+			console.log(
+				'Languages table already has data, skipping initialization',
+			);
+		}
+	}
 }

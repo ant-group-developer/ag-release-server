@@ -1,14 +1,18 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { BucketGcsService } from 'src/modules/bucket/services/bucket.gcs.service';
 import { Repository } from 'typeorm';
+import {
+	ArtistMessageCodeError,
+	ArtistMessageError,
+} from '../constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
 	UpdateArtistDto,
 } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
-import { ArtistValidateService } from './artist.validate.service';
 
 @Injectable()
 export class ArtistService {
@@ -16,12 +20,12 @@ export class ArtistService {
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
 
-		private readonly artistValidateService: ArtistValidateService,
+		private readonly bucketGcsService: BucketGcsService,
 	) {}
 
 	async create(createArtistDto: CreateArtistDto): Promise<Artist> {
 		const { name } = createArtistDto;
-		await this.artistValidateService.validate({ name });
+		await this.validate({ name });
 
 		const artist = this.artistRepo.create(createArtistDto);
 		return await this.artistRepo.save(artist);
@@ -30,7 +34,10 @@ export class ArtistService {
 	async findOne(id: string): Promise<Artist> {
 		const artist = await this.artistRepo.findOne({ where: { id } });
 		if (!artist) {
-			throw new BadRequestException('Not found');
+			throw new ResponseError({
+				message: ArtistMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
 		}
 
 		return artist;
@@ -58,10 +65,20 @@ export class ArtistService {
 		id: string,
 		updateArtistDto: UpdateArtistDto,
 	): Promise<Artist> {
-		const { name } = updateArtistDto;
+		const { name, picture } = updateArtistDto;
 
-		if (name) {
-			await this.artistValidateService.validate({ name });
+		const artist = await this.findOne(id);
+
+		if (name && name !== artist.name) {
+			await this.validate({ name });
+		}
+
+		if (
+			picture !== undefined &&
+			picture !== artist.picture &&
+			artist.picture
+		) {
+			await this.bucketGcsService.deletePublicFile(artist.picture);
 		}
 
 		await this.artistRepo.update(id, updateArtistDto);
@@ -69,6 +86,23 @@ export class ArtistService {
 	}
 
 	async remove(id: string): Promise<void> {
+		const artist = await this.findOne(id);
+		if (artist.picture)
+			await this.bucketGcsService.deletePublicFile(artist.picture);
 		await this.artistRepo.delete(id);
+	}
+
+	async validate({ name }: { name: string }) {
+		const artist = await this.artistRepo.findOne({
+			where: { name },
+		});
+
+		if (artist) {
+			throw new ResponseError({
+				message: ArtistMessageError.DUPLICATE_NAME_ARTIST,
+				messageCode: ArtistMessageCodeError.DUPLICATE_NAME_ARTIST,
+				statusCode: 409,
+			});
+		}
 	}
 }
