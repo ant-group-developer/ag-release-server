@@ -1,0 +1,25 @@
+export const ReleaseArtistMessageCodeSuccess = {
+	CREATE: 'releaseArtist.message.success.create',
+	UPDATE: 'releaseArtist.message.success.update',
+	DELETE: 'releaseArtist.message.success.delete',
+};
+
+export const ReleaseArtistMessageSuccess = {
+	CREATE: 'Create success',
+	UPDATE: 'Update success',
+	DELETE: 'Delete success',
+};
+
+export const ReleaseArtistMessageCodeError = {
+	NOT_FOUND: 'releaseArtist.message.error.notFound',
+	ARTIST_ROLE_NOT_FOUND: 'releaseArtist.message.error.artistRoleNotFound',
+	ARTIST_NOT_FOUND: 'releaseArtist.message.error.artistNotFound',
+	RELEASE_NOT_FOUND: 'releaseArtist.message.error.releaseNotFound',
+};
+
+export const ReleaseArtistMessageError = {
+	NOT_FOUND: 'Not found',
+	ARTIST_ROLE_NOT_FOUND: 'Artist role not found',
+	ARTIST_NOT_FOUND: 'Artist not found',
+	RELEASE_NOT_FOUND: 'Release not found',
+};
