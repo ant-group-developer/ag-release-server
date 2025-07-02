@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import { ArtistRoleService } from './artist-role.service';
 import {
 	ArtistRoleMessageCodeSuccess,
 	ArtistRoleMessageError,
@@ -22,6 +21,7 @@ import {
 	UpdateArtistRoleDto,
 } from './dto/artist-role.dto';
 import { ArtistRole } from './entities/artist-role.entity';
+import { ArtistRoleService } from './services/artist-role.service';
 
 @ApiTags('Artist Roles')
 @Controller('artist-roles')

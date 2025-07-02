@@ -15,9 +15,9 @@ import {
 	DspMessageError,
 	DspMessageSuccess,
 } from './constants/dsp.constant';
-import { DspService } from './dsp.service';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
 import { Dsp } from './entities/dsp.entity';
+import { DspService } from './services/dsp.service';
 
 @ApiTags('DSPs')
 @Controller('dsps')

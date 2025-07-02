@@ -2,10 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { BucketGcsService } from '../bucket/services/bucket.gcs.service';
-import { DspMessageCodeError, DspMessageError } from './constants/dsp.constant';
-import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
-import { Dsp } from './entities/dsp.entity';
+import { BucketGcsService } from '../../bucket/services/bucket.gcs.service';
+import {
+	DspMessageCodeError,
+	DspMessageError,
+} from '../constants/dsp.constant';
+import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
+import { Dsp } from '../entities/dsp.entity';
+import { DspQbService } from './dsp.qb.service';
 
 @Injectable()
 export class DspService {
@@ -14,6 +18,7 @@ export class DspService {
 		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly dspQbService: DspQbService,
 	) {}
 
 	async create(createDspDto: CreateDspDto): Promise<Dsp> {
@@ -32,15 +37,11 @@ export class DspService {
 	}
 
 	async getList(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
-		const { page, pageSize, skip, fieldOrder, orderBy } = query;
+		const { page, pageSize } = query;
 
-		const [dsps, totalItems] = await this.dspRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-		});
+		const queryGetList = this.dspQbService.createQueryGetList(query);
+
+		const [dsps, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: dsps,

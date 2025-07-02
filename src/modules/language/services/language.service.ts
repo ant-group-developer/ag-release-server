@@ -5,19 +5,22 @@ import { Repository } from 'typeorm';
 import {
 	LanguageMessageCodeError,
 	LanguageMessageError,
-} from './constants/language.constant';
+} from '../constants/language.constant';
 import {
 	CreateLanguageDto,
 	QueryGetListLanguageDto,
 	UpdateLanguageDto,
-} from './dto/language.dto';
-import { Language } from './entities/language.entity';
+} from '../dto/language.dto';
+import { Language } from '../entities/language.entity';
+import { LanguageQbService } from './language.qb.service';
 
 @Injectable()
 export class LanguageService {
 	constructor(
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
+
+		private readonly languageQbService: LanguageQbService,
 	) {}
 
 	async create(createLanguageDto: CreateLanguageDto): Promise<Language> {
@@ -42,15 +45,11 @@ export class LanguageService {
 	}
 
 	async getList(query: QueryGetListLanguageDto): Promise<PageDto<Language>> {
-		const { page, pageSize, skip, fieldOrder, orderBy } = query;
+		const { page, pageSize } = query;
 
-		const [languages, totalItems] = await this.languageRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-		});
+		const queryGetList = this.languageQbService.createQueryGetList(query);
+
+		const [languages, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: languages,
