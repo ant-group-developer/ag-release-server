@@ -32,24 +32,14 @@ export class DspService {
 	}
 
 	async getList(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, fieldOrder, orderBy } = query;
 
 		const [dsps, totalItems] = await this.dspRepo.findAndCount({
 			skip,
 			take: pageSize,
-			// relations: ['creator', 'modifier'],
-			// select: {
-			// 	creator: {
-			// 		id: true,
-			// 		email: true,
-			// 		name: true,
-			// 	},
-			// 	modifier: {
-			// 		id: true,
-			// 		email: true,
-			// 		name: true,
-			// 	},
-			// },
+			order: {
+				[fieldOrder]: orderBy,
+			},
 		});
 
 		return new PageDto({

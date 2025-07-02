@@ -42,11 +42,14 @@ export class LanguageService {
 	}
 
 	async getList(query: QueryGetListLanguageDto): Promise<PageDto<Language>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, fieldOrder, orderBy } = query;
 
 		const [languages, totalItems] = await this.languageRepo.findAndCount({
 			skip,
 			take: pageSize,
+			order: {
+				[fieldOrder]: orderBy,
+			},
 		});
 
 		return new PageDto({

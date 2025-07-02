@@ -43,11 +43,14 @@ export class GenreService {
 	}
 
 	async getList(query: QueryGetListGenreDto): Promise<PageDto<Genre>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, fieldOrder, orderBy } = query;
 
 		const [genres, totalItems] = await this.genreRepo.findAndCount({
 			skip,
 			take: pageSize,
+			order: {
+				[fieldOrder]: orderBy,
+			},
 		});
 
 		return new PageDto({

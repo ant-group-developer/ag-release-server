@@ -1,5 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import {
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -8,6 +9,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { FieldOrderLabel } from '../enum/label.enum';
 
 export class CreateLabelDto {
 	@ApiProperty({
@@ -44,6 +46,7 @@ export class CreateLabelDto {
 	@MaxLength(200)
 	description?: string | null;
 }
+
 export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	@IsString()
 	@IsNotEmpty()
@@ -52,4 +55,8 @@ export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	name: string;
 }
 
-export class QueryGetListLabelDto extends BaseQueryDto {}
+export class QueryGetListLabelDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderLabel)
+	fieldOrder: FieldOrderLabel = FieldOrderLabel.NAME;
+}

@@ -42,12 +42,15 @@ export class ArtistRoleService {
 	async getList(
 		query: QueryGetListArtistRoleDto,
 	): Promise<PageDto<ArtistRole>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, fieldOrder, orderBy } = query;
 
 		const [artistRoles, totalItems] =
 			await this.artistRoleRepo.findAndCount({
 				skip,
 				take: pageSize,
+				order: {
+					[fieldOrder]: orderBy,
+				},
 			});
 
 		return new PageDto({

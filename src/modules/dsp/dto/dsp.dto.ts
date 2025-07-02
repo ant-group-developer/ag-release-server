@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import {
 	IsBoolean,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -9,6 +10,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { FieldOrderDsp } from '../enum/dsp.enum';
 
 export class CreateDspDto {
 	@ApiProperty({
@@ -50,4 +52,8 @@ export class UpdateDspDto extends PartialType(CreateDspDto) {
 	name: string;
 }
 
-export class QueryGetListDspDto extends BaseQueryDto {}
+export class QueryGetListDspDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderDsp)
+	fieldOrder: FieldOrderDsp = FieldOrderDsp.NAME;
+}

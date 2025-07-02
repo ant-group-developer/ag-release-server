@@ -8,7 +8,7 @@ import {
 	SUCCESS_MESSAGE_CODE_DEFAULT,
 	SUCCESS_MESSAGE_DEFAULT,
 	SUCCESS_STATUS_CODE_DEFAULT,
-} from '../constants/message.constants';
+} from '../constants/common.default.constants';
 
 /**
  * Standard wrapper for single-item responses.

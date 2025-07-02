@@ -1,7 +1,14 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+	IsEnum,
+	IsOptional,
+	IsString,
+	MaxLength,
+	ValidateIf,
+} from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { FieldOrderGenre } from '../enum/genre.enum';
 
 export class CreateGenreDto {
 	@ApiProperty({
@@ -40,4 +47,8 @@ export class UpdateGenreDto extends PartialType(CreateGenreDto) {
 	name: string;
 }
 
-export class QueryGetListGenreDto extends BaseQueryDto {}
+export class QueryGetListGenreDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderGenre)
+	fieldOrder: FieldOrderGenre = FieldOrderGenre.NAME;
+}

@@ -1,6 +1,14 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+	IsEnum,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	MaxLength,
+	ValidateIf,
+} from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { FieldOrderArtistRole } from '../enum/artist-role.enum';
 
 export class CreateArtistRoleDto {
 	@ApiProperty({
@@ -22,4 +30,8 @@ export class UpdateArtistRoleDto extends PartialType(CreateArtistRoleDto) {
 	name: string;
 }
 
-export class QueryGetListArtistRoleDto extends BaseQueryDto {}
+export class QueryGetListArtistRoleDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderArtistRole)
+	fieldOrder: FieldOrderArtistRole = FieldOrderArtistRole.NAME;
+}
