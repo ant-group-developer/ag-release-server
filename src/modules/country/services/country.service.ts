@@ -41,11 +41,14 @@ export class CountryService {
 	}
 
 	async getList(query: QueryGetListCountryDto): Promise<PageDto<Country>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, orderBy, fieldOrder } = query;
 
 		const [countries, totalItems] = await this.countryRepo.findAndCount({
 			skip,
 			take: pageSize,
+			order: {
+				[fieldOrder]: orderBy,
+			},
 			// relations: ['trackLanguages', 'releaseLanguages'],
 		});
 

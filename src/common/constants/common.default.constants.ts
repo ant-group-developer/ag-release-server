@@ -5,3 +5,5 @@ export const SUCCESS_MESSAGE_CODE_DEFAULT = 'success';
 export const ERROR_STATUS_CODE_DEFAULT = 400;
 export const ERROR_MESSAGE_DEFAULT = 'Error';
 export const ERROR_MESSAGE_CODE_DEFAULT = 'error';
+
+export const FILED_ORDER_DEFAULT = 'name';

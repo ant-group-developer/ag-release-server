@@ -1,5 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import {
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -7,6 +8,8 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { FieldOrderLabel } from '../enum/label.enum';
 
 export class CreateLabelDto {
 	@ApiProperty({
@@ -21,14 +24,14 @@ export class CreateLabelDto {
 
 	@ApiProperty({
 		description: 'URL of the label’s logo or picture',
-		maxLength: 100,
+		maxLength: lengthPicture,
 		example:
 			'https://storage.googleapis.com/ant-music-assets/label/warner.jpg',
 		required: false,
 	})
 	@IsString()
 	@IsOptional()
-	@MaxLength(100)
+	@MaxLength(lengthPicture)
 	picture?: string | null;
 
 	@ApiProperty({
@@ -43,6 +46,7 @@ export class CreateLabelDto {
 	@MaxLength(200)
 	description?: string | null;
 }
+
 export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	@IsString()
 	@IsNotEmpty()
@@ -51,4 +55,8 @@ export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	name: string;
 }
 
-export class QueryGetListLabelDto extends BaseQueryDto {}
+export class QueryGetListLabelDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderLabel)
+	fieldOrder: FieldOrderLabel = FieldOrderLabel.NAME;
+}

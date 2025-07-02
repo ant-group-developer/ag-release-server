@@ -2662,4 +2662,4 @@ export const listLanguages = [
 	['Yiddish', 'yi'],
 ];
 
-export const maxLengthPicture = 100;
+export const lengthPicture = 200;

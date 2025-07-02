@@ -1,5 +1,6 @@
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -19,7 +20,7 @@ export class Track extends BaseCustomIDEntity {
 	@Column({ type: 'varchar', length: 100 })
 	title: string;
 
-	@Column({ type: 'varchar', length: 100, nullable: true })
+	@Column({ type: 'varchar', length: lengthPicture, nullable: true })
 	picture: string | null;
 
 	@Column({

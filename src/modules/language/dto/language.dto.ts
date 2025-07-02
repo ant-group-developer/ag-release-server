@@ -1,6 +1,14 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
+import {
+	IsEnum,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	MaxLength,
+	ValidateIf,
+} from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { FieldOrderLanguage } from '../enum/language.enum';
 
 export class CreateLanguageDto {
 	@ApiProperty({
@@ -38,4 +46,8 @@ export class UpdateLanguageDto extends PartialType(CreateLanguageDto) {
 	code: string;
 }
 
-export class QueryGetListLanguageDto extends BaseQueryDto {}
+export class QueryGetListLanguageDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderLanguage)
+	fieldOrder: FieldOrderLanguage = FieldOrderLanguage.NAME;
+}

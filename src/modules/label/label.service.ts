@@ -43,11 +43,14 @@ export class LabelService {
 	}
 
 	async getList(query: QueryGetListLabelDto): Promise<PageDto<Label>> {
-		const { page, pageSize, skip } = query;
+		const { page, pageSize, skip, orderBy, fieldOrder } = query;
 
 		const [labels, totalItems] = await this.labelRepo.findAndCount({
 			skip,
 			take: pageSize,
+			order: {
+				[fieldOrder]: orderBy,
+			},
 		});
 
 		return new PageDto({

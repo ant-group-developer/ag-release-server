@@ -2,7 +2,7 @@ import { Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-	GenerateGcsPictureUploadUrlDto,
+	GenerateGcsPresignedUploadUrlDto,
 	GetUrlUploadDto,
 } from '../dto/bucket.gcs.dto';
 import { BucketGcsAction } from '../enum/bucket.enum';
@@ -22,7 +22,7 @@ export class BucketGcsService {
 			this.configService.get<string>('PUBLIC_BUCKET')!;
 		this.privateBucketName =
 			this.configService.get<string>('PROTECTED_BUCKET')!;
-		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}/`;
+		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}`;
 	}
 
 	async getUrlUploadPublicBucket(data: GetUrlUploadDto): Promise<string> {
@@ -42,7 +42,7 @@ export class BucketGcsService {
 	async deletePublicFile(urlPublic: string): Promise<void> {
 		const file = this.storage
 			.bucket(this.publicBucketName)
-			.file(urlPublic.replace(this.baseUrlPublic, ''));
+			.file(urlPublic.replace(this.baseUrlPublic + '/', ''));
 
 		const [exists] = await file.exists();
 		if (!exists) return;
@@ -50,8 +50,8 @@ export class BucketGcsService {
 		await file.delete();
 	}
 
-	async generatePublicPictureUrl(
-		data: GenerateGcsPictureUploadUrlDto,
+	async generatePublicPresignedUploadUrl(
+		data: GenerateGcsPresignedUploadUrlDto,
 	): Promise<{
 		urlPublic: string;
 		urlUpload: string;
@@ -74,6 +74,6 @@ export class BucketGcsService {
 	}
 
 	private getUrlPublic(entityType: string, fileName: string) {
-		return `${this.baseUrlPublic}${entityType}/${fileName}`;
+		return `${this.baseUrlPublic}/${entityType}/${fileName}`;
 	}
 }

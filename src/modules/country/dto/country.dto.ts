@@ -1,8 +1,15 @@
-import { IsNumber, IsString, ValidateIf } from 'class-validator';
+import {
+	IsEnum,
+	IsNumber,
+	IsOptional,
+	IsString,
+	ValidateIf,
+} from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, MaxLength } from 'class-validator';
+import { FieldOrderCountry } from '../enum/country.enum';
 
 export class CreateCountryDto {
 	@ApiProperty({
@@ -181,4 +188,8 @@ export class UpdateCountryDto extends PartialType(CreateCountryDto) {
 	nationality: string;
 }
 
-export class QueryGetListCountryDto extends BaseQueryDto {}
+export class QueryGetListCountryDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderCountry)
+	fieldOrder: FieldOrderCountry = FieldOrderCountry.NAME;
+}
