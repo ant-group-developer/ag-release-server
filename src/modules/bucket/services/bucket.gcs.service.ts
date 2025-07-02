@@ -2,7 +2,7 @@ import { Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-	GenerateGcsPictureUploadUrlDto,
+	GenerateGcsPresignedUploadUrlDto,
 	GetUrlUploadDto,
 } from '../dto/bucket.gcs.dto';
 import { BucketGcsAction } from '../enum/bucket.enum';
@@ -50,8 +50,8 @@ export class BucketGcsService {
 		await file.delete();
 	}
 
-	async generatePublicPictureUrl(
-		data: GenerateGcsPictureUploadUrlDto,
+	async generatePublicPresignedUploadUrl(
+		data: GenerateGcsPresignedUploadUrlDto,
 	): Promise<{
 		urlPublic: string;
 		urlUpload: string;

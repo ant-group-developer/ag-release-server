@@ -1,4 +1,5 @@
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
@@ -8,7 +9,7 @@ export class Genre extends BaseCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 1000, nullable: true })
+	@Column({ type: 'varchar', length: lengthPicture, nullable: true })
 	picture: string | null;
 
 	@Column({ type: 'varchar', length: 200, nullable: true })

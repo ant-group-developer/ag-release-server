@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
 
 export class CreateGenreDto {
 	@ApiProperty({
@@ -14,10 +15,11 @@ export class CreateGenreDto {
 	@ApiPropertyOptional({
 		description: 'The picture associated with the genre, can be null',
 		example: 'rock_picture.jpg',
+		maxLength: lengthPicture,
 	})
 	@IsOptional()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(lengthPicture)
 	picture: string | null;
 
 	@ApiPropertyOptional({

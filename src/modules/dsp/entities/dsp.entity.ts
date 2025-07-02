@@ -1,5 +1,6 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
@@ -9,7 +10,12 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@Column({ name: 'name', type: 'varchar', unique: true, length: 100 })
 	name: string;
 
-	@Column({ name: 'picture', type: 'varchar', length: 100, nullable: true })
+	@Column({
+		name: 'picture',
+		type: 'varchar',
+		length: lengthPicture,
+		nullable: true,
+	})
 	picture: string | null;
 
 	@Column({

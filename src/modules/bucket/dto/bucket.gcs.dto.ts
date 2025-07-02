@@ -26,7 +26,7 @@ export class GetUrlUploadDto {
 	fileSize: number;
 }
 
-export class GenerateGcsPictureUploadUrlDto {
+export class GenerateGcsPresignedUploadUrlDto {
 	@ApiProperty({
 		description:
 			'Entity type related to the picture (e.g., artists, genres)',
@@ -43,7 +43,7 @@ export class GenerateGcsPictureUploadUrlDto {
 		maxLength: 100,
 	})
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(100 + 'YYYYMMDDHHmmss_'.length)
 	@IsString()
 	@Transform(({ value }) => generateFileNameWithTimestamp(value))
 	fileName: string;

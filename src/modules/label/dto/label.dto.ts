@@ -7,6 +7,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { lengthPicture } from 'src/modules/database/constants/database.constant';
 
 export class CreateLabelDto {
 	@ApiProperty({
@@ -21,14 +22,14 @@ export class CreateLabelDto {
 
 	@ApiProperty({
 		description: 'URL of the label’s logo or picture',
-		maxLength: 100,
+		maxLength: lengthPicture,
 		example:
 			'https://storage.googleapis.com/ant-music-assets/label/warner.jpg',
 		required: false,
 	})
 	@IsString()
 	@IsOptional()
-	@MaxLength(100)
+	@MaxLength(lengthPicture)
 	picture?: string | null;
 
 	@ApiProperty({
