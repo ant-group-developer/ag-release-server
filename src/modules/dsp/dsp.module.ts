@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BucketModule } from '../bucket/bucket.module';
 import { DspController } from './dsp.controller';
-import { DspService } from './dsp.service';
 import { Dsp } from './entities/dsp.entity';
+import { DspQbService } from './services/dsp.qb.service';
+import { DspService } from './services/dsp.service';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([Dsp]), BucketModule],
 	controllers: [DspController],
-	providers: [DspService],
+	providers: [DspService, DspQbService],
 })
 export class DspModule {}

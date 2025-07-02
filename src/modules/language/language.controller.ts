@@ -21,7 +21,7 @@ import {
 	UpdateLanguageDto,
 } from './dto/language.dto';
 import { Language } from './entities/language.entity';
-import { LanguageService } from './language.service';
+import { LanguageService } from './services/language.service';
 
 @ApiTags('Languages')
 @Controller('languages')

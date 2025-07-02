@@ -1,11 +1,12 @@
-import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
+import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { lengthPicture } from 'src/modules/database/constants/database.constant';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { User } from 'src/modules/user/entities/user.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('genres')
-export class Genre extends BaseCustomIDEntity {
+export class Genre extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
@@ -28,4 +29,13 @@ export class Genre extends BaseCustomIDEntity {
 
 	@OneToMany(() => Track, (track) => track.subGenre)
 	subGenreTracks: Track[];
+
+	//user
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User;
 }

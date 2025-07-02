@@ -22,7 +22,7 @@ import {
 	UpdateGenreDto,
 } from './dto/genre.dto';
 import { Genre } from './entities/genre.entity';
-import { GenreService } from './genre.service';
+import { GenreService } from './services/genre.service';
 
 @ApiTags('Genres')
 @Controller('genres')

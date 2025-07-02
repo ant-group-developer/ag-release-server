@@ -2,17 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { BucketGcsService } from '../bucket/services/bucket.gcs.service';
+import { BucketGcsService } from '../../bucket/services/bucket.gcs.service';
 import {
 	GenreMessageCodeError,
 	GenreMessageError,
-} from './constants/genre.constant';
+} from '../constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
 	UpdateGenreDto,
-} from './dto/genre.dto';
-import { Genre } from './entities/genre.entity';
+} from '../dto/genre.dto';
+import { Genre } from '../entities/genre.entity';
+import { GenreQbService } from './genre.qb.service';
 
 @Injectable()
 export class GenreService {
@@ -21,6 +22,7 @@ export class GenreService {
 		private readonly genreRepo: Repository<Genre>,
 
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly genreQbService: GenreQbService,
 	) {}
 
 	async create(createGenreDto: CreateGenreDto): Promise<Genre> {
@@ -43,15 +45,11 @@ export class GenreService {
 	}
 
 	async getList(query: QueryGetListGenreDto): Promise<PageDto<Genre>> {
-		const { page, pageSize, skip, fieldOrder, orderBy } = query;
+		const { page, pageSize } = query;
 
-		const [genres, totalItems] = await this.genreRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-		});
+		const queryGetList = this.genreQbService.createQueryGetList(query);
+
+		const [genres, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: genres,

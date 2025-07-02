@@ -2,17 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { BucketGcsService } from '../bucket/services/bucket.gcs.service';
+
+import { BucketGcsService } from 'src/modules/bucket/services/bucket.gcs.service';
 import {
 	LabelMessageCodeError,
 	LabelMessageError,
-} from './constants/label.constant';
+} from '../constants/label.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
 	UpdateLabelDto,
-} from './dto/label.dto';
-import { Label } from './entities/label.entity';
+} from '../dto/label.dto';
+import { Label } from '../entities/label.entity';
+import { LabelQbService } from './label.qb.service';
 
 @Injectable()
 export class LabelService {
@@ -21,6 +23,7 @@ export class LabelService {
 		private readonly labelRepo: Repository<Label>,
 
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly labelQbService: LabelQbService,
 	) {}
 
 	async create(createLabelDto: CreateLabelDto): Promise<Label> {
@@ -43,15 +46,11 @@ export class LabelService {
 	}
 
 	async getList(query: QueryGetListLabelDto): Promise<PageDto<Label>> {
-		const { page, pageSize, skip, orderBy, fieldOrder } = query;
+		const { page, pageSize } = query;
 
-		const [labels, totalItems] = await this.labelRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-		});
+		const queryGetList = this.labelQbService.createQueryGetList(query);
+
+		const [labels, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: labels,

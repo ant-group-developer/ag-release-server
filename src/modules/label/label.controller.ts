@@ -21,7 +21,7 @@ import {
 	UpdateLabelDto,
 } from './dto/label.dto';
 import { Label } from './entities/label.entity';
-import { LabelService } from './label.service';
+import { LabelService } from './services/label.service';
 
 @ApiTags('Labels')
 @Controller('labels')

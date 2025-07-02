@@ -1,7 +1,14 @@
 // src/common/dtos/base-query.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+	IsDate,
+	IsEnum,
+	IsInt,
+	IsOptional,
+	IsString,
+	Min,
+} from 'class-validator';
 import { FILED_ORDER_DEFAULT } from '../constants/common.default.constants';
 import { OrderDirection } from '../enums/common';
 
@@ -61,4 +68,32 @@ export class BaseQueryDto {
 	@IsString()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.ASC;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	startCreatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	endCreatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	startUpdatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	endUpdatedAt?: Date;
 }

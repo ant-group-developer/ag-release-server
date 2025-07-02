@@ -5,19 +5,22 @@ import { Repository } from 'typeorm';
 import {
 	ArtistRoleMessageCodeError,
 	ArtistRoleMessageError,
-} from './constants/artist-role.constant';
+} from '../constants/artist-role.constant';
 import {
 	CreateArtistRoleDto,
 	QueryGetListArtistRoleDto,
 	UpdateArtistRoleDto,
-} from './dto/artist-role.dto';
-import { ArtistRole } from './entities/artist-role.entity';
+} from '../dto/artist-role.dto';
+import { ArtistRole } from '../entities/artist-role.entity';
+import { ArtistRoleQbService } from './artist-role.qb.service';
 
 @Injectable()
 export class ArtistRoleService {
 	constructor(
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
+
+		private readonly artistRoleQbService: ArtistRoleQbService,
 	) {}
 
 	async create(
@@ -42,16 +45,11 @@ export class ArtistRoleService {
 	async getList(
 		query: QueryGetListArtistRoleDto,
 	): Promise<PageDto<ArtistRole>> {
-		const { page, pageSize, skip, fieldOrder, orderBy } = query;
+		const { page, pageSize } = query;
 
-		const [artistRoles, totalItems] =
-			await this.artistRoleRepo.findAndCount({
-				skip,
-				take: pageSize,
-				order: {
-					[fieldOrder]: orderBy,
-				},
-			});
+		const queryGetList = this.artistRoleQbService.createQueryGetList(query);
+
+		const [artistRoles, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: artistRoles,

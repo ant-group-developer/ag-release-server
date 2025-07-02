@@ -13,12 +13,15 @@ import {
 	UpdateCountryDto,
 } from '../dto/country.dto';
 import { Country } from '../entities/country.entity';
+import { CountryQbService } from './country.qb.service';
 
 @Injectable()
 export class CountryService {
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
+
+		private readonly countryQbService: CountryQbService,
 	) {}
 
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
@@ -41,16 +44,11 @@ export class CountryService {
 	}
 
 	async getList(query: QueryGetListCountryDto): Promise<PageDto<Country>> {
-		const { page, pageSize, skip, orderBy, fieldOrder } = query;
+		const { page, pageSize } = query;
 
-		const [countries, totalItems] = await this.countryRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-			// relations: ['trackLanguages', 'releaseLanguages'],
-		});
+		const queryGetList = this.countryQbService.createQueryGetList(query);
+
+		const [countries, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: countries,

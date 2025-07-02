@@ -59,4 +59,7 @@ export class QueryGetListArtistDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderArtist)
 	fieldOrder: FieldOrderArtist = FieldOrderArtist.NAME;
+
+	@IsOptional()
+	id: string;
 }

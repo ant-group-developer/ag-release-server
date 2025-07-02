@@ -13,6 +13,7 @@ import {
 	UpdateArtistDto,
 } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
+import { ArtistQbService } from './artist.qb.service';
 
 @Injectable()
 export class ArtistService {
@@ -21,6 +22,7 @@ export class ArtistService {
 		private readonly artistRepo: Repository<Artist>,
 
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly artistQbService: ArtistQbService,
 	) {}
 
 	async create(createArtistDto: CreateArtistDto): Promise<Artist> {
@@ -44,15 +46,11 @@ export class ArtistService {
 	}
 
 	async getList(query: QueryGetListArtistDto): Promise<PageDto<Artist>> {
-		const { page, pageSize, skip, orderBy, fieldOrder } = query;
+		const { page, pageSize } = query;
 
-		const [artists, totalItems] = await this.artistRepo.findAndCount({
-			skip,
-			take: pageSize,
-			order: {
-				[fieldOrder]: orderBy,
-			},
-		});
+		const queryGetList = this.artistQbService.createQueryGetList(query);
+
+		const [artists, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: artists,

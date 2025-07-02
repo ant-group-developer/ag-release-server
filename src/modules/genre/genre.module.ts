@@ -3,11 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from './entities/genre.entity';
 import { GenreController } from './genre.controller';
-import { GenreService } from './genre.service';
+import { GenreQbService } from './services/genre.qb.service';
+import { GenreService } from './services/genre.service';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([Genre]), BucketModule],
 	controllers: [GenreController],
-	providers: [GenreService],
+	providers: [GenreService, GenreQbService],
 })
 export class GenreModule {}
