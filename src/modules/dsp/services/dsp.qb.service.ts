@@ -30,7 +30,7 @@ export class DspQbService {
 		const queryBuilder = this.dspRepo.createQueryBuilder('dsp');
 
 		if (keyword) {
-			queryBuilder.andWhere('dsp.name LIKE :keyword', {
+			queryBuilder.andWhere('dsp.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}

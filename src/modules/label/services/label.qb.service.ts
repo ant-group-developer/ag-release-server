@@ -30,7 +30,7 @@ export class LabelQbService {
 		const queryBuilder = this.labelRepo.createQueryBuilder('label');
 
 		if (keyword) {
-			queryBuilder.andWhere('label.name LIKE :keyword', {
+			queryBuilder.andWhere('label.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}

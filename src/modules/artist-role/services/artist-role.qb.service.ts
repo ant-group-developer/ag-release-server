@@ -31,7 +31,7 @@ export class ArtistRoleQbService {
 			this.artistRoleRepo.createQueryBuilder('artistRole');
 
 		if (keyword) {
-			queryBuilder.andWhere('artistRole.name LIKE :keyword', {
+			queryBuilder.andWhere('artistRole.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}
