@@ -2,6 +2,7 @@ import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { lengthPicture } from 'src/modules/database/constants/database.constant';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
+import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -25,6 +26,7 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	canLinkArtistProfile: boolean;
 
+	// relation
 	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
 	organizationDsps: OrganizationDsp[];
 
@@ -35,4 +37,7 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.dsp)
+	releaseDsp: ReleaseDsp[];
 }

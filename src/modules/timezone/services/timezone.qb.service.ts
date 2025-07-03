@@ -33,7 +33,6 @@ export class TimezoneQbService {
 		const queryBuilder = this.timezoneRepo.createQueryBuilder('timezone');
 
 		if (keyword) {
-			console.log(keyword);
 			queryBuilder.andWhere('timezone.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});

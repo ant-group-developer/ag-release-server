@@ -20,6 +20,8 @@ import { OrganizationUserModule } from './modules/organization-user/organization
 import { OrganizationModule } from './modules/organization/organization.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
+import { ReleaseCoverArtModule } from './modules/release-cover-art/release-cover-art.module';
+import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLanguageModule } from './modules/release-language/release-language.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
@@ -70,6 +72,8 @@ import { UserModule } from './modules/user/user.module';
 		UserPermissionModule,
 		BucketModule,
 		TimezoneModule,
+		ReleaseCoverArtModule,
+		ReleaseDspModule,
 		// ScheduleModule,
 	],
 	controllers: [AppController],
