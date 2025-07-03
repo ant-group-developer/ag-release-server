@@ -40,19 +40,27 @@ export class Track extends BaseCustomIDEntity {
 	@Column({ type: 'uuid' })
 	releaseId: string;
 
-	@ManyToOne(() => Release)
-	@JoinColumn({ name: 'release_id' })
-	release: Release;
+	@Column({
+		type: 'varchar',
+		length: 200,
+		comment: 'Example: 2025 Exclusive Licensed AMG',
+	})
+	pLineOwner: string;
 
 	@Column({ type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
+	@Column({ type: 'varchar', length: 10, nullable: true })
+	subGenreId: string | null;
+
+	// relation
+	@ManyToOne(() => Release)
+	@JoinColumn({ name: 'release_id' })
+	release: Release;
+
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'primary_genre_id' })
 	primaryGenre: Genre;
-
-	@Column({ type: 'varchar', length: 10, nullable: true })
-	subGenreId: string | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })

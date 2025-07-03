@@ -4,7 +4,11 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { UserType } from 'src/modules/user/enum/user.enum';
 import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { listCountries, listLanguages } from '../constants/database.constant';
+import {
+	listCountries,
+	listLanguages,
+	listTimeZones,
+} from '../constants/database.constant';
 
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {
@@ -19,6 +23,7 @@ export class DatabaseInitService implements OnModuleInit {
 			await this.initUser();
 			await this.initCountry();
 			await this.initLanguage();
+			await this.initTimeZones();
 		} catch (error) {
 			console.error('Error initializing database:', error);
 		}
@@ -183,6 +188,39 @@ export class DatabaseInitService implements OnModuleInit {
 		} else {
 			console.log(
 				'Languages table already has data, skipping initialization',
+			);
+		}
+	}
+
+	private async initTimeZones() {
+		const countQuery = `SELECT COUNT(*) FROM timezones`;
+		const result = await this.dataSource.query(countQuery);
+
+		if (result[0].count === '0') {
+			console.log('Initializing timezones');
+			const query = `
+				INSERT INTO timezones (
+					id, name, utc, zone
+				) VALUES (
+					$1, $2, $3, $4
+				)
+			`;
+
+			const dataInitTimeZones = listTimeZones;
+
+			for (const timezone of dataInitTimeZones) {
+				await this.dataSource.query(query, [
+					uuidv4(),
+					timezone[0],
+					timezone[1],
+					timezone[2],
+				]);
+			}
+
+			console.log('Timezones inserted successfully');
+		} else {
+			console.log(
+				'Timezones table already has data, skipping initialization',
 			);
 		}
 	}

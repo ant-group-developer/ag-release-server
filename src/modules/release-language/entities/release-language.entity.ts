@@ -9,26 +9,27 @@ export class ReleaseLanguage extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	metadataLanguageCountryId: string;
 
+	@Column({ type: 'uuid' })
+	audioLanguageId: string;
+
+	@Column({ type: 'uuid' })
+	metadataLanguageId: string;
+
+	@Column({ type: 'uuid' })
+	releaseId: string;
+
+	// relation
 	@ManyToOne(() => Country)
 	@JoinColumn({ name: 'metadata_language_country_id' })
 	metadataLanguageCountry: Country;
-
-	@Column({ type: 'uuid' })
-	audioLanguageId: string;
 
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'audio_language_id' })
 	audioLanguage: Language;
 
-	@Column({ type: 'uuid' })
-	metadataLanguageId: string;
-
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'metadata_language_id' })
 	metadataLanguage: Language;
-
-	@Column({ type: 'uuid' })
-	releaseId: string;
 
 	@OneToOne(() => Release, (release) => release.releaseLanguage)
 	@JoinColumn({ name: 'release_id' })

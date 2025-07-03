@@ -8,13 +8,13 @@ export class ReleaseLocalize extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	languageId: string;
 
-	@ManyToOne(() => Language)
-	@JoinColumn({ name: 'language_id' })
-	language: Language;
-
 	@Column({ type: 'uuid' })
 	releaseId: string;
 
+	// relation
+	@ManyToOne(() => Language)
+	@JoinColumn({ name: 'language_id' })
+	language: Language;
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
