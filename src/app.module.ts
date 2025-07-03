@@ -23,6 +23,7 @@ import { ReleaseArtistModule } from './modules/release-artist/release-artist.mod
 import { ReleaseLanguageModule } from './modules/release-language/release-language.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
+import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
@@ -68,6 +69,7 @@ import { UserModule } from './modules/user/user.module';
 		OrganizationUserModule,
 		UserPermissionModule,
 		BucketModule,
+		TimezoneModule,
 		// ScheduleModule,
 	],
 	controllers: [AppController],

@@ -2,7 +2,7 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Column, Entity } from 'typeorm';
 
 @Entity('timezones')
-export class TimeZone extends BaseUUIDEntity {
+export class Timezone extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 100 })
 	name: string;
 

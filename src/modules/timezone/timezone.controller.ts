@@ -1,117 +1,108 @@
-// import {
-// 	Body,
-// 	Controller,
-// 	Delete,
-// 	Get,
-// 	Param,
-// 	Post,
-// 	Put,
-// 	Query,
-// } from '@nestjs/common';
-// import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-// import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-// import {
-// 	ReleaseMessageCodeSuccess,
-// 	ReleaseMessageError,
-// 	ReleaseMessageSuccess,
-// } from './constants/release.constant';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	TimezoneMessageCodeSuccess,
+	TimezoneMessageError,
+	TimezoneMessageSuccess,
+} from './constants/timezone.constant';
 
-// import {
-// 	CreateReleaseDto,
-// 	QueryGetListReleaseDto,
-// 	UpdateReleaseDto,
-// } from './dto/release.dto';
-// import { Release } from './entities/release.entity';
-// import { ReleaseService } from './services/release.service';
+import {
+	CreateTimezoneDto,
+	QueryGetListTimezoneDto,
+	UpdateTimezoneDto,
+} from './dto/timezone.dto';
+import { Timezone } from './entities/timezone.entity';
+import { TimezoneService } from './services/timezone.service';
+@ApiTags('Timezones')
+@Controller('timezones')
+export class TimezoneController {
+	constructor(private readonly timezoneService: TimezoneService) {}
 
-// @ApiTags('Releases')
-// @Controller('releases')
-// export class ReleaseController {
-// 	constructor(private readonly releaseService: ReleaseService) {}
+	@Post()
+	@ApiOperation({ summary: 'Create a new timezone' })
+	@ApiResponse({
+		status: 200,
+		description: TimezoneMessageSuccess.CREATE,
+	})
+	async create(
+		@Body() createTimezoneDto: CreateTimezoneDto,
+	): Promise<ResponseSuccess<Timezone>> {
+		const result = await this.timezoneService.create(createTimezoneDto);
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TimezoneMessageCodeSuccess.CREATE,
+		});
+	}
 
-// 	@Post()
-// 	@ApiOperation({ summary: 'Create a new release' })
-// 	@ApiResponse({
-// 		status: 200,
-// 		description: ReleaseMessageSuccess.CREATE,
-// 	})
-// 	@ApiResponse({
-// 		status: 400,
-// 		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-// 	})
-// 	async create(
-// 		@Body() createReleaseDto: CreateReleaseDto,
-// 	): Promise<ResponseSuccess<Release>> {
-// 		const result = await this.releaseService.create(createReleaseDto);
-// 		return new ResponseSuccess({
-// 			data: result,
-// 			messageCode: ReleaseMessageCodeSuccess.CREATE,
-// 		});
-// 	}
+	@Get(':id')
+	@ApiOperation({ summary: 'Get a timezone by ID' })
+	@ApiResponse({
+		status: 200,
+		description: 'Successfully retrieved timezone',
+	})
+	@ApiResponse({
+		status: 404,
+		description: TimezoneMessageError.NOT_FOUND,
+	})
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Timezone>> {
+		const result = await this.timezoneService.findOne(id);
+		return new ResponseSuccess({ data: result });
+	}
 
-// 	@Get(':id')
-// 	@ApiOperation({ summary: 'Get a release by ID' })
-// 	@ApiResponse({
-// 		status: 200,
-// 		description: 'Successfully retrieved release',
-// 	})
-// 	@ApiResponse({
-// 		status: 404,
-// 		description: ReleaseMessageError.NOT_FOUND,
-// 	})
-// 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Release>> {
-// 		const result = await this.releaseService.findOne(id);
-// 		return new ResponseSuccess({ data: result });
-// 	}
+	@Get()
+	@ApiOperation({ summary: 'Get a list of timezones' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of timezones',
+	})
+	async getList(
+		@Query() query: QueryGetListTimezoneDto,
+	): Promise<ResponseSuccess<PageDto<Timezone>>> {
+		const result = await this.timezoneService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
 
-// 	@Get()
-// 	@ApiOperation({ summary: 'Get a list of releases' })
-// 	@ApiResponse({
-// 		status: 200,
-// 		description: 'List of releases',
-// 	})
-// 	async getList(
-// 		@Query() query: QueryGetListReleaseDto,
-// 	): Promise<ResponseSuccess<PageDto<Release>>> {
-// 		const result = await this.releaseService.getList(query);
-// 		return new ResponseSuccess({ data: result });
-// 	}
+	@Put(':id')
+	@ApiOperation({ summary: 'Update a timezone by ID' })
+	@ApiResponse({
+		status: 200,
+		description: TimezoneMessageSuccess.UPDATE,
+	})
+	@ApiResponse({
+		status: 404,
+		description: TimezoneMessageError.NOT_FOUND,
+	})
+	async update(
+		@Param('id') id: string,
+		@Body() updateTimezoneDto: UpdateTimezoneDto,
+	): Promise<ResponseSuccess<Timezone>> {
+		const result = await this.timezoneService.update(id, updateTimezoneDto);
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TimezoneMessageCodeSuccess.UPDATE,
+		});
+	}
 
-// 	@Put(':id')
-// 	@ApiOperation({ summary: 'Update a release by ID' })
-// 	@ApiResponse({
-// 		status: 200,
-// 		description: ReleaseMessageSuccess.UPDATE,
-// 	})
-// 	@ApiResponse({
-// 		status: 404,
-// 		description: ReleaseMessageError.NOT_FOUND,
-// 	})
-// 	@ApiResponse({
-// 		status: 400,
-// 		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-// 	})
-// 	async update(
-// 		@Param('id') id: string,
-// 		@Body() updateReleaseDto: UpdateReleaseDto,
-// 	): Promise<ResponseSuccess<Release>> {
-// 		const result = await this.releaseService.update(id, updateReleaseDto);
-// 		return new ResponseSuccess({
-// 			data: result,
-// 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
-// 		});
-// 	}
-
-// 	@Delete(':id')
-// 	@ApiOperation({ summary: 'Delete a release by ID' })
-// 	@ApiResponse({
-// 		status: 200,
-// 		description: ReleaseMessageSuccess.DELETE,
-// 	})
-// 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-// 		await this.releaseService.remove(id);
-// 		return new ResponseSuccess({
-// 			messageCode: ReleaseMessageCodeSuccess.DELETE,
-// 		});
-// 	}
-// }
+	@Delete(':id')
+	@ApiOperation({ summary: 'Delete a timezone by ID' })
+	@ApiResponse({
+		status: 200,
+		description: TimezoneMessageSuccess.DELETE,
+	})
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.timezoneService.remove(id);
+		return new ResponseSuccess({
+			messageCode: TimezoneMessageCodeSuccess.DELETE,
+		});
+	}
+}
