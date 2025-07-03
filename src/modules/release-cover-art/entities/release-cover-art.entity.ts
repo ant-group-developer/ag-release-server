@@ -1,5 +1,7 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Column, Entity } from 'typeorm';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { ReleaseCoverArtSize } from '../enum/release-cover-art.enum';
 
 @Entity('release_cover_art')
 export class ReleaseCoverArt extends BaseUUIDEntity {
@@ -34,10 +36,14 @@ export class ReleaseCoverArt extends BaseUUIDEntity {
 		type: 'varchar',
 		length: 20,
 		comment: `Example: 75x75, 100x100, 160x160, 300x300, 900x900, original`,
+		// type: 'enum',
+		// enum: ReleaseCoverArtSize,
+		// default: ReleaseCoverArtSize.ORIGINAL,
 	})
-	type: string;
+	type: ReleaseCoverArtSize;
 
 	// // relations
-	// @ManyToOne(() => Release, (release) => release.files)
-	// release: Release;
+	@ManyToOne(() => Release, (release) => release.releaseCoverArt)
+	@JoinColumn({ name: 'release_id' })
+	release: Release;
 }

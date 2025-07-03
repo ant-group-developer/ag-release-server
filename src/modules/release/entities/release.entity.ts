@@ -4,6 +4,11 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
+
+import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseTerritory } from 'src/modules/release-territories/entities/release-dsp.entity';
+import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import {
@@ -42,7 +47,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'enum', enum: ReleaseType })
 	type: ReleaseType;
 
-	@Column({ type: 'uuid', nullable: true })
+	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
 	releaseTimezoneId: string;
 
 	@Column({
@@ -117,8 +122,19 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// // timezone
-	// @ManyToOne(() => TimeZone)
-	// @JoinColumn({ name: 'release_timezone_id' })
-	// timeZone: TimeZone;
+	@ManyToOne(() => Timezone)
+	@JoinColumn({ name: 'release_timezone_id' })
+	timeZone: Timezone;
+
+	@OneToMany(
+		() => ReleaseCoverArt,
+		(releaseCoverArt) => releaseCoverArt.release,
+	)
+	releaseCoverArt: ReleaseCoverArt[];
+
+	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
+	releaseDsp: ReleaseDsp[];
+
+	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
+	releaseTerritories: ReleaseTerritory[];
 }

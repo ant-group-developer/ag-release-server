@@ -59,6 +59,15 @@ export class CreateReleaseDto {
 	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
 	@IsEnum(ReleaseType)
 	type: ReleaseType;
+
+	// cLineOwner;
+
+	// pLineOwner;
+
+	// catalogId;
+	// releaseDate;
+	// releaseTime;
+	// releaseTimezoneId;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
