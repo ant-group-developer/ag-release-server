@@ -24,23 +24,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 10 })
 	primaryGenreId: string;
 
-	@ManyToOne(() => Genre)
-	@JoinColumn({ name: 'primary_genre_id' })
-	primaryGenre: Genre;
-
 	@Column({ type: 'varchar', length: 10, nullable: true })
 	subGenreId: string | null;
 
-	@ManyToOne(() => Genre)
-	@JoinColumn({ name: 'sub_genre_id' })
-	subGenre: Genre | null;
-
 	@Column({ name: 'label_id', type: 'varchar', length: 10 })
 	labelId: string;
-
-	@ManyToOne(() => Label)
-	@JoinColumn({ name: 'label_id' })
-	label: Label;
 
 	@Column({ type: 'varchar', length: 150 })
 	title: string;
@@ -53,6 +41,54 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'enum', enum: ReleaseType })
 	type: ReleaseType;
+
+	@Column({ type: 'uuid', nullable: true })
+	releaseTimezoneId: string;
+
+	@Column({
+		type: 'varchar',
+		length: 200,
+		comment: 'Example: 2025 Exclusive Licensed AMG',
+	})
+	cLineOwner: string;
+
+	@Column({
+		type: 'varchar',
+		length: 200,
+		comment: 'Example: 2025 Exclusive Licensed AMG',
+	})
+	pLineOwner: string;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+	})
+	catalogId: string | null;
+
+	@Column({ type: 'date' })
+	releaseDate: Date;
+
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'Format: HH:ss. Example: 18:00',
+	})
+	releaseTime: string | null;
+
+	// relation
+	@ManyToOne(() => Genre)
+	@JoinColumn({ name: 'primary_genre_id' })
+	primaryGenre: Genre;
+
+	@ManyToOne(() => Genre)
+	@JoinColumn({ name: 'sub_genre_id' })
+	subGenre: Genre | null;
+
+	@ManyToOne(() => Label)
+	@JoinColumn({ name: 'label_id' })
+	label: Label;
 
 	// tracks
 	@OneToMany(() => Track, (track) => track.release)
@@ -80,4 +116,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	// // timezone
+	// @ManyToOne(() => TimeZone)
+	// @JoinColumn({ name: 'release_timezone_id' })
+	// timeZone: TimeZone;
 }

@@ -30,7 +30,7 @@ export class LanguageQbService {
 		const queryBuilder = this.languageRepo.createQueryBuilder('language');
 
 		if (keyword) {
-			queryBuilder.andWhere('language.name LIKE :keyword', {
+			queryBuilder.andWhere('language.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}

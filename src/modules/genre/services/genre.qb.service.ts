@@ -30,7 +30,7 @@ export class GenreQbService {
 		const queryBuilder = this.genreRepo.createQueryBuilder('genre');
 
 		if (keyword) {
-			queryBuilder.andWhere('genre.name LIKE :keyword', {
+			queryBuilder.andWhere('genre.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}

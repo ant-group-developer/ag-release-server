@@ -38,6 +38,9 @@ export class Country extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })
 	nationality: string;
 
+	@Column({ type: 'varchar', length: 30, default: 'Asia' })
+	continent: string;
+
 	@OneToMany(
 		() => TrackLanguage,
 		(trackLanguage) => trackLanguage.metadataLanguageCountry,

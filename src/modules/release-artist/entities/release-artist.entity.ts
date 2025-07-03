@@ -9,6 +9,10 @@ export class ReleaseArtist extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	artistRoleId: string;
 
+	@Column({ type: 'uuid' })
+	releaseId: string;
+
+	//relation
 	@ManyToOne(() => ArtistRole)
 	@JoinColumn({ name: 'artist_role_id' })
 	artistRole: ArtistRole;
@@ -19,9 +23,6 @@ export class ReleaseArtist extends BaseUUIDEntity {
 	@ManyToOne(() => Artist)
 	@JoinColumn({ name: 'artist_id' })
 	artist: Artist;
-
-	@Column({ type: 'uuid' })
-	releaseId: string;
 
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })

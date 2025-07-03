@@ -31,13 +31,13 @@ export class ArtistQbService {
 		const queryBuilder = this.artistRepo.createQueryBuilder('artist');
 
 		if (keyword) {
-			queryBuilder.andWhere('artist.name LIKE :keyword', {
+			queryBuilder.andWhere('artist.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}
 
 		if (id) {
-			queryBuilder.andWhere('artist.id LIKE :id', {
+			queryBuilder.andWhere('artist.id ILIKE :id', {
 				id: `%${id}%`,
 			});
 		}

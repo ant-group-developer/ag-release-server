@@ -30,7 +30,7 @@ export class CountryQbService {
 		const queryBuilder = this.countryRepo.createQueryBuilder('country');
 
 		if (keyword) {
-			queryBuilder.andWhere('country.name LIKE :keyword', {
+			queryBuilder.andWhere('country.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
 		}
