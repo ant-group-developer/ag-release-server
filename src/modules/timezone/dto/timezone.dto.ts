@@ -1,5 +1,6 @@
 import { PartialType } from '@nestjs/swagger';
 import {
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -7,6 +8,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { FieldTimezoneArtist } from '../enum/timezone.enum';
 
 export class CreateTimezoneDto {
 	@IsNotEmpty()
@@ -56,4 +58,8 @@ export class QueryGetListTimezoneDto extends BaseQueryDto {
 	@IsString()
 	@IsOptional()
 	zone?: string;
+
+	@IsOptional()
+	@IsEnum(FieldTimezoneArtist)
+	fieldOrder: FieldTimezoneArtist = FieldTimezoneArtist.NAME;
 }

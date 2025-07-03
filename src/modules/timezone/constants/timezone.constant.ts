@@ -1,7 +1,7 @@
 export const TimezoneMessageCodeSuccess = {
-	CREATE: 'releaseArtist.message.success.create',
-	UPDATE: 'releaseArtist.message.success.update',
-	DELETE: 'releaseArtist.message.success.delete',
+	CREATE: 'timezone.message.success.create',
+	UPDATE: 'timezone.message.success.update',
+	DELETE: 'timezone.message.success.delete',
 };
 
 export const TimezoneMessageSuccess = {
