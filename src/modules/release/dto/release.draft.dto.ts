@@ -11,14 +11,9 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import {
-	FieldOrderRelease,
-	ReleaseStatus,
-	ReleaseType,
-} from '../enum/release.enum';
+import { ReleaseType } from '../enum/release.enum';
 
-export class CreateReleaseDto {
+export class CreateDraftReleaseDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()
@@ -43,9 +38,9 @@ export class CreateReleaseDto {
 
 	@ApiProperty({ example: 'JzCTrtvkEn' })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@Length(10, 10)
-	primaryGenreId: string;
+	primaryGenreId?: string | null;
 
 	@ApiProperty({ example: 'JzCTrtvkEn', required: false })
 	@IsOptional()
@@ -55,13 +50,9 @@ export class CreateReleaseDto {
 
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@Length(10, 10)
-	labelId: string;
-
-	@ApiProperty({ enum: ReleaseStatus, example: ReleaseStatus.DRAFT })
-	@IsEnum(ReleaseStatus)
-	status: ReleaseStatus = ReleaseStatus.DRAFT;
+	labelId?: string | null;
 
 	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
 	@IsEnum(ReleaseType)
@@ -69,35 +60,35 @@ export class CreateReleaseDto {
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@MaxLength(200)
-	cLineOwner: string;
+	cLineOwner?: string | null;
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@MaxLength(200)
-	pLineOwner: string;
+	pLineOwner: string | null;
 
 	@ApiProperty({ example: 'A1234' })
 	@IsOptional()
 	@IsString()
 	@MaxLength(100)
-	catalogId?: string;
+	catalogId?: string | null;
 
 	@ApiProperty({ example: '2025-07-01' })
-	@IsNotEmpty()
+	@IsOptional()
 	@Transform(({ value }: { value: string | undefined }) =>
 		value ? new Date(value) : undefined,
 	)
 	@IsDate()
-	releaseDate: Date;
+	releaseDate?: Date | null;
 
 	@ApiProperty({ example: '18:00' })
 	@IsOptional()
 	@IsString()
 	@MaxLength(10)
-	releaseTime: string;
+	releaseTime?: string | null;
 
 	@ApiProperty({
 		example: '2c9bcd45-4f34-4e98-8ba6-3d5bcbcd11b1',
@@ -108,65 +99,41 @@ export class CreateReleaseDto {
 	releaseTimezoneId?: string | null;
 }
 
-export class SubmitCreateReleaseDto extends CreateReleaseDto {
-	@IsNotEmpty()
-	@IsUUID()
-	id: string;
-}
-
-export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
+export class UpdateReleaseDraftDto extends PartialType(CreateDraftReleaseDto) {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(150)
 	@ValidateIf((_, value) => value !== undefined)
-	title: string;
-
-	@IsString()
-	@IsNotEmpty()
-	@Length(10, 10)
-	@ValidateIf((_, value) => value !== undefined)
-	primaryGenreId: string;
-
-	@IsString()
-	@IsNotEmpty()
-	@Length(10, 10)
-	@ValidateIf((_, value) => value !== undefined)
-	labelId: string;
-
-	@IsEnum(ReleaseStatus)
-	@ValidateIf((_, value) => value !== undefined)
-	status: ReleaseStatus;
+	title?: string;
 
 	@IsEnum(ReleaseType)
 	@ValidateIf((_, value) => value !== undefined)
-	type: ReleaseType;
+	type?: ReleaseType;
 
-	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@IsNotEmpty()
-	@MaxLength(200)
-	cLineOwner?: string;
+	@IsOptional()
+	@Length(10, 10)
+	primaryGenreId?: string | null;
 
-	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@IsNotEmpty()
-	@MaxLength(200)
-	pLineOwner?: string;
+	@IsOptional()
+	@Length(10, 10)
+	labelId?: string | null;
 
-	@ValidateIf((_, value) => value !== undefined)
-	@IsNotEmpty()
+	@IsString()
+	@IsOptional()
+	@MaxLength(200)
+	cLineOwner?: string | null;
+
+	@IsString()
+	@IsOptional()
+	@MaxLength(200)
+	pLineOwner?: string | null;
+
+	@IsOptional()
 	@Transform(({ value }: { value: string | undefined }) =>
 		value ? new Date(value) : undefined,
 	)
 	@IsDate()
-	releaseDate?: Date;
-}
-
-export class QueryGetListReleaseDto extends BaseQueryDto {
-	@IsOptional()
-	@IsString()
-	title?: string;
-
-	@IsEnum(FieldOrderRelease)
-	fieldOrder: string = FieldOrderRelease.TITLE;
+	releaseDate?: Date | null;
 }

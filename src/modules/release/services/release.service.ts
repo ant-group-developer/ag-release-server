@@ -2,13 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { ReleaseMessageError } from '../constants/release.constant';
 import {
 	CreateReleaseDto,
 	QueryGetListReleaseDto,
+	SubmitCreateReleaseDto,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
+import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseQbService } from './release.qb.service';
 import { ReleaseValidateService } from './release.validate.service';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class ReleaseService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
+		private readonly releaseQbService: ReleaseQbService,
 	) {}
 
 	async create(createReleaseDto: CreateReleaseDto): Promise<Release> {
@@ -34,25 +37,31 @@ export class ReleaseService {
 		return await this.releaseRepo.save(release);
 	}
 
-	async findOne(id: string): Promise<Release> {
-		const release = await this.releaseRepo.findOne({ where: { id } });
-		if (!release) {
-			throw new ResponseError({
-				message: ReleaseMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+	async submit(data: SubmitCreateReleaseDto) {
+		const { id } = data;
+
+		const release = await this.releaseQbService.findOne(id);
+
+		if (release.status !== ReleaseStatus.DRAFT) {
+			throw new ResponseError({ message: 'Error release.status' });
 		}
+
+		release.status = ReleaseStatus.PROCESSING;
+		await this.releaseRepo.update(id, release);
 
 		return release;
 	}
 
-	async getList(query: QueryGetListReleaseDto): Promise<PageDto<Release>> {
-		const { page, pageSize, skip } = query;
+	async findOne(id: string): Promise<Release> {
+		return await this.releaseQbService.findOne(id);
+	}
 
-		const [releases, totalItems] = await this.releaseRepo.findAndCount({
-			skip,
-			take: pageSize,
-		});
+	async getList(query: QueryGetListReleaseDto): Promise<PageDto<Release>> {
+		const { page, pageSize } = query;
+
+		const queryGetList = this.releaseQbService.createQueryGetList(query);
+
+		const [releases, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
 			items: releases,
@@ -71,7 +80,7 @@ export class ReleaseService {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
 			updateReleaseDto;
 
-		const release = await this.findOne(id);
+		const release = await this.releaseQbService.findOne(id);
 
 		if (labelId && labelId !== release.labelId) {
 			await this.releaseValidateService.validate({
@@ -101,7 +110,7 @@ export class ReleaseService {
 		}
 
 		await this.releaseRepo.update(id, updateReleaseDto);
-		return await this.findOne(id);
+		return await this.releaseQbService.findOne(id);
 	}
 
 	async remove(id: string): Promise<void> {

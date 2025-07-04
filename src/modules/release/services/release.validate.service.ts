@@ -29,9 +29,9 @@ export class ReleaseValidateService {
 		labelId,
 		releaseTimezoneId,
 	}: {
-		primaryGenreId?: string;
+		primaryGenreId?: string | null;
 		subGenreId?: string | null;
-		labelId?: string;
+		labelId?: string | null;
 		releaseTimezoneId?: string | null;
 	}) {
 		if (primaryGenreId) {
