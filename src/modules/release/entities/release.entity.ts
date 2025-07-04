@@ -48,7 +48,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	type: ReleaseType;
 
 	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
-	releaseTimezoneId: string;
+	releaseTimezoneId: string | null;
 
 	@Column({
 		type: 'varchar',

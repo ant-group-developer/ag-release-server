@@ -137,6 +137,7 @@ export const listCountries = [
 		'؋',
 		1,
 		'Afghan',
+		'Asia',
 	],
 	[
 		'Albania',
@@ -150,6 +151,7 @@ export const listCountries = [
 		'Lek',
 		1,
 		'Albanian',
+		'Europe',
 	],
 	[
 		'Algeria',
@@ -163,6 +165,7 @@ export const listCountries = [
 		'دج',
 		1,
 		'Algerian',
+		'Africa',
 	],
 	[
 		'American Samoa',
@@ -176,6 +179,7 @@ export const listCountries = [
 		'$',
 		1,
 		'American Samoan',
+		'Australia',
 	],
 	[
 		'Andorra',
@@ -189,6 +193,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Andorran',
+		'Europe',
 	],
 	[
 		'Angola',
@@ -202,6 +207,7 @@ export const listCountries = [
 		'Kz',
 		1,
 		'Angolan',
+		'Africa',
 	],
 	[
 		'Anguilla',
@@ -215,6 +221,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Anguillan',
+		'North America',
 	],
 	[
 		'Antigua and Barbuda',
@@ -228,6 +235,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Antiguan and Barbudan',
+		'North America',
 	],
 	[
 		'Argentina',
@@ -241,6 +249,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Argentine',
+		'South America',
 	],
 	[
 		'Armenia',
@@ -254,6 +263,7 @@ export const listCountries = [
 		'֏',
 		1,
 		'Armenian',
+		'Asia',
 	],
 	[
 		'Aruba',
@@ -267,6 +277,7 @@ export const listCountries = [
 		'ƒ',
 		1,
 		'Aruban',
+		'North America',
 	],
 	[
 		'Australia',
@@ -280,6 +291,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Australian',
+		'Australia',
 	],
 	[
 		'Austria',
@@ -293,6 +305,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Austrian',
+		'Europe',
 	],
 	[
 		'Azerbaijan',
@@ -306,6 +319,7 @@ export const listCountries = [
 		'₼',
 		1,
 		'Azerbaijani',
+		'Asia',
 	],
 	[
 		'Bahamas',
@@ -319,6 +333,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Bahamian',
+		'North America',
 	],
 	[
 		'Bahrain',
@@ -332,6 +347,7 @@ export const listCountries = [
 		'.د.ب',
 		1,
 		'Bahraini',
+		'Asia',
 	],
 	[
 		'Bangladesh',
@@ -345,6 +361,7 @@ export const listCountries = [
 		'৳',
 		1,
 		'Bangladeshi',
+		'Asia',
 	],
 	[
 		'Barbados',
@@ -358,6 +375,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Barbadian',
+		'North America',
 	],
 	[
 		'Belarus',
@@ -371,6 +389,7 @@ export const listCountries = [
 		'Br',
 		1,
 		'Belarusian',
+		'Europe',
 	],
 	[
 		'Belgium',
@@ -384,6 +403,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Belgian',
+		'Europe',
 	],
 	[
 		'Belize',
@@ -397,6 +417,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Belizean',
+		'North America',
 	],
 	[
 		'Benin',
@@ -410,6 +431,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Beninese',
+		'Africa',
 	],
 	[
 		'Bermuda',
@@ -423,6 +445,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Bermudian',
+		'North America',
 	],
 	[
 		'Bhutan',
@@ -436,6 +459,7 @@ export const listCountries = [
 		'Nu.',
 		1,
 		'Bhutanese',
+		'Asia',
 	],
 	[
 		'Bolivia',
@@ -449,6 +473,7 @@ export const listCountries = [
 		'Bs.',
 		1,
 		'Bolivian',
+		'South America',
 	],
 	[
 		'Bosnia and Herzegovina',
@@ -462,6 +487,7 @@ export const listCountries = [
 		'KM',
 		1,
 		'Bosnian',
+		'Europe',
 	],
 	[
 		'Botswana',
@@ -475,6 +501,7 @@ export const listCountries = [
 		'P',
 		1,
 		'Motswana',
+		'Africa',
 	],
 	[
 		'Brazil',
@@ -488,6 +515,7 @@ export const listCountries = [
 		'R$',
 		1,
 		'Brazilian',
+		'South America',
 	],
 	[
 		'Brunei',
@@ -501,6 +529,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Bruneian',
+		'Asia',
 	],
 	[
 		'Bulgaria',
@@ -514,6 +543,7 @@ export const listCountries = [
 		'лв',
 		1,
 		'Bulgarian',
+		'Europe',
 	],
 	[
 		'Burkina Faso',
@@ -527,6 +557,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Burkinabe',
+		'Africa',
 	],
 	[
 		'Burundi',
@@ -540,6 +571,7 @@ export const listCountries = [
 		'FBu',
 		1,
 		'Burundian',
+		'Africa',
 	],
 	[
 		'Cabo Verde',
@@ -553,6 +585,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Cape Verdean',
+		'Africa',
 	],
 	[
 		'Cambodia',
@@ -566,6 +599,7 @@ export const listCountries = [
 		'៛',
 		1,
 		'Cambodian',
+		'Asia',
 	],
 	[
 		'Cameroon',
@@ -579,6 +613,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Cameroonian',
+		'Africa',
 	],
 	[
 		'Canada',
@@ -593,6 +628,7 @@ export const listCountries = [
 		1,
 		'CanadianFuse',
 		'Canadian',
+		'North America',
 	],
 	[
 		'Cayman Islands',
@@ -606,6 +642,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Caymanian',
+		'North America',
 	],
 	[
 		'Central African Republic',
@@ -619,6 +656,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Central African',
+		'Africa',
 	],
 	[
 		'Chad',
@@ -632,6 +670,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Chadian',
+		'Africa',
 	],
 	[
 		'Chile',
@@ -645,6 +684,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Chilean',
+		'South America',
 	],
 	[
 		'China',
@@ -658,6 +698,7 @@ export const listCountries = [
 		'¥',
 		1,
 		'Chinese',
+		'Asia',
 	],
 	[
 		'Colombia',
@@ -671,6 +712,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Colombian',
+		'South America',
 	],
 	[
 		'Comoros',
@@ -684,6 +726,7 @@ export const listCountries = [
 		'CF',
 		1,
 		'Comorian',
+		'Africa',
 	],
 	[
 		'Congo, Democratic Republic of the',
@@ -697,6 +740,7 @@ export const listCountries = [
 		'FC',
 		1,
 		'Congolese',
+		'Africa',
 	],
 	[
 		'Congo, Republic of the',
@@ -710,6 +754,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Congolese',
+		'Africa',
 	],
 	[
 		'Costa Rica',
@@ -723,6 +768,7 @@ export const listCountries = [
 		'₡',
 		1,
 		'Costa Rican',
+		'North America',
 	],
 	[
 		"Côte d'Ivoire",
@@ -736,6 +782,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Ivorian',
+		'Africa',
 	],
 	[
 		'Croatia',
@@ -749,6 +796,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Croatian',
+		'Europe',
 	],
 	[
 		'Cuba',
@@ -762,6 +810,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Cuban',
+		'North America',
 	],
 	[
 		'Cyprus',
@@ -775,6 +824,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Cypriot',
+		'Asia',
 	],
 	[
 		'Czech Republic',
@@ -788,6 +838,7 @@ export const listCountries = [
 		'Kč',
 		1,
 		'Czech',
+		'Europe',
 	],
 	[
 		'Denmark',
@@ -801,6 +852,7 @@ export const listCountries = [
 		'kr',
 		1,
 		'Danish',
+		'Europe',
 	],
 	[
 		'Djibouti',
@@ -814,6 +866,7 @@ export const listCountries = [
 		'Fdj',
 		1,
 		'Djiboutian',
+		'Africa',
 	],
 	[
 		'Dominica',
@@ -827,6 +880,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Dominican',
+		'North America',
 	],
 	[
 		'Dominican Republic',
@@ -840,6 +894,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Dominican',
+		'North America',
 	],
 	[
 		'Ecuador',
@@ -853,6 +908,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Ecuadorian',
+		'South America',
 	],
 	[
 		'Egypt',
@@ -866,6 +922,7 @@ export const listCountries = [
 		'£',
 		1,
 		'Egyptian',
+		'Africa',
 	],
 	[
 		'El Salvador',
@@ -879,6 +936,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Salvadoran',
+		'North America',
 	],
 	[
 		'Equatorial Guinea',
@@ -892,6 +950,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Equatorial Guinean',
+		'Africa',
 	],
 	[
 		'Eritrea',
@@ -905,6 +964,7 @@ export const listCountries = [
 		'Nfk',
 		1,
 		'Eritrean',
+		'Africa',
 	],
 	[
 		'Estonia',
@@ -918,6 +978,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Estonian',
+		'Europe',
 	],
 	[
 		'Eswatini',
@@ -931,6 +992,7 @@ export const listCountries = [
 		'E',
 		1,
 		'Swazi',
+		'Africa',
 	],
 	[
 		'Ethiopia',
@@ -944,6 +1006,7 @@ export const listCountries = [
 		'Br',
 		1,
 		'Ethiopian',
+		'Africa',
 	],
 	[
 		'Fiji',
@@ -957,6 +1020,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Fijian',
+		'Australia',
 	],
 	[
 		'Finland',
@@ -970,6 +1034,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Finnish',
+		'Europe',
 	],
 	[
 		'France',
@@ -983,6 +1048,7 @@ export const listCountries = [
 		'€',
 		1,
 		'French',
+		'Europe',
 	],
 	[
 		'Gabon',
@@ -996,6 +1062,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Gabonese',
+		'Africa',
 	],
 	[
 		'Gambia',
@@ -1009,6 +1076,7 @@ export const listCountries = [
 		'D',
 		1,
 		'Gambian',
+		'Africa',
 	],
 	[
 		'Georgia',
@@ -1022,6 +1090,7 @@ export const listCountries = [
 		'₾',
 		1,
 		'Georgian',
+		'Asia',
 	],
 	[
 		'Germany',
@@ -1035,6 +1104,7 @@ export const listCountries = [
 		'€',
 		1,
 		'German',
+		'Europe',
 	],
 	[
 		'Ghana',
@@ -1048,6 +1118,7 @@ export const listCountries = [
 		'₵',
 		1,
 		'Ghanaian',
+		'Africa',
 	],
 	[
 		'Greece',
@@ -1061,6 +1132,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Greek',
+		'Europe',
 	],
 	[
 		'Grenada',
@@ -1074,6 +1146,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Grenadian',
+		'North America',
 	],
 	[
 		'Guatemala',
@@ -1087,6 +1160,7 @@ export const listCountries = [
 		'Q',
 		1,
 		'Guatemalan',
+		'North America',
 	],
 	[
 		'Guinea',
@@ -1100,6 +1174,7 @@ export const listCountries = [
 		'FG',
 		1,
 		'Guinean',
+		'Africa',
 	],
 	[
 		'Guinea-Bissau',
@@ -1113,6 +1188,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Bissau-Guinean',
+		'Africa',
 	],
 	[
 		'Guyana',
@@ -1126,6 +1202,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Guyanese',
+		'South America',
 	],
 	[
 		'Haiti',
@@ -1139,6 +1216,7 @@ export const listCountries = [
 		'G',
 		1,
 		'Haitian',
+		'North America',
 	],
 	[
 		'Honduras',
@@ -1152,6 +1230,7 @@ export const listCountries = [
 		'L',
 		1,
 		'Honduran',
+		'North America',
 	],
 	[
 		'Hungary',
@@ -1165,6 +1244,7 @@ export const listCountries = [
 		'Ft',
 		1,
 		'Hungarian',
+		'Europe',
 	],
 	[
 		'Iceland',
@@ -1178,6 +1258,7 @@ export const listCountries = [
 		'kr',
 		1,
 		'Icelandic',
+		'Europe',
 	],
 	[
 		'India',
@@ -1191,6 +1272,7 @@ export const listCountries = [
 		'₹',
 		1,
 		'Indian',
+		'Asia',
 	],
 	[
 		'Indonesia',
@@ -1204,6 +1286,7 @@ export const listCountries = [
 		'Rp',
 		1,
 		'Indonesian',
+		'Asia',
 	],
 	[
 		'Iran',
@@ -1217,6 +1300,7 @@ export const listCountries = [
 		'﷼',
 		1,
 		'Iranian',
+		'Asia',
 	],
 	[
 		'Iraq',
@@ -1230,6 +1314,7 @@ export const listCountries = [
 		'ع.د',
 		1,
 		'Iraqi',
+		'Asia',
 	],
 	[
 		'Ireland',
@@ -1243,6 +1328,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Irish',
+		'Europe',
 	],
 	[
 		'Israel',
@@ -1256,6 +1342,7 @@ export const listCountries = [
 		'₪',
 		1,
 		'Israeli',
+		'Asia',
 	],
 	[
 		'Italy',
@@ -1269,6 +1356,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Italian',
+		'Europe',
 	],
 	[
 		'Jamaica',
@@ -1282,6 +1370,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Jamaican',
+		'North America',
 	],
 	[
 		'Japan',
@@ -1295,6 +1384,7 @@ export const listCountries = [
 		'¥',
 		1,
 		'Japanese',
+		'Asia',
 	],
 	[
 		'Jordan',
@@ -1308,6 +1398,7 @@ export const listCountries = [
 		'د.ا',
 		1,
 		'Jordanian',
+		'Asia',
 	],
 	[
 		'Kazakhstan',
@@ -1321,6 +1412,7 @@ export const listCountries = [
 		'₸',
 		1,
 		'Kazakhstani',
+		'Asia',
 	],
 	[
 		'Kenya',
@@ -1334,6 +1426,7 @@ export const listCountries = [
 		'KSh',
 		1,
 		'Kenyan',
+		'Africa',
 	],
 	[
 		'Kiribati',
@@ -1347,6 +1440,7 @@ export const listCountries = [
 		'$',
 		1,
 		'I-Kiribati',
+		'Australia',
 	],
 	[
 		'Korea, North',
@@ -1360,6 +1454,7 @@ export const listCountries = [
 		'₩',
 		1,
 		'North Korean',
+		'Asia',
 	],
 	[
 		'Korea, South',
@@ -1373,6 +1468,7 @@ export const listCountries = [
 		'₩',
 		1,
 		'South Korean',
+		'Asia',
 	],
 	[
 		'Kuwait',
@@ -1386,6 +1482,7 @@ export const listCountries = [
 		'د.ك',
 		1,
 		'Kuwaiti',
+		'Asia',
 	],
 	[
 		'Kyrgyzstan',
@@ -1399,6 +1496,7 @@ export const listCountries = [
 		'с',
 		1,
 		'Kyrgyzstani',
+		'Asia',
 	],
 	[
 		'Laos',
@@ -1412,6 +1510,7 @@ export const listCountries = [
 		'₭',
 		1,
 		'Lao',
+		'Asia',
 	],
 	[
 		'Latvia',
@@ -1425,6 +1524,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Latvian',
+		'Europe',
 	],
 	[
 		'Lebanon',
@@ -1438,6 +1538,7 @@ export const listCountries = [
 		'ل.ل',
 		1,
 		'Lebanese',
+		'Asia',
 	],
 	[
 		'Lesotho',
@@ -1451,6 +1552,7 @@ export const listCountries = [
 		'L',
 		1,
 		'Basotho',
+		'Africa',
 	],
 	[
 		'Liberia',
@@ -1464,6 +1566,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Liberian',
+		'Africa',
 	],
 	[
 		'Libya',
@@ -1477,6 +1580,7 @@ export const listCountries = [
 		'ل.د',
 		1,
 		'Libyan',
+		'Africa',
 	],
 	[
 		'Liechtenstein',
@@ -1490,6 +1594,7 @@ export const listCountries = [
 		'CHF',
 		1,
 		'Liechtensteiner',
+		'Europe',
 	],
 	[
 		'Lithuania',
@@ -1503,6 +1608,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Lithuanian',
+		'Europe',
 	],
 	[
 		'Luxembourg',
@@ -1516,6 +1622,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Luxembourger',
+		'Europe',
 	],
 	[
 		'Madagascar',
@@ -1529,6 +1636,7 @@ export const listCountries = [
 		'Ar',
 		1,
 		'Malagasy',
+		'Africa',
 	],
 	[
 		'Malawi',
@@ -1542,6 +1650,7 @@ export const listCountries = [
 		'MK',
 		1,
 		'Malawian',
+		'Africa',
 	],
 	[
 		'Malaysia',
@@ -1555,6 +1664,7 @@ export const listCountries = [
 		'RM',
 		1,
 		'Malaysian',
+		'Asia',
 	],
 	[
 		'Maldives',
@@ -1568,6 +1678,7 @@ export const listCountries = [
 		'Rf',
 		1,
 		'Maldivian',
+		'Asia',
 	],
 	[
 		'Mali',
@@ -1581,6 +1692,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Malian',
+		'Africa',
 	],
 	[
 		'Malta',
@@ -1594,6 +1706,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Maltese',
+		'Europe',
 	],
 	[
 		'Marshall Islands',
@@ -1607,6 +1720,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Marshallese',
+		'Australia',
 	],
 	[
 		'Mauritania',
@@ -1620,6 +1734,7 @@ export const listCountries = [
 		'UM',
 		1,
 		'Mauritanian',
+		'Africa',
 	],
 	[
 		'Mauritius',
@@ -1633,6 +1748,7 @@ export const listCountries = [
 		'₨',
 		1,
 		'Mauritian',
+		'Africa',
 	],
 	[
 		'Mexico',
@@ -1646,6 +1762,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Mexican',
+		'North America',
 	],
 	[
 		'Micronesia',
@@ -1659,6 +1776,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Micronesian',
+		'Australia',
 	],
 	[
 		'Moldova',
@@ -1672,6 +1790,7 @@ export const listCountries = [
 		'L',
 		1,
 		'Moldovan',
+		'Europe',
 	],
 	[
 		'Monaco',
@@ -1685,6 +1804,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Monegasque',
+		'Europe',
 	],
 	[
 		'Mongolia',
@@ -1698,6 +1818,7 @@ export const listCountries = [
 		'₮',
 		1,
 		'Mongolian',
+		'Asia',
 	],
 	[
 		'Montenegro',
@@ -1711,6 +1832,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Montenegrin',
+		'Europe',
 	],
 	[
 		'Morocco',
@@ -1724,6 +1846,7 @@ export const listCountries = [
 		'د.م.',
 		1,
 		'Moroccan',
+		'Africa',
 	],
 	[
 		'Mozambique',
@@ -1737,6 +1860,7 @@ export const listCountries = [
 		'MT',
 		1,
 		'Mozambican',
+		'Africa',
 	],
 	[
 		'Myanmar',
@@ -1750,6 +1874,7 @@ export const listCountries = [
 		'K',
 		1,
 		'Burman',
+		'Asia',
 	],
 	[
 		'Namibia',
@@ -1763,6 +1888,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Namibian',
+		'Africa',
 	],
 	[
 		'Nauru',
@@ -1776,6 +1902,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Nauruan',
+		'Australia',
 	],
 	[
 		'Nepal',
@@ -1789,6 +1916,7 @@ export const listCountries = [
 		'₨',
 		1,
 		'Nepalese',
+		'Asia',
 	],
 	[
 		'Netherlands',
@@ -1802,6 +1930,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Dutch',
+		'Europe',
 	],
 	[
 		'New Zealand',
@@ -1815,6 +1944,7 @@ export const listCountries = [
 		'$',
 		1,
 		'New Zealander',
+		'Australia',
 	],
 	[
 		'Nicaragua',
@@ -1828,6 +1958,7 @@ export const listCountries = [
 		'C$',
 		1,
 		'Nicaraguan',
+		'North America',
 	],
 	[
 		'Niger',
@@ -1841,6 +1972,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Nigerien',
+		'Africa',
 	],
 	[
 		'Nigeria',
@@ -1854,6 +1986,7 @@ export const listCountries = [
 		'₦',
 		1,
 		'Nigerian',
+		'Africa',
 	],
 	[
 		'North Macedonia',
@@ -1867,6 +2000,7 @@ export const listCountries = [
 		'ден',
 		1,
 		'Macedonian',
+		'Europe',
 	],
 	[
 		'Norway',
@@ -1880,6 +2014,7 @@ export const listCountries = [
 		'kr',
 		1,
 		'Norwegian',
+		'Europe',
 	],
 	[
 		'Oman',
@@ -1893,6 +2028,7 @@ export const listCountries = [
 		'ر.ع.',
 		1,
 		'Omani',
+		'Asia',
 	],
 	[
 		'Pakistan',
@@ -1906,6 +2042,7 @@ export const listCountries = [
 		'₨',
 		1,
 		'Pakistani',
+		'Asia',
 	],
 	[
 		'Palau',
@@ -1919,6 +2056,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Palauan',
+		'Australia',
 	],
 	[
 		'Panama',
@@ -1932,6 +2070,7 @@ export const listCountries = [
 		'B/.',
 		1,
 		'Panamanian',
+		'North America',
 	],
 	[
 		'Papua New Guinea',
@@ -1945,6 +2084,7 @@ export const listCountries = [
 		'K',
 		1,
 		'Papua New Guinean',
+		'Australia',
 	],
 	[
 		'Paraguay',
@@ -1958,6 +2098,7 @@ export const listCountries = [
 		'₲',
 		1,
 		'Paraguayan',
+		'South America',
 	],
 	[
 		'Peru',
@@ -1971,6 +2112,7 @@ export const listCountries = [
 		'S/.',
 		1,
 		'Peruvian',
+		'South America',
 	],
 	[
 		'Philippines',
@@ -1984,6 +2126,7 @@ export const listCountries = [
 		'₱',
 		1,
 		'Filipino',
+		'Asia',
 	],
 	[
 		'Poland',
@@ -1997,6 +2140,7 @@ export const listCountries = [
 		'zł',
 		1,
 		'Polish',
+		'Europe',
 	],
 	[
 		'Portugal',
@@ -2010,6 +2154,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Portuguese',
+		'Europe',
 	],
 	[
 		'Qatar',
@@ -2023,6 +2168,7 @@ export const listCountries = [
 		'ر.ق',
 		1,
 		'Qatari',
+		'Asia',
 	],
 	[
 		'Romania',
@@ -2036,6 +2182,7 @@ export const listCountries = [
 		'lei',
 		1,
 		'Romanian',
+		'Europe',
 	],
 	[
 		'Russia',
@@ -2049,6 +2196,7 @@ export const listCountries = [
 		'₽',
 		1,
 		'Russian',
+		'Europe',
 	],
 	[
 		'Rwanda',
@@ -2062,6 +2210,7 @@ export const listCountries = [
 		'FRw',
 		1,
 		'Rwandan',
+		'Africa',
 	],
 	[
 		'Saint Kitts and Nevis',
@@ -2075,6 +2224,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Kittitian or Nevisian',
+		'North America',
 	],
 	[
 		'Saint Lucia',
@@ -2088,6 +2238,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Saint Lucian',
+		'North America',
 	],
 	[
 		'Saint Vincent and the Grenadines',
@@ -2101,6 +2252,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Vincentian',
+		'North America',
 	],
 	[
 		'Samoa',
@@ -2114,6 +2266,7 @@ export const listCountries = [
 		'T',
 		1,
 		'Samoan',
+		'Australia',
 	],
 	[
 		'San Marino',
@@ -2127,6 +2280,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Sammarinese',
+		'Europe',
 	],
 	[
 		'Sao Tome and Principe',
@@ -2140,6 +2294,7 @@ export const listCountries = [
 		'Db',
 		1,
 		'São Toméan',
+		'Africa',
 	],
 	[
 		'Saudi Arabia',
@@ -2153,6 +2308,7 @@ export const listCountries = [
 		'ر.س',
 		1,
 		'Saudi',
+		'Asia',
 	],
 	[
 		'Senegal',
@@ -2166,6 +2322,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Senegalese',
+		'Africa',
 	],
 	[
 		'Serbia',
@@ -2179,6 +2336,7 @@ export const listCountries = [
 		'дин',
 		1,
 		'Serbian',
+		'Europe',
 	],
 	[
 		'Seychelles',
@@ -2192,6 +2350,7 @@ export const listCountries = [
 		'₨',
 		1,
 		'Seychellois',
+		'Africa',
 	],
 	[
 		'Sierra Leone',
@@ -2205,6 +2364,7 @@ export const listCountries = [
 		'Le',
 		1,
 		'Sierra Leonean',
+		'Africa',
 	],
 	[
 		'Singapore',
@@ -2218,6 +2378,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Singaporean',
+		'Asia',
 	],
 	[
 		'Slovakia',
@@ -2231,6 +2392,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Slovak',
+		'Europe',
 	],
 	[
 		'Slovenia',
@@ -2244,6 +2406,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Slovenian',
+		'Europe',
 	],
 	[
 		'Solomon Islands',
@@ -2257,6 +2420,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Solomon Islander',
+		'Australia',
 	],
 	[
 		'Somalia',
@@ -2270,6 +2434,7 @@ export const listCountries = [
 		'Sh',
 		1,
 		'Somali',
+		'Africa',
 	],
 	[
 		'South Africa',
@@ -2283,6 +2448,7 @@ export const listCountries = [
 		'R',
 		1,
 		'South African',
+		'Africa',
 	],
 	[
 		'South Sudan',
@@ -2296,6 +2462,7 @@ export const listCountries = [
 		'£',
 		1,
 		'South Sudanese',
+		'Africa',
 	],
 	[
 		'Spain',
@@ -2309,6 +2476,7 @@ export const listCountries = [
 		'€',
 		1,
 		'Spanish',
+		'Europe',
 	],
 	[
 		'Sri Lanka',
@@ -2322,6 +2490,7 @@ export const listCountries = [
 		'₨',
 		1,
 		'Sri Lankan',
+		'Asia',
 	],
 	[
 		'Sudan',
@@ -2335,6 +2504,7 @@ export const listCountries = [
 		'£',
 		1,
 		'Sudanese',
+		'Africa',
 	],
 	[
 		'Suriname',
@@ -2348,6 +2518,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Surinamese',
+		'South America',
 	],
 	[
 		'Sweden',
@@ -2361,6 +2532,7 @@ export const listCountries = [
 		'kr',
 		1,
 		'Swedish',
+		'Europe',
 	],
 	[
 		'Switzerland',
@@ -2374,6 +2546,7 @@ export const listCountries = [
 		'CHF',
 		1,
 		'Swiss',
+		'Europe',
 	],
 	[
 		'Syria',
@@ -2387,6 +2560,7 @@ export const listCountries = [
 		'£',
 		1,
 		'Syrian',
+		'Asia',
 	],
 	[
 		'Taiwan',
@@ -2400,12 +2574,13 @@ export const listCountries = [
 		'NT$',
 		1,
 		'Taiwanese',
+		'Asia',
 	],
 	[
 		'Tajikistan',
 		'TJK',
 		'TJ',
-		'762',
+		'星',
 		'992',
 		'Dushanbe',
 		'TJS',
@@ -2413,6 +2588,7 @@ export const listCountries = [
 		'SM',
 		1,
 		'Tajikistani',
+		'Asia',
 	],
 	[
 		'Tanzania',
@@ -2426,6 +2602,7 @@ export const listCountries = [
 		'TSh',
 		1,
 		'Tanzanian',
+		'Africa',
 	],
 	[
 		'Thailand',
@@ -2439,6 +2616,7 @@ export const listCountries = [
 		'฿',
 		1,
 		'Thai',
+		'Asia',
 	],
 	[
 		'Timor-Leste',
@@ -2452,6 +2630,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Timorese',
+		'Asia',
 	],
 	[
 		'Togo',
@@ -2465,6 +2644,7 @@ export const listCountries = [
 		'CFA',
 		1,
 		'Togolese',
+		'Africa',
 	],
 	[
 		'Tonga',
@@ -2478,6 +2658,7 @@ export const listCountries = [
 		'T$',
 		1,
 		'Tongan',
+		'Australia',
 	],
 	[
 		'Trinidad and Tobago',
@@ -2491,6 +2672,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Trinidadian or Tobagonian',
+		'North America',
 	],
 	[
 		'Tunisia',
@@ -2504,6 +2686,7 @@ export const listCountries = [
 		'د.ت',
 		1,
 		'Tunisian',
+		'Africa',
 	],
 	[
 		'Turkey',
@@ -2517,6 +2700,7 @@ export const listCountries = [
 		'₺',
 		1,
 		'Turkish',
+		'Asia',
 	],
 	[
 		'Turkmenistan',
@@ -2530,6 +2714,7 @@ export const listCountries = [
 		'm',
 		1,
 		'Turkmen',
+		'Asia',
 	],
 	[
 		'Tuvalu',
@@ -2543,6 +2728,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Tuvaluan',
+		'Australia',
 	],
 	[
 		'Uganda',
@@ -2556,6 +2742,7 @@ export const listCountries = [
 		'USh',
 		1,
 		'Ugandan',
+		'Africa',
 	],
 	[
 		'Ukraine',
@@ -2569,6 +2756,7 @@ export const listCountries = [
 		'₴',
 		1,
 		'Ukrainian',
+		'Europe',
 	],
 	[
 		'United Arab Emirates',
@@ -2582,6 +2770,7 @@ export const listCountries = [
 		'د.إ',
 		1,
 		'Emirati',
+		'Asia',
 	],
 	[
 		'United Kingdom',
@@ -2595,6 +2784,7 @@ export const listCountries = [
 		'£',
 		1,
 		'British',
+		'Europe',
 	],
 	[
 		'United States',
@@ -2608,6 +2798,7 @@ export const listCountries = [
 		'$',
 		1,
 		'American',
+		'North America',
 	],
 	[
 		'Uruguay',
@@ -2621,6 +2812,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Uruguayan',
+		'South America',
 	],
 	[
 		'Uzbekistan',
@@ -2634,6 +2826,7 @@ export const listCountries = [
 		'сўм',
 		1,
 		'Uzbekistani',
+		'Asia',
 	],
 	[
 		'Vanuatu',
@@ -2647,6 +2840,7 @@ export const listCountries = [
 		'VT',
 		1,
 		'Ni-Vanuatu',
+		'Australia',
 	],
 	[
 		'Venezuela',
@@ -2660,6 +2854,7 @@ export const listCountries = [
 		'Bs.S',
 		1,
 		'Venezuelan',
+		'South America',
 	],
 	[
 		'Vietnam',
@@ -2673,6 +2868,7 @@ export const listCountries = [
 		'₫',
 		1,
 		'Vietnamese',
+		'Asia',
 	],
 	[
 		'Yemen',
@@ -2686,6 +2882,7 @@ export const listCountries = [
 		'﷼',
 		1,
 		'Yemeni',
+		'Asia',
 	],
 	[
 		'Zambia',
@@ -2699,6 +2896,7 @@ export const listCountries = [
 		'ZK',
 		1,
 		'Zambian',
+		'Africa',
 	],
 	[
 		'Zimbabwe',
@@ -2712,6 +2910,7 @@ export const listCountries = [
 		'$',
 		1,
 		'Zimbabwean',
+		'Africa',
 	],
 ];
 

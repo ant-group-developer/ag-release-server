@@ -38,7 +38,7 @@ export class Country extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })
 	nationality: string;
 
-	@Column({ type: 'varchar', length: 30, default: 'Asia' })
+	@Column({ type: 'varchar', length: 30 })
 	continent: string;
 
 	@OneToMany(

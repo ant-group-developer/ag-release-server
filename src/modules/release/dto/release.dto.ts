@@ -1,9 +1,12 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+	IsDate,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
 	Length,
 	MaxLength,
 	ValidateIf,
@@ -60,14 +63,45 @@ export class CreateReleaseDto {
 	@IsEnum(ReleaseType)
 	type: ReleaseType;
 
-	// cLineOwner;
+	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(200)
+	cLineOwner: string;
 
-	// pLineOwner;
+	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(200)
+	pLineOwner: string;
 
-	// catalogId;
-	// releaseDate;
-	// releaseTime;
-	// releaseTimezoneId;
+	@ApiProperty({ example: 'A1234' })
+	@IsOptional()
+	@IsString()
+	@MaxLength(100)
+	catalogId: string;
+
+	@ApiProperty({ example: '2025-07-01' })
+	@IsNotEmpty()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	@IsDate()
+	releaseDate: Date;
+
+	@ApiProperty({ example: '18:00' })
+	@IsOptional()
+	@IsString()
+	@MaxLength(10)
+	releaseTime: string;
+
+	@ApiProperty({
+		example: '2c9bcd45-4f34-4e98-8ba6-3d5bcbcd11b1',
+		required: false,
+	})
+	@IsOptional()
+	@IsUUID()
+	releaseTimezoneId?: string | null;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
@@ -96,6 +130,26 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	@IsEnum(ReleaseType)
 	@ValidateIf((_, value) => value !== undefined)
 	type: ReleaseType;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(200)
+	cLineOwner?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(200)
+	pLineOwner?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsNotEmpty()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	@IsDate()
+	releaseDate?: Date;
 }
 
 export class QueryGetListReleaseDto extends BaseQueryDto {}

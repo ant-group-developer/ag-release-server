@@ -31,19 +31,19 @@ export class UpdateTimezoneDto extends PartialType(CreateTimezoneDto) {
 	@IsNotEmpty()
 	@IsString()
 	@MaxLength(100)
-	name: string;
+	name?: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsNotEmpty()
 	@IsString()
 	@MaxLength(10)
-	utc: string;
+	utc?: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsNotEmpty()
 	@IsString()
 	@MaxLength(100)
-	zone: string;
+	zone?: string;
 }
 
 export class QueryGetListTimezoneDto extends BaseQueryDto {

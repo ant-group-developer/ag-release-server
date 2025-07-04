@@ -20,12 +20,14 @@ export class ReleaseService {
 	) {}
 
 	async create(createReleaseDto: CreateReleaseDto): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId } = createReleaseDto;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			createReleaseDto;
 
 		await this.releaseValidateService.validate({
 			labelId,
 			primaryGenreId,
 			subGenreId,
+			releaseTimezoneId,
 		});
 
 		const release = this.releaseRepo.create(createReleaseDto);
@@ -66,7 +68,8 @@ export class ReleaseService {
 		id: string,
 		updateReleaseDto: UpdateReleaseDto,
 	): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId } = updateReleaseDto;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			updateReleaseDto;
 
 		const release = await this.findOne(id);
 
@@ -85,6 +88,15 @@ export class ReleaseService {
 		if (subGenreId && subGenreId !== release.subGenreId) {
 			await this.releaseValidateService.validate({
 				subGenreId,
+			});
+		}
+
+		if (
+			releaseTimezoneId &&
+			releaseTimezoneId !== release.releaseTimezoneId
+		) {
+			await this.releaseValidateService.validate({
+				releaseTimezoneId,
 			});
 		}
 

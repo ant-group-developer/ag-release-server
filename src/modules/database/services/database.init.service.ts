@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -74,9 +75,9 @@ export class DatabaseInitService implements OnModuleInit {
 	// 	if (result[0].count === '0') {
 	// 		const query = `
 	// 		INSERT INTO countries (
-	// 		  id, name, iso3, iso2, numeric_code, phone_code, capital, currency, currency_name, currency_symbol, region_id, nationality
+	// 		  id, name, iso3, iso2, numeric_code, phone_code, capital, currency, currency_name, currency_symbol, region_id, nationality, continent
 	// 		) VALUES (
-	// 		  uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	// 		  uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13
 	// 		)
 	// 	  `;
 
@@ -130,9 +131,9 @@ export class DatabaseInitService implements OnModuleInit {
 			const query = `
 				INSERT INTO countries (
 					id, name, iso3, iso2, numeric_code, phone_code, capital,
-					currency, currency_name, currency_symbol, region_id, nationality
+					currency, currency_name, currency_symbol, region_id, nationality, continent
 				) VALUES (
-					$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+					$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 				)
 			`;
 
@@ -150,6 +151,7 @@ export class DatabaseInitService implements OnModuleInit {
 					item[8],
 					item[9],
 					item[10],
+					item[11],
 				]);
 			}
 			console.log('Countries inserted successfully');
