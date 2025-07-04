@@ -7,3 +7,5 @@ export const ERROR_MESSAGE_DEFAULT = 'Error';
 export const ERROR_MESSAGE_CODE_DEFAULT = 'error';
 
 export const FILED_ORDER_DEFAULT = 'name';
+
+export const COMMENT_FOR_NULLABLE = 'Nullable when status is draft';

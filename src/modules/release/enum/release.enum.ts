@@ -1,5 +1,5 @@
 export enum ReleaseStatus {
-	DRAFT = 'draf',
+	DRAFT = 'draft',
 	PROCESSING = 'processing',
 	ISSUES = 'issues',
 	NEVER_DISTRIBUTED = 'never_distributed',
@@ -11,4 +11,13 @@ export enum ReleaseType {
 	ALBUM = 'album',
 	SINGLE = 'single',
 	EP = 'ep',
+}
+
+export enum FieldOrderRelease {
+	TITLE = 'title',
+	VERSION = 'version',
+	C_LINE_OWNER = 'cLineOwner',
+	P_LINE_OWNER = 'pLineOwner',
+	CREATED_AT = 'createdAt',
+	UPDATED_AT = 'updatedAt',
 }

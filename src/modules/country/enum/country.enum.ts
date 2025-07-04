@@ -13,3 +13,13 @@ export enum FieldOrderCountry {
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
 }
+
+export enum Continent {
+	AFRICA = 'Africa',
+	ANTARCTICA = 'Antarctica',
+	ASIA = 'Asia',
+	EUROPE = 'Europe',
+	NORTH_AMERICA = 'North America',
+	OCEANIA = 'Oceania',
+	SOUTH_AMERICA = 'South America',
+}

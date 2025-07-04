@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -14,35 +15,48 @@ import {
 	ReleaseMessageCodeSuccess,
 	ReleaseMessageError,
 	ReleaseMessageSuccess,
-} from './constants/release.constant';
+} from '../constants/release.constant';
 
 import {
-	CreateReleaseDto,
 	QueryGetListReleaseDto,
+	SubmitCreateReleaseDto,
 	UpdateReleaseDto,
-} from './dto/release.dto';
-import { Release } from './entities/release.entity';
-import { ReleaseService } from './services/release.service';
+} from '../dto/release.dto';
+import { Release } from '../entities/release.entity';
+import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
-	@Post()
-	@ApiOperation({ summary: 'Create a new release' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseMessageSuccess.CREATE,
-	})
-	@ApiResponse({
-		status: 400,
-		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-	})
-	async create(
-		@Body() createReleaseDto: CreateReleaseDto,
+	// @Post()
+	// @ApiOperation({ summary: 'Create a new release' })
+	// @ApiResponse({
+	// 	status: 200,
+	// 	description: ReleaseMessageSuccess.CREATE,
+	// })
+	// @ApiResponse({
+	// 	status: 400,
+	// 	description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
+	// })
+	// async create(
+	// 	@Body() createReleaseDto: CreateReleaseDto,
+	// ): Promise<ResponseSuccess<Release>> {
+	// 	const result = await this.releaseService.create(createReleaseDto);
+	// 	return new ResponseSuccess({
+	// 		data: result,
+	// 		messageCode: ReleaseMessageCodeSuccess.CREATE,
+	// 	});
+	// }
+
+	@Post(':id/submit')
+	async submit(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() data: SubmitCreateReleaseDto,
 	): Promise<ResponseSuccess<Release>> {
-		const result = await this.releaseService.create(createReleaseDto);
+		const result = await this.releaseService.submit(id);
+
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.CREATE,
@@ -92,7 +106,7 @@ export class ReleaseController {
 		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateReleaseDto: UpdateReleaseDto,
 	): Promise<ResponseSuccess<Release>> {
 		const result = await this.releaseService.update(id, updateReleaseDto);

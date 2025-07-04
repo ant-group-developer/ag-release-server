@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
+import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
 import {
 	ReleaseMessageCodeError,
@@ -17,16 +18,21 @@ export class ReleaseValidateService {
 
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
+
+		@InjectRepository(Timezone)
+		private readonly timezoneRepo: Repository<Timezone>,
 	) {}
 
 	async validate({
 		primaryGenreId,
 		subGenreId,
 		labelId,
+		releaseTimezoneId,
 	}: {
-		primaryGenreId?: string;
+		primaryGenreId?: string | null;
 		subGenreId?: string | null;
-		labelId?: string;
+		labelId?: string | null;
+		releaseTimezoneId?: string | null;
 	}) {
 		if (primaryGenreId) {
 			const genre = await this.genreRepo.findOne({
@@ -62,6 +68,19 @@ export class ReleaseValidateService {
 				throw new ResponseError({
 					message: ReleaseMessageError.LABEL_NOT_FOUND,
 					messageCode: ReleaseMessageCodeError.LABEL_NOT_FOUND,
+				});
+			}
+		}
+
+		if (releaseTimezoneId) {
+			const timezone = await this.timezoneRepo.findOne({
+				where: { id: releaseTimezoneId },
+			});
+
+			if (!timezone) {
+				throw new ResponseError({
+					message: ReleaseMessageError.TIMEZONE_NOT_FOUND,
+					messageCode: ReleaseMessageCodeError.TIMEZONE_NOT_FOUND,
 				});
 			}
 		}

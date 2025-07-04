@@ -119,6 +119,11 @@ export class CreateCountryDto {
 	@IsNotEmpty()
 	@MaxLength(30)
 	nationality: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(30)
+	continent: string;
 }
 
 export class UpdateCountryDto extends PartialType(CreateCountryDto) {
@@ -126,66 +131,72 @@ export class UpdateCountryDto extends PartialType(CreateCountryDto) {
 	@IsNotEmpty()
 	@MaxLength(100)
 	@ValidateIf((_, value) => value !== undefined)
-	name: string;
+	name?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	iso3: string;
+	iso3?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	iso2: string;
+	iso2?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	numericCode: string;
+	numericCode?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	phoneCode: string;
+	phoneCode?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	capital: string;
+	capital?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	currency: string;
+	currency?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	currencyName: string;
+	currencyName?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	currencySymbol: string;
+	currencySymbol?: string;
 
 	@IsNumber()
 	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
-	regionId: number;
+	regionId?: number;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	nationality: string;
+	nationality?: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(30)
+	@ValidateIf((_, value) => value !== undefined)
+	continent?: string;
 }
 
 export class QueryGetListCountryDto extends BaseQueryDto {

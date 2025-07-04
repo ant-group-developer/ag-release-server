@@ -77,7 +77,7 @@ export class CountryService {
 		await this.countryRepo.delete(id);
 	}
 
-	async validate({ name }: { name: string }) {
+	async validate({ name }: { name?: string }) {
 		if (name) {
 			const artist = await this.countryRepo.findOne({ where: { name } });
 
