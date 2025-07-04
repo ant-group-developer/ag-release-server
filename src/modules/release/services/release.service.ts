@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import {
 	CreateReleaseDto,
 	QueryGetListReleaseDto,
-	SubmitCreateReleaseDto,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
@@ -22,9 +21,8 @@ export class ReleaseService {
 		private readonly releaseQbService: ReleaseQbService,
 	) {}
 
-	async create(createReleaseDto: CreateReleaseDto): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			createReleaseDto;
+	async create(data: CreateReleaseDto): Promise<Release> {
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		await this.releaseValidateService.validate({
 			labelId,
@@ -33,13 +31,11 @@ export class ReleaseService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create(createReleaseDto);
+		const release = this.releaseRepo.create(data);
 		return await this.releaseRepo.save(release);
 	}
 
-	async submit(data: SubmitCreateReleaseDto) {
-		const { id } = data;
-
+	async submit(id: string) {
 		const release = await this.releaseQbService.findOne(id);
 
 		if (release.status !== ReleaseStatus.DRAFT) {
@@ -73,12 +69,8 @@ export class ReleaseService {
 		});
 	}
 
-	async update(
-		id: string,
-		updateReleaseDto: UpdateReleaseDto,
-	): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			updateReleaseDto;
+	async update(id: string, data: UpdateReleaseDto): Promise<Release> {
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		const release = await this.releaseQbService.findOne(id);
 
@@ -109,7 +101,7 @@ export class ReleaseService {
 			});
 		}
 
-		await this.releaseRepo.update(id, updateReleaseDto);
+		await this.releaseRepo.update(id, data);
 		return await this.releaseQbService.findOne(id);
 	}
 

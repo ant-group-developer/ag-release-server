@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Put,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
@@ -29,7 +36,7 @@ export class ReleaseDraftController {
 
 	@Put(':id')
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
 	): Promise<ResponseSuccess<Release>> {
 		const result = await this.releaseDraftService.update(id, data);

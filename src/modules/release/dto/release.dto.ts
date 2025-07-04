@@ -61,7 +61,7 @@ export class CreateReleaseDto {
 
 	@ApiProperty({ enum: ReleaseStatus, example: ReleaseStatus.DRAFT })
 	@IsEnum(ReleaseStatus)
-	status: ReleaseStatus = ReleaseStatus.DRAFT;
+	status: ReleaseStatus;
 
 	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
 	@IsEnum(ReleaseType)
@@ -108,11 +108,7 @@ export class CreateReleaseDto {
 	releaseTimezoneId?: string | null;
 }
 
-export class SubmitCreateReleaseDto extends CreateReleaseDto {
-	@IsNotEmpty()
-	@IsUUID()
-	id: string;
-}
+export class SubmitCreateReleaseDto extends CreateReleaseDto {}
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	@IsString()

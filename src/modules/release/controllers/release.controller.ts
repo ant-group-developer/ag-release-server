@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -49,11 +50,13 @@ export class ReleaseController {
 	// 	});
 	// }
 
-	@Post('submit')
+	@Post(':id/submit')
 	async submit(
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: SubmitCreateReleaseDto,
 	): Promise<ResponseSuccess<Release>> {
-		const result = await this.releaseService.submit(data);
+		const result = await this.releaseService.submit(id);
+
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.CREATE,
@@ -103,7 +106,7 @@ export class ReleaseController {
 		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateReleaseDto: UpdateReleaseDto,
 	): Promise<ResponseSuccess<Release>> {
 		const result = await this.releaseService.update(id, updateReleaseDto);
