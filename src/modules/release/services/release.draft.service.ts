@@ -3,11 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
-	CreateDraftReleaseDto,
+	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
+import { IReleaseDraft } from '../interfaces/release.interface';
 import { ReleaseQbService } from './release.qb.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -20,7 +21,7 @@ export class ReleaseDraftService {
 		private readonly releaseQbService: ReleaseQbService,
 	) {}
 
-	async create(data: CreateDraftReleaseDto): Promise<Release> {
+	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		await this.releaseValidateService.validate({
@@ -31,10 +32,15 @@ export class ReleaseDraftService {
 		});
 
 		const release = this.releaseRepo.create(data);
-		return await this.releaseRepo.save(release);
+		const result = await this.releaseRepo.save(release);
+
+		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 
-	async update(id: string, data: UpdateReleaseDraftDto): Promise<Release> {
+	async update(
+		id: string,
+		data: UpdateReleaseDraftDto,
+	): Promise<IReleaseDraft> {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		const release = await this.releaseQbService.findOne(id);
@@ -73,6 +79,8 @@ export class ReleaseDraftService {
 		}
 
 		await this.releaseRepo.update(id, data);
-		return await this.releaseQbService.findOne(id);
+		const result = await this.releaseQbService.findOne(id);
+
+		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 }

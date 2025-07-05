@@ -9,6 +9,12 @@ import {
 	ReleaseMessageCodeError,
 	ReleaseMessageError,
 } from '../constants/release.constant';
+import { ReleaseStatus } from '../enum/release.enum';
+import {
+	IRelease,
+	IReleaseDraft,
+	IReleaseNonDraft,
+} from '../interfaces/release.interface';
 
 @Injectable()
 export class ReleaseValidateService {
@@ -84,5 +90,53 @@ export class ReleaseValidateService {
 				});
 			}
 		}
+	}
+
+	ensureNonDraftRelease(release: IRelease): IReleaseNonDraft {
+		if (release.status === ReleaseStatus.DRAFT) {
+			throw new ResponseError({ message: 'Invalid release.status' });
+		}
+
+		if (!release.primaryGenreId) {
+			throw new ResponseError({
+				message: 'Invalid release.primaryGenreId',
+			});
+		}
+
+		if (!release.labelId) {
+			throw new ResponseError({
+				message: 'Invalid release.labelId',
+			});
+		}
+
+		if (!release.cLineOwner) {
+			throw new ResponseError({
+				message: 'Invalid release.cLineOwner',
+			});
+		}
+
+		if (!release.pLineOwner) {
+			throw new ResponseError({
+				message: 'Invalid release.pLineOwner',
+			});
+		}
+
+		if (!release.releaseDate) {
+			throw new ResponseError({
+				message: 'Invalid release.releaseDate',
+			});
+		}
+
+		return release as IReleaseNonDraft;
+	}
+
+	ensureDraftRelease(release: IRelease): IReleaseDraft {
+		if (release.status !== ReleaseStatus.DRAFT) {
+			throw new ResponseError({
+				message: 'Invalid release.status',
+			});
+		}
+
+		return release as IReleaseDraft;
 	}
 }

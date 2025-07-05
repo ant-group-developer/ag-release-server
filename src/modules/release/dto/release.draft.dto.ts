@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 import { ReleaseType } from '../enum/release.enum';
 
-export class CreateDraftReleaseDto {
+export class CreateReleaseDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()
@@ -99,7 +99,7 @@ export class CreateDraftReleaseDto {
 	releaseTimezoneId?: string | null;
 }
 
-export class UpdateReleaseDraftDto extends PartialType(CreateDraftReleaseDto) {
+export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(150)

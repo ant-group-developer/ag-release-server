@@ -8,10 +8,18 @@ import { Release } from '../entities/release.entity';
 
 @Injectable()
 export class ReleaseQbService {
+	private mainAlias: string;
+
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
-	) {}
+	) {
+		this.mainAlias = 'release';
+	}
+
+	public getMainAlias() {
+		return this.mainAlias;
+	}
 
 	createQueryGetList(query: QueryGetListReleaseDto) {
 		const {
@@ -29,7 +37,9 @@ export class ReleaseQbService {
 			pageSize,
 		} = query;
 
-		const queryBuilder = this.releaseRepo.createQueryBuilder('release');
+		const queryBuilder = this.releaseRepo.createQueryBuilder(
+			this.mainAlias,
+		);
 
 		queryBuilder.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
 
@@ -80,17 +90,24 @@ export class ReleaseQbService {
 		return release;
 	}
 
-	// async saveToDatabase(data: IRelease) {
-	// 	const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+	async getDetail(id: string): Promise<Release> {
+		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
-	// 	await this.releaseValidateService.validate({
-	// 		labelId,
-	// 		primaryGenreId,
-	// 		subGenreId,
-	// 		releaseTimezoneId,
-	// 	});
+		query.where('release.id = :id', {
+			id,
+		});
 
-	// 	const release = this.releaseRepo.create(createReleaseDto);
-	// 	return await this.releaseRepo.save(release);
-	// }
+		query.leftJoinAndSelect('release.releaseCoverArt', 'releaseCoverArt');
+
+		const release = await query.getOne();
+
+		if (!release) {
+			throw new ResponseError({
+				message: ReleaseMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return release;
+	}
 }

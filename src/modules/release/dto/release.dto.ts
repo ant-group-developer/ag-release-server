@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
 	IsDate,
 	IsEnum,
+	IsIn,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -32,14 +33,20 @@ export class CreateReleaseDto {
 	})
 	@IsOptional()
 	@IsString()
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
 	@MaxLength(150)
-	version?: string | null;
+	version: string | null;
 
 	@ApiProperty({ example: '893123456789', required: false })
 	@IsOptional()
 	@IsString()
 	@MaxLength(20)
-	upc?: string | null;
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	upc: string | null;
 
 	@ApiProperty({ example: 'JzCTrtvkEn' })
 	@IsString()
@@ -51,7 +58,10 @@ export class CreateReleaseDto {
 	@IsOptional()
 	@IsString()
 	@Length(10, 10)
-	subGenreId?: string | null;
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	subGenreId: string | null;
 
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
@@ -83,7 +93,10 @@ export class CreateReleaseDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(100)
-	catalogId?: string;
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	catalogId: string | null;
 
 	@ApiProperty({ example: '2025-07-01' })
 	@IsNotEmpty()
@@ -97,6 +110,9 @@ export class CreateReleaseDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(10)
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
 	releaseTime: string;
 
 	@ApiProperty({
@@ -105,10 +121,18 @@ export class CreateReleaseDto {
 	})
 	@IsOptional()
 	@IsUUID()
-	releaseTimezoneId?: string | null;
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	releaseTimezoneId: string | null;
 }
 
-export class SubmitCreateReleaseDto extends CreateReleaseDto {}
+export class SubmitCreateReleaseDto extends CreateReleaseDto {
+	@IsOptional()
+	@ValidateIf((_, value) => value !== undefined)
+	@IsIn([ReleaseStatus.DRAFT])
+	status: ReleaseStatus.DRAFT;
+}
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	@IsString()
