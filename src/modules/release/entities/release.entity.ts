@@ -21,9 +21,10 @@ import {
 	OneToOne,
 } from 'typeorm';
 import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
+import { IRelease } from '../interfaces/release.interface';
 
 @Entity('releases')
-export class Release extends BaseUserTrackedUUIDEntity {
+export class Release extends BaseUserTrackedUUIDEntity implements IRelease {
 	@Column({ type: 'varchar', length: 20, nullable: true })
 	upc: string | null;
 
