@@ -1,7 +1,7 @@
 import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';

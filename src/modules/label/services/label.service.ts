@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { BucketGcsService } from 'src/modules/bucket/services/bucket.gcs.service';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import {
 	LabelMessageCodeError,
 	LabelMessageError,
@@ -22,7 +22,7 @@ export class LabelService {
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
 
-		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketService: BucketService,
 		private readonly labelQbService: LabelQbService,
 	) {}
 
@@ -76,7 +76,7 @@ export class LabelService {
 			picture !== label.picture &&
 			label.picture
 		) {
-			await this.bucketGcsService.deletePublicFile(label.picture);
+			await this.bucketService.deletePublicFile(label.picture);
 		}
 
 		await this.labelRepo.update(id, updateLabelDto);
@@ -87,7 +87,7 @@ export class LabelService {
 		const label = await this.findOne(id);
 
 		if (label.picture) {
-			await this.bucketGcsService.deletePublicFile(label.picture);
+			await this.bucketService.deletePublicFile(label.picture);
 		}
 
 		await this.labelRepo.delete(id);

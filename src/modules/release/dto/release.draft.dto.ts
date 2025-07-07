@@ -97,6 +97,12 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	@IsUUID()
 	releaseTimezoneId?: string | null;
+
+	// // coverArt
+	// @IsNotEmpty()
+	// @ValidateNested()
+	// @Type(() => CreateCoverArtDto)
+	// releaseCoverArt: CreateCoverArtDto;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
@@ -136,4 +142,10 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	)
 	@IsDate()
 	releaseDate?: Date | null;
+
+	// @ValidateIf((_, value) => value !== undefined)
+	// @IsNotEmpty()
+	// @ValidateNested()
+	// @Type(() => CreateCoverArtDto)
+	// releaseCoverArt?: CreateCoverArtDto;
 }

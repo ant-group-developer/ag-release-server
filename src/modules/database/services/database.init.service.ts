@@ -9,7 +9,7 @@ import {
 	listCountries,
 	listLanguages,
 	listTimeZones,
-} from '../constants/database.constant';
+} from '../constants/database.init.constant';
 
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {

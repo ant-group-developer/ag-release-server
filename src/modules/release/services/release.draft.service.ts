@@ -19,10 +19,16 @@ export class ReleaseDraftService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQbService: ReleaseQbService,
+		// private readonly releaseCoverArtService: ReleaseCoverArtService,
 	) {}
 
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+		const {
+			// releaseCoverArt,
+			...restOfData
+		} = data;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			restOfData;
 
 		await this.releaseValidateService.validate({
 			labelId,
@@ -31,8 +37,14 @@ export class ReleaseDraftService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create(data);
+		const release = this.releaseRepo.create(restOfData);
 		const result = await this.releaseRepo.save(release);
+
+		// // coverArt
+		// await this.releaseCoverArtService.create({
+		// 	...releaseCoverArt,
+		// 	releaseId: release.id,
+		// });
 
 		return this.releaseValidateService.ensureDraftRelease(result);
 	}
@@ -41,7 +53,12 @@ export class ReleaseDraftService {
 		id: string,
 		data: UpdateReleaseDraftDto,
 	): Promise<IReleaseDraft> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+		const {
+			//  releaseCoverArt,
+			...restOfData
+		} = data;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			restOfData;
 
 		const release = await this.releaseQbService.findOne(id);
 
@@ -78,7 +95,7 @@ export class ReleaseDraftService {
 			});
 		}
 
-		await this.releaseRepo.update(id, data);
+		await this.releaseRepo.update(id, restOfData);
 		const result = await this.releaseQbService.findOne(id);
 
 		return this.releaseValidateService.ensureDraftRelease(result);

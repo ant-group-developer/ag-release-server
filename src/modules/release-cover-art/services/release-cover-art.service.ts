@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { CreateReleaseCoverArtDto } from '../dto/release-cover-art.dto';
+import {
+	CreateReleaseCoverArtDto,
+	UpdateReleaseCoverArtDto,
+} from '../dto/release-cover-art.dto';
 import { ReleaseCoverArt } from '../entities/release-cover-art.entity';
 import { ReleaseCoverArtValidateService } from './release-cover-art.validate.service';
 
@@ -13,21 +17,56 @@ export class ReleaseCoverArtService {
 		private readonly releaseCoverArtRepo: Repository<ReleaseCoverArt>,
 
 		private readonly releaseCoverArtValidateService: ReleaseCoverArtValidateService,
-
-		private readonly configService: ConfigService,
+		private readonly bucketService: BucketService,
 	) {}
 
 	async create(data: CreateReleaseCoverArtDto): Promise<ReleaseCoverArt> {
-		const { fileName, releaseId } = data;
-		await this.releaseCoverArtValidateService.validate({ releaseId });
-		const key = `releases/${fileName}`;
+		const { releaseId, fileId } = data;
+		await this.releaseCoverArtValidateService.validate({
+			releaseId,
+			fileId,
+		});
+		await this.bucketService.submitFile(fileId);
 
-		const releaseCoverArt = this.releaseCoverArtRepo.create({
-			...data,
-			key,
-			bucket: this.configService.get<string>('PUBLIC_BUCKET')!,
+		const releaseCoverArt = this.releaseCoverArtRepo.create(data);
+		return await this.releaseCoverArtRepo.save(releaseCoverArt);
+	}
+
+	async update(
+		id: string,
+		data: UpdateReleaseCoverArtDto,
+	): Promise<ReleaseCoverArt> {
+		const { releaseId, fileId } = data;
+		const releaseCoverArt = await this.findOne(id);
+
+		if (releaseId && releaseId !== releaseCoverArt.releaseId) {
+			await this.releaseCoverArtValidateService.validate({
+				releaseId,
+			});
+		}
+
+		if (fileId && fileId !== releaseCoverArt.fileId) {
+			await this.releaseCoverArtValidateService.validate({
+				fileId,
+			});
+
+			await this.bucketService.removeFile(fileId);
+			await this.bucketService.submitFile(fileId);
+		}
+
+		await this.releaseCoverArtRepo.update(id, data);
+		return this.findOne(id);
+	}
+
+	async findOne(id: string) {
+		const releaseCoverArt = await this.releaseCoverArtRepo.findOne({
+			where: { id },
 		});
 
-		return await this.releaseCoverArtRepo.save(releaseCoverArt);
+		if (!releaseCoverArt) {
+			throw new ResponseError({ message: 'Release cover art not found' });
+		}
+
+		return releaseCoverArt;
 	}
 }

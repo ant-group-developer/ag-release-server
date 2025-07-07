@@ -1,6 +1,6 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';

@@ -4,8 +4,8 @@ import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 
 @Entity('audio_files')
 export class AudioFile extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: 100 })
-	fileName: string;
+	// @Column({ type: 'varchar', length: 100 })
+	// fileName: string;
 
 	@Column({ type: 'varchar', length: 20 })
 	sampleRate: string;
@@ -16,20 +16,20 @@ export class AudioFile extends BaseUUIDEntity {
 	@Column({ type: 'smallint' })
 	bitDepth: number;
 
-	@Column({ type: 'varchar', length: 100 })
-	key: string;
+	// @Column({ type: 'varchar', length: 100 })
+	// key: string;
 
-	@Column({ type: 'varchar', length: 30 })
-	contentType: string;
+	// @Column({ type: 'varchar', length: 30 })
+	// contentType: string;
 
-	@Column({ type: 'varchar' })
-	extension: string;
+	// @Column({ type: 'varchar' })
+	// extension: string;
 
-	@Column({ type: 'bigint', comment: 'store in bytes' })
-	fileSize: number;
+	// @Column({ type: 'bigint', comment: 'store in bytes' })
+	// fileSize: number;
 
-	@Column({ type: 'varchar', length: 30 })
-	bucket: string;
+	// @Column({ type: 'varchar', length: 30 })
+	// bucket: string;
 
 	@Column({ type: 'int', comment: 'store in seconds' })
 	duration: number;

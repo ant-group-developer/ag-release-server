@@ -12,7 +12,10 @@ import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Release, Genre, Label, Timezone])],
+	imports: [
+		TypeOrmModule.forFeature([Release, Genre, Label, Timezone]),
+		// ReleaseCoverArtModule,
+	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [
 		ReleaseService,

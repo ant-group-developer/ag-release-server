@@ -1,5 +1,5 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';

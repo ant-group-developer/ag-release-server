@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
-import { BucketGcsService } from 'src/modules/bucket/services/bucket.gcs.service';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
 import {
 	ArtistMessageCodeError,
@@ -21,7 +21,7 @@ export class ArtistService {
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
 
-		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketService: BucketService,
 		private readonly artistQbService: ArtistQbService,
 	) {}
 
@@ -79,7 +79,7 @@ export class ArtistService {
 			picture !== artist.picture &&
 			artist.picture
 		) {
-			await this.bucketGcsService.deletePublicFile(artist.picture);
+			await this.bucketService.deletePublicFile(artist.picture);
 		}
 
 		await this.artistRepo.update(id, updateArtistDto);
@@ -89,7 +89,7 @@ export class ArtistService {
 	async remove(id: string): Promise<void> {
 		const artist = await this.findOne(id);
 		if (artist.picture)
-			await this.bucketGcsService.deletePublicFile(artist.picture);
+			await this.bucketService.deletePublicFile(artist.picture);
 		await this.artistRepo.delete(id);
 	}
 

@@ -55,11 +55,7 @@ export interface IReleaseNonDraft {
 	releaseTime: string | null;
 }
 
-export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
-	coverArtThumbnails: CoverArtThumbnails;
-}
-
-export interface CoverArtThumbnails {
+export interface ICoverArtThumbnails {
 	'75x75': string | null;
 	'100x100': string | null;
 	'160x160': string | null;
@@ -67,3 +63,13 @@ export interface CoverArtThumbnails {
 	'900x900': string | null;
 	original: string | null;
 }
+
+export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
+	coverArtThumbnails: ICoverArtThumbnails;
+}
+
+// export interface ICreateReleaseDraft extends IReleaseDraft {
+// 	releaseCoverArt: {
+
+// 	}
+// }

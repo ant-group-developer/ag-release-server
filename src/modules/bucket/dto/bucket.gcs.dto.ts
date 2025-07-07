@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsEnum,
 	IsNotEmpty,
@@ -8,25 +8,23 @@ import {
 	Matches,
 	Max,
 	MaxLength,
+	ValidateNested,
 } from 'class-validator';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
-import { EntityTypePicture } from '../enum/bucket.enum';
+import { EntityTypePicture, UploadPurpose } from '../enum/bucket.enum';
+import { CreateFileDtoSub } from './bucket.file.dto';
 
 export class GetUrlUploadDto {
 	@IsNotEmpty()
-	folder: string;
-
-	@IsNotEmpty()
-	fileName: string;
+	key: string;
 
 	@IsNotEmpty()
 	contentType: string;
 
-	@IsNotEmpty()
-	fileSize: number;
+	isPublic: boolean = false;
 }
 
-export class GenerateGcsPresignedUploadUrlDto {
+export class GeneratePublicUploadUrlDto {
 	@ApiProperty({
 		description:
 			'Entity type related to the picture (e.g., artists, genres)',
@@ -45,7 +43,9 @@ export class GenerateGcsPresignedUploadUrlDto {
 	@IsNotEmpty()
 	@MaxLength(100 + 'YYYYMMDDHHmmss_'.length)
 	@IsString()
-	@Transform(({ value }) => generateFileNameWithTimestamp(value))
+	@Transform(({ value }: { value: string }) =>
+		generateFileNameWithTimestamp(value),
+	)
 	fileName: string;
 
 	@ApiProperty({
@@ -67,4 +67,14 @@ export class GenerateGcsPresignedUploadUrlDto {
 			'Only image content types are allowed (jpeg, png, gif, webp, jpg)',
 	})
 	contentType: string;
+}
+
+export class CreateBucketDto {
+	@IsNotEmpty()
+	@ValidateNested()
+	@Type(() => CreateFileDtoSub)
+	file: CreateFileDtoSub;
+
+	@IsEnum(UploadPurpose)
+	uploadPurpose: UploadPurpose;
 }

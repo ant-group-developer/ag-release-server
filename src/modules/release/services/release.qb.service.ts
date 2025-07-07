@@ -90,6 +90,12 @@ export class ReleaseQbService {
 		return release;
 	}
 
+	async getList(query: QueryGetListReleaseDto) {
+		const queryGetList = this.createQueryGetList(query);
+
+		return await queryGetList.getManyAndCount();
+	}
+
 	async getDetail(id: string): Promise<Release> {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 

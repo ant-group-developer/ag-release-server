@@ -1,11 +1,9 @@
-import { Storage } from '@google-cloud/storage';
+import { File, Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-	GenerateGcsPresignedUploadUrlDto,
-	GetUrlUploadDto,
-} from '../dto/bucket.gcs.dto';
-import { BucketGcsAction } from '../enum/bucket.enum';
+import { ResponseError } from 'src/common/dtos/response.dto';
+import { GetUrlUploadDto } from '../dto/bucket.gcs.dto';
+import { BucketGcsAction, UploadPurpose } from '../enum/bucket.enum';
 
 @Injectable()
 export class BucketGcsService {
@@ -13,6 +11,7 @@ export class BucketGcsService {
 	private publicBucketName: string;
 	private privateBucketName: string;
 	private baseUrlPublic: string;
+	private baseUrlPrivate: string;
 
 	constructor(private readonly configService: ConfigService) {
 		const keyFilePath = this.configService.get<string>('PATH_GCS_KEY');
@@ -23,12 +22,15 @@ export class BucketGcsService {
 		this.privateBucketName =
 			this.configService.get<string>('PROTECTED_BUCKET')!;
 		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}`;
+		this.baseUrlPrivate = `https://storage.cloud.google.com/${this.privateBucketName}`;
 	}
 
-	async getUrlUploadPublicBucket(data: GetUrlUploadDto): Promise<string> {
-		const { folder, contentType, fileName } = data;
-		const filePath = `${folder}/${fileName}`;
-		const file = this.storage.bucket(this.publicBucketName).file(filePath);
+	async getUrlUpload(data: GetUrlUploadDto): Promise<string> {
+		const { contentType, key, isPublic } = data;
+
+		const bucketName = this.getBucketName({ isPublic });
+
+		const file = this.storage.bucket(bucketName).file(key);
 
 		const [url] = await file.getSignedUrl({
 			action: BucketGcsAction.write,
@@ -39,10 +41,28 @@ export class BucketGcsService {
 		return url;
 	}
 
-	async deletePublicFile(urlPublic: string): Promise<void> {
-		const file = this.storage
-			.bucket(this.publicBucketName)
-			.file(urlPublic.replace(this.baseUrlPublic + '/', ''));
+	async findOne({
+		bucketName,
+		key,
+	}: {
+		bucketName: string;
+		key: string;
+	}): Promise<File> {
+		const file = this.storage.bucket(bucketName).file(key);
+
+		const [exists] = await file.exists();
+		if (!exists)
+			throw new ResponseError({
+				message: 'File not found on Google Cloud Storage',
+			});
+
+		return file;
+	}
+
+	async delete({ isPublic, key }: { isPublic: boolean; key: string }) {
+		const bucketName = this.getBucketName({ isPublic });
+
+		const file = this.storage.bucket(bucketName).file(key);
 
 		const [exists] = await file.exists();
 		if (!exists) return;
@@ -50,30 +70,37 @@ export class BucketGcsService {
 		await file.delete();
 	}
 
-	async generatePublicPresignedUploadUrl(
-		data: GenerateGcsPresignedUploadUrlDto,
-	): Promise<{
-		urlPublic: string;
-		urlUpload: string;
-	}> {
-		const { entityType, fileName, contentType, fileSize } = data;
-
-		const urlUpload = await this.getUrlUploadPublicBucket({
-			contentType,
-			fileName,
-			fileSize,
-			folder: entityType,
-		});
-
-		const urlPublic = this.getUrlPublic(entityType, fileName);
-
-		return {
-			urlPublic,
-			urlUpload,
-		};
+	//
+	getKey(previousKey: string, fileName: string) {
+		return `${previousKey}/${fileName}`;
 	}
 
-	private getUrlPublic(entityType: string, fileName: string) {
-		return `${this.baseUrlPublic}/${entityType}/${fileName}`;
+	getPreviousKey(uploadPurpose: UploadPurpose) {
+		switch (uploadPurpose) {
+			case UploadPurpose.TRACK_AUDIO:
+				return `tracks/audio`;
+			case UploadPurpose.RELEASE_COVER_ART:
+				return `release_cover_art`;
+
+			default:
+				return `unknown`;
+		}
+	}
+
+	getUrlPublic(key: string) {
+		return `${this.baseUrlPublic}/${key}`;
+	}
+
+	getUrlPrivate(key: string) {
+		return `${this.baseUrlPrivate}/${key}`;
+	}
+
+	getBucketName({ isPublic }: { isPublic: boolean }): string {
+		return isPublic ? this.publicBucketName : this.privateBucketName;
+	}
+
+	async deletePublicFile(urlPublic: string): Promise<void> {
+		const key = urlPublic.replace(this.baseUrlPublic + '/', '');
+		await this.delete({ isPublic: true, key });
 	}
 }

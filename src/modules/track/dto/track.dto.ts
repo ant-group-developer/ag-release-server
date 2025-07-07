@@ -10,7 +10,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 
 export class CreateTrackDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })

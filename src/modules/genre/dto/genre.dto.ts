@@ -7,7 +7,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 import { FieldOrderGenre } from '../enum/genre.enum';
 
 export class CreateGenreDto {

@@ -9,8 +9,7 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
-
+import { lengthPicture } from 'src/modules/database/constants/database.constants';
 export class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
 	@IsString()

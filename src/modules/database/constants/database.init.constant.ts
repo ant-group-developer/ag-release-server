@@ -2913,5 +2913,3 @@ export const listCountries = [
 		'Africa',
 	],
 ];
-
-export const lengthPicture = 200;

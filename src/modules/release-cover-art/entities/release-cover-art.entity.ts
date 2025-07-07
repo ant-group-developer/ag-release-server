@@ -1,26 +1,13 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('release_cover_art')
 export class ReleaseCoverArt extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: 100 })
-	fileName: string;
-
-	@Column({ type: 'varchar', length: 100 })
-	key: string;
-
-	@Column({ type: 'varchar', length: 30 })
-	contentType: string;
-
-	@Column({ type: 'varchar', length: 10 })
-	extension: string;
-
-	@Column({ type: 'bigint', comment: 'store in bytes' })
-	fileSize: number;
-
-	@Column({ type: 'varchar', length: 30 })
-	bucket: string;
+	@Column({ type: 'uuid' })
+	fileId: string;
 
 	@Column({ type: 'uuid' })
 	releaseId: string;
@@ -34,11 +21,15 @@ export class ReleaseCoverArt extends BaseUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 20,
-		comment: `Example: 75x75, 100x100, 160x160, 300x300, 900x900, original`,
+		comment: `Example: 75x75, 100x100, 160x160, 300x300, 900x900,  `,
 	})
 	type: string;
 
 	// // relations
+	@ManyToOne(() => FileEntity, (file) => file.releaseCoverArts)
+	@JoinColumn({ name: 'file_id' })
+	file: FileEntity;
+
 	@ManyToOne(() => Release, (release) => release.releaseCoverArt)
 	@JoinColumn({ name: 'release_id' })
 	release: Release;

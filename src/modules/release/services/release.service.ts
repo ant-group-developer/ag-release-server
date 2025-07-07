@@ -11,7 +11,7 @@ import {
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
-	CoverArtThumbnails,
+	ICoverArtThumbnails,
 	IRelease,
 	IReleaseDetail,
 	IReleaseNonDraft,
@@ -56,7 +56,7 @@ export class ReleaseService {
 				status: ReleaseStatus.PROCESSING,
 			});
 
-		await this.releaseRepo.update(id, releaseNonDraft);
+		await this.releaseRepo.save(releaseNonDraft);
 		const result = await this.releaseQbService.findOne(id);
 
 		// convert to IReleaseNonDraft
@@ -79,9 +79,8 @@ export class ReleaseService {
 	async getList(query: QueryGetListReleaseDto): Promise<PageDto<IRelease>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.releaseQbService.createQueryGetList(query);
-
-		const [releases, totalItems] = await queryGetList.getManyAndCount();
+		const [releases, totalItems] =
+			await this.releaseQbService.getList(query);
 
 		return new PageDto({
 			items: releases,
@@ -139,8 +138,10 @@ export class ReleaseService {
 		await this.releaseRepo.delete(id);
 	}
 
-	private getCoverArtThumbnails(data: ReleaseCoverArt[]): CoverArtThumbnails {
-		const result: CoverArtThumbnails = {
+	private getCoverArtThumbnails(
+		data: ReleaseCoverArt[],
+	): ICoverArtThumbnails {
+		const result: ICoverArtThumbnails = {
 			'75x75': null,
 			'100x100': null,
 			'160x160': null,
@@ -160,7 +161,7 @@ export class ReleaseService {
 					'original',
 				].includes(item.type)
 			) {
-				result[item.type as keyof CoverArtThumbnails] = item.key;
+				result[item.type as keyof ICoverArtThumbnails] = item.fileId;
 			}
 		});
 
