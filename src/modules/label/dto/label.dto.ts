@@ -8,7 +8,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { lengthPicture } from 'src/modules/database/constants/database.constants';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderLabel } from '../enum/label.enum';
 
 export class CreateLabelDto {
@@ -24,14 +24,14 @@ export class CreateLabelDto {
 
 	@ApiProperty({
 		description: 'URL of the label’s logo or picture',
-		maxLength: lengthPicture,
+		maxLength: LENGTH_PICTURE,
 		example:
 			'https://storage.googleapis.com/ant-music-assets/label/warner.jpg',
 		required: false,
 	})
 	@IsString()
 	@IsOptional()
-	@MaxLength(lengthPicture)
+	@MaxLength(LENGTH_PICTURE)
 	picture?: string | null;
 
 	@ApiProperty({

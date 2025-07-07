@@ -10,7 +10,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { lengthPicture } from 'src/modules/database/constants/database.constants';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 
 export class CreateTrackDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -23,7 +23,7 @@ export class CreateTrackDto {
 	@IsOptional()
 	@Transform(({ value }: { value: undefined | string }) => value ?? null)
 	@IsString()
-	@MaxLength(lengthPicture)
+	@MaxLength(LENGTH_PICTURE)
 	picture: string | null;
 
 	@ApiProperty({

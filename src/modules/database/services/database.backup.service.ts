@@ -68,12 +68,12 @@ export class DatabaseBackupService {
 				shell: shellPath,
 			});
 
-			this.notificationService.sendNotificationBackup({
+			await this.notificationService.sendNotificationBackup({
 				status: true,
 				filename,
 			});
 		} catch (err) {
-			this.notificationService.sendNotificationBackup({
+			await this.notificationService.sendNotificationBackup({
 				status: false,
 				filename,
 				error: err instanceof Error ? err.message : String(err),

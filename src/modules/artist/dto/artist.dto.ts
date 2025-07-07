@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
-import { lengthPicture } from 'src/modules/database/constants/database.constants';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderArtist } from '../enum/artist.enum';
 
 export class CreateArtistDto {
@@ -25,13 +25,13 @@ export class CreateArtistDto {
 
 	@ApiProperty({
 		description: 'Picture of the artist',
-		maxLength: lengthPicture,
+		maxLength: LENGTH_PICTURE,
 		required: false,
 		type: 'string',
 		example: 'http://example.com/picture.jpg',
 	})
 	@IsOptional()
-	@MaxLength(lengthPicture)
+	@MaxLength(LENGTH_PICTURE)
 	@IsString()
 	picture: string | null;
 

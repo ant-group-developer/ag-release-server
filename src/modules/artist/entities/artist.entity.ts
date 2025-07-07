@@ -1,5 +1,5 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
-import { lengthPicture } from 'src/modules/database/constants/database.constants';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
@@ -9,7 +9,7 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: lengthPicture, nullable: true })
+	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
 	picture: string | null;
 
 	@Column({ type: 'varchar', length: 250, nullable: true })
