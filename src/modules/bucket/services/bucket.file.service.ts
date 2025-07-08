@@ -27,7 +27,7 @@ export class BucketFileService {
 		return file;
 	}
 
-	async submitFile(id: string) {
+	async submit(id: string) {
 		await this.fileRepo.update(id, { isSubmitted: true });
 		return this.findOne(id);
 	}

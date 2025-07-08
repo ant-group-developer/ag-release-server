@@ -24,8 +24,8 @@ import {
 } from '../dto/release.dto';
 import {
 	IRelease,
-	IReleaseDetail,
 	IReleaseNonDraft,
+	IReleaseWithCoverArt,
 } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
 
@@ -79,7 +79,7 @@ export class ReleaseController {
 	})
 	async getDetail(
 		@Param('id') id: string,
-	): Promise<ResponseSuccess<IReleaseDetail>> {
+	): Promise<ResponseSuccess<IReleaseWithCoverArt>> {
 		const result = await this.releaseService.getDetail(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -92,7 +92,7 @@ export class ReleaseController {
 	})
 	async getList(
 		@Query() query: QueryGetListReleaseDto,
-	): Promise<ResponseSuccess<PageDto<IRelease>>> {
+	): Promise<ResponseSuccess<PageDto<IReleaseWithCoverArt>>> {
 		const result = await this.releaseService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}

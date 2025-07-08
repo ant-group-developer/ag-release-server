@@ -64,12 +64,7 @@ export interface ICoverArtThumbnails {
 	original: string | null;
 }
 
-export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
+export interface IReleaseWithCoverArt
+	extends Omit<IRelease, 'releaseCoverArt'> {
 	coverArtThumbnails: ICoverArtThumbnails;
 }
-
-// export interface ICreateReleaseDraft extends IReleaseDraft {
-// 	releaseCoverArt: {
-
-// 	}
-// }

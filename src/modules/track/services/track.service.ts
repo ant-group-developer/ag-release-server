@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PageDto } from 'src/common/dtos/response.dto';
+import {
+	IAudioFile,
+	IAudioFileBucket,
+} from 'src/modules/audio-file/interfaces/audio-file.interface';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { SubmitCreateTrackDto, UpdateTrackDto } from '../dto/track.dto';
+import {
+	QueryGetListTrackDto,
+	SubmitCreateTrackDto,
+	UpdateTrackDto,
+} from '../dto/track.dto';
 import { Track } from '../entities/track.entity';
-import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
-import { TrackQbService } from './track.qb.service';
+import {
+	ITrack,
+	ITrackAudioBucket,
+	ITrackNonDraft,
+	ITrackWithAudio,
+} from '../interfaces/track.interface';
+import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
 
 @Injectable()
@@ -13,7 +28,8 @@ export class TrackService {
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
 		private readonly trackValidateService: TrackValidateService,
-		private readonly trackQbService: TrackQbService,
+		private readonly trackQueryService: TrackQueryService,
+		private readonly bucketService: BucketService,
 	) {}
 
 	// async create(data: CreateTrackDto): Promise<Track> {
@@ -35,48 +51,50 @@ export class TrackService {
 		data: SubmitCreateTrackDto,
 	): Promise<ITrackNonDraft> {
 		// validate id
-		await this.trackQbService.findOne(id);
+		await this.trackQueryService.findOne(id);
 
 		// validate nonDraft
 		const trackNonDraft =
 			this.trackValidateService.ensureNonDraftTrack(data);
 
 		await this.trackRepo.update(id, trackNonDraft);
-		const result = await this.trackQbService.findOne(id);
+		const result = await this.trackQueryService.findOne(id);
 
 		// convert to ITrackNonDraft
 		return this.trackValidateService.ensureNonDraftTrack(result);
 	}
 
-	// async getDetail(id: string): Promise<ITrackDetail> {
-	// 	const track = await this.trackQbService.getDetail(id);
+	async getDetail(id: string): Promise<ITrackAudioBucket> {
+		const track = await this.trackQueryService.getDetail(id);
 
-	// 	const { trackCoverArt, ...restOfTrack } = track;
+		const { audioFile, ...restOfTrack } = track;
 
-	// 	const coverArtThumbnails = this.getCoverArtThumbnails(trackCoverArt);
+		const audioFileBucket = await this.getAudioFileBucket(audioFile);
 
-	// 	return {
-	// 		...restOfTrack,
-	// 		coverArtThumbnails,
-	// 	};
-	// }
+		return {
+			...restOfTrack,
+			audioFileBucket,
+		};
+	}
 
-	// async getList(query: QueryGetListTrackDto): Promise<PageDto<ITrack>> {
-	// 	const { page, pageSize } = query;
+	async getList(
+		query: QueryGetListTrackDto,
+	): Promise<PageDto<ITrackAudioBucket>> {
+		const { page, pageSize } = query;
 
-	// 	const queryGetList = this.trackQbService.createQueryGetList(query);
+		const queryGetList = this.trackQueryService.createQueryGetList(query);
 
-	// 	const [tracks, totalItems] = await queryGetList.getManyAndCount();
+		const [tracks, totalItems] = await queryGetList.getManyAndCount();
 
-	// 	return new PageDto({
-	// 		items: tracks,
-	// 		metadata: {
-	// 			currentPage: page,
-	// 			pageSize,
-	// 			totalItems,
-	// 		},
-	// 	});
-	// }
+		return new PageDto({
+			items: await this.getTracksAudioBucket(tracks),
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
 
 	async update(id: string, data: UpdateTrackDto): Promise<ITrack> {
 		const {
@@ -85,7 +103,7 @@ export class TrackService {
 			subGenreId,
 		} = data;
 
-		const track = await this.trackQbService.findOne(id);
+		const track = await this.trackQueryService.findOne(id);
 
 		// if (releaseId && releaseId !== track.releaseId) {
 		// 	await this.trackValidateService.validate({
@@ -106,38 +124,35 @@ export class TrackService {
 		}
 
 		await this.trackRepo.update(id, data);
-		return await this.trackQbService.findOne(id);
+		return await this.trackQueryService.findOne(id);
 	}
 
-	// async remove(id: string): Promise<void> {
-	// 	await this.trackRepo.delete(id);
-	// }
+	async getAudioFileBucket(audioFile: IAudioFile): Promise<IAudioFileBucket> {
+		const file = await this.bucketService.getUrlRead(audioFile.fileId);
+		const peak = await this.bucketService.getUrlRead(audioFile.peakId);
 
-	// private getCoverArtThumbnails(data: TrackCoverArt[]): CoverArtThumbnails {
-	// 	const result: CoverArtThumbnails = {
-	// 		'75x75': null,
-	// 		'100x100': null,
-	// 		'160x160': null,
-	// 		'300x300': null,
-	// 		'900x900': null,
-	// 		original: null,
-	// 	};
+		return {
+			...audioFile,
+			file,
+			peak,
+		};
+	}
 
-	// 	data.forEach((item) => {
-	// 		if (
-	// 			[
-	// 				'75x75',
-	// 				'100x100',
-	// 				'160x160',
-	// 				'300x300',
-	// 				'900x900',
-	// 				'original',
-	// 			].includes(item.type)
-	// 		) {
-	// 			result[item.type as keyof CoverArtThumbnails] = item.key;
-	// 		}
-	// 	});
+	async getTracksAudioBucket(
+		tracks: ITrackWithAudio[],
+	): Promise<ITrackAudioBucket[]> {
+		const result: ITrackAudioBucket[] = [];
+		for (const track of tracks) {
+			const { audioFile, ...restOfTrack } = track;
 
-	// 	return result;
-	// }
+			const audioFileBucket = await this.getAudioFileBucket(audioFile);
+
+			result.push({
+				...restOfTrack,
+				audioFileBucket,
+			});
+		}
+
+		return result;
+	}
 }

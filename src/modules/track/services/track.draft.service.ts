@@ -8,7 +8,7 @@ import {
 import { Track } from '../entities/track.entity';
 import { ITrackDraft } from '../interfaces/track.interface';
 
-import { TrackQbService } from './track.qb.service';
+import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class TrackDraftService {
 		private readonly trackRepo: Repository<Track>,
 		private readonly trackValidateService: TrackValidateService,
 
-		private readonly trackQbService: TrackQbService,
+		private readonly trackQueryService: TrackQueryService,
 	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
@@ -43,7 +43,7 @@ export class TrackDraftService {
 			subGenreId,
 		} = data;
 
-		const track = await this.trackQbService.findOne(id);
+		const track = await this.trackQueryService.findOne(id);
 
 		// if (releaseId && releaseId !== track.releaseId) {
 		// 	await this.trackValidateService.validate({
@@ -64,7 +64,7 @@ export class TrackDraftService {
 		}
 
 		await this.trackRepo.update(id, data);
-		const result = await this.trackQbService.findOne(id);
+		const result = await this.trackQueryService.findOne(id);
 
 		return this.trackValidateService.ensureDraftTrack(result);
 	}

@@ -8,6 +8,7 @@ import {
 	ReleaseCoverArtMessageCodeError,
 	ReleaseCoverArtMessageError,
 } from '../constants/release-cover-art.constant';
+import { ReleaseCoverArt } from '../entities/release-cover-art.entity';
 
 @Injectable()
 export class ReleaseCoverArtValidateService {
@@ -17,6 +18,9 @@ export class ReleaseCoverArtValidateService {
 
 		@InjectRepository(FileEntity)
 		private readonly fileRepo: Repository<FileEntity>,
+
+		@InjectRepository(ReleaseCoverArt)
+		private readonly releaseCoverArtRepo: Repository<ReleaseCoverArt>,
 	) {}
 
 	async validate({
@@ -46,6 +50,16 @@ export class ReleaseCoverArtValidateService {
 			});
 
 			if (!file) {
+				throw new ResponseError({
+					message: 'Error fileId',
+				});
+			}
+
+			const releaseCoverArt = await this.releaseCoverArtRepo.findOne({
+				where: { fileId },
+			});
+
+			if (releaseCoverArt) {
 				throw new ResponseError({
 					message: 'Error fileId',
 				});

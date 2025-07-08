@@ -14,7 +14,7 @@ import { generateFileNameWithTimestamp } from 'src/utils/date';
 import { EntityTypePicture, UploadPurpose } from '../enum/bucket.enum';
 import { CreateFileDtoSub } from './bucket.file.dto';
 
-export class GetUrlUploadDto {
+export class GetSignedUrlUploadDto {
 	@IsNotEmpty()
 	key: string;
 
@@ -22,6 +22,22 @@ export class GetUrlUploadDto {
 	contentType: string;
 
 	isPublic: boolean = false;
+}
+
+export class GetSignedUrlReadDto {
+	@IsNotEmpty()
+	key: string;
+
+	isPublic: boolean = false;
+}
+
+export class GetSignedUrlDownDto {
+	@IsNotEmpty()
+	key: string;
+
+	isPublic: boolean = false;
+
+	fileName: string;
 }
 
 export class GeneratePublicUploadUrlDto {

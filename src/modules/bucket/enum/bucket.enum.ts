@@ -1,6 +1,6 @@
 export enum BucketGcsAction {
-	read = 'read',
-	write = 'write',
+	READ = 'read',
+	WRITE = 'write',
 }
 
 export enum EntityTypePicture {

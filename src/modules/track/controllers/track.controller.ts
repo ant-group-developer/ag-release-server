@@ -1,14 +1,22 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	TrackMessageCodeSuccess,
 	TrackMessageError,
 	TrackMessageSuccess,
 } from '../constants/track.constant';
 
-import { SubmitCreateTrackDto, UpdateTrackDto } from '../dto/track.dto';
-import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
+import {
+	QueryGetListTrackDto,
+	SubmitCreateTrackDto,
+	UpdateTrackDto,
+} from '../dto/track.dto';
+import {
+	ITrack,
+	ITrackAudioBucket,
+	ITrackNonDraft,
+} from '../interfaces/track.interface';
 import { TrackService } from '../services/track.service';
 
 @ApiTags('Tracks')
@@ -49,35 +57,26 @@ export class TrackController {
 		});
 	}
 
-	// @Get(':id')
-	// @ApiOperation({ summary: 'Get a track by ID' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: 'Successfully retrieved track',
-	// })
-	// @ApiResponse({
-	// 	status: 404,
-	// 	description: TrackMessageError.NOT_FOUND,
-	// })
-	// async getDetail(
-	// 	@Param('id') id: string,
-	// ): Promise<ResponseSuccess<ITrackDetail>> {
-	// 	const result = await this.trackService.getDetail(id);
-	// 	return new ResponseSuccess({ data: result });
-	// }
+	@Get(':id')
+	async getDetail(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<ITrackAudioBucket>> {
+		const result = await this.trackService.getDetail(id);
+		return new ResponseSuccess({ data: result });
+	}
 
-	// @Get()
-	// @ApiOperation({ summary: 'Get a list of tracks' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: 'List of tracks',
-	// })
-	// async getList(
-	// 	@Query() query: QueryGetListTrackDto,
-	// ): Promise<ResponseSuccess<PageDto<ITrack>>> {
-	// 	const result = await this.trackService.getList(query);
-	// 	return new ResponseSuccess({ data: result });
-	// }
+	@Get()
+	@ApiOperation({ summary: 'Get a list of tracks' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of tracks',
+	})
+	async getList(
+		@Query() query: QueryGetListTrackDto,
+	): Promise<ResponseSuccess<PageDto<ITrackAudioBucket>>> {
+		const result = await this.trackService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
 
 	@Put(':id')
 	@ApiOperation({ summary: 'Update a track by ID' })

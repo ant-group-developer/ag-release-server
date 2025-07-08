@@ -1,6 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity } from 'typeorm';
 
 @Entity('files')
 export class FileEntity extends BaseUUIDEntity {
@@ -25,6 +24,9 @@ export class FileEntity extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })
 	bucket: string;
 
-	@OneToMany(() => ReleaseCoverArt, (releaseCoverArt) => releaseCoverArt.file)
-	releaseCoverArts: ReleaseCoverArt[];
+	// @OneToMany(() => ReleaseCoverArt, (releaseCoverArt) => releaseCoverArt.file)
+	// releaseCoverArts: ReleaseCoverArt[];
+
+	// @OneToOne(() => ReleaseCoverArt, (releaseCoverArt) => releaseCoverArt.file)
+	// releaseCoverArt: ReleaseCoverArt;
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { Repository } from 'typeorm';
 import {
@@ -13,8 +14,8 @@ import { ReleaseStatus } from '../enum/release.enum';
 import {
 	ICoverArtThumbnails,
 	IRelease,
-	IReleaseDetail,
 	IReleaseNonDraft,
+	IReleaseWithCoverArt,
 } from '../interfaces/release.interface';
 import { ReleaseQbService } from './release.qb.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -26,6 +27,7 @@ export class ReleaseService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQbService: ReleaseQbService,
+		private readonly bucketService: BucketService,
 	) {}
 
 	// async create(data: CreateReleaseDto): Promise<Release> {
@@ -63,12 +65,13 @@ export class ReleaseService {
 		return this.releaseValidateService.ensureNonDraftRelease(result);
 	}
 
-	async getDetail(id: string): Promise<IReleaseDetail> {
+	async getDetail(id: string): Promise<IReleaseWithCoverArt> {
 		const release = await this.releaseQbService.getDetail(id);
 
-		const { releaseCoverArt, ...restOfRelease } = release;
+		const { releaseCoverArts, ...restOfRelease } = release;
 
-		const coverArtThumbnails = this.getCoverArtThumbnails(releaseCoverArt);
+		const coverArtThumbnails =
+			await this.getCoverArtThumbnails(releaseCoverArts);
 
 		return {
 			...restOfRelease,
@@ -76,14 +79,16 @@ export class ReleaseService {
 		};
 	}
 
-	async getList(query: QueryGetListReleaseDto): Promise<PageDto<IRelease>> {
+	async getList(
+		query: QueryGetListReleaseDto,
+	): Promise<PageDto<IReleaseWithCoverArt>> {
 		const { page, pageSize } = query;
 
 		const [releases, totalItems] =
 			await this.releaseQbService.getList(query);
 
 		return new PageDto({
-			items: releases,
+			items: await this.getReleasesWithCoverArt(releases),
 			metadata: {
 				currentPage: page,
 				pageSize,
@@ -138,9 +143,9 @@ export class ReleaseService {
 		await this.releaseRepo.delete(id);
 	}
 
-	private getCoverArtThumbnails(
-		data: ReleaseCoverArt[],
-	): ICoverArtThumbnails {
+	private async getCoverArtThumbnails(
+		coverArts: ReleaseCoverArt[],
+	): Promise<ICoverArtThumbnails> {
 		const result: ICoverArtThumbnails = {
 			'75x75': null,
 			'100x100': null,
@@ -150,7 +155,7 @@ export class ReleaseService {
 			original: null,
 		};
 
-		data.forEach((item) => {
+		for (const coverArt of coverArts) {
 			if (
 				[
 					'75x75',
@@ -159,11 +164,32 @@ export class ReleaseService {
 					'300x300',
 					'900x900',
 					'original',
-				].includes(item.type)
+				].includes(coverArt.type)
 			) {
-				result[item.type as keyof ICoverArtThumbnails] = item.fileId;
+				result[coverArt.type as keyof ICoverArtThumbnails] =
+					await this.bucketService.getUrlRead(coverArt.fileId);
 			}
-		});
+		}
+
+		return result;
+	}
+
+	private async getReleasesWithCoverArt(
+		releases: Release[],
+	): Promise<IReleaseWithCoverArt[]> {
+		const result: IReleaseWithCoverArt[] = [];
+
+		for (const release of releases) {
+			const { releaseCoverArts, ...restOfRelease } = release;
+
+			const coverArtThumbnails =
+				await this.getCoverArtThumbnails(releaseCoverArts);
+
+			result.push({
+				...restOfRelease,
+				coverArtThumbnails,
+			});
+		}
 
 		return result;
 	}

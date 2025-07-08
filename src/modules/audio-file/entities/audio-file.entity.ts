@@ -1,35 +1,31 @@
+import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 
 @Entity('audio_files')
 export class AudioFile extends BaseUUIDEntity {
-	// @Column({ type: 'varchar', length: 100 })
-	// fileName: string;
-
-	@Column({ type: 'varchar', length: 20 })
+	@Column({
+		type: 'varchar',
+		length: 20,
+	})
 	sampleRate: string;
 
-	@Column({ type: 'varchar', comment: 'Mbps' })
-	bitrate: string;
+	@Column({
+		type: 'varchar',
+		comment: 'Mbps' + ' & ' + COMMENT_FOR_NULLABLE,
+		nullable: true,
+		length: 10,
+	})
+	bitrate: string | null;
 
-	@Column({ type: 'smallint' })
-	bitDepth: number;
-
-	// @Column({ type: 'varchar', length: 100 })
-	// key: string;
-
-	// @Column({ type: 'varchar', length: 30 })
-	// contentType: string;
-
-	// @Column({ type: 'varchar' })
-	// extension: string;
-
-	// @Column({ type: 'bigint', comment: 'store in bytes' })
-	// fileSize: number;
-
-	// @Column({ type: 'varchar', length: 30 })
-	// bucket: string;
+	@Column({
+		type: 'smallint',
+		comment: ' & ' + COMMENT_FOR_NULLABLE,
+		nullable: true,
+	})
+	bitDepth: number | null;
 
 	@Column({ type: 'int', comment: 'store in seconds' })
 	duration: number;
@@ -37,14 +33,76 @@ export class AudioFile extends BaseUUIDEntity {
 	@Column({
 		type: 'int',
 		comment:
-			'This is where the track will begin playing when listeners are previewing the sample',
+			'This is where the track will begin playing when listeners are previewing the sample' +
+			' & ' +
+			COMMENT_FOR_NULLABLE,
+		nullable: true,
 	})
-	hook: number;
+	hook: number | null;
 
 	@Column({ type: 'varchar' })
 	trackId: string;
 
+	@Column({ type: 'uuid' })
+	fileId: string;
+
+	@Column({ type: 'uuid' })
+	peakId: string;
+
+	// relation
 	@OneToOne(() => Track, (track) => track.audioFile)
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
+
+	@OneToOne(() => FileEntity)
+	@JoinColumn({ name: 'file_id' })
+	file: FileEntity;
+
+	@OneToOne(() => FileEntity)
+	@JoinColumn({ name: 'peak_id' })
+	peak: FileEntity;
 }
+
+// @Entity('audio_files')
+// export class AudioFile extends BaseUUIDEntity {
+// 	@Column({ type: 'varchar', length: 20 })
+// 	sampleRate: string;
+
+// 	@Column({ type: 'varchar', comment: 'Mbps' })
+// 	bitrate: string;
+
+// 	@Column({ type: 'smallint' })
+// 	bitDepth: number;
+
+// 	@Column({ type: 'int', comment: 'store in seconds' })
+// 	duration: number;
+
+// 	@Column({
+// 		type: 'int',
+// 		comment:
+// 			'This is where the track will begin playing when listeners are previewing the sample',
+// 	})
+// 	hook: number;
+
+// 	@Column({ type: 'varchar' })
+// 	trackId: string;
+
+// 	@Column({ type: 'uuid' })
+// 	fileId: string;
+
+// 	@Column({ type: 'uuid' })
+// 	peakId: string;
+
+// 	// relation
+// 	@OneToOne(() => Track, (track) => track.audioFile)
+// 	@JoinColumn({ name: 'track_id' })
+// 	track: Track;
+
+// 	@OneToOne(() => FileEntity)
+// 	@JoinColumn({ name: 'file_id' })
+// 	file: FileEntity;
+
+// 	@OneToOne(() => FileEntity)
+// 	@JoinColumn({ name: 'peak_id' })
+// 	peak: FileEntity;
+// }

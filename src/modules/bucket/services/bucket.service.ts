@@ -30,7 +30,7 @@ export class BucketService {
 			bucket,
 		});
 
-		const urlUpload = await this.bucketGcsService.getUrlUpload({
+		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType: newFile.contentType,
 			key,
 			isPublic: false,
@@ -42,7 +42,39 @@ export class BucketService {
 		};
 	}
 
-	async submitFile(id: string) {
+	async getUrlRead(id: string) {
+		const file = await this.bucketFileService.findOne(id);
+		const { key } = file;
+
+		return this.bucketGcsService.getSignedUrlRead({
+			key,
+			isPublic: false,
+		});
+	}
+
+	async getUrlDown(id: string) {
+		const file = await this.bucketFileService.findOne(id);
+		const { key, fileName } = file;
+
+		return this.bucketGcsService.getSignedUrlDown({
+			key,
+			isPublic: false,
+			fileName,
+		});
+	}
+
+	async remove(id: string) {
+		const fileDb = await this.bucketFileService.findOne(id);
+		await this.bucketGcsService.delete({
+			isPublic: false,
+			key: fileDb.key,
+		});
+
+		await this.bucketFileService.delete(id);
+	}
+
+	//
+	async submit(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
 		await this.bucketGcsService.findOne({
 			bucketName: fileDb.bucket,
@@ -55,7 +87,7 @@ export class BucketService {
 		// 	});
 		// }
 
-		return await this.bucketFileService.submitFile(id);
+		return await this.bucketFileService.submit(id);
 	}
 
 	async getDetail(id: string) {
@@ -65,17 +97,11 @@ export class BucketService {
 			...file,
 			urlPublic: this.bucketGcsService.getUrlPublic(file.key),
 			urlPrivate: this.bucketGcsService.getUrlPrivate(file.key),
+			urlRead: await this.bucketGcsService.getSignedUrlRead({
+				key: file.key,
+				isPublic: false,
+			}),
 		};
-	}
-
-	async removeFile(id: string) {
-		const fileDb = await this.bucketFileService.findOne(id);
-		await this.bucketGcsService.delete({
-			isPublic: false,
-			key: fileDb.key,
-		});
-
-		await this.bucketFileService.delete(id);
 	}
 
 	// public
@@ -93,7 +119,7 @@ export class BucketService {
 
 		const key = this.bucketGcsService.getKey(entityType, fileName);
 
-		const urlUpload = await this.bucketGcsService.getUrlUpload({
+		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType,
 			key,
 			isPublic: true,

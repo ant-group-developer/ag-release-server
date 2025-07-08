@@ -42,6 +42,10 @@ export class ReleaseQbService {
 		);
 
 		queryBuilder.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+		queryBuilder.leftJoinAndSelect(
+			'release.releaseCoverArts',
+			'releaseCoverArts',
+		);
 
 		if (keyword) {
 			queryBuilder.andWhere('release.title ILIKE :keyword', {
@@ -103,7 +107,7 @@ export class ReleaseQbService {
 			id,
 		});
 
-		query.leftJoinAndSelect('release.releaseCoverArt', 'releaseCoverArt');
+		query.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts');
 
 		const release = await query.getOne();
 

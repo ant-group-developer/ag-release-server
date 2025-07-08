@@ -2,7 +2,11 @@ import { File, Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { GetUrlUploadDto } from '../dto/bucket.gcs.dto';
+import {
+	GetSignedUrlDownDto,
+	GetSignedUrlReadDto,
+	GetSignedUrlUploadDto,
+} from '../dto/bucket.gcs.dto';
 import { BucketGcsAction, UploadPurpose } from '../enum/bucket.enum';
 
 @Injectable()
@@ -25,7 +29,7 @@ export class BucketGcsService {
 		this.baseUrlPrivate = `https://storage.cloud.google.com/${this.privateBucketName}`;
 	}
 
-	async getUrlUpload(data: GetUrlUploadDto): Promise<string> {
+	async getSignedUrlUpload(data: GetSignedUrlUploadDto): Promise<string> {
 		const { contentType, key, isPublic } = data;
 
 		const bucketName = this.getBucketName({ isPublic });
@@ -33,7 +37,7 @@ export class BucketGcsService {
 		const file = this.storage.bucket(bucketName).file(key);
 
 		const [url] = await file.getSignedUrl({
-			action: BucketGcsAction.write,
+			action: BucketGcsAction.WRITE,
 			expires: Date.now() + 30 * 60 * 1000,
 			contentType,
 		});
@@ -41,6 +45,49 @@ export class BucketGcsService {
 		return url;
 	}
 
+	async getSignedUrlRead(data: GetSignedUrlReadDto): Promise<string> {
+		const { key, isPublic } = data;
+
+		const bucketName = this.getBucketName({ isPublic });
+
+		const file = this.storage.bucket(bucketName).file(key);
+
+		const [url] = await file.getSignedUrl({
+			action: BucketGcsAction.READ,
+			expires: Date.now() + 4 * 3600 * 1000,
+		});
+
+		return url;
+	}
+
+	async getSignedUrlDown(data: GetSignedUrlDownDto): Promise<string> {
+		const { key, isPublic, fileName } = data;
+
+		const bucketName = this.getBucketName({ isPublic });
+
+		const file = this.storage.bucket(bucketName).file(key);
+
+		const [url] = await file.getSignedUrl({
+			action: BucketGcsAction.READ,
+			expires: Date.now() + 4 * 3600 * 1000,
+			responseDisposition: `attachment; filename=${fileName}`,
+		});
+
+		return url;
+	}
+
+	async delete({ isPublic, key }: { isPublic: boolean; key: string }) {
+		const bucketName = this.getBucketName({ isPublic });
+
+		const file = this.storage.bucket(bucketName).file(key);
+
+		const [exists] = await file.exists();
+		if (!exists) return;
+
+		await file.delete();
+	}
+
+	//
 	async findOne({
 		bucketName,
 		key,
@@ -57,17 +104,6 @@ export class BucketGcsService {
 			});
 
 		return file;
-	}
-
-	async delete({ isPublic, key }: { isPublic: boolean; key: string }) {
-		const bucketName = this.getBucketName({ isPublic });
-
-		const file = this.storage.bucket(bucketName).file(key);
-
-		const [exists] = await file.exists();
-		if (!exists) return;
-
-		await file.delete();
 	}
 
 	//

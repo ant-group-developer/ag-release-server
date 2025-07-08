@@ -1,3 +1,8 @@
+import {
+	IAudioFile,
+	IAudioFileBucket,
+} from 'src/modules/audio-file/interfaces/audio-file.interface';
+
 export interface ITrack {
 	title: string;
 
@@ -56,4 +61,12 @@ export interface ITrackNonDraft {
 	primaryGenreId: string;
 
 	subGenreId: string | null;
+}
+
+export interface ITrackWithAudio extends ITrack {
+	audioFile: IAudioFile;
+}
+
+export interface ITrackAudioBucket extends ITrack {
+	audioFileBucket: IAudioFileBucket;
 }

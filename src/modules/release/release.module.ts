@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { Timezone } from '../timezone/entities/timezone.entity';
@@ -15,6 +16,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 	imports: [
 		TypeOrmModule.forFeature([Release, Genre, Label, Timezone]),
 		// ReleaseCoverArtModule,
+		BucketModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

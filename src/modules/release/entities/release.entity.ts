@@ -150,7 +150,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		() => ReleaseCoverArt,
 		(releaseCoverArt) => releaseCoverArt.release,
 	)
-	releaseCoverArt: ReleaseCoverArt[];
+	releaseCoverArts: ReleaseCoverArt[];
 
 	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
 	releaseDsp: ReleaseDsp[];
