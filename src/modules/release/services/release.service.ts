@@ -14,8 +14,8 @@ import { ReleaseStatus } from '../enum/release.enum';
 import {
 	ICoverArtThumbnails,
 	IRelease,
+	IReleaseDetail,
 	IReleaseNonDraft,
-	IReleaseWithCoverArt,
 } from '../interfaces/release.interface';
 import { ReleaseQbService } from './release.qb.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -65,8 +65,8 @@ export class ReleaseService {
 		return this.releaseValidateService.ensureNonDraftRelease(result);
 	}
 
-	async getDetail(id: string): Promise<IReleaseWithCoverArt> {
-		const release = await this.releaseQbService.getDetail(id);
+	async getOneDetail(id: string): Promise<IReleaseDetail> {
+		const release = await this.releaseQbService.getOneDetail(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
 
@@ -79,13 +79,13 @@ export class ReleaseService {
 		};
 	}
 
-	async getList(
+	async getListDetail(
 		query: QueryGetListReleaseDto,
-	): Promise<PageDto<IReleaseWithCoverArt>> {
+	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 
 		const [releases, totalItems] =
-			await this.releaseQbService.getList(query);
+			await this.releaseQbService.getListDetail(query);
 
 		return new PageDto({
 			items: await this.getReleasesWithCoverArt(releases),
@@ -176,8 +176,8 @@ export class ReleaseService {
 
 	private async getReleasesWithCoverArt(
 		releases: Release[],
-	): Promise<IReleaseWithCoverArt[]> {
-		const result: IReleaseWithCoverArt[] = [];
+	): Promise<IReleaseDetail[]> {
+		const result: IReleaseDetail[] = [];
 
 		for (const release of releases) {
 			const { releaseCoverArts, ...restOfRelease } = release;

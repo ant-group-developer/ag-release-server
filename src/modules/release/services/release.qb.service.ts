@@ -21,7 +21,7 @@ export class ReleaseQbService {
 		return this.mainAlias;
 	}
 
-	createQueryGetList(query: QueryGetListReleaseDto) {
+	private createQueryGetList(query: QueryGetListReleaseDto) {
 		const {
 			keyword,
 
@@ -39,12 +39,6 @@ export class ReleaseQbService {
 
 		const queryBuilder = this.releaseRepo.createQueryBuilder(
 			this.mainAlias,
-		);
-
-		queryBuilder.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
-		queryBuilder.leftJoinAndSelect(
-			'release.releaseCoverArts',
-			'releaseCoverArts',
 		);
 
 		if (keyword) {
@@ -79,6 +73,7 @@ export class ReleaseQbService {
 		return queryBuilder;
 	}
 
+	// public
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
@@ -94,20 +89,44 @@ export class ReleaseQbService {
 		return release;
 	}
 
-	async getList(query: QueryGetListReleaseDto) {
+	async getListDetail(query: QueryGetListReleaseDto) {
 		const queryGetList = this.createQueryGetList(query);
+		queryGetList
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
+			.leftJoinAndSelect('releaseArtists.artist', 'artist')
+			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
+
+			.leftJoinAndSelect('release.label', 'label');
 
 		return await queryGetList.getManyAndCount();
 	}
 
-	async getDetail(id: string): Promise<Release> {
+	async getOneDetail(id: string): Promise<Release> {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
+		query
+			.leftJoinAndSelect('release.label', 'label')
+
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
+			.leftJoinAndSelect('release.subGenre', 'subGenre')
+
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
+			.leftJoinAndSelect('releaseArtists.artist', 'artist')
+			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
+
+			.leftJoinAndSelect('release.releaseLanguage', 'releaseLanguage')
+			.leftJoinAndSelect(
+				'releaseLanguage.metadataLanguage',
+				'metadataLanguage',
+			);
 
 		query.where('release.id = :id', {
 			id,
 		});
-
-		query.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts');
 
 		const release = await query.getOne();
 

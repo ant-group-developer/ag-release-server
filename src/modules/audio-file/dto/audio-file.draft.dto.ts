@@ -1,5 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+	ArrayMinSize,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
@@ -10,6 +12,7 @@ import {
 	MaxLength,
 	Min,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 export class CreateAudioFileDraftDto {
 	@IsNotEmpty()
@@ -48,6 +51,14 @@ export class CreateAudioFileDraftDto {
 
 	@IsUUID()
 	peakId: string;
+}
+
+export class BulkCreateAudioFileDraft {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => CreateAudioFileDraftDto)
+	createAudioFileDraftDtos: CreateAudioFileDraftDto[];
 }
 
 export class UpdateAudioFileDraftDto extends PartialType(

@@ -115,6 +115,9 @@ export class BucketGcsService {
 		switch (uploadPurpose) {
 			case UploadPurpose.TRACK_AUDIO:
 				return `tracks/audio`;
+			case UploadPurpose.PEAK_AUDIO:
+				return `tracks/peak`;
+
 			case UploadPurpose.RELEASE_COVER_ART:
 				return `release_cover_art`;
 

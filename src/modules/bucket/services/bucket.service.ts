@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import axios from 'axios';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import {
 	BulkCreateBucketDto,
@@ -47,7 +48,7 @@ export class BucketService {
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
 		const result = [];
 
-		for (const item of data.payload) {
+		for (const item of data.createBucketDtos) {
 			const newBucket = await this.create(item);
 			result.push(newBucket);
 		}
@@ -156,5 +157,17 @@ export class BucketService {
 			urlPublic,
 			urlUpload,
 		};
+	}
+
+	async testPeak(id: string) {
+		const urlReadFile = await this.getUrlRead(id);
+
+		try {
+			const response = await axios.get(urlReadFile);
+			return response.data;
+		} catch (error) {
+			console.error('Error fetching data:', error);
+			return {};
+		}
 	}
 }

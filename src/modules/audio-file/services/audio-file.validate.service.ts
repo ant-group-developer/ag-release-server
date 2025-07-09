@@ -60,10 +60,12 @@ export class AudioFileValidateService {
 				where: { id: peakId },
 			});
 
-			if (!peak) {
-				throw new ResponseError({
-					message: 'Peak not found',
-				});
+			const audioFile = await this.audioFileRepo.findOne({
+				where: { peakId },
+			});
+
+			if (!peak || audioFile) {
+				throw new ResponseError({ message: 'Invalid peakId' });
 			}
 		}
 
@@ -72,10 +74,12 @@ export class AudioFileValidateService {
 				where: { id: fileId },
 			});
 
-			if (!file) {
-				throw new ResponseError({
-					message: 'File not found',
-				});
+			const audioFile = await this.audioFileRepo.findOne({
+				where: { fileId },
+			});
+
+			if (!file || audioFile) {
+				throw new ResponseError({ message: 'Invalid fileId' });
 			}
 		}
 	}

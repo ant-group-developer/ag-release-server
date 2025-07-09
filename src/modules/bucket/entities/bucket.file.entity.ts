@@ -29,4 +29,7 @@ export class FileEntity extends BaseUUIDEntity {
 
 	// @OneToOne(() => ReleaseCoverArt, (releaseCoverArt) => releaseCoverArt.file)
 	// releaseCoverArt: ReleaseCoverArt;
+
+	// @OneToOne(() => AudioFile, (audioFile) => audioFile.file)
+	// audioFile: AudioFile;
 }

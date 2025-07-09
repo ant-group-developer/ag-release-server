@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+	BulkCreateTrackDraft,
 	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
@@ -34,6 +35,15 @@ export class TrackDraftService {
 		const result = await this.trackRepo.save(track);
 
 		return this.trackValidateService.ensureDraftTrack(result);
+	}
+
+	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
+		const result = [];
+		for (const createTrackDraftDto of data.createTrackDrafts) {
+			const newTrackDraft = await this.create(createTrackDraftDto);
+			result.push(newTrackDraft);
+		}
+		return result;
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {

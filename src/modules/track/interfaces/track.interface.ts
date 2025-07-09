@@ -64,9 +64,9 @@ export interface ITrackNonDraft {
 }
 
 export interface ITrackWithAudio extends ITrack {
-	audioFile: IAudioFile;
+	audioFile: IAudioFile | null;
 }
 
 export interface ITrackAudioBucket extends ITrack {
-	audioFileBucket: IAudioFileBucket;
+	audioFileBucket: IAudioFileBucket | null;
 }

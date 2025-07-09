@@ -48,6 +48,9 @@ export class CreateReleaseDraftDto {
 	@Length(10, 10)
 	subGenreId?: string | null;
 
+	@IsOptional()
+	isVariousArtist?: boolean;
+
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
 	@IsOptional()
@@ -120,6 +123,9 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@IsOptional()
 	@Length(10, 10)
 	primaryGenreId?: string | null;
+
+	@IsOptional()
+	isVariousArtist?: boolean;
 
 	@IsString()
 	@IsOptional()

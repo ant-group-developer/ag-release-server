@@ -24,8 +24,8 @@ import {
 } from '../dto/release.dto';
 import {
 	IRelease,
+	IReleaseDetail,
 	IReleaseNonDraft,
-	IReleaseWithCoverArt,
 } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
 
@@ -77,10 +77,10 @@ export class ReleaseController {
 		status: 404,
 		description: ReleaseMessageError.NOT_FOUND,
 	})
-	async getDetail(
+	async getOneDetail(
 		@Param('id') id: string,
-	): Promise<ResponseSuccess<IReleaseWithCoverArt>> {
-		const result = await this.releaseService.getDetail(id);
+	): Promise<ResponseSuccess<IReleaseDetail>> {
+		const result = await this.releaseService.getOneDetail(id);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -90,10 +90,10 @@ export class ReleaseController {
 		status: 200,
 		description: 'List of releases',
 	})
-	async getList(
+	async getListDetail(
 		@Query() query: QueryGetListReleaseDto,
-	): Promise<ResponseSuccess<PageDto<IReleaseWithCoverArt>>> {
-		const result = await this.releaseService.getList(query);
+	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
+		const result = await this.releaseService.getListDetail(query);
 		return new ResponseSuccess({ data: result });
 	}
 

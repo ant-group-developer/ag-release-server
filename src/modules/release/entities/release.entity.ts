@@ -102,10 +102,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	})
 	releaseTime: string | null;
 
+	@Column({ type: Boolean, default: false })
+	isVariousArtist: boolean;
+
 	// relation
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'primary_genre_id' })
-	primaryGenre?: Genre;
+	primaryGenre: Genre | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
@@ -113,7 +116,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@ManyToOne(() => Label)
 	@JoinColumn({ name: 'label_id' })
-	label: Label;
+	label: Label | null;
 
 	// tracks
 	@OneToMany(() => Track, (track) => track.release)

@@ -4,6 +4,7 @@ import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import {
+	BulkCreateTrackDraft,
 	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
@@ -29,9 +30,9 @@ export class TrackDraftController {
 
 	@Post('bulk')
 	async bulkCreate(
-		@Body() data: CreateTrackDraftDto,
-	): Promise<ResponseSuccess<ITrackDraft>> {
-		const result = await this.trackDraftService.create(data);
+		@Body() data: BulkCreateTrackDraft,
+	): Promise<ResponseSuccess<ITrackDraft[]>> {
+		const result = await this.trackDraftService.bulkCreate(data);
 
 		return new ResponseSuccess({
 			data: result,

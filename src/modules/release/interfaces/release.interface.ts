@@ -1,3 +1,7 @@
+import { Genre } from 'src/modules/genre/entities/genre.entity';
+import { Label } from 'src/modules/label/entities/label.entity';
+import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
+import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import {
 	ReleaseStatus,
 	ReleaseStatusNonDraft,
@@ -64,7 +68,11 @@ export interface ICoverArtThumbnails {
 	original: string | null;
 }
 
-export interface IReleaseWithCoverArt
-	extends Omit<IRelease, 'releaseCoverArt'> {
+export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	coverArtThumbnails: ICoverArtThumbnails;
+	releaseArtists: ReleaseArtist[];
+	label: Label | null;
+	primaryGenre: Genre | null;
+	subGenre: Genre | null;
+	releaseLanguage: ReleaseLanguage | null;
 }

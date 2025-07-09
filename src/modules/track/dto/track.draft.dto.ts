@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+	ArrayMinSize,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -8,6 +9,7 @@ import {
 	Length,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 export class CreateTrackDraftDto {
@@ -75,6 +77,14 @@ export class CreateTrackDraftDto {
 	@Length(10, 10)
 	@Transform(({ value }: { value: undefined | string }) => value ?? null)
 	subGenreId: string | null;
+}
+
+export class BulkCreateTrackDraft {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => CreateTrackDraftDto)
+	createTrackDrafts: CreateTrackDraftDto[];
 }
 
 export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {

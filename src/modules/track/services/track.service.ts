@@ -69,7 +69,9 @@ export class TrackService {
 
 		const { audioFile, ...restOfTrack } = track;
 
-		const audioFileBucket = await this.getAudioFileBucket(audioFile);
+		const audioFileBucket = audioFile
+			? await this.getAudioFileBucket(audioFile)
+			: null;
 
 		return {
 			...restOfTrack,
@@ -145,7 +147,9 @@ export class TrackService {
 		for (const track of tracks) {
 			const { audioFile, ...restOfTrack } = track;
 
-			const audioFileBucket = await this.getAudioFileBucket(audioFile);
+			const audioFileBucket = audioFile
+				? await this.getAudioFileBucket(audioFile)
+				: null;
 
 			result.push({
 				...restOfTrack,

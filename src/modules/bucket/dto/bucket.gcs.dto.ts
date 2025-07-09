@@ -6,6 +6,7 @@ import {
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
+	IsOptional,
 	IsString,
 	IsUUID,
 	Matches,
@@ -98,8 +99,8 @@ export class CreateBucketDto {
 	uploadPurpose: UploadPurpose;
 
 	@IsString()
-	@IsNotEmpty()
-	key: string;
+	@IsOptional()
+	key: string | null = null;
 }
 
 export class BulkCreateBucketDto {
@@ -107,7 +108,7 @@ export class BulkCreateBucketDto {
 	@ArrayMinSize(1)
 	@ValidateNested({ each: true })
 	@Type(() => CreateBucketDto)
-	payload: CreateBucketDto[];
+	createBucketDtos: CreateBucketDto[];
 }
 
 export class BulkSubmitDto {

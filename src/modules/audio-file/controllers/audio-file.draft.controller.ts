@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 
 import {
+	BulkCreateAudioFileDraft,
 	CreateAudioFileDraftDto,
 	UpdateAudioFileDraftDto,
 } from '../dto/audio-file.draft.dto';
@@ -30,17 +31,17 @@ export class AudioFileDraftController {
 		});
 	}
 
-	// @Post('bulk')
-	// async bulkCreate(
-	// 	@Body() data: CreateAudioFileDraftDto,
-	// ): Promise<ResponseSuccess<IAudioFileDraft>> {
-	// 	const result = await this.audioFileDraftService.create(data);
+	@Post('bulk')
+	async bulkCreate(
+		@Body() data: BulkCreateAudioFileDraft,
+	): Promise<ResponseSuccess<IAudioFileDraft[]>> {
+		const result = await this.audioFileDraftService.bulkCreate(data);
 
-	// 	return new ResponseSuccess({
-	// 		data: result,
-	// 		messageCode: AudioFileMessageCodeSuccess.CREATE,
-	// 	});
-	// }
+		return new ResponseSuccess({
+			data: result,
+			messageCode: AudioFileMessageCodeSuccess.CREATE,
+		});
+	}
 
 	@Put(':id')
 	async update(

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+	BulkCreateAudioFileDraft,
 	CreateAudioFileDraftDto,
 	UpdateAudioFileDraftDto,
 } from '../dto/audio-file.draft.dto';
@@ -36,6 +37,16 @@ export class AudioFileDraftService {
 		const result = await this.audioFileRepo.save(audioFile);
 
 		return this.audioFileValidateService.ensureDraftAudioFile(result);
+	}
+
+	async bulkCreate(
+		data: BulkCreateAudioFileDraft,
+	): Promise<IAudioFileDraft[]> {
+		const result = [];
+		for (const audioFileDraft of data.createAudioFileDraftDtos) {
+			result.push(await this.create(audioFileDraft));
+		}
+		return result;
 	}
 
 	async update(
