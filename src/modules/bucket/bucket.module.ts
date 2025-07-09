@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BucketGcsController } from './controllers/bucket.gcs.controller';
+import { BucketGcsController } from './controllers/bucket.controller';
 import { FileEntity } from './entities/bucket.file.entity';
 import { BucketFileService } from './services/bucket.file.service';
 import { BucketGcsService } from './services/bucket.gcs.service';
