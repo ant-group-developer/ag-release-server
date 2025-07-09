@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import {
+	BulkCreateBucketDto,
+	BulkSubmitDto,
 	CreateBucketDto,
 	GeneratePublicUploadUrlDto,
 } from '../dto/bucket.gcs.dto';
+import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
 
@@ -13,11 +17,8 @@ export class BucketService {
 		private readonly bucketFileService: BucketFileService,
 	) {}
 
-	async create(data: CreateBucketDto): Promise<{
-		fileId: string;
-		urlUpload: string;
-	}> {
-		const { file, uploadPurpose } = data;
+	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
+		const { file, uploadPurpose, key: keyResult } = data;
 
 		// create file
 		const previousKey = this.bucketGcsService.getPreviousKey(uploadPurpose);
@@ -39,7 +40,19 @@ export class BucketService {
 		return {
 			fileId: newFile.id,
 			urlUpload,
+			key: keyResult,
 		};
+	}
+
+	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
+		const result = [];
+
+		for (const item of data.payload) {
+			const newBucket = await this.create(item);
+			result.push(newBucket);
+		}
+
+		return result;
 	}
 
 	async getUrlRead(id: string) {
@@ -76,18 +89,30 @@ export class BucketService {
 	//
 	async submit(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
+		const { bucket, key, isSubmitted } = fileDb;
+
 		await this.bucketGcsService.findOne({
-			bucketName: fileDb.bucket,
-			key: fileDb.key,
+			bucketName: bucket,
+			key,
 		});
 
-		// if (fileDb.isSubmitted) {
-		// 	throw new ResponseError({
-		// 		message: 'File is submitted',
-		// 	});
-		// }
+		if (isSubmitted) {
+			throw new ResponseError({
+				message: 'File is submitted',
+			});
+		}
 
 		return await this.bucketFileService.submit(id);
+	}
+
+	async bulkSubmit(data: BulkSubmitDto) {
+		const result = [];
+
+		for (const id of data.ids) {
+			result.push(await this.submit(id));
+		}
+
+		return result;
 	}
 
 	async getDetail(id: string) {

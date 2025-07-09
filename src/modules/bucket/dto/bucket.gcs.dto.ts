@@ -1,10 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+	ArrayMinSize,
+	IsArray,
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
 	IsString,
+	IsUUID,
 	Matches,
 	Max,
 	MaxLength,
@@ -93,4 +96,23 @@ export class CreateBucketDto {
 
 	@IsEnum(UploadPurpose)
 	uploadPurpose: UploadPurpose;
+
+	@IsString()
+	@IsNotEmpty()
+	key: string;
+}
+
+export class BulkCreateBucketDto {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => CreateBucketDto)
+	payload: CreateBucketDto[];
+}
+
+export class BulkSubmitDto {
+	@IsArray()
+	@ArrayMinSize(1)
+	@IsUUID('4', { each: true })
+	ids: string[];
 }

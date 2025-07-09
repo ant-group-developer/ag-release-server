@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import {
 	SubmitCreateAudioFileDto,
 	UpdateAudioFileDto,
@@ -18,6 +19,7 @@ export class AudioFileService {
 		private readonly audioFileRepo: Repository<AudioFile>,
 		private readonly audioFileValidateService: AudioFileValidateService,
 		private readonly audioFileQueryService: AudioFileQueryService,
+		private readonly bucketService: BucketService,
 	) {}
 
 	async submit(
@@ -86,12 +88,16 @@ export class AudioFileService {
 			await this.audioFileValidateService.validate({
 				fileId,
 			});
+
+			await this.bucketService.remove(audioFile.fileId);
 		}
 
 		if (peakId && peakId !== audioFile.peakId) {
 			await this.audioFileValidateService.validate({
 				peakId,
 			});
+
+			await this.bucketService.remove(audioFile.fileId);
 		}
 
 		await this.audioFileRepo.update(id, data);

@@ -32,9 +32,6 @@ export class AudioFileDraftService {
 			peakId,
 		});
 
-		await this.bucketService.submit(fileId);
-		await this.bucketService.submit(peakId);
-
 		const audioFile = this.audioFileRepo.create(data);
 		const result = await this.audioFileRepo.save(audioFile);
 
@@ -59,12 +56,16 @@ export class AudioFileDraftService {
 			await this.audioFileValidateService.validate({
 				fileId,
 			});
+
+			await this.bucketService.remove(audioFile.fileId);
 		}
 
 		if (peakId && peakId !== audioFile.peakId) {
 			await this.audioFileValidateService.validate({
 				peakId,
 			});
+
+			await this.bucketService.remove(audioFile.fileId);
 		}
 
 		await this.audioFileRepo.update(id, data);

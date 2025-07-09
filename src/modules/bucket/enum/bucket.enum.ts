@@ -13,5 +13,6 @@ export enum EntityTypePicture {
 
 export enum UploadPurpose {
 	TRACK_AUDIO = 'track_audio',
+	PEAK_AUDIO = 'peak_audio',
 	RELEASE_COVER_ART = 'release_cover_art',
 }

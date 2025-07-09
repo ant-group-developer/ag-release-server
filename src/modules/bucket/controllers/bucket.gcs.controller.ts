@@ -9,6 +9,8 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
+	BulkCreateBucketDto,
+	BulkSubmitDto,
 	CreateBucketDto,
 	GeneratePublicUploadUrlDto,
 } from '../dto/bucket.gcs.dto';
@@ -38,6 +40,33 @@ export class BucketGcsController {
 	})
 	async create(@Body() data: CreateBucketDto) {
 		const result = await this.bucketService.create(data);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@Post('private/bulk')
+	async bulkCreate(@Body() data: BulkCreateBucketDto) {
+		const result = await this.bucketService.bulkCreate(data);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@Post('private/bulk/submit')
+	async bulkSubmit(@Body() data: BulkSubmitDto) {
+		const result = await this.bucketService.bulkSubmit(data);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@Post('private/:id/submit')
+	async submit(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.bucketService.submit(id);
 
 		return new ResponseSuccess({
 			data: result,
@@ -89,10 +118,9 @@ export class BucketGcsController {
 		});
 	}
 
-	@Post('delete')
-	async deletePublic() {
-		return await this.bucketService.deletePublicFile(
-			'https://storage.googleapis.com/ant-music-assets/artists/20250707161551_ballad.jpge',
-		);
+	@Post('public/:urlPublic/delete')
+	async deletePublic(@Param('urlPublic') urlPublic: string) {
+		const decodedUrl = decodeURIComponent(urlPublic);
+		return await this.bucketService.deletePublicFile(decodedUrl);
 	}
 }

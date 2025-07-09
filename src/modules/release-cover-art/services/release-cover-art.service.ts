@@ -26,7 +26,6 @@ export class ReleaseCoverArtService {
 			releaseId,
 			fileId,
 		});
-		await this.bucketService.submit(fileId);
 
 		const releaseCoverArt = this.releaseCoverArtRepo.create(data);
 		return await this.releaseCoverArtRepo.save(releaseCoverArt);
@@ -51,7 +50,6 @@ export class ReleaseCoverArtService {
 			});
 
 			await this.bucketService.remove(fileId);
-			await this.bucketService.submit(fileId);
 		}
 
 		await this.releaseCoverArtRepo.update(id, data);
