@@ -6,6 +6,7 @@ import { Release } from '../release/entities/release.entity';
 import { ReleaseLanguageDraftController } from './controllers/release-language.draft.controller';
 import { ReleaseLanguage } from './entities/release-language.entity';
 import { ReleaseLanguageDraftService } from './services/release-language.draft.service';
+import { ReleaseLanguageQueryService } from './services/release-language.query.service';
 import { ReleaseLanguageValidateService } from './services/release-language.validate.service';
 
 @Module({
@@ -13,6 +14,10 @@ import { ReleaseLanguageValidateService } from './services/release-language.vali
 		TypeOrmModule.forFeature([ReleaseLanguage, Language, Release, Country]),
 	],
 	controllers: [ReleaseLanguageDraftController],
-	providers: [ReleaseLanguageDraftService, ReleaseLanguageValidateService],
+	providers: [
+		ReleaseLanguageDraftService,
+		ReleaseLanguageValidateService,
+		ReleaseLanguageQueryService,
+	],
 })
 export class ReleaseLanguageModule {}

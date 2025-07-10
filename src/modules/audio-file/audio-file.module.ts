@@ -20,5 +20,6 @@ import { AudioFileValidateService } from './services/audio-file.validate.service
 		AudioFileValidateService,
 		AudioFileQueryService,
 	],
+	exports: [AudioFileDraftService],
 })
 export class AudioFileModule {}

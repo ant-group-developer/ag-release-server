@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AudioFileModule } from '../audio-file/audio-file.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Release } from '../release/entities/release.entity';
@@ -12,7 +13,11 @@ import { TrackService } from './services/track.service';
 import { TrackValidateService } from './services/track.validate.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Track, Release, Genre]), BucketModule],
+	imports: [
+		TypeOrmModule.forFeature([Track, Release, Genre]),
+		BucketModule,
+		AudioFileModule,
+	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [
 		TrackService,

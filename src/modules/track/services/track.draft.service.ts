@@ -9,6 +9,7 @@ import {
 import { Track } from '../entities/track.entity';
 import { ITrackDraft } from '../interfaces/track.interface';
 
+import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
 
@@ -18,12 +19,13 @@ export class TrackDraftService {
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
 		private readonly trackValidateService: TrackValidateService,
-
 		private readonly trackQueryService: TrackQueryService,
+		private readonly audioFileDraftService: AudioFileDraftService,
 	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
-		const { releaseId, primaryGenreId, subGenreId } = data;
+		const { releaseId, primaryGenreId, subGenreId, createAudioFileDraft } =
+			data;
 
 		await this.trackValidateService.validate({
 			releaseId,
@@ -33,6 +35,14 @@ export class TrackDraftService {
 
 		const track = this.trackRepo.create(data);
 		const result = await this.trackRepo.save(track);
+
+		// create audioFile
+		if (createAudioFileDraft) {
+			await this.audioFileDraftService.create({
+				...createAudioFileDraft,
+				trackId: track.id,
+			});
+		}
 
 		return this.trackValidateService.ensureDraftTrack(result);
 	}

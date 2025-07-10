@@ -1,111 +1,92 @@
-// import { Injectable } from '@nestjs/common';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { ResponseError } from 'src/common/dtos/response.dto';
-// import { Repository } from 'typeorm';
-// import { TrackMessageError } from '../constants/track.constant';
-// import { QueryGetListTrackDto } from '../dto/track.dto';
-// import { Track } from '../entities/track.entity';
-// import { ITrackWithAudio } from '../interfaces/track.interface';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
+import { Repository } from 'typeorm';
+import { ReleaseLanguage } from '../entities/release-language.entity';
 
-// @Injectable()
-// export class TrackQueryService {
-// 	private mainAlias: string;
+@Injectable()
+export class ReleaseLanguageQueryService {
+	private mainAlias: string;
 
-// 	constructor(
-// 		@InjectRepository(Track)
-// 		private readonly trackRepo: Repository<Track>,
-// 	) {
-// 		this.mainAlias = 'track';
-// 	}
+	constructor(
+		@InjectRepository(ReleaseLanguage)
+		private readonly releaseLanguageRepo: Repository<ReleaseLanguage>,
+	) {
+		this.mainAlias = 'releaseLanguage';
+	}
 
-// 	public getMainAlias() {
-// 		return this.mainAlias;
-// 	}
+	public getMainAlias() {
+		return this.mainAlias;
+	}
 
-// 	createQueryGetList(query: QueryGetListTrackDto) {
-// 		const {
-// 			keyword,
+	// createQueryGetList(query: QueryGetListReleaseLanguageDto) {
+	// 	const {
+	// 		keyword,
 
-// 			startCreatedAt,
-// 			endCreatedAt,
-// 			startUpdatedAt,
-// 			endUpdatedAt,
+	// 		startCreatedAt,
+	// 		endCreatedAt,
+	// 		startUpdatedAt,
+	// 		endUpdatedAt,
 
-// 			fieldOrder,
-// 			orderBy,
+	// 		fieldOrder,
+	// 		orderBy,
 
-// 			skip,
-// 			pageSize,
-// 		} = query;
+	// 		skip,
+	// 		pageSize,
+	// 	} = query;
 
-// 		const queryBuilder = this.trackRepo.createQueryBuilder(this.mainAlias);
-// 		queryBuilder.leftJoinAndSelect('track.audioFile', 'audioFile');
+	// 	const queryBuilder = this.releaseLanguageRepo.createQueryBuilder(
+	// 		this.mainAlias,
+	// 	);
+	// 	queryBuilder.leftJoinAndSelect(
+	// 		'releaseLanguage.audioFile',
+	// 		'audioFile',
+	// 	);
 
-// 		if (keyword) {
-// 			queryBuilder.andWhere('track.title ILIKE :keyword', {
-// 				keyword: `%${keyword}%`,
-// 			});
-// 		}
+	// 	if (keyword) {
+	// 		queryBuilder.andWhere('releaseLanguage.title ILIKE :keyword', {
+	// 			keyword: `%${keyword}%`,
+	// 		});
+	// 	}
 
-// 		if (startCreatedAt && endCreatedAt) {
-// 			queryBuilder.andWhere(
-// 				`track.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
-// 				{
-// 					startCreatedAt,
-// 					endCreatedAt,
-// 				},
-// 			);
-// 		}
+	// 	if (startCreatedAt && endCreatedAt) {
+	// 		queryBuilder.andWhere(
+	// 			`releaseLanguage.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+	// 			{
+	// 				startCreatedAt,
+	// 				endCreatedAt,
+	// 			},
+	// 		);
+	// 	}
 
-// 		if (startUpdatedAt && endUpdatedAt) {
-// 			queryBuilder.andWhere(
-// 				`track.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
-// 				{
-// 					startUpdatedAt,
-// 					endUpdatedAt,
-// 				},
-// 			);
-// 		}
+	// 	if (startUpdatedAt && endUpdatedAt) {
+	// 		queryBuilder.andWhere(
+	// 			`releaseLanguage.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+	// 			{
+	// 				startUpdatedAt,
+	// 				endUpdatedAt,
+	// 			},
+	// 		);
+	// 	}
 
-// 		queryBuilder.orderBy(`track.${fieldOrder}`, orderBy);
-// 		queryBuilder.skip(skip).take(pageSize);
+	// 	queryBuilder.orderBy(`releaseLanguage.${fieldOrder}`, orderBy);
+	// 	queryBuilder.skip(skip).take(pageSize);
 
-// 		return queryBuilder;
-// 	}
+	// 	return queryBuilder;
+	// }
 
-// 	async findOne(id: string): Promise<Track> {
-// 		const track = await this.trackRepo.findOne({
-// 			where: { id },
-// 		});
+	async findOne(id: string): Promise<ReleaseLanguage> {
+		const releaseLanguage = await this.releaseLanguageRepo.findOne({
+			where: { id },
+		});
 
-// 		if (!track) {
-// 			throw new ResponseError({
-// 				message: TrackMessageError.NOT_FOUND,
-// 				statusCode: 404,
-// 			});
-// 		}
+		if (!releaseLanguage) {
+			throw new ResponseError({
+				message: 'Not found',
+				statusCode: 404,
+			});
+		}
 
-// 		return track;
-// 	}
-
-// 	async getDetail(id: string): Promise<ITrackWithAudio> {
-// 		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
-
-// 		query.where('track.id = :id', {
-// 			id,
-// 		});
-
-// 		query.leftJoinAndSelect('track.audioFile', 'audioFile');
-
-// 		const track = await query.getOne();
-
-// 		if (!track) {
-// 			throw new ResponseError({
-// 				message: TrackMessageError.NOT_FOUND,
-// 				statusCode: 404,
-// 			});
-// 		}
-
-// 		return track;
-// 	}
-// }
+		return releaseLanguage;
+	}
+}

@@ -11,7 +11,9 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
+import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+
 export class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
 	@IsString()
@@ -77,6 +79,11 @@ export class CreateTrackDraftDto {
 	@Length(10, 10)
 	@Transform(({ value }: { value: undefined | string }) => value ?? null)
 	subGenreId: string | null;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => CreateAudioFileDraftDto)
+	createAudioFileDraft?: Omit<CreateAudioFileDraftDto, 'trackId'>;
 }
 
 export class BulkCreateTrackDraft {
