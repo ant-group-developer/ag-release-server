@@ -53,15 +53,19 @@ export class AudioFileDraftService {
 		id: string,
 		data: UpdateAudioFileDraftDto,
 	): Promise<IAudioFileDraft> {
-		const { trackId, fileId, peakId } = data;
+		const {
+			//  trackId,
+			fileId,
+			peakId,
+		} = data;
 
 		const audioFile = await this.audioFileQueryService.findOne(id);
 
-		if (trackId && trackId !== audioFile.trackId) {
-			await this.audioFileValidateService.validate({
-				trackId,
-			});
-		}
+		// if (trackId && trackId !== audioFile.trackId) {
+		// 	await this.audioFileValidateService.validate({
+		// 		trackId,
+		// 	});
+		// }
 
 		if (fileId && fileId !== audioFile.fileId) {
 			await this.audioFileValidateService.validate({

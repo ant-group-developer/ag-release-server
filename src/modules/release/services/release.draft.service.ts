@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
 import { Repository } from 'typeorm';
 import {
 	CreateReleaseDraftDto,
@@ -20,6 +21,7 @@ export class ReleaseDraftService {
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQbService: ReleaseQbService,
 		// private readonly releaseCoverArtService: ReleaseCoverArtService,
+		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
 	) {}
 
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
@@ -46,6 +48,10 @@ export class ReleaseDraftService {
 		// 	releaseId: release.id,
 		// });
 
+		await this.releaseLanguageDraftService.create({
+			releaseId: release.id,
+		});
+
 		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 
@@ -55,6 +61,7 @@ export class ReleaseDraftService {
 	): Promise<IReleaseDraft> {
 		const {
 			//  releaseCoverArt,
+			releaseLanguage,
 			...restOfData
 		} = data;
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
@@ -93,6 +100,20 @@ export class ReleaseDraftService {
 			await this.releaseValidateService.validate({
 				releaseTimezoneId,
 			});
+		}
+
+		// language
+		if (
+			releaseLanguage?.metadataLanguageId !== undefined &&
+			releaseLanguage.metadataLanguageId !==
+				release.releaseLanguage.metadataLanguageId
+		) {
+			await this.releaseLanguageDraftService.update(
+				release.releaseLanguage.id,
+				{
+					metadataLanguageId: releaseLanguage.metadataLanguageId,
+				},
+			);
 		}
 
 		await this.releaseRepo.update(id, restOfData);

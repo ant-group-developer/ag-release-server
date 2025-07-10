@@ -7,7 +7,6 @@ import {
 	IsOptional,
 	IsString,
 	IsUUID,
-	Length,
 	Max,
 	MaxLength,
 	Min,
@@ -40,9 +39,9 @@ export class CreateAudioFileDraftDto {
 	@Min(0)
 	hook?: number | null;
 
-	@IsNotEmpty()
-	@IsString()
-	@Length(10, 10)
+	// @IsNotEmpty()
+	// @IsString()
+	// @Length(10, 10)
 	trackId: string;
 
 	@IsNotEmpty()
@@ -75,11 +74,11 @@ export class UpdateAudioFileDraftDto extends PartialType(
 	@Min(1)
 	duration?: number;
 
-	@ValidateIf((_, value) => value !== undefined)
-	@IsNotEmpty()
-	@IsString()
-	@Length(10, 10)
-	trackId?: string;
+	// @ValidateIf((_, value) => value !== undefined)
+	// @IsNotEmpty()
+	// @IsString()
+	// @Length(10, 10)
+	// trackId?: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsNotEmpty()

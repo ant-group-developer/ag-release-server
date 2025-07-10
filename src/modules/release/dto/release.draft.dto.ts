@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
 	IsEnum,
@@ -10,7 +10,9 @@ import {
 	Length,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
+import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseType } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
@@ -154,4 +156,8 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	// @ValidateNested()
 	// @Type(() => CreateCoverArtDto)
 	// releaseCoverArt?: CreateCoverArtDto;
+
+	@ValidateNested()
+	@Type(() => UpdateReleaseLanguageDraftDto)
+	releaseLanguage?: UpdateReleaseLanguageDraftDto;
 }

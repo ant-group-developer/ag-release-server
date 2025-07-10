@@ -24,8 +24,7 @@ export class TrackDraftService {
 	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
-		const { releaseId, primaryGenreId, subGenreId, createAudioFileDraft } =
-			data;
+		const { releaseId, primaryGenreId, subGenreId, audioFile } = data;
 
 		await this.trackValidateService.validate({
 			releaseId,
@@ -37,9 +36,9 @@ export class TrackDraftService {
 		const result = await this.trackRepo.save(track);
 
 		// create audioFile
-		if (createAudioFileDraft) {
+		if (audioFile) {
 			await this.audioFileDraftService.create({
-				...createAudioFileDraft,
+				...audioFile,
 				trackId: track.id,
 			});
 		}
@@ -49,8 +48,8 @@ export class TrackDraftService {
 
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const result = [];
-		for (const createTrackDraftDto of data.createTrackDrafts) {
-			const newTrackDraft = await this.create(createTrackDraftDto);
+		for (const track of data.tracks) {
+			const newTrackDraft = await this.create(track);
 			result.push(newTrackDraft);
 		}
 		return result;

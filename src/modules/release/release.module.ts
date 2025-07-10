@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
+import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
@@ -17,6 +18,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		TypeOrmModule.forFeature([Release, Genre, Label, Timezone]),
 		// ReleaseCoverArtModule,
 		BucketModule,
+		ReleaseLanguageModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

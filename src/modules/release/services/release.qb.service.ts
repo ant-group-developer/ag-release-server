@@ -77,6 +77,7 @@ export class ReleaseQbService {
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
+			relations: ['releaseLanguage'],
 		});
 
 		if (!release) {

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../user/entities/user.entity';
 import { EmailService } from './services/notification.email-service';
 import { NotificationService } from './services/notification.service';
+import { TelegramService } from './services/notification.telegram-service';
 import { NotificationUserService } from './services/notification.user-service';
 
 @Module({
@@ -10,7 +11,7 @@ import { NotificationUserService } from './services/notification.user-service';
 	providers: [
 		NotificationService,
 		EmailService,
-		// TelegramService,
+		TelegramService,
 		NotificationUserService,
 	],
 	exports: [NotificationService],

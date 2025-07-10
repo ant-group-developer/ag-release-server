@@ -82,7 +82,7 @@ export class ReleaseLanguageQueryService {
 
 		if (!releaseLanguage) {
 			throw new ResponseError({
-				message: 'Not found',
+				message: 'Not found release language',
 				statusCode: 404,
 			});
 		}

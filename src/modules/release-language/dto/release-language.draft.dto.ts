@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsUUID, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 export class CreateReleaseLanguageDraftDto {
 	@IsUUID()
 	@IsOptional()
@@ -21,8 +21,8 @@ export class CreateReleaseLanguageDraftDto {
 export class UpdateReleaseLanguageDraftDto extends PartialType(
 	CreateReleaseLanguageDraftDto,
 ) {
-	@ValidateIf((_, value) => value !== undefined)
-	@IsUUID()
-	@IsNotEmpty()
-	releaseId: string;
+	// @ValidateIf((_, value) => value !== undefined)
+	// @IsUUID()
+	// @IsNotEmpty()
+	// releaseId?: string;
 }

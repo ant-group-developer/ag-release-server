@@ -80,10 +80,10 @@ export class CreateTrackDraftDto {
 	@Transform(({ value }: { value: undefined | string }) => value ?? null)
 	subGenreId: string | null;
 
-	@IsOptional()
+	@IsNotEmpty()
 	@ValidateNested()
 	@Type(() => CreateAudioFileDraftDto)
-	createAudioFileDraft?: Omit<CreateAudioFileDraftDto, 'trackId'>;
+	audioFile?: Omit<CreateAudioFileDraftDto, 'trackId'>;
 }
 
 export class BulkCreateTrackDraft {
@@ -91,7 +91,7 @@ export class BulkCreateTrackDraft {
 	@ArrayMinSize(1)
 	@ValidateNested({ each: true })
 	@Type(() => CreateTrackDraftDto)
-	createTrackDrafts: CreateTrackDraftDto[];
+	tracks: CreateTrackDraftDto[];
 }
 
 export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {

@@ -50,7 +50,7 @@ export class ReleaseLanguageDraftService {
 		data: UpdateReleaseLanguageDraftDto,
 	): Promise<IReleaseLanguageDraft> {
 		const {
-			releaseId,
+			// releaseId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
@@ -59,11 +59,11 @@ export class ReleaseLanguageDraftService {
 		const releaseLanguage =
 			await this.releaseLanguageQueryService.findOne(id);
 
-		if (releaseId && releaseId !== releaseLanguage.releaseId) {
-			await this.releaseLanguageValidateService.validate({
-				releaseId,
-			});
-		}
+		// if (releaseId && releaseId !== releaseLanguage.releaseId) {
+		// 	await this.releaseLanguageValidateService.validate({
+		// 		releaseId,
+		// 	});
+		// }
 
 		if (
 			audioLanguageId &&
