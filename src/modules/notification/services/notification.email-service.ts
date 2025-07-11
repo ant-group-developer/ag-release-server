@@ -20,14 +20,10 @@ export class EmailService {
 	async sendMessage(data: { to: string[]; subject: string; html: string }) {
 		const { to, subject, html } = data;
 
-		try {
-			await this.transporter.sendMail({
-				to,
-				subject,
-				html,
-			});
-		} catch (error) {
-			throw error;
-		}
+		await this.transporter.sendMail({
+			to,
+			subject,
+			html,
+		});
 	}
 }

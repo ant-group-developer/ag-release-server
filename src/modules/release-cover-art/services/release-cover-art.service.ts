@@ -67,4 +67,8 @@ export class ReleaseCoverArtService {
 
 		return releaseCoverArt;
 	}
+
+	async delete(id: string) {
+		await this.releaseCoverArtRepo.delete(id);
+	}
 }

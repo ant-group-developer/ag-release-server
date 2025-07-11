@@ -164,7 +164,7 @@ export class BucketService {
 
 		try {
 			const response = await axios.get(urlReadFile);
-			return response.data;
+			return response.data as number[];
 		} catch (error) {
 			console.error('Error fetching data:', error);
 			return {};

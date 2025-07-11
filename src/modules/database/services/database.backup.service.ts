@@ -4,9 +4,11 @@ import { exec as execCallback } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { DateFormat } from 'src/common/enums/common';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
 import { promisify } from 'util';
+import { BackupDto } from '../dto/database.dto';
 
 @Injectable()
 export class DatabaseBackupService {
@@ -33,11 +35,14 @@ export class DatabaseBackupService {
 		};
 	}
 
-	async backup() {
+	async backup(data: BackupDto) {
+		const { toDrive, toGcs } = data;
+
 		const exec = promisify(execCallback);
 
 		const filename = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
+			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
 
 		const backupDir = path.join(os.homedir(), 'backups');
@@ -48,6 +53,7 @@ export class DatabaseBackupService {
 		}
 
 		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
+		const rcloneConfig = '--config=./database.rclone.conf';
 		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
 
 		try {
@@ -57,24 +63,28 @@ export class DatabaseBackupService {
 				shell: shellPath,
 			});
 
-			// Upload
-			const gdriveUploadCommand = `rclone copy "${backupPath}" gdrive:/backups/ --progress`;
-			await exec(gdriveUploadCommand, { shell: shellPath });
+			// backup
+			if (toDrive) {
+				const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
 
-			const bucketName =
-				this.configService.get<string>('PROTECTED_BUCKET');
-			const gcsUploadCommand = `rclone copy "${backupPath}" gcs:/${bucketName}/backups/ --progress`;
-			await exec(gcsUploadCommand, {
-				shell: shellPath,
-			});
+				await exec(driveUploadCommand, { shell: shellPath });
+			}
 
-			await this.notificationService.sendNotificationBackup({
-				status: true,
+			if (toGcs) {
+				const bucketName =
+					this.configService.get<string>('PROTECTED_BUCKET');
+				const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
+
+				await exec(gcsUploadCommand, {
+					shell: shellPath,
+				});
+			}
+
+			await this.notificationService.sendNotificationBackupSuccess({
 				filename,
 			});
 		} catch (err) {
-			await this.notificationService.sendNotificationBackup({
-				status: false,
+			await this.notificationService.sendNotificationBackupFail({
 				filename,
 				error: err instanceof Error ? err.message : String(err),
 			});

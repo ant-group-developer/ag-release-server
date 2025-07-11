@@ -1,3 +1,5 @@
+export const NAME_MAIN_ARTIST_ROLE = 'Main Artist';
+
 export const listLanguages = [
 	['English', 'en'],
 	['Vietnamese', 'vi'],

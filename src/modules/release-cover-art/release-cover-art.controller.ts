@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Put } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateReleaseCoverArtDto,
@@ -34,5 +34,12 @@ export class ReleaseCoverArtController {
 		return new ResponseSuccess({
 			data: result,
 		});
+	}
+
+	@Delete(':id')
+	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.releaseCoverArtService.delete(id);
+
+		return new ResponseSuccess({});
 	}
 }

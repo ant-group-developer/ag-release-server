@@ -84,10 +84,8 @@ export class TrackService {
 	): Promise<PageDto<ITrackAudioBucket>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.trackQueryService.createQueryGetList(query);
-
-		const [tracks, totalItems] = await queryGetList.getManyAndCount();
-
+		const [tracks, totalItems] =
+			await this.trackQueryService.getList(query);
 		return new PageDto({
 			items: await this.getTracksAudioBucket(tracks),
 			metadata: {

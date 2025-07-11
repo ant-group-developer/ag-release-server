@@ -7,7 +7,7 @@ import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 
 @Injectable()
-export class ReleaseQbService {
+export class ReleaseQueryService {
 	private mainAlias: string;
 
 	constructor(

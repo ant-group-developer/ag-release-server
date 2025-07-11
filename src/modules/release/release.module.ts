@@ -9,7 +9,7 @@ import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { Release } from './entities/release.entity';
 import { ReleaseDraftService } from './services/release.draft.service';
-import { ReleaseQbService } from './services/release.qb.service';
+import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 
@@ -25,7 +25,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseService,
 		ReleaseDraftService,
 		ReleaseValidateService,
-		ReleaseQbService,
+		ReleaseQueryService,
 	],
 })
 export class ReleaseModule {}

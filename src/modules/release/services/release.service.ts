@@ -17,7 +17,7 @@ import {
 	IReleaseDetail,
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
-import { ReleaseQbService } from './release.qb.service';
+import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class ReleaseService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
-		private readonly releaseQbService: ReleaseQbService,
+		private readonly releaseQueryService: ReleaseQueryService,
 		private readonly bucketService: BucketService,
 	) {}
 
@@ -49,7 +49,7 @@ export class ReleaseService {
 		data: SubmitCreateReleaseDto,
 	): Promise<IReleaseNonDraft> {
 		// validate id
-		await this.releaseQbService.findOne(id);
+		await this.releaseQueryService.findOne(id);
 
 		// validate nonDraft
 		const releaseNonDraft =
@@ -59,14 +59,14 @@ export class ReleaseService {
 			});
 
 		await this.releaseRepo.save(releaseNonDraft);
-		const result = await this.releaseQbService.findOne(id);
+		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
 		return this.releaseValidateService.ensureNonDraftRelease(result);
 	}
 
 	async getOneDetail(id: string): Promise<IReleaseDetail> {
-		const release = await this.releaseQbService.getOneDetail(id);
+		const release = await this.releaseQueryService.getOneDetail(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
 
@@ -85,7 +85,7 @@ export class ReleaseService {
 		const { page, pageSize } = query;
 
 		const [releases, totalItems] =
-			await this.releaseQbService.getListDetail(query);
+			await this.releaseQueryService.getListDetail(query);
 
 		return new PageDto({
 			items: await this.getReleasesWithCoverArt(releases),
@@ -100,7 +100,7 @@ export class ReleaseService {
 	async update(id: string, data: UpdateReleaseDto): Promise<IRelease> {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
-		const release = await this.releaseQbService.findOne(id);
+		const release = await this.releaseQueryService.findOne(id);
 
 		if (release.status === ReleaseStatus.DRAFT) {
 			throw new ResponseError({
@@ -136,7 +136,7 @@ export class ReleaseService {
 		}
 
 		await this.releaseRepo.update(id, data);
-		return await this.releaseQbService.findOne(id);
+		return await this.releaseQueryService.findOne(id);
 	}
 
 	async remove(id: string): Promise<void> {

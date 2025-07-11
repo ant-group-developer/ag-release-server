@@ -22,7 +22,7 @@ export class TrackQueryService {
 		return this.mainAlias;
 	}
 
-	createQueryGetList(query: QueryGetListTrackDto) {
+	private createQueryGetList(query: QueryGetListTrackDto) {
 		const {
 			keyword,
 
@@ -71,6 +71,12 @@ export class TrackQueryService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async getList(query: QueryGetListTrackDto) {
+		const queryGetList = this.createQueryGetList(query);
+
+		return await queryGetList.getManyAndCount();
 	}
 
 	async findOne(id: string): Promise<Track> {

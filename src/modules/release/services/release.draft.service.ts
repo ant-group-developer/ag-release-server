@@ -10,7 +10,7 @@ import {
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IReleaseDraft } from '../interfaces/release.interface';
-import { ReleaseQbService } from './release.qb.service';
+import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class ReleaseDraftService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
-		private readonly releaseQbService: ReleaseQbService,
+		private readonly releaseQueryService: ReleaseQueryService,
 		// private readonly releaseCoverArtService: ReleaseCoverArtService,
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
 	) {}
@@ -67,7 +67,7 @@ export class ReleaseDraftService {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
 			restOfData;
 
-		const release = await this.releaseQbService.findOne(id);
+		const release = await this.releaseQueryService.findOne(id);
 
 		if (release.status !== ReleaseStatus.DRAFT) {
 			throw new ResponseError({
@@ -117,7 +117,7 @@ export class ReleaseDraftService {
 		}
 
 		await this.releaseRepo.update(id, restOfData);
-		const result = await this.releaseQbService.findOne(id);
+		const result = await this.releaseQueryService.getOneDetail(id);
 
 		return this.releaseValidateService.ensureDraftRelease(result);
 	}
