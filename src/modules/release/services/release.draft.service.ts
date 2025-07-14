@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
 import { Repository } from 'typeorm';
 import {
-	CreateDraftReleaseDto,
+	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import { ReleaseQbService } from './release.qb.service';
+import { IReleaseDraft } from '../interfaces/release.interface';
+import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
 @Injectable()
@@ -17,11 +19,18 @@ export class ReleaseDraftService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
-		private readonly releaseQbService: ReleaseQbService,
+		private readonly releaseQueryService: ReleaseQueryService,
+		// private readonly releaseCoverArtService: ReleaseCoverArtService,
+		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
 	) {}
 
-	async create(data: CreateDraftReleaseDto): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
+		const {
+			// releaseCoverArt,
+			...restOfData
+		} = data;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			restOfData;
 
 		await this.releaseValidateService.validate({
 			labelId,
@@ -30,14 +39,35 @@ export class ReleaseDraftService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create(data);
-		return await this.releaseRepo.save(release);
+		const release = this.releaseRepo.create(restOfData);
+		const result = await this.releaseRepo.save(release);
+
+		// // coverArt
+		// await this.releaseCoverArtService.create({
+		// 	...releaseCoverArt,
+		// 	releaseId: release.id,
+		// });
+
+		await this.releaseLanguageDraftService.create({
+			releaseId: release.id,
+		});
+
+		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 
-	async update(id: string, data: UpdateReleaseDraftDto): Promise<Release> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+	async update(
+		id: string,
+		data: UpdateReleaseDraftDto,
+	): Promise<IReleaseDraft> {
+		const {
+			//  releaseCoverArt,
+			releaseLanguage,
+			...restOfData
+		} = data;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			restOfData;
 
-		const release = await this.releaseQbService.findOne(id);
+		const release = await this.releaseQueryService.findOne(id);
 
 		if (release.status !== ReleaseStatus.DRAFT) {
 			throw new ResponseError({
@@ -72,7 +102,23 @@ export class ReleaseDraftService {
 			});
 		}
 
-		await this.releaseRepo.update(id, data);
-		return await this.releaseQbService.findOne(id);
+		// language
+		if (
+			releaseLanguage?.metadataLanguageId !== undefined &&
+			releaseLanguage.metadataLanguageId !==
+				release.releaseLanguage.metadataLanguageId
+		) {
+			await this.releaseLanguageDraftService.update(
+				release.releaseLanguage.id,
+				{
+					metadataLanguageId: releaseLanguage.metadataLanguageId,
+				},
+			);
+		}
+
+		await this.releaseRepo.update(id, restOfData);
+		const result = await this.releaseQueryService.getOneDetail(id);
+
+		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 }

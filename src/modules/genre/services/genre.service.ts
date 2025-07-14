@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { BucketGcsService } from '../../bucket/services/bucket.gcs.service';
 import {
 	GenreMessageCodeError,
 	GenreMessageError,
@@ -21,7 +21,7 @@ export class GenreService {
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
 
-		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketService: BucketService,
 		private readonly genreQbService: GenreQbService,
 	) {}
 
@@ -74,7 +74,7 @@ export class GenreService {
 			picture !== genre.picture &&
 			genre.picture
 		) {
-			await this.bucketGcsService.deletePublicFile(genre.picture);
+			await this.bucketService.deletePublicFile(genre.picture);
 		}
 
 		await this.genreRepo.update(id, updateGenreDto);
@@ -84,7 +84,7 @@ export class GenreService {
 	async remove(id: string): Promise<void> {
 		const genre = await this.findOne(id);
 		if (genre.picture)
-			await this.bucketGcsService.deletePublicFile(genre.picture);
+			await this.bucketService.deletePublicFile(genre.picture);
 		await this.genreRepo.delete(id);
 	}
 

@@ -1,3 +1,5 @@
+export const NAME_MAIN_ARTIST_ROLE = 'Main Artist';
+
 export const listLanguages = [
 	['English', 'en'],
 	['Vietnamese', 'vi'],
@@ -2913,5 +2915,3 @@ export const listCountries = [
 		'Africa',
 	],
 ];
-
-export const lengthPicture = 200;

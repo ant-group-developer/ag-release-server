@@ -1,6 +1,6 @@
 export enum BucketGcsAction {
-	read = 'read',
-	write = 'write',
+	READ = 'read',
+	WRITE = 'write',
 }
 
 export enum EntityTypePicture {
@@ -9,4 +9,10 @@ export enum EntityTypePicture {
 	LABEL = 'labels',
 	GENRE = 'genres',
 	TRACK = 'tracks',
+}
+
+export enum UploadPurpose {
+	TRACK_AUDIO = 'track_audio',
+	PEAK_AUDIO = 'peak_audio',
+	RELEASE_COVER_ART = 'release_cover_art',
 }

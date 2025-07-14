@@ -7,6 +7,8 @@ export enum ReleaseStatus {
 	TAKEN_DOWN = 'taken_down',
 }
 
+export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
+
 export enum ReleaseType {
 	ALBUM = 'album',
 	SINGLE = 'single',

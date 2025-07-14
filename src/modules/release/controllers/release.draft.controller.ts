@@ -11,10 +11,10 @@ import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import {
-	CreateDraftReleaseDto,
+	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
-import { Release } from '../entities/release.entity';
+import { IReleaseDraft } from '../interfaces/release.interface';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
 @ApiTags('Releases Draft')
@@ -24,8 +24,8 @@ export class ReleaseDraftController {
 
 	@Post()
 	async create(
-		@Body() data: CreateDraftReleaseDto,
-	): Promise<ResponseSuccess<Release>> {
+		@Body() data: CreateReleaseDraftDto,
+	): Promise<ResponseSuccess<IReleaseDraft>> {
 		const result = await this.releaseDraftService.create(data);
 
 		return new ResponseSuccess({
@@ -38,7 +38,7 @@ export class ReleaseDraftController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
-	): Promise<ResponseSuccess<Release>> {
+	): Promise<ResponseSuccess<IReleaseDraft>> {
 		const result = await this.releaseDraftService.update(id, data);
 		return new ResponseSuccess({
 			data: result,

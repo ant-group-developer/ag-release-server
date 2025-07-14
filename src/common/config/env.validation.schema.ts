@@ -23,4 +23,11 @@ export const envValidationSchema = Joi.object({
 	EMAIL_USER: Joi.string().required(),
 	EMAIL_PASS: Joi.string().required(),
 	EMAIL_SERVICE: Joi.string().required(),
+
+	// Telegram
+	TELEGRAM_TOKEN: Joi.string().required(),
+
+	// Path
+	PATH_GCS_KEY: Joi.string().required(),
+	// PATH_TEMPLATES: Joi.string().required(),
 });

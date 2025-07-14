@@ -1,10 +1,15 @@
 import { Module } from '@nestjs/common';
-import { BucketGcsController } from './controllers/bucket.controller.gcs';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BucketGcsController } from './controllers/bucket.controller';
+import { FileEntity } from './entities/bucket.file.entity';
+import { BucketFileService } from './services/bucket.file.service';
 import { BucketGcsService } from './services/bucket.gcs.service';
+import { BucketService } from './services/bucket.service';
 
 @Module({
-	providers: [BucketGcsService],
+	imports: [TypeOrmModule.forFeature([FileEntity])],
+	providers: [BucketService, BucketGcsService, BucketFileService],
 	controllers: [BucketGcsController],
-	exports: [BucketGcsService],
+	exports: [BucketService],
 })
 export class BucketModule {}

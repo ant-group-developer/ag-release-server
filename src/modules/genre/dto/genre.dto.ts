@@ -7,7 +7,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { lengthPicture } from 'src/modules/database/constants/database.constant';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderGenre } from '../enum/genre.enum';
 
 export class CreateGenreDto {
@@ -22,11 +22,11 @@ export class CreateGenreDto {
 	@ApiPropertyOptional({
 		description: 'The picture associated with the genre, can be null',
 		example: 'rock_picture.jpg',
-		maxLength: lengthPicture,
+		maxLength: LENGTH_PICTURE,
 	})
 	@IsOptional()
 	@IsString()
-	@MaxLength(lengthPicture)
+	@MaxLength(LENGTH_PICTURE)
 	picture: string | null;
 
 	@ApiPropertyOptional({

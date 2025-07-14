@@ -22,7 +22,11 @@ import {
 	SubmitCreateReleaseDto,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
-import { Release } from '../entities/release.entity';
+import {
+	IRelease,
+	IReleaseDetail,
+	IReleaseNonDraft,
+} from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
@@ -54,8 +58,8 @@ export class ReleaseController {
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: SubmitCreateReleaseDto,
-	): Promise<ResponseSuccess<Release>> {
-		const result = await this.releaseService.submit(id);
+	): Promise<ResponseSuccess<IReleaseNonDraft>> {
+		const result = await this.releaseService.submit(id, data);
 
 		return new ResponseSuccess({
 			data: result,
@@ -73,8 +77,10 @@ export class ReleaseController {
 		status: 404,
 		description: ReleaseMessageError.NOT_FOUND,
 	})
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Release>> {
-		const result = await this.releaseService.findOne(id);
+	async getOneDetail(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<IReleaseDetail>> {
+		const result = await this.releaseService.getOneDetail(id);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -84,10 +90,10 @@ export class ReleaseController {
 		status: 200,
 		description: 'List of releases',
 	})
-	async getList(
+	async getListDetail(
 		@Query() query: QueryGetListReleaseDto,
-	): Promise<ResponseSuccess<PageDto<Release>>> {
-		const result = await this.releaseService.getList(query);
+	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
+		const result = await this.releaseService.getListDetail(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -108,7 +114,7 @@ export class ReleaseController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateReleaseDto: UpdateReleaseDto,
-	): Promise<ResponseSuccess<Release>> {
+	): Promise<ResponseSuccess<IRelease>> {
 		const result = await this.releaseService.update(id, updateReleaseDto);
 		return new ResponseSuccess({
 			data: result,

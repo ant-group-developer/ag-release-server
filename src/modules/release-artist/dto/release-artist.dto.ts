@@ -32,7 +32,7 @@ export class UpdateReleaseArtistDto extends PartialType(
 	artistRoleId: string;
 
 	@IsNotEmpty()
-	@IsUUID()
+	@Length(10)
 	@ValidateIf((_, value) => value !== undefined)
 	artistId: string;
 

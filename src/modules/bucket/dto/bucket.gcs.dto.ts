@@ -12,21 +12,8 @@ import {
 import { generateFileNameWithTimestamp } from 'src/utils/date';
 import { EntityTypePicture } from '../enum/bucket.enum';
 
-export class GetUrlUploadDto {
-	@IsNotEmpty()
-	folder: string;
-
-	@IsNotEmpty()
-	fileName: string;
-
-	@IsNotEmpty()
-	contentType: string;
-
-	@IsNotEmpty()
-	fileSize: number;
-}
-
-export class GenerateGcsPresignedUploadUrlDto {
+// non file
+export class GeneratePublicUploadUrlDto {
 	@ApiProperty({
 		description:
 			'Entity type related to the picture (e.g., artists, genres)',
@@ -45,7 +32,9 @@ export class GenerateGcsPresignedUploadUrlDto {
 	@IsNotEmpty()
 	@MaxLength(100 + 'YYYYMMDDHHmmss_'.length)
 	@IsString()
-	@Transform(({ value }) => generateFileNameWithTimestamp(value))
+	@Transform(({ value }: { value: string }) =>
+		generateFileNameWithTimestamp(value),
+	)
 	fileName: string;
 
 	@ApiProperty({

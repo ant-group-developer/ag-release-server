@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
 	IsEnum,
@@ -10,10 +10,12 @@ import {
 	Length,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
+import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseType } from '../enum/release.enum';
 
-export class CreateDraftReleaseDto {
+export class CreateReleaseDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()
@@ -47,6 +49,9 @@ export class CreateDraftReleaseDto {
 	@IsString()
 	@Length(10, 10)
 	subGenreId?: string | null;
+
+	@IsOptional()
+	isVariousArtist?: boolean;
 
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
@@ -97,9 +102,15 @@ export class CreateDraftReleaseDto {
 	@IsOptional()
 	@IsUUID()
 	releaseTimezoneId?: string | null;
+
+	// // coverArt
+	// @IsNotEmpty()
+	// @ValidateNested()
+	// @Type(() => CreateCoverArtDto)
+	// releaseCoverArt: CreateCoverArtDto;
 }
 
-export class UpdateReleaseDraftDto extends PartialType(CreateDraftReleaseDto) {
+export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(150)
@@ -114,6 +125,9 @@ export class UpdateReleaseDraftDto extends PartialType(CreateDraftReleaseDto) {
 	@IsOptional()
 	@Length(10, 10)
 	primaryGenreId?: string | null;
+
+	@IsOptional()
+	isVariousArtist?: boolean;
 
 	@IsString()
 	@IsOptional()
@@ -136,4 +150,14 @@ export class UpdateReleaseDraftDto extends PartialType(CreateDraftReleaseDto) {
 	)
 	@IsDate()
 	releaseDate?: Date | null;
+
+	// @ValidateIf((_, value) => value !== undefined)
+	// @IsNotEmpty()
+	// @ValidateNested()
+	// @Type(() => CreateCoverArtDto)
+	// releaseCoverArt?: CreateCoverArtDto;
+
+	@ValidateNested()
+	@Type(() => UpdateReleaseLanguageDraftDto)
+	releaseLanguage?: UpdateReleaseLanguageDraftDto;
 }

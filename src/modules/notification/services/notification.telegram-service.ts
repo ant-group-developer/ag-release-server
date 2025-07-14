@@ -10,14 +10,24 @@ export class TelegramService {
 		const token = this.configService.get<string>('TELEGRAM_TOKEN')!;
 
 		this.bot = new TelegramBot(token, { polling: true });
+
+		this.bot.onText(/\/start/, (msg) => {
+			const chatId = msg.chat.id;
+			const telegramId = msg.from?.id;
+
+			this.bot
+				.sendMessage(chatId, `Hello, your telegram Id is ${telegramId}`)
+				.then(() => {
+					console.log('Message sent successfully!');
+				})
+				.catch((error) => {
+					console.error('Error sending message:', error);
+				});
+		});
 	}
 
 	async sendMessage(telegramId: string, message: string) {
-		try {
-			await this.bot.sendMessage(telegramId, message);
-		} catch (error) {
-			throw error;
-		}
+		await this.bot.sendMessage(telegramId, message);
 	}
 
 	async sendMessages(data: { telegramIds: string[]; message: string }) {
