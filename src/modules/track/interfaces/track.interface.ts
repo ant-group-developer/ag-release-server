@@ -13,6 +13,7 @@ export interface ITrack {
 	pLineOwner: string | null;
 	primaryGenreId: string | null;
 	subGenreId: string | null;
+	trackArtists: TrackArtist[] | [];
 }
 
 export interface ITrackDraft {
@@ -43,5 +44,4 @@ export interface ITrackWithAudio extends ITrack {
 
 export interface ITrackDetails extends ITrack {
 	audioFileBucket: IAudioFileBucket | null;
-	trackArtists: TrackArtist[];
 }

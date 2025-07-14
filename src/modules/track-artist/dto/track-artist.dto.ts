@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
 import {
 	IsNotEmpty,
+	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
@@ -42,5 +43,6 @@ export class UpdateTrackArtistDto extends PartialType(CreateTrackArtistDto) {
 
 export class QueryGetListTrackArtistDto extends BaseQueryDto {
 	@Length(10, 10)
-	trackId: string;
+	@IsOptional()
+	trackId?: string;
 }

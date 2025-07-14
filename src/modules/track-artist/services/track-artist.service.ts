@@ -18,7 +18,7 @@ export class TrackArtistService {
 		private readonly trackArtistRepo: Repository<TrackArtist>,
 
 		private readonly trackArtistValidateService: TrackArtistValidateService,
-	) {}
+	) { }
 
 	async create(
 		createTrackArtistDto: CreateTrackArtistDto,
