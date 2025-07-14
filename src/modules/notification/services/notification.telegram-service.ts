@@ -1,15 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import TelegramBot from 'node-telegram-bot-api';
-import { ENV } from 'src/common/enums/common';
 
 @Injectable()
 export class TelegramService {
 	private bot: TelegramBot;
 
 	constructor(private configService: ConfigService) {
-		const env = this.configService.get<ENV>('ENV')!;
-		const token = this.getToken(env);
+		const token = this.configService.get<string>('TELEGRAM_TOKEN')!;
 
 		this.bot = new TelegramBot(token, { polling: true });
 
@@ -37,21 +35,6 @@ export class TelegramService {
 
 		for (const telegramId of telegramIds) {
 			await this.sendMessage(telegramId, message);
-		}
-	}
-
-	private getToken(env: ENV) {
-		switch (env) {
-			case ENV.LOCAL:
-				return this.configService.get<ENV>('TELEGRAM_TOKEN_LOCAL')!;
-
-			case ENV.DEV_TEST:
-				return this.configService.get<ENV>('TELEGRAM_TOKEN_DEV_TEST')!;
-
-			case ENV.PRODUCTION:
-				return this.configService.get<ENV>(
-					'TELEGRAM_TOKEN_PRODUCTION',
-				)!;
 		}
 	}
 }
