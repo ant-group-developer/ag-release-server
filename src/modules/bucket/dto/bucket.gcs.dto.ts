@@ -1,49 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
-	ArrayMinSize,
-	IsArray,
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
-	IsOptional,
 	IsString,
-	IsUUID,
 	Matches,
 	Max,
 	MaxLength,
-	ValidateNested,
 } from 'class-validator';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
-import { EntityTypePicture, UploadPurpose } from '../enum/bucket.enum';
-import { CreateFileDtoSub } from './bucket.file.dto';
+import { EntityTypePicture } from '../enum/bucket.enum';
 
-export class GetSignedUrlUploadDto {
-	@IsNotEmpty()
-	key: string;
-
-	@IsNotEmpty()
-	contentType: string;
-
-	isPublic: boolean = false;
-}
-
-export class GetSignedUrlReadDto {
-	@IsNotEmpty()
-	key: string;
-
-	isPublic: boolean = false;
-}
-
-export class GetSignedUrlDownDto {
-	@IsNotEmpty()
-	key: string;
-
-	isPublic: boolean = false;
-
-	fileName: string;
-}
-
+// non file
 export class GeneratePublicUploadUrlDto {
 	@ApiProperty({
 		description:
@@ -87,33 +56,4 @@ export class GeneratePublicUploadUrlDto {
 			'Only image content types are allowed (jpeg, png, gif, webp, jpg)',
 	})
 	contentType: string;
-}
-
-export class CreateBucketDto {
-	@IsNotEmpty()
-	@ValidateNested()
-	@Type(() => CreateFileDtoSub)
-	file: CreateFileDtoSub;
-
-	@IsEnum(UploadPurpose)
-	uploadPurpose: UploadPurpose;
-
-	@IsString()
-	@IsOptional()
-	key: string | null = null;
-}
-
-export class BulkCreateBucketDto {
-	@IsNotEmpty()
-	@ArrayMinSize(1)
-	@ValidateNested({ each: true })
-	@Type(() => CreateBucketDto)
-	createBucketDtos: CreateBucketDto[];
-}
-
-export class BulkSubmitDto {
-	@IsArray()
-	@ArrayMinSize(1)
-	@IsUUID('4', { each: true })
-	ids: string[];
 }

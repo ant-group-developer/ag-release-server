@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { CreateFileDto } from '../dto/bucket.file.dto';
+
 import { FileEntity } from '../entities/bucket.file.entity';
+import { ICreateFile } from '../interfaces/bucket.interface';
 
 @Injectable()
 export class BucketFileService {
@@ -12,7 +13,7 @@ export class BucketFileService {
 		private readonly fileRepo: Repository<FileEntity>,
 	) {}
 
-	async create(data: CreateFileDto) {
+	async create(data: ICreateFile) {
 		const file = this.fileRepo.create(data);
 		return await this.fileRepo.save(file);
 	}

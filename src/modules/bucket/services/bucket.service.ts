@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { generateFileNameWithTimestamp } from 'src/utils/date';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
-	GeneratePublicUploadUrlDto,
-} from '../dto/bucket.gcs.dto';
+} from '../dto/bucket.dto';
+import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
@@ -22,8 +23,10 @@ export class BucketService {
 		const { file, uploadPurpose, key: keyResult } = data;
 
 		// create file
-		const previousKey = this.bucketGcsService.getPreviousKey(uploadPurpose);
-		const key = this.bucketGcsService.getKey(previousKey, file.fileName);
+		const key = this.bucketGcsService.getKey({
+			previousKey: this.bucketGcsService.getPreviousKey(uploadPurpose),
+			fileName: generateFileNameWithTimestamp(file.fileName),
+		});
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
@@ -48,7 +51,7 @@ export class BucketService {
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
 		const result = [];
 
-		for (const item of data.createBucketDtos) {
+		for (const item of data.bucketDtos) {
 			const newBucket = await this.create(item);
 			result.push(newBucket);
 		}
@@ -143,7 +146,10 @@ export class BucketService {
 	}> {
 		const { entityType, fileName, contentType } = data;
 
-		const key = this.bucketGcsService.getKey(entityType, fileName);
+		const key = this.bucketGcsService.getKey({
+			previousKey: entityType,
+			fileName,
+		});
 
 		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType,

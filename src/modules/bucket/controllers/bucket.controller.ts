@@ -12,8 +12,8 @@ import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
-	GeneratePublicUploadUrlDto,
-} from '../dto/bucket.gcs.dto';
+} from '../dto/bucket.dto';
+import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { BucketService } from '../services/bucket.service';
 
 @ApiTags('GCS Upload')

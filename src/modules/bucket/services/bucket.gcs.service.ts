@@ -2,12 +2,13 @@ import { File, Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import {
-	GetSignedUrlDownDto,
-	GetSignedUrlReadDto,
-	GetSignedUrlUploadDto,
-} from '../dto/bucket.gcs.dto';
+
 import { BucketGcsAction, UploadPurpose } from '../enum/bucket.enum';
+import {
+	IGetSignedUrlDown,
+	IGetSignedUrlRead,
+	IGetSignedUrlUpload,
+} from '../interfaces/bucket.interface';
 
 @Injectable()
 export class BucketGcsService {
@@ -29,8 +30,8 @@ export class BucketGcsService {
 		this.baseUrlPrivate = `https://storage.cloud.google.com/${this.privateBucketName}`;
 	}
 
-	async getSignedUrlUpload(data: GetSignedUrlUploadDto): Promise<string> {
-		const { contentType, key, isPublic } = data;
+	async getSignedUrlUpload(data: IGetSignedUrlUpload): Promise<string> {
+		const { contentType, key, isPublic = false } = data;
 
 		const bucketName = this.getBucketName({ isPublic });
 
@@ -45,8 +46,8 @@ export class BucketGcsService {
 		return url;
 	}
 
-	async getSignedUrlRead(data: GetSignedUrlReadDto): Promise<string> {
-		const { key, isPublic } = data;
+	async getSignedUrlRead(data: IGetSignedUrlRead): Promise<string> {
+		const { key, isPublic = false } = data;
 
 		const bucketName = this.getBucketName({ isPublic });
 
@@ -60,8 +61,8 @@ export class BucketGcsService {
 		return url;
 	}
 
-	async getSignedUrlDown(data: GetSignedUrlDownDto): Promise<string> {
-		const { key, isPublic, fileName } = data;
+	async getSignedUrlDown(data: IGetSignedUrlDown): Promise<string> {
+		const { key, isPublic = false, fileName } = data;
 
 		const bucketName = this.getBucketName({ isPublic });
 
@@ -107,7 +108,13 @@ export class BucketGcsService {
 	}
 
 	//
-	getKey(previousKey: string, fileName: string) {
+	getKey({
+		previousKey,
+		fileName,
+	}: {
+		previousKey: string;
+		fileName: string;
+	}) {
 		return `${previousKey}/${fileName}`;
 	}
 
