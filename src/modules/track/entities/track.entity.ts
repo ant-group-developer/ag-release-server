@@ -1,7 +1,6 @@
 import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -21,9 +20,6 @@ import { ITrack } from '../interfaces/track.interface';
 export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'varchar', length: 100 })
 	title: string;
-
-	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
-	picture: string | null;
 
 	@Column({
 		type: 'varchar',

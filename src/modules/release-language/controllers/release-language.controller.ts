@@ -14,7 +14,7 @@
 // } from '../dto/track.dto';
 // import {
 // 	ITrack,
-// 	ITrackAudioBucket,
+// 	ITrackDetails,
 // 	ITrackNonDraft,
 // } from '../interfaces/track.interface';
 // import { TrackService } from '../services/track.service';
@@ -60,7 +60,7 @@
 // 	@Get(':id')
 // 	async getDetail(
 // 		@Param('id') id: string,
-// 	): Promise<ResponseSuccess<ITrackAudioBucket>> {
+// 	): Promise<ResponseSuccess<ITrackDetails>> {
 // 		const result = await this.trackService.getDetail(id);
 // 		return new ResponseSuccess({ data: result });
 // 	}
@@ -73,7 +73,7 @@
 // 	})
 // 	async getList(
 // 		@Query() query: QueryGetListTrackDto,
-// 	): Promise<ResponseSuccess<PageDto<ITrackAudioBucket>>> {
+// 	): Promise<ResponseSuccess<PageDto<ITrackDetails>>> {
 // 		const result = await this.trackService.getList(query);
 // 		return new ResponseSuccess({ data: result });
 // 	}

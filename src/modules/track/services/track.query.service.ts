@@ -5,7 +5,6 @@ import { Repository } from 'typeorm';
 import { TrackMessageError } from '../constants/track.constant';
 import { QueryGetListTrackDto } from '../dto/track.dto';
 import { Track } from '../entities/track.entity';
-import { ITrackWithAudio } from '../interfaces/track.interface';
 
 @Injectable()
 export class TrackQueryService {
@@ -42,6 +41,10 @@ export class TrackQueryService {
 
 		const queryBuilder = this.trackRepo.createQueryBuilder(this.mainAlias);
 		queryBuilder.leftJoinAndSelect('track.audioFile', 'audioFile');
+
+		queryBuilder.leftJoinAndSelect('track.trackArtists', 'trackArtists');
+		queryBuilder.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
+		queryBuilder.leftJoinAndSelect('trackArtists.artist', 'artist');
 
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
@@ -102,7 +105,7 @@ export class TrackQueryService {
 		return track;
 	}
 
-	async getDetail(id: string): Promise<ITrackWithAudio> {
+	async getDetail(id: string): Promise<Track> {
 		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
 
 		query.where('track.id = :id', {
@@ -110,6 +113,10 @@ export class TrackQueryService {
 		});
 
 		query.leftJoinAndSelect('track.audioFile', 'audioFile');
+
+		query.leftJoinAndSelect('track.trackArtists', 'trackArtists');
+		query.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
+		query.leftJoinAndSelect('trackArtists.artist', 'artist');
 
 		const track = await query.getOne();
 

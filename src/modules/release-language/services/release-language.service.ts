@@ -15,7 +15,7 @@
 // import { Track } from '../entities/track.entity';
 // import {
 // 	ITrack,
-// 	ITrackAudioBucket,
+// 	ITrackDetails,
 // 	ITrackNonDraft,
 // 	ITrackWithAudio,
 // } from '../interfaces/track.interface';
@@ -64,7 +64,7 @@
 // 		return this.trackValidateService.ensureNonDraftTrack(result);
 // 	}
 
-// 	async getDetail(id: string): Promise<ITrackAudioBucket> {
+// 	async getDetail(id: string): Promise<ITrackDetails> {
 // 		const track = await this.trackQueryService.getDetail(id);
 
 // 		const { audioFile, ...restOfTrack } = track;
@@ -79,7 +79,7 @@
 
 // 	async getList(
 // 		query: QueryGetListTrackDto,
-// 	): Promise<PageDto<ITrackAudioBucket>> {
+// 	): Promise<PageDto<ITrackDetails>> {
 // 		const { page, pageSize } = query;
 
 // 		const queryGetList = this.trackQueryService.createQueryGetList(query);
@@ -140,8 +140,8 @@
 
 // 	async getTracksAudioBucket(
 // 		tracks: ITrackWithAudio[],
-// 	): Promise<ITrackAudioBucket[]> {
-// 		const result: ITrackAudioBucket[] = [];
+// 	): Promise<ITrackDetails[]> {
+// 		const result: ITrackDetails[] = [];
 // 		for (const track of tracks) {
 // 			const { audioFile, ...restOfTrack } = track;
 

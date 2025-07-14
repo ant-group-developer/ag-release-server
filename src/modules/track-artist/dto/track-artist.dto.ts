@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
-export class CreateReleaseArtistDto {
+export class CreateTrackArtistDto {
 	@IsNotEmpty()
 	@IsUUID()
 	artistRoleId: string;
@@ -19,13 +19,11 @@ export class CreateReleaseArtistDto {
 	artistId: string;
 
 	@IsNotEmpty()
-	@IsUUID()
-	releaseId: string;
+	@Length(10, 10)
+	trackId: string;
 }
 
-export class UpdateReleaseArtistDto extends PartialType(
-	CreateReleaseArtistDto,
-) {
+export class UpdateTrackArtistDto extends PartialType(CreateTrackArtistDto) {
 	@IsNotEmpty()
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
@@ -39,7 +37,10 @@ export class UpdateReleaseArtistDto extends PartialType(
 	@IsNotEmpty()
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
-	releaseId: string;
+	trackId: string;
 }
 
-export class QueryGetListReleaseArtistDto extends BaseQueryDto {}
+export class QueryGetListTrackArtistDto extends BaseQueryDto {
+	@Length(10, 10)
+	trackId: string;
+}

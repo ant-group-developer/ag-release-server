@@ -9,19 +9,20 @@ export class TrackArtist extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	artistId: string;
 
-	@ManyToOne(() => Artist)
-	@JoinColumn({ name: 'artist_id' })
-	artist: Artist;
-
 	@Column({ type: 'uuid' })
 	artistRoleId: string;
 
+	@Column({ type: 'varchar', length: 10 })
+	trackId: string;
+
+	// relation
 	@ManyToOne(() => ArtistRole)
 	@JoinColumn({ name: 'artist_role_id' })
 	artistRole: ArtistRole;
 
-	@Column({ type: 'varchar', length: 10 })
-	trackId: string;
+	@ManyToOne(() => Artist)
+	@JoinColumn({ name: 'artist_id' })
+	artist: Artist;
 
 	@ManyToOne(() => Track)
 	@JoinColumn({ name: 'track_id' })
