@@ -86,6 +86,7 @@ export class TrackService {
 
 		const [tracks, totalItems] =
 			await this.trackQueryService.getList(query);
+
 		return new PageDto({
 			items: await this.getTracksAudioBucket(tracks),
 			metadata: {

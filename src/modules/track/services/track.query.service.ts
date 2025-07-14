@@ -26,6 +26,8 @@ export class TrackQueryService {
 		const {
 			keyword,
 
+			releaseId,
+
 			startCreatedAt,
 			endCreatedAt,
 			startUpdatedAt,
@@ -44,6 +46,12 @@ export class TrackQueryService {
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
 				keyword: `%${keyword}%`,
+			});
+		}
+
+		if (releaseId) {
+			queryBuilder.andWhere('track.releaseId = :releaseId', {
+				releaseId: releaseId,
 			});
 		}
 

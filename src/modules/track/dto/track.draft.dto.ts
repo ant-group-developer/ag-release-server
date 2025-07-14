@@ -83,7 +83,7 @@ export class CreateTrackDraftDto {
 	@IsNotEmpty()
 	@ValidateNested()
 	@Type(() => CreateAudioFileDraftDto)
-	audioFile?: Omit<CreateAudioFileDraftDto, 'trackId'>;
+	audioFileDraft?: Omit<CreateAudioFileDraftDto, 'trackId'>;
 }
 
 export class BulkCreateTrackDraft {
@@ -91,7 +91,7 @@ export class BulkCreateTrackDraft {
 	@ArrayMinSize(1)
 	@ValidateNested({ each: true })
 	@Type(() => CreateTrackDraftDto)
-	tracks: CreateTrackDraftDto[];
+	trackDrafts: CreateTrackDraftDto[];
 }
 
 export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {

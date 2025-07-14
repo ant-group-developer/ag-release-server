@@ -103,6 +103,10 @@ export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 }
 
 export class QueryGetListTrackDto extends BaseQueryDto {
+	@IsUUID()
+	@IsOptional()
+	releaseId?: string;
+
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;
 }
