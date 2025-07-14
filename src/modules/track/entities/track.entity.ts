@@ -60,6 +60,9 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'varchar', length: 10, nullable: true })
 	subGenreId: string | null;
 
+	@Column({ type: 'int', default: 0 })
+	order: number;
+
 	// relation
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })

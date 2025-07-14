@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
 	BulkCreateTrackDraft,
+	BulkUpdateTrackDraft,
 	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
@@ -21,7 +22,7 @@ export class TrackDraftService {
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 		private readonly audioFileDraftService: AudioFileDraftService,
-	) {}
+	) { }
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
 		const { releaseId, primaryGenreId, subGenreId, audioFileDraft } = data;
@@ -53,6 +54,15 @@ export class TrackDraftService {
 			result.push(newTrackDraft);
 		}
 		return result;
+	}
+
+	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
+		const { trackDrafts } = data
+		for (const track of trackDrafts) {
+			await this.trackQueryService.findOne(track.id)
+		}
+
+		return await this.trackRepo.save(trackDrafts)
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {

@@ -5,6 +5,7 @@ import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import {
 	BulkCreateTrackDraft,
+	BulkUpdateTrackDraft,
 	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
@@ -14,7 +15,7 @@ import { TrackDraftService } from '../services/track.draft.service';
 @ApiTags('Tracks Draft')
 @Controller('tracks/draft')
 export class TrackDraftController {
-	constructor(private readonly trackDraftService: TrackDraftService) {}
+	constructor(private readonly trackDraftService: TrackDraftService) { }
 
 	@Post()
 	async create(
@@ -40,6 +41,20 @@ export class TrackDraftController {
 		});
 	}
 
+	@Put('bulk')
+	async bulkUpdate(
+		@Body() data: BulkUpdateTrackDraft,
+	): Promise<ResponseSuccess<ITrackDraft[]>> {
+
+		console.log('update')
+		const result = await this.trackDraftService.bulkUpdate(data);
+
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackMessageCodeSuccess.CREATE,
+		});
+	}
+
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -51,4 +66,6 @@ export class TrackDraftController {
 			messageCode: TrackMessageCodeSuccess.UPDATE,
 		});
 	}
+
+
 }

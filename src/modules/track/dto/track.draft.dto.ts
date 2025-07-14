@@ -2,12 +2,14 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
+	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
 	MaxLength,
+	Min,
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
@@ -78,6 +80,25 @@ export class BulkCreateTrackDraft {
 	@ValidateNested({ each: true })
 	@Type(() => CreateTrackDraftDto)
 	trackDrafts: CreateTrackDraftDto[];
+}
+
+export class BulkUpdateTrackDraft {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => UpdateOrderTrackDraft)
+	trackDrafts: UpdateOrderTrackDraft[];
+}
+
+export class UpdateOrderTrackDraft {
+	@Length(10, 10)
+	@IsNotEmpty()
+	id: string;
+
+	@IsInt()
+	@IsNotEmpty()
+	@Min(0)
+	order: number;
 }
 
 export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
