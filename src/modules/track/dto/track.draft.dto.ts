@@ -14,6 +14,7 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
+import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 
 export class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -108,10 +109,7 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	title?: string;
 
-	// @ApiProperty({ example: 'release-id-123' })
-	// @ValidateIf((_, value) => value !== undefined)
-	// @IsString()
-	// @IsUUID()
-	// @IsNotEmpty()
-	// releaseId?: string;
+	@ValidateNested()
+	@Type(() => UpdateTrackLanguageDraftDto)
+	trackLanguage?: UpdateTrackLanguageDraftDto;
 }

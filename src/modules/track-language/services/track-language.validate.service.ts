@@ -3,53 +3,50 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
-import { Release } from 'src/modules/release/entities/release.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
-import { ReleaseLanguage } from '../entities/release-language.entity';
-import {
-	IReleaseLanguage,
-	IReleaseLanguageDraft,
-} from '../interfaces/release-language.interface';
+import { TrackLanguage } from '../entities/track-language.entity';
+import { ITrackLanguage, ITrackLanguageDraft } from '../interfaces/track-language.interface';
 
 @Injectable()
-export class ReleaseLanguageValidateService {
+export class TrackLanguageValidateService {
 	constructor(
-		@InjectRepository(ReleaseLanguage)
-		private readonly releaseLanguageRepo: Repository<ReleaseLanguage>,
+		@InjectRepository(TrackLanguage)
+		private readonly trackLanguageRepo: Repository<TrackLanguage>,
 
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
 
-		@InjectRepository(Release)
-		private readonly releaseRepo: Repository<Release>,
+		@InjectRepository(Track)
+		private readonly trackRepo: Repository<Track>,
 
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 	) { }
 
 	async validate({
-		releaseId,
+		trackId,
 		audioLanguageId,
 		metadataLanguageCountryId,
 		metadataLanguageId,
 	}: {
-		releaseId?: string | null;
+		trackId?: string | null;
 		audioLanguageId?: string | null;
 		metadataLanguageCountryId?: string | null;
 		metadataLanguageId?: string | null;
 	}) {
-		if (releaseId) {
-			const release = await this.releaseRepo.findOne({
-				where: { id: releaseId },
+		if (trackId) {
+			const track = await this.trackRepo.findOne({
+				where: { id: trackId },
 			});
 
-			const releaseLanguage = await this.releaseLanguageRepo.findOne({
-				where: { releaseId },
+			const trackLanguage = await this.trackLanguageRepo.findOne({
+				where: { trackId },
 			});
 
-			if (!release || releaseLanguage) {
+			if (!track || trackLanguage) {
 				throw new ResponseError({
-					message: 'Invalid releaseId',
+					message: 'Invalid trackId',
 				});
 			}
 		}
@@ -91,37 +88,37 @@ export class ReleaseLanguageValidateService {
 		}
 	}
 
-	// ensureNonDraftReleaseLanguage(
-	// 	releaseLanguage: IReleaseLanguage,
-	// ): IReleaseLanguageNonDraft {
-	// 	// if (releaseLanguage.status === ReleaseLanguageStatus.DRAFT) {
-	// 	// 	throw new ResponseError({ message: 'Invalid releaseLanguage.status' });
+	// ensureNonDraftTrackLanguage(
+	// 	trackLanguage: ITrackLanguage,
+	// ): ITrackLanguageNonDraft {
+	// 	// if (trackLanguage.status === TrackLanguageStatus.DRAFT) {
+	// 	// 	throw new ResponseError({ message: 'Invalid trackLanguage.status' });
 	// 	// }
 
-	// 	if (!releaseLanguage.primaryGenreId) {
+	// 	if (!trackLanguage.primaryGenreId) {
 	// 		throw new ResponseError({
-	// 			message: 'Invalid releaseLanguage.primaryGenreId',
+	// 			message: 'Invalid trackLanguage.primaryGenreId',
 	// 		});
 	// 	}
 
-	// 	if (!releaseLanguage.pLineOwner) {
+	// 	if (!trackLanguage.pLineOwner) {
 	// 		throw new ResponseError({
-	// 			message: 'Invalid releaseLanguage.pLineOwner',
+	// 			message: 'Invalid trackLanguage.pLineOwner',
 	// 		});
 	// 	}
 
-	// 	return releaseLanguage as IReleaseLanguageNonDraft;
+	// 	return trackLanguage as ITrackLanguageNonDraft;
 	// }
 
-	ensureDraftReleaseLanguage(
-		releaseLanguage: IReleaseLanguage,
-	): IReleaseLanguageDraft {
-		// if (releaseLanguage.status !== ReleaseLanguageStatus.DRAFT) {
+	ensureDraftTrackLanguage(
+		trackLanguage: ITrackLanguage,
+	): ITrackLanguageDraft {
+		// if (trackLanguage.status !== TrackLanguageStatus.DRAFT) {
 		// 	throw new ResponseError({
-		// 		message: 'Invalid releaseLanguage.status',
+		// 		message: 'Invalid trackLanguage.status',
 		// 	});
 		// }
 
-		return releaseLanguage as IReleaseLanguageDraft;
+		return trackLanguage as ITrackLanguageDraft;
 	}
 }

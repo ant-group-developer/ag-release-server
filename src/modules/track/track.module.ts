@@ -11,12 +11,14 @@ import { TrackDraftService } from './services/track.draft.service';
 import { TrackQueryService } from './services/track.query.service';
 import { TrackService } from './services/track.service';
 import { TrackValidateService } from './services/track.validate.service';
+import { TrackLanguageModule } from '../track-language/track-language.module';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Track, Release, Genre]),
 		BucketModule,
 		AudioFileModule,
+		TrackLanguageModule
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [
@@ -26,4 +28,4 @@ import { TrackValidateService } from './services/track.validate.service';
 		TrackQueryService,
 	],
 })
-export class TrackModule {}
+export class TrackModule { }

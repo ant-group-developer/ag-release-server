@@ -4,7 +4,6 @@ import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
-import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import {
 	Column,
@@ -15,6 +14,7 @@ import {
 	OneToOne,
 } from 'typeorm';
 import { ITrack } from '../interfaces/track.interface';
+import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 
 @Entity('tracks')
 export class Track extends BaseCustomIDEntity implements ITrack {
