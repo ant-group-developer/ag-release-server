@@ -9,11 +9,11 @@ export interface ITrackLanguage {
 }
 
 export interface ICreateTrackLanguage {
-	metadataLanguageCountryId: string | null;
+	metadataLanguageCountryId?: string | null;
 
-	audioLanguageId: string | null;
+	audioLanguageId?: string | null;
 
-	metadataLanguageId: string | null;
+	metadataLanguageId?: string | null;
 
 	trackId: string;
 }
@@ -25,7 +25,6 @@ export interface IUpdateTrackLanguage {
 
 	metadataLanguageId?: string | null;
 }
-
 
 export interface ITrackLanguageDraft {
 	metadataLanguageCountryId: string | null;

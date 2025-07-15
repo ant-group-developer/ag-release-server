@@ -5,21 +5,19 @@ import { Language } from 'src/modules/language/entities/language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
-
 @Entity('track_language')
 export class TrackLanguage extends BaseUUIDEntity {
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE })
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	metadataLanguageCountryId: string | null;
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE })
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	audioLanguageId: string | null;
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE })
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	metadataLanguageId: string | null;
 
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
-
 
 	// relation
 	@ManyToOne(() => Country)
@@ -39,7 +37,6 @@ export class TrackLanguage extends BaseUUIDEntity {
 	track: Track;
 }
 
-
 // @Entity('track_language')
 // export class TrackLanguage extends BaseUUIDEntity {
 // 	@Column({ type: 'uuid' })
@@ -53,7 +50,6 @@ export class TrackLanguage extends BaseUUIDEntity {
 
 // 	@Column({ type: 'varchar', length: 10 })
 // 	trackId: string;
-
 
 // 	// relation
 // 	@ManyToOne(() => Country)

@@ -11,6 +11,8 @@ import { Track } from '../entities/track.entity';
 import { ITrackDraft } from '../interfaces/track.interface';
 
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
@@ -20,6 +22,13 @@ export class TrackDraftService {
 	constructor(
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
+
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(TrackArtist)
+		private readonly trackArtistRepo: Repository<TrackArtist>,
+
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 		private readonly audioFileDraftService: AudioFileDraftService,
@@ -46,6 +55,11 @@ export class TrackDraftService {
 			});
 		}
 
+		// create trackLanguage
+		await this.trackLanguageDraftService.create({
+			trackId: track.id,
+		});
+
 		return this.trackValidateService.ensureDraftTrack(result);
 	}
 
@@ -68,14 +82,15 @@ export class TrackDraftService {
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
+		const { copyArtistsFromRelease, trackLanguage, ...restOfTrack } = data;
+
 		const {
 			// releaseId,
 			primaryGenreId,
 			subGenreId,
-			trackLanguage,
-		} = data;
+		} = restOfTrack;
 
-		const track = await this.trackQueryService.findOne(id);
+		const track = await this.trackQueryService.getDetail(id);
 
 		// if (releaseId && releaseId !== track.releaseId) {
 		// 	await this.trackValidateService.validate({
@@ -96,22 +111,58 @@ export class TrackDraftService {
 		}
 
 		// language
-		if (
-			trackLanguage?.metadataLanguageId !== undefined &&
-			trackLanguage.metadataLanguageId !==
-				track.trackLanguage.metadataLanguageId
-		) {
-			await this.trackLanguageDraftService.update(
-				track.trackLanguage.id,
-				{
-					metadataLanguageId: trackLanguage.metadataLanguageId,
-				},
-			);
+		if (trackLanguage) {
+			await this.trackLanguageDraftService.update({
+				id: track.trackLanguage.id,
+				trackLanguage,
+			});
 		}
 
-		await this.trackRepo.update(id, data);
+		//
+		if (copyArtistsFromRelease) {
+			await this.copyArtistFromRelease({
+				releaseId: track.releaseId,
+				trackId: track.id,
+			});
+		}
+
+		await this.trackRepo.update(id, restOfTrack);
 		const result = await this.trackQueryService.findOne(id);
 
 		return this.trackValidateService.ensureDraftTrack(result);
+	}
+
+	async copyArtistFromRelease({
+		releaseId,
+		trackId,
+	}: {
+		releaseId: string;
+		trackId: string;
+	}) {
+		const release = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			relations: {
+				releaseArtists: true,
+			},
+		});
+
+		if (
+			release &&
+			release.releaseArtists &&
+			release.releaseArtists.length > 0
+		) {
+			const trackArtistData = release?.releaseArtists?.map(
+				(releaseArtist) => ({
+					artistId: releaseArtist.artistId,
+					artistRoleId: releaseArtist.artistRoleId,
+					trackId,
+				}),
+			);
+
+			const trackArtistEntities =
+				this.trackArtistRepo.create(trackArtistData);
+
+			await this.trackArtistRepo.save(trackArtistEntities);
+		}
 	}
 }

@@ -6,7 +6,10 @@ import { Language } from 'src/modules/language/entities/language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { TrackLanguage } from '../entities/track-language.entity';
-import { ITrackLanguage, ITrackLanguageDraft } from '../interfaces/track-language.interface';
+import {
+	ITrackLanguage,
+	ITrackLanguageDraft,
+} from '../interfaces/track-language.interface';
 
 @Injectable()
 export class TrackLanguageValidateService {
@@ -22,7 +25,7 @@ export class TrackLanguageValidateService {
 
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
-	) { }
+	) {}
 
 	async validate({
 		trackId,

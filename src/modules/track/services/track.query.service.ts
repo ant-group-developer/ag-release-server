@@ -46,6 +46,20 @@ export class TrackQueryService {
 		queryBuilder.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
 		queryBuilder.leftJoinAndSelect('trackArtists.artist', 'artist');
 
+		queryBuilder.leftJoinAndSelect('track.trackLanguage', 'trackLanguage');
+		queryBuilder.leftJoinAndSelect(
+			'trackLanguage.metadataLanguageCountry',
+			'metadataLanguageCountry',
+		);
+		queryBuilder.leftJoinAndSelect(
+			'trackLanguage.audioLanguage',
+			'audioLanguage',
+		);
+		queryBuilder.leftJoinAndSelect(
+			'trackLanguage.metadataLanguage',
+			'metadataLanguage',
+		);
+
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
 				keyword: `%${keyword}%`,
@@ -117,6 +131,17 @@ export class TrackQueryService {
 		query.leftJoinAndSelect('track.trackArtists', 'trackArtists');
 		query.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
 		query.leftJoinAndSelect('trackArtists.artist', 'artist');
+
+		query.leftJoinAndSelect('track.trackLanguage', 'trackLanguage');
+		query.leftJoinAndSelect(
+			'trackLanguage.metadataLanguageCountry',
+			'metadataLanguageCountry',
+		);
+		query.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage');
+		query.leftJoinAndSelect(
+			'trackLanguage.metadataLanguage',
+			'metadataLanguage',
+		);
 
 		const track = await query.getOne();
 

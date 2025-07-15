@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TrackLanguage } from '../entities/track-language.entity';
-import { TrackLanguageValidateService } from './track-language.validate.service';
+import {
+	ICreateTrackLanguage,
+	ITrackLanguageDraft,
+	IUpdateTrackLanguage,
+} from '../interfaces/track-language.interface';
 import { TrackLanguageQueryService } from './track-language.query.service';
-import { CreateTrackLanguageDraftDto, UpdateTrackLanguageDraftDto } from '../dto/track-language.draft.dto';
-import { ICreateTrackLanguage, ITrackLanguageDraft, IUpdateTrackLanguage } from '../interfaces/track-language.interface';
-
+import { TrackLanguageValidateService } from './track-language.validate.service';
 
 @Injectable()
 export class TrackLanguageDraftService {
@@ -16,11 +18,9 @@ export class TrackLanguageDraftService {
 		private readonly trackLanguageValidateService: TrackLanguageValidateService,
 
 		private readonly trackLanguageQueryService: TrackLanguageQueryService,
-	) { }
+	) {}
 
-	async create(
-		data: ICreateTrackLanguage,
-	): Promise<ITrackLanguageDraft> {
+	async create(data: ICreateTrackLanguage): Promise<ITrackLanguageDraft> {
 		const {
 			trackId,
 			audioLanguageId,
@@ -43,18 +43,21 @@ export class TrackLanguageDraftService {
 		);
 	}
 
-	async update(
-		id: string,
-		data: IUpdateTrackLanguage,
-	): Promise<ITrackLanguageDraft> {
+	async update({
+		id,
+		trackLanguage,
+	}: {
+		id: string;
+		trackLanguage: IUpdateTrackLanguage;
+	}): Promise<ITrackLanguageDraft> {
 		const {
 			// trackId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
-		} = data;
+		} = trackLanguage;
 
-		const trackLanguage =
+		const trackLanguageDb =
 			await this.trackLanguageQueryService.findOne(id);
 
 		// if (trackId && trackId !== trackLanguage.trackId) {
@@ -75,7 +78,7 @@ export class TrackLanguageDraftService {
 		if (
 			metadataLanguageCountryId &&
 			metadataLanguageCountryId !==
-			trackLanguage.metadataLanguageCountryId
+				trackLanguageDb.metadataLanguageCountryId
 		) {
 			await this.trackLanguageValidateService.validate({
 				metadataLanguageCountryId,
@@ -91,7 +94,7 @@ export class TrackLanguageDraftService {
 			});
 		}
 
-		await this.trackLanguageRepo.update(id, data);
+		await this.trackLanguageRepo.update(id, trackLanguage);
 		const result = await this.trackLanguageQueryService.findOne(id);
 
 		return this.trackLanguageValidateService.ensureDraftTrackLanguage(

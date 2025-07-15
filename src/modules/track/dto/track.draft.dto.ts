@@ -2,6 +2,8 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
+	IsBoolean,
+	IsEnum,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
@@ -15,6 +17,7 @@ import {
 } from 'class-validator';
 import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
+import { OriginType } from '../enum/track.enum';
 
 export class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -109,7 +112,26 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	title?: string;
 
+	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdateTrackLanguageDraftDto)
 	trackLanguage?: UpdateTrackLanguageDraftDto;
+
+	// other
+	@IsOptional()
+	@IsEnum(OriginType)
+	originType?: OriginType;
+
+	@IsOptional()
+	@IsBoolean()
+	copyArtistsFromRelease?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	isSensitiveContent?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(5000)
+	lyric?: string;
 }
