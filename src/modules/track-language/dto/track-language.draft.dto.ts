@@ -13,6 +13,10 @@ export class CreateTrackLanguageDraftDto {
 	@IsOptional()
 	metadataLanguageId?: string | null;
 
+	@IsUUID()
+	@IsOptional()
+	recordingCountryId?: string | null;
+
 	// @IsUUID()
 	// @IsNotEmpty()
 	// trackId: string;

@@ -27,6 +27,8 @@ import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
+import { TrackOriginTypeModule } from './modules/track-origin-type/track-origin-type.module';
+import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserPermissionModule } from './modules/user-permission/user-permission.module';
 import { UserModule } from './modules/user/user.module';
@@ -69,6 +71,8 @@ import { UserModule } from './modules/user/user.module';
 		TrackLanguageModule,
 		TrackLocalizeModule,
 		AudioFileModule,
+		TrackTypeModule,
+		TrackOriginTypeModule,
 
 		ArtistModule,
 		ArtistRoleModule,

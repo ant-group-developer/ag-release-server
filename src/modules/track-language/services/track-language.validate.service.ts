@@ -32,11 +32,13 @@ export class TrackLanguageValidateService {
 		audioLanguageId,
 		metadataLanguageCountryId,
 		metadataLanguageId,
+		recordingCountryId,
 	}: {
 		trackId?: string | null;
 		audioLanguageId?: string | null;
 		metadataLanguageCountryId?: string | null;
 		metadataLanguageId?: string | null;
+		recordingCountryId?: string | null;
 	}) {
 		if (trackId) {
 			const track = await this.trackRepo.findOne({
@@ -86,6 +88,18 @@ export class TrackLanguageValidateService {
 			if (!metadataLanguage) {
 				throw new ResponseError({
 					message: 'Invalid metadataLanguageId',
+				});
+			}
+		}
+
+		if (recordingCountryId) {
+			const country = await this.countryRepo.findOne({
+				where: { id: recordingCountryId },
+			});
+
+			if (!country) {
+				throw new ResponseError({
+					message: 'Invalid recordingCountryId',
 				});
 			}
 		}

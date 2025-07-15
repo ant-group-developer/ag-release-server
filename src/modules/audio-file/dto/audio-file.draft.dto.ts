@@ -39,6 +39,11 @@ export class CreateAudioFileDraftDto {
 	@Min(0)
 	hook?: number | null;
 
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	preview?: number | null;
+
 	// @IsNotEmpty()
 	// @IsString()
 	// @Length(10, 10)

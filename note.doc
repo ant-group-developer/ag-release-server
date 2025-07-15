@@ -31,3 +31,96 @@ export abstract class BaseCustomIDEntity {
 default phai la hang so khi init db
 
 ant-music-assets/labels/
+
+thay đổi track
+{
+	"id": "55T0f7i0G7",
+	"createdAt": "2025-07-14T09:18:08.829Z",
+	"updatedAt": "2025-07-14T09:18:08.829Z",
+	"title": "Waiting by the Window",
+	"version": null,
+	"isrc": null,
+	"iswc": null,
+	"releaseId": "272a3d39-893d-4d6b-a364-6af5cda39d96",
+	"pLineOwner": null,
+	"primaryGenreId": null,
+	"subGenreId": null,
+	"trackArtists": [],
+	"audioFileBucket": { 
+		"id": "c81efa4d-2d80-4a54-bb37-4d5346af4e9e",
+		"createdAt": "2025-07-14T09:18:08.849Z",
+		"updatedAt": "2025-07-14T09:18:08.849Z",
+		"sampleRate": "44100",
+		"bitrate": "1411200",
+		"bitDepth": 16,
+		"duration": 124,
+		"hook": null,
+		"trackId": "55T0f7i0G7",
+		"fileId": "1618cd14-4a08-4d8a-ade1-2d1e76893a3c",
+		"peakId": "0ed895f6-f477-48d5-a1ba-6840b532474f",
+		"file": "string"
+		"peak": "string"
+	}
+},
+
+vs
+
+{
+	"id": "NxpYrcNHc6",
+	"createdAt": "2025-07-05T08:31:52.199Z",
+	"updatedAt": "2025-07-05T08:31:52.199Z",
+	"title": "Autumn Without You",
+	"version": null,
+	"isrc": null,
+	"iswc": null,
+	"releaseId": "ef4ca945-ca1f-4fde-9455-f3f5e6cb4d70",
+	"pLineOwner": null,
+	"primaryGenreId": null,
+	"subGenreId": null,
+	"order": 0,
+	"originType": "original",
+	"isSensitiveContent": null,
+	"lyric": null,
+	"trackArtists": [],
+	"trackLanguage": null,
+	"audioFile": {
+		"id": "44cd991c-4896-44a7-90a8-8dc54db9a94f",
+		"createdAt": "2025-07-09T03:57:36.596Z",
+		"updatedAt": "2025-07-09T03:57:36.596Z",
+		"sampleRate": "44100",
+		"bitrate": null,
+		"bitDepth": 16,
+		"duration": 180,
+		"hook": 30,
+		"preview": null,
+		"trackId": "NxpYrcNHc6",
+		"fileId": "6244d258-5149-412d-ac85-f5ab1438d709",
+		"peakId": "7847c6bd-3e06-45c6-a4e0-734a33dc85f2",
+		"file": {
+			"id": "6244d258-5149-412d-ac85-f5ab1438d709",
+			"createdAt": "2025-07-08T04:01:09.612Z",
+			"updatedAt": "2025-07-08T04:01:09.612Z",
+			"isSubmitted": false,
+			"fileName": "20250708110109_my_song.mp3",
+			"key": "tracks/audio/20250708110109_my_song.mp3",
+			"contentType": "audio/mpeg",
+			"extension": "mp3",
+			"fileSize": "5120000",
+			"bucket": "ant-music-assets-protected",
+			"urlRead": "string"
+		},
+		"peak": {
+			"id": "7847c6bd-3e06-45c6-a4e0-734a33dc85f2",
+			"createdAt": "2025-07-08T04:01:18.429Z",
+			"updatedAt": "2025-07-08T04:01:18.429Z",
+			"isSubmitted": false,
+			"fileName": "20250708110118_my_song.mp3",
+			"key": "tracks/audio/20250708110118_my_song.mp3",
+			"contentType": "audio/mpeg",
+			"extension": "mp3",
+			"fileSize": "5120000",
+			"bucket": "ant-music-assets-protected",
+			"urlRead": "string"	
+		}
+	}
+}

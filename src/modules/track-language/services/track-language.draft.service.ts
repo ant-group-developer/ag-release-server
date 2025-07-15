@@ -26,6 +26,7 @@ export class TrackLanguageDraftService {
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
+			recordingCountryId,
 		} = data;
 
 		await this.trackLanguageValidateService.validate({
@@ -33,6 +34,7 @@ export class TrackLanguageDraftService {
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
+			recordingCountryId,
 		});
 
 		const trackLanguage = this.trackLanguageRepo.create(data);
@@ -51,20 +53,14 @@ export class TrackLanguageDraftService {
 		dataUpdate: IUpdateTrackLanguage;
 	}): Promise<ITrackLanguageDraft> {
 		const {
-			// trackId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
+			recordingCountryId,
 		} = dataUpdate;
 
 		const trackLanguageDb =
 			await this.trackLanguageQueryService.findOne(id);
-
-		// if (trackId && trackId !== trackLanguage.trackId) {
-		// 	await this.trackLanguageValidateService.validate({
-		// 		trackId,
-		// 	});
-		// }
 
 		if (
 			audioLanguageId &&
@@ -91,6 +87,15 @@ export class TrackLanguageDraftService {
 		) {
 			await this.trackLanguageValidateService.validate({
 				metadataLanguageId,
+			});
+		}
+
+		if (
+			recordingCountryId &&
+			recordingCountryId !== trackLanguageDb.recordingCountryId
+		) {
+			await this.trackLanguageValidateService.validate({
+				recordingCountryId,
 			});
 		}
 

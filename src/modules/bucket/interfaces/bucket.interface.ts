@@ -1,3 +1,5 @@
+import { FileEntity } from '../entities/bucket.file.entity';
+
 export interface IResCreateBucket {
 	fileId: string;
 	urlUpload: string;
@@ -30,4 +32,10 @@ export interface IGetSignedUrlDown {
 	key: string;
 	isPublic?: boolean;
 	fileName: string;
+}
+
+// file
+export interface IFile extends FileEntity {}
+export interface IFileBucket extends FileEntity {
+	urlRead: string;
 }

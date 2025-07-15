@@ -43,5 +43,5 @@ export interface ITrackWithAudio extends ITrack {
 }
 
 export interface ITrackDetails extends ITrack {
-	audioFileBucket: IAudioFileBucket | null;
+	audioFile: IAudioFileBucket | null;
 }

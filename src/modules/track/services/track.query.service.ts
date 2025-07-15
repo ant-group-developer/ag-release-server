@@ -41,6 +41,8 @@ export class TrackQueryService {
 
 		const queryBuilder = this.trackRepo.createQueryBuilder(this.mainAlias);
 		queryBuilder.leftJoinAndSelect('track.audioFile', 'audioFile');
+		queryBuilder.leftJoinAndSelect('audioFile.file', 'file');
+		queryBuilder.leftJoinAndSelect('audioFile.peak', 'peak');
 
 		queryBuilder.leftJoinAndSelect('track.trackArtists', 'trackArtists');
 		queryBuilder.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
@@ -127,6 +129,8 @@ export class TrackQueryService {
 		});
 
 		query.leftJoinAndSelect('track.audioFile', 'audioFile');
+		query.leftJoinAndSelect('audioFile.file', 'file');
+		query.leftJoinAndSelect('audioFile.peak', 'peak');
 
 		query.leftJoinAndSelect('track.trackArtists', 'trackArtists');
 		query.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
