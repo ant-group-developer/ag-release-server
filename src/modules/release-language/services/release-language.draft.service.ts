@@ -45,16 +45,19 @@ export class ReleaseLanguageDraftService {
 		);
 	}
 
-	async update(
-		id: string,
-		data: UpdateReleaseLanguageDraftDto,
-	): Promise<IReleaseLanguageDraft> {
+	async update({
+		id,
+		dataUpdate,
+	}: {
+		id: string;
+		dataUpdate: UpdateReleaseLanguageDraftDto;
+	}): Promise<IReleaseLanguageDraft> {
 		const {
 			// releaseId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
-		} = data;
+		} = dataUpdate;
 
 		const releaseLanguage =
 			await this.releaseLanguageQueryService.findOne(id);
@@ -93,7 +96,7 @@ export class ReleaseLanguageDraftService {
 			});
 		}
 
-		await this.releaseLanguageRepo.update(id, data);
+		await this.releaseLanguageRepo.update(id, dataUpdate);
 		const result = await this.releaseLanguageQueryService.findOne(id);
 
 		return this.releaseLanguageValidateService.ensureDraftReleaseLanguage(

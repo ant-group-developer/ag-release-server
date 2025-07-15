@@ -8,10 +8,10 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 @Entity('track_language')
 export class TrackLanguage extends BaseUUIDEntity {
 	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
-	metadataLanguageCountryId: string | null;
+	metadataLanguageCountryId: string | null; // ngon ngu quoc gia
 
 	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
-	audioLanguageId: string | null;
+	audioLanguageId: string | null; // ngon ngu bai hat
 
 	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	metadataLanguageId: string | null;

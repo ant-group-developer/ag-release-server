@@ -133,6 +133,18 @@ export class BucketService {
 		};
 	}
 
+	async getFileBuffer(fileId: string): Promise<Buffer> {
+		const fileDb = await this.bucketFileService.findOne(fileId);
+
+		const fileGcs = await this.bucketGcsService.findOne({
+			bucketName: fileDb.bucket,
+			key: fileDb.key,
+		});
+
+		const [contents] = await fileGcs.download();
+		return contents;
+	}
+
 	// public
 	async deletePublicFile(urlPublic: string): Promise<void> {
 		await this.bucketGcsService.deletePublicFile(urlPublic);

@@ -12,6 +12,7 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
+import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseType } from '../enum/release.enum';
 
@@ -106,8 +107,8 @@ export class CreateReleaseDraftDto {
 	// // coverArt
 	// @IsNotEmpty()
 	// @ValidateNested()
-	// @Type(() => CreateCoverArtDto)
-	// releaseCoverArt: CreateCoverArtDto;
+	// @Type(() => CreateReleaseCoverArtDto)
+	// releaseCoverArt: CreateReleaseCoverArtDto;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
@@ -153,9 +154,10 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 
 	// @ValidateIf((_, value) => value !== undefined)
 	// @IsNotEmpty()
-	// @ValidateNested()
-	// @Type(() => CreateCoverArtDto)
-	// releaseCoverArt?: CreateCoverArtDto;
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => CreateReleaseCoverArtDto)
+	releaseCoverArt?: CreateReleaseCoverArtDto | null;
 
 	@ValidateNested()
 	@Type(() => UpdateReleaseLanguageDraftDto)

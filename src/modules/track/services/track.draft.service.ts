@@ -114,7 +114,7 @@ export class TrackDraftService {
 		if (trackLanguage) {
 			await this.trackLanguageDraftService.update({
 				id: track.trackLanguage.id,
-				trackLanguage,
+				dataUpdate: trackLanguage,
 			});
 		}
 

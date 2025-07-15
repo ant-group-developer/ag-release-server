@@ -45,17 +45,17 @@ export class TrackLanguageDraftService {
 
 	async update({
 		id,
-		trackLanguage,
+		dataUpdate,
 	}: {
 		id: string;
-		trackLanguage: IUpdateTrackLanguage;
+		dataUpdate: IUpdateTrackLanguage;
 	}): Promise<ITrackLanguageDraft> {
 		const {
 			// trackId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
-		} = trackLanguage;
+		} = dataUpdate;
 
 		const trackLanguageDb =
 			await this.trackLanguageQueryService.findOne(id);
@@ -68,7 +68,7 @@ export class TrackLanguageDraftService {
 
 		if (
 			audioLanguageId &&
-			audioLanguageId !== trackLanguage.audioLanguageId
+			audioLanguageId !== trackLanguageDb.audioLanguageId
 		) {
 			await this.trackLanguageValidateService.validate({
 				audioLanguageId,
@@ -87,14 +87,14 @@ export class TrackLanguageDraftService {
 
 		if (
 			metadataLanguageId &&
-			metadataLanguageId !== trackLanguage.metadataLanguageId
+			metadataLanguageId !== trackLanguageDb.metadataLanguageId
 		) {
 			await this.trackLanguageValidateService.validate({
 				metadataLanguageId,
 			});
 		}
 
-		await this.trackLanguageRepo.update(id, trackLanguage);
+		await this.trackLanguageRepo.update(id, dataUpdate);
 		const result = await this.trackLanguageQueryService.findOne(id);
 
 		return this.trackLanguageValidateService.ensureDraftTrackLanguage(

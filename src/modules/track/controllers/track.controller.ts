@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
@@ -103,16 +112,16 @@ export class TrackController {
 		});
 	}
 
-	// @Delete(':id')
-	// @ApiOperation({ summary: 'Delete a track by ID' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: TrackMessageSuccess.DELETE,
-	// })
-	// async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-	// 	await this.trackService.remove(id);
-	// 	return new ResponseSuccess({
-	// 		messageCode: TrackMessageCodeSuccess.DELETE,
-	// 	});
-	// }
+	@Delete(':id')
+	@ApiOperation({ summary: 'Delete a track by ID' })
+	@ApiResponse({
+		status: 200,
+		description: TrackMessageSuccess.DELETE,
+	})
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.trackService.remove(id);
+		return new ResponseSuccess({
+			messageCode: TrackMessageCodeSuccess.DELETE,
+		});
+	}
 }
