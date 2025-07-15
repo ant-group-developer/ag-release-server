@@ -4,6 +4,7 @@ import { AudioFileModule } from '../audio-file/audio-file.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Release } from '../release/entities/release.entity';
+import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackController } from './controllers/track.controller';
 import { TrackDraftController } from './controllers/track.draft.controller';
 import { Track } from './entities/track.entity';
@@ -11,14 +12,13 @@ import { TrackDraftService } from './services/track.draft.service';
 import { TrackQueryService } from './services/track.query.service';
 import { TrackService } from './services/track.service';
 import { TrackValidateService } from './services/track.validate.service';
-import { TrackLanguageModule } from '../track-language/track-language.module';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Track, Release, Genre]),
 		BucketModule,
 		AudioFileModule,
-		TrackLanguageModule
+		TrackLanguageModule,
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [
@@ -28,4 +28,4 @@ import { TrackLanguageModule } from '../track-language/track-language.module';
 		TrackQueryService,
 	],
 })
-export class TrackModule { }
+export class TrackModule {}

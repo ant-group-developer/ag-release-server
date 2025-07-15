@@ -30,7 +30,7 @@ export class TrackService {
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 		private readonly bucketService: BucketService,
-	) { }
+	) {}
 
 	// async create(data: CreateTrackDto): Promise<Track> {
 	// 	const { labelId, primaryGenreId, subGenreId, trackTimezoneId } = data;
@@ -54,8 +54,10 @@ export class TrackService {
 		await this.trackQueryService.findOne(id);
 
 		// validate nonDraft
-		const trackNonDraft =
-			this.trackValidateService.ensureNonDraftTrack({ ...data, trackArtists: [] });
+		const trackNonDraft = this.trackValidateService.ensureNonDraftTrack({
+			...data,
+			trackArtists: [],
+		});
 
 		await this.trackRepo.update(id, trackNonDraft);
 		const result = await this.trackQueryService.findOne(id);
@@ -152,7 +154,7 @@ export class TrackService {
 
 			result.push({
 				...restOfTrack,
-				audioFileBucket
+				audioFileBucket,
 			});
 		}
 

@@ -11,9 +11,9 @@ import { Track } from '../entities/track.entity';
 import { ITrackDraft } from '../interfaces/track.interface';
 
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
+import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
-import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 
 @Injectable()
 export class TrackDraftService {
@@ -23,8 +23,8 @@ export class TrackDraftService {
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 		private readonly audioFileDraftService: AudioFileDraftService,
-		private readonly trackLanguageDraftService: TrackLanguageDraftService
-	) { }
+		private readonly trackLanguageDraftService: TrackLanguageDraftService,
+	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
 		const { releaseId, primaryGenreId, subGenreId, audioFileDraft } = data;
@@ -59,12 +59,12 @@ export class TrackDraftService {
 	}
 
 	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
-		const { trackDrafts } = data
+		const { trackDrafts } = data;
 		for (const track of trackDrafts) {
-			await this.trackQueryService.findOne(track.id)
+			await this.trackQueryService.findOne(track.id);
 		}
 
-		return await this.trackRepo.save(trackDrafts)
+		return await this.trackRepo.save(trackDrafts);
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
@@ -72,7 +72,7 @@ export class TrackDraftService {
 			// releaseId,
 			primaryGenreId,
 			subGenreId,
-			trackLanguage
+			trackLanguage,
 		} = data;
 
 		const track = await this.trackQueryService.findOne(id);
@@ -99,7 +99,7 @@ export class TrackDraftService {
 		if (
 			trackLanguage?.metadataLanguageId !== undefined &&
 			trackLanguage.metadataLanguageId !==
-			track.trackLanguage.metadataLanguageId
+				track.trackLanguage.metadataLanguageId
 		) {
 			await this.trackLanguageDraftService.update(
 				track.trackLanguage.id,
