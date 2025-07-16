@@ -8,7 +8,7 @@ import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-l
 import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
-import { ReleaseTerritory } from 'src/modules/release-territories/entities/release-dsp.entity';
+import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territoty.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
@@ -158,8 +158,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
 	releaseDsp: ReleaseDsp[];
 
-	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
-	releaseTerritories: ReleaseTerritory[];
+	@OneToOne(
+		() => ReleaseTerritory,
+		(releaseTerritory) => releaseTerritory.release,
+	)
+	releaseTerritory: ReleaseTerritory;
 }
 
 // @Entity('releases')

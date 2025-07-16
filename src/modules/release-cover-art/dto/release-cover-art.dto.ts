@@ -2,10 +2,6 @@ import { IsInt, IsNotEmpty, IsUUID, Max } from 'class-validator';
 import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
 
 export class CreateReleaseCoverArtDto {
-	// @IsNotEmpty()
-	// @IsUUID()
-	// releaseId: string;
-
 	@IsNotEmpty()
 	@IsUUID()
 	fileId: string;
@@ -19,11 +15,6 @@ export class CreateReleaseCoverArtDto {
 	@IsInt()
 	@Max(MAX_INTEGER)
 	height: number;
-
-	// @IsNotEmpty()
-	// @IsString()
-	// @MaxLength(20)
-	// type: string;
 }
 
 // export class UpdateReleaseCoverArtDto extends PartialType(

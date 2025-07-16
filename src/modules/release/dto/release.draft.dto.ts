@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
+import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { ReleaseType } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
@@ -150,7 +151,13 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@Type(() => CreateReleaseCoverArtDto)
 	releaseCoverArt?: CreateReleaseCoverArtDto | null;
 
+	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdateReleaseLanguageDraftDto)
 	releaseLanguage?: UpdateReleaseLanguageDraftDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateReleaseTerritoryDto)
+	releaseTerritory?: UpdateReleaseTerritoryDto;
 }

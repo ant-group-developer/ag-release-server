@@ -27,3 +27,16 @@ export interface IReleaseLanguageNonDraft {
 
 	releaseId: string;
 }
+
+export interface ICreateReleaseLanguage {
+	metadataLanguageCountryId?: string | null;
+	audioLanguageId?: string | null;
+	metadataLanguageId?: string | null;
+	releaseId: string;
+}
+
+export class IUpdateReleaseLanguage {
+	metadataLanguageCountryId?: string | null;
+	audioLanguageId?: string | null;
+	metadataLanguageId?: string | null;
+}

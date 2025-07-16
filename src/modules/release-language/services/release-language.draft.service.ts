@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-	CreateReleaseLanguageDraftDto,
-	UpdateReleaseLanguageDraftDto,
-} from '../dto/release-language.draft.dto';
 import { ReleaseLanguage } from '../entities/release-language.entity';
-import { IReleaseLanguageDraft } from '../interfaces/release-language.interface';
+import {
+	ICreateReleaseLanguage,
+	IReleaseLanguageDraft,
+	IUpdateReleaseLanguage,
+} from '../interfaces/release-language.interface';
 import { ReleaseLanguageQueryService } from './release-language.query.service';
 import { ReleaseLanguageValidateService } from './release-language.validate.service';
 
@@ -20,9 +20,7 @@ export class ReleaseLanguageDraftService {
 		private readonly releaseLanguageQueryService: ReleaseLanguageQueryService,
 	) {}
 
-	async create(
-		data: CreateReleaseLanguageDraftDto,
-	): Promise<IReleaseLanguageDraft> {
+	async create(data: ICreateReleaseLanguage): Promise<IReleaseLanguageDraft> {
 		const {
 			releaseId,
 			audioLanguageId,
@@ -50,10 +48,9 @@ export class ReleaseLanguageDraftService {
 		dataUpdate,
 	}: {
 		id: string;
-		dataUpdate: UpdateReleaseLanguageDraftDto;
+		dataUpdate: IUpdateReleaseLanguage;
 	}): Promise<IReleaseLanguageDraft> {
 		const {
-			// releaseId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
@@ -61,12 +58,6 @@ export class ReleaseLanguageDraftService {
 
 		const releaseLanguage =
 			await this.releaseLanguageQueryService.findOne(id);
-
-		// if (releaseId && releaseId !== releaseLanguage.releaseId) {
-		// 	await this.releaseLanguageValidateService.validate({
-		// 		releaseId,
-		// 	});
-		// }
 
 		if (
 			audioLanguageId &&
