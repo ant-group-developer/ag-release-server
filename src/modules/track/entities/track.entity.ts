@@ -14,7 +14,7 @@ import {
 	OneToMany,
 	OneToOne,
 } from 'typeorm';
-import { OriginType } from '../enum/track.enum';
+
 import { ITrack } from '../interfaces/track.interface';
 
 @Entity('tracks')
@@ -65,8 +65,11 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	order: number;
 
 	// other
-	@Column({ type: 'enum', enum: OriginType, default: OriginType.ORIGINAL })
-	originType: OriginType;
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	trackTypeId: string | null;
+
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	trackOriginTypeId: string | null;
 
 	@Column({ type: Boolean, nullable: true })
 	isSensitiveContent: boolean;

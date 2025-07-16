@@ -23,14 +23,14 @@ export class TrackOriginTypeService {
 		private readonly trackOriginTypeQueryService: TrackOriginTypeQueryService,
 	) {}
 
-	async create(
-		createTrackOriginTypeDto: CreateTrackOriginTypeDto,
-	): Promise<TrackOriginType> {
-		await this.validate({ name: createTrackOriginTypeDto.name });
+	async create(data: CreateTrackOriginTypeDto): Promise<TrackOriginType> {
+		const { name, value } = data;
 
-		const trackOriginType = this.trackOriginTypeRepo.create(
-			createTrackOriginTypeDto,
-		);
+		await this.validate({ name });
+		await this.validate({ value });
+
+		const trackOriginType = this.trackOriginTypeRepo.create(data);
+
 		return await this.trackOriginTypeRepo.save(trackOriginType);
 	}
 
@@ -71,16 +71,20 @@ export class TrackOriginTypeService {
 
 	async update(
 		id: string,
-		updateTrackOriginTypeDto: UpdateTrackOriginTypeDto,
+		data: UpdateTrackOriginTypeDto,
 	): Promise<TrackOriginType> {
-		const { name } = updateTrackOriginTypeDto;
+		const { name, value } = data;
 		const trackOriginType = await this.findOne(id);
 
 		if (name && name !== trackOriginType.name) {
 			await this.validate({ name });
 		}
 
-		await this.trackOriginTypeRepo.update(id, updateTrackOriginTypeDto);
+		if (value && value !== trackOriginType.value) {
+			await this.validate({ value });
+		}
+
+		await this.trackOriginTypeRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
@@ -88,18 +92,35 @@ export class TrackOriginTypeService {
 		await this.trackOriginTypeRepo.delete(id);
 	}
 
-	async validate({ name }: { name?: string }) {
-		const trackOriginType = await this.trackOriginTypeRepo.findOne({
-			where: { name },
-		});
-
-		if (trackOriginType) {
-			throw new ResponseError({
-				messageCode:
-					TrackOriginTypeMessageCodeError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
-				message:
-					TrackOriginTypeMessageError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
+	async validate({ name, value }: { name?: string; value?: string }) {
+		if (name) {
+			const trackOriginType = await this.trackOriginTypeRepo.findOne({
+				where: { name },
 			});
+
+			if (trackOriginType) {
+				throw new ResponseError({
+					messageCode:
+						TrackOriginTypeMessageCodeError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
+					message:
+						TrackOriginTypeMessageError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
+				});
+			}
+		}
+
+		if (value) {
+			const trackOriginType = await this.trackOriginTypeRepo.findOne({
+				where: { value },
+			});
+
+			if (trackOriginType) {
+				throw new ResponseError({
+					messageCode:
+						TrackOriginTypeMessageCodeError.DUPLICATE_VALUE_TRACK_ORIGIN_TYPE,
+					message:
+						TrackOriginTypeMessageError.DUPLICATE_VALUE_TRACK_ORIGIN_TYPE,
+				});
+			}
 		}
 	}
 }

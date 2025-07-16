@@ -1,7 +1,4 @@
-import {
-	IAudioFile,
-	IAudioFileBucket,
-} from 'src/modules/audio-file/interfaces/audio-file.interface';
+import { IAudioFileBucket } from 'src/modules/audio-file/interfaces/audio-file.interface';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 
 export interface ITrack {
@@ -38,10 +35,16 @@ export interface ITrackNonDraft {
 	subGenreId: string | null;
 }
 
-export interface ITrackWithAudio extends ITrack {
-	audioFile: IAudioFile | null;
-}
+export interface ITrackDetails {
+	title: string;
+	version: string | null;
+	isrc: string | null;
+	iswc: string | null;
+	releaseId: string;
+	pLineOwner: string | null;
+	primaryGenreId: string | null;
+	subGenreId: string | null;
+	trackArtists: TrackArtist[] | [];
 
-export interface ITrackDetails extends ITrack {
 	audioFile: IAudioFileBucket | null;
 }

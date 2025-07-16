@@ -28,6 +28,18 @@ export class BucketFileService {
 		return file;
 	}
 
+	async update(id: string, { fileName }: { fileName: string }) {
+		const file = await this.fileRepo.findOne({ where: { id } });
+
+		if (!file) {
+			throw new ResponseError({ message: 'File not found' });
+		}
+
+		await this.fileRepo.update(id, { fileName });
+
+		// return this.findOne(id);
+	}
+
 	async submit(id: string) {
 		await this.fileRepo.update(id, { isSubmitted: true });
 		return this.findOne(id);

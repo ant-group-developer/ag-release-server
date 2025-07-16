@@ -14,6 +14,8 @@ export const TrackMessageCodeError = {
 	NOT_FOUND: 'track.message.error.notFound',
 	PRIMARY_GENRE_NOT_FOUND: 'track.message.error.primaryGenreNotFound',
 	SUB_GENRE_NOT_FOUND: 'track.message.error.subGenreNotFound',
+	TRACK_TYPE_NOT_FOUND: 'track.message.error.trackTypeNotFound',
+	TRACK_ORIGIN_TYPE_NOT_FOUND: 'track.message.error.trackOriginTypeNotFound',
 	RELEASE_NOT_FOUND: 'track.message.error.releaseNotFound',
 };
 
@@ -21,6 +23,7 @@ export const TrackMessageError = {
 	NOT_FOUND: 'Not found',
 	PRIMARY_GENRE_NOT_FOUND: 'Primary genre not found',
 	SUB_GENRE_NOT_FOUND: 'Sub-genre not found',
-
+	TRACK_TYPE_NOT_FOUND: 'Track type not found',
+	TRACK_ORIGIN_TYPE_NOT_FOUND: 'Track origin type not found',
 	RELEASE_NOT_FOUND: 'Release not found',
 };

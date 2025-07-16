@@ -80,7 +80,7 @@ export class CreateTrackDto {
 	subGenreId: string | null;
 }
 
-export class SubmitCreateTrackDto extends CreateTrackDto { }
+export class SubmitCreateTrackDto extends CreateTrackDto {}
 
 export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 	@IsString()

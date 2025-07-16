@@ -54,12 +54,12 @@ export class TrackQueryService {
 			'metadataLanguageCountry',
 		);
 		queryBuilder.leftJoinAndSelect(
-			'trackLanguage.audioLanguage',
-			'audioLanguage',
+			'trackLanguage.recordingCountry',
+			'recordingCountry',
 		);
 		queryBuilder.leftJoinAndSelect(
-			'trackLanguage.metadataLanguage',
-			'metadataLanguage',
+			'trackLanguage.audioLanguage',
+			'audioLanguage',
 		);
 
 		if (keyword) {
@@ -140,6 +140,10 @@ export class TrackQueryService {
 		query.leftJoinAndSelect(
 			'trackLanguage.metadataLanguageCountry',
 			'metadataLanguageCountry',
+		);
+		query.leftJoinAndSelect(
+			'trackLanguage.recordingCountry',
+			'recordingCountry',
 		);
 		query.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage');
 		query.leftJoinAndSelect(

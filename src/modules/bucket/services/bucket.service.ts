@@ -80,6 +80,18 @@ export class BucketService {
 		});
 	}
 
+	async update({
+		fileId,
+		dataUpdate,
+	}: {
+		fileId: string;
+		dataUpdate: { fileName: string };
+	}) {
+		await this.bucketFileService.update(fileId, {
+			fileName: dataUpdate.fileName,
+		});
+	}
+
 	async remove(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
 		await this.bucketGcsService.delete({

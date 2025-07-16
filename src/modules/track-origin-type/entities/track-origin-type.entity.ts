@@ -5,4 +5,7 @@ import { Column, Entity } from 'typeorm';
 export class TrackOriginType extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
+
+	@Column({ type: 'varchar', length: 50, unique: true })
+	value: string;
 }

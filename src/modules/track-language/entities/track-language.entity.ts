@@ -19,7 +19,6 @@ export class TrackLanguage extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
 
-	// other
 	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	recordingCountryId: string | null;
 
@@ -27,6 +26,10 @@ export class TrackLanguage extends BaseUUIDEntity {
 	@ManyToOne(() => Country)
 	@JoinColumn({ name: 'metadata_language_country_id' })
 	metadataLanguageCountry: Country | null;
+
+	@ManyToOne(() => Country)
+	@JoinColumn({ name: 'recording_country_id' })
+	recordingCountry: Country | null;
 
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'audio_language_id' })

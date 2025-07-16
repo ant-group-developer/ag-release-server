@@ -3,21 +3,21 @@ import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
 	IsBoolean,
-	IsEnum,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
+	Max,
 	MaxLength,
 	Min,
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
 import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
+import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
-import { OriginType } from '../enum/track.enum';
 
 export class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -105,6 +105,23 @@ export class UpdateOrderTrackDraft {
 	order: number;
 }
 
+class File {
+	@MaxLength(100)
+	fileName: string;
+}
+
+class AudioFile {
+	@IsOptional()
+	@IsInt()
+	@Max(MAX_INTEGER)
+	preview?: number;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => File)
+	file?: File;
+}
+
 export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@IsString()
 	@IsNotEmpty()
@@ -117,10 +134,13 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@Type(() => UpdateTrackLanguageDraftDto)
 	trackLanguage?: UpdateTrackLanguageDraftDto;
 
-	// other
 	@IsOptional()
-	@IsEnum(OriginType)
-	originType?: OriginType;
+	@IsUUID()
+	trackOriginTypeId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	trackTypeId?: string;
 
 	@IsOptional()
 	@IsBoolean()
@@ -134,4 +154,9 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@IsString()
 	@MaxLength(5000)
 	lyric?: string;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => AudioFile)
+	audioFile?: AudioFile;
 }

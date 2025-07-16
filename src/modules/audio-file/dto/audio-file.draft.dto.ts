@@ -1,7 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
-	ArrayMinSize,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
@@ -10,8 +7,6 @@ import {
 	Max,
 	MaxLength,
 	Min,
-	ValidateIf,
-	ValidateNested,
 } from 'class-validator';
 export class CreateAudioFileDraftDto {
 	@IsNotEmpty()
@@ -44,11 +39,6 @@ export class CreateAudioFileDraftDto {
 	@Min(0)
 	preview?: number | null;
 
-	// @IsNotEmpty()
-	// @IsString()
-	// @Length(10, 10)
-	trackId: string;
-
 	@IsNotEmpty()
 	@IsUUID()
 	fileId: string;
@@ -57,40 +47,40 @@ export class CreateAudioFileDraftDto {
 	peakId: string;
 }
 
-export class BulkCreateAudioFileDraft {
-	@IsNotEmpty()
-	@ArrayMinSize(1)
-	@ValidateNested({ each: true })
-	@Type(() => CreateAudioFileDraftDto)
-	createAudioFileDraftDtos: CreateAudioFileDraftDto[];
-}
+// export class BulkCreateAudioFileDraft {
+// 	@IsNotEmpty()
+// 	@ArrayMinSize(1)
+// 	@ValidateNested({ each: true })
+// 	@Type(() => CreateAudioFileDraftDto)
+// 	createAudioFileDraftDtos: CreateAudioFileDraftDto[];
+// }
 
-export class UpdateAudioFileDraftDto extends PartialType(
-	CreateAudioFileDraftDto,
-) {
-	@ValidateIf((_, value) => value !== undefined)
-	@IsNotEmpty()
-	@IsString()
-	@MaxLength(20)
-	sampleRate?: string;
+// export class UpdateAudioFileDraftDto extends PartialType(
+// 	CreateAudioFileDraftDto,
+// ) {
+// 	@ValidateIf((_, value) => value !== undefined)
+// 	@IsNotEmpty()
+// 	@IsString()
+// 	@MaxLength(20)
+// 	sampleRate?: string;
 
-	@ValidateIf((_, value) => value !== undefined)
-	@IsInt()
-	@Min(1)
-	duration?: number;
+// 	@ValidateIf((_, value) => value !== undefined)
+// 	@IsInt()
+// 	@Min(1)
+// 	duration?: number;
 
-	// @ValidateIf((_, value) => value !== undefined)
-	// @IsNotEmpty()
-	// @IsString()
-	// @Length(10, 10)
-	// trackId?: string;
+// 	// @ValidateIf((_, value) => value !== undefined)
+// 	// @IsNotEmpty()
+// 	// @IsString()
+// 	// @Length(10, 10)
+// 	// trackId?: string;
 
-	@ValidateIf((_, value) => value !== undefined)
-	@IsNotEmpty()
-	@IsUUID()
-	fileId?: string;
+// 	@ValidateIf((_, value) => value !== undefined)
+// 	@IsNotEmpty()
+// 	@IsUUID()
+// 	fileId?: string;
 
-	@ValidateIf((_, value) => value !== undefined)
-	@IsUUID()
-	peakId?: string;
-}
+// 	@ValidateIf((_, value) => value !== undefined)
+// 	@IsUUID()
+// 	peakId?: string;
+// }
