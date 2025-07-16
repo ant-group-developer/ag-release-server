@@ -14,5 +14,6 @@ import { ReleaseArtistValidateService } from './services/release-artist.validate
 	],
 	controllers: [ReleaseArtistController],
 	providers: [ReleaseArtistService, ReleaseArtistValidateService],
+	exports: [ReleaseArtistService],
 })
 export class ReleaseArtistModule {}

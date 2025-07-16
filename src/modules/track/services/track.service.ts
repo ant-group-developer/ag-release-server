@@ -164,8 +164,8 @@ export class TrackService {
 		return result;
 	}
 
-	async remove(id: string) {
-		await this.trackRepo.delete(id);
-		// xoa con
-	}
+	// async remove(id: string) {
+	// 	await this.trackRepo.delete(id);
+	// 	// xoa con
+	// }
 }

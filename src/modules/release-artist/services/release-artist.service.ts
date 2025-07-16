@@ -103,6 +103,14 @@ export class ReleaseArtistService {
 		return await this.findOne(id);
 	}
 
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		await this.releaseArtistRepo.delete({ releaseId });
+	}
+
 	async remove(id: string): Promise<void> {
 		await this.releaseArtistRepo.delete(id);
 	}

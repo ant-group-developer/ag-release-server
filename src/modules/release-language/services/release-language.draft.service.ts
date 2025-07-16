@@ -103,4 +103,12 @@ export class ReleaseLanguageDraftService {
 			result,
 		);
 	}
+
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		await this.releaseLanguageRepo.delete({ releaseId });
+	}
 }

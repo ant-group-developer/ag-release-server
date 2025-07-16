@@ -15,6 +15,8 @@ import {
 	OneToOne,
 } from 'typeorm';
 
+import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
 
 @Entity('tracks')
@@ -101,6 +103,14 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@OneToOne(() => AudioFile, (audioFile) => audioFile.track)
 	audioFile: AudioFile;
+
+	@ManyToOne(() => TrackType)
+	@JoinColumn({ name: 'track_type_id' })
+	trackType: TrackType | null;
+
+	@ManyToOne(() => TrackOriginType)
+	@JoinColumn({ name: 'track_origin_type_id' })
+	trackOriginType: TrackOriginType | null;
 }
 
 // @Entity('tracks')

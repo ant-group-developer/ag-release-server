@@ -107,7 +107,7 @@ export class TrackArtistController {
 		description: TrackArtistMessageSuccess.DELETE,
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.trackArtistService.remove(id);
+		await this.trackArtistService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TrackArtistMessageCodeSuccess.DELETE,
 		});

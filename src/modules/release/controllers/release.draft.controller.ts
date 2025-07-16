@@ -1,14 +1,18 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Param,
 	ParseUUIDPipe,
 	Post,
 	Put,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
-import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
+import {
+	ReleaseMessageCodeSuccess,
+	ReleaseMessageSuccess,
+} from '../constants/release.constant';
 
 import {
 	CreateReleaseDraftDto,
@@ -43,6 +47,19 @@ export class ReleaseDraftController {
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
+		});
+	}
+
+	@Delete(':id')
+	@ApiOperation({ summary: 'Delete a release by ID' })
+	@ApiResponse({
+		status: 200,
+		description: ReleaseMessageSuccess.DELETE,
+	})
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.releaseDraftService.mainDelete(id);
+		return new ResponseSuccess({
+			messageCode: ReleaseMessageCodeSuccess.DELETE,
 		});
 	}
 }

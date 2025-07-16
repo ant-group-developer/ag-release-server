@@ -3,9 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QueryGetListCountryDto } from '../dto/country.dto';
 import { Country } from '../entities/country.entity';
+import { IContinentWithCountries } from '../interfaces/country.interface';
 
 @Injectable()
-export class CountryQbService {
+export class CountryQueryService {
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
@@ -59,5 +60,34 @@ export class CountryQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async getListContinent(): Promise<IContinentWithCountries[]> {
+		const result: IContinentWithCountries[] = [];
+
+		const countries = await this.countryRepo
+			.createQueryBuilder('country')
+			.select(['country.continent AS continent', 'country.name AS name'])
+			.orderBy('country.continent')
+			.addOrderBy('country.name')
+			.getRawMany<{ continent: string; name: string }>();
+
+		const map = new Map<string, string[]>();
+
+		for (const { continent, name } of countries) {
+			if (!map.has(continent)) {
+				map.set(continent, []);
+			}
+			map.get(continent)!.push(name);
+		}
+
+		for (const [continent, countryList] of map.entries()) {
+			result.push({
+				continentName: continent,
+				countries: countryList,
+			});
+		}
+
+		return result;
 	}
 }

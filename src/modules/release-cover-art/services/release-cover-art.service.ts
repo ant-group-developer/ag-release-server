@@ -88,7 +88,11 @@ export class ReleaseCoverArtService {
 		await this.releaseCoverArtRepo.delete(id);
 	}
 
-	async deleteListArtOfRelease(releaseId: string) {
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
 		await this.releaseCoverArtRepo.delete({ releaseId });
 	}
 }

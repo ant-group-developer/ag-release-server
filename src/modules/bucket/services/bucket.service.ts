@@ -92,7 +92,7 @@ export class BucketService {
 		});
 	}
 
-	async remove(id: string) {
+	async delete(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
 		await this.bucketGcsService.delete({
 			isPublic: false,

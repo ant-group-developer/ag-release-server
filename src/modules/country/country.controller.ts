@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -48,6 +49,14 @@ export class CountryController {
 		});
 	}
 
+	@Get('continents')
+	async getListContinent() {
+		const result = await this.countryService.getListContinent();
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get a country by ID' })
 	@ApiResponse({
@@ -55,7 +64,9 @@ export class CountryController {
 		description: 'Successfully retrieved country',
 	})
 	@ApiResponse({ status: 404, description: CountryMessageError.NOT_FOUND })
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Country>> {
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -86,7 +97,7 @@ export class CountryController {
 		description: CountryMessageError.DUPLICATE_NAME_COUNTRY,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateCountryDto: UpdateCountryDto,
 	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.update(id, updateCountryDto);
@@ -99,7 +110,9 @@ export class CountryController {
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a country by ID' })
 	@ApiResponse({ status: 200, description: CountryMessageSuccess.DELETE })
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+	async remove(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
 		await this.countryService.remove(id);
 		return new ResponseSuccess({
 			messageCode: CountryMessageCodeSuccess.DELETE,

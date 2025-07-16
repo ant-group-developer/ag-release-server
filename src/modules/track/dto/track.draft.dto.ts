@@ -75,7 +75,7 @@ export class CreateTrackDraftDto {
 	@IsNotEmpty()
 	@ValidateNested()
 	@Type(() => CreateAudioFileDraftDto)
-	audioFileDraft?: Omit<CreateAudioFileDraftDto, 'trackId'>;
+	audioFileDraft?: CreateAudioFileDraftDto;
 }
 
 export class BulkCreateTrackDraft {

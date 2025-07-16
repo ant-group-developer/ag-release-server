@@ -65,7 +65,7 @@ export class AudioFileDraftService {
 				fileId,
 			});
 
-			await this.bucketService.remove(audioFile.fileId);
+			await this.bucketService.delete(audioFile.fileId);
 		}
 
 		if (peakId && peakId !== audioFile.peakId) {
@@ -73,7 +73,7 @@ export class AudioFileDraftService {
 				peakId,
 			});
 
-			await this.bucketService.remove(audioFile.fileId);
+			await this.bucketService.delete(audioFile.fileId);
 		}
 
 		await this.audioFileRepo.update(audioFileId, restOfDataUpdate);
@@ -87,5 +87,26 @@ export class AudioFileDraftService {
 		}
 
 		return this.audioFileValidateService.ensureDraftAudioFile(result);
+	}
+
+	// delete
+	async deleteRecordOfTrack({ trackId }: { trackId: string }) {
+		const audioFileOfTrack =
+			await this.audioFileQueryService.getAudioFileOfTrack({
+				trackId,
+			});
+
+		await this.mainDelete(audioFileOfTrack.id);
+	}
+
+	async deleteAudioAndPeak(audioFile: AudioFile) {
+		await this.bucketService.delete(audioFile.fileId);
+		await this.bucketService.delete(audioFile.peakId);
+	}
+
+	async mainDelete(id: string) {
+		const audioFile = await this.audioFileQueryService.findOne(id);
+		await this.audioFileRepo.delete(id);
+		await this.deleteAudioAndPeak(audioFile);
 	}
 }

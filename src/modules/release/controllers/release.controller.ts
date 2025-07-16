@@ -1,7 +1,6 @@
 import {
 	Body,
 	Controller,
-	Delete,
 	Get,
 	Param,
 	ParseUUIDPipe,
@@ -119,19 +118,6 @@ export class ReleaseController {
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
-		});
-	}
-
-	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a release by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseMessageSuccess.DELETE,
-	})
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseService.remove(id);
-		return new ResponseSuccess({
-			messageCode: ReleaseMessageCodeSuccess.DELETE,
 		});
 	}
 }

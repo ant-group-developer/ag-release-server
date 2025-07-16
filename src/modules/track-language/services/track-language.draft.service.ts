@@ -106,4 +106,8 @@ export class TrackLanguageDraftService {
 			result,
 		);
 	}
+
+	async deleteRecordOfTrack({ trackId }: { trackId: string }): Promise<void> {
+		await this.trackLanguageRepo.delete({ trackId });
+	}
 }

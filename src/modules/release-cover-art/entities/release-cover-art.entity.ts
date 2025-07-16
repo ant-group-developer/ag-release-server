@@ -1,3 +1,4 @@
+import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
 
@@ -6,17 +7,17 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('release_cover_art')
 export class ReleaseCoverArt extends BaseUUIDEntity {
-	@Column({ type: 'uuid' })
-	fileId: string;
+	@Column({ type: 'uuid', nullable: true, comment: COMMENT_FOR_NULLABLE })
+	fileId: string | null;
 
 	@Column({ type: 'uuid' })
 	releaseId: string;
 
-	@Column({ type: 'int' })
-	width: number;
+	@Column({ type: 'int', nullable: true, comment: COMMENT_FOR_NULLABLE })
+	width: number | null;
 
-	@Column({ type: 'int' })
-	height: number;
+	@Column({ type: 'int', nullable: true, comment: COMMENT_FOR_NULLABLE })
+	height: number | null;
 
 	@Column({
 		type: 'varchar',

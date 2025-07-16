@@ -123,7 +123,9 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect(
 				'releaseLanguage.metadataLanguage',
 				'metadataLanguage',
-			);
+			)
+
+			.leftJoinAndSelect('release.timeZone', 'timeZone');
 
 		query.where('release.id = :id', {
 			id,

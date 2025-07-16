@@ -101,7 +101,11 @@ export class TrackArtistService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
 		await this.trackArtistRepo.delete(id);
+	}
+
+	async deleteRecordOfTrack({ trackId }: { trackId: string }): Promise<void> {
+		await this.trackArtistRepo.delete({ trackId });
 	}
 }

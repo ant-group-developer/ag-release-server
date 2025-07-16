@@ -5,6 +5,7 @@ import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Release } from '../release/entities/release.entity';
 import { TrackArtist } from '../track-artist/entities/track-artist.entity';
+import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackOriginType } from '../track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from '../track-type/entities/track-type.entity';
@@ -29,6 +30,7 @@ import { TrackValidateService } from './services/track.validate.service';
 		BucketModule,
 		AudioFileModule,
 		TrackLanguageModule,
+		TrackArtistModule,
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [
@@ -37,5 +39,6 @@ import { TrackValidateService } from './services/track.validate.service';
 		TrackValidateService,
 		TrackQueryService,
 	],
+	exports: [TrackDraftService],
 })
 export class TrackModule {}

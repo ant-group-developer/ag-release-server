@@ -146,15 +146,6 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	pLineOwner?: string | null;
 
 	@IsOptional()
-	@Transform(({ value }: { value: string | undefined }) =>
-		value ? new Date(value) : undefined,
-	)
-	@IsDate()
-	releaseDate?: Date | null;
-
-	// @ValidateIf((_, value) => value !== undefined)
-	// @IsNotEmpty()
-	@IsOptional()
 	@ValidateNested()
 	@Type(() => CreateReleaseCoverArtDto)
 	releaseCoverArt?: CreateReleaseCoverArtDto | null;

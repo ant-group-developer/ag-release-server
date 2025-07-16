@@ -139,10 +139,6 @@ export class ReleaseService {
 		return await this.releaseQueryService.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		await this.releaseRepo.delete(id);
-	}
-
 	private async getCoverArtThumbnails(
 		coverArts: ReleaseCoverArt[],
 	): Promise<ICoverArtThumbnails> {
@@ -167,7 +163,9 @@ export class ReleaseService {
 				].includes(coverArt.type)
 			) {
 				result[coverArt.type as keyof ICoverArtThumbnails] =
-					await this.bucketService.getUrlRead(coverArt.fileId);
+					coverArt.fileId
+						? await this.bucketService.getUrlRead(coverArt.fileId)
+						: null;
 			}
 		}
 

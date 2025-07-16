@@ -5,11 +5,13 @@ import sharp from 'sharp';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { ReleaseCoverArtSize } from 'src/modules/release-cover-art/enum/release-cover-art.enum';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
+import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
 import { Repository } from 'typeorm';
 import {
 	CreateReleaseDraftDto,
@@ -31,6 +33,8 @@ export class ReleaseDraftService {
 		private readonly releaseCoverArtService: ReleaseCoverArtService,
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
 		private readonly bucketService: BucketService,
+		private readonly releaseArtistService: ReleaseArtistService,
+		private readonly trackDraftService: TrackDraftService,
 	) {}
 
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
@@ -63,8 +67,6 @@ export class ReleaseDraftService {
 		data: UpdateReleaseDraftDto,
 	): Promise<IReleaseDraft> {
 		const { releaseCoverArt, releaseLanguage, ...restOfData } = data;
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			restOfData;
 
 		const release = await this.releaseQueryService.findOne(id);
 
@@ -73,6 +75,31 @@ export class ReleaseDraftService {
 				message: 'Error release.status',
 			});
 		}
+
+		await this.handleValidateDataUpdate({ release, dataUpdate: data });
+
+		//
+		await this.updateSubEntities({
+			release,
+			releaseLanguage,
+			releaseCoverArt,
+		});
+
+		await this.releaseRepo.update(id, restOfData);
+		const result = await this.releaseQueryService.getOneDetail(id);
+
+		return this.releaseValidateService.ensureDraftRelease(result);
+	}
+
+	private async handleValidateDataUpdate({
+		release,
+		dataUpdate,
+	}: {
+		release: Release;
+		dataUpdate: UpdateReleaseDraftDto;
+	}) {
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			dataUpdate;
 
 		if (labelId && labelId !== release.labelId) {
 			await this.releaseValidateService.validate({
@@ -100,18 +127,6 @@ export class ReleaseDraftService {
 				releaseTimezoneId,
 			});
 		}
-
-		//
-		await this.updateSubEntities({
-			release,
-			releaseLanguage,
-			releaseCoverArt,
-		});
-
-		await this.releaseRepo.update(id, restOfData);
-		const result = await this.releaseQueryService.getOneDetail(id);
-
-		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 
 	private async createSubEntities(releaseId: string) {
@@ -227,5 +242,26 @@ export class ReleaseDraftService {
 		result[ReleaseCoverArtSize.ORIGINAL] = fileId;
 
 		return result;
+	}
+
+	async mainDelete(id: string): Promise<void> {
+		await this.deleteRelatedRecords({ releaseId: id });
+		await this.releaseRepo.delete(id);
+	}
+
+	private async deleteRelatedRecords({ releaseId }: { releaseId: string }) {
+		await this.releaseArtistService.deleteRecordOfRelease({
+			releaseId,
+		});
+
+		await this.releaseLanguageDraftService.deleteRecordOfRelease({
+			releaseId,
+		});
+
+		await this.releaseCoverArtService.deleteRecordOfRelease({
+			releaseId,
+		});
+
+		await this.trackDraftService.deleteRecordOfRelease({ releaseId });
 	}
 }

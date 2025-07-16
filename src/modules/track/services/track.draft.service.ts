@@ -13,6 +13,7 @@ import { ITrackDraft } from '../interfaces/track.interface';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
@@ -33,6 +34,7 @@ export class TrackDraftService {
 		private readonly trackQueryService: TrackQueryService,
 		private readonly audioFileDraftService: AudioFileDraftService,
 		private readonly trackLanguageDraftService: TrackLanguageDraftService,
+		private readonly trackArtistService: TrackArtistService,
 	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
@@ -72,6 +74,7 @@ export class TrackDraftService {
 		return result;
 	}
 
+	// update
 	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
 		for (const track of trackDrafts) {
@@ -89,48 +92,11 @@ export class TrackDraftService {
 			...restOfTrack
 		} = data;
 
-		const {
-			// releaseId,
-			primaryGenreId,
-			subGenreId,
-			trackOriginTypeId,
-			trackTypeId,
-		} = restOfTrack;
-
 		const track = await this.trackQueryService.getDetail(id);
-
-		// if (releaseId && releaseId !== track.releaseId) {
-		// 	await this.trackValidateService.validate({
-		// 		releaseId,
-		// 	});
-		// }
-
-		if (primaryGenreId && primaryGenreId !== track.primaryGenreId) {
-			await this.trackValidateService.validate({
-				primaryGenreId,
-			});
-		}
-
-		if (subGenreId && subGenreId !== track.subGenreId) {
-			await this.trackValidateService.validate({
-				subGenreId,
-			});
-		}
-
-		if (
-			trackOriginTypeId &&
-			trackOriginTypeId !== track.trackOriginTypeId
-		) {
-			await this.trackValidateService.validate({
-				trackOriginTypeId,
-			});
-		}
-
-		if (trackTypeId && trackTypeId !== track.trackTypeId) {
-			await this.trackValidateService.validate({
-				trackTypeId,
-			});
-		}
+		await this.handleValidateDataUpdate({
+			trackDb: track,
+			dataUpdate: data,
+		});
 
 		// language
 		if (trackLanguage) {
@@ -169,7 +135,45 @@ export class TrackDraftService {
 		return this.trackValidateService.ensureDraftTrack(result);
 	}
 
-	async copyArtistFromRelease({
+	private async handleValidateDataUpdate({
+		trackDb,
+		dataUpdate,
+	}: {
+		trackDb: Track;
+		dataUpdate: UpdateTrackDraftDto;
+	}) {
+		const { primaryGenreId, subGenreId, trackOriginTypeId, trackTypeId } =
+			dataUpdate;
+
+		if (primaryGenreId && primaryGenreId !== trackDb.primaryGenreId) {
+			await this.trackValidateService.validate({
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId && subGenreId !== trackDb.subGenreId) {
+			await this.trackValidateService.validate({
+				subGenreId,
+			});
+		}
+
+		if (
+			trackOriginTypeId &&
+			trackOriginTypeId !== trackDb.trackOriginTypeId
+		) {
+			await this.trackValidateService.validate({
+				trackOriginTypeId,
+			});
+		}
+
+		if (trackTypeId && trackTypeId !== trackDb.trackTypeId) {
+			await this.trackValidateService.validate({
+				trackTypeId,
+			});
+		}
+	}
+
+	private async copyArtistFromRelease({
 		releaseId,
 		trackId,
 	}: {
@@ -201,5 +205,31 @@ export class TrackDraftService {
 
 			await this.trackArtistRepo.save(trackArtistEntities);
 		}
+	}
+
+	//delete
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		const tracks = await this.trackQueryService.getTracksOfRelease({
+			releaseId,
+		});
+
+		for (const track of tracks) {
+			await this.mainDelete(track.id);
+		}
+	}
+
+	async mainDelete(id: string) {
+		await this.deleteRelatedRecords({ trackId: id });
+		await this.trackRepo.delete(id);
+	}
+
+	private async deleteRelatedRecords({ trackId }: { trackId: string }) {
+		await this.audioFileDraftService.deleteRecordOfTrack({ trackId });
+		await this.trackArtistService.deleteRecordOfTrack({ trackId });
+		await this.trackLanguageDraftService.deleteRecordOfTrack({ trackId });
 	}
 }

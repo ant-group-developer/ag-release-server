@@ -63,9 +63,6 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'enum', enum: ReleaseType })
 	type: ReleaseType;
 
-	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
-	releaseTimezoneId: string | null;
-
 	@Column({
 		type: 'varchar',
 		length: 200,
@@ -90,6 +87,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		nullable: true,
 	})
 	catalogId: string | null;
+
+	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
+	releaseTimezoneId: string | null;
 
 	@Column({ type: 'date', comment: COMMENT_FOR_NULLABLE, nullable: true })
 	releaseDate: Date | null;

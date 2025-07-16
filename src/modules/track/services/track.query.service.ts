@@ -62,6 +62,13 @@ export class TrackQueryService {
 			'audioLanguage',
 		);
 
+		queryBuilder.leftJoinAndSelect('track.trackType', 'trackType');
+
+		queryBuilder.leftJoinAndSelect(
+			'track.trackOriginType',
+			'trackOriginType',
+		);
+
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
 				keyword: `%${keyword}%`,
@@ -161,5 +168,9 @@ export class TrackQueryService {
 		}
 
 		return track;
+	}
+
+	async getTracksOfRelease({ releaseId }: { releaseId: string }) {
+		return this.trackRepo.find({ where: { releaseId } });
 	}
 }

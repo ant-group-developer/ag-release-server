@@ -124,3 +124,77 @@ vs
 		}
 	}
 }
+
+
+[
+	{
+		ten chau luc: string,
+		countries: []
+	}
+]
+
+{
+    "statusCode": 200,
+    "message": "Success",
+    "messageCode": "success",
+    "data": {
+        "id": "ydbKjo4bsq",
+        "createdAt": "2025-07-09T03:37:05.131Z",
+        "updatedAt": "2025-07-09T03:37:05.131Z",
+        "title": "Con mua ngang qua",
+        "version": null,
+        "isrc": null,
+        "iswc": null,
+        "releaseId": "ef4ca945-ca1f-4fde-9455-f3f5e6cb4d70",
+        "pLineOwner": null,
+        "primaryGenreId": null,
+        "subGenreId": null,
+        "order": 0,
+        "trackTypeId": "d6fca634-6974-436b-8cce-8f655ada1d33",
+        "trackOriginTypeId": "5b036eba-8a3c-48e1-b218-c2b9f9c784b4",
+        "isSensitiveContent": null,
+        "lyric": null,
+        "trackArtists": [],
+        "trackLanguage": null,
+        "audioFile": {
+            "id": "6f224dac-6ae7-485a-97c2-4c514106e271",
+            "createdAt": "2025-07-09T03:39:12.856Z",
+            "updatedAt": "2025-07-09T03:39:12.856Z",
+            "sampleRate": "44100",
+            "bitrate": null,
+            "bitDepth": 16,
+            "duration": 180,
+            "hook": 30,
+            "preview": null,
+            "trackId": "ydbKjo4bsq",
+            "fileId": "76786a5c-dd99-4568-82ca-2f3e8e651840",
+            "peakId": "99f6dd87-c385-4457-8909-441e2efb8992",
+            "file": {
+                "id": "76786a5c-dd99-4568-82ca-2f3e8e651840",
+                "createdAt": "2025-07-09T03:30:43.763Z",
+                "updatedAt": "2025-07-09T03:34:53.590Z",
+                "isSubmitted": true,
+                "fileName": "20250709103043_conmuangangqua.mp3",
+                "key": "tracks/audio/20250709103043_conmuangangqua.mp3",
+                "contentType": "audio/mpeg",
+                "extension": "mp3",
+                "fileSize": "5120000",
+                "bucket": "ant-music-assets-protected",
+                "urlRead": "https://storage.googleapis.com/ant-music-assets-protected/tracks/audio/20250709103043_conmuangangqua.mp3?GoogleAccessId=vinctuan02%40antmusic-381907.iam.gserviceaccount.com&Expires=1752665564&Signature=hXRrkKS1R32nKcdUyUF3BpUEuAWlK9uUCctdgqfaNaMK%2BDm8JVUwikTdOJQIGoUFOGkiNTxaxPbYN9RrN1n8rFuo2TbqgrzuiNcHqS2T30FvGEJ5Ru2OQj6PMCVaVsDAYKGUKTREU7hw9mUmEjIyQ7KONYc4GJ%2BtyH8nSkm8rJQ0VYcrQ02jFfyiHoNxyyUSz%2FvXC8%2FMbp4jPNeSDqerc%2F34faRcLyzqKw1Qo90GtkZPyVm%2BkgPRItiP6x3vmJYQQsuxwoMO5ueM582AVe%2BqR9uPab2wvSri5GnEO%2BScIBI7rhgNvaOJh%2Byo0qbV%2F11u2SRxWe3%2FCRNOVmNH7w%2BDLg%3D%3D"
+            },
+            "peak": {
+                "id": "99f6dd87-c385-4457-8909-441e2efb8992",
+                "createdAt": "2025-07-09T03:30:43.778Z",
+                "updatedAt": "2025-07-09T03:34:53.773Z",
+                "isSubmitted": true,
+                "fileName": "20250709103043_conmuangangqua.json",
+                "key": "tracks/peak/20250709103043_conmuangangqua.json",
+                "contentType": "application/json",
+                "extension": "json",
+                "fileSize": "18000",
+                "bucket": "ant-music-assets-protected",
+                "urlRead": "https://storage.googleapis.com/ant-music-assets-protected/tracks/peak/20250709103043_conmuangangqua.json?GoogleAccessId=vinctuan02%40antmusic-381907.iam.gserviceaccount.com&Expires=1752665564&Signature=YD%2B3D%2BcxS2ZRPwBPX0BIRcuDRY7ZbYHJGMmPVYjleyRgfiNSvPN0ryd1RaPBgMYppcP73d5BurJfwMwal8318kwSVCO28RQoBRwpvslYlX8SOxUpW3AKwTT7HuLJJp%2B%2BwXcCfejw1LSRUMEGOZg0mIei3lvRuedsRed%2FVb7OE7%2Fe3yk2hF5yrVSLgE43NPFuM8ebLD9NqCMLXw0gGYATg0x%2B7qq2XJySxE37TlxH6mvd84AQz%2BdZtgpJ7LD%2B61XiONCeztjg7jENRLqnZpzYgjM%2F8k%2FC5gxqniWDB8%2FD6O0lypiz6AUB5D8KCIajAxVBGd%2FA4t8NCaDTkYw5icLhOA%3D%3D"
+            }
+        }
+    }
+}

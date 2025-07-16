@@ -14,5 +14,6 @@ import { TrackArtistController } from './track-artist.controller';
 	],
 	controllers: [TrackArtistController],
 	providers: [TrackArtistService, TrackArtistValidateService],
+	exports: [TrackArtistService],
 })
 export class TrackArtistModule {}
