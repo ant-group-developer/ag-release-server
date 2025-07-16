@@ -10,10 +10,12 @@ import {
 import { Track } from '../entities/track.entity';
 import { ITrackDraft } from '../interfaces/track.interface';
 
+import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
+import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
@@ -38,7 +40,8 @@ export class TrackDraftService {
 	) {}
 
 	async create(data: CreateTrackDraftDto): Promise<ITrackDraft> {
-		const { releaseId, primaryGenreId, subGenreId, audioFileDraft } = data;
+		const { audioFileDraft, ...restOfData } = data;
+		const { releaseId, primaryGenreId, subGenreId } = restOfData;
 
 		await this.trackValidateService.validate({
 			releaseId,
@@ -47,22 +50,31 @@ export class TrackDraftService {
 		});
 
 		const track = this.trackRepo.create(data);
-		const result = await this.trackRepo.save(track);
+		const trackDb = await this.trackRepo.save(track);
 
-		// create audioFile
-		if (audioFileDraft) {
-			await this.audioFileDraftService.create({
-				...audioFileDraft,
-				trackId: track.id,
-			});
-		}
-
-		// create trackLanguage
-		await this.trackLanguageDraftService.create({
+		await this.createSubEntities({
 			trackId: track.id,
+			audioFile: audioFileDraft,
 		});
 
-		return this.trackValidateService.ensureDraftTrack(result);
+		return this.trackValidateService.ensureDraftTrack(trackDb);
+	}
+
+	private async createSubEntities({
+		trackId,
+		audioFile,
+	}: {
+		trackId: string;
+		audioFile: CreateAudioFileDraftDto;
+	}) {
+		await this.audioFileDraftService.create({
+			...audioFile,
+			trackId,
+		});
+
+		await this.trackLanguageDraftService.create({
+			trackId,
+		});
 	}
 
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
@@ -93,41 +105,18 @@ export class TrackDraftService {
 		} = data;
 
 		const track = await this.trackQueryService.getDetail(id);
+
 		await this.handleValidateDataUpdate({
 			trackDb: track,
 			dataUpdate: data,
 		});
 
-		// language
-		if (trackLanguage) {
-			if (track.trackLanguage?.id) {
-				await this.trackLanguageDraftService.update({
-					id: track.trackLanguage.id,
-					dataUpdate: trackLanguage,
-				});
-			} else {
-				await this.trackLanguageDraftService.create({
-					...trackLanguage,
-					trackId: track.id,
-				});
-			}
-		}
-
-		//
-		if (copyArtistsFromRelease) {
-			await this.copyArtistFromRelease({
-				releaseId: track.releaseId,
-				trackId: track.id,
-			});
-		}
-
-		//
-		if (audioFile) {
-			await this.audioFileDraftService.update({
-				audioFileId: track.audioFile.id,
-				dataUpdate: audioFile,
-			});
-		}
+		await this.updateSubEntities({
+			track,
+			copyArtistsFromRelease,
+			audioFile,
+			trackLanguage,
+		});
 
 		await this.trackRepo.update(id, restOfTrack);
 		const result = await this.trackQueryService.getDetail(id);
@@ -169,6 +158,52 @@ export class TrackDraftService {
 		if (trackTypeId && trackTypeId !== trackDb.trackTypeId) {
 			await this.trackValidateService.validate({
 				trackTypeId,
+			});
+		}
+	}
+
+	private async updateSubEntities({
+		track,
+		trackLanguage,
+		audioFile,
+		copyArtistsFromRelease,
+	}: {
+		track: Track;
+		trackLanguage?: UpdateTrackLanguageDraftDto;
+		audioFile?: {
+			preview?: number;
+			file?: {
+				fileName: string;
+			};
+		};
+		copyArtistsFromRelease?: boolean;
+	}) {
+		if (trackLanguage) {
+			if (track.trackLanguage?.id) {
+				await this.trackLanguageDraftService.update({
+					id: track.trackLanguage.id,
+					dataUpdate: trackLanguage,
+				});
+			} else {
+				await this.trackLanguageDraftService.create({
+					...trackLanguage,
+					trackId: track.id,
+				});
+			}
+		}
+
+		if (audioFile) {
+			await this.audioFileDraftService.update({
+				audioFileId: track.audioFile.id,
+				dataUpdate: audioFile,
+			});
+		}
+
+		//
+		if (copyArtistsFromRelease) {
+			await this.copyArtistFromRelease({
+				releaseId: track.releaseId,
+				trackId: track.id,
 			});
 		}
 	}

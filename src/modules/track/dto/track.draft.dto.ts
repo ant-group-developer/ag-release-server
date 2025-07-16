@@ -75,7 +75,7 @@ export class CreateTrackDraftDto {
 	@IsNotEmpty()
 	@ValidateNested()
 	@Type(() => CreateAudioFileDraftDto)
-	audioFileDraft?: CreateAudioFileDraftDto;
+	audioFileDraft: CreateAudioFileDraftDto;
 }
 
 export class BulkCreateTrackDraft {
@@ -130,21 +130,12 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	title?: string;
 
 	@IsOptional()
-	@ValidateNested()
-	@Type(() => UpdateTrackLanguageDraftDto)
-	trackLanguage?: UpdateTrackLanguageDraftDto;
-
-	@IsOptional()
 	@IsUUID()
 	trackOriginTypeId?: string;
 
 	@IsOptional()
 	@IsUUID()
 	trackTypeId?: string;
-
-	@IsOptional()
-	@IsBoolean()
-	copyArtistsFromRelease?: boolean;
 
 	@IsOptional()
 	@IsBoolean()
@@ -155,8 +146,18 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@MaxLength(5000)
 	lyric?: string;
 
+	//
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateTrackLanguageDraftDto)
+	trackLanguage?: UpdateTrackLanguageDraftDto;
+
 	@IsOptional()
 	@ValidateNested()
 	@Type(() => AudioFile)
 	audioFile?: AudioFile;
+
+	@IsOptional()
+	@IsBoolean()
+	copyArtistsFromRelease?: boolean;
 }
