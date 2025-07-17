@@ -8,6 +8,7 @@ import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { ReleaseCoverArtSize } from 'src/modules/release-cover-art/enum/release-cover-art.enum';
+import { ICreateReleaseCoverArt } from 'src/modules/release-cover-art/interface/release-cover-art.interface';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
@@ -67,13 +68,13 @@ export class ReleaseDraftService {
 	}
 
 	private async createSubEntities(releaseId: string) {
-		await this.releaseCoverArtService.bulkCreate([
-			{ releaseId, type: '75x75' },
-			{ releaseId, type: '100x100' },
-			{ releaseId, type: '160x160' },
-			{ releaseId, type: '300x300' },
-			{ releaseId, type: 'original' },
-		]);
+		// await this.releaseCoverArtService.bulkCreate([
+		// 	{ releaseId, type: '75x75' },
+		// 	{ releaseId, type: '100x100' },
+		// 	{ releaseId, type: '160x160' },
+		// 	{ releaseId, type: '300x300' },
+		// 	{ releaseId, type: 'original' },
+		// ]);
 
 		await this.releaseLanguageDraftService.create({
 			releaseId,
@@ -106,7 +107,7 @@ export class ReleaseDraftService {
 
 		await this.handleValidateDataUpdate({ release, dataUpdate: data });
 
-		//
+		// subEntities
 		await this.updateSubEntities({
 			release,
 			releaseLanguage,
@@ -169,6 +170,8 @@ export class ReleaseDraftService {
 		releaseCoverArt?: CreateReleaseCoverArtDto | null;
 		releaseTerritory?: UpdateReleaseTerritoryDto;
 	}) {
+		const releaseId = release.id;
+
 		if (releaseLanguage) {
 			if (release.releaseLanguage?.id) {
 				await this.releaseLanguageDraftService.update({
@@ -177,7 +180,7 @@ export class ReleaseDraftService {
 				});
 			} else {
 				await this.releaseLanguageDraftService.create({
-					releaseId: release.id,
+					releaseId,
 					...releaseLanguage,
 				});
 			}
@@ -192,37 +195,67 @@ export class ReleaseDraftService {
 			} else {
 				await this.releaseTerritoryService.create({
 					...releaseTerritory,
-					releaseId: release.id,
+					releaseId,
 				});
 			}
 		}
 
-		if (releaseCoverArt) {
-			// const listCoverArts = await this.genListCoverArt(
-			// 	releaseCoverArt.fileId,
-			// );
-			// const coverArtEntities: ICreateReleaseCoverArt[] = Object.entries(
-			// 	listCoverArts,
-			// ).map(([size, fileId]) => {
-			// 	const [widthStr, heightStr] =
-			// 		size === 'original' ? ['0', '0'] : size.split('x');
-			// 	return {
-			// 		releaseId: release.id,
-			// 		fileId,
-			// 		width: Number(widthStr),
-			// 		height: Number(heightStr),
-			// 		type: size,
-			// 	};
-			// });
-			// await this.releaseCoverArtService.bulkCreate(coverArtEntities);
+		if (releaseCoverArt?.fileId !== undefined) {
+			// delete
+			if (releaseCoverArt.fileId === null) {
+				await this.releaseCoverArtService.deleteRecordOfRelease({
+					releaseId,
+				});
+			}
+
+			// update
+			if (releaseCoverArt.fileId) {
+				await this.releaseCoverArtService.deleteRecordOfRelease({
+					releaseId,
+				});
+
+				const coverArtEntities = await this.getCoverArtEntities({
+					fileId: releaseCoverArt.fileId,
+					releaseId,
+				});
+
+				await this.releaseCoverArtService.bulkCreate(coverArtEntities);
+			}
 		}
+	}
+
+	private async getCoverArtEntities({
+		fileId,
+		releaseId,
+	}: {
+		fileId: string;
+		releaseId: string;
+	}) {
+		const listCoverArts = await this.genListCoverArt(fileId);
+
+		const result: ICreateReleaseCoverArt[] = Object.entries(
+			listCoverArts,
+		).map(([size, fileId]) => {
+			const [widthStr, heightStr] =
+				size === 'original' ? ['1080', '1080'] : size.split('x');
+			return {
+				releaseId,
+				fileId,
+				width: Number(widthStr),
+				height: Number(heightStr),
+				type: size,
+			};
+		});
+
+		return result;
 	}
 
 	private async genListCoverArt(
 		fileId: string,
 	): Promise<Record<ReleaseCoverArtSize, string>> {
 		// 1. Lấy ảnh gốc dạng buffer
-		const originalBuffer = await this.bucketService.getFileBuffer(fileId);
+		const { buffet: originalBuffer, fileName } =
+			await this.bucketService.getFileBufferAndFileName(fileId);
 
 		// 2. Danh sách size cần xử lý (ngoại trừ 'original')
 		const resizeSizes = [
@@ -250,7 +283,7 @@ export class ReleaseDraftService {
 				uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
 				key: size,
 				file: {
-					fileName: `${fileId}_${size}.jpg`,
+					fileName: `${fileName}_${size}.jpg`,
 					contentType: 'image/jpeg',
 					extension: 'jpg',
 					fileSize: resizedBuffers[size].length,
@@ -287,18 +320,11 @@ export class ReleaseDraftService {
 	}
 
 	private async deleteRelatedRecords({ releaseId }: { releaseId: string }) {
-		await this.releaseArtistService.deleteRecordOfRelease({
-			releaseId,
-		});
-
 		await this.releaseLanguageDraftService.deleteRecordOfRelease({
 			releaseId,
 		});
-
-		await this.releaseCoverArtService.deleteRecordOfRelease({
-			releaseId,
-		});
-
+		await this.releaseArtistService.deleteRecordOfRelease({ releaseId });
+		await this.releaseCoverArtService.deleteRecordOfRelease({ releaseId });
 		await this.trackDraftService.deleteRecordOfRelease({ releaseId });
 		await this.releaseTerritoryService.deleteRecordOfRelease({ releaseId });
 	}

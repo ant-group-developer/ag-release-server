@@ -126,7 +126,7 @@ export class BucketGcsService {
 				return `tracks/peak`;
 
 			case UploadPurpose.RELEASE_COVER_ART:
-				return `release_cover_art`;
+				return `release_cover_art_test`;
 
 			default:
 				return `unknown`;

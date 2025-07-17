@@ -1,8 +1,8 @@
 export interface ICreateReleaseCoverArt {
 	releaseId: string;
-	fileId?: string;
-	width?: number;
-	height?: number;
+	fileId: string;
+	width: number;
+	height: number;
 	type: string;
 }
 

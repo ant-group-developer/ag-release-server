@@ -145,7 +145,9 @@ export class BucketService {
 		};
 	}
 
-	async getFileBuffer(fileId: string): Promise<Buffer> {
+	async getFileBufferAndFileName(
+		fileId: string,
+	): Promise<{ buffet: Buffer; fileName: string }> {
 		const fileDb = await this.bucketFileService.findOne(fileId);
 
 		const fileGcs = await this.bucketGcsService.findOne({
@@ -154,7 +156,10 @@ export class BucketService {
 		});
 
 		const [contents] = await fileGcs.download();
-		return contents;
+		return {
+			buffet: contents,
+			fileName: fileDb.fileName,
+		};
 	}
 
 	// public

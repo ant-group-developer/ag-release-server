@@ -1,20 +1,19 @@
-import { IsInt, IsNotEmpty, IsUUID, Max } from 'class-validator';
-import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 
 export class CreateReleaseCoverArtDto {
 	@IsNotEmpty()
 	@IsUUID()
 	fileId: string;
 
-	@IsNotEmpty()
-	@IsInt()
-	@Max(MAX_INTEGER)
-	width: number;
+	// @IsNotEmpty()
+	// @IsInt()
+	// @Max(MAX_INTEGER)
+	// width: number;
 
-	@IsNotEmpty()
-	@IsInt()
-	@Max(MAX_INTEGER)
-	height: number;
+	// @IsNotEmpty()
+	// @IsInt()
+	// @Max(MAX_INTEGER)
+	// height: number;
 }
 
 // export class UpdateReleaseCoverArtDto extends PartialType(
