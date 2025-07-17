@@ -39,7 +39,7 @@ export class ReleaseDraftService {
 		private readonly releaseArtistService: ReleaseArtistService,
 		private readonly trackDraftService: TrackDraftService,
 		private readonly releaseTerritoryService: ReleaseTerritoryService,
-	) {}
+	) { }
 
 	// create
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
@@ -234,7 +234,7 @@ export class ReleaseDraftService {
 		fileId: string;
 		releaseId: string;
 	}) {
-		const listCoverArts = await this.genListCoverArt(fileId);
+		const listCoverArts = await this.genListCoverArt(fileId, releaseId);
 
 		const result: ICreateReleaseCoverArt[] = Object.entries(
 			listCoverArts,
@@ -255,6 +255,7 @@ export class ReleaseDraftService {
 
 	private async genListCoverArt(
 		fileId: string,
+		releaseId: string
 	): Promise<Record<ReleaseCoverArtSize, string>> {
 		// 1. Lấy ảnh gốc dạng buffer
 		const { buffet: originalBuffer, fileName } =
@@ -283,7 +284,11 @@ export class ReleaseDraftService {
 		// 4. Lấy URL upload từ bucket
 		const listUrlUpload = await this.bucketService.bulkCreate({
 			bucketDtos: resizeSizes.map((size) => ({
-				uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
+				// uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
+				folderGcs: this.bucketService.getFolderBucket({
+					releaseId,
+					uploadPurpose: UploadPurpose.RELEASE_COVER_ART
+				}),
 				key: size,
 				file: {
 					fileName: `${fileName}_${size}.jpg`,

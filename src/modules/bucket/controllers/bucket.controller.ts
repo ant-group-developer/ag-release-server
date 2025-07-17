@@ -12,6 +12,7 @@ import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
+	GetFolderBucketDto,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { BucketService } from '../services/bucket.service';
@@ -19,7 +20,7 @@ import { BucketService } from '../services/bucket.service';
 @ApiTags('GCS Upload')
 @Controller('bucket/gcs')
 export class BucketGcsController {
-	constructor(private readonly bucketService: BucketService) {}
+	constructor(private readonly bucketService: BucketService) { }
 
 	// file
 	@Post('private')
@@ -67,6 +68,15 @@ export class BucketGcsController {
 	@Post('private/:id/submit')
 	async submit(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.submit(id);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@Get('private/folder-bucket')
+	async getFolderBucket(@Body() data: GetFolderBucketDto) {
+		const result = await this.bucketService.getFolderBucket(data);
 
 		return new ResponseSuccess({
 			data: result,

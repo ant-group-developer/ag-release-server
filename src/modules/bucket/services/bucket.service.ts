@@ -11,20 +11,22 @@ import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
+import { UploadPurpose } from '../enum/bucket.enum';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class BucketService {
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
-	) {}
+	) { }
 
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
-		const { file, uploadPurpose, key: keyResult } = data;
+		const { file, folderGcs, key: keyResult } = data;
 
 		// create file
 		const key = this.bucketGcsService.getKey({
-			previousKey: this.bucketGcsService.getPreviousKey(uploadPurpose),
+			previousKey: folderGcs,
 			fileName: generateFileNameWithTimestamp(file.fileName),
 		});
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
@@ -203,6 +205,39 @@ export class BucketService {
 		} catch (error) {
 			console.error('Error fetching data:', error);
 			return {};
+		}
+	}
+
+	// folder
+	getFolderBucket({
+		uploadPurpose,
+		releaseId,
+		trackName
+	}: {
+		uploadPurpose: UploadPurpose,
+		releaseId: string,
+		trackName?: string,
+	}) {
+		const datePrefix = dayjs().format('YYYY_MM_DD');
+		const subFolder = this.getSubFolder(uploadPurpose);
+
+		const trackSegment = trackName ? `/${trackName}` : '';
+
+		return `${datePrefix}/releases/${releaseId}/${subFolder}${trackSegment}`;
+	}
+
+	getSubFolder(uploadPurpose: UploadPurpose) {
+		switch (uploadPurpose) {
+			case UploadPurpose.TRACK_AUDIO:
+				return `tracks`;
+			case UploadPurpose.PEAK_AUDIO:
+				return `tracks`;
+
+			case UploadPurpose.RELEASE_COVER_ART:
+				return `release_cover_art`;
+
+			default:
+				return `unknown`;
 		}
 	}
 }

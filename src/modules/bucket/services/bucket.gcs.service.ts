@@ -107,18 +107,6 @@ export class BucketGcsService {
 		return file;
 	}
 
-	getFolderGcs(
-		uploadPurpose: UploadPurpose,
-		releaseId: string,
-		trackName?: string,
-	) {
-		const datePrefix = new Date().toISOString();
-		const subFolder = this.getPreviousKey(uploadPurpose);
-
-		const trackSegment = trackName ? `/${trackName}` : '';
-
-		return `${datePrefix}/releases/${releaseId}/${subFolder}${trackSegment}`;
-	}
 
 	//
 	getKey({
@@ -131,20 +119,7 @@ export class BucketGcsService {
 		return `${previousKey}/${fileName}`;
 	}
 
-	getPreviousKey(uploadPurpose: UploadPurpose) {
-		switch (uploadPurpose) {
-			case UploadPurpose.TRACK_AUDIO:
-				return `tracks`;
-			case UploadPurpose.PEAK_AUDIO:
-				return `tracks`;
 
-			case UploadPurpose.RELEASE_COVER_ART:
-				return `release_cover_art`;
-
-			default:
-				return `unknown`;
-		}
-	}
 
 	getUrlPublic(key: string) {
 		return `${this.baseUrlPublic}/${key}`;
