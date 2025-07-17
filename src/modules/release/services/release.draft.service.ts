@@ -200,31 +200,34 @@ export class ReleaseDraftService {
 			}
 		}
 
-		if (releaseCoverArt?.fileId !== undefined) {
+		if (releaseCoverArt !== undefined) {
 			// delete
-			if (releaseCoverArt.fileId === null) {
+			if (releaseCoverArt === null) {
 				await this.releaseCoverArtService.deleteRecordOfRelease({
 					releaseId,
 				});
 			}
 
 			// update
-			if (releaseCoverArt.fileId) {
+			if (releaseCoverArt) {
 				await this.releaseCoverArtService.deleteRecordOfRelease({
 					releaseId,
 				});
 
-				const coverArtEntities = await this.getCoverArtEntities({
-					fileId: releaseCoverArt.fileId,
-					releaseId,
-				});
+				const releaseCoverArtEntities =
+					await this.getReleaseCoverArtEntities({
+						fileId: releaseCoverArt.fileId,
+						releaseId,
+					});
 
-				await this.releaseCoverArtService.bulkCreate(coverArtEntities);
+				await this.releaseCoverArtService.bulkCreate(
+					releaseCoverArtEntities,
+				);
 			}
 		}
 	}
 
-	private async getCoverArtEntities({
+	private async getReleaseCoverArtEntities({
 		fileId,
 		releaseId,
 	}: {

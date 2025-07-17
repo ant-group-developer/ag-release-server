@@ -59,10 +59,9 @@ export class ReleaseCoverArtService {
 
 		const fileIds = releaseCoverArts.map((item) => item.fileId);
 
+		await this.releaseCoverArtRepo.delete({ releaseId });
 		for (const fileId of fileIds) {
 			await this.bucketService.delete(fileId);
 		}
-
-		await this.releaseCoverArtRepo.delete({ releaseId });
 	}
 }
