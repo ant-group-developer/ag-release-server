@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -57,7 +58,7 @@ export class TrackArtistController {
 		description: TrackArtistMessageError.NOT_FOUND,
 	})
 	async findOne(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<TrackArtist>> {
 		const result = await this.trackArtistService.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -87,7 +88,7 @@ export class TrackArtistController {
 		description: TrackArtistMessageError.NOT_FOUND,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackArtistDto: UpdateTrackArtistDto,
 	): Promise<ResponseSuccess<TrackArtist>> {
 		const result = await this.trackArtistService.update(
@@ -106,7 +107,9 @@ export class TrackArtistController {
 		status: 200,
 		description: TrackArtistMessageSuccess.DELETE,
 	})
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+	async remove(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
 		await this.trackArtistService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TrackArtistMessageCodeSuccess.DELETE,

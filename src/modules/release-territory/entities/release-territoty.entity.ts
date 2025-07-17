@@ -25,7 +25,7 @@ export class ReleaseTerritory extends BaseUUIDEntity {
 	})
 	distributionType: DistributionType | null;
 
-	@Column({ type: 'text', array: true, nullable: true })
+	@Column({ type: 'uuid', array: true, nullable: true })
 	selectedCountries: string[] | null;
 
 	// Relations
