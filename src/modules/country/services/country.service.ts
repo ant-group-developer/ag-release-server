@@ -13,7 +13,8 @@ import {
 	UpdateCountryDto,
 } from '../dto/country.dto';
 import { Country } from '../entities/country.entity';
-import { CountryQbService } from './country.qb.service';
+import { IContinentWithCountries } from '../interfaces/country.interface';
+import { CountryQueryService } from './country.query.service';
 
 @Injectable()
 export class CountryService {
@@ -21,7 +22,7 @@ export class CountryService {
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 
-		private readonly countryQbService: CountryQbService,
+		private readonly countryQueryService: CountryQueryService,
 	) {}
 
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
@@ -46,7 +47,7 @@ export class CountryService {
 	async getList(query: QueryGetListCountryDto): Promise<PageDto<Country>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.countryQbService.createQueryGetList(query);
+		const queryGetList = this.countryQueryService.createQueryGetList(query);
 
 		const [countries, totalItems] = await queryGetList.getManyAndCount();
 
@@ -58,6 +59,10 @@ export class CountryService {
 				totalItems,
 			},
 		});
+	}
+
+	async getListContinent(): Promise<IContinentWithCountries[]> {
+		return await this.countryQueryService.getListContinent();
 	}
 
 	async update(

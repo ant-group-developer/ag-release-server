@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseError } from 'src/common/dtos/response.dto';
 
-import { BucketGcsAction, UploadPurpose } from '../enum/bucket.enum';
+import { BucketGcsAction } from '../enum/bucket.enum';
 import {
 	IGetSignedUrlDown,
 	IGetSignedUrlRead,
@@ -116,21 +116,6 @@ export class BucketGcsService {
 		fileName: string;
 	}) {
 		return `${previousKey}/${fileName}`;
-	}
-
-	getPreviousKey(uploadPurpose: UploadPurpose) {
-		switch (uploadPurpose) {
-			case UploadPurpose.TRACK_AUDIO:
-				return `tracks/audio`;
-			case UploadPurpose.PEAK_AUDIO:
-				return `tracks/peak`;
-
-			case UploadPurpose.RELEASE_COVER_ART:
-				return `release_cover_art`;
-
-			default:
-				return `unknown`;
-		}
 	}
 
 	getUrlPublic(key: string) {

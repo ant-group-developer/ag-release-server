@@ -1,10 +1,11 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import {
 	BulkCreateTrackDraft,
+	BulkUpdateTrackDraft,
 	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
@@ -40,6 +41,18 @@ export class TrackDraftController {
 		});
 	}
 
+	@Put('bulk')
+	async bulkUpdate(
+		@Body() data: BulkUpdateTrackDraft,
+	): Promise<ResponseSuccess<ITrackDraft[]>> {
+		const result = await this.trackDraftService.bulkUpdate(data);
+
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackMessageCodeSuccess.CREATE,
+		});
+	}
+
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -49,6 +62,14 @@ export class TrackDraftController {
 		return new ResponseSuccess({
 			data: result,
 			messageCode: TrackMessageCodeSuccess.UPDATE,
+		});
+	}
+
+	@Delete(':id')
+	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.trackDraftService.mainDelete(id);
+		return new ResponseSuccess({
+			messageCode: TrackMessageCodeSuccess.DELETE,
 		});
 	}
 }

@@ -20,4 +20,16 @@ export class AudioFileQueryService {
 
 		return audioFile;
 	}
+
+	async getAudioFileOfTrack({ trackId }: { trackId: string }) {
+		const audioFile = await this.audioFileRepo.findOne({
+			where: { trackId },
+		});
+
+		if (!audioFile) {
+			throw new ResponseError({ message: 'Audio file not found' });
+		}
+
+		return audioFile;
+	}
 }

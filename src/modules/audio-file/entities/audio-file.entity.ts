@@ -40,6 +40,9 @@ export class AudioFile extends BaseUUIDEntity {
 	})
 	hook: number | null;
 
+	@Column({ type: 'int', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	preview: number | null;
+
 	@Column({ type: 'varchar' })
 	trackId: string;
 

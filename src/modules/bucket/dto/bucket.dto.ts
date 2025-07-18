@@ -41,12 +41,25 @@ export class CreateBucketDto {
 	@Type(() => CreateFileDto)
 	file: CreateFileDto;
 
-	@IsEnum(UploadPurpose)
-	uploadPurpose: UploadPurpose;
+	@IsNotEmpty()
+	folderBucket: string;
 
 	@IsString()
 	@IsOptional()
 	key: string | null = null;
+}
+
+export class GetFolderBucketDto {
+	@IsEnum(UploadPurpose)
+	@IsNotEmpty()
+	uploadPurpose: UploadPurpose;
+
+	@IsNotEmpty()
+	@IsUUID()
+	releaseId: string;
+
+	@IsOptional()
+	trackName?: string;
 }
 
 export class BulkCreateBucketDto {

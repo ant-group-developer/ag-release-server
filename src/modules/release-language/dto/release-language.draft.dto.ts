@@ -20,9 +20,4 @@ export class CreateReleaseLanguageDraftDto {
 
 export class UpdateReleaseLanguageDraftDto extends PartialType(
 	CreateReleaseLanguageDraftDto,
-) {
-	// @ValidateIf((_, value) => value !== undefined)
-	// @IsUUID()
-	// @IsNotEmpty()
-	// releaseId?: string;
-}
+) {}

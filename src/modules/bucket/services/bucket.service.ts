@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
 import {
@@ -8,6 +9,8 @@ import {
 	CreateBucketDto,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
+import { FileEntity } from '../entities/bucket.file.entity';
+import { UploadPurpose } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
@@ -20,11 +23,11 @@ export class BucketService {
 	) {}
 
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
-		const { file, uploadPurpose, key: keyResult } = data;
+		const { file, folderBucket, key: keyResult } = data;
 
 		// create file
 		const key = this.bucketGcsService.getKey({
-			previousKey: this.bucketGcsService.getPreviousKey(uploadPurpose),
+			previousKey: folderBucket,
 			fileName: generateFileNameWithTimestamp(file.fileName),
 		});
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
@@ -80,7 +83,19 @@ export class BucketService {
 		});
 	}
 
-	async remove(id: string) {
+	async update({
+		fileId,
+		dataUpdate,
+	}: {
+		fileId: string;
+		dataUpdate: { fileName: string };
+	}) {
+		await this.bucketFileService.update(fileId, {
+			fileName: dataUpdate.fileName,
+		});
+	}
+
+	async delete(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
 		await this.bucketGcsService.delete({
 			isPublic: false,
@@ -133,6 +148,24 @@ export class BucketService {
 		};
 	}
 
+	async getFileBuffer(fileId: string): Promise<{
+		fileBuffet: Buffer;
+		fileDb: FileEntity;
+	}> {
+		const fileDb = await this.bucketFileService.findOne(fileId);
+
+		const fileGcs = await this.bucketGcsService.findOne({
+			bucketName: fileDb.bucket,
+			key: fileDb.key,
+		});
+
+		const [contents] = await fileGcs.download();
+		return {
+			fileBuffet: contents,
+			fileDb,
+		};
+	}
+
 	// public
 	async deletePublicFile(urlPublic: string): Promise<void> {
 		await this.bucketGcsService.deletePublicFile(urlPublic);
@@ -174,6 +207,39 @@ export class BucketService {
 		} catch (error) {
 			console.error('Error fetching data:', error);
 			return {};
+		}
+	}
+
+	// folder
+	getFolderBucket({
+		uploadPurpose,
+		releaseId,
+		trackName,
+	}: {
+		uploadPurpose: UploadPurpose;
+		releaseId: string;
+		trackName?: string;
+	}) {
+		const datePrefix = dayjs().format('YYYY_MM_DD');
+		const subFolder = this.getSubFolder(uploadPurpose);
+
+		const trackSegment = trackName ? `/${trackName}` : '';
+
+		return `${datePrefix}/releases/${releaseId}/${subFolder}${trackSegment}`;
+	}
+
+	getSubFolder(uploadPurpose: UploadPurpose) {
+		switch (uploadPurpose) {
+			case UploadPurpose.TRACK_AUDIO:
+				return `tracks`;
+			case UploadPurpose.PEAK_AUDIO:
+				return `tracks`;
+
+			case UploadPurpose.RELEASE_COVER_ART:
+				return `release_cover_art`;
+
+			default:
+				return `unknown`;
 		}
 	}
 }

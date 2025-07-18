@@ -14,7 +14,7 @@ import {
 } from '../dto/track.dto';
 import {
 	ITrack,
-	ITrackAudioBucket,
+	ITrackDetails,
 	ITrackNonDraft,
 } from '../interfaces/track.interface';
 import { TrackService } from '../services/track.service';
@@ -60,7 +60,7 @@ export class TrackController {
 	@Get(':id')
 	async getDetail(
 		@Param('id') id: string,
-	): Promise<ResponseSuccess<ITrackAudioBucket>> {
+	): Promise<ResponseSuccess<ITrackDetails>> {
 		const result = await this.trackService.getDetail(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -73,7 +73,7 @@ export class TrackController {
 	})
 	async getList(
 		@Query() query: QueryGetListTrackDto,
-	): Promise<ResponseSuccess<PageDto<ITrackAudioBucket>>> {
+	): Promise<ResponseSuccess<PageDto<ITrackDetails>>> {
 		const result = await this.trackService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
@@ -102,17 +102,4 @@ export class TrackController {
 			messageCode: TrackMessageCodeSuccess.UPDATE,
 		});
 	}
-
-	// @Delete(':id')
-	// @ApiOperation({ summary: 'Delete a track by ID' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: TrackMessageSuccess.DELETE,
-	// })
-	// async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-	// 	await this.trackService.remove(id);
-	// 	return new ResponseSuccess({
-	// 		messageCode: TrackMessageCodeSuccess.DELETE,
-	// 	});
-	// }
 }

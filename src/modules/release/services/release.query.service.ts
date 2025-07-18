@@ -77,7 +77,7 @@ export class ReleaseQueryService {
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
-			relations: ['releaseLanguage'],
+			relations: ['releaseLanguage', 'releaseTerritory'],
 		});
 
 		if (!release) {
@@ -123,7 +123,11 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect(
 				'releaseLanguage.metadataLanguage',
 				'metadataLanguage',
-			);
+			)
+
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
+
+			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory');
 
 		query.where('release.id = :id', {
 			id,

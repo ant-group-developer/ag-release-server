@@ -6,3 +6,11 @@ export enum ReleaseCoverArtSize {
 	'900x900' = '900x900',
 	ORIGINAL = 'original',
 }
+export enum ValidFormatCoverArt {
+	JPG = 'jpg',
+	JPEG = 'jpeg',
+	PNG = 'png',
+	WEBP = 'webp',
+	AVIF = 'avif',
+	SVG = 'svg',
+}

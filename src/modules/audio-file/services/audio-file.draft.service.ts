@@ -1,15 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-	BulkCreateAudioFileDraft,
-	CreateAudioFileDraftDto,
-	UpdateAudioFileDraftDto,
-} from '../dto/audio-file.draft.dto';
 import { AudioFile } from '../entities/audio-file.entity';
 
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { IAudioFileDraft } from '../interfaces/audio-file.interface';
+import {
+	IAudioFileDraft,
+	ICreateAudioFile,
+	IUpdateAudioFile,
+} from '../interfaces/audio-file.interface';
 import { AudioFileQueryService } from './audio-file.query.service';
 import { AudioFileValidateService } from './audio-file.validate.service';
 
@@ -24,7 +23,7 @@ export class AudioFileDraftService {
 		private readonly audioFileQueryService: AudioFileQueryService,
 	) {}
 
-	async create(data: CreateAudioFileDraftDto): Promise<IAudioFileDraft> {
+	async create(data: ICreateAudioFile): Promise<IAudioFileDraft> {
 		const { trackId, fileId, peakId } = data;
 
 		await this.audioFileValidateService.validate({
@@ -39,40 +38,34 @@ export class AudioFileDraftService {
 		return this.audioFileValidateService.ensureDraftAudioFile(result);
 	}
 
-	async bulkCreate(
-		data: BulkCreateAudioFileDraft,
-	): Promise<IAudioFileDraft[]> {
-		const result = [];
-		for (const audioFileDraft of data.createAudioFileDraftDtos) {
-			result.push(await this.create(audioFileDraft));
-		}
-		return result;
-	}
+	// async bulkCreate(
+	// 	data: BulkCreateAudioFileDraft,
+	// ): Promise<IAudioFileDraft[]> {
+	// 	const result = [];
+	// 	for (const audioFileDraft of data.createAudioFileDraftDtos) {
+	// 		result.push(await this.create(audioFileDraft));
+	// 	}
+	// 	return result;
+	// }
 
-	async update(
-		id: string,
-		data: UpdateAudioFileDraftDto,
-	): Promise<IAudioFileDraft> {
-		const {
-			//  trackId,
-			fileId,
-			peakId,
-		} = data;
+	async update({
+		audioFileId,
+		dataUpdate,
+	}: {
+		audioFileId: string;
+		dataUpdate: IUpdateAudioFile;
+	}): Promise<IAudioFileDraft> {
+		const { file, ...restOfDataUpdate } = dataUpdate;
+		const { fileId, peakId } = restOfDataUpdate;
 
-		const audioFile = await this.audioFileQueryService.findOne(id);
-
-		// if (trackId && trackId !== audioFile.trackId) {
-		// 	await this.audioFileValidateService.validate({
-		// 		trackId,
-		// 	});
-		// }
+		const audioFile = await this.audioFileQueryService.findOne(audioFileId);
 
 		if (fileId && fileId !== audioFile.fileId) {
 			await this.audioFileValidateService.validate({
 				fileId,
 			});
 
-			await this.bucketService.remove(audioFile.fileId);
+			await this.bucketService.delete(audioFile.fileId);
 		}
 
 		if (peakId && peakId !== audioFile.peakId) {
@@ -80,12 +73,40 @@ export class AudioFileDraftService {
 				peakId,
 			});
 
-			await this.bucketService.remove(audioFile.fileId);
+			await this.bucketService.delete(audioFile.fileId);
 		}
 
-		await this.audioFileRepo.update(id, data);
-		const result = await this.audioFileQueryService.findOne(id);
+		await this.audioFileRepo.update(audioFileId, restOfDataUpdate);
+		const result = await this.audioFileQueryService.findOne(audioFileId);
+
+		if (file?.fileName) {
+			await this.bucketService.update({
+				fileId: audioFile.fileId,
+				dataUpdate: { fileName: file.fileName },
+			});
+		}
 
 		return this.audioFileValidateService.ensureDraftAudioFile(result);
+	}
+
+	// delete
+	async deleteRecordOfTrack({ trackId }: { trackId: string }) {
+		const audioFileOfTrack =
+			await this.audioFileQueryService.getAudioFileOfTrack({
+				trackId,
+			});
+
+		await this.mainDelete(audioFileOfTrack.id);
+	}
+
+	async deleteAudioAndPeak(audioFile: AudioFile) {
+		await this.bucketService.delete(audioFile.fileId);
+		await this.bucketService.delete(audioFile.peakId);
+	}
+
+	async mainDelete(id: string) {
+		const audioFile = await this.audioFileQueryService.findOne(id);
+		await this.audioFileRepo.delete(id);
+		await this.deleteAudioAndPeak(audioFile);
 	}
 }

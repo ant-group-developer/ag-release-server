@@ -41,14 +41,14 @@ export class BaseQueryDto {
 	@ApiProperty({
 		description: 'Number of items per page',
 		required: false,
-		default: 10,
+		default: 20,
 		minimum: 1,
 	})
 	@IsOptional()
 	@Type(() => Number)
 	@IsInt()
 	@Min(1)
-	pageSize: number = 10;
+	pageSize: number = 20;
 
 	/** Number of records to skip */
 	get skip(): number {

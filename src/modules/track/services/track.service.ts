@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
-import {
-	IAudioFile,
-	IAudioFileBucket,
-} from 'src/modules/audio-file/interfaces/audio-file.interface';
+import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
+import { IAudioFileBucket } from 'src/modules/audio-file/interfaces/audio-file.interface';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
 import {
@@ -15,9 +13,8 @@ import {
 import { Track } from '../entities/track.entity';
 import {
 	ITrack,
-	ITrackAudioBucket,
+	ITrackDetails,
 	ITrackNonDraft,
-	ITrackWithAudio,
 } from '../interfaces/track.interface';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
@@ -54,8 +51,10 @@ export class TrackService {
 		await this.trackQueryService.findOne(id);
 
 		// validate nonDraft
-		const trackNonDraft =
-			this.trackValidateService.ensureNonDraftTrack(data);
+		const trackNonDraft = this.trackValidateService.ensureNonDraftTrack({
+			...data,
+			trackArtists: [],
+		});
 
 		await this.trackRepo.update(id, trackNonDraft);
 		const result = await this.trackQueryService.findOne(id);
@@ -64,7 +63,7 @@ export class TrackService {
 		return this.trackValidateService.ensureNonDraftTrack(result);
 	}
 
-	async getDetail(id: string): Promise<ITrackAudioBucket> {
+	async getDetail(id: string): Promise<ITrackDetails> {
 		const track = await this.trackQueryService.getDetail(id);
 
 		const { audioFile, ...restOfTrack } = track;
@@ -75,13 +74,13 @@ export class TrackService {
 
 		return {
 			...restOfTrack,
-			audioFileBucket,
+			audioFile: audioFileBucket,
 		};
 	}
 
 	async getList(
 		query: QueryGetListTrackDto,
-	): Promise<PageDto<ITrackAudioBucket>> {
+	): Promise<PageDto<ITrackDetails>> {
 		const { page, pageSize } = query;
 
 		const [tracks, totalItems] =
@@ -128,21 +127,27 @@ export class TrackService {
 		return await this.trackQueryService.findOne(id);
 	}
 
-	async getAudioFileBucket(audioFile: IAudioFile): Promise<IAudioFileBucket> {
-		const file = await this.bucketService.getUrlRead(audioFile.fileId);
-		const peak = await this.bucketService.getUrlRead(audioFile.peakId);
+	async getAudioFileBucket(audioFile: AudioFile): Promise<IAudioFileBucket> {
+		const { file, peak } = audioFile;
+
+		const urlReadFile = await this.bucketService.getUrlRead(file.id);
+		const urlReadPeak = await this.bucketService.getUrlRead(peak.id);
 
 		return {
 			...audioFile,
-			file,
-			peak,
+			file: {
+				...file,
+				urlRead: urlReadFile,
+			},
+			peak: {
+				...peak,
+				urlRead: urlReadPeak,
+			},
 		};
 	}
 
-	async getTracksAudioBucket(
-		tracks: ITrackWithAudio[],
-	): Promise<ITrackAudioBucket[]> {
-		const result: ITrackAudioBucket[] = [];
+	async getTracksAudioBucket(tracks: Track[]) {
+		const result = [];
 		for (const track of tracks) {
 			const { audioFile, ...restOfTrack } = track;
 
@@ -152,10 +157,15 @@ export class TrackService {
 
 			result.push({
 				...restOfTrack,
-				audioFileBucket,
+				audioFile: audioFileBucket,
 			});
 		}
 
 		return result;
 	}
+
+	// async remove(id: string) {
+	// 	await this.trackRepo.delete(id);
+	// 	// xoa con
+	// }
 }

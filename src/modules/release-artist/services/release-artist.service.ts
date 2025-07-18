@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
 import { Repository } from 'typeorm';
 import { ReleaseArtistMessageError } from '../constants/release-artist.constant';
 import {
@@ -18,8 +19,11 @@ export class ReleaseArtistService {
 		private readonly releaseArtistRepo: Repository<ReleaseArtist>,
 
 		private readonly releaseArtistValidateService: ReleaseArtistValidateService,
+
+		private readonly trackDraftService: TrackDraftService,
 	) {}
 
+	// create
 	async create(
 		createReleaseArtistDto: CreateReleaseArtistDto,
 	): Promise<ReleaseArtist> {
@@ -34,9 +38,14 @@ export class ReleaseArtistService {
 		const releaseArtist = this.releaseArtistRepo.create(
 			createReleaseArtistDto,
 		);
-		return await this.releaseArtistRepo.save(releaseArtist);
+		const releaseArtistDb =
+			await this.releaseArtistRepo.save(releaseArtist);
+		await this.pasteReleaseArtistToTrackArtist(releaseArtistDb);
+
+		return releaseArtistDb;
 	}
 
+	// read
 	async findOne(id: string): Promise<ReleaseArtist> {
 		const releaseArtist = await this.releaseArtistRepo.findOne({
 			where: { id },
@@ -73,37 +82,79 @@ export class ReleaseArtistService {
 		});
 	}
 
+	// update
 	async update(
 		id: string,
-		updateReleaseArtistDto: UpdateReleaseArtistDto,
+		dataUpdate: UpdateReleaseArtistDto,
 	): Promise<ReleaseArtist> {
-		const { artistId, artistRoleId, releaseId } = updateReleaseArtistDto;
-
 		const releaseArtist = await this.findOne(id);
 
-		if (artistId && artistId !== releaseArtist.artistId) {
-			await this.releaseArtistValidateService.validate({
-				artistId,
-			});
-		}
+		await this.releaseArtistValidateService.handleValidateUpdate({
+			releaseArtist,
+			dataUpdate,
+		});
 
-		if (artistRoleId && artistRoleId !== releaseArtist.artistRoleId) {
-			await this.releaseArtistValidateService.validate({
-				artistRoleId,
-			});
-		}
+		await this.releaseArtistRepo.update(id, dataUpdate);
+		const releaseArtistDb = await this.findOne(id);
 
-		if (releaseId && releaseId !== releaseArtist.releaseId) {
-			await this.releaseArtistValidateService.validate({
-				releaseId,
-			});
-		}
+		await this.updateRelatedRecords(releaseArtistDb);
+		await this.handleArtistToTrack2({
+			releaseArtist: releaseArtistDb,
+			addArtistToTracks: dataUpdate.addArtistToTracks,
+		});
 
-		await this.releaseArtistRepo.update(id, updateReleaseArtistDto);
-		return await this.findOne(id);
+		return releaseArtistDb;
 	}
 
-	async remove(id: string): Promise<void> {
+	//delete
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		const releaseArtists = await this.releaseArtistRepo.find({
+			where: { releaseId },
+		});
+
+		for (const item of releaseArtists) {
+			await this.delete(item.id);
+		}
+	}
+
+	async delete(id: string): Promise<void> {
+		await this.deleteRelatedRecords(id);
 		await this.releaseArtistRepo.delete(id);
+	}
+
+	async deleteRelatedRecords(releaseArtistId: string) {
+		await this.trackDraftService.deleteByReleaseArtist(releaseArtistId);
+	}
+
+	// artist
+	private async pasteReleaseArtistToTrackArtist(
+		releaseArtist: ReleaseArtist,
+	) {
+		await this.trackDraftService.addArtistToTracks(releaseArtist);
+	}
+
+	private async updateRelatedRecords(releaseArtist: ReleaseArtist) {
+		await this.trackDraftService.updateByReleaseArtist(releaseArtist);
+	}
+
+	private async handleArtistToTrack2({
+		addArtistToTracks,
+		releaseArtist,
+	}: {
+		addArtistToTracks?: boolean;
+		releaseArtist: ReleaseArtist;
+	}) {
+		if (addArtistToTracks !== undefined) {
+			if (addArtistToTracks === true) {
+				await this.trackDraftService.addArtistToTracks2(releaseArtist);
+			}
+			if (addArtistToTracks === false) {
+				await this.trackDraftService.deleteArtistTracks2(releaseArtist);
+			}
+		}
 	}
 }

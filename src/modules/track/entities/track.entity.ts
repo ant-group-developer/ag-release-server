@@ -1,7 +1,6 @@
 import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -15,15 +14,15 @@ import {
 	OneToMany,
 	OneToOne,
 } from 'typeorm';
+
+import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
 
 @Entity('tracks')
 export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'varchar', length: 100 })
 	title: string;
-
-	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
-	picture: string | null;
 
 	@Column({
 		type: 'varchar',
@@ -64,6 +63,26 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'varchar', length: 10, nullable: true })
 	subGenreId: string | null;
 
+	@Column({ type: 'int', default: 0 })
+	order: number;
+
+	// other
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	trackTypeId: string | null;
+
+	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	trackOriginTypeId: string | null;
+
+	@Column({ type: Boolean, nullable: true })
+	isSensitiveContent: boolean;
+
+	@Column({ type: 'text', nullable: true })
+	lyric: string;
+
+	//
+	@Column({ type: 'boolean', default: false })
+	copyArtistsFromRelease: boolean;
+
 	// relation
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })
@@ -88,6 +107,14 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@OneToOne(() => AudioFile, (audioFile) => audioFile.track)
 	audioFile: AudioFile;
+
+	@ManyToOne(() => TrackType)
+	@JoinColumn({ name: 'track_type_id' })
+	trackType: TrackType | null;
+
+	@ManyToOne(() => TrackOriginType)
+	@JoinColumn({ name: 'track_origin_type_id' })
+	trackOriginType: TrackOriginType | null;
 }
 
 // @Entity('tracks')

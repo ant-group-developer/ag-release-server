@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
-import {
-	CreateReleaseLanguageDraftDto,
-	UpdateReleaseLanguageDraftDto,
-} from '../dto/release-language.draft.dto';
+import { UpdateReleaseLanguageDraftDto } from '../dto/release-language.draft.dto';
 import { ReleaseLanguage } from '../entities/release-language.entity';
-import { IReleaseLanguageDraft } from '../interfaces/release-language.interface';
+import {
+	ICreateReleaseLanguage,
+	IUpdateReleaseLanguage,
+} from '../interfaces/release-language.interface';
 import { ReleaseLanguageQueryService } from './release-language.query.service';
 import { ReleaseLanguageValidateService } from './release-language.validate.service';
 
@@ -20,9 +21,7 @@ export class ReleaseLanguageDraftService {
 		private readonly releaseLanguageQueryService: ReleaseLanguageQueryService,
 	) {}
 
-	async create(
-		data: CreateReleaseLanguageDraftDto,
-	): Promise<IReleaseLanguageDraft> {
+	async create(data: ICreateReleaseLanguage) {
 		const {
 			releaseId,
 			audioLanguageId,
@@ -38,32 +37,44 @@ export class ReleaseLanguageDraftService {
 		});
 
 		const releaseLanguage = this.releaseLanguageRepo.create(data);
-		const result = await this.releaseLanguageRepo.save(releaseLanguage);
-
-		return this.releaseLanguageValidateService.ensureDraftReleaseLanguage(
-			result,
-		);
+		await this.releaseLanguageRepo.save(releaseLanguage);
 	}
 
-	async update(
-		id: string,
-		data: UpdateReleaseLanguageDraftDto,
-	): Promise<IReleaseLanguageDraft> {
+	async handleUpdateReleaseLanguage({
+		release,
+		releaseLanguage,
+	}: {
+		release: Release;
+		releaseLanguage?: UpdateReleaseLanguageDraftDto;
+	}) {
+		if (release.releaseLanguage?.id) {
+			await this.update({
+				id: release.releaseLanguage.id,
+				dataUpdate: { ...releaseLanguage },
+			});
+		} else {
+			await this.create({
+				releaseId: release.id,
+				...releaseLanguage,
+			});
+		}
+	}
+
+	async update({
+		id,
+		dataUpdate,
+	}: {
+		id: string;
+		dataUpdate: IUpdateReleaseLanguage;
+	}) {
 		const {
-			// releaseId,
 			audioLanguageId,
 			metadataLanguageCountryId,
 			metadataLanguageId,
-		} = data;
+		} = dataUpdate;
 
 		const releaseLanguage =
 			await this.releaseLanguageQueryService.findOne(id);
-
-		// if (releaseId && releaseId !== releaseLanguage.releaseId) {
-		// 	await this.releaseLanguageValidateService.validate({
-		// 		releaseId,
-		// 	});
-		// }
 
 		if (
 			audioLanguageId &&
@@ -93,11 +104,14 @@ export class ReleaseLanguageDraftService {
 			});
 		}
 
-		await this.releaseLanguageRepo.update(id, data);
-		const result = await this.releaseLanguageQueryService.findOne(id);
+		await this.releaseLanguageRepo.update(id, dataUpdate);
+	}
 
-		return this.releaseLanguageValidateService.ensureDraftReleaseLanguage(
-			result,
-		);
+	async deleteRecordOfRelease({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		await this.releaseLanguageRepo.delete({ releaseId });
 	}
 }

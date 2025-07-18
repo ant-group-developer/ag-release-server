@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtistRole } from '../artist-role/entities/artist-role.entity';
 import { Artist } from '../artist/entities/artist.entity';
 import { Release } from '../release/entities/release.entity';
+import { TrackModule } from '../track/track.module';
 import { ReleaseArtist } from './entities/release-artist.entity';
 import { ReleaseArtistController } from './release-artist.controller';
 import { ReleaseArtistService } from './services/release-artist.service';
@@ -11,8 +12,10 @@ import { ReleaseArtistValidateService } from './services/release-artist.validate
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([ReleaseArtist, Artist, ArtistRole, Release]),
+		TrackModule,
 	],
 	controllers: [ReleaseArtistController],
 	providers: [ReleaseArtistService, ReleaseArtistValidateService],
+	exports: [ReleaseArtistService],
 })
 export class ReleaseArtistModule {}

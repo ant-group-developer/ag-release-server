@@ -12,7 +12,9 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
+import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
+import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { ReleaseType } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
@@ -102,12 +104,6 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	@IsUUID()
 	releaseTimezoneId?: string | null;
-
-	// // coverArt
-	// @IsNotEmpty()
-	// @ValidateNested()
-	// @Type(() => CreateCoverArtDto)
-	// releaseCoverArt: CreateCoverArtDto;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
@@ -145,19 +141,17 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	pLineOwner?: string | null;
 
 	@IsOptional()
-	@Transform(({ value }: { value: string | undefined }) =>
-		value ? new Date(value) : undefined,
-	)
-	@IsDate()
-	releaseDate?: Date | null;
+	@ValidateNested()
+	@Type(() => CreateReleaseCoverArtDto)
+	releaseCoverArt?: CreateReleaseCoverArtDto | null;
 
-	// @ValidateIf((_, value) => value !== undefined)
-	// @IsNotEmpty()
-	// @ValidateNested()
-	// @Type(() => CreateCoverArtDto)
-	// releaseCoverArt?: CreateCoverArtDto;
-
+	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdateReleaseLanguageDraftDto)
 	releaseLanguage?: UpdateReleaseLanguageDraftDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateReleaseTerritoryDto)
+	releaseTerritory?: UpdateReleaseTerritoryDto;
 }

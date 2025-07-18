@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { Repository } from 'typeorm';
 import {
 	QueryGetListReleaseDto,
@@ -12,7 +11,6 @@ import {
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
-	ICoverArtThumbnails,
 	IRelease,
 	IReleaseDetail,
 	IReleaseNonDraft,
@@ -27,7 +25,9 @@ export class ReleaseService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
-		private readonly bucketService: BucketService,
+		// private readonly bucketService: BucketService,
+
+		private readonly releaseCoverArtService: ReleaseCoverArtService,
 	) {}
 
 	// async create(data: CreateReleaseDto): Promise<Release> {
@@ -71,7 +71,9 @@ export class ReleaseService {
 		const { releaseCoverArts, ...restOfRelease } = release;
 
 		const coverArtThumbnails =
-			await this.getCoverArtThumbnails(releaseCoverArts);
+			await this.releaseCoverArtService.getCoverArtThumbnails(
+				releaseCoverArts,
+			);
 
 		return {
 			...restOfRelease,
@@ -139,41 +141,6 @@ export class ReleaseService {
 		return await this.releaseQueryService.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		await this.releaseRepo.delete(id);
-	}
-
-	private async getCoverArtThumbnails(
-		coverArts: ReleaseCoverArt[],
-	): Promise<ICoverArtThumbnails> {
-		const result: ICoverArtThumbnails = {
-			'75x75': null,
-			'100x100': null,
-			'160x160': null,
-			'300x300': null,
-			'900x900': null,
-			original: null,
-		};
-
-		for (const coverArt of coverArts) {
-			if (
-				[
-					'75x75',
-					'100x100',
-					'160x160',
-					'300x300',
-					'900x900',
-					'original',
-				].includes(coverArt.type)
-			) {
-				result[coverArt.type as keyof ICoverArtThumbnails] =
-					await this.bucketService.getUrlRead(coverArt.fileId);
-			}
-		}
-
-		return result;
-	}
-
 	private async getReleasesWithCoverArt(
 		releases: Release[],
 	): Promise<IReleaseDetail[]> {
@@ -183,7 +150,9 @@ export class ReleaseService {
 			const { releaseCoverArts, ...restOfRelease } = release;
 
 			const coverArtThumbnails =
-				await this.getCoverArtThumbnails(releaseCoverArts);
+				await this.releaseCoverArtService.getCoverArtThumbnails(
+					releaseCoverArts,
+				);
 
 			result.push({
 				...restOfRelease,
