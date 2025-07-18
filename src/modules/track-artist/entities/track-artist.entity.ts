@@ -3,6 +3,7 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { TypeSource } from '../enum/track-artist.enum';
 
 @Entity('track_artist')
 export class TrackArtist extends BaseUUIDEntity {
@@ -14,6 +15,17 @@ export class TrackArtist extends BaseUUIDEntity {
 
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
+
+	// others
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'column for auto sync artist from release',
+	})
+	releaseArtistId: string;
+
+	@Column({ type: 'enum', nullable: true, enum: TypeSource })
+	typeSource: TypeSource;
 
 	// relation
 	@ManyToOne(() => ArtistRole)

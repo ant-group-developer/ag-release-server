@@ -9,6 +9,8 @@ import {
 	ReleaseArtistMessageCodeError,
 	ReleaseArtistMessageError,
 } from '../constants/release-artist.constant';
+import { UpdateReleaseArtistDto } from '../dto/release-artist.dto';
+import { ReleaseArtist } from '../entities/release-artist.entity';
 
 @Injectable()
 export class ReleaseArtistValidateService {
@@ -71,6 +73,34 @@ export class ReleaseArtistValidateService {
 						ReleaseArtistMessageCodeError.RELEASE_NOT_FOUND,
 				});
 			}
+		}
+	}
+
+	async handleValidateUpdate({
+		releaseArtist,
+		dataUpdate,
+	}: {
+		releaseArtist: ReleaseArtist;
+		dataUpdate: UpdateReleaseArtistDto;
+	}) {
+		const { artistId, artistRoleId, releaseId } = dataUpdate;
+
+		if (artistId && artistId !== releaseArtist.artistId) {
+			await this.validate({
+				artistId,
+			});
+		}
+
+		if (artistRoleId && artistRoleId !== releaseArtist.artistRoleId) {
+			await this.validate({
+				artistRoleId,
+			});
+		}
+
+		if (releaseId && releaseId !== releaseArtist.releaseId) {
+			await this.validate({
+				releaseId,
+			});
 		}
 	}
 }

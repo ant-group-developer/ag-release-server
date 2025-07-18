@@ -10,6 +10,8 @@ import {
 	TrackMessageCodeError,
 	TrackMessageError,
 } from '../constants/track.constant';
+import { UpdateTrackDraftDto } from '../dto/track.draft.dto';
+import { Track } from '../entities/track.entity';
 import {
 	ITrack,
 	ITrackDraft,
@@ -139,5 +141,43 @@ export class TrackValidateService {
 		// }
 
 		return track as ITrackDraft;
+	}
+
+	async handleValidateDataUpdate({
+		trackDb,
+		dataUpdate,
+	}: {
+		trackDb: Track;
+		dataUpdate: UpdateTrackDraftDto;
+	}) {
+		const { primaryGenreId, subGenreId, trackOriginTypeId, trackTypeId } =
+			dataUpdate;
+
+		if (primaryGenreId && primaryGenreId !== trackDb.primaryGenreId) {
+			await this.validate({
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId && subGenreId !== trackDb.subGenreId) {
+			await this.validate({
+				subGenreId,
+			});
+		}
+
+		if (
+			trackOriginTypeId &&
+			trackOriginTypeId !== trackDb.trackOriginTypeId
+		) {
+			await this.validate({
+				trackOriginTypeId,
+			});
+		}
+
+		if (trackTypeId && trackTypeId !== trackDb.trackTypeId) {
+			await this.validate({
+				trackTypeId,
+			});
+		}
 	}
 }

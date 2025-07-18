@@ -1,6 +1,8 @@
 import { PartialType } from '@nestjs/swagger';
 import {
+	IsBoolean,
 	IsNotEmpty,
+	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
@@ -40,6 +42,10 @@ export class UpdateReleaseArtistDto extends PartialType(
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
 	releaseId: string;
+
+	@IsBoolean()
+	@IsOptional()
+	addArtistToTracks?: boolean;
 }
 
 export class QueryGetListReleaseArtistDto extends BaseQueryDto {}

@@ -12,8 +12,10 @@ import { ITrackDraft } from '../interfaces/track.interface';
 
 import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
+import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { TypeSource } from 'src/modules/track-artist/enum/track-artist.enum';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
@@ -97,23 +99,18 @@ export class TrackDraftService {
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
-		const {
-			copyArtistsFromRelease,
-			audioFile,
-			trackLanguage,
-			...restOfTrack
-		} = data;
+		const { audioFile, trackLanguage, ...restOfTrack } = data;
 
 		const track = await this.trackQueryService.getDetail(id);
 
-		await this.handleValidateDataUpdate({
+		await this.trackValidateService.handleValidateDataUpdate({
 			trackDb: track,
 			dataUpdate: data,
 		});
 
 		await this.updateSubEntities({
 			track,
-			copyArtistsFromRelease,
+			copyArtistsFromRelease: data.copyArtistsFromRelease,
 			audioFile,
 			trackLanguage,
 		});
@@ -122,44 +119,6 @@ export class TrackDraftService {
 		const result = await this.trackQueryService.getDetail(id);
 
 		return this.trackValidateService.ensureDraftTrack(result);
-	}
-
-	private async handleValidateDataUpdate({
-		trackDb,
-		dataUpdate,
-	}: {
-		trackDb: Track;
-		dataUpdate: UpdateTrackDraftDto;
-	}) {
-		const { primaryGenreId, subGenreId, trackOriginTypeId, trackTypeId } =
-			dataUpdate;
-
-		if (primaryGenreId && primaryGenreId !== trackDb.primaryGenreId) {
-			await this.trackValidateService.validate({
-				primaryGenreId,
-			});
-		}
-
-		if (subGenreId && subGenreId !== trackDb.subGenreId) {
-			await this.trackValidateService.validate({
-				subGenreId,
-			});
-		}
-
-		if (
-			trackOriginTypeId &&
-			trackOriginTypeId !== trackDb.trackOriginTypeId
-		) {
-			await this.trackValidateService.validate({
-				trackOriginTypeId,
-			});
-		}
-
-		if (trackTypeId && trackTypeId !== trackDb.trackTypeId) {
-			await this.trackValidateService.validate({
-				trackTypeId,
-			});
-		}
 	}
 
 	private async updateSubEntities({
@@ -200,45 +159,17 @@ export class TrackDraftService {
 		}
 
 		//
-		if (copyArtistsFromRelease) {
-			await this.copyArtistFromRelease({
-				releaseId: track.releaseId,
-				trackId: track.id,
-			});
-		}
-	}
+		if (copyArtistsFromRelease !== undefined) {
+			if (copyArtistsFromRelease === true) {
+				await this.copyArtistFromRelease({
+					releaseId: track.releaseId,
+					trackId: track.id,
+				});
+			}
 
-	private async copyArtistFromRelease({
-		releaseId,
-		trackId,
-	}: {
-		releaseId: string;
-		trackId: string;
-	}) {
-		const release = await this.releaseRepo.findOne({
-			where: { id: releaseId },
-			relations: {
-				releaseArtists: true,
-			},
-		});
-
-		if (
-			release &&
-			release.releaseArtists &&
-			release.releaseArtists.length > 0
-		) {
-			const trackArtistData = release?.releaseArtists?.map(
-				(releaseArtist) => ({
-					artistId: releaseArtist.artistId,
-					artistRoleId: releaseArtist.artistRoleId,
-					trackId,
-				}),
-			);
-
-			const trackArtistEntities =
-				this.trackArtistRepo.create(trackArtistData);
-
-			await this.trackArtistRepo.save(trackArtistEntities);
+			if (copyArtistsFromRelease === false) {
+				await this.deleteArtistFromRelease(track.id);
+			}
 		}
 	}
 
@@ -266,5 +197,138 @@ export class TrackDraftService {
 		await this.audioFileDraftService.deleteRecordOfTrack({ trackId });
 		await this.trackArtistService.deleteRecordOfTrack({ trackId });
 		await this.trackLanguageDraftService.deleteRecordOfTrack({ trackId });
+	}
+
+	// artist
+	// add artist from release
+	async addArtistToTracks(releaseArtist: ReleaseArtist) {
+		const { releaseId, artistId, artistRoleId } = releaseArtist;
+
+		const tracks = await this.trackRepo.find({
+			where: {
+				releaseId,
+				copyArtistsFromRelease: true,
+				trackArtists: {
+					typeSource: TypeSource.COPY_FROM_RELEASE,
+				},
+			},
+		});
+
+		const trackArtistEntities = tracks.map((track) => {
+			return this.trackArtistRepo.create({
+				trackId: track.id,
+				artistId,
+				artistRoleId,
+				typeSource: TypeSource.COPY_FROM_RELEASE,
+				releaseArtistId: releaseArtist.id,
+			});
+		});
+
+		await this.trackArtistRepo.save(trackArtistEntities);
+	}
+
+	async addArtistToTracks2(releaseArtist: ReleaseArtist) {
+		const { releaseId, artistId, artistRoleId } = releaseArtist;
+
+		const tracks = await this.trackRepo.find({
+			where: {
+				releaseId,
+			},
+		});
+
+		const trackArtistEntities = tracks.map((track) => {
+			return this.trackArtistRepo.create({
+				trackId: track.id,
+				artistId,
+				artistRoleId,
+				typeSource: TypeSource.COPY_FROM_RELEASE2,
+				releaseArtistId: releaseArtist.id,
+			});
+		});
+
+		await this.trackArtistRepo.save(trackArtistEntities);
+	}
+
+	async deleteArtistTracks2(releaseArtist: ReleaseArtist) {
+		const { releaseId } = releaseArtist;
+
+		const trackArtists = await this.trackArtistRepo
+			.createQueryBuilder('ta')
+			.leftJoin('ta.track', 'track')
+			.where('track.releaseId = :releaseId', { releaseId })
+			.andWhere('ta.typeSource = :typeSource', {
+				typeSource: TypeSource.COPY_FROM_RELEASE2,
+			})
+			.select('ta.id')
+			.getMany();
+
+		const ids = trackArtists.map((ta) => ta.id);
+
+		if (ids.length) {
+			await this.trackArtistRepo.delete(ids);
+		}
+	}
+
+	private async copyArtistFromRelease({
+		releaseId,
+		trackId,
+	}: {
+		releaseId: string;
+		trackId: string;
+	}) {
+		const release = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			relations: {
+				releaseArtists: true,
+			},
+		});
+
+		if (
+			release &&
+			release.releaseArtists &&
+			release.releaseArtists.length > 0
+		) {
+			const trackArtistData = release?.releaseArtists?.map(
+				(releaseArtist) => ({
+					artistId: releaseArtist.artistId,
+					artistRoleId: releaseArtist.artistRoleId,
+					trackId,
+					releaseArtistId: releaseArtist.id,
+					typeSource: TypeSource.COPY_FROM_RELEASE,
+				}),
+			);
+
+			const trackArtistEntities =
+				this.trackArtistRepo.create(trackArtistData);
+
+			await this.trackArtistRepo.save(trackArtistEntities);
+		}
+	}
+
+	private async deleteArtistFromRelease(trackId: string) {
+		await this.trackArtistRepo.delete({
+			trackId,
+			typeSource: TypeSource.COPY_FROM_RELEASE,
+		});
+	}
+
+	async updateByReleaseArtist(releaseArtist: ReleaseArtist) {
+		const { artistId, artistRoleId } = releaseArtist;
+
+		const trackArtists = await this.trackArtistRepo.find({
+			where: { releaseArtistId: releaseArtist.id },
+		});
+
+		for (const trackArtist of trackArtists) {
+			trackArtist.artistId = artistId;
+			trackArtist.artistRoleId = artistRoleId;
+		}
+
+		await this.trackArtistRepo.save(trackArtists);
+	}
+
+	//
+	async deleteByReleaseArtist(releaseArtistId: string) {
+		await this.trackArtistRepo.delete({ releaseArtistId });
 	}
 }

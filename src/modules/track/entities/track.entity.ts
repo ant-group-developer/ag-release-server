@@ -79,6 +79,10 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'text', nullable: true })
 	lyric: string;
 
+	//
+	@Column({ type: 'boolean', default: false })
+	copyArtistsFromRelease: boolean;
+
 	// relation
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })

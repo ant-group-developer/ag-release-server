@@ -12,6 +12,9 @@ export class ReleaseArtist extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	releaseId: string;
 
+	@Column({ type: 'boolean', default: false })
+	addArtistToTracks: boolean;
+
 	//relation
 	@ManyToOne(() => ArtistRole)
 	@JoinColumn({ name: 'artist_role_id' })

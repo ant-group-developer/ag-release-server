@@ -1,7 +1,7 @@
 export const TrackArtistMessageCodeSuccess = {
-	CREATE: 'TrackArtist.message.success.create',
-	UPDATE: 'TrackArtist.message.success.update',
-	DELETE: 'TrackArtist.message.success.delete',
+	CREATE: 'trackArtist.message.success.create',
+	UPDATE: 'trackArtist.message.success.update',
+	DELETE: 'trackArtist.message.success.delete',
 };
 
 export const TrackArtistMessageSuccess = {
@@ -11,7 +11,7 @@ export const TrackArtistMessageSuccess = {
 };
 
 export const TrackArtistMessageCodeError = {
-	NOT_FOUND: 'TrackArtist.message.error.notFound',
+	NOT_FOUND: 'trackArtist.message.error.notFound',
 };
 
 export const TrackArtistMessageError = {
