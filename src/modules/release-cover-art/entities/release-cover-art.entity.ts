@@ -25,15 +25,6 @@ export class ReleaseCoverArt extends BaseUUIDEntity {
 	})
 	type: string;
 
-	// // relations
-	// @ManyToOne(() => FileEntity, (file) => file.releaseCoverArts)
-	// @JoinColumn({ name: 'file_id' })
-	// file: FileEntity;
-
-	// @OneToOne(() => FileEntity, (file) => file.releaseCoverArt)
-	// @JoinColumn({ name: 'file_id' })
-	// file: FileEntity;
-
 	@OneToOne(() => FileEntity)
 	@JoinColumn({ name: 'file_id' })
 	file: FileEntity;

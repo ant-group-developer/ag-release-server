@@ -1,14 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import axios from 'axios';
-import sharp from 'sharp';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
-import { ReleaseCoverArtSize } from 'src/modules/release-cover-art/enum/release-cover-art.enum';
-import { ICreateReleaseCoverArt } from 'src/modules/release-cover-art/interface/release-cover-art.interface';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
@@ -35,11 +29,11 @@ export class ReleaseDraftService {
 		private readonly releaseQueryService: ReleaseQueryService,
 		private readonly releaseCoverArtService: ReleaseCoverArtService,
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
-		private readonly bucketService: BucketService,
+		// private readonly bucketService: BucketService,
 		private readonly releaseArtistService: ReleaseArtistService,
 		private readonly trackDraftService: TrackDraftService,
 		private readonly releaseTerritoryService: ReleaseTerritoryService,
-	) { }
+	) {}
 
 	// create
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
@@ -200,125 +194,10 @@ export class ReleaseDraftService {
 			}
 		}
 
-		if (releaseCoverArt !== undefined) {
-			// delete
-			if (releaseCoverArt === null) {
-				await this.releaseCoverArtService.deleteRecordOfRelease({
-					releaseId,
-				});
-			}
-
-			// update
-			if (releaseCoverArt) {
-				await this.releaseCoverArtService.deleteRecordOfRelease({
-					releaseId,
-				});
-
-				const releaseCoverArtEntities =
-					await this.getReleaseCoverArtEntities({
-						fileId: releaseCoverArt.fileId,
-						releaseId,
-					});
-
-				await this.releaseCoverArtService.bulkCreate(
-					releaseCoverArtEntities,
-				);
-			}
-		}
-	}
-
-	private async getReleaseCoverArtEntities({
-		fileId,
-		releaseId,
-	}: {
-		fileId: string;
-		releaseId: string;
-	}) {
-		const listCoverArts = await this.genListCoverArt(fileId, releaseId);
-
-		const result: ICreateReleaseCoverArt[] = Object.entries(
-			listCoverArts,
-		).map(([size, fileId]) => {
-			const [widthStr, heightStr] =
-				size === 'original' ? ['1080', '1080'] : size.split('x');
-			return {
-				releaseId,
-				fileId,
-				width: Number(widthStr),
-				height: Number(heightStr),
-				type: size,
-			};
+		await this.releaseCoverArtService.handleUpdateReleaseCoverArt({
+			releaseId,
+			releaseCoverArt,
 		});
-
-		return result;
-	}
-
-	private async genListCoverArt(
-		fileId: string,
-		releaseId: string
-	): Promise<Record<ReleaseCoverArtSize, string>> {
-		// 1. Lấy ảnh gốc dạng buffer
-		const { buffet: originalBuffer, fileName } =
-			await this.bucketService.getFileBufferAndFileName(fileId);
-
-		// 2. Danh sách size cần xử lý (ngoại trừ 'original')
-		const resizeSizes = [
-			ReleaseCoverArtSize['75x75'],
-			ReleaseCoverArtSize['100x100'],
-			ReleaseCoverArtSize['160x160'],
-			ReleaseCoverArtSize['300x300'],
-			ReleaseCoverArtSize['900x900'],
-		];
-
-		// 3. Resize ảnh ra từng size
-		const resizedBuffers: Record<string, Buffer> = {};
-		for (const size of resizeSizes) {
-			const [width, height] = size.split('x').map(Number);
-			const buffer = await sharp(originalBuffer)
-				.resize(width, height)
-				.toFormat('jpeg')
-				.toBuffer();
-			resizedBuffers[size] = buffer;
-		}
-
-		// 4. Lấy URL upload từ bucket
-		const listUrlUpload = await this.bucketService.bulkCreate({
-			bucketDtos: resizeSizes.map((size) => ({
-				// uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
-				folderGcs: this.bucketService.getFolderBucket({
-					releaseId,
-					uploadPurpose: UploadPurpose.RELEASE_COVER_ART
-				}),
-				key: size,
-				file: {
-					fileName: `${fileName}_${size}.jpg`,
-					contentType: 'image/jpeg',
-					extension: 'jpg',
-					fileSize: resizedBuffers[size].length,
-				},
-			})),
-		});
-
-		// 5. Upload từng ảnh lên GCS
-		const result = {} as Record<ReleaseCoverArtSize, string>;
-
-		for (const item of listUrlUpload) {
-			const buffer = resizedBuffers[item.key!];
-			if (!buffer) continue;
-
-			await axios.put(item.urlUpload, buffer, {
-				headers: {
-					'Content-Type': 'image/jpeg',
-				},
-			});
-
-			result[item.key as ReleaseCoverArtSize] = item.fileId;
-		}
-
-		// 6. Gán ảnh gốc vào key "original"
-		result[ReleaseCoverArtSize.ORIGINAL] = fileId;
-
-		return result;
 	}
 
 	// delete

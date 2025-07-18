@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
@@ -28,7 +27,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseTerritoryModule,
 
 		TrackModule,
-		BucketModule,
+		// BucketModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [
