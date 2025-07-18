@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
+import { UpdateReleaseLanguageDraftDto } from '../dto/release-language.draft.dto';
 import { ReleaseLanguage } from '../entities/release-language.entity';
 import {
 	ICreateReleaseLanguage,
-	IReleaseLanguageDraft,
 	IUpdateReleaseLanguage,
 } from '../interfaces/release-language.interface';
 import { ReleaseLanguageQueryService } from './release-language.query.service';
@@ -20,7 +21,7 @@ export class ReleaseLanguageDraftService {
 		private readonly releaseLanguageQueryService: ReleaseLanguageQueryService,
 	) {}
 
-	async create(data: ICreateReleaseLanguage): Promise<IReleaseLanguageDraft> {
+	async create(data: ICreateReleaseLanguage) {
 		const {
 			releaseId,
 			audioLanguageId,
@@ -36,11 +37,27 @@ export class ReleaseLanguageDraftService {
 		});
 
 		const releaseLanguage = this.releaseLanguageRepo.create(data);
-		const result = await this.releaseLanguageRepo.save(releaseLanguage);
+		await this.releaseLanguageRepo.save(releaseLanguage);
+	}
 
-		return this.releaseLanguageValidateService.ensureDraftReleaseLanguage(
-			result,
-		);
+	async handleUpdateReleaseLanguage({
+		release,
+		releaseLanguage,
+	}: {
+		release: Release;
+		releaseLanguage?: UpdateReleaseLanguageDraftDto;
+	}) {
+		if (release.releaseLanguage?.id) {
+			await this.update({
+				id: release.releaseLanguage.id,
+				dataUpdate: { ...releaseLanguage },
+			});
+		} else {
+			await this.create({
+				releaseId: release.id,
+				...releaseLanguage,
+			});
+		}
 	}
 
 	async update({
@@ -49,7 +66,7 @@ export class ReleaseLanguageDraftService {
 	}: {
 		id: string;
 		dataUpdate: IUpdateReleaseLanguage;
-	}): Promise<IReleaseLanguageDraft> {
+	}) {
 		const {
 			audioLanguageId,
 			metadataLanguageCountryId,
@@ -88,11 +105,6 @@ export class ReleaseLanguageDraftService {
 		}
 
 		await this.releaseLanguageRepo.update(id, dataUpdate);
-		const result = await this.releaseLanguageQueryService.findOne(id);
-
-		return this.releaseLanguageValidateService.ensureDraftReleaseLanguage(
-			result,
-		);
 	}
 
 	async deleteRecordOfRelease({

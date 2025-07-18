@@ -26,11 +26,9 @@ export class ReleaseCoverArtService {
 		private readonly bucketService: BucketService,
 	) {}
 
-	async bulkCreate(
-		data: ICreateReleaseCoverArt[],
-	): Promise<ReleaseCoverArt[]> {
+	async bulkCreate(data: ICreateReleaseCoverArt[]) {
 		const releaseCoverArt = this.releaseCoverArtRepo.create(data);
-		return await this.releaseCoverArtRepo.save(releaseCoverArt);
+		await this.releaseCoverArtRepo.save(releaseCoverArt);
 	}
 
 	// update
@@ -100,7 +98,7 @@ export class ReleaseCoverArtService {
 		fileId: string,
 		releaseId: string,
 	): Promise<Record<ReleaseCoverArtSize, string>> {
-		// 1. Lấy ảnh gốc dạng buffer
+		// 1. Get original image as buffer
 		const {
 			fileBuffet: originalBuffer,
 			fileDb: { fileName, contentType, extension },
@@ -108,7 +106,7 @@ export class ReleaseCoverArtService {
 
 		const extensionValidated = this.validateSharpFormat(extension);
 
-		// 2. Danh sách size cần xử lý (ngoại trừ 'original')
+		// 2. Define target sizes to generate (excluding 'original')
 		const resizeSizes = [
 			ReleaseCoverArtSize['75x75'],
 			ReleaseCoverArtSize['100x100'],
@@ -117,7 +115,7 @@ export class ReleaseCoverArtService {
 			ReleaseCoverArtSize['900x900'],
 		];
 
-		// 3. Resize ảnh ra từng size
+		// 3. Resize the original image to each target size
 		const resizedBuffers: Record<string, Buffer> = {};
 		for (const size of resizeSizes) {
 			const [width, height] = size.split('x').map(Number);
@@ -128,10 +126,9 @@ export class ReleaseCoverArtService {
 			resizedBuffers[size] = buffer;
 		}
 
-		// 4. Lấy URL upload từ bucket
+		// 4. Generate upload URLs for resized images
 		const resCreateBuckets = await this.bucketService.bulkCreate({
 			bucketDtos: resizeSizes.map((size) => ({
-				// uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
 				folderBucket: this.bucketService.getFolderBucket({
 					releaseId,
 					uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
@@ -146,7 +143,7 @@ export class ReleaseCoverArtService {
 			})),
 		});
 
-		// 5. Upload từng ảnh lên GCS
+		// 5. Upload resized images to the bucket
 		const result = {} as Record<ReleaseCoverArtSize, string>;
 
 		for (const item of resCreateBuckets) {
@@ -162,7 +159,7 @@ export class ReleaseCoverArtService {
 			result[item.key as ReleaseCoverArtSize] = item.fileId;
 		}
 
-		// 6. Gán ảnh gốc vào key "original"
+		// 6. Add original image with the 'original' key
 		result[ReleaseCoverArtSize.ORIGINAL] = fileId;
 
 		return result;
@@ -229,6 +226,7 @@ export class ReleaseCoverArtService {
 		const fileIds = releaseCoverArts.map((item) => item.fileId);
 
 		await this.releaseCoverArtRepo.delete({ releaseId });
+
 		for (const fileId of fileIds) {
 			await this.bucketService.delete(fileId);
 		}

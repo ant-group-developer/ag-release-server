@@ -19,62 +19,6 @@ export class ReleaseLanguageQueryService {
 		return this.mainAlias;
 	}
 
-	// createQueryGetList(query: QueryGetListReleaseLanguageDto) {
-	// 	const {
-	// 		keyword,
-
-	// 		startCreatedAt,
-	// 		endCreatedAt,
-	// 		startUpdatedAt,
-	// 		endUpdatedAt,
-
-	// 		fieldOrder,
-	// 		orderBy,
-
-	// 		skip,
-	// 		pageSize,
-	// 	} = query;
-
-	// 	const queryBuilder = this.releaseLanguageRepo.createQueryBuilder(
-	// 		this.mainAlias,
-	// 	);
-	// 	queryBuilder.leftJoinAndSelect(
-	// 		'releaseLanguage.audioFile',
-	// 		'audioFile',
-	// 	);
-
-	// 	if (keyword) {
-	// 		queryBuilder.andWhere('releaseLanguage.title ILIKE :keyword', {
-	// 			keyword: `%${keyword}%`,
-	// 		});
-	// 	}
-
-	// 	if (startCreatedAt && endCreatedAt) {
-	// 		queryBuilder.andWhere(
-	// 			`releaseLanguage.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
-	// 			{
-	// 				startCreatedAt,
-	// 				endCreatedAt,
-	// 			},
-	// 		);
-	// 	}
-
-	// 	if (startUpdatedAt && endUpdatedAt) {
-	// 		queryBuilder.andWhere(
-	// 			`releaseLanguage.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
-	// 			{
-	// 				startUpdatedAt,
-	// 				endUpdatedAt,
-	// 			},
-	// 		);
-	// 	}
-
-	// 	queryBuilder.orderBy(`releaseLanguage.${fieldOrder}`, orderBy);
-	// 	queryBuilder.skip(skip).take(pageSize);
-
-	// 	return queryBuilder;
-	// }
-
 	async findOne(id: string): Promise<ReleaseLanguage> {
 		const releaseLanguage = await this.releaseLanguageRepo.findOne({
 			where: { id },

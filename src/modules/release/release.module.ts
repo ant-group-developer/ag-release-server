@@ -19,7 +19,6 @@ import { ReleaseValidateService } from './services/release.validate.service';
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Release, Genre, Label, Timezone]),
-		// ReleaseCoverArtModule,
 
 		ReleaseLanguageModule,
 		ReleaseCoverArtModule,

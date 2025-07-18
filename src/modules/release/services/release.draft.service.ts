@@ -27,23 +27,18 @@ export class ReleaseDraftService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
+
 		private readonly releaseCoverArtService: ReleaseCoverArtService,
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
-		// private readonly bucketService: BucketService,
 		private readonly releaseArtistService: ReleaseArtistService,
-		private readonly trackDraftService: TrackDraftService,
 		private readonly releaseTerritoryService: ReleaseTerritoryService,
+
+		private readonly trackDraftService: TrackDraftService,
 	) {}
 
 	// create
 	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
-		const {
-			// releaseCoverArt,
-			...restOfData
-		} = data;
-
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			restOfData;
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		await this.releaseValidateService.validate({
 			labelId,
@@ -52,7 +47,7 @@ export class ReleaseDraftService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create(restOfData);
+		const release = this.releaseRepo.create(data);
 		const releaseDb = await this.releaseRepo.save(release);
 
 		// coverArt
@@ -62,14 +57,6 @@ export class ReleaseDraftService {
 	}
 
 	private async createSubEntities(releaseId: string) {
-		// await this.releaseCoverArtService.bulkCreate([
-		// 	{ releaseId, type: '75x75' },
-		// 	{ releaseId, type: '100x100' },
-		// 	{ releaseId, type: '160x160' },
-		// 	{ releaseId, type: '300x300' },
-		// 	{ releaseId, type: 'original' },
-		// ]);
-
 		await this.releaseLanguageDraftService.create({
 			releaseId,
 		});
@@ -99,7 +86,10 @@ export class ReleaseDraftService {
 			});
 		}
 
-		await this.handleValidateDataUpdate({ release, dataUpdate: data });
+		await this.releaseValidateService.handleValidateDataUpdate({
+			release,
+			dataUpdate: data,
+		});
 
 		// subEntities
 		await this.updateSubEntities({
@@ -115,44 +105,6 @@ export class ReleaseDraftService {
 		return this.releaseValidateService.ensureDraftRelease(result);
 	}
 
-	private async handleValidateDataUpdate({
-		release,
-		dataUpdate,
-	}: {
-		release: Release;
-		dataUpdate: UpdateReleaseDraftDto;
-	}) {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			dataUpdate;
-
-		if (labelId && labelId !== release.labelId) {
-			await this.releaseValidateService.validate({
-				labelId,
-			});
-		}
-
-		if (primaryGenreId && primaryGenreId !== release.primaryGenreId) {
-			await this.releaseValidateService.validate({
-				primaryGenreId,
-			});
-		}
-
-		if (subGenreId && subGenreId !== release.subGenreId) {
-			await this.releaseValidateService.validate({
-				subGenreId,
-			});
-		}
-
-		if (
-			releaseTimezoneId &&
-			releaseTimezoneId !== release.releaseTimezoneId
-		) {
-			await this.releaseValidateService.validate({
-				releaseTimezoneId,
-			});
-		}
-	}
-
 	private async updateSubEntities({
 		release,
 		releaseLanguage,
@@ -166,33 +118,15 @@ export class ReleaseDraftService {
 	}) {
 		const releaseId = release.id;
 
-		if (releaseLanguage) {
-			if (release.releaseLanguage?.id) {
-				await this.releaseLanguageDraftService.update({
-					id: release.releaseLanguage.id,
-					dataUpdate: { ...releaseLanguage },
-				});
-			} else {
-				await this.releaseLanguageDraftService.create({
-					releaseId,
-					...releaseLanguage,
-				});
-			}
-		}
+		await this.releaseLanguageDraftService.handleUpdateReleaseLanguage({
+			release,
+			releaseLanguage,
+		});
 
-		if (releaseTerritory) {
-			if (release.releaseTerritory?.id) {
-				await this.releaseTerritoryService.update(
-					release.releaseTerritory.id,
-					releaseTerritory,
-				);
-			} else {
-				await this.releaseTerritoryService.create({
-					...releaseTerritory,
-					releaseId,
-				});
-			}
-		}
+		await this.releaseTerritoryService.handleUpdateReleaseTerritory({
+			release,
+			releaseTerritory,
+		});
 
 		await this.releaseCoverArtService.handleUpdateReleaseCoverArt({
 			releaseId,

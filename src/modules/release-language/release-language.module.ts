@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Country } from '../country/entities/country.entity';
 import { Language } from '../language/entities/language.entity';
 import { Release } from '../release/entities/release.entity';
-// import { ReleaseLanguageDraftController } from './controllers/release-language.draft.controller';
 import { ReleaseLanguage } from './entities/release-language.entity';
 import { ReleaseLanguageDraftService } from './services/release-language.draft.service';
 import { ReleaseLanguageQueryService } from './services/release-language.query.service';
@@ -13,7 +12,6 @@ import { ReleaseLanguageValidateService } from './services/release-language.vali
 	imports: [
 		TypeOrmModule.forFeature([ReleaseLanguage, Language, Release, Country]),
 	],
-	// controllers: [ReleaseLanguageDraftController],
 	providers: [
 		ReleaseLanguageDraftService,
 		ReleaseLanguageValidateService,

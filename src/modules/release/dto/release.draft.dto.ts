@@ -104,12 +104,6 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	@IsUUID()
 	releaseTimezoneId?: string | null;
-
-	// // coverArt
-	// @IsNotEmpty()
-	// @ValidateNested()
-	// @Type(() => CreateReleaseCoverArtDto)
-	// releaseCoverArt: CreateReleaseCoverArtDto;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {

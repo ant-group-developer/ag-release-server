@@ -9,6 +9,8 @@ import {
 	ReleaseMessageCodeError,
 	ReleaseMessageError,
 } from '../constants/release.constant';
+import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
+import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
 	IRelease,
@@ -138,5 +140,43 @@ export class ReleaseValidateService {
 		}
 
 		return release as IReleaseDraft;
+	}
+
+	async handleValidateDataUpdate({
+		release,
+		dataUpdate,
+	}: {
+		release: Release;
+		dataUpdate: UpdateReleaseDraftDto;
+	}) {
+		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
+			dataUpdate;
+
+		if (labelId && labelId !== release.labelId) {
+			await this.validate({
+				labelId,
+			});
+		}
+
+		if (primaryGenreId && primaryGenreId !== release.primaryGenreId) {
+			await this.validate({
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId && subGenreId !== release.subGenreId) {
+			await this.validate({
+				subGenreId,
+			});
+		}
+
+		if (
+			releaseTimezoneId &&
+			releaseTimezoneId !== release.releaseTimezoneId
+		) {
+			await this.validate({
+				releaseTimezoneId,
+			});
+		}
 	}
 }

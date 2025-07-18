@@ -25,7 +25,7 @@ export class ReleaseLanguageValidateService {
 
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
-	) { }
+	) {}
 
 	async validate({
 		releaseId,
