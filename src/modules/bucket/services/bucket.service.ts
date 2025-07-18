@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
 import {
@@ -8,25 +9,25 @@ import {
 	CreateBucketDto,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
+import { FileEntity } from '../entities/bucket.file.entity';
+import { UploadPurpose } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
-import { UploadPurpose } from '../enum/bucket.enum';
-import dayjs from 'dayjs';
 
 @Injectable()
 export class BucketService {
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
-	) { }
+	) {}
 
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
-		const { file, folderGcs, key: keyResult } = data;
+		const { file, folderBucket, key: keyResult } = data;
 
 		// create file
 		const key = this.bucketGcsService.getKey({
-			previousKey: folderGcs,
+			previousKey: folderBucket,
 			fileName: generateFileNameWithTimestamp(file.fileName),
 		});
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
@@ -147,9 +148,10 @@ export class BucketService {
 		};
 	}
 
-	async getFileBufferAndFileName(
-		fileId: string,
-	): Promise<{ buffet: Buffer; fileName: string }> {
+	async getFileBuffer(fileId: string): Promise<{
+		fileBuffet: Buffer;
+		fileDb: FileEntity;
+	}> {
 		const fileDb = await this.bucketFileService.findOne(fileId);
 
 		const fileGcs = await this.bucketGcsService.findOne({
@@ -159,8 +161,8 @@ export class BucketService {
 
 		const [contents] = await fileGcs.download();
 		return {
-			buffet: contents,
-			fileName: fileDb.fileName,
+			fileBuffet: contents,
+			fileDb,
 		};
 	}
 
@@ -212,11 +214,11 @@ export class BucketService {
 	getFolderBucket({
 		uploadPurpose,
 		releaseId,
-		trackName
+		trackName,
 	}: {
-		uploadPurpose: UploadPurpose,
-		releaseId: string,
-		trackName?: string,
+		uploadPurpose: UploadPurpose;
+		releaseId: string;
+		trackName?: string;
 	}) {
 		const datePrefix = dayjs().format('YYYY_MM_DD');
 		const subFolder = this.getSubFolder(uploadPurpose);

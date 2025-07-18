@@ -42,13 +42,12 @@ export class CreateBucketDto {
 	file: CreateFileDto;
 
 	@IsNotEmpty()
-	folderGcs: string;
+	folderBucket: string;
 
 	@IsString()
 	@IsOptional()
 	key: string | null = null;
 }
-
 
 export class GetFolderBucketDto {
 	@IsEnum(UploadPurpose)

@@ -20,7 +20,7 @@ import { BucketService } from '../services/bucket.service';
 @ApiTags('GCS Upload')
 @Controller('bucket/gcs')
 export class BucketGcsController {
-	constructor(private readonly bucketService: BucketService) { }
+	constructor(private readonly bucketService: BucketService) {}
 
 	// file
 	@Post('private')
@@ -75,8 +75,8 @@ export class BucketGcsController {
 	}
 
 	@Get('private/folder-bucket')
-	async getFolderBucket(@Body() data: GetFolderBucketDto) {
-		const result = await this.bucketService.getFolderBucket(data);
+	getFolderBucket(@Body() data: GetFolderBucketDto) {
+		const result = this.bucketService.getFolderBucket(data);
 
 		return new ResponseSuccess({
 			data: result,

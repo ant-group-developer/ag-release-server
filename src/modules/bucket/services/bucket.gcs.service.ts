@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseError } from 'src/common/dtos/response.dto';
 
-import { BucketGcsAction, UploadPurpose } from '../enum/bucket.enum';
+import { BucketGcsAction } from '../enum/bucket.enum';
 import {
 	IGetSignedUrlDown,
 	IGetSignedUrlRead,
@@ -107,7 +107,6 @@ export class BucketGcsService {
 		return file;
 	}
 
-
 	//
 	getKey({
 		previousKey,
@@ -118,8 +117,6 @@ export class BucketGcsService {
 	}) {
 		return `${previousKey}/${fileName}`;
 	}
-
-
 
 	getUrlPublic(key: string) {
 		return `${this.baseUrlPublic}/${key}`;
