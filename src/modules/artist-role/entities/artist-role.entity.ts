@@ -1,5 +1,6 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
+import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -11,6 +12,9 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
 	releaseArtists: ReleaseArtist[];
 
+	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.artistRole)
+	trackArtists: TrackArtist[];
+
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -18,4 +22,7 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	releaseCount?: number;
+	trackCount?: number;
 }

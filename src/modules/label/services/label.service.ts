@@ -14,7 +14,7 @@ import {
 	UpdateLabelDto,
 } from '../dto/label.dto';
 import { Label } from '../entities/label.entity';
-import { LabelQbService } from './label.qb.service';
+import { LabelQueryService } from './label.query.service';
 
 @Injectable()
 export class LabelService {
@@ -23,7 +23,7 @@ export class LabelService {
 		private readonly labelRepo: Repository<Label>,
 
 		private readonly bucketService: BucketService,
-		private readonly labelQbService: LabelQbService,
+		private readonly labelQueryService: LabelQueryService,
 	) {}
 
 	async create(createLabelDto: CreateLabelDto): Promise<Label> {
@@ -48,9 +48,8 @@ export class LabelService {
 	async getList(query: QueryGetListLabelDto): Promise<PageDto<Label>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.labelQbService.createQueryGetList(query);
-
-		const [labels, totalItems] = await queryGetList.getManyAndCount();
+		const [labels, totalItems] =
+			await this.labelQueryService.getList(query);
 
 		return new PageDto({
 			items: labels,
@@ -83,8 +82,22 @@ export class LabelService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		const label = await this.findOne(id);
+	async delete(id: string): Promise<void> {
+		const label = await this.labelQueryService.findOneWithCountRelation(id);
+
+		if (!label) {
+			throw new ResponseError({
+				message: 'Artist role not found.',
+				statusCode: 404,
+			});
+		}
+
+		if ((label.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this label because it is linked to ${label.releaseCount} release(s).`,
+				statusCode: 400,
+			});
+		}
 
 		if (label.picture) {
 			await this.bucketService.deletePublicFile(label.picture);
@@ -93,6 +106,7 @@ export class LabelService {
 		await this.labelRepo.delete(id);
 	}
 
+	// validate
 	async validate({ name }: { name?: string }) {
 		if (name) {
 			const artist = await this.labelRepo.findOne({ where: { name } });

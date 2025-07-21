@@ -38,4 +38,10 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	// count relation
+	primaryGenreReleasesCount?: number;
+	subGenreReleasesCount?: number;
+	primaryGenreTracksCount?: number;
+	subGenreTracksCount?: number;
 }

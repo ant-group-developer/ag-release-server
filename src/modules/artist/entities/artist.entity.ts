@@ -25,4 +25,8 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	// count relation
+	releaseCount?: number;
+	trackCount?: number;
 }

@@ -5,7 +5,7 @@ import { QueryGetListArtistRoleDto } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
 
 @Injectable()
-export class ArtistRoleQbService {
+export class ArtistRoleQueryService {
 	constructor(
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
@@ -29,6 +29,10 @@ export class ArtistRoleQbService {
 
 		const queryBuilder =
 			this.artistRoleRepo.createQueryBuilder('artistRole');
+
+		queryBuilder
+			.leftJoinAndSelect('artistRole.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('artistRole.releaseArtists', 'releaseArtists');
 
 		if (keyword) {
 			queryBuilder.andWhere('artistRole.name ILIKE :keyword', {
@@ -60,5 +64,22 @@ export class ArtistRoleQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.artistRoleRepo
+			.createQueryBuilder('artistRole')
+			.where('artistRole.id = :id', { id })
+
+			.loadRelationCountAndMap(
+				'artistRole.releaseCount',
+				'artistRole.releaseArtists',
+			)
+			.loadRelationCountAndMap(
+				'artistRole.trackCount',
+				'artistRole.trackArtists',
+			);
+
+		return await queryBuilder.getOne();
 	}
 }

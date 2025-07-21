@@ -35,6 +35,7 @@ export class BucketGcsController {
 				data: {
 					uploadUrl: 'https://storage.googleapis.com/...',
 					fileId: 'fileId',
+					key: 'string',
 				},
 			}),
 		},

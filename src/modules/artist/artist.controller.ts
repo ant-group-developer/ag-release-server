@@ -88,7 +88,7 @@ export class ArtistController {
 	@ApiResponse({ status: 200, description: ArtistMessageSuccess.DELETE })
 	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.artistService.remove(id);
+		await this.artistService.delete(id);
 		return new ResponseSuccess({
 			messageCode: ArtistMessageCodeSuccess.DELETE,
 		});

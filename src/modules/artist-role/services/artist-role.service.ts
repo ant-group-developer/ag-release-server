@@ -12,7 +12,7 @@ import {
 	UpdateArtistRoleDto,
 } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
-import { ArtistRoleQbService } from './artist-role.qb.service';
+import { ArtistRoleQueryService } from './artist-role.query.service';
 
 @Injectable()
 export class ArtistRoleService {
@@ -20,16 +20,14 @@ export class ArtistRoleService {
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 
-		private readonly artistRoleQbService: ArtistRoleQbService,
+		private readonly artistRoleQueryService: ArtistRoleQueryService,
 	) {}
 
-	async create(
-		createArtistRoleDto: CreateArtistRoleDto,
-	): Promise<ArtistRole> {
-		const { name } = createArtistRoleDto;
+	async create(data: CreateArtistRoleDto): Promise<ArtistRole> {
+		const { name } = data;
 		await this.validate({ name });
 
-		const artist = this.artistRoleRepo.create(createArtistRoleDto);
+		const artist = this.artistRoleRepo.create(data);
 		return await this.artistRoleRepo.save(artist);
 	}
 
@@ -47,7 +45,8 @@ export class ArtistRoleService {
 	): Promise<PageDto<ArtistRole>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.artistRoleQbService.createQueryGetList(query);
+		const queryGetList =
+			this.artistRoleQueryService.createQueryGetList(query);
 
 		const [artistRoles, totalItems] = await queryGetList.getManyAndCount();
 
@@ -61,22 +60,47 @@ export class ArtistRoleService {
 		});
 	}
 
-	async update(
-		id: string,
-		updateArtistRoleDto: UpdateArtistRoleDto,
-	): Promise<ArtistRole> {
-		const { name } = updateArtistRoleDto;
+	async update(id: string, data: UpdateArtistRoleDto): Promise<ArtistRole> {
+		const { name } = data;
 		const artistRole = await this.findOne(id);
 		if (name && name !== artistRole.name) {
 			await this.validate({ name });
 		}
 
-		await this.artistRoleRepo.update(id, updateArtistRoleDto);
+		await this.artistRoleRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
+		const artistRole =
+			await this.artistRoleQueryService.findOneWithCountRelation(id);
+		this.validateDelete(artistRole);
+
 		await this.artistRoleRepo.delete(id);
+	}
+
+	// validate
+	private validateDelete(artistRole: ArtistRole | null) {
+		if (!artistRole) {
+			throw new ResponseError({
+				message: 'Artist role not found.',
+				statusCode: 404,
+			});
+		}
+
+		if ((artistRole.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this artist role because it is linked to ${artistRole.releaseCount} release(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((artistRole.trackCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this artist role because it is linked to ${artistRole.trackCount} track(s).`,
+				statusCode: 400,
+			});
+		}
 	}
 
 	async validate({ name }: { name?: string }) {

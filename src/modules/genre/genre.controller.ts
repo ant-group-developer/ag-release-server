@@ -88,7 +88,7 @@ export class GenreController {
 	@ApiOperation({ summary: 'Delete a genre by ID' })
 	@ApiResponse({ status: 200, description: GenreMessageSuccess.DELETE })
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.genreService.remove(id);
+		await this.genreService.delete(id);
 		return new ResponseSuccess({
 			messageCode: GenreMessageCodeSuccess.DELETE,
 		});
