@@ -39,35 +39,33 @@ export class TrackQueryService {
 			pageSize,
 		} = query;
 
-		const queryBuilder = this.trackRepo.createQueryBuilder(this.mainAlias);
-		queryBuilder.leftJoinAndSelect('track.audioFile', 'audioFile');
-		queryBuilder.leftJoinAndSelect('audioFile.file', 'file');
-		queryBuilder.leftJoinAndSelect('audioFile.peak', 'peak');
+		const queryBuilder = this.trackRepo.createQueryBuilder('track');
 
-		queryBuilder.leftJoinAndSelect('track.trackArtists', 'trackArtists');
-		queryBuilder.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
-		queryBuilder.leftJoinAndSelect('trackArtists.artist', 'artist');
+		queryBuilder
+			.leftJoinAndSelect('track.audioFile', 'audioFile')
+			.leftJoinAndSelect('audioFile.file', 'file')
+			.leftJoinAndSelect('audioFile.peak', 'peak')
 
-		queryBuilder.leftJoinAndSelect('track.trackLanguage', 'trackLanguage');
-		queryBuilder.leftJoinAndSelect(
-			'trackLanguage.metadataLanguageCountry',
-			'metadataLanguageCountry',
-		);
-		queryBuilder.leftJoinAndSelect(
-			'trackLanguage.recordingCountry',
-			'recordingCountry',
-		);
-		queryBuilder.leftJoinAndSelect(
-			'trackLanguage.audioLanguage',
-			'audioLanguage',
-		);
+			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
+			.leftJoinAndSelect('trackArtists.artist', 'artist')
 
-		queryBuilder.leftJoinAndSelect('track.trackType', 'trackType');
+			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoinAndSelect(
+				'trackLanguage.recordingCountry',
+				'recordingCountry',
+			)
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
 
-		queryBuilder.leftJoinAndSelect(
-			'track.trackOriginType',
-			'trackOriginType',
-		);
+			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
+			.leftJoinAndSelect('track.subGenre', 'subGenre')
+
+			.leftJoinAndSelect('track.trackType', 'trackType')
+			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
 
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
@@ -135,28 +133,29 @@ export class TrackQueryService {
 			id,
 		});
 
-		query.leftJoinAndSelect('track.audioFile', 'audioFile');
-		query.leftJoinAndSelect('audioFile.file', 'file');
-		query.leftJoinAndSelect('audioFile.peak', 'peak');
+		query
+			.leftJoinAndSelect('track.audioFile', 'audioFile')
+			.leftJoinAndSelect('audioFile.file', 'file')
+			.leftJoinAndSelect('audioFile.peak', 'peak')
 
-		query.leftJoinAndSelect('track.trackArtists', 'trackArtists');
-		query.leftJoinAndSelect('trackArtists.artistRole', 'artistRole');
-		query.leftJoinAndSelect('trackArtists.artist', 'artist');
+			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
+			.leftJoinAndSelect('trackArtists.artist', 'artist')
 
-		query.leftJoinAndSelect('track.trackLanguage', 'trackLanguage');
-		query.leftJoinAndSelect(
-			'trackLanguage.metadataLanguageCountry',
-			'metadataLanguageCountry',
-		);
-		query.leftJoinAndSelect(
-			'trackLanguage.recordingCountry',
-			'recordingCountry',
-		);
-		query.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage');
-		query.leftJoinAndSelect(
-			'trackLanguage.metadataLanguage',
-			'metadataLanguage',
-		);
+			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoinAndSelect(
+				'trackLanguage.recordingCountry',
+				'recordingCountry',
+			)
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguage',
+				'metadataLanguage',
+			);
 
 		const track = await query.getOne();
 
