@@ -27,7 +27,7 @@ import { CountryService } from './services/country.service';
 @ApiTags('Countries')
 @Controller('countries')
 export class CountryController {
-	constructor(private readonly countryService: CountryService) {}
+	constructor(private readonly countryService: CountryService) { }
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new country' })
@@ -113,7 +113,7 @@ export class CountryController {
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {
-		await this.countryService.remove(id);
+		await this.countryService.delete(id);
 		return new ResponseSuccess({
 			messageCode: CountryMessageCodeSuccess.DELETE,
 		});

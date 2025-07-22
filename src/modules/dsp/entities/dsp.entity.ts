@@ -27,9 +27,6 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	canLinkArtistProfile: boolean;
 
 	// relation
-	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
-	organizationDsps: OrganizationDsp[];
-
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -38,6 +35,13 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
+	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
+	organizationDsps: OrganizationDsp[];
+
 	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.dsp)
-	releaseDsp: ReleaseDsp[];
+	releaseDsps: ReleaseDsp[];
+
+	// count relation
+	organizationDspsCount?: number;
+	releaseDspsCount?: number;
 }

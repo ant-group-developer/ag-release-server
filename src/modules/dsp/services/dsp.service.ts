@@ -9,7 +9,7 @@ import {
 } from '../constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
-import { DspQbService } from './dsp.qb.service';
+import { DspQueryService } from './dsp.query.service';
 
 @Injectable()
 export class DspService {
@@ -18,8 +18,8 @@ export class DspService {
 		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly bucketService: BucketService,
-		private readonly dspQbService: DspQbService,
-	) {}
+		private readonly dspQueryService: DspQueryService,
+	) { }
 
 	async create(createDspDto: CreateDspDto): Promise<Dsp> {
 		await this.validate({ name: createDspDto.name });
@@ -39,7 +39,7 @@ export class DspService {
 	async getList(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.dspQbService.createQueryGetList(query);
+		const queryGetList = this.dspQueryService.createQueryGetList(query);
 
 		const [dsps, totalItems] = await queryGetList.getManyAndCount();
 
@@ -69,11 +69,31 @@ export class DspService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		const dsp = await this.findOne(id);
+	async delete(id: string): Promise<void> {
+		const dsp = await this.dspQueryService.findOneWithCountRelation(id);
+
+		if (!dsp) {
+			throw new ResponseError({ message: 'DSP not found.', statusCode: 404 });
+		}
+
+		if ((dsp.organizationDspsCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this DSP because it is linked to ${dsp.organizationDspsCount} organization(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((dsp.releaseDspsCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this DSP because it is linked to ${dsp.releaseDspsCount} release(s).`,
+				statusCode: 400,
+			});
+		}
+
 		if (dsp.picture) {
 			await this.bucketService.deletePublicFile(dsp.picture);
 		}
+
 		await this.dspRepo.delete(id);
 	}
 

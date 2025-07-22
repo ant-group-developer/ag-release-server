@@ -10,7 +10,7 @@ export class CountryQueryService {
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
-	) {}
+	) { }
 
 	createQueryGetList(query: QueryGetListCountryDto) {
 		const {
@@ -90,4 +90,26 @@ export class CountryQueryService {
 
 		return result;
 	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.countryRepo
+			.createQueryBuilder('country')
+			.where('country.id = :id', { id })
+
+			.loadRelationCountAndMap(
+				'country.releaseMetadataLanguageCountriesCount',
+				'country.releaseMetadataLanguageCountries',
+			)
+			.loadRelationCountAndMap(
+				'country.trackMetadataLanguageCountriesCount',
+				'country.trackMetadataLanguageCountries',
+			)
+			.loadRelationCountAndMap(
+				'country.trackRecordingCountriesCount',
+				'country.trackRecordingCountries',
+			);
+
+		return await queryBuilder.getOne();
+	}
+
 }

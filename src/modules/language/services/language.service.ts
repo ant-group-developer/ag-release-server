@@ -12,7 +12,7 @@ import {
 	UpdateLanguageDto,
 } from '../dto/language.dto';
 import { Language } from '../entities/language.entity';
-import { LanguageQbService } from './language.qb.service';
+import { LanguageQueryService } from './language.query.service';
 
 @Injectable()
 export class LanguageService {
@@ -20,8 +20,8 @@ export class LanguageService {
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
 
-		private readonly languageQbService: LanguageQbService,
-	) {}
+		private readonly languageQueryService: LanguageQueryService,
+	) { }
 
 	async create(createLanguageDto: CreateLanguageDto): Promise<Language> {
 		const { code, name } = createLanguageDto;
@@ -47,7 +47,7 @@ export class LanguageService {
 	async getList(query: QueryGetListLanguageDto): Promise<PageDto<Language>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.languageQbService.createQueryGetList(query);
+		const queryGetList = this.languageQueryService.createQueryGetList(query);
 
 		const [languages, totalItems] = await queryGetList.getManyAndCount();
 
@@ -80,7 +80,57 @@ export class LanguageService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
+		const language = await this.languageQueryService.findOneWithCountRelation(id);
+		if (!language) {
+			throw new ResponseError({
+				message: LanguageMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		if ((language.releaseLocalizesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.releaseLocalizesCount} release localization(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((language.releaseAudiolanguagesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.releaseAudiolanguagesCount} release audio language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((language.releaseMetadataLanguagesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.releaseMetadataLanguagesCount} release metadata language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((language.trackAudioLanguagesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.trackAudioLanguagesCount} track audio language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((language.trackMetadataLanguagesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.trackMetadataLanguagesCount} track metadata language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((language.trackLocalizesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this language because it is linked to ${language.trackLocalizesCount} track localization(s).`,
+				statusCode: 400,
+			});
+		}
+
 		await this.languageRepo.delete(id);
 	}
 

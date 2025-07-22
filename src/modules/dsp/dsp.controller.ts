@@ -22,7 +22,7 @@ import { DspService } from './services/dsp.service';
 @ApiTags('DSPs')
 @Controller('dsps')
 export class DspController {
-	constructor(private readonly dspService: DspService) {}
+	constructor(private readonly dspService: DspService) { }
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new DSP' })
@@ -84,7 +84,7 @@ export class DspController {
 	@ApiResponse({ status: 200, description: DspMessageSuccess.DELETE })
 	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.dspService.remove(id);
+		await this.dspService.delete(id);
 		return new ResponseSuccess({
 			messageCode: DspMessageCodeSuccess.DELETE,
 		});

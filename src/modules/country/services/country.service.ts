@@ -23,7 +23,7 @@ export class CountryService {
 		private readonly countryRepo: Repository<Country>,
 
 		private readonly countryQueryService: CountryQueryService,
-	) {}
+	) { }
 
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
 		await this.validate({ name: createCountryDto.name });
@@ -78,7 +78,37 @@ export class CountryService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
+		const country = await this.countryQueryService.findOneWithCountRelation(id)
+		if (!country) {
+			throw new ResponseError({
+				message: CountryMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		if ((country.releaseMetadataLanguageCountriesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this country because it is linked to ${country.releaseMetadataLanguageCountriesCount} release metadata language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((country.trackMetadataLanguageCountriesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this country because it is linked to ${country.trackMetadataLanguageCountriesCount} track metadata language(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((country.trackRecordingCountriesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this country because it is linked to ${country.trackRecordingCountriesCount} track recording(s).`,
+				statusCode: 400,
+			});
+		}
+
+
 		await this.countryRepo.delete(id);
 	}
 

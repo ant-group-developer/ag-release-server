@@ -5,11 +5,11 @@ import { QueryGetListTimezoneDto } from '../dto/timezone.dto';
 import { Timezone } from '../entities/timezone.entity';
 
 @Injectable()
-export class TimezoneQbService {
+export class TimezoneQueryService {
 	constructor(
 		@InjectRepository(Timezone)
 		private readonly timezoneRepo: Repository<Timezone>,
-	) {}
+	) { }
 
 	createQueryGetList(query: QueryGetListTimezoneDto) {
 		const {
@@ -81,4 +81,17 @@ export class TimezoneQbService {
 
 		return queryBuilder;
 	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.timezoneRepo
+			.createQueryBuilder('timezone')
+			.where('timezone.id = :id', { id })
+			.loadRelationCountAndMap(
+				'timezone.releasesCount',
+				'timezone.releases'
+			);
+
+		return await queryBuilder.getOne();
+	}
+
 }

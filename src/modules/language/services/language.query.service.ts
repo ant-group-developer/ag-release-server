@@ -5,11 +5,11 @@ import { QueryGetListLanguageDto } from '../dto/language.dto';
 import { Language } from '../entities/language.entity';
 
 @Injectable()
-export class LanguageQbService {
+export class LanguageQueryService {
 	constructor(
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
-	) {}
+	) { }
 
 	createQueryGetList(query: QueryGetListLanguageDto) {
 		const {
@@ -59,5 +59,38 @@ export class LanguageQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.languageRepo
+			.createQueryBuilder('language')
+			.where('language.id = :id', { id })
+
+			.loadRelationCountAndMap(
+				'language.releaseLocalizesCount',
+				'language.releaseLocalizes',
+			)
+			.loadRelationCountAndMap(
+				'language.releaseAudiolanguagesCount',
+				'language.releaseAudiolanguages',
+			)
+
+			.loadRelationCountAndMap(
+				'language.releaseMetadataLanguagesCount',
+				'language.releaseMetadataLanguages',
+			)
+
+			.loadRelationCountAndMap(
+				'language.trackAudioLanguagesCount',
+				'language.trackAudioLanguages',
+			).loadRelationCountAndMap(
+				'language.trackMetadataLanguagesCount',
+				'language.trackMetadataLanguages',
+			).loadRelationCountAndMap(
+				'language.trackLocalizesCount',
+				'language.trackLocalizes',
+			);
+
+		return await queryBuilder.getOne();
 	}
 }
