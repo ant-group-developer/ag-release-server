@@ -23,7 +23,7 @@ export class CountryService {
 		private readonly countryRepo: Repository<Country>,
 
 		private readonly countryQueryService: CountryQueryService,
-	) { }
+	) {}
 
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
 		await this.validate({ name: createCountryDto.name });
@@ -79,7 +79,8 @@ export class CountryService {
 	}
 
 	async delete(id: string): Promise<void> {
-		const country = await this.countryQueryService.findOneWithCountRelation(id)
+		const country =
+			await this.countryQueryService.findOneWithCountRelation(id);
 		if (!country) {
 			throw new ResponseError({
 				message: CountryMessageError.NOT_FOUND,
@@ -107,7 +108,6 @@ export class CountryService {
 				statusCode: 400,
 			});
 		}
-
 
 		await this.countryRepo.delete(id);
 	}

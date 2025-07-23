@@ -61,4 +61,15 @@ export class TrackOriginTypeQueryService {
 
 		return queryBuilder;
 	}
+
+	async findOneWithCountRelation(id: string) {
+		return await this.trackOriginTypeRepo
+			.createQueryBuilder('trackOriginType')
+			.where('trackOriginType.id = :id', { id })
+			.loadRelationCountAndMap(
+				'trackOriginType.tracksCount',
+				'trackOriginType.tracks',
+			)
+			.getOne();
+	}
 }

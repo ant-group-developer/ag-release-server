@@ -27,7 +27,7 @@ import { LanguageService } from './services/language.service';
 @ApiTags('Languages')
 @Controller('languages')
 export class LanguageController {
-	constructor(private readonly languageService: LanguageService) { }
+	constructor(private readonly languageService: LanguageService) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new language' })
@@ -63,7 +63,9 @@ export class LanguageController {
 		status: 404,
 		description: LanguageMessageError.NOT_FOUND,
 	})
-	async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<Language>> {
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Language>> {
 		const result = await this.languageService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -116,7 +118,9 @@ export class LanguageController {
 		status: 200,
 		description: LanguageMessageSuccess.DELETE,
 	})
-	async remove(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<void>> {
+	async remove(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
 		await this.languageService.delete(id);
 		return new ResponseSuccess({
 			messageCode: LanguageMessageCodeSuccess.DELETE,

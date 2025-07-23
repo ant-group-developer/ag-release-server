@@ -10,7 +10,7 @@ export class CountryQueryService {
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
-	) { }
+	) {}
 
 	createQueryGetList(query: QueryGetListCountryDto) {
 		const {
@@ -111,5 +111,4 @@ export class CountryQueryService {
 
 		return await queryBuilder.getOne();
 	}
-
 }

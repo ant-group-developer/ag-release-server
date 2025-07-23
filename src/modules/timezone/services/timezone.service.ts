@@ -18,7 +18,7 @@ export class TimezoneService {
 		private readonly timezoneRepo: Repository<Timezone>,
 
 		private readonly timezoneQueryService: TimezoneQueryService,
-	) { }
+	) {}
 
 	async create(createTimezoneDto: CreateTimezoneDto): Promise<Timezone> {
 		const timezone = this.timezoneRepo.create(createTimezoneDto);
@@ -40,7 +40,8 @@ export class TimezoneService {
 	async getList(query: QueryGetListTimezoneDto): Promise<PageDto<Timezone>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.timezoneQueryService.createQueryGetList(query);
+		const queryGetList =
+			this.timezoneQueryService.createQueryGetList(query);
 
 		const [timezones, totalItems] = await queryGetList.getManyAndCount();
 
@@ -65,7 +66,8 @@ export class TimezoneService {
 	}
 
 	async delete(id: string): Promise<void> {
-		const timezone = await this.timezoneQueryService.findOneWithCountRelation(id);
+		const timezone =
+			await this.timezoneQueryService.findOneWithCountRelation(id);
 
 		if (!timezone) {
 			throw new ResponseError({
@@ -83,5 +85,4 @@ export class TimezoneService {
 
 		await this.timezoneRepo.delete(id);
 	}
-
 }

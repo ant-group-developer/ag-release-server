@@ -19,7 +19,7 @@ export class DspService {
 
 		private readonly bucketService: BucketService,
 		private readonly dspQueryService: DspQueryService,
-	) { }
+	) {}
 
 	async create(createDspDto: CreateDspDto): Promise<Dsp> {
 		await this.validate({ name: createDspDto.name });
@@ -73,7 +73,10 @@ export class DspService {
 		const dsp = await this.dspQueryService.findOneWithCountRelation(id);
 
 		if (!dsp) {
-			throw new ResponseError({ message: 'DSP not found.', statusCode: 404 });
+			throw new ResponseError({
+				message: 'DSP not found.',
+				statusCode: 404,
+			});
 		}
 
 		if ((dsp.organizationDspsCount ?? 0) > 0) {

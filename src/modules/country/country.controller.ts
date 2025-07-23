@@ -27,7 +27,7 @@ import { CountryService } from './services/country.service';
 @ApiTags('Countries')
 @Controller('countries')
 export class CountryController {
-	constructor(private readonly countryService: CountryService) { }
+	constructor(private readonly countryService: CountryService) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new country' })

@@ -9,7 +9,7 @@ export class DspQueryService {
 	constructor(
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
-	) { }
+	) {}
 
 	createQueryGetList(query: QueryGetListDspDto) {
 		const {
@@ -67,14 +67,10 @@ export class DspQueryService {
 			.where('dsp.id = :id', { id })
 			.loadRelationCountAndMap(
 				'dsp.organizationDspsCount',
-				'dsp.organizationDsps'
+				'dsp.organizationDsps',
 			)
-			.loadRelationCountAndMap(
-				'dsp.releaseDspsCount',
-				'dsp.releaseDsps'
-			);
+			.loadRelationCountAndMap('dsp.releaseDspsCount', 'dsp.releaseDsps');
 
 		return await queryBuilder.getOne();
 	}
-
 }

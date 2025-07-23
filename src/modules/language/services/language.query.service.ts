@@ -9,7 +9,7 @@ export class LanguageQueryService {
 	constructor(
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
-	) { }
+	) {}
 
 	createQueryGetList(query: QueryGetListLanguageDto) {
 		const {
@@ -83,10 +83,12 @@ export class LanguageQueryService {
 			.loadRelationCountAndMap(
 				'language.trackAudioLanguagesCount',
 				'language.trackAudioLanguages',
-			).loadRelationCountAndMap(
+			)
+			.loadRelationCountAndMap(
 				'language.trackMetadataLanguagesCount',
 				'language.trackMetadataLanguages',
-			).loadRelationCountAndMap(
+			)
+			.loadRelationCountAndMap(
 				'language.trackLocalizesCount',
 				'language.trackLocalizes',
 			);

@@ -9,7 +9,7 @@ export class TimezoneQueryService {
 	constructor(
 		@InjectRepository(Timezone)
 		private readonly timezoneRepo: Repository<Timezone>,
-	) { }
+	) {}
 
 	createQueryGetList(query: QueryGetListTimezoneDto) {
 		const {
@@ -88,10 +88,9 @@ export class TimezoneQueryService {
 			.where('timezone.id = :id', { id })
 			.loadRelationCountAndMap(
 				'timezone.releasesCount',
-				'timezone.releases'
+				'timezone.releases',
 			);
 
 		return await queryBuilder.getOne();
 	}
-
 }

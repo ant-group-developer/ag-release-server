@@ -10,4 +10,4 @@ import { LanguageService } from './services/language.service';
 	controllers: [LanguageController],
 	providers: [LanguageService, LanguageQueryService],
 })
-export class LanguageModule { }
+export class LanguageModule {}

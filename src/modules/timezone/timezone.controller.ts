@@ -27,7 +27,7 @@ import { TimezoneService } from './services/timezone.service';
 @ApiTags('Timezones')
 @Controller('timezones')
 export class TimezoneController {
-	constructor(private readonly timezoneService: TimezoneService) { }
+	constructor(private readonly timezoneService: TimezoneService) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Create a new timezone' })
@@ -55,7 +55,9 @@ export class TimezoneController {
 		status: 404,
 		description: TimezoneMessageError.NOT_FOUND,
 	})
-	async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<Timezone>> {
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Timezone>> {
 		const result = await this.timezoneService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -100,7 +102,9 @@ export class TimezoneController {
 		status: 200,
 		description: TimezoneMessageSuccess.DELETE,
 	})
-	async delete(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<void>> {
+	async delete(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
 		await this.timezoneService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TimezoneMessageCodeSuccess.DELETE,

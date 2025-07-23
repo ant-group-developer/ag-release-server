@@ -21,7 +21,7 @@ export class LanguageService {
 		private readonly languageRepo: Repository<Language>,
 
 		private readonly languageQueryService: LanguageQueryService,
-	) { }
+	) {}
 
 	async create(createLanguageDto: CreateLanguageDto): Promise<Language> {
 		const { code, name } = createLanguageDto;
@@ -47,7 +47,8 @@ export class LanguageService {
 	async getList(query: QueryGetListLanguageDto): Promise<PageDto<Language>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.languageQueryService.createQueryGetList(query);
+		const queryGetList =
+			this.languageQueryService.createQueryGetList(query);
 
 		const [languages, totalItems] = await queryGetList.getManyAndCount();
 
@@ -81,7 +82,8 @@ export class LanguageService {
 	}
 
 	async delete(id: string): Promise<void> {
-		const language = await this.languageQueryService.findOneWithCountRelation(id);
+		const language =
+			await this.languageQueryService.findOneWithCountRelation(id);
 		if (!language) {
 			throw new ResponseError({
 				message: LanguageMessageError.NOT_FOUND,

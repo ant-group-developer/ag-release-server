@@ -48,7 +48,6 @@ export class Language extends BaseUUIDEntity {
 	@OneToMany(() => TrackLocalize, (trackLocalize) => trackLocalize.language)
 	trackLocalizes: TrackLocalize[];
 
-
 	// count relation
 	releaseLocalizesCount?: number;
 	releaseAudiolanguagesCount?: number;

@@ -88,7 +88,28 @@ export class TrackOriginTypeService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	// async delete(id: string): Promise<void> {
+	// 	await this.trackOriginTypeRepo.delete(id);
+	// }
+
+	async delete(id: string): Promise<void> {
+		const originType =
+			await this.trackOriginTypeQueryService.findOneWithCountRelation(id);
+
+		if (!originType) {
+			throw new ResponseError({
+				message: 'Track origin type not found.',
+				statusCode: 404,
+			});
+		}
+
+		if ((originType.tracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this track origin type because it is linked to ${originType.tracksCount} track(s).`,
+				statusCode: 400,
+			});
+		}
+
 		await this.trackOriginTypeRepo.delete(id);
 	}
 

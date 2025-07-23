@@ -77,7 +77,24 @@ export class TrackTypeService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
+		const trackType =
+			await this.trackTypeQueryService.findOneWithCountRelation(id);
+
+		if (!trackType) {
+			throw new ResponseError({
+				message: 'Track type not found.',
+				statusCode: 404,
+			});
+		}
+
+		if ((trackType.tracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this track type because it is linked to ${trackType.tracksCount} track(s).`,
+				statusCode: 400,
+			});
+		}
+
 		await this.trackTypeRepo.delete(id);
 	}
 

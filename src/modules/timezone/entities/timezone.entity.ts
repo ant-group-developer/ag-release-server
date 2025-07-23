@@ -15,8 +15,8 @@ export class Timezone extends BaseUUIDEntity {
 
 	// relation
 	@OneToMany(() => Release, (release) => release.timeZone)
-	releases: Release[]
+	releases: Release[];
 
 	// count relation
-	releasesCount?: number
+	releasesCount?: number;
 }

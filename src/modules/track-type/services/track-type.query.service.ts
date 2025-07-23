@@ -60,4 +60,15 @@ export class TrackTypeQueryService {
 
 		return queryBuilder;
 	}
+
+	async findOneWithCountRelation(id: string) {
+		return await this.trackTypeRepo
+			.createQueryBuilder('trackType')
+			.where('trackType.id = :id', { id })
+			.loadRelationCountAndMap(
+				'trackType.tracksCount',
+				'trackType.tracks',
+			)
+			.getOne();
+	}
 }
