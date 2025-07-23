@@ -9,12 +9,14 @@ import {
 	ReleaseArtistMessageCodeError,
 	ReleaseArtistMessageError,
 } from '../constants/release-artist.constant';
-import { UpdateReleaseArtistDto } from '../dto/release-artist.dto';
 import { ReleaseArtist } from '../entities/release-artist.entity';
 
 @Injectable()
 export class ReleaseArtistValidateService {
 	constructor(
+		@InjectRepository(ReleaseArtist)
+		private readonly releaseArtistRepo: Repository<ReleaseArtist>,
+
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 
@@ -25,7 +27,7 @@ export class ReleaseArtistValidateService {
 		private readonly releaseRepo: Repository<Release>,
 	) {}
 
-	async validate({
+	private async validateForeignKey({
 		artistRoleId,
 		artistId,
 		releaseId,
@@ -76,31 +78,67 @@ export class ReleaseArtistValidateService {
 		}
 	}
 
-	async handleValidateUpdate({
+	private async validateUnique({
+		releaseId,
+		artistRoleId,
+		artistId,
+	}: {
+		artistRoleId: string;
+		artistId: string;
+		releaseId: string;
+	}) {
+		const releaseArtist = await this.releaseArtistRepo.findOne({
+			where: {
+				releaseId,
+				artistRoleId,
+				artistId,
+			},
+		});
+
+		if (releaseArtist) {
+			throw new ResponseError({
+				message: ReleaseArtistMessageError.UNIQUE_CONSTRAINT,
+				messageCode: ReleaseArtistMessageCodeError.UNIQUE_CONSTRAINT,
+			});
+		}
+	}
+
+	async handleValidateCreate({
 		releaseArtist,
-		dataUpdate,
 	}: {
 		releaseArtist: ReleaseArtist;
-		dataUpdate: UpdateReleaseArtistDto;
 	}) {
-		const { artistId, artistRoleId, releaseId } = dataUpdate;
+		await this.validateForeignKey(releaseArtist);
+		await this.validateUnique(releaseArtist);
+	}
 
-		if (artistId && artistId !== releaseArtist.artistId) {
-			await this.validate({
+	async handleValidateUpdate({
+		releaseArtistPrevious,
+		releaseArtistUpdate,
+	}: {
+		releaseArtistPrevious: ReleaseArtist;
+		releaseArtistUpdate: ReleaseArtist;
+	}) {
+		const { artistId, artistRoleId, releaseId } = releaseArtistUpdate;
+
+		if (artistId !== releaseArtistPrevious.artistId) {
+			await this.validateForeignKey({
 				artistId,
 			});
 		}
 
-		if (artistRoleId && artistRoleId !== releaseArtist.artistRoleId) {
-			await this.validate({
+		if (artistRoleId !== releaseArtistPrevious.artistRoleId) {
+			await this.validateForeignKey({
 				artistRoleId,
 			});
 		}
 
-		if (releaseId && releaseId !== releaseArtist.releaseId) {
-			await this.validate({
+		if (releaseId !== releaseArtistPrevious.releaseId) {
+			await this.validateForeignKey({
 				releaseId,
 			});
 		}
+
+		await this.validateUnique(releaseArtistUpdate);
 	}
 }

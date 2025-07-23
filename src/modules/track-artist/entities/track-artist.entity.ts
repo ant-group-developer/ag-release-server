@@ -2,10 +2,10 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { TypeSource } from '../enum/track-artist.enum';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 @Entity('track_artist')
+@Unique(['artistId', 'artistRoleId', 'trackId'])
 export class TrackArtist extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	artistId: string;
@@ -22,10 +22,16 @@ export class TrackArtist extends BaseUUIDEntity {
 		nullable: true,
 		comment: 'column for auto sync artist from release',
 	})
-	releaseArtistId: string;
+	releaseArtistId: string | null;
 
-	@Column({ type: 'enum', nullable: true, enum: TypeSource })
-	typeSource: TypeSource;
+	// @Column({ type: 'enum', nullable: true, enum: TypeSource })
+	// typeSource: TypeSource | null;
+
+	@Column({ type: 'boolean', default: false })
+	isFromReleaseAction: boolean;
+
+	@Column({ type: 'boolean', default: false })
+	isFromTrackAction: boolean;
 
 	// relation
 	@ManyToOne(() => ArtistRole)
