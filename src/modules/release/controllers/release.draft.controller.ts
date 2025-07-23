@@ -18,7 +18,7 @@ import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
-import { IReleaseDraft } from '../interfaces/release.interface';
+import { IReleaseDetail, IReleaseDraft } from '../interfaces/release.interface';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
 @ApiTags('Releases Draft')
@@ -42,7 +42,7 @@ export class ReleaseDraftController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
-	): Promise<ResponseSuccess<IReleaseDraft>> {
+	): Promise<ResponseSuccess<IReleaseDetail>> {
 		const result = await this.releaseDraftService.update(id, data);
 		return new ResponseSuccess({
 			data: result,

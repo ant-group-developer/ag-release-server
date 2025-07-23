@@ -124,6 +124,11 @@ export class ReleaseQueryService {
 				'releaseLanguage.metadataLanguage',
 				'metadataLanguage',
 			)
+			.leftJoinAndSelect('releaseLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect(
+				'releaseLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
 
 			.leftJoinAndSelect('release.timeZone', 'timeZone')
 
