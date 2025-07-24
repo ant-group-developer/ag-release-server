@@ -24,9 +24,6 @@ export class TrackArtist extends BaseUUIDEntity {
 	})
 	releaseArtistId: string | null;
 
-	// @Column({ type: 'enum', nullable: true, enum: TypeSource })
-	// typeSource: TypeSource | null;
-
 	@Column({ type: 'boolean', default: false })
 	isFromReleaseAction: boolean;
 

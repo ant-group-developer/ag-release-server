@@ -45,21 +45,25 @@ export class TrackArtistValidateService {
 			await this.validateForeignKey({
 				artistId,
 			});
+
+			await this.validateUnique(trackArtistUpdate);
 		}
 
 		if (artistRoleId !== trackArtistPrevious.artistRoleId) {
 			await this.validateForeignKey({
 				artistRoleId,
 			});
+
+			await this.validateUnique(trackArtistUpdate);
 		}
 
 		if (trackId !== trackArtistPrevious.trackId) {
 			await this.validateForeignKey({
 				trackId,
 			});
-		}
 
-		await this.validateUnique(trackArtistUpdate);
+			await this.validateUnique(trackArtistUpdate);
+		}
 	}
 
 	private async validateForeignKey({

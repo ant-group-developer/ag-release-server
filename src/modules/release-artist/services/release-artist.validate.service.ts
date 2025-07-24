@@ -125,20 +125,23 @@ export class ReleaseArtistValidateService {
 			await this.validateForeignKey({
 				artistId,
 			});
+			await this.validateUnique(releaseArtistUpdate);
 		}
 
 		if (artistRoleId !== releaseArtistPrevious.artistRoleId) {
 			await this.validateForeignKey({
 				artistRoleId,
 			});
+
+			await this.validateUnique(releaseArtistUpdate);
 		}
 
 		if (releaseId !== releaseArtistPrevious.releaseId) {
 			await this.validateForeignKey({
 				releaseId,
 			});
-		}
 
-		await this.validateUnique(releaseArtistUpdate);
+			await this.validateUnique(releaseArtistUpdate);
+		}
 	}
 }

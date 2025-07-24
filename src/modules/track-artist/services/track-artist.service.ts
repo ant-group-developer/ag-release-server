@@ -11,6 +11,7 @@ import {
 	UpdateTrackArtistDto,
 } from '../dto/track-artist.dto';
 import { TrackArtist } from '../entities/track-artist.entity';
+import { TypeSource } from '../enum/track-artist.enum';
 import { TrackArtistValidateService } from './track-artist.validate.service';
 
 @Injectable()
@@ -31,6 +32,60 @@ export class TrackArtistService {
 		return await this.trackArtistRepo.save(trackArtist);
 	}
 
+	private async mergeTrackArtists({
+		items,
+		typeSource,
+	}: {
+		items: {
+			artistId: string;
+			artistRoleId: string;
+			trackId: string;
+			releaseArtistId: string;
+		}[];
+		typeSource: TypeSource;
+	}) {
+		for (const item of items) {
+			const { artistId, artistRoleId, trackId, releaseArtistId } = item;
+
+			const existing = await this.trackArtistRepo.findOne({
+				where: { artistId, artistRoleId, trackId },
+			});
+
+			if (existing) {
+				if (
+					!existing.isFromReleaseAction &&
+					typeSource === TypeSource.SOURCE2
+				) {
+					existing.isFromReleaseAction = true;
+				}
+
+				if (
+					!existing.isFromTrackAction &&
+					typeSource === TypeSource.SOURCE1
+				) {
+					existing.isFromTrackAction = true;
+				}
+
+				existing.releaseArtistId = releaseArtistId;
+
+				await this.trackArtistRepo.save(existing);
+			} else {
+				const newEntry = this.trackArtistRepo.create({
+					artistId,
+					artistRoleId,
+					trackId,
+					isFromReleaseAction:
+						typeSource === TypeSource.SOURCE2 ? true : false,
+					isFromTrackAction:
+						typeSource === TypeSource.SOURCE1 ? true : false,
+					releaseArtistId: releaseArtistId,
+				});
+
+				await this.trackArtistRepo.save(newEntry);
+			}
+		}
+	}
+
 	async copyArtistFromReleaseSource1({
 		releaseId,
 		trackId,
@@ -43,18 +98,17 @@ export class TrackArtistService {
 		});
 
 		if (releaseArtists.length > 0) {
-			const trackArtistData = releaseArtists.map((releaseArtist) => ({
+			const trackArtist = releaseArtists.map((releaseArtist) => ({
 				artistId: releaseArtist.artistId,
 				artistRoleId: releaseArtist.artistRoleId,
 				trackId,
 				releaseArtistId: releaseArtist.id,
-				isFromTrackAction: true,
 			}));
 
-			const trackArtistEntities =
-				this.trackArtistRepo.create(trackArtistData);
-
-			await this.trackArtistRepo.save(trackArtistEntities);
+			await this.mergeTrackArtists({
+				items: trackArtist,
+				typeSource: TypeSource.SOURCE1,
+			});
 		}
 	}
 
@@ -83,17 +137,17 @@ export class TrackArtistService {
 	) {
 		const { artistId, artistRoleId } = releaseArtist;
 
-		const trackArtistEntities = tracksOfRelease.map((track) => {
-			return this.trackArtistRepo.create({
-				trackId: track.id,
-				artistId,
-				artistRoleId,
-				isFromReleaseAction: true,
-				releaseArtistId: releaseArtist.id,
-			});
-		});
+		const trackArtistEntities = tracksOfRelease.map((track) => ({
+			trackId: track.id,
+			artistId,
+			artistRoleId,
+			releaseArtistId: releaseArtist.id,
+		}));
 
-		await this.trackArtistRepo.save(trackArtistEntities);
+		await this.mergeTrackArtists({
+			items: trackArtistEntities,
+			typeSource: TypeSource.SOURCE2,
+		});
 	}
 
 	async copyArtistFromReleaseSource2({
@@ -108,15 +162,16 @@ export class TrackArtistService {
 		});
 
 		if (releaseArtists.length > 0) {
-			const trackArtistData = releaseArtists.map((releaseArtist) => ({
-				artistId: releaseArtist.artistId,
-				artistRoleId: releaseArtist.artistRoleId,
-				trackId,
-				releaseArtistId: releaseArtist.id,
-				isFromTrackAction: true,
-			}));
-			const trackArtistEntities =
-				this.trackArtistRepo.create(trackArtistData);
+			const trackArtistEntities = this.trackArtistRepo.create(
+				releaseArtists.map((releaseArtist) => ({
+					artistId: releaseArtist.artistId,
+					artistRoleId: releaseArtist.artistRoleId,
+					trackId,
+					releaseArtistId: releaseArtist.id,
+					isFromReleaseAction: true,
+				})),
+			);
+
 			await this.trackArtistRepo.save(trackArtistEntities);
 		}
 	}
@@ -210,21 +265,37 @@ export class TrackArtistService {
 	}
 
 	async deleteArtistSource1(trackId: string) {
+		await this.trackArtistRepo
+			.createQueryBuilder()
+			.update()
+			.set({
+				isFromTrackAction: false,
+			})
+			.where('trackId = :trackId', { trackId })
+			.andWhere('isFromTrackAction = true')
+			.andWhere('releaseArtistId IS NOT NULL')
+			.execute();
+
+		await this.deleteUnusedTrackArtists(trackId);
+	}
+
+	private async deleteUnusedTrackArtists(trackId: string) {
 		await this.trackArtistRepo.delete({
 			trackId,
-			isFromTrackAction: true,
+			isFromReleaseAction: false,
+			isFromTrackAction: false,
 		});
 	}
 
 	async deleteArtistTracks2(releaseArtist: ReleaseArtist) {
-		const { releaseId } = releaseArtist;
+		const { releaseId, id: releaseArtistId } = releaseArtist;
 
 		const trackArtists = await this.trackArtistRepo
 			.createQueryBuilder('trackArtist')
 			.leftJoin('trackArtist.track', 'track')
 			.where('track.releaseId = :releaseId', { releaseId })
 			.andWhere('trackArtist.releaseArtistId = :releaseArtistId', {
-				releaseArtistId: releaseArtist.id,
+				releaseArtistId,
 			})
 			.andWhere(
 				'trackArtist.isFromReleaseAction = :isFromReleaseAction',
@@ -232,11 +303,17 @@ export class TrackArtistService {
 					isFromReleaseAction: true,
 				},
 			)
-			.select('trackArtist.id')
 			.getMany();
-		const ids = trackArtists.map((ta) => ta.id);
-		if (ids.length) {
-			await this.trackArtistRepo.delete(ids);
+
+		if (trackArtists.length) {
+			for (const trackArtist of trackArtists) {
+				await this.trackArtistRepo.update(
+					{ id: trackArtist.id },
+					{ isFromReleaseAction: false },
+				);
+
+				await this.deleteUnusedTrackArtists(trackArtist.trackId);
+			}
 		}
 	}
 

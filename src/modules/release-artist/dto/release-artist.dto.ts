@@ -23,6 +23,10 @@ export class CreateReleaseArtistDto {
 	@IsNotEmpty()
 	@IsUUID()
 	releaseId: string;
+
+	@IsBoolean()
+	@IsNotEmpty()
+	addArtistToTracks: boolean;
 }
 
 export class UpdateReleaseArtistDto extends PartialType(

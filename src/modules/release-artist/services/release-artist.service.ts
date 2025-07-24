@@ -32,9 +32,26 @@ export class ReleaseArtistService {
 
 		const releaseArtistDb =
 			await this.releaseArtistRepo.save(releaseArtist);
-		await this.pushArtistToTracksSource1(releaseArtistDb);
+
+		await this.handleCreateSubEntities({
+			releaseArtist: releaseArtistDb,
+			createDto: data,
+		});
 
 		return releaseArtistDb;
+	}
+
+	private async handleCreateSubEntities({
+		releaseArtist,
+		createDto,
+	}: {
+		releaseArtist: ReleaseArtist;
+		createDto: CreateReleaseArtistDto;
+	}) {
+		await this.pushArtistToTracksSource1(releaseArtist);
+		if (createDto.addArtistToTracks) {
+			await this.trackDraftService.addArtistToTracks2(releaseArtist);
+		}
 	}
 
 	private async pushArtistToTracksSource1(releaseArtist: ReleaseArtist) {
@@ -130,6 +147,7 @@ export class ReleaseArtistService {
 			) {
 				await this.trackDraftService.addArtistToTracks2(releaseArtist);
 			}
+
 			if (
 				addArtistToTracks === false &&
 				addArtistToTracks !== addArtistToTracksPrevious
