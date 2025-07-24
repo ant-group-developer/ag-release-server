@@ -159,4 +159,9 @@ export class ReleaseDraftService {
 		await this.trackDraftService.deleteRecordOfRelease({ releaseId });
 		await this.releaseTerritoryService.deleteRecordOfRelease({ releaseId });
 	}
+
+	// other
+	async validateSchemaRelease(id: string) {
+		return await this.releaseValidateService.validateSchemaRelease(id);
+	}
 }

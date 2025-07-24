@@ -16,11 +16,15 @@ import {
 	IRelease,
 	IReleaseDraft,
 	IReleaseNonDraft,
+	ReleaseSchema,
 } from '../interfaces/release.interface';
 
 @Injectable()
 export class ReleaseValidateService {
 	constructor(
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
+
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
 
@@ -178,5 +182,29 @@ export class ReleaseValidateService {
 				releaseTimezoneId,
 			});
 		}
+	}
+
+	async validateSchemaRelease(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				tracks: { audioFile: true },
+			},
+		});
+
+		if (!release) {
+			throw new ResponseError({
+				message: ReleaseMessageError.NOT_FOUND,
+				messageCode: ReleaseMessageCodeError.NOT_FOUND,
+			});
+		}
+
+		const validationResult = ReleaseSchema.safeParse(release);
+
+		if (!validationResult.success) {
+			return validationResult.error.errors;
+		}
+
+		return release;
 	}
 }

@@ -2,6 +2,7 @@ import {
 	Body,
 	Controller,
 	Delete,
+	Get,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -48,6 +49,12 @@ export class ReleaseDraftController {
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
 		});
+	}
+
+	@Get(':id/validate')
+	async validateSchemaRelease(@Param('id') id: string) {
+		const result = await this.releaseDraftService.validateSchemaRelease(id);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')
