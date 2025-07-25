@@ -35,6 +35,7 @@ export class BucketGcsController {
 				data: {
 					uploadUrl: 'https://storage.googleapis.com/...',
 					fileId: 'fileId',
+					key: 'string',
 				},
 			}),
 		},
@@ -86,15 +87,6 @@ export class BucketGcsController {
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);
-
-		return new ResponseSuccess({
-			data: result,
-		});
-	}
-
-	@Get('private/:id/test-peak')
-	async testPeak(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.bucketService.testPeak(id);
 
 		return new ResponseSuccess({
 			data: result,

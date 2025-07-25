@@ -13,7 +13,7 @@ import {
 	UpdateArtistDto,
 } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
-import { ArtistQbService } from './artist.qb.service';
+import { ArtistQueryService } from './artist.query.service';
 
 @Injectable()
 export class ArtistService {
@@ -22,7 +22,7 @@ export class ArtistService {
 		private readonly artistRepo: Repository<Artist>,
 
 		private readonly bucketService: BucketService,
-		private readonly artistQbService: ArtistQbService,
+		private readonly artistQueryService: ArtistQueryService,
 	) {}
 
 	async create(createArtistDto: CreateArtistDto): Promise<Artist> {
@@ -48,9 +48,8 @@ export class ArtistService {
 	async getList(query: QueryGetListArtistDto): Promise<PageDto<Artist>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.artistQbService.createQueryGetList(query);
-
-		const [artists, totalItems] = await queryGetList.getManyAndCount();
+		const [artists, totalItems] =
+			await this.artistQueryService.getList(query);
 
 		return new PageDto({
 			items: artists,
@@ -86,8 +85,31 @@ export class ArtistService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		const artist = await this.findOne(id);
+	async delete(id: string): Promise<void> {
+		const artist =
+			await this.artistQueryService.findOneWithCountRelation(id);
+
+		if (!artist) {
+			throw new ResponseError({
+				message: ArtistMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		if ((artist.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this artist because it is linked to ${artist.releaseCount} release(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((artist.trackCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this artist because it is linked to ${artist.trackCount} track(s).`,
+				statusCode: 400,
+			});
+		}
+
 		if (artist.picture)
 			await this.bucketService.deletePublicFile(artist.picture);
 		await this.artistRepo.delete(id);

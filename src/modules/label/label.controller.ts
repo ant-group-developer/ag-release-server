@@ -104,7 +104,7 @@ export class LabelController {
 		description: LabelMessageSuccess.DELETE,
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.labelService.remove(id);
+		await this.labelService.delete(id);
 		return new ResponseSuccess({
 			messageCode: LabelMessageCodeSuccess.DELETE,
 		});

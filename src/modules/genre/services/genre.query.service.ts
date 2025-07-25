@@ -5,7 +5,7 @@ import { QueryGetListGenreDto } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
 
 @Injectable()
-export class GenreQbService {
+export class GenreQueryService {
 	constructor(
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
@@ -59,5 +59,31 @@ export class GenreQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.genreRepo
+			.createQueryBuilder('genre')
+			.where('genre.id = :id', { id })
+
+			.loadRelationCountAndMap(
+				'genre.primaryGenreReleasesCount',
+				'genre.primaryGenreReleases',
+			)
+			.loadRelationCountAndMap(
+				'genre.subGenreReleasesCount',
+				'genre.subGenreReleases',
+			)
+
+			.loadRelationCountAndMap(
+				'genre.primaryGenreTracksCount',
+				'genre.primaryGenreTracks',
+			)
+			.loadRelationCountAndMap(
+				'genre.subGenreTracksCount',
+				'genre.subGenreTracks',
+			);
+
+		return await queryBuilder.getOne();
 	}
 }

@@ -41,15 +41,28 @@ export class Country extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })
 	continent: string;
 
-	@OneToMany(
-		() => TrackLanguage,
-		(trackLanguage) => trackLanguage.metadataLanguageCountry,
-	)
-	trackLanguages: TrackLanguage[];
-
+	// release
 	@OneToMany(
 		() => ReleaseLanguage,
 		(releaseLanguage) => releaseLanguage.metadataLanguageCountry,
 	)
-	releaseLanguages: ReleaseLanguage[];
+	releaseMetadataLanguageCountries: ReleaseLanguage[];
+
+	// relation
+	@OneToMany(
+		() => TrackLanguage,
+		(trackLanguage) => trackLanguage.metadataLanguageCountry,
+	)
+	trackMetadataLanguageCountries: TrackLanguage[];
+
+	@OneToMany(
+		() => TrackLanguage,
+		(trackLanguage) => trackLanguage.recordingCountry,
+	)
+	trackRecordingCountries: TrackLanguage[];
+
+	// count relation
+	releaseMetadataLanguageCountriesCount?: number;
+	trackMetadataLanguageCountriesCount?: number;
+	trackRecordingCountriesCount?: number;
 }

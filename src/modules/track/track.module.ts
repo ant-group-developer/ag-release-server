@@ -4,7 +4,6 @@ import { AudioFileModule } from '../audio-file/audio-file.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Release } from '../release/entities/release.entity';
-import { TrackArtist } from '../track-artist/entities/track-artist.entity';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackOriginType } from '../track-origin-type/entities/track-origin-type.entity';
@@ -21,9 +20,8 @@ import { TrackValidateService } from './services/track.validate.service';
 	imports: [
 		TypeOrmModule.forFeature([
 			Track,
-			Release,
 			Genre,
-			TrackArtist,
+			Release,
 			TrackType,
 			TrackOriginType,
 		]),

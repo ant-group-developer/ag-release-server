@@ -5,13 +5,13 @@ import { QueryGetListLabelDto } from '../dto/label.dto';
 import { Label } from '../entities/label.entity';
 
 @Injectable()
-export class LabelQbService {
+export class LabelQueryService {
 	constructor(
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
 	) {}
 
-	createQueryGetList(query: QueryGetListLabelDto) {
+	private createQueryGetList(query: QueryGetListLabelDto) {
 		const {
 			keyword,
 
@@ -59,5 +59,20 @@ export class LabelQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async getList(query: QueryGetListLabelDto) {
+		const queryGetList = this.createQueryGetList(query);
+		return await queryGetList.getManyAndCount();
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.labelRepo
+			.createQueryBuilder('label')
+			.where('label.id = :id', { id })
+
+			.loadRelationCountAndMap('label.releaseCount', 'label.releases');
+
+		return await queryBuilder.getOne();
 	}
 }

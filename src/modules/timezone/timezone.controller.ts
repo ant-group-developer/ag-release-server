@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -54,7 +55,9 @@ export class TimezoneController {
 		status: 404,
 		description: TimezoneMessageError.NOT_FOUND,
 	})
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Timezone>> {
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Timezone>> {
 		const result = await this.timezoneService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
@@ -83,7 +86,7 @@ export class TimezoneController {
 		description: TimezoneMessageError.NOT_FOUND,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTimezoneDto: UpdateTimezoneDto,
 	): Promise<ResponseSuccess<Timezone>> {
 		const result = await this.timezoneService.update(id, updateTimezoneDto);
@@ -99,8 +102,10 @@ export class TimezoneController {
 		status: 200,
 		description: TimezoneMessageSuccess.DELETE,
 	})
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.timezoneService.remove(id);
+	async delete(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.timezoneService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TimezoneMessageCodeSuccess.DELETE,
 		});

@@ -5,7 +5,7 @@ import { QueryGetListDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
 
 @Injectable()
-export class DspQbService {
+export class DspQueryService {
 	constructor(
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
@@ -59,5 +59,18 @@ export class DspQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.dspRepo
+			.createQueryBuilder('dsp')
+			.where('dsp.id = :id', { id })
+			.loadRelationCountAndMap(
+				'dsp.organizationDspsCount',
+				'dsp.organizationDsps',
+			)
+			.loadRelationCountAndMap('dsp.releaseDspsCount', 'dsp.releaseDsps');
+
+		return await queryBuilder.getOne();
 	}
 }

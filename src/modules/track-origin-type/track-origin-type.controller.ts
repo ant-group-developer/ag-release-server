@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -55,7 +56,7 @@ export class TrackOriginTypeController {
 		description: TrackOriginTypeMessageError.NOT_FOUND,
 	})
 	async findOne(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<TrackOriginType>> {
 		const result = await this.trackOriginTypeService.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -87,7 +88,7 @@ export class TrackOriginTypeController {
 		description: TrackOriginTypeMessageError.NOT_FOUND,
 	})
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackOriginTypeDto: UpdateTrackOriginTypeDto,
 	): Promise<ResponseSuccess<TrackOriginType>> {
 		const result = await this.trackOriginTypeService.update(
@@ -106,8 +107,10 @@ export class TrackOriginTypeController {
 		status: 200,
 		description: TrackOriginTypeMessageSuccess.DELETE,
 	})
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.trackOriginTypeService.remove(id);
+	async delete(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.trackOriginTypeService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TrackOriginTypeMessageCodeSuccess.DELETE,
 		});

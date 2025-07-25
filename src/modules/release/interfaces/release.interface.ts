@@ -8,6 +8,8 @@ import {
 	ReleaseType,
 } from '../enum/release.enum';
 
+import { z } from 'zod';
+
 export interface IRelease {
 	upc: string | null;
 	primaryGenreId: string | null;
@@ -76,3 +78,28 @@ export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	subGenre: Genre | null;
 	releaseLanguage: ReleaseLanguage | null;
 }
+
+export const ReleaseSchema = z.object({
+	upc: z.string().nullable().optional(),
+	primaryGenreId: z.string().length(10),
+	subGenreId: z.string().nullable().optional(),
+	labelId: z.string().length(10),
+	title: z.string().max(150),
+	version: z.string().nullable().optional(),
+	status: z.enum([
+		ReleaseStatus.DRAFT,
+		ReleaseStatus.PROCESSING,
+		ReleaseStatus.ISSUES,
+		ReleaseStatus.NEVER_DISTRIBUTED,
+		ReleaseStatus.DISTRIBUTED,
+		ReleaseStatus.TAKEN_DOWN,
+	]),
+	type: z.enum([ReleaseType.ALBUM, ReleaseType.SINGLE, ReleaseType.EP]),
+	releaseTimezoneId: z.string().uuid().nullable().optional(),
+	cLineOwner: z.string().max(200).nullable().optional(),
+	pLineOwner: z.string().max(200).nullable().optional(),
+	catalogId: z.string().max(100).nullable().optional(),
+	releaseDate: z.date().nullable().optional(),
+	releaseTime: z.string().length(5).nullable().optional(),
+	isVariousArtist: z.boolean(),
+});

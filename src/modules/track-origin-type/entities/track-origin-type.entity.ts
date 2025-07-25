@@ -8,4 +8,7 @@ export class TrackOriginType extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'varchar', length: 50, unique: true })
 	value: string;
+
+	// count relation
+	tracksCount?: number;
 }

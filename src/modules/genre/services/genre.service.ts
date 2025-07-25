@@ -13,7 +13,7 @@ import {
 	UpdateGenreDto,
 } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
-import { GenreQbService } from './genre.qb.service';
+import { GenreQueryService } from './genre.query.service';
 
 @Injectable()
 export class GenreService {
@@ -22,7 +22,7 @@ export class GenreService {
 		private readonly genreRepo: Repository<Genre>,
 
 		private readonly bucketService: BucketService,
-		private readonly genreQbService: GenreQbService,
+		private readonly genreQueryService: GenreQueryService,
 	) {}
 
 	async create(createGenreDto: CreateGenreDto): Promise<Genre> {
@@ -47,7 +47,7 @@ export class GenreService {
 	async getList(query: QueryGetListGenreDto): Promise<PageDto<Genre>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.genreQbService.createQueryGetList(query);
+		const queryGetList = this.genreQueryService.createQueryGetList(query);
 
 		const [genres, totalItems] = await queryGetList.getManyAndCount();
 
@@ -81,8 +81,46 @@ export class GenreService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		const genre = await this.findOne(id);
+	async delete(id: string): Promise<void> {
+		const genre = await this.genreQueryService.findOneWithCountRelation(id);
+
+		if (!genre) {
+			if (!genre) {
+				throw new ResponseError({
+					message: GenreMessageError.NOT_FOUND,
+					statusCode: 404,
+				});
+			}
+		}
+
+		if ((genre.primaryGenreReleasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this genre because it is linked to ${genre.primaryGenreReleasesCount} primary release(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.subGenreReleasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this genre because it is linked to ${genre.subGenreReleasesCount} sub-genre release(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.primaryGenreTracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this genre because it is linked to ${genre.primaryGenreTracksCount} primary track(s).`,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.subGenreTracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this genre because it is linked to ${genre.subGenreTracksCount} sub-genre track(s).`,
+				statusCode: 400,
+			});
+		}
+
 		if (genre.picture)
 			await this.bucketService.deletePublicFile(genre.picture);
 		await this.genreRepo.delete(id);

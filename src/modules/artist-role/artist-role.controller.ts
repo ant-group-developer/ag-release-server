@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -28,7 +29,6 @@ import { ArtistRoleService } from './services/artist-role.service';
 export class ArtistRoleController {
 	constructor(private readonly artistRoleService: ArtistRoleService) {}
 
-	@Post()
 	@ApiOperation({ summary: 'Create a new artist role' })
 	@ApiResponse({
 		status: 200,
@@ -38,6 +38,7 @@ export class ArtistRoleController {
 		status: 409,
 		description: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
 	})
+	@Post()
 	async create(
 		@Body() createArtistRoleDto: CreateArtistRoleDto,
 	): Promise<ResponseSuccess<ArtistRole>> {
@@ -48,7 +49,6 @@ export class ArtistRoleController {
 		});
 	}
 
-	@Get(':id')
 	@ApiOperation({ summary: 'Get an artist role by ID' })
 	@ApiResponse({
 		status: 200,
@@ -58,19 +58,20 @@ export class ArtistRoleController {
 		status: 404,
 		description: ArtistRoleMessageError.NOT_FOUND,
 	})
+	@Get(':id')
 	async findOne(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<ArtistRole>> {
 		const result = await this.artistRoleService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Get()
 	@ApiOperation({ summary: 'Get a list of artist roles' })
 	@ApiResponse({
 		status: 200,
 		description: 'List of artist roles',
 	})
+	@Get()
 	async getList(
 		@Query() query: QueryGetListArtistRoleDto,
 	): Promise<ResponseSuccess<PageDto<ArtistRole>>> {
@@ -78,7 +79,6 @@ export class ArtistRoleController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Put(':id')
 	@ApiOperation({ summary: 'Update an artist role by ID' })
 	@ApiResponse({
 		status: 200,
@@ -92,8 +92,9 @@ export class ArtistRoleController {
 		status: 404,
 		description: ArtistRoleMessageError.NOT_FOUND,
 	})
+	@Put(':id')
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateArtistRoleDto: UpdateArtistRoleDto,
 	): Promise<ResponseSuccess<ArtistRole>> {
 		const result = await this.artistRoleService.update(
@@ -106,14 +107,16 @@ export class ArtistRoleController {
 		});
 	}
 
-	@Delete(':id')
 	@ApiOperation({ summary: 'Delete an artist role by ID' })
 	@ApiResponse({
 		status: 200,
 		description: ArtistRoleMessageSuccess.DELETE,
 	})
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.artistRoleService.remove(id);
+	@Delete(':id')
+	async delete(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.artistRoleService.delete(id);
 		return new ResponseSuccess({
 			messageCode: ArtistRoleMessageCodeSuccess.DELETE,
 		});

@@ -100,7 +100,7 @@ export class ReleaseCoverArtService {
 	): Promise<Record<ReleaseCoverArtSize, string>> {
 		// 1. Get original image as buffer
 		const {
-			fileBuffet: originalBuffer,
+			fileBuffer: originalBuffer,
 			fileDb: { fileName, contentType, extension },
 		} = await this.bucketService.getFileBuffer(fileId);
 
@@ -117,14 +117,17 @@ export class ReleaseCoverArtService {
 
 		// 3. Resize the original image to each target size
 		const resizedBuffers: Record<string, Buffer> = {};
-		for (const size of resizeSizes) {
-			const [width, height] = size.split('x').map(Number);
-			const buffer = await sharp(originalBuffer)
-				.resize(width, height)
-				.toFormat(extensionValidated)
-				.toBuffer();
-			resizedBuffers[size] = buffer;
-		}
+
+		await Promise.all(
+			resizeSizes.map(async (size) => {
+				const [width, height] = size.split('x').map(Number);
+				const buffer = await sharp(originalBuffer)
+					.resize(width, height)
+					.toFormat(extensionValidated)
+					.toBuffer();
+				resizedBuffers[size] = buffer;
+			}),
+		);
 
 		// 4. Generate upload URLs for resized images
 		const resCreateBuckets = await this.bucketService.bulkCreate({
@@ -145,19 +148,22 @@ export class ReleaseCoverArtService {
 
 		// 5. Upload resized images to the bucket
 		const result = {} as Record<ReleaseCoverArtSize, string>;
+		await Promise.all(
+			resCreateBuckets.map(async (item) => {
+				const buffer = resizedBuffers[item.key!];
+				if (!buffer) return;
 
-		for (const item of resCreateBuckets) {
-			const buffer = resizedBuffers[item.key!];
-			if (!buffer) continue;
+				await axios.put(item.urlUpload, buffer, {
+					headers: {
+						'Content-Type': contentType,
+					},
+				});
 
-			await axios.put(item.urlUpload, buffer, {
-				headers: {
-					'Content-Type': contentType,
-				},
-			});
+				await this.bucketService.submit(item.fileId);
 
-			result[item.key as ReleaseCoverArtSize] = item.fileId;
-		}
+				result[item.key as ReleaseCoverArtSize] = item.fileId;
+			}),
+		);
 
 		// 6. Add original image with the 'original' key
 		result[ReleaseCoverArtSize.ORIGINAL] = fileId;
@@ -227,8 +233,8 @@ export class ReleaseCoverArtService {
 
 		await this.releaseCoverArtRepo.delete({ releaseId });
 
-		for (const fileId of fileIds) {
-			await this.bucketService.delete(fileId);
-		}
+		await Promise.all(
+			fileIds.map((fileId) => this.bucketService.delete(fileId)),
+		);
 	}
 }

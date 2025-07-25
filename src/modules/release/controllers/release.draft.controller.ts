@@ -2,6 +2,7 @@ import {
 	Body,
 	Controller,
 	Delete,
+	Get,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -18,7 +19,7 @@ import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
-import { IReleaseDraft } from '../interfaces/release.interface';
+import { IReleaseDetail, IReleaseDraft } from '../interfaces/release.interface';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
 @ApiTags('Releases Draft')
@@ -42,12 +43,18 @@ export class ReleaseDraftController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
-	): Promise<ResponseSuccess<IReleaseDraft>> {
+	): Promise<ResponseSuccess<IReleaseDetail>> {
 		const result = await this.releaseDraftService.update(id, data);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
 		});
+	}
+
+	@Get(':id/validate')
+	async validateSchemaRelease(@Param('id') id: string) {
+		const result = await this.releaseDraftService.validateSchemaRelease(id);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')

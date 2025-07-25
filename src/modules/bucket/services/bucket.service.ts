@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
 import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { generateFileNameWithTimestamp } from 'src/utils/date';
+import { folderMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
@@ -52,12 +52,14 @@ export class BucketService {
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
-		const result = [];
+		const result: IResCreateBucket[] = [];
 
-		for (const item of data.bucketDtos) {
-			const newBucket = await this.create(item);
-			result.push(newBucket);
-		}
+		await Promise.all(
+			data.bucketDtos.map(async (item) => {
+				const newBucket = await this.create(item);
+				result.push(newBucket);
+			}),
+		);
 
 		return result;
 	}
@@ -125,11 +127,14 @@ export class BucketService {
 	}
 
 	async bulkSubmit(data: BulkSubmitDto) {
-		const result = [];
+		const result: FileEntity[] = [];
 
-		for (const id of data.ids) {
-			result.push(await this.submit(id));
-		}
+		await Promise.all(
+			data.ids.map(async (id) => {
+				const data = await this.submit(id);
+				result.push(data);
+			}),
+		);
 
 		return result;
 	}
@@ -149,7 +154,7 @@ export class BucketService {
 	}
 
 	async getFileBuffer(fileId: string): Promise<{
-		fileBuffet: Buffer;
+		fileBuffer: Buffer;
 		fileDb: FileEntity;
 	}> {
 		const fileDb = await this.bucketFileService.findOne(fileId);
@@ -161,7 +166,7 @@ export class BucketService {
 
 		const [contents] = await fileGcs.download();
 		return {
-			fileBuffet: contents,
+			fileBuffer: contents,
 			fileDb,
 		};
 	}
@@ -198,18 +203,6 @@ export class BucketService {
 		};
 	}
 
-	async testPeak(id: string) {
-		const urlReadFile = await this.getUrlRead(id);
-
-		try {
-			const response = await axios.get(urlReadFile);
-			return response.data as number[];
-		} catch (error) {
-			console.error('Error fetching data:', error);
-			return {};
-		}
-	}
-
 	// folder
 	getFolderBucket({
 		uploadPurpose,
@@ -221,25 +214,8 @@ export class BucketService {
 		trackName?: string;
 	}) {
 		const datePrefix = dayjs().format('YYYY_MM_DD');
-		const subFolder = this.getSubFolder(uploadPurpose);
-
+		const subFolder = folderMap[uploadPurpose];
 		const trackSegment = trackName ? `/${trackName}` : '';
-
 		return `${datePrefix}/releases/${releaseId}/${subFolder}${trackSegment}`;
-	}
-
-	getSubFolder(uploadPurpose: UploadPurpose) {
-		switch (uploadPurpose) {
-			case UploadPurpose.TRACK_AUDIO:
-				return `tracks`;
-			case UploadPurpose.PEAK_AUDIO:
-				return `tracks`;
-
-			case UploadPurpose.RELEASE_COVER_ART:
-				return `release_cover_art`;
-
-			default:
-				return `unknown`;
-		}
 	}
 }

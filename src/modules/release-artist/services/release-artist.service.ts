@@ -19,30 +19,43 @@ export class ReleaseArtistService {
 		private readonly releaseArtistRepo: Repository<ReleaseArtist>,
 
 		private readonly releaseArtistValidateService: ReleaseArtistValidateService,
-
 		private readonly trackDraftService: TrackDraftService,
 	) {}
 
 	// create
-	async create(
-		createReleaseArtistDto: CreateReleaseArtistDto,
-	): Promise<ReleaseArtist> {
-		const { artistId, artistRoleId, releaseId } = createReleaseArtistDto;
+	async create(data: CreateReleaseArtistDto): Promise<ReleaseArtist> {
+		const releaseArtist = this.releaseArtistRepo.create(data);
 
-		await this.releaseArtistValidateService.validate({
-			artistId,
-			artistRoleId,
-			releaseId,
+		await this.releaseArtistValidateService.handleValidateCreate({
+			releaseArtist,
 		});
 
-		const releaseArtist = this.releaseArtistRepo.create(
-			createReleaseArtistDto,
-		);
 		const releaseArtistDb =
 			await this.releaseArtistRepo.save(releaseArtist);
-		await this.pasteReleaseArtistToTrackArtist(releaseArtistDb);
+
+		await this.handleCreateSubEntities({
+			releaseArtist: releaseArtistDb,
+			createDto: data,
+		});
 
 		return releaseArtistDb;
+	}
+
+	private async handleCreateSubEntities({
+		releaseArtist,
+		createDto,
+	}: {
+		releaseArtist: ReleaseArtist;
+		createDto: CreateReleaseArtistDto;
+	}) {
+		await this.pushArtistToTracksSource1(releaseArtist);
+		if (createDto.addArtistToTracks) {
+			await this.trackDraftService.addArtistToTracks2(releaseArtist);
+		}
+	}
+
+	private async pushArtistToTracksSource1(releaseArtist: ReleaseArtist) {
+		await this.trackDraftService.addArtistToTracksSource1(releaseArtist);
 	}
 
 	// read
@@ -87,23 +100,61 @@ export class ReleaseArtistService {
 		id: string,
 		dataUpdate: UpdateReleaseArtistDto,
 	): Promise<ReleaseArtist> {
-		const releaseArtist = await this.findOne(id);
+		const releaseArtistPrevious = await this.findOne(id);
+
+		const releaseArtistUpdate = Object.assign(
+			{},
+			releaseArtistPrevious,
+			dataUpdate,
+		);
 
 		await this.releaseArtistValidateService.handleValidateUpdate({
-			releaseArtist,
-			dataUpdate,
+			releaseArtistPrevious,
+			releaseArtistUpdate,
 		});
 
-		await this.releaseArtistRepo.update(id, dataUpdate);
+		await this.releaseArtistRepo.save(releaseArtistUpdate);
+
 		const releaseArtistDb = await this.findOne(id);
 
 		await this.updateRelatedRecords(releaseArtistDb);
 		await this.handleArtistToTrack2({
+			addArtistToTracksPrevious: releaseArtistPrevious.addArtistToTracks,
 			releaseArtist: releaseArtistDb,
 			addArtistToTracks: dataUpdate.addArtistToTracks,
 		});
 
 		return releaseArtistDb;
+	}
+
+	private async updateRelatedRecords(releaseArtist: ReleaseArtist) {
+		await this.trackDraftService.updateByReleaseArtist(releaseArtist);
+	}
+
+	private async handleArtistToTrack2({
+		addArtistToTracks,
+		addArtistToTracksPrevious,
+		releaseArtist,
+	}: {
+		addArtistToTracks?: boolean;
+		addArtistToTracksPrevious: boolean;
+		releaseArtist: ReleaseArtist;
+	}) {
+		if (addArtistToTracks !== undefined) {
+			if (
+				addArtistToTracks === true &&
+				addArtistToTracks !== addArtistToTracksPrevious
+			) {
+				await this.trackDraftService.addArtistToTracks2(releaseArtist);
+			}
+
+			if (
+				addArtistToTracks === false &&
+				addArtistToTracks !== addArtistToTracksPrevious
+			) {
+				await this.trackDraftService.deleteArtistTracks2(releaseArtist);
+			}
+		}
 	}
 
 	//delete
@@ -128,33 +179,5 @@ export class ReleaseArtistService {
 
 	async deleteRelatedRecords(releaseArtistId: string) {
 		await this.trackDraftService.deleteByReleaseArtist(releaseArtistId);
-	}
-
-	// artist
-	private async pasteReleaseArtistToTrackArtist(
-		releaseArtist: ReleaseArtist,
-	) {
-		await this.trackDraftService.addArtistToTracks(releaseArtist);
-	}
-
-	private async updateRelatedRecords(releaseArtist: ReleaseArtist) {
-		await this.trackDraftService.updateByReleaseArtist(releaseArtist);
-	}
-
-	private async handleArtistToTrack2({
-		addArtistToTracks,
-		releaseArtist,
-	}: {
-		addArtistToTracks?: boolean;
-		releaseArtist: ReleaseArtist;
-	}) {
-		if (addArtistToTracks !== undefined) {
-			if (addArtistToTracks === true) {
-				await this.trackDraftService.addArtistToTracks2(releaseArtist);
-			}
-			if (addArtistToTracks === false) {
-				await this.trackDraftService.deleteArtistTracks2(releaseArtist);
-			}
-		}
 	}
 }

@@ -9,7 +9,7 @@ import {
 	UpdateTimezoneDto,
 } from '../dto/timezone.dto';
 import { Timezone } from '../entities/timezone.entity';
-import { TimezoneQbService } from './timezone.qb.service';
+import { TimezoneQueryService } from './timezone.query.service';
 
 @Injectable()
 export class TimezoneService {
@@ -17,7 +17,7 @@ export class TimezoneService {
 		@InjectRepository(Timezone)
 		private readonly timezoneRepo: Repository<Timezone>,
 
-		private readonly timezoneQbService: TimezoneQbService,
+		private readonly timezoneQueryService: TimezoneQueryService,
 	) {}
 
 	async create(createTimezoneDto: CreateTimezoneDto): Promise<Timezone> {
@@ -40,7 +40,8 @@ export class TimezoneService {
 	async getList(query: QueryGetListTimezoneDto): Promise<PageDto<Timezone>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.timezoneQbService.createQueryGetList(query);
+		const queryGetList =
+			this.timezoneQueryService.createQueryGetList(query);
 
 		const [timezones, totalItems] = await queryGetList.getManyAndCount();
 
@@ -64,7 +65,24 @@ export class TimezoneService {
 		return await this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
+	async delete(id: string): Promise<void> {
+		const timezone =
+			await this.timezoneQueryService.findOneWithCountRelation(id);
+
+		if (!timezone) {
+			throw new ResponseError({
+				message: TimezoneMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		if ((timezone.releasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: `Cannot delete this timezone because it is linked to ${timezone.releasesCount} release(s).`,
+				statusCode: 400,
+			});
+		}
+
 		await this.timezoneRepo.delete(id);
 	}
 }

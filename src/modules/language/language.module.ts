@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Language } from './entities/language.entity';
 import { LanguageController } from './language.controller';
-import { LanguageQbService } from './services/language.qb.service';
+import { LanguageQueryService } from './services/language.query.service';
 import { LanguageService } from './services/language.service';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([Language])],
 	controllers: [LanguageController],
-	providers: [LanguageService, LanguageQbService],
+	providers: [LanguageService, LanguageQueryService],
 })
 export class LanguageModule {}

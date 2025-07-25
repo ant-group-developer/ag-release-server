@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -48,7 +49,7 @@ export class TrackTypeController {
 	})
 	@ApiResponse({ status: 404, description: TrackTypeMessageError.NOT_FOUND })
 	async findOne(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<TrackType>> {
 		const result = await this.trackTypeService.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -73,7 +74,7 @@ export class TrackTypeController {
 	})
 	@ApiResponse({ status: 404, description: TrackTypeMessageError.NOT_FOUND })
 	async update(
-		@Param('id') id: string,
+		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackTypeDto: UpdateTrackTypeDto,
 	): Promise<ResponseSuccess<TrackType>> {
 		const result = await this.trackTypeService.update(
@@ -89,8 +90,10 @@ export class TrackTypeController {
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a trackType by ID' })
 	@ApiResponse({ status: 200, description: TrackTypeMessageSuccess.DELETE })
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.trackTypeService.remove(id);
+	async delete(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.trackTypeService.delete(id);
 		return new ResponseSuccess({
 			messageCode: TrackTypeMessageCodeSuccess.DELETE,
 		});

@@ -5,13 +5,13 @@ import { QueryGetListArtistDto } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
 
 @Injectable()
-export class ArtistQbService {
+export class ArtistQueryService {
 	constructor(
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
 	) {}
 
-	createQueryGetList(query: QueryGetListArtistDto) {
+	private createQueryGetList(query: QueryGetListArtistDto) {
 		const {
 			keyword,
 			id,
@@ -66,5 +66,21 @@ export class ArtistQbService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	async getList(query: QueryGetListArtistDto) {
+		const queryGetList = this.createQueryGetList(query);
+		return await queryGetList.getManyAndCount();
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.artistRepo
+			.createQueryBuilder('artist')
+			.where('artist.id = :id', { id })
+
+			.loadRelationCountAndMap('artist.releaseCount', 'artist.releases')
+			.loadRelationCountAndMap('artist.trackCount', 'artist.tracks');
+
+		return await queryBuilder.getOne();
 	}
 }

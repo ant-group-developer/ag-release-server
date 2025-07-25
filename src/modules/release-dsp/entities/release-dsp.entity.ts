@@ -16,7 +16,7 @@ export class ReleaseDsp extends BaseUUIDEntity {
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
-	@ManyToOne(() => Dsp, (dsp) => dsp.releaseDsp)
+	@ManyToOne(() => Dsp, (dsp) => dsp.releaseDsps)
 	@JoinColumn({ name: 'dsp_id' })
 	dsp: Dsp;
 }

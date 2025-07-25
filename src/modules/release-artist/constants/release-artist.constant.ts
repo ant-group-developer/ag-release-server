@@ -15,6 +15,7 @@ export const ReleaseArtistMessageCodeError = {
 	ARTIST_ROLE_NOT_FOUND: 'releaseArtist.message.error.artistRoleNotFound',
 	ARTIST_NOT_FOUND: 'releaseArtist.message.error.artistNotFound',
 	RELEASE_NOT_FOUND: 'releaseArtist.message.error.releaseNotFound',
+	UNIQUE_CONSTRAINT: 'releaseArtist.message.error.uniqueConstraint',
 };
 
 export const ReleaseArtistMessageError = {
@@ -22,4 +23,6 @@ export const ReleaseArtistMessageError = {
 	ARTIST_ROLE_NOT_FOUND: 'Artist role not found',
 	ARTIST_NOT_FOUND: 'Artist not found',
 	RELEASE_NOT_FOUND: 'Release not found',
+	UNIQUE_CONSTRAINT:
+		'The combination of artist, role, and release must be unique.',
 };

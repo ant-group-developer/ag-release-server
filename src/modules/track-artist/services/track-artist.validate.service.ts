@@ -5,10 +5,18 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
+import {
+	TrackArtistMessageCodeError,
+	TrackArtistMessageError,
+} from '../constants/track-artist.constant';
+import { TrackArtist } from '../entities/track-artist.entity';
 
 @Injectable()
 export class TrackArtistValidateService {
 	constructor(
+		@InjectRepository(TrackArtist)
+		private readonly trackArtistRepo: Repository<TrackArtist>,
+
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 
@@ -19,7 +27,46 @@ export class TrackArtistValidateService {
 		private readonly trackRepo: Repository<Track>,
 	) {}
 
-	async validate({
+	async handleValidateCreate(trackArtist: TrackArtist) {
+		await this.validateForeignKey(trackArtist);
+		await this.validateUnique(trackArtist);
+	}
+
+	async handleValidateUpdate({
+		trackArtistPrevious,
+		trackArtistUpdate,
+	}: {
+		trackArtistPrevious: TrackArtist;
+		trackArtistUpdate: TrackArtist;
+	}) {
+		const { artistId, artistRoleId, trackId } = trackArtistUpdate;
+
+		if (artistId !== trackArtistPrevious.artistId) {
+			await this.validateForeignKey({
+				artistId,
+			});
+
+			await this.validateUnique(trackArtistUpdate);
+		}
+
+		if (artistRoleId !== trackArtistPrevious.artistRoleId) {
+			await this.validateForeignKey({
+				artistRoleId,
+			});
+
+			await this.validateUnique(trackArtistUpdate);
+		}
+
+		if (trackId !== trackArtistPrevious.trackId) {
+			await this.validateForeignKey({
+				trackId,
+			});
+
+			await this.validateUnique(trackArtistUpdate);
+		}
+	}
+
+	private async validateForeignKey({
 		artistRoleId,
 		artistId,
 		trackId,
@@ -62,6 +109,31 @@ export class TrackArtistValidateService {
 					message: 'Track not found',
 				});
 			}
+		}
+	}
+
+	private async validateUnique({
+		trackId,
+		artistRoleId,
+		artistId,
+	}: {
+		artistRoleId: string;
+		artistId: string;
+		trackId: string;
+	}) {
+		const releaseArtist = await this.trackArtistRepo.findOne({
+			where: {
+				trackId,
+				artistRoleId,
+				artistId,
+			},
+		});
+
+		if (releaseArtist) {
+			throw new ResponseError({
+				message: TrackArtistMessageError.UNIQUE_CONSTRAINT,
+				messageCode: TrackArtistMessageCodeError.UNIQUE_CONSTRAINT,
+			});
 		}
 	}
 }

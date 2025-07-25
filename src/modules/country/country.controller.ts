@@ -113,7 +113,7 @@ export class CountryController {
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {
-		await this.countryService.remove(id);
+		await this.countryService.delete(id);
 		return new ResponseSuccess({
 			messageCode: CountryMessageCodeSuccess.DELETE,
 		});

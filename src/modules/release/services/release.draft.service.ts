@@ -16,7 +16,7 @@ import {
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import { IReleaseDraft } from '../interfaces/release.interface';
+import { IReleaseDetail, IReleaseDraft } from '../interfaces/release.interface';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -70,7 +70,7 @@ export class ReleaseDraftService {
 	async update(
 		id: string,
 		data: UpdateReleaseDraftDto,
-	): Promise<IReleaseDraft> {
+	): Promise<IReleaseDetail> {
 		const {
 			releaseCoverArt,
 			releaseLanguage,
@@ -100,9 +100,19 @@ export class ReleaseDraftService {
 		});
 
 		await this.releaseRepo.update(id, restOfData);
-		const result = await this.releaseQueryService.getOneDetail(id);
+		const releaseDb = await this.releaseQueryService.getOneDetail(id);
 
-		return this.releaseValidateService.ensureDraftRelease(result);
+		const { releaseCoverArts, ...restOfRelease } = releaseDb;
+
+		const coverArtThumbnails =
+			await this.releaseCoverArtService.getCoverArtThumbnails(
+				releaseCoverArts,
+			);
+
+		return {
+			...restOfRelease,
+			coverArtThumbnails,
+		};
 	}
 
 	private async updateSubEntities({
@@ -148,5 +158,10 @@ export class ReleaseDraftService {
 		await this.releaseCoverArtService.deleteRecordOfRelease({ releaseId });
 		await this.trackDraftService.deleteRecordOfRelease({ releaseId });
 		await this.releaseTerritoryService.deleteRecordOfRelease({ releaseId });
+	}
+
+	// other
+	async validateSchemaRelease(id: string) {
+		return await this.releaseValidateService.validateSchemaRelease(id);
 	}
 }

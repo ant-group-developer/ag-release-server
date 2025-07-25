@@ -1,4 +1,4 @@
 export enum TypeSource {
-	COPY_FROM_RELEASE = 'copyFromRelease',
-	COPY_FROM_RELEASE2 = 'copyFromRelease2',
+	SOURCE1 = 'fromTrack',
+	SOURCE2 = 'fromRelease',
 }
