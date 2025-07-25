@@ -129,7 +129,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		() => ReleaseLanguage,
 		(releaseLanguage) => releaseLanguage.release,
 	)
-	releaseLanguage: ReleaseLanguage;
+	releaseLanguage: ReleaseLanguage | null;
 
 	@OneToMany(
 		() => ReleaseLocalize,

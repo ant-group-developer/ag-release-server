@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { FieldErrorDetails, ResponseError } from 'src/common/dtos/response.dto';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -16,7 +16,6 @@ import {
 	IRelease,
 	IReleaseDraft,
 	IReleaseNonDraft,
-	ReleaseSchema,
 } from '../interfaces/release.interface';
 
 @Injectable()
@@ -184,27 +183,221 @@ export class ReleaseValidateService {
 		}
 	}
 
+	// validate schema release
 	async validateSchemaRelease(id: string) {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
 			relations: {
-				tracks: { audioFile: true },
+				releaseLanguage: true,
+				tracks: {
+					trackLanguage: true,
+					audioFile: true,
+				},
 			},
 		});
 
-		if (!release) {
-			throw new ResponseError({
-				message: ReleaseMessageError.NOT_FOUND,
-				messageCode: ReleaseMessageCodeError.NOT_FOUND,
-			});
+		const result: FieldErrorDetails[] = [];
+
+		if (release) {
+			result.push(...this.validateRelease(release));
+			result.push(...this.validateLanguage(release.releaseLanguage));
+			result.push(...this.validateTracks(release.tracks));
 		}
 
-		const validationResult = ReleaseSchema.safeParse(release);
+		return result;
+	}
 
-		if (!validationResult.success) {
-			return validationResult.error.errors;
+	validateRelease(release: Release) {
+		const result: FieldErrorDetails[] = [];
+
+		if (!release.primaryGenreId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'core-detail',
+					field: 'primaryGenreId',
+				}),
+			);
+			if (!release.labelId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'core-detail',
+						field: 'labelId',
+					}),
+				);
+			}
+
+			if (!release.title) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'core-detail',
+						field: 'title',
+					}),
+				);
+			}
+
+			if (!release.cLineOwner) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'core-detail',
+						field: 'cLineOwner',
+					}),
+				);
+			}
+
+			if (!release.pLineOwner) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'core-detail',
+						field: 'pLineOwner',
+					}),
+				);
+			}
+
+			if (!release.releaseDate) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'core-detail',
+						field: 'releaseDate',
+					}),
+				);
+			}
 		}
 
-		return release;
+		return result;
+	}
+
+	validateLanguage(releaseLanguage: Release['releaseLanguage']) {
+		const result: FieldErrorDetails[] = [];
+
+		if (!releaseLanguage?.metadataLanguageCountryId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'core-detail',
+					field: 'metadataLanguageCountryId',
+				}),
+			);
+		}
+
+		if (!releaseLanguage?.audioLanguageId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'core-detail',
+					field: 'audioLanguageId',
+				}),
+			);
+		}
+
+		if (!releaseLanguage?.metadataLanguageId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'core-detail',
+					field: 'metadataLanguageId',
+				}),
+			);
+		}
+		return result;
+	}
+
+	validateTracks(tracks: Release['tracks']) {
+		const result: FieldErrorDetails[] = [];
+		tracks.forEach((track, index) => {
+			if (!track.trackOriginTypeId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackOriginTypeId`,
+					}),
+				);
+			}
+
+			if (!track.primaryGenreId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.primaryGenreId`,
+					}),
+				);
+			}
+
+			if (!track.pLineOwner) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.pLineOwner`,
+					}),
+				);
+			}
+
+			if (!track.primaryGenreId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.primaryGenreId`,
+					}),
+				);
+			}
+
+			if (!track.trackTypeId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackTypeId`,
+					}),
+				);
+			}
+
+			// audio file validation
+			if (!track.audioFile.hook) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.hook`,
+					}),
+				);
+			}
+
+			// language validation
+			result.push(
+				...this.validateTrackLanguage(track.trackLanguage, index),
+			);
+		});
+
+		return result;
+	}
+
+	validateTrackLanguage(
+		trackLanguage: Release['tracks'][number]['trackLanguage'],
+		index: number,
+	) {
+		const result: FieldErrorDetails[] = [];
+
+		if (!trackLanguage?.audioLanguageId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: `tracks.${index}.audioLanguageId`,
+				}),
+			);
+		}
+
+		if (!trackLanguage?.metadataLanguageId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: `tracks.${index}.metadataLanguageId`,
+				}),
+			);
+		}
+
+		if (!trackLanguage?.metadataLanguageCountryId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: `tracks.${index}.metadataLanguageCountryId`,
+				}),
+			);
+		}
+
+		return result;
 	}
 }
