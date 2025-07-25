@@ -93,15 +93,6 @@ export class BucketGcsController {
 		});
 	}
 
-	@Get('private/:id/test-peak')
-	async testPeak(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.bucketService.testPeak(id);
-
-		return new ResponseSuccess({
-			data: result,
-		});
-	}
-
 	@Get('private/:id')
 	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getDetail(id);
