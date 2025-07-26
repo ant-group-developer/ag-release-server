@@ -51,7 +51,8 @@ export class TrackLanguageValidateService {
 
 			if (!track || trackLanguage) {
 				throw new ResponseError({
-					message: 'Invalid trackId',
+					message:
+						'Invalid trackId. Track does not exist or track already has a language.',
 				});
 			}
 		}
