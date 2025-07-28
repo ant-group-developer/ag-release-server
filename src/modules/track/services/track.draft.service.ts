@@ -35,6 +35,68 @@ export class TrackDraftService {
 		private readonly trackReleaseService: TrackReleaseService,
 	) {}
 
+	// async bulkCreate1(
+	// 	data: BulkCreateTrackDraft,
+	// ): Promise<ITrackDraft[] | any> {
+	// 	const result = [];
+	// 	for (const track of data.trackDrafts) {
+	// 		const newTrackDraft = await this.handleCreateOne1(track);
+	// 		result.push(newTrackDraft);
+	// 	}
+	// 	return result;
+	// }
+
+	// async handleCreateOne1(data: CreateTrackDraftDto) {
+	// 	const { audioFileDraft, trackLanguage, ...trackData } = data;
+
+	// 	// create track
+	// 	const trackDraft = await this.createTrackDraft1(trackData);
+	// 	// create sub entities
+	// 	await this.createSubEntities1({
+	// 		track: trackDraft,
+	// 		audioFile: data.audioFileDraft,
+	// 	});
+	// }
+
+	// async createTrackDraft1(data: CreateTrackDraftDto): Promise<ITrackDraft> {
+	// 	const { audioFileDraft, ...restOfData } = data;
+	// 	const { releaseId, primaryGenreId, subGenreId } = restOfData;
+
+	// 	await this.trackValidateService.validate({
+	// 		releaseId,
+	// 		primaryGenreId,
+	// 		subGenreId,
+	// 	});
+
+	// 	const track = this.trackRepo.create(data);
+	// 	return await this.trackRepo.save(track);
+	// }
+
+	// private async createSubEntities1({
+	// 	track,
+	// 	audioFile,
+	// }: {
+	// 	track: Track;
+	// 	audioFile: CreateAudioFileDraftDto;
+	// }) {
+	// 	const trackId = track.id;
+
+	// 	await this.audioFileDraftService.create({
+	// 		...audioFile,
+	// 		trackId,
+	// 	});
+
+	// 	await this.trackLanguageDraftService.create({
+	// 		trackId,
+	// 	});
+
+	// 	await this.trackArtistService.copyArtistFromReleaseSource2({
+	// 		releaseId: track.releaseId,
+	// 		trackId: track.id,
+	// 	});
+	// }
+
+	//
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
 		const releaseIdOfTracks = trackDrafts[0].releaseId;
