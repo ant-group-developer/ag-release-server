@@ -44,12 +44,9 @@ export class TrackDraftService {
 
 		return await Promise.all(
 			trackDrafts.map((track) => {
-				const syncedTrackDraft = this.syncTrackWithRelease(
-					track,
-					release,
-				);
+				const trackDraft = this.buildTrackFromRelease(track, release);
 
-				return this.handleCreateOne(syncedTrackDraft);
+				return this.handleCreateOne(trackDraft);
 			}),
 		);
 	}
@@ -123,7 +120,7 @@ export class TrackDraftService {
 		});
 	}
 
-	private syncTrackWithRelease(
+	private buildTrackFromRelease(
 		track: CreateTrackDraftDto,
 		release: Release | null,
 	): ICreateTrackDraft {

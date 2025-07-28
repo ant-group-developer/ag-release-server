@@ -17,6 +17,7 @@ import {
 	IRelease,
 	IReleaseDraft,
 	IReleaseNonDraft,
+	releaseSchema,
 } from '../interfaces/release.interface';
 
 @Injectable()
@@ -408,6 +409,7 @@ export class ReleaseValidateService {
 
 	private validateTracks(tracks: Release['tracks']) {
 		const result: FieldErrorDetails[] = [];
+
 		tracks.forEach((track, index) => {
 			if (!track.trackOriginTypeId) {
 				result.push(
@@ -436,15 +438,6 @@ export class ReleaseValidateService {
 				);
 			}
 
-			if (!track.primaryGenreId) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.primaryGenreId`,
-					}),
-				);
-			}
-
 			if (!track.trackTypeId) {
 				result.push(
 					new FieldErrorDetails({
@@ -464,6 +457,16 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackArtists`,
+					}),
+				);
+			}
+
+			//
+			if (track.audioFile && !track.audioFile.preview) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.preview`,
 					}),
 				);
 			}
@@ -510,6 +513,59 @@ export class ReleaseValidateService {
 			);
 		}
 
+		if (!trackLanguage?.recordingCountryId) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: `tracks.${index}.recordingCountryId`,
+				}),
+			);
+		}
+
 		return result;
+	}
+
+	// other
+	async validateSchemaRelease2(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				releaseCoverArts: true,
+				releaseArtists: {
+					artistRole: true,
+				},
+				releaseLanguage: true,
+				tracks: {
+					trackLanguage: true,
+					audioFile: true,
+					trackArtists: {
+						artistRole: true,
+					},
+				},
+				releaseTerritory: true,
+			},
+		});
+
+		if (!release) return [];
+
+		return this.validateWithZod(release);
+	}
+
+	validateWithZod(data: Release) {
+		const result = releaseSchema.safeParse(data);
+
+		if (result.success) return [];
+
+		return result.error.issues.map((err) => {
+			try {
+				return JSON.parse(err.message) as FieldErrorDetails;
+			} catch {
+				return new FieldErrorDetails({
+					message: 'Invalid error message format',
+					page: 'unknown',
+					field: 'unknown',
+				});
+			}
+		});
 	}
 }
