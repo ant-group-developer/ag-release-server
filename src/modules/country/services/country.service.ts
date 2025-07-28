@@ -90,21 +90,30 @@ export class CountryService {
 
 		if ((country.releaseMetadataLanguageCountriesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this country because it is linked to ${country.releaseMetadataLanguageCountriesCount} release metadata language(s).`,
+				message:
+					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+				messageCode:
+					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((country.trackMetadataLanguageCountriesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this country because it is linked to ${country.trackMetadataLanguageCountriesCount} track metadata language(s).`,
+				message:
+					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+				messageCode:
+					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((country.trackRecordingCountriesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this country because it is linked to ${country.trackRecordingCountriesCount} track recording(s).`,
+				message:
+					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
+				messageCode:
+					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
 				statusCode: 400,
 			});
 		}

@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { TimezoneMessageError } from '../constants/timezone.constant';
+import {
+	TimezoneMessageCodeError,
+	TimezoneMessageError,
+} from '../constants/timezone.constant';
 import {
 	CreateTimezoneDto,
 	QueryGetListTimezoneDto,
@@ -78,7 +81,10 @@ export class TimezoneService {
 
 		if ((timezone.releasesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this timezone because it is linked to ${timezone.releasesCount} release(s).`,
+				message:
+					TimezoneMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					TimezoneMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
 				statusCode: 400,
 			});
 		}

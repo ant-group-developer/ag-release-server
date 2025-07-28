@@ -90,14 +90,20 @@ export class ArtistRoleService {
 
 		if ((artistRole.releaseCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this artist role because it is linked to ${artistRole.releaseCount} release(s).`,
+				message:
+					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
 				statusCode: 400,
 			});
 		}
 
 		if ((artistRole.trackCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this artist role because it is linked to ${artistRole.trackCount} track(s).`,
+				message:
+					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
 				statusCode: 400,
 			});
 		}

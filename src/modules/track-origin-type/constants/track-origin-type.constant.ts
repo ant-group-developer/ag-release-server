@@ -17,10 +17,14 @@ export const TrackOriginTypeMessageCodeError = {
 	DUPLICATE_VALUE_TRACK_ORIGIN_TYPE:
 		'trackOriginType.message.error.duplicateValueTrackOriginType',
 	NOT_FOUND: 'trackOriginType.message.error.notFound',
+	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
+		'trackOriginType.message.error.cannotDeleteBecauseLinkedTracks',
 };
 
 export const TrackOriginTypeMessageError = {
 	DUPLICATE_NAME_TRACK_ORIGIN_TYPE: 'Duplicate trackOriginType name',
 	DUPLICATE_VALUE_TRACK_ORIGIN_TYPE: 'Duplicate trackOriginType value',
 	NOT_FOUND: 'Not found',
+	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
+		'Cannot delete this track origin type because it is linked to tracks.',
 };

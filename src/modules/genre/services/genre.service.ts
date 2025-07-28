@@ -95,28 +95,40 @@ export class GenreService {
 
 		if ((genre.primaryGenreReleasesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this genre because it is linked to ${genre.primaryGenreReleasesCount} primary release(s).`,
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
 				statusCode: 400,
 			});
 		}
 
 		if ((genre.subGenreReleasesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this genre because it is linked to ${genre.subGenreReleasesCount} sub-genre release(s).`,
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
 				statusCode: 400,
 			});
 		}
 
 		if ((genre.primaryGenreTracksCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this genre because it is linked to ${genre.primaryGenreTracksCount} primary track(s).`,
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
 				statusCode: 400,
 			});
 		}
 
 		if ((genre.subGenreTracksCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this genre because it is linked to ${genre.subGenreTracksCount} sub-genre track(s).`,
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
 				statusCode: 400,
 			});
 		}

@@ -98,14 +98,19 @@ export class ArtistService {
 
 		if ((artist.releaseCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this artist because it is linked to ${artist.releaseCount} release(s).`,
+				message:
+					ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
 				statusCode: 400,
 			});
 		}
 
 		if ((artist.trackCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this artist because it is linked to ${artist.trackCount} track(s).`,
+				message: ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
 				statusCode: 400,
 			});
 		}
