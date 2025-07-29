@@ -4,13 +4,15 @@ import { Repository } from 'typeorm';
 import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
-	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 } from '../dto/track.draft.dto';
 import { Track } from '../entities/track.entity';
-import { ICreateTrackDraft, ITrackDraft } from '../interfaces/track.interface';
+import {
+	ICreateTrackDraft,
+	IHandleCreateTrackOne,
+	ITrackDraft,
+} from '../interfaces/track.interface';
 
-import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.draft.dto';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -35,94 +37,57 @@ export class TrackDraftService {
 		private readonly trackReleaseService: TrackReleaseService,
 	) {}
 
-	// async bulkCreate1(
-	// 	data: BulkCreateTrackDraft,
-	// ): Promise<ITrackDraft[] | any> {
-	// 	const result = [];
-	// 	for (const track of data.trackDrafts) {
-	// 		const newTrackDraft = await this.handleCreateOne1(track);
-	// 		result.push(newTrackDraft);
-	// 	}
-	// 	return result;
-	// }
-
-	// async handleCreateOne1(data: CreateTrackDraftDto) {
-	// 	const { audioFileDraft, trackLanguage, ...trackData } = data;
-
-	// 	// create track
-	// 	const trackDraft = await this.createTrackDraft1(trackData);
-	// 	// create sub entities
-	// 	await this.createSubEntities1({
-	// 		track: trackDraft,
-	// 		audioFile: data.audioFileDraft,
-	// 	});
-	// }
-
-	// async createTrackDraft1(data: CreateTrackDraftDto): Promise<ITrackDraft> {
-	// 	const { audioFileDraft, ...restOfData } = data;
-	// 	const { releaseId, primaryGenreId, subGenreId } = restOfData;
-
-	// 	await this.trackValidateService.validate({
-	// 		releaseId,
-	// 		primaryGenreId,
-	// 		subGenreId,
-	// 	});
-
-	// 	const track = this.trackRepo.create(data);
-	// 	return await this.trackRepo.save(track);
-	// }
-
-	// private async createSubEntities1({
-	// 	track,
-	// 	audioFile,
-	// }: {
-	// 	track: Track;
-	// 	audioFile: CreateAudioFileDraftDto;
-	// }) {
-	// 	const trackId = track.id;
-
-	// 	await this.audioFileDraftService.create({
-	// 		...audioFile,
-	// 		trackId,
-	// 	});
-
-	// 	await this.trackLanguageDraftService.create({
-	// 		trackId,
-	// 	});
-
-	// 	await this.trackArtistService.copyArtistFromReleaseSource2({
-	// 		releaseId: track.releaseId,
-	// 		trackId: track.id,
-	// 	});
-	// }
-
-	//
+	// create
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
 		const releaseIdOfTracks = trackDrafts[0].releaseId;
 
-		const release =
+		const releaseOfTracks =
 			await this.trackReleaseService.getReleaseById(releaseIdOfTracks);
 
-		// return await Promise.all(
-		// 	trackDrafts.map((track) => {
-		// 		const trackDraft = this.buildTrackFromRelease(track, release);
+		return await Promise.all(
+			trackDrafts.map((track) => {
+				const trackDraft = this.buildTrackFromRelease({
+					track,
+					releaseOfTracks,
+				});
 
-		// 		return this.handleCreateOne(trackDraft);
-		// 	}),
-		// );
+				return this.handleCreateOne(trackDraft);
+			}),
+		);
+	}
 
-		const result = [];
-		for (const track of trackDrafts) {
-			const trackDraft = this.buildTrackFromRelease(track, release);
-			result.push(await this.handleCreateOne(trackDraft));
-		}
+	private buildTrackFromRelease({
+		track,
+		releaseOfTracks,
+	}: {
+		track: BulkCreateTrackDraft['trackDrafts'][number];
+		releaseOfTracks: Release | null;
+	}): IHandleCreateTrackOne {
+		const trackLanguage = releaseOfTracks?.releaseLanguage
+			? (({ id: _id, ...restOfReleaseLanguage }) => {
+					return {
+						...restOfReleaseLanguage,
+						recordingCountryId:
+							restOfReleaseLanguage.metadataLanguageCountryId,
+					};
+				})(releaseOfTracks.releaseLanguage)
+			: undefined;
 
-		return result;
+		return {
+			...track,
+
+			pLineOwner: releaseOfTracks?.pLineOwner,
+			primaryGenreId: releaseOfTracks?.primaryGenreId,
+			subGenreId: releaseOfTracks?.subGenreId,
+			version: releaseOfTracks?.version,
+
+			trackLanguage,
+		};
 	}
 
 	private async handleCreateOne(
-		data: ICreateTrackDraft,
+		data: IHandleCreateTrackOne,
 	): Promise<ITrackDraft> {
 		const { audioFileDraft, trackLanguage, ...trackData } = data;
 		const trackDb = await this.createTrackDraft(trackData);
@@ -136,16 +101,7 @@ export class TrackDraftService {
 		return this.trackValidateService.ensureDraftTrack(trackDb);
 	}
 
-	private async createTrackDraft(data: {
-		title: string;
-		version?: string | null;
-		isrc?: string;
-		iswc?: string;
-		releaseId: string;
-		pLineOwner?: string | null;
-		primaryGenreId?: string | null;
-		subGenreId?: string | null;
-	}) {
+	private async createTrackDraft(data: ICreateTrackDraft) {
 		const { releaseId, primaryGenreId, subGenreId } = data;
 
 		await this.trackValidateService.validate({
@@ -164,13 +120,8 @@ export class TrackDraftService {
 		audioFile,
 	}: {
 		track: Track;
-		trackLanguage?: {
-			metadataLanguageCountryId?: string | null;
-			audioLanguageId?: string | null;
-			metadataLanguageId?: string | null;
-			recordingCountryId?: string | null;
-		};
-		audioFile: CreateAudioFileDraftDto;
+		trackLanguage?: IHandleCreateTrackOne['trackLanguage'];
+		audioFile: IHandleCreateTrackOne['audioFileDraft'];
 	}) {
 		const { id: trackId } = track;
 
@@ -188,26 +139,6 @@ export class TrackDraftService {
 			releaseId: track.releaseId,
 			trackId: track.id,
 		});
-	}
-
-	private buildTrackFromRelease(
-		track: CreateTrackDraftDto,
-		release: Release | null,
-	): ICreateTrackDraft {
-		return {
-			...track,
-
-			pLineOwner: release?.pLineOwner,
-			primaryGenreId: release?.primaryGenreId,
-			subGenreId: release?.subGenreId,
-			version: release?.version,
-
-			trackLanguage: {
-				...release?.releaseLanguage,
-				recordingCountryId:
-					release?.releaseLanguage?.metadataLanguageCountryId,
-			},
-		};
 	}
 
 	// update
