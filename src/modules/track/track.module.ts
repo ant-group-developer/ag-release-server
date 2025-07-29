@@ -11,6 +11,7 @@ import { TrackType } from '../track-type/entities/track-type.entity';
 import { TrackController } from './controllers/track.controller';
 import { TrackDraftController } from './controllers/track.draft.controller';
 import { Track } from './entities/track.entity';
+import { TrackReleaseService } from './services/track-release.service';
 import { TrackDraftService } from './services/track.draft.service';
 import { TrackQueryService } from './services/track.query.service';
 import { TrackService } from './services/track.service';
@@ -36,6 +37,7 @@ import { TrackValidateService } from './services/track.validate.service';
 		TrackDraftService,
 		TrackValidateService,
 		TrackQueryService,
+		TrackReleaseService,
 	],
 	exports: [TrackDraftService],
 })

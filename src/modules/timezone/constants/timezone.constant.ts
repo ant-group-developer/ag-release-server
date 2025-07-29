@@ -12,8 +12,12 @@ export const TimezoneMessageSuccess = {
 
 export const TimezoneMessageCodeError = {
 	NOT_FOUND: 'timezone.message.error.notFound',
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
+		'timezone.message.error.cannotDeleteBecauseLinkedReleases',
 };
 
 export const TimezoneMessageError = {
 	NOT_FOUND: 'Not found',
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
+		'Cannot delete this timezone because it is linked to releases.',
 };

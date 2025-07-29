@@ -164,4 +164,9 @@ export class ReleaseDraftService {
 	async validateSchemaRelease(id: string) {
 		return await this.releaseValidateService.validateSchemaRelease(id);
 	}
+
+	// other
+	async validateSchemaRelease2(id: string) {
+		return await this.releaseValidateService.validateSchemaRelease2(id);
+	}
 }

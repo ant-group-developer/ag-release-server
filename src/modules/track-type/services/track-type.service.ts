@@ -83,14 +83,17 @@ export class TrackTypeService {
 
 		if (!trackType) {
 			throw new ResponseError({
-				message: 'Track type not found.',
+				message: TrackTypeMessageError.NOT_FOUND,
 				statusCode: 404,
 			});
 		}
 
 		if ((trackType.tracksCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this track type because it is linked to ${trackType.tracksCount} track(s).`,
+				message:
+					TrackTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					TrackTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
 				statusCode: 400,
 			});
 		}

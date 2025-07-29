@@ -34,7 +34,7 @@ export class CreateTrackDraftDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(50)
-	version?: string;
+	version?: string | null;
 
 	@ApiProperty({ example: 'US123456789', required: false })
 	@IsOptional()
@@ -58,19 +58,19 @@ export class CreateTrackDraftDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(200)
-	pLineOwner?: string;
+	pLineOwner?: string | null;
 
 	@ApiProperty({ example: 'primary-genre-id-123', required: false })
 	@IsOptional()
 	@IsString()
 	@Length(10, 10)
-	primaryGenreId?: string;
+	primaryGenreId?: string | null;
 
 	@ApiProperty({ example: 'sub-genre-id-123', required: false })
 	@IsOptional()
 	@IsString()
 	@Length(10, 10)
-	subGenreId?: string;
+	subGenreId?: string | null;
 
 	@IsNotEmpty()
 	@ValidateNested()
@@ -106,8 +106,8 @@ export class UpdateOrderTrackDraft {
 }
 
 class File {
-	@MaxLength(100)
-	fileName: string;
+	// @MaxLength(100)
+	// fileName: string;
 }
 
 class AudioFile {

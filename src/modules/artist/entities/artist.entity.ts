@@ -1,6 +1,7 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
+import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -15,8 +16,12 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: 250, nullable: true })
 	biography: string | null;
 
+	// relations
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
 	releaseArtists: ReleaseArtist[];
+
+	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.artist)
+	trackArtists: TrackArtist[];
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

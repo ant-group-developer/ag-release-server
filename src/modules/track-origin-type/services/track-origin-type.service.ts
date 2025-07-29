@@ -98,14 +98,17 @@ export class TrackOriginTypeService {
 
 		if (!originType) {
 			throw new ResponseError({
-				message: 'Track origin type not found.',
+				message: TrackOriginTypeMessageError.NOT_FOUND,
 				statusCode: 404,
 			});
 		}
 
 		if ((originType.tracksCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this track origin type because it is linked to ${originType.tracksCount} track(s).`,
+				message:
+					TrackOriginTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					TrackOriginTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
 				statusCode: 400,
 			});
 		}

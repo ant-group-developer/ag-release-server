@@ -93,42 +93,60 @@ export class LanguageService {
 
 		if ((language.releaseLocalizesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.releaseLocalizesCount} release localization(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
 				statusCode: 400,
 			});
 		}
 
 		if ((language.releaseAudiolanguagesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.releaseAudiolanguagesCount} release audio language(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((language.releaseMetadataLanguagesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.releaseMetadataLanguagesCount} release metadata language(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((language.trackAudioLanguagesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.trackAudioLanguagesCount} track audio language(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((language.trackMetadataLanguagesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.trackMetadataLanguagesCount} track metadata language(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
 				statusCode: 400,
 			});
 		}
 
 		if ((language.trackLocalizesCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this language because it is linked to ${language.trackLocalizesCount} track localization(s).`,
+				message:
+					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
+				messageCode:
+					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
 				statusCode: 400,
 			});
 		}

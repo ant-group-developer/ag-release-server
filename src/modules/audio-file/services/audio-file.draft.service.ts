@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AudioFile } from '../entities/audio-file.entity';
 
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import {
 	IAudioFileDraft,
@@ -56,9 +57,15 @@ export class AudioFileDraftService {
 		dataUpdate: IUpdateAudioFile;
 	}): Promise<IAudioFileDraft> {
 		const { file, ...restOfDataUpdate } = dataUpdate;
-		const { fileId, peakId } = restOfDataUpdate;
+		const { fileId, peakId, preview } = restOfDataUpdate;
 
 		const audioFile = await this.audioFileQueryService.findOne(audioFileId);
+
+		if (preview && preview > audioFile.duration) {
+			throw new ResponseError({
+				message: 'Preview cannot be greater than the original duration',
+			});
+		}
 
 		if (fileId && fileId !== audioFile.fileId) {
 			await this.audioFileValidateService.validate({

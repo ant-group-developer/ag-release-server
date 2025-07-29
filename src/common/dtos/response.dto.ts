@@ -160,3 +160,27 @@ export class ResponseError extends HttpException {
 		// this.data = data;
 	}
 }
+
+export class FieldErrorDetails {
+	messageCode: string;
+	message: string;
+	page: string;
+	field: string;
+
+	constructor({
+		messageCode = 'validation.input',
+		message = 'Please enter information!',
+		page = 'unknown',
+		field = 'unknown',
+	}: {
+		messageCode?: string;
+		message?: string;
+		page?: string;
+		field?: string;
+	}) {
+		this.messageCode = messageCode;
+		this.message = message;
+		this.page = page;
+		this.field = field;
+	}
+}

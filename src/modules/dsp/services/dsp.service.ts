@@ -74,21 +74,26 @@ export class DspService {
 
 		if (!dsp) {
 			throw new ResponseError({
-				message: 'DSP not found.',
+				message: DspMessageError.NOT_FOUND,
 				statusCode: 404,
 			});
 		}
 
 		if ((dsp.organizationDspsCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this DSP because it is linked to ${dsp.organizationDspsCount} organization(s).`,
+				message:
+					DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
+				messageCode:
+					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
 				statusCode: 400,
 			});
 		}
 
 		if ((dsp.releaseDspsCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this DSP because it is linked to ${dsp.releaseDspsCount} release(s).`,
+				message: DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
 				statusCode: 400,
 			});
 		}

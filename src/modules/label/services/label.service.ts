@@ -94,7 +94,10 @@ export class LabelService {
 
 		if ((label.releaseCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: `Cannot delete this label because it is linked to ${label.releaseCount} release(s).`,
+				message:
+					LabelMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					LabelMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
 				statusCode: 400,
 			});
 		}

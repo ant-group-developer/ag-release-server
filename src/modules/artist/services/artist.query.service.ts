@@ -78,8 +78,14 @@ export class ArtistQueryService {
 			.createQueryBuilder('artist')
 			.where('artist.id = :id', { id })
 
-			.loadRelationCountAndMap('artist.releaseCount', 'artist.releases')
-			.loadRelationCountAndMap('artist.trackCount', 'artist.tracks');
+			.loadRelationCountAndMap(
+				'artist.releaseCount',
+				'artist.releaseArtists',
+			)
+			.loadRelationCountAndMap(
+				'artist.trackCount',
+				'artist.trackArtists',
+			);
 
 		return await queryBuilder.getOne();
 	}

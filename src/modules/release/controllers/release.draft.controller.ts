@@ -57,6 +57,13 @@ export class ReleaseDraftController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/validate2')
+	async validateSchemaRelease2(@Param('id') id: string) {
+		const result =
+			await this.releaseDraftService.validateSchemaRelease2(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
 	@ApiResponse({
