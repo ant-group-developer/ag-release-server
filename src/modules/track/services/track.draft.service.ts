@@ -104,13 +104,21 @@ export class TrackDraftService {
 		const release =
 			await this.trackReleaseService.getReleaseById(releaseIdOfTracks);
 
-		return await Promise.all(
-			trackDrafts.map((track) => {
-				const trackDraft = this.buildTrackFromRelease(track, release);
+		// return await Promise.all(
+		// 	trackDrafts.map((track) => {
+		// 		const trackDraft = this.buildTrackFromRelease(track, release);
 
-				return this.handleCreateOne(trackDraft);
-			}),
-		);
+		// 		return this.handleCreateOne(trackDraft);
+		// 	}),
+		// );
+
+		const result = [];
+		for (const track of trackDrafts) {
+			const trackDraft = this.buildTrackFromRelease(track, release);
+			result.push(await this.handleCreateOne(trackDraft));
+		}
+
+		return result;
 	}
 
 	private async handleCreateOne(
