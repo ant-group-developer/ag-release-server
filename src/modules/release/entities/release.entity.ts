@@ -163,6 +163,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		(releaseTerritory) => releaseTerritory.release,
 	)
 	releaseTerritory: ReleaseTerritory | null;
+
+	// count relation
+	tracksCount?: number;
 }
 
 // @Entity('releases')

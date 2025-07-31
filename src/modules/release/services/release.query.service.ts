@@ -99,7 +99,8 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releaseArtists.artist', 'artist')
 			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
 
-			.leftJoinAndSelect('release.label', 'label');
+			.leftJoinAndSelect('release.label', 'label')
+			.loadRelationCountAndMap('release.tracksCount', 'release.tracks');
 
 		return await queryGetList.getManyAndCount();
 	}
