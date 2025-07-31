@@ -19,7 +19,7 @@ import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.d
 import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 
-export class CreateTrackDraftDto {
+class CreateTrackDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
 	@IsString()
 	@IsNotEmpty()

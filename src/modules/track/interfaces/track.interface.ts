@@ -51,6 +51,11 @@ export interface ITrackDetails {
 }
 
 //
+export interface IHandleCreateTrackOne extends ICreateTrackDraft {
+	audioFileDraft: IAudioFileDraft;
+
+	trackLanguage?: ITrackLanguage;
+}
 export interface ICreateTrackDraft {
 	title: string;
 	version?: string | null;
@@ -60,10 +65,6 @@ export interface ICreateTrackDraft {
 	pLineOwner?: string | null;
 	primaryGenreId?: string | null;
 	subGenreId?: string | null;
-
-	audioFileDraft: IAudioFileDraft;
-
-	trackLanguage?: ITrackLanguage;
 }
 
 interface ITrackLanguage {

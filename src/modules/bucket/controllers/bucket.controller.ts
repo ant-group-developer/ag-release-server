@@ -93,6 +93,15 @@ export class BucketGcsController {
 		});
 	}
 
+	@Get('private/:id/read')
+	async getUrlRead(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.bucketService.getUrlRead(id);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
 	@Get('private/:id')
 	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getDetail(id);

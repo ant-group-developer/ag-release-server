@@ -382,7 +382,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',
-					field: 'metadataLanguageCountryId',
+					field: 'releaseLanguage.metadataLanguageCountryId',
 				}),
 			);
 		}
@@ -391,7 +391,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',
-					field: 'audioLanguageId',
+					field: 'releaseLanguage.audioLanguageId',
 				}),
 			);
 		}
@@ -400,7 +400,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',
-					field: 'metadataLanguageId',
+					field: 'releaseLanguage.metadataLanguageId',
 				}),
 			);
 		}
@@ -466,7 +466,7 @@ export class ReleaseValidateService {
 				result.push(
 					new FieldErrorDetails({
 						page: 'tracks',
-						field: `tracks.${index}.preview`,
+						field: `tracks.${index}.audioFile.preview`,
 					}),
 				);
 			}
@@ -490,7 +490,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'tracks',
-					field: `tracks.${index}.audioLanguageId`,
+					field: `tracks.${index}.trackLanguage.audioLanguageId`,
 				}),
 			);
 		}
@@ -499,7 +499,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'tracks',
-					field: `tracks.${index}.metadataLanguageId`,
+					field: `tracks.${index}.trackLanguage.metadataLanguageId`,
 				}),
 			);
 		}
@@ -508,7 +508,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'tracks',
-					field: `tracks.${index}.metadataLanguageCountryId`,
+					field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
 				}),
 			);
 		}
@@ -517,7 +517,7 @@ export class ReleaseValidateService {
 			result.push(
 				new FieldErrorDetails({
 					page: 'tracks',
-					field: `tracks.${index}.recordingCountryId`,
+					field: `tracks.${index}.trackLanguage.recordingCountryId`,
 				}),
 			);
 		}
