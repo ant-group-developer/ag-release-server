@@ -35,6 +35,19 @@ class CreateFileDto {
 	fileSize: number;
 }
 
+class FolderBucket {
+	@IsEnum(UploadPurpose)
+	uploadPurpose: UploadPurpose;
+
+	@IsOptional()
+	@IsUUID()
+	releaseId?: string;
+
+	@IsOptional()
+	@MaxLength(80)
+	trackFileName?: string;
+}
+
 export class CreateBucketDto {
 	@IsNotEmpty()
 	@ValidateNested()
@@ -42,24 +55,13 @@ export class CreateBucketDto {
 	file: CreateFileDto;
 
 	@IsNotEmpty()
-	folderBucket: string;
+	@ValidateNested({ each: true })
+	@Type(() => FolderBucket)
+	folderBucket: FolderBucket;
 
 	@IsString()
 	@IsOptional()
 	key: string | null = null;
-}
-
-export class GetFolderBucketDto {
-	@IsEnum(UploadPurpose)
-	@IsNotEmpty()
-	uploadPurpose: UploadPurpose;
-
-	@IsNotEmpty()
-	@IsUUID()
-	releaseId: string;
-
-	@IsOptional()
-	trackName?: string;
 }
 
 export class BulkCreateBucketDto {

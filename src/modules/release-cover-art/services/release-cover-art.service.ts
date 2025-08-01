@@ -132,10 +132,10 @@ export class ReleaseCoverArtService {
 		// 4. Generate upload URLs for resized images
 		const resCreateBuckets = await this.bucketService.bulkCreate({
 			bucketDtos: resizeSizes.map((size) => ({
-				folderBucket: this.bucketService.getFolderBucket({
+				folderBucket: {
 					releaseId,
 					uploadPurpose: UploadPurpose.RELEASE_COVER_ART,
-				}),
+				},
 				key: size,
 				file: {
 					fileName: `${fileName}_${size}.${extension}`,

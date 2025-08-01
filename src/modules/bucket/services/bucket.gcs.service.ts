@@ -30,6 +30,20 @@ export class BucketGcsService {
 		this.baseUrlPrivate = `https://storage.cloud.google.com/${this.privateBucketName}`;
 	}
 
+	// data method
+	getBaseUrlPublic() {
+		return this.baseUrlPublic;
+	}
+
+	getBaseUrlPrivate() {
+		return this.baseUrlPrivate;
+	}
+
+	getBucketName({ isPublic }: { isPublic: boolean }): string {
+		return isPublic ? this.publicBucketName : this.privateBucketName;
+	}
+
+	// business logic
 	async getSignedUrlUpload(data: IGetSignedUrlUpload): Promise<string> {
 		const { contentType, key, isPublic = false } = data;
 
@@ -77,17 +91,6 @@ export class BucketGcsService {
 		return url;
 	}
 
-	async delete({ isPublic, key }: { isPublic: boolean; key: string }) {
-		const bucketName = this.getBucketName({ isPublic });
-
-		const file = this.storage.bucket(bucketName).file(key);
-
-		const [exists] = await file.exists();
-		if (!exists) return;
-
-		await file.delete();
-	}
-
 	//
 	async findOne({
 		bucketName,
@@ -107,31 +110,27 @@ export class BucketGcsService {
 		return file;
 	}
 
-	//
-	getKey({
-		previousKey,
-		fileName,
-	}: {
-		previousKey: string;
-		fileName: string;
-	}) {
-		return `${previousKey}/${fileName}`;
+	// delete
+	async deletePublicFile(key: string) {
+		const file = await this.findOne({
+			bucketName: this.publicBucketName,
+			key,
+		});
+		await this.delete(file);
 	}
 
-	getUrlPublic(key: string) {
-		return `${this.baseUrlPublic}/${key}`;
+	async deletePrivate(key: string) {
+		const file = await this.findOne({
+			bucketName: this.privateBucketName,
+			key,
+		});
+		await this.delete(file);
 	}
 
-	getUrlPrivate(key: string) {
-		return `${this.baseUrlPrivate}/${key}`;
-	}
+	private async delete(file: File) {
+		const [exists] = await file.exists();
+		if (!exists) return;
 
-	getBucketName({ isPublic }: { isPublic: boolean }): string {
-		return isPublic ? this.publicBucketName : this.privateBucketName;
-	}
-
-	async deletePublicFile(urlPublic: string): Promise<void> {
-		const key = urlPublic.replace(this.baseUrlPublic + '/', '');
-		await this.delete({ isPublic: true, key });
+		await file.delete();
 	}
 }
