@@ -140,26 +140,25 @@ export class ReleaseService {
 	}
 
 	private async getReleasesDetails(releases: Release[]) {
-		const result: IReleaseDetail[] = [];
+		return await Promise.all(
+			releases.map(async (release) => {
+				const { releaseCoverArts, ...restOfRelease } = release;
 
-		for (const release of releases) {
-			const { releaseCoverArts, ...restOfRelease } = release;
-
-			const coverArtThumbnails =
-				this.releaseCoverArtService.getCoverArtThumbnails(
-					releaseCoverArts,
-				);
-
-			result.push({
-				...restOfRelease,
-				totalDuration:
-					await this.releaseQueryService.getTotalDurationOfRelease(
+				const [coverArtThumbnails, totalDuration] = await Promise.all([
+					this.releaseCoverArtService.getCoverArtThumbnails(
+						releaseCoverArts,
+					),
+					this.releaseQueryService.getTotalDurationOfRelease(
 						release.id,
 					),
-				coverArtThumbnails,
-			});
-		}
+				]);
 
-		return result;
+				return {
+					...restOfRelease,
+					totalDuration,
+					coverArtThumbnails,
+				};
+			}),
+		);
 	}
 }
