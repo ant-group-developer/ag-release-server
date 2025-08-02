@@ -65,19 +65,31 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	status: ReleaseStatus;
 
 	@Column({
+		type: 'int',
+		comment: 'Example: 2025 ' + '&' + COMMENT_FOR_NULLABLE,
+		nullable: true,
+	})
+	cLineYear: number | null;
+
+	@Column({
 		type: 'varchar',
 		length: 200,
-		comment:
-			'Example: 2025 Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
 		nullable: true,
 	})
 	cLineOwner: string | null;
 
 	@Column({
+		type: 'int',
+		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE,
+		nullable: true,
+	})
+	pLineYear: number | null;
+
+	@Column({
 		type: 'varchar',
 		length: 200,
-		comment:
-			'Example: 2025 Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
 		nullable: true,
 	})
 	pLineOwner: string | null;

@@ -3,11 +3,14 @@ import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
+	Max,
 	MaxLength,
+	Min,
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
@@ -63,13 +66,27 @@ export class CreateReleaseDraftDto {
 	@Length(10, 10)
 	albumFormatId: string;
 
-	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsOptional()
+	@Min(1000)
+	@Max(9999)
+	cLineYear?: number | null;
+
+	@ApiProperty({ example: 'Exclusive Licensed AMG' })
 	@IsString()
 	@IsOptional()
 	@MaxLength(200)
 	cLineOwner?: string | null;
 
-	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsOptional()
+	@Min(1000)
+	@Max(9999)
+	pLineYear?: number | null;
+
+	@ApiProperty({ example: 'Exclusive Licensed AMG' })
 	@IsString()
 	@IsOptional()
 	@MaxLength(200)
@@ -121,23 +138,10 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@Length(10, 10)
 	primaryGenreId?: string | null;
 
-	@IsOptional()
-	isVariousArtist?: boolean;
-
 	@IsString()
 	@IsOptional()
 	@Length(10, 10)
 	labelId?: string | null;
-
-	@IsString()
-	@IsOptional()
-	@MaxLength(200)
-	cLineOwner?: string | null;
-
-	@IsString()
-	@IsOptional()
-	@MaxLength(200)
-	pLineOwner?: string | null;
 
 	@IsOptional()
 	@ValidateNested()

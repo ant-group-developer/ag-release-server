@@ -5,11 +5,14 @@ import {
 	IsEnum,
 	IsIn,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
+	Max,
 	MaxLength,
+	Min,
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
@@ -21,6 +24,10 @@ export class CreateReleaseDto {
 	@IsNotEmpty()
 	@MaxLength(150)
 	title: string;
+
+	@IsNotEmpty()
+	@Length(10, 10)
+	albumFormatId: string;
 
 	@ApiProperty({
 		example: 'Original Version',
@@ -69,15 +76,25 @@ export class CreateReleaseDto {
 	@IsEnum(ReleaseStatus)
 	status: ReleaseStatus;
 
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
 	@IsNotEmpty()
-	@Length(10, 10)
-	albumFormatId: string;
+	@Min(1000)
+	@Max(9999)
+	cLineYear: number;
 
-	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@ApiProperty({ example: 'Exclusive Licensed AMG' })
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(200)
 	cLineOwner: string;
+
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsNotEmpty()
+	@Min(1000)
+	@Max(9999)
+	pLineYear: number;
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
 	@IsString()
@@ -131,6 +148,11 @@ export class SubmitCreateReleaseDto extends CreateReleaseDto {
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
+	@IsNotEmpty()
+	@Length(10, 10)
+	@ValidateIf((_, value) => value !== undefined)
+	albumFormatId?: string;
+
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(150)
@@ -152,10 +174,6 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	@IsEnum(ReleaseStatus)
 	@ValidateIf((_, value) => value !== undefined)
 	status: ReleaseStatus;
-
-	// @IsEnum(ReleaseType)
-	// @ValidateIf((_, value) => value !== undefined)
-	// type: ReleaseType;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
