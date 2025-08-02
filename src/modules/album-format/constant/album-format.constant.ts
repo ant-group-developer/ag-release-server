@@ -18,8 +18,6 @@ export const AlbumFormatMessageCodeError = {
 	NOT_FOUND: 'albumFormat.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'albumFormat.message.error.cannotDeleteBecauseLinkedReleases',
-	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
-		'albumFormat.message.error.cannotDeleteBecauseLinkedTracks',
 };
 
 export const AlbumFormatMessageError = {
@@ -28,6 +26,4 @@ export const AlbumFormatMessageError = {
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this album format because it is linked to releases.',
-	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
-		'Cannot delete this album format because it is linked to tracks.',
 };

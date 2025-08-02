@@ -66,4 +66,17 @@ export class AlbumFormatQueryService {
 		const queryGetList = this.createQueryGetList(query);
 		return await queryGetList.getManyAndCount();
 	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.albumFormatRepo
+			.createQueryBuilder('albumFormat')
+			.where('albumFormat.id = :id', { id })
+
+			.loadRelationCountAndMap(
+				'albumFormat.releasesCount',
+				'albumFormat.releases',
+			);
+
+		return await queryBuilder.getOne();
+	}
 }

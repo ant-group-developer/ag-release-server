@@ -82,7 +82,7 @@ export class AlbumFormatController {
 		description: 'Album format deleted successfully',
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.albumFormatService.remove(id);
+		await this.albumFormatService.delete(id);
 		return new ResponseSuccess({ messageCode: 'Album format deleted' });
 	}
 }

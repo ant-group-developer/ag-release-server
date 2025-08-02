@@ -78,8 +78,27 @@ export class AlbumFormatService {
 		return this.findOne(id);
 	}
 
-	async remove(id: string): Promise<void> {
-		await this.findOne(id);
+	async delete(id: string): Promise<void> {
+		const albumFormat =
+			await this.albumFormatQueryService.findOneWithCountRelation(id);
+
+		if (!albumFormat) {
+			throw new ResponseError({
+				message: AlbumFormatMessageError.NOT_FOUND,
+				messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		if ((albumFormat?.releasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					AlbumFormatMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					AlbumFormatMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				statusCode: 400,
+			});
+		}
 		await this.albumFormatRepo.delete(id);
 	}
 
