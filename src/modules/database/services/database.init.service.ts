@@ -1,7 +1,8 @@
 /* eslint-disable */
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { mainArtistRole } from 'src/modules/artist-role/constants/artist-role.constant';
 import { UserType } from 'src/modules/user/enum/user.enum';
 import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,11 +10,12 @@ import {
 	listCountries,
 	listLanguages,
 	listTimeZones,
-	NAME_MAIN_ARTIST_ROLE,
 } from '../constants/database.init.constant';
 
 @Injectable()
 export class DatabaseInitService implements OnModuleInit {
+	private readonly logger = new Logger(DatabaseInitService.name);
+
 	private defaultUser: {
 		id: string;
 		name: string;
@@ -40,13 +42,15 @@ export class DatabaseInitService implements OnModuleInit {
 
 	async onModuleInit() {
 		try {
-			await this.initUser();
-			await this.initCountry();
-			await this.initLanguage();
-			await this.initTimeZones();
-			await this.initMainArtistRole();
+			await Promise.all([
+				this.initUser(),
+				this.initCountry(),
+				this.initLanguage(),
+				this.initTimeZones(),
+				this.initMainArtistRole(),
+			]);
 		} catch (error) {
-			console.error('Error initializing database:', error);
+			this.logger.error('Error initializing database:', error);
 		}
 	}
 
@@ -69,9 +73,9 @@ export class DatabaseInitService implements OnModuleInit {
 				this.defaultUser.modifierId,
 			]);
 
-			console.log('Default user inserted successfully');
+			this.logger.log('Default user inserted successfully');
 		} else {
-			console.log(
+			this.logger.log(
 				'Users table already has data, skipping initialization',
 			);
 		}
@@ -84,7 +88,7 @@ export class DatabaseInitService implements OnModuleInit {
 		const dataInit = listCountries;
 
 		if (result[0].count === '0') {
-			console.log('Initializing country');
+			this.logger.log('Initializing country');
 			const query = `
 				INSERT INTO countries (
 					id, name, iso3, iso2, numeric_code, phone_code, capital,
@@ -94,26 +98,29 @@ export class DatabaseInitService implements OnModuleInit {
 				)
 			`;
 
-			for (const item of dataInit) {
-				await this.dataSource.query(query, [
-					uuidv4(),
-					item[0],
-					item[1],
-					item[2],
-					item[3],
-					item[4],
-					item[5],
-					item[6],
-					item[7],
-					item[8],
-					item[9],
-					item[10],
-					item[11],
-				]);
-			}
-			console.log('Countries inserted successfully');
+			Promise.all(
+				dataInit.map((item) => {
+					return this.dataSource.query(query, [
+						uuidv4(),
+						item[0],
+						item[1],
+						item[2],
+						item[3],
+						item[4],
+						item[5],
+						item[6],
+						item[7],
+						item[8],
+						item[9],
+						item[10],
+						item[11],
+					]);
+				}),
+			);
+
+			this.logger.log('Countries inserted successfully');
 		} else {
-			console.log(
+			this.logger.log(
 				'Countries table already has data, skipping initialization',
 			);
 		}
@@ -124,7 +131,7 @@ export class DatabaseInitService implements OnModuleInit {
 		const result = await this.dataSource.query(countQuery);
 
 		if (result[0].count === '0') {
-			console.log('Initializing language');
+			this.logger.log('Initializing language');
 			const query = `
 				INSERT INTO languages (
 					id, name, code
@@ -143,9 +150,9 @@ export class DatabaseInitService implements OnModuleInit {
 				]);
 			}
 
-			console.log('Languages inserted successfully');
+			this.logger.log('Languages inserted successfully');
 		} else {
-			console.log(
+			this.logger.log(
 				'Languages table already has data, skipping initialization',
 			);
 		}
@@ -156,7 +163,7 @@ export class DatabaseInitService implements OnModuleInit {
 		const result = await this.dataSource.query(countQuery);
 
 		if (result[0].count === '0') {
-			console.log('Initializing timezones');
+			this.logger.log('Initializing timezones');
 			const query = `
 				INSERT INTO timezones (
 					id, name, utc, zone
@@ -176,9 +183,9 @@ export class DatabaseInitService implements OnModuleInit {
 				]);
 			}
 
-			console.log('Timezones inserted successfully');
+			this.logger.log('Timezones inserted successfully');
 		} else {
-			console.log(
+			this.logger.log(
 				'Timezones table already has data, skipping initialization',
 			);
 		}
@@ -187,30 +194,33 @@ export class DatabaseInitService implements OnModuleInit {
 	private async initMainArtistRole() {
 		const countQuery = `
 			SELECT COUNT(*) FROM artist_roles
-			WHERE name = '${NAME_MAIN_ARTIST_ROLE}'
-		`;
-		const result = await this.dataSource.query(countQuery);
+			WHERE name = $1
+  		`;
+		const result = await this.dataSource.query(countQuery, [
+			mainArtistRole.name,
+		]);
 
 		if (result[0].count === '0') {
 			console.log('Initializing main artist role');
 			const query = `
-				INSERT INTO artist_roles (
-					id, name, creator_id, modifier_id
-				) VALUES (
-					$1, $2, $3, $4
-				)
-			`;
+      			INSERT INTO artist_roles (
+        			id, name, value, creator_id, modifier_id
+      			) VALUES (
+        			$1, $2, $3, $4, $5
+      			)
+    		`;
 
 			await this.dataSource.query(query, [
 				uuidv4(),
-				NAME_MAIN_ARTIST_ROLE,
+				mainArtistRole.name,
+				mainArtistRole.value,
 				this.defaultUser.id,
 				this.defaultUser.id,
 			]);
 
-			console.log('Main artist role inserted successfully');
+			this.logger.log('Main artist role inserted successfully');
 		} else {
-			console.log(
+			this.logger.log(
 				'Artist role table already has data, skipping initialization',
 			);
 		}
