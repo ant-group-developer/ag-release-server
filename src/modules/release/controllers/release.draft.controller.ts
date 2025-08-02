@@ -19,7 +19,7 @@ import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
-import { IReleaseDetail, IReleaseDraft } from '../interfaces/release.interface';
+import { IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
 @ApiTags('Releases Draft')
@@ -28,9 +28,7 @@ export class ReleaseDraftController {
 	constructor(private readonly releaseDraftService: ReleaseDraftService) {}
 
 	@Post()
-	async create(
-		@Body() data: CreateReleaseDraftDto,
-	): Promise<ResponseSuccess<IReleaseDraft>> {
+	async create(@Body() data: CreateReleaseDraftDto) {
 		const result = await this.releaseDraftService.create(data);
 
 		return new ResponseSuccess({

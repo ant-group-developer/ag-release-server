@@ -4,13 +4,10 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import z from 'zod';
-import {
-	ReleaseStatus,
-	ReleaseStatusNonDraft,
-	ReleaseType,
-} from '../enum/release.enum';
+import { ReleaseStatus, ReleaseStatusNonDraft } from '../enum/release.enum';
 
 export interface IRelease {
+	albumFormatId: string;
 	upc: string | null;
 	primaryGenreId: string | null;
 	subGenreId: string | null;
@@ -18,13 +15,13 @@ export interface IRelease {
 	title: string;
 	version: string | null;
 	status: ReleaseStatus;
-	type: ReleaseType;
 	releaseTimezoneId: string | null;
 	cLineOwner: string | null;
 	pLineOwner: string | null;
 	catalogId: string | null;
 	releaseDate: Date | null;
 	releaseTime: string | null;
+	totalDuration?: number;
 }
 
 export interface IReleaseDraft {
@@ -35,7 +32,7 @@ export interface IReleaseDraft {
 	title: string;
 	version: string | null;
 	status: ReleaseStatus.DRAFT;
-	type: ReleaseType;
+	albumFormatId: string;
 	releaseTimezoneId: string | null;
 	cLineOwner: string | null;
 	pLineOwner: string | null;
@@ -52,7 +49,7 @@ export interface IReleaseNonDraft {
 	title: string;
 	version: string | null;
 	status: ReleaseStatusNonDraft;
-	type: ReleaseType;
+	albumFormatId: string;
 	releaseTimezoneId: string | null;
 	cLineOwner: string;
 	pLineOwner: string;
@@ -66,13 +63,13 @@ export interface ICoverArtThumbnails {
 	'100x100': string | null;
 	'160x160': string | null;
 	'300x300': string | null;
-	'900x900': string | null;
 	original: string | null;
 }
 
 export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	coverArtThumbnails: ICoverArtThumbnails;
 	releaseArtists: ReleaseArtist[];
+
 	label: Label | null;
 	primaryGenre: Genre | null;
 	subGenre: Genre | null;

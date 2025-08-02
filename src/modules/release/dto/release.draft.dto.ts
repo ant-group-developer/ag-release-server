@@ -2,20 +2,21 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
-	IsEnum,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
+	Max,
 	MaxLength,
+	Min,
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
-import { ReleaseType } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
@@ -61,17 +62,31 @@ export class CreateReleaseDraftDto {
 	@Length(10, 10)
 	labelId?: string | null;
 
-	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
-	@IsEnum(ReleaseType)
-	type: ReleaseType;
+	@IsNotEmpty()
+	@Length(10, 10)
+	albumFormatId: string;
 
-	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsOptional()
+	@Min(1000)
+	@Max(9999)
+	cLineYear?: number | null;
+
+	@ApiProperty({ example: 'Exclusive Licensed AMG' })
 	@IsString()
 	@IsOptional()
 	@MaxLength(200)
 	cLineOwner?: string | null;
 
-	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsOptional()
+	@Min(1000)
+	@Max(9999)
+	pLineYear?: number | null;
+
+	@ApiProperty({ example: 'Exclusive Licensed AMG' })
 	@IsString()
 	@IsOptional()
 	@MaxLength(200)
@@ -113,32 +128,20 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	title?: string;
 
-	@IsEnum(ReleaseType)
+	@IsNotEmpty()
+	@Length(10, 10)
 	@ValidateIf((_, value) => value !== undefined)
-	type?: ReleaseType;
+	albumFormatId?: string;
 
 	@IsString()
 	@IsOptional()
 	@Length(10, 10)
 	primaryGenreId?: string | null;
 
-	@IsOptional()
-	isVariousArtist?: boolean;
-
 	@IsString()
 	@IsOptional()
 	@Length(10, 10)
 	labelId?: string | null;
-
-	@IsString()
-	@IsOptional()
-	@MaxLength(200)
-	cLineOwner?: string | null;
-
-	@IsString()
-	@IsOptional()
-	@MaxLength(200)
-	pLineOwner?: string | null;
 
 	@IsOptional()
 	@ValidateNested()

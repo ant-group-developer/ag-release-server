@@ -9,11 +9,11 @@ export enum ReleaseStatus {
 
 export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
 
-export enum ReleaseType {
-	ALBUM = 'album',
-	SINGLE = 'single',
-	EP = 'ep',
-}
+// export enum ReleaseType {
+// 	ALBUM = 'album',
+// 	SINGLE = 'single',
+// 	EP = 'ep',
+// }
 
 export enum FieldOrderRelease {
 	TITLE = 'title',

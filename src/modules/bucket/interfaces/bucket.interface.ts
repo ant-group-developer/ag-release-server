@@ -35,7 +35,6 @@ export interface IGetSignedUrlDown {
 }
 
 // file
-export interface IFile extends FileEntity {}
 export interface IFileBucket extends FileEntity {
 	urlRead: string;
 }

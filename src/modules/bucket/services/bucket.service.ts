@@ -10,7 +10,6 @@ import {
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
-import { UploadPurpose } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
@@ -22,32 +21,34 @@ export class BucketService {
 		private readonly bucketFileService: BucketFileService,
 	) {}
 
+	// create
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
-		const { file, folderBucket, key: keyResult } = data;
+		const { file, folderBucket, key: keyForMapping } = data;
 
 		// create file
-		const key = this.bucketGcsService.getKey({
-			previousKey: folderBucket,
+		const fullKeyBucket = this.getFullKey({
+			previousKey: this.getPreviousKey(folderBucket),
 			fileName: generateFileNameWithTimestamp(file.fileName),
 		});
+
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
 			...file,
-			key,
+			key: fullKeyBucket,
 			bucket,
 		});
 
 		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType: newFile.contentType,
-			key,
+			key: fullKeyBucket,
 			isPublic: false,
 		});
 
 		return {
 			fileId: newFile.id,
 			urlUpload,
-			key: keyResult,
+			key: keyForMapping,
 		};
 	}
 
@@ -64,50 +65,28 @@ export class BucketService {
 		return result;
 	}
 
-	async getUrlRead(id: string) {
-		const file = await this.bucketFileService.findOne(id);
-		const { key } = file;
-
-		return this.bucketGcsService.getSignedUrlRead({
-			key,
-			isPublic: false,
-		});
+	// folder
+	private getPreviousKey({
+		uploadPurpose,
+		releaseId,
+		trackFileName,
+	}: CreateBucketDto['folderBucket']) {
+		const datePrefix = dayjs().format('YYYY_MM');
+		const subFolder = folderMap[uploadPurpose];
+		const trackSegment = trackFileName ? `/${trackFileName}` : '';
+		return `releases/${datePrefix}/${releaseId}/${subFolder}${trackSegment}`;
 	}
 
-	async getUrlDown(id: string) {
-		const file = await this.bucketFileService.findOne(id);
-		const { key, fileName } = file;
-
-		return this.bucketGcsService.getSignedUrlDown({
-			key,
-			isPublic: false,
-			fileName,
-		});
-	}
-
-	async update({
-		fileId,
-		dataUpdate,
+	private getFullKey({
+		previousKey,
+		fileName,
 	}: {
-		fileId: string;
-		dataUpdate: { fileName: string };
+		previousKey: string;
+		fileName: string;
 	}) {
-		await this.bucketFileService.update(fileId, {
-			fileName: dataUpdate.fileName,
-		});
+		return `${previousKey}/${fileName}`;
 	}
 
-	async delete(id: string) {
-		const fileDb = await this.bucketFileService.findOne(id);
-		await this.bucketGcsService.delete({
-			isPublic: false,
-			key: fileDb.key,
-		});
-
-		await this.bucketFileService.delete(id);
-	}
-
-	//
 	async submit(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
 		const { bucket, key, isSubmitted } = fileDb;
@@ -139,18 +118,48 @@ export class BucketService {
 		return result;
 	}
 
+	// read
+	async getUrlRead(id: string) {
+		const file = await this.bucketFileService.findOne(id);
+		const { key } = file;
+
+		return this.bucketGcsService.getSignedUrlRead({
+			key,
+			isPublic: false,
+		});
+	}
+
+	async getUrlDown(id: string) {
+		const file = await this.bucketFileService.findOne(id);
+		const { key, fileName } = file;
+
+		return this.bucketGcsService.getSignedUrlDown({
+			key,
+			isPublic: false,
+			fileName,
+		});
+	}
+
 	async getDetail(id: string) {
 		const file = await this.bucketFileService.findOne(id);
 
 		return {
 			...file,
-			urlPublic: this.bucketGcsService.getUrlPublic(file.key),
-			urlPrivate: this.bucketGcsService.getUrlPrivate(file.key),
+			urlPublic: this.getUrlPublic(file.key),
+			urlPrivate: this.getUrlPrivate(file.key),
 			urlRead: await this.bucketGcsService.getSignedUrlRead({
 				key: file.key,
 				isPublic: false,
 			}),
 		};
+	}
+
+	private getUrlPublic(key: string) {
+		return `${this.bucketGcsService.getBaseUrlPublic()}/${key}`;
+	}
+
+	private getUrlPrivate(key: string) {
+		return `${this.bucketGcsService.getBaseUrlPrivate()}/${key}`;
 	}
 
 	async getFileBuffer(fileId: string): Promise<{
@@ -171,11 +180,28 @@ export class BucketService {
 		};
 	}
 
-	// public
-	async deletePublicFile(urlPublic: string): Promise<void> {
-		await this.bucketGcsService.deletePublicFile(urlPublic);
+	// update
+	async update({
+		fileId,
+		dataUpdate,
+	}: {
+		fileId: string;
+		dataUpdate: { fileName: string };
+	}) {
+		await this.bucketFileService.update(fileId, {
+			fileName: dataUpdate.fileName,
+		});
 	}
 
+	// delete
+	async delete(id: string) {
+		const fileDb = await this.bucketFileService.findOne(id);
+		await this.bucketGcsService.deletePrivate(fileDb.key);
+
+		await this.bucketFileService.delete(id);
+	}
+
+	// public
 	async generatePublicPresignedUploadUrl(
 		data: GeneratePublicUploadUrlDto,
 	): Promise<{
@@ -184,7 +210,7 @@ export class BucketService {
 	}> {
 		const { entityType, fileName, contentType } = data;
 
-		const key = this.bucketGcsService.getKey({
+		const key = this.getFullKey({
 			previousKey: entityType,
 			fileName,
 		});
@@ -195,7 +221,7 @@ export class BucketService {
 			isPublic: true,
 		});
 
-		const urlPublic = this.bucketGcsService.getUrlPublic(key);
+		const urlPublic = this.getUrlPublic(key);
 
 		return {
 			urlPublic,
@@ -203,19 +229,11 @@ export class BucketService {
 		};
 	}
 
-	// folder
-	getFolderBucket({
-		uploadPurpose,
-		releaseId,
-		trackName,
-	}: {
-		uploadPurpose: UploadPurpose;
-		releaseId: string;
-		trackName?: string;
-	}) {
-		const datePrefix = dayjs().format('YYYY_MM_DD');
-		const subFolder = folderMap[uploadPurpose];
-		const trackSegment = trackName ? `/${trackName}` : '';
-		return `${datePrefix}/releases/${releaseId}/${subFolder}${trackSegment}`;
+	async deletePublicFile(urlPublic: string): Promise<void> {
+		const key = urlPublic.replace(
+			this.bucketGcsService.getBaseUrlPublic() + '/',
+			'',
+		);
+		await this.bucketGcsService.deletePublicFile(key);
 	}
 }

@@ -19,6 +19,10 @@ export class CreateGenreDto {
 	@MaxLength(100)
 	name: string;
 
+	@IsString()
+	@MaxLength(50)
+	value: string;
+
 	@ApiPropertyOptional({
 		description: 'The picture associated with the genre, can be null',
 		example: 'rock_picture.jpg',
@@ -45,6 +49,11 @@ export class UpdateGenreDto extends PartialType(CreateGenreDto) {
 	@MaxLength(100)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(50)
+	value: string;
 }
 
 export class QueryGetListGenreDto extends BaseQueryDto {

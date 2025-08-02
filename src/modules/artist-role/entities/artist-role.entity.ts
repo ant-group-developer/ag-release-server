@@ -9,6 +9,9 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
+	@Column({ type: 'varchar', length: 50, unique: true })
+	value: string;
+
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
 	releaseArtists: ReleaseArtist[];
 

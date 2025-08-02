@@ -12,7 +12,6 @@ import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
-	GetFolderBucketDto,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { BucketService } from '../services/bucket.service';
@@ -22,7 +21,7 @@ import { BucketService } from '../services/bucket.service';
 export class BucketGcsController {
 	constructor(private readonly bucketService: BucketService) {}
 
-	// file
+	// create
 	@Post('private')
 	@ApiOperation({
 		summary: 'Generate signed URL to upload a private picture to GCS',
@@ -75,15 +74,7 @@ export class BucketGcsController {
 		});
 	}
 
-	@Get('private/folder-bucket')
-	getFolderBucket(@Body() data: GetFolderBucketDto) {
-		const result = this.bucketService.getFolderBucket(data);
-
-		return new ResponseSuccess({
-			data: result,
-		});
-	}
-
+	// read
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);
@@ -110,7 +101,7 @@ export class BucketGcsController {
 		});
 	}
 
-	// non file
+	// public: non file
 	@Post('public/upload/presigned-url')
 	@ApiOperation({
 		summary: 'Generate signed URL to upload a public picture to GCS',

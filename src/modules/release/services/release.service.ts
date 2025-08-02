@@ -71,9 +71,7 @@ export class ReleaseService {
 		const { releaseCoverArts, ...restOfRelease } = release;
 
 		const coverArtThumbnails =
-			await this.releaseCoverArtService.getCoverArtThumbnails(
-				releaseCoverArts,
-			);
+			this.releaseCoverArtService.getCoverArtThumbnails(releaseCoverArts);
 
 		return {
 			...restOfRelease,
@@ -86,11 +84,11 @@ export class ReleaseService {
 	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 
-		const [releases, totalItems] =
+		const [releasesRaw, totalItems] =
 			await this.releaseQueryService.getListDetail(query);
 
 		return new PageDto({
-			items: await this.getReleasesWithCoverArt(releases),
+			items: await this.getReleasesDetails(releasesRaw),
 			metadata: {
 				currentPage: page,
 				pageSize,
@@ -141,21 +139,23 @@ export class ReleaseService {
 		return await this.releaseQueryService.findOne(id);
 	}
 
-	private async getReleasesWithCoverArt(
-		releases: Release[],
-	): Promise<IReleaseDetail[]> {
+	private async getReleasesDetails(releases: Release[]) {
 		const result: IReleaseDetail[] = [];
 
 		for (const release of releases) {
 			const { releaseCoverArts, ...restOfRelease } = release;
 
 			const coverArtThumbnails =
-				await this.releaseCoverArtService.getCoverArtThumbnails(
+				this.releaseCoverArtService.getCoverArtThumbnails(
 					releaseCoverArts,
 				);
 
 			result.push({
 				...restOfRelease,
+				totalDuration:
+					await this.releaseQueryService.getTotalDurationOfRelease(
+						release.id,
+					),
 				coverArtThumbnails,
 			});
 		}

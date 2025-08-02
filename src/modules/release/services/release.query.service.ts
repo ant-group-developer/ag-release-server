@@ -93,6 +93,7 @@ export class ReleaseQueryService {
 	async getListDetail(query: QueryGetListReleaseDto) {
 		const queryGetList = this.createQueryGetList(query);
 		queryGetList
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
@@ -109,6 +110,7 @@ export class ReleaseQueryService {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
 		query
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.label', 'label')
 
 			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
@@ -149,5 +151,17 @@ export class ReleaseQueryService {
 		}
 
 		return release;
+	}
+
+	async getTotalDurationOfRelease(id: string) {
+		const result = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoin('release.tracks', 'track')
+			.leftJoin('track.audioFile', 'audioFile')
+			.select('SUM(audioFile.duration)', 'totalDuration')
+			.where('release.id = :id', { id })
+			.getRawOne<{ totalDuration: number }>();
+
+		return result?.totalDuration ? Number(result.totalDuration) : 0;
 	}
 }

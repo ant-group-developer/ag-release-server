@@ -23,10 +23,11 @@ export class TrackTypeService {
 		private readonly trackTypeQueryService: TrackTypeQueryService,
 	) {}
 
-	async create(createTrackTypeDto: CreateTrackTypeDto): Promise<TrackType> {
-		await this.validate({ name: createTrackTypeDto.name });
+	async create(data: CreateTrackTypeDto): Promise<TrackType> {
+		const { name, value } = data;
+		await this.validate({ name, value });
 
-		const trackType = this.trackTypeRepo.create(createTrackTypeDto);
+		const trackType = this.trackTypeRepo.create(data);
 		return await this.trackTypeRepo.save(trackType);
 	}
 
@@ -62,18 +63,19 @@ export class TrackTypeService {
 		});
 	}
 
-	async update(
-		id: string,
-		updateTrackTypeDto: UpdateTrackTypeDto,
-	): Promise<TrackType> {
-		const { name } = updateTrackTypeDto;
+	async update(id: string, data: UpdateTrackTypeDto): Promise<TrackType> {
+		const { name, value } = data;
 		const trackType = await this.findOne(id);
 
 		if (name && name !== trackType.name) {
 			await this.validate({ name });
 		}
 
-		await this.trackTypeRepo.update(id, updateTrackTypeDto);
+		if (value && value !== trackType.value) {
+			await this.validate({ value });
+		}
+
+		await this.trackTypeRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
@@ -101,15 +103,32 @@ export class TrackTypeService {
 		await this.trackTypeRepo.delete(id);
 	}
 
-	async validate({ name }: { name?: string }) {
-		const trackType = await this.trackTypeRepo.findOne({ where: { name } });
-
-		if (trackType) {
-			throw new ResponseError({
-				messageCode:
-					TrackTypeMessageCodeError.DUPLICATE_NAME_TRACK_TYPE,
-				message: TrackTypeMessageError.DUPLICATE_NAME_TRACK_TYPE,
+	async validate({ name, value }: { name?: string; value?: string }) {
+		if (name) {
+			const trackType = await this.trackTypeRepo.findOne({
+				where: { name },
 			});
+
+			if (trackType) {
+				throw new ResponseError({
+					messageCode:
+						TrackTypeMessageCodeError.DUPLICATE_NAME_TRACK_TYPE,
+					message: TrackTypeMessageError.DUPLICATE_NAME_TRACK_TYPE,
+				});
+			}
+		}
+
+		if (value) {
+			const trackType = await this.trackTypeRepo.findOne({
+				where: { value },
+			});
+			if (trackType) {
+				throw new ResponseError({
+					messageCode:
+						TrackTypeMessageCodeError.DUPLICATE_VALUE_TRACK_TYPE,
+					message: TrackTypeMessageError.DUPLICATE_VALUE_TRACK_TYPE,
+				});
+			}
 		}
 	}
 }

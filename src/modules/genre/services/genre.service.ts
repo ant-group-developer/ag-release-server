@@ -25,10 +25,11 @@ export class GenreService {
 		private readonly genreQueryService: GenreQueryService,
 	) {}
 
-	async create(createGenreDto: CreateGenreDto): Promise<Genre> {
-		await this.validate({ name: createGenreDto.name });
+	async create(data: CreateGenreDto): Promise<Genre> {
+		const { name, value } = data;
+		await this.validate({ name, value });
 
-		const genre = this.genreRepo.create(createGenreDto);
+		const genre = this.genreRepo.create(data);
 		return await this.genreRepo.save(genre);
 	}
 
@@ -62,11 +63,15 @@ export class GenreService {
 	}
 
 	async update(id: string, updateGenreDto: UpdateGenreDto): Promise<Genre> {
-		const { name, picture } = updateGenreDto;
+		const { name, value, picture } = updateGenreDto;
 		const genre = await this.findOne(id);
 
 		if (name && name !== genre.name) {
 			await this.validate({ name });
+		}
+
+		if (value && value !== genre.value) {
+			await this.validate({ value });
 		}
 
 		if (
@@ -138,14 +143,25 @@ export class GenreService {
 		await this.genreRepo.delete(id);
 	}
 
-	async validate({ name }: { name?: string }) {
-		const genre = await this.genreRepo.findOne({ where: { name } });
+	async validate({ name, value }: { name?: string; value?: string }) {
+		if (name) {
+			const genre = await this.genreRepo.findOne({ where: { name } });
+			if (genre) {
+				throw new ResponseError({
+					messageCode: GenreMessageCodeError.DUPLICATE_NAME_GENRE,
+					message: GenreMessageError.DUPLICATE_NAME_GENRE,
+				});
+			}
+		}
 
-		if (genre) {
-			throw new ResponseError({
-				messageCode: GenreMessageCodeError.DUPLICATE_NAME_GENRE,
-				message: GenreMessageError.DUPLICATE_NAME_GENRE,
-			});
+		if (value) {
+			const genre = await this.genreRepo.findOne({ where: { value } });
+			if (genre) {
+				throw new ResponseError({
+					messageCode: GenreMessageCodeError.DUPLICATE_VALUE_GENRE,
+					message: GenreMessageError.DUPLICATE_VALUE_GENRE,
+				});
+			}
 		}
 	}
 }
