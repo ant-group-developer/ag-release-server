@@ -26,8 +26,7 @@ export class TrackOriginTypeService {
 	async create(data: CreateTrackOriginTypeDto): Promise<TrackOriginType> {
 		const { name, value } = data;
 
-		await this.validate({ name });
-		await this.validate({ value });
+		await this.validate({ name, value });
 
 		const trackOriginType = this.trackOriginTypeRepo.create(data);
 

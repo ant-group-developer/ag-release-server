@@ -10,6 +10,9 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: 100, unique: true })
 	name: string;
 
+	@Column({ type: 'varchar', length: 50, unique: true })
+	value: string;
+
 	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
 	picture: string | null;
 

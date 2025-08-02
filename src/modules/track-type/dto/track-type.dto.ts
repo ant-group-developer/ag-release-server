@@ -13,6 +13,10 @@ export class CreateTrackTypeDto {
 	@IsString()
 	@MaxLength(100)
 	name: string;
+
+	@IsString()
+	@MaxLength(50)
+	value: string;
 }
 
 export class UpdateTrackTypeDto extends PartialType(CreateTrackTypeDto) {
@@ -20,6 +24,11 @@ export class UpdateTrackTypeDto extends PartialType(CreateTrackTypeDto) {
 	@MaxLength(100)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(50)
+	value: string;
 }
 
 export class QueryGetListTrackTypeDto extends BaseQueryDto {

@@ -24,8 +24,8 @@ export class ArtistRoleService {
 	) {}
 
 	async create(data: CreateArtistRoleDto): Promise<ArtistRole> {
-		const { name } = data;
-		await this.validate({ name });
+		const { name, value } = data;
+		await this.validate({ name, value });
 
 		const artist = this.artistRoleRepo.create(data);
 		return await this.artistRoleRepo.save(artist);
@@ -61,10 +61,14 @@ export class ArtistRoleService {
 	}
 
 	async update(id: string, data: UpdateArtistRoleDto): Promise<ArtistRole> {
-		const { name } = data;
+		const { name, value } = data;
 		const artistRole = await this.findOne(id);
 		if (name && name !== artistRole.name) {
 			await this.validate({ name });
+		}
+
+		if (value && value !== artistRole.value) {
+			await this.validate({ value });
 		}
 
 		await this.artistRoleRepo.update(id, data);
@@ -109,7 +113,7 @@ export class ArtistRoleService {
 		}
 	}
 
-	async validate({ name }: { name?: string }) {
+	async validate({ name, value }: { name?: string; value?: string }) {
 		if (name) {
 			const artistRole = await this.artistRoleRepo.findOne({
 				where: { name },
@@ -120,6 +124,21 @@ export class ArtistRoleService {
 					message: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
 					messageCode:
 						ArtistRoleMessageCodeError.DUPLICATE_NAME_ARTIST_ROLE,
+					statusCode: 409,
+				});
+			}
+		}
+
+		if (value) {
+			const artistRole = await this.artistRoleRepo.findOne({
+				where: { value },
+			});
+
+			if (artistRole) {
+				throw new ResponseError({
+					message: ArtistRoleMessageError.DUPLICATE_VALUE_ARTIST_ROLE,
+					messageCode:
+						ArtistRoleMessageCodeError.DUPLICATE_VALUE_ARTIST_ROLE,
 					statusCode: 409,
 				});
 			}

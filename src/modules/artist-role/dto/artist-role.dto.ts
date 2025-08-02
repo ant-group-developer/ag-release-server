@@ -20,6 +20,10 @@ export class CreateArtistRoleDto {
 	@IsString()
 	@MaxLength(100)
 	name: string;
+
+	@IsString()
+	@MaxLength(50)
+	value: string;
 }
 
 export class UpdateArtistRoleDto extends PartialType(CreateArtistRoleDto) {
@@ -28,6 +32,11 @@ export class UpdateArtistRoleDto extends PartialType(CreateArtistRoleDto) {
 	@MaxLength(100)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(50)
+	value: string;
 }
 
 export class QueryGetListArtistRoleDto extends BaseQueryDto {
