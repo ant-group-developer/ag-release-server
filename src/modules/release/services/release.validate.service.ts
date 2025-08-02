@@ -270,7 +270,7 @@ export class ReleaseValidateService {
 					page: 'tracks',
 					field: 'minTrackCount',
 					// message: `${release.albumFormat.name} format cannot have less than ${release.albumFormat.minTrackCount} tracks.`,
-					message: `${release.albumFormat.maxTrackCount}`,
+					message: `${release.albumFormat.minTrackCount}`,
 					messageCode: ReleaseMessageCodeError.ERROR_MIN_COUNT_TRACKS,
 				}),
 			);

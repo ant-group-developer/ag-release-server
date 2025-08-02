@@ -1,35 +1,25 @@
-enum NameAlbumDefault {
-	ALBUM = 'Album',
-	EP = 'Ep',
-	SINGLE = 'Single',
-}
+const albumType = {
+	value: 'album',
+	name: 'Album',
+	minTrackCount: 1,
+	maxTrackCount: 20,
+};
 
-enum ValueAlbumDefault {
-	ALBUM = 'album',
-	EP = 'ep',
-	SINGLE = 'single',
-}
+const epType = {
+	value: 'ep',
+	name: 'Ep',
+	minTrackCount: 1,
+	maxTrackCount: 10,
+};
 
-export const AlbumFormatDefault = [
-	{
-		value: ValueAlbumDefault.ALBUM,
-		name: NameAlbumDefault.ALBUM,
-		minTrackCount: 1,
-		maxTrackCount: 20,
-	},
-	{
-		value: ValueAlbumDefault.EP,
-		name: NameAlbumDefault.EP,
-		minTrackCount: 1,
-		maxTrackCount: 10,
-	},
-	{
-		value: ValueAlbumDefault.SINGLE,
-		name: NameAlbumDefault.SINGLE,
-		minTrackCount: 1,
-		maxTrackCount: 10,
-	},
-];
+const singleType = {
+	value: 'single',
+	name: 'Single',
+	minTrackCount: 1,
+	maxTrackCount: 1,
+};
+
+export const AlbumFormatDefault = [albumType, epType, singleType];
 
 export const AlbumFormatMessageCodeSuccess = {
 	CREATE: 'albumFormat.message.success.create',
