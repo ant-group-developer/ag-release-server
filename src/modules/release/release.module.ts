@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
@@ -18,7 +19,13 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([Release, Genre, Label, Timezone]),
+		TypeOrmModule.forFeature([
+			Release,
+			AlbumFormat,
+			Genre,
+			Label,
+			Timezone,
+		]),
 
 		ReleaseLanguageModule,
 		ReleaseCoverArtModule,

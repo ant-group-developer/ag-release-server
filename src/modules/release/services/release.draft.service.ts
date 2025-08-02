@@ -16,7 +16,7 @@ import {
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import { IReleaseDetail, IReleaseDraft } from '../interfaces/release.interface';
+import { IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -37,10 +37,17 @@ export class ReleaseDraftService {
 	) {}
 
 	// create
-	async create(data: CreateReleaseDraftDto): Promise<IReleaseDraft> {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
+	async create(data: CreateReleaseDraftDto): Promise<Release> {
+		const {
+			albumFormatId,
+			labelId,
+			primaryGenreId,
+			subGenreId,
+			releaseTimezoneId,
+		} = data;
 
 		await this.releaseValidateService.validate({
+			albumFormatId,
 			labelId,
 			primaryGenreId,
 			subGenreId,
@@ -53,7 +60,7 @@ export class ReleaseDraftService {
 		// coverArt
 		await this.createSubEntities(releaseDb.id);
 
-		return this.releaseValidateService.ensureDraftRelease(releaseDb);
+		return releaseDb;
 	}
 
 	private async createSubEntities(releaseId: string) {

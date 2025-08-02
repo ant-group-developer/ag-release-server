@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FieldErrorDetails, ResponseError } from 'src/common/dtos/response.dto';
-import { NAME_MAIN_ARTIST_ROLE } from 'src/modules/database/constants/database.init.constant';
+import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
+import { mainArtistRole } from 'src/modules/artist-role/constants/artist-role.constant';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -26,6 +27,9 @@ export class ReleaseValidateService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 
+		@InjectRepository(AlbumFormat)
+		private readonly albumFormatRepo: Repository<AlbumFormat>,
+
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
 
@@ -37,16 +41,31 @@ export class ReleaseValidateService {
 	) {}
 
 	async validate({
+		albumFormatId,
 		primaryGenreId,
 		subGenreId,
 		labelId,
 		releaseTimezoneId,
 	}: {
+		albumFormatId?: string | null;
 		primaryGenreId?: string | null;
 		subGenreId?: string | null;
 		labelId?: string | null;
 		releaseTimezoneId?: string | null;
 	}) {
+		if (albumFormatId) {
+			const albumFormat = await this.albumFormatRepo.findOne({
+				where: { id: albumFormatId },
+			});
+
+			if (!albumFormat) {
+				throw new ResponseError({
+					message: ReleaseMessageError.ALBUM_FORMAT_NOT_FOUND,
+					messageCode: ReleaseMessageCodeError.ALBUM_FORMAT_NOT_FOUND,
+				});
+			}
+		}
+
 		if (primaryGenreId) {
 			const genre = await this.genreRepo.findOne({
 				where: { id: primaryGenreId },
@@ -154,8 +173,19 @@ export class ReleaseValidateService {
 		release: Release;
 		dataUpdate: UpdateReleaseDraftDto;
 	}) {
-		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } =
-			dataUpdate;
+		const {
+			albumFormatId,
+			labelId,
+			primaryGenreId,
+			subGenreId,
+			releaseTimezoneId,
+		} = dataUpdate;
+
+		if (albumFormatId && albumFormatId !== release.albumFormatId) {
+			await this.validate({
+				albumFormatId,
+			});
+		}
 
 		if (labelId && labelId !== release.labelId) {
 			await this.validate({
@@ -361,7 +391,7 @@ export class ReleaseValidateService {
 		if (
 			release.isVariousArtist === false &&
 			!release.releaseArtists.some(
-				(ra) => ra.artistRole.name === NAME_MAIN_ARTIST_ROLE,
+				(ra) => ra.artistRole.value === mainArtistRole.value,
 			)
 		) {
 			result.push(
@@ -450,7 +480,7 @@ export class ReleaseValidateService {
 			// track artists validation
 			if (
 				!track.trackArtists.some(
-					(ta) => ta.artistRole.name === NAME_MAIN_ARTIST_ROLE,
+					(ta) => ta.artistRole.value === mainArtistRole.value,
 				)
 			) {
 				result.push(

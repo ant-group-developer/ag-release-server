@@ -6,6 +6,7 @@ import { ReleaseLanguage } from 'src/modules/release-language/entities/release-l
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 
 import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territoty.entity';
@@ -20,12 +21,15 @@ import {
 	OneToMany,
 	OneToOne,
 } from 'typeorm';
-import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
+import { ReleaseStatus } from '../enum/release.enum';
 
 @Entity('releases')
 export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 20, nullable: true })
 	upc: string | null;
+
+	@Column({ type: 'varchar', length: 10 })
+	albumFormatId: string;
 
 	@Column({
 		type: 'varchar',
@@ -59,9 +63,6 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'enum', enum: ReleaseStatus, default: ReleaseStatus.DRAFT })
 	status: ReleaseStatus;
-
-	@Column({ type: 'enum', enum: ReleaseType })
-	type: ReleaseType;
 
 	@Column({
 		type: 'varchar',
@@ -106,6 +107,10 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	isVariousArtist: boolean;
 
 	// relation
+	@ManyToOne(() => AlbumFormat)
+	@JoinColumn({ name: 'album_format_id' })
+	albumFormat: AlbumFormat;
+
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'primary_genre_id' })
 	primaryGenre: Genre | null;

@@ -12,6 +12,7 @@ export const ReleaseMessageSuccess = {
 
 export const ReleaseMessageCodeError = {
 	NOT_FOUND: 'release.message.error.notFound',
+	ALBUM_FORMAT_NOT_FOUND: 'release.message.error.albumFormatNotFound',
 	PRIMARY_GENRE_NOT_FOUND: 'release.message.error.primaryGenreNotFound',
 	SUB_GENRE_NOT_FOUND: 'release.message.error.subGenreNotFound',
 	LABEL_NOT_FOUND: 'release.message.error.labelNotFound',
@@ -20,6 +21,7 @@ export const ReleaseMessageCodeError = {
 
 export const ReleaseMessageError = {
 	NOT_FOUND: 'Not found',
+	ALBUM_FORMAT_NOT_FOUND: 'Album format not found',
 	PRIMARY_GENRE_NOT_FOUND: 'Primary genre not found',
 	SUB_GENRE_NOT_FOUND: 'Sub-genre not found',
 	LABEL_NOT_FOUND: 'Label not found',

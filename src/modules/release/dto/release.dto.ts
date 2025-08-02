@@ -13,11 +13,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import {
-	FieldOrderRelease,
-	ReleaseStatus,
-	ReleaseType,
-} from '../enum/release.enum';
+import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 
 export class CreateReleaseDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
@@ -73,9 +69,9 @@ export class CreateReleaseDto {
 	@IsEnum(ReleaseStatus)
 	status: ReleaseStatus;
 
-	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
-	@IsEnum(ReleaseType)
-	type: ReleaseType;
+	@IsNotEmpty()
+	@Length(10, 10)
+	albumFormatId: string;
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
 	@IsString()
@@ -157,9 +153,9 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	status: ReleaseStatus;
 
-	@IsEnum(ReleaseType)
-	@ValidateIf((_, value) => value !== undefined)
-	type: ReleaseType;
+	// @IsEnum(ReleaseType)
+	// @ValidateIf((_, value) => value !== undefined)
+	// type: ReleaseType;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()

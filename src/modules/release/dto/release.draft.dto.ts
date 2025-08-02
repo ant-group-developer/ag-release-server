@@ -2,7 +2,6 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
-	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -15,7 +14,6 @@ import {
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
-import { ReleaseType } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
@@ -61,9 +59,9 @@ export class CreateReleaseDraftDto {
 	@Length(10, 10)
 	labelId?: string | null;
 
-	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
-	@IsEnum(ReleaseType)
-	type: ReleaseType;
+	@IsNotEmpty()
+	@Length(10, 10)
+	albumFormatId: string;
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG' })
 	@IsString()
@@ -113,9 +111,10 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	title?: string;
 
-	@IsEnum(ReleaseType)
+	@IsNotEmpty()
+	@Length(10, 10)
 	@ValidateIf((_, value) => value !== undefined)
-	type?: ReleaseType;
+	albumFormatId?: string;
 
 	@IsString()
 	@IsOptional()
