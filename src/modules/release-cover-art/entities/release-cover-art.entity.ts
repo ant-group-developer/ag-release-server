@@ -21,7 +21,7 @@ export class ReleaseCoverArt extends BaseUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 20,
-		comment: `Example: 75x75, 100x100, 160x160, 300x300, 900x900,  `,
+		comment: `Example: 75x75, 100x100, 160x160, 300x300`,
 	})
 	type: string;
 

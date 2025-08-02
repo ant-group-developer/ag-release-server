@@ -49,25 +49,40 @@ export class ReleaseCoverArtService {
 
 			// update
 			if (releaseCoverArt) {
-				const { fileId } = releaseCoverArt;
+				const { fileId: fileCoverArtOriginalId } = releaseCoverArt;
 
-				await this.releaseCoverArtValidateService.validate({ fileId });
+				await this.releaseCoverArtValidateService.validate({
+					fileId: fileCoverArtOriginalId,
+				});
 
 				await this.deleteRecordOfRelease({ releaseId });
 
-				//listArtOnBucket: Record<ReleaseCoverArtSize, fileId>;
-				const listArtOnBucket = await this.genListCoverArtOnBucket(
-					fileId,
+				await this.genArtOnBucketAndSaveToDb({
+					fileCoverArtOriginalId,
 					releaseId,
-				);
-
-				const releaseCoverArtEntities = this.getReleaseCoverArtEntities(
-					{ listArtOnBucket, releaseId },
-				);
-
-				await this.bulkCreate(releaseCoverArtEntities);
+				});
 			}
 		}
+	}
+
+	private async genArtOnBucketAndSaveToDb({
+		fileCoverArtOriginalId,
+		releaseId,
+	}: {
+		fileCoverArtOriginalId: string;
+		releaseId: string;
+	}) {
+		const listArtOnBucket = await this.genListCoverArtOnBucket(
+			fileCoverArtOriginalId,
+			releaseId,
+		);
+
+		const releaseCoverArtEntities = this.getReleaseCoverArtEntities({
+			listArtOnBucket,
+			releaseId,
+		});
+
+		await this.bulkCreate(releaseCoverArtEntities);
 	}
 
 	private getReleaseCoverArtEntities({
@@ -112,7 +127,6 @@ export class ReleaseCoverArtService {
 			ReleaseCoverArtSize['100x100'],
 			ReleaseCoverArtSize['160x160'],
 			ReleaseCoverArtSize['300x300'],
-			ReleaseCoverArtSize['900x900'],
 		];
 
 		// 3. Resize the original image to each target size
@@ -182,33 +196,23 @@ export class ReleaseCoverArtService {
 	}
 
 	// read
-	async getCoverArtThumbnails(
-		coverArts: ReleaseCoverArt[],
-	): Promise<ICoverArtThumbnails> {
+	getCoverArtThumbnails(coverArts: ReleaseCoverArt[]): ICoverArtThumbnails {
 		const result: ICoverArtThumbnails = {
 			'75x75': null,
 			'100x100': null,
 			'160x160': null,
 			'300x300': null,
-			'900x900': null,
 			original: null,
 		};
 
 		for (const coverArt of coverArts) {
 			if (
-				[
-					'75x75',
-					'100x100',
-					'160x160',
-					'300x300',
-					'900x900',
-					'original',
-				].includes(coverArt.type)
+				['75x75', '100x100', '160x160', '300x300', 'original'].includes(
+					coverArt.type,
+				)
 			) {
 				result[coverArt.type as keyof ICoverArtThumbnails] =
-					coverArt.fileId
-						? await this.bucketService.getUrlRead(coverArt.fileId)
-						: null;
+					coverArt.fileId ?? null;
 			}
 		}
 
