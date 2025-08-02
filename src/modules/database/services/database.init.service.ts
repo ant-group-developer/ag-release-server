@@ -201,7 +201,7 @@ export class DatabaseInitService implements OnModuleInit {
 		]);
 
 		if (result[0].count === '0') {
-			console.log('Initializing main artist role');
+			this.logger.log('Initializing main artist role');
 			const query = `
       			INSERT INTO artist_roles (
         			id, name, value, creator_id, modifier_id

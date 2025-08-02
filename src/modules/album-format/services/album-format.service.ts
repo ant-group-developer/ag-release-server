@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
+	AlbumFormatDefault,
 	AlbumFormatMessageCodeError,
 	AlbumFormatMessageError,
 } from '../constant/album-format.constant';
@@ -15,13 +16,37 @@ import { AlbumFormat } from '../entities/album-format.entity';
 import { AlbumFormatQueryService } from './album-format.query.service';
 
 @Injectable()
-export class AlbumFormatService {
+export class AlbumFormatService implements OnModuleInit {
+	private readonly logger = new Logger(AlbumFormatService.name);
+
 	constructor(
 		@InjectRepository(AlbumFormat)
 		private readonly albumFormatRepo: Repository<AlbumFormat>,
 
 		private readonly albumFormatQueryService: AlbumFormatQueryService,
 	) {}
+
+	async onModuleInit() {
+		await this.initializeData();
+	}
+
+	private async initializeData() {
+		const recordCount = await this.albumFormatRepo.count();
+
+		if (recordCount === 0) {
+			this.logger.log('Initializing album format');
+
+			await Promise.all(
+				AlbumFormatDefault.map((item) => this.create(item)),
+			).catch((e) => {
+				this.logger.error(e);
+			});
+		} else {
+			this.logger.log(
+				'Album format already has data, skipping initialization',
+			);
+		}
+	}
 
 	async create(data: CreateAlbumFormatDto): Promise<AlbumFormat> {
 		await this.validate({ name: data.name, value: data.value });

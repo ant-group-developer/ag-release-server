@@ -183,6 +183,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	// count relation
 	tracksCount?: number;
+	totalDuration?: number;
 }
 
 // @Entity('releases')

@@ -152,4 +152,16 @@ export class ReleaseQueryService {
 
 		return release;
 	}
+
+	async getTotalDurationOfRelease(id: string) {
+		const result = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoin('release.tracks', 'track')
+			.leftJoin('track.audioFile', 'audioFile')
+			.select('SUM(audioFile.duration)', 'totalDuration')
+			.where('release.id = :id', { id })
+			.getRawOne<{ totalDuration: number }>();
+
+		return result?.totalDuration ? Number(result.totalDuration) : 0;
+	}
 }

@@ -220,6 +220,7 @@ export class ReleaseValidateService {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
 			relations: {
+				albumFormat: true,
 				releaseCoverArts: true,
 				releaseArtists: {
 					artistRole: true,
@@ -250,6 +251,31 @@ export class ReleaseValidateService {
 	private validateRelease(release: Release) {
 		const result: FieldErrorDetails[] = [];
 
+		// validate release.albumFormat
+		if (release.tracks.length > release.albumFormat.maxTrackCount) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: 'maxTrackCount',
+					// message: `${release.albumFormat.name} format cannot have more than ${release.albumFormat.maxTrackCount} tracks.`,
+					message: `${release.albumFormat.maxTrackCount}`,
+					messageCode: ReleaseMessageCodeError.ERROR_MAX_COUNT_TRACKS,
+				}),
+			);
+		}
+
+		if (release.tracks.length < release.albumFormat.minTrackCount) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'tracks',
+					field: 'minTrackCount',
+					// message: `${release.albumFormat.name} format cannot have less than ${release.albumFormat.minTrackCount} tracks.`,
+					message: `${release.albumFormat.maxTrackCount}`,
+					messageCode: ReleaseMessageCodeError.ERROR_MIN_COUNT_TRACKS,
+				}),
+			);
+		}
+
 		if (!release.primaryGenreId) {
 			result.push(
 				new FieldErrorDetails({
@@ -277,46 +303,44 @@ export class ReleaseValidateService {
 			);
 		}
 
+		if (!release.cLineYear) {
+			result.push(
+				new FieldErrorDetails({
+					message: 'C Line Year is required',
+					page: 'core-detail',
+					field: 'cLineYear',
+				}),
+			);
+		}
+
 		if (!release.cLineOwner) {
 			result.push(
 				new FieldErrorDetails({
+					message: 'C Line Owner is required',
 					page: 'core-detail',
 					field: 'cLineOwner',
 				}),
 			);
 		}
 
-		if (release.cLineOwner) {
-			if (release.cLineOwner.length <= 4) {
-				result.push(
-					new FieldErrorDetails({
-						message: 'C Line Owner is required',
-						page: 'core-detail',
-						field: 'cLineOwner',
-					}),
-				);
-			}
+		if (!release.pLineYear) {
+			result.push(
+				new FieldErrorDetails({
+					message: 'P Line Year is required',
+					page: 'core-detail',
+					field: 'pLineYear',
+				}),
+			);
 		}
 
 		if (!release.pLineOwner) {
 			result.push(
 				new FieldErrorDetails({
+					message: 'P Line Owner is required',
 					page: 'core-detail',
 					field: 'pLineOwner',
 				}),
 			);
-		}
-
-		if (release.pLineOwner) {
-			if (release.pLineOwner.length <= 4) {
-				result.push(
-					new FieldErrorDetails({
-						message: 'P Line Owner is required',
-						page: 'core-detail',
-						field: 'pLineOwner',
-					}),
-				);
-			}
 		}
 
 		// cover arts validation

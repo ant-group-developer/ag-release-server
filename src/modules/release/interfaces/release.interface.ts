@@ -21,6 +21,7 @@ export interface IRelease {
 	catalogId: string | null;
 	releaseDate: Date | null;
 	releaseTime: string | null;
+	totalDuration?: number;
 }
 
 export interface IReleaseDraft {
@@ -68,6 +69,7 @@ export interface ICoverArtThumbnails {
 export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	coverArtThumbnails: ICoverArtThumbnails;
 	releaseArtists: ReleaseArtist[];
+
 	label: Label | null;
 	primaryGenre: Genre | null;
 	subGenre: Genre | null;

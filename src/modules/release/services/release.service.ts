@@ -84,11 +84,11 @@ export class ReleaseService {
 	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 
-		const [releases, totalItems] =
+		const [releasesRaw, totalItems] =
 			await this.releaseQueryService.getListDetail(query);
 
 		return new PageDto({
-			items: this.getReleasesWithCoverArt(releases),
+			items: await this.getReleasesDetails(releasesRaw),
 			metadata: {
 				currentPage: page,
 				pageSize,
@@ -139,7 +139,7 @@ export class ReleaseService {
 		return await this.releaseQueryService.findOne(id);
 	}
 
-	private getReleasesWithCoverArt(releases: Release[]): IReleaseDetail[] {
+	private async getReleasesDetails(releases: Release[]) {
 		const result: IReleaseDetail[] = [];
 
 		for (const release of releases) {
@@ -152,6 +152,10 @@ export class ReleaseService {
 
 			result.push({
 				...restOfRelease,
+				totalDuration:
+					await this.releaseQueryService.getTotalDurationOfRelease(
+						release.id,
+					),
 				coverArtThumbnails,
 			});
 		}
