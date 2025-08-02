@@ -112,9 +112,7 @@ export class ReleaseDraftService {
 		const { releaseCoverArts, ...restOfRelease } = releaseDb;
 
 		const coverArtThumbnails =
-			await this.releaseCoverArtService.getCoverArtThumbnails(
-				releaseCoverArts,
-			);
+			this.releaseCoverArtService.getCoverArtThumbnails(releaseCoverArts);
 
 		return {
 			...restOfRelease,

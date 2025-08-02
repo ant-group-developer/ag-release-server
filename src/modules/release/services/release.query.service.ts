@@ -93,6 +93,7 @@ export class ReleaseQueryService {
 	async getListDetail(query: QueryGetListReleaseDto) {
 		const queryGetList = this.createQueryGetList(query);
 		queryGetList
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
@@ -109,6 +110,7 @@ export class ReleaseQueryService {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
 		query
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.label', 'label')
 
 			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')

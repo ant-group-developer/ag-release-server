@@ -62,7 +62,6 @@ export interface ICoverArtThumbnails {
 	'100x100': string | null;
 	'160x160': string | null;
 	'300x300': string | null;
-	'900x900': string | null;
 	original: string | null;
 }
 
