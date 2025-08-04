@@ -203,4 +203,20 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 
 	@IsEnum(FieldOrderRelease)
 	fieldOrder: string = FieldOrderRelease.TITLE;
+
+	@IsOptional()
+	@Length(10, 10)
+	albumFormatId?: string;
+
+	@IsOptional()
+	// @IsDate()
+	startDateRelease?: Date;
+
+	@IsOptional()
+	// @IsDate()
+	endDateRelease?: Date;
+
+	@IsEnum(ReleaseStatus)
+	@IsOptional()
+	status?: ReleaseStatus;
 }

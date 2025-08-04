@@ -30,6 +30,12 @@ export class ReleaseQueryService {
 			startUpdatedAt,
 			endUpdatedAt,
 
+			startDateRelease,
+			endDateRelease,
+
+			albumFormatId,
+			status,
+
 			fieldOrder,
 			orderBy,
 
@@ -65,6 +71,29 @@ export class ReleaseQueryService {
 					endUpdatedAt,
 				},
 			);
+		}
+
+		if (startDateRelease && endDateRelease) {
+			console.log(startDateRelease, endDateRelease);
+			queryBuilder.andWhere(
+				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
+				{
+					startDateRelease,
+					endDateRelease,
+				},
+			);
+		}
+
+		if (albumFormatId) {
+			queryBuilder.andWhere(`release.albumFormatId = :albumFormatId`, {
+				albumFormatId,
+			});
+		}
+
+		if (status) {
+			queryBuilder.andWhere(`release.status = :status`, {
+				status,
+			});
 		}
 
 		queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
@@ -153,15 +182,24 @@ export class ReleaseQueryService {
 		return release;
 	}
 
-	async getTotalDurationOfRelease(id: string) {
+	async getListTotalDurationOfRelease(ids: string[]) {
+		if (!ids.length) return {};
+
 		const result = await this.releaseRepo
 			.createQueryBuilder('release')
 			.leftJoin('release.tracks', 'track')
 			.leftJoin('track.audioFile', 'audioFile')
-			.select('SUM(audioFile.duration)', 'totalDuration')
-			.where('release.id = :id', { id })
-			.getRawOne<{ totalDuration: number }>();
+			.select('release.id', 'releaseId')
+			.addSelect('SUM(audioFile.duration)', 'totalDuration')
+			.where('release.id IN (:...ids)', { ids })
+			.groupBy('release.id')
+			.getRawMany<{ releaseId: string; totalDuration: string | null }>();
 
-		return result?.totalDuration ? Number(result.totalDuration) : 0;
+		return result.reduce<Record<string, number>>((acc, row) => {
+			acc[row.releaseId] = row.totalDuration
+				? Number(row.totalDuration)
+				: 0;
+			return acc;
+		}, {});
 	}
 }
