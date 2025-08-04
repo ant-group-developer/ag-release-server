@@ -29,6 +29,9 @@ export class User extends BaseUUIDEntity {
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive: boolean;
 
+	@Column({ select: false, default: '' })
+	password: string;
+
 	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
 	userPermissions: UserPermission[];
 
