@@ -30,6 +30,12 @@ export class ReleaseQueryService {
 			startUpdatedAt,
 			endUpdatedAt,
 
+			startDateRelease,
+			endDateRelease,
+
+			albumFormatId,
+			status,
+
 			fieldOrder,
 			orderBy,
 
@@ -65,6 +71,29 @@ export class ReleaseQueryService {
 					endUpdatedAt,
 				},
 			);
+		}
+
+		if (startDateRelease && endDateRelease) {
+			console.log(startDateRelease, endDateRelease);
+			queryBuilder.andWhere(
+				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
+				{
+					startDateRelease,
+					endDateRelease,
+				},
+			);
+		}
+
+		if (albumFormatId) {
+			queryBuilder.andWhere(`release.albumFormatId = :albumFormatId`, {
+				albumFormatId,
+			});
+		}
+
+		if (status) {
+			queryBuilder.andWhere(`release.status = :status`, {
+				status,
+			});
 		}
 
 		queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
