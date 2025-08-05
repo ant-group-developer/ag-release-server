@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 /** Kết quả node có thêm mảng con */
 export type TreeNode<T, K extends string> = T & Record<K, TreeNode<T, K>[]>;
 
