@@ -208,6 +208,26 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10)
 	albumFormatId?: string;
 
+	@IsString()
+	@IsOptional()
+	@Length(10, 10)
+	primaryGenreId?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@Length(10, 10)
+	subGenreId?: string | null;
+
+	@IsString()
+	@IsOptional()
+	@Length(10, 10)
+	labelId?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@Length(10, 10)
+	artistId?: string | null;
+
 	@IsOptional()
 	// @IsDate()
 	startDateRelease?: Date;

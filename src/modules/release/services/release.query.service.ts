@@ -35,6 +35,12 @@ export class ReleaseQueryService {
 
 			albumFormatId,
 			status,
+			primaryGenreId,
+			subGenreId,
+
+			labelId,
+
+			artistId,
 
 			fieldOrder,
 			orderBy,
@@ -74,7 +80,6 @@ export class ReleaseQueryService {
 		}
 
 		if (startDateRelease && endDateRelease) {
-			console.log(startDateRelease, endDateRelease);
 			queryBuilder.andWhere(
 				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
 				{
@@ -87,6 +92,31 @@ export class ReleaseQueryService {
 		if (albumFormatId) {
 			queryBuilder.andWhere(`release.albumFormatId = :albumFormatId`, {
 				albumFormatId,
+			});
+		}
+
+		if (primaryGenreId) {
+			queryBuilder.andWhere(`release.primaryGenreId = :primaryGenreId`, {
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId) {
+			queryBuilder.andWhere(`release.subGenreId = :subGenreId`, {
+				subGenreId,
+			});
+		}
+
+		if (labelId) {
+			queryBuilder.andWhere(`release.labelId = :labelId`, {
+				labelId,
+			});
+		}
+
+		if (artistId) {
+			queryBuilder.leftJoin('release.releaseArtists', 'releaseArtist');
+			queryBuilder.andWhere('releaseArtist.artistId = :artistId', {
+				artistId,
 			});
 		}
 
