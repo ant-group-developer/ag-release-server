@@ -18,8 +18,8 @@ export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
 export enum FieldOrderRelease {
 	TITLE = 'title',
 	VERSION = 'version',
-	C_LINE_OWNER = 'cLineOwner',
-	P_LINE_OWNER = 'pLineOwner',
 	CREATED_AT = 'createdAt',
+	TOTAL_DURATION = 'totalDuration',
+	TRACKS_COUNT = 'tracksCount',
 	UPDATED_AT = 'updatedAt',
 }

@@ -127,6 +127,7 @@ export class ReleaseQueryService {
 		}
 
 		queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
+
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
@@ -160,9 +161,39 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
 
 			.leftJoinAndSelect('release.label', 'label')
-			.loadRelationCountAndMap('release.tracksCount', 'release.tracks');
 
-		return await queryGetList.getManyAndCount();
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(track.id)')
+					.from('tracks', 'track')
+					.where('track.releaseId = release.id');
+			}, 'tracks_count')
+
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('SUM(audioFile.duration)')
+					.from('tracks', 'track')
+					.leftJoin('track.audioFile', 'audioFile')
+					.where('track.releaseId = release.id');
+			}, 'total_duration');
+
+		const dataFromDb: {
+			entities: Release[];
+			raw: { tracks_count: string; total_duration: string }[];
+		} = await queryGetList.getRawAndEntities();
+
+		const releases = dataFromDb.entities.map((entity, index) => {
+			entity.tracksCount = Number(dataFromDb.raw[index].tracks_count);
+			entity.totalDuration = Number(dataFromDb.raw[index].total_duration);
+			return entity;
+		});
+
+		const totalItems = await queryGetList.getCount();
+
+		return {
+			totalItems,
+			releases,
+		};
 	}
 
 	async getOneDetail(id: string): Promise<Release> {
