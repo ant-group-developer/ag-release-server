@@ -1,4 +1,3 @@
-import { IAudioFileBucket } from 'src/modules/audio-file/interfaces/audio-file.interface';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 
 // type
@@ -34,20 +33,6 @@ export interface ITrackNonDraft {
 	pLineOwner: string;
 	primaryGenreId: string;
 	subGenreId: string | null;
-}
-
-export interface ITrackDetails {
-	title: string;
-	version: string | null;
-	isrc: string | null;
-	iswc: string | null;
-	releaseId: string;
-	pLineOwner: string | null;
-	primaryGenreId: string | null;
-	subGenreId: string | null;
-	trackArtists: TrackArtist[] | [];
-
-	audioFile: IAudioFileBucket | null;
 }
 
 //

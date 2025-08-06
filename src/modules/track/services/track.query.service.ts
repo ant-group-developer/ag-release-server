@@ -169,6 +169,77 @@ export class TrackQueryService {
 		return track;
 	}
 
+	async getDetailMetadata(id: string): Promise<Track> {
+		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
+
+		query.where('track.id = :id', {
+			id,
+		});
+
+		query
+			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
+			.leftJoinAndSelect('track.subGenre', 'subGenre')
+
+			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
+			.leftJoinAndSelect('trackArtists.artist', 'artist')
+
+			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoinAndSelect(
+				'trackLanguage.recordingCountry',
+				'recordingCountry',
+			)
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguage',
+				'metadataLanguage',
+			)
+
+			.leftJoinAndSelect('track.trackLocalizes', 'trackLocalizes')
+
+			.leftJoinAndSelect('track.trackType', 'trackType')
+			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
+
+		const track = await query.getOne();
+
+		if (!track) {
+			throw new ResponseError({
+				message: TrackMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return track;
+	}
+
+	async getDetailAudioFile(id: string): Promise<Track> {
+		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
+
+		query.where('track.id = :id', {
+			id,
+		});
+
+		query
+			.leftJoinAndSelect('track.audioFile', 'audioFile')
+			.leftJoinAndSelect('audioFile.file', 'file')
+			.leftJoinAndSelect('audioFile.peak', 'peak');
+
+		const track = await query.getOne();
+
+		if (!track) {
+			throw new ResponseError({
+				message: TrackMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return track;
+	}
+
 	async getTracksOfRelease({ releaseId }: { releaseId: string }) {
 		return this.trackRepo.find({ where: { releaseId } });
 	}

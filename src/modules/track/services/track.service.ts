@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
-import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { IAudioFileBucket } from 'src/modules/audio-file/interfaces/audio-file.interface';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
 import {
 	QueryGetListTrackDto,
@@ -11,11 +8,7 @@ import {
 	UpdateTrackDto,
 } from '../dto/track.dto';
 import { Track } from '../entities/track.entity';
-import {
-	ITrack,
-	ITrackDetails,
-	ITrackNonDraft,
-} from '../interfaces/track.interface';
+import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
 import { TrackQueryService } from './track.query.service';
 import { TrackValidateService } from './track.validate.service';
 
@@ -26,7 +19,6 @@ export class TrackService {
 		private readonly trackRepo: Repository<Track>,
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
-		private readonly bucketService: BucketService,
 	) {}
 
 	// async create(data: CreateTrackDto): Promise<Track> {
@@ -63,31 +55,26 @@ export class TrackService {
 		return this.trackValidateService.ensureNonDraftTrack(result);
 	}
 
-	async getDetail(id: string): Promise<ITrackDetails> {
-		const track = await this.trackQueryService.getDetail(id);
-
-		const { audioFile, ...restOfTrack } = track;
-
-		const audioFileBucket = audioFile
-			? await this.getAudioFileBucket(audioFile)
-			: null;
-
-		return {
-			...restOfTrack,
-			audioFile: audioFileBucket,
-		};
+	async getDetail(id: string): Promise<Track> {
+		return await this.trackQueryService.getDetail(id);
 	}
 
-	async getList(
-		query: QueryGetListTrackDto,
-	): Promise<PageDto<ITrackDetails>> {
+	async getDetailMetadata(id: string): Promise<Track> {
+		return await this.trackQueryService.getDetailMetadata(id);
+	}
+
+	async getDetailAudioFile(id: string): Promise<Track> {
+		return await this.trackQueryService.getDetailAudioFile(id);
+	}
+
+	async getList(query: QueryGetListTrackDto): Promise<PageDto<Track>> {
 		const { page, pageSize } = query;
 
 		const [tracks, totalItems] =
 			await this.trackQueryService.getList(query);
 
 		return new PageDto({
-			items: await this.getTracksAudioBucket(tracks),
+			items: tracks,
 			metadata: {
 				currentPage: page,
 				pageSize,
@@ -125,43 +112,6 @@ export class TrackService {
 
 		await this.trackRepo.update(id, data);
 		return await this.trackQueryService.findOne(id);
-	}
-
-	async getAudioFileBucket(audioFile: AudioFile): Promise<IAudioFileBucket> {
-		const { file, peak } = audioFile;
-
-		const urlReadFile = await this.bucketService.getUrlRead(file.id);
-		const urlReadPeak = await this.bucketService.getUrlRead(peak.id);
-
-		return {
-			...audioFile,
-			file: {
-				...file,
-				urlRead: urlReadFile,
-			},
-			peak: {
-				...peak,
-				urlRead: urlReadPeak,
-			},
-		};
-	}
-
-	async getTracksAudioBucket(tracks: Track[]) {
-		const result = [];
-		for (const track of tracks) {
-			const { audioFile, ...restOfTrack } = track;
-
-			const audioFileBucket = audioFile
-				? await this.getAudioFileBucket(audioFile)
-				: null;
-
-			result.push({
-				...restOfTrack,
-				audioFile: audioFileBucket,
-			});
-		}
-
-		return result;
 	}
 
 	// async remove(id: string) {
