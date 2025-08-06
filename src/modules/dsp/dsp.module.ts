@@ -11,4 +11,4 @@ import { DspService } from './services/dsp.service';
 	controllers: [DspController],
 	providers: [DspService, DspQueryService],
 })
-export class DspModule { }
+export class DspModule {}

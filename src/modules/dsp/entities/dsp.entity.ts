@@ -26,6 +26,14 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	canLinkArtistProfile: boolean;
 
+	@Column('varchar', {
+		array: true,
+		nullable: false,
+		length: 100,
+		default: [],
+	})
+	formatLinks: string[];
+
 	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
