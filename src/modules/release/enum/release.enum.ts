@@ -9,17 +9,18 @@ export enum ReleaseStatus {
 
 export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
 
-// export enum ReleaseType {
-// 	ALBUM = 'album',
-// 	SINGLE = 'single',
-// 	EP = 'ep',
-// }
-
 export enum FieldOrderRelease {
 	TITLE = 'title',
 	VERSION = 'version',
 	CREATED_AT = 'createdAt',
-	TOTAL_DURATION = 'totalDuration',
-	TRACKS_COUNT = 'tracksCount',
 	UPDATED_AT = 'updatedAt',
+
+	// virtual
+	TRACKS_COUNT = 'tracks_count',
+	TOTAL_DURATION = 'total_duration',
+}
+
+export enum VirtualColumnRelease {
+	TRACKS_COUNT = 'tracks_count',
+	TOTAL_DURATION = 'total_duration',
 }
