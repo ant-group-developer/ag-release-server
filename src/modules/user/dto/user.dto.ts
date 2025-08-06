@@ -49,6 +49,11 @@ export abstract class UpdateUserDto {
 	@IsBoolean()
 	isActive?: boolean;
 
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsBoolean()
+	emailVerified?: boolean;
+
 	@ApiPropertyOptional({ enum: UserType })
 	@IsOptional()
 	@IsEnum(UserType)
