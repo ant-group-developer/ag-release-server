@@ -12,3 +12,7 @@ export enum DateFormat {
 	YYYYMMDDHHmmss = 'YYYYMMDDHHmmss',
 	'YYYY-MM-DD_HH-mm-ss' = 'YYYY-MM-DD_HH-mm-ss',
 }
+
+export enum AppEvent {
+	CHANGE_TIME_SYNC_DATA = 'CHANGE_TIME_SYNC_DATA',
+}

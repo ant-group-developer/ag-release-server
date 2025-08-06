@@ -23,11 +23,32 @@ export class User extends BaseUUIDEntity {
 	@Column({ type: 'varchar', nullable: true })
 	telegramId: string | null;
 
+	@Column({ type: 'varchar', nullable: true })
+	avatar: string | null;
+
 	@Column({ type: 'enum', enum: UserType, default: UserType.USER })
 	type: UserType;
 
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive: boolean;
+
+	@Column({ select: false, default: '' })
+	password: string;
+
+	@Column({ default: false, name: 'email_verified' })
+	emailVerified: boolean;
+
+	@Column({ name: 'auth0_user_id', nullable: true })
+	auth0UserId: string;
+
+	@Column({ name: 'last_login', nullable: true })
+	lastLogin: Date;
+
+	@Column({ name: 'last_ip', nullable: true })
+	lastIp: string;
+
+	@Column({ name: 'logins_count', default: 0 })
+	loginsCount: number;
 
 	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
 	userPermissions: UserPermission[];

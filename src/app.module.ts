@@ -6,9 +6,11 @@ import { AppService } from './app.service';
 import appConfig from './common/config/app.config';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
+import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
 import { ArtistModule } from './modules/artist/artist.module';
 import { AudioFileModule } from './modules/audio-file/audio-file.module';
+import { Auth0Module } from './modules/auth0/auth0.module';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CountryModule } from './modules/country/country.module';
 import { DatabaseModule } from './modules/database/database.module';
@@ -86,6 +88,8 @@ import { UserModule } from './modules/user/user.module';
 		BucketModule,
 		TimezoneModule,
 
+		AppConfigModule,
+		Auth0Module,
 		// ScheduleModule,
 	],
 	controllers: [AppController],
