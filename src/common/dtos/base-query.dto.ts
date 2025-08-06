@@ -12,7 +12,7 @@ import {
 import { FILED_ORDER_DEFAULT } from '../constants/common.default.constants';
 import { OrderDirection } from '../enums/common';
 
-export class BaseQueryDto {
+export abstract class BaseQueryDto {
 	/** Full‑text search keyword */
 	@ApiProperty({
 		description: 'Full-text search keyword',

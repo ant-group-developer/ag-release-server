@@ -1,31 +1,23 @@
-import {
-	Body,
-	Controller,
-	Delete,
-	Get,
-	Param,
-	Post,
-	Put,
-	Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	CreateUserDto,
-	QueryGetListUserDto,
-	UpdateUserDto,
-} from './dto/user.dto';
+import { CreateUserDto, GetListUserDto, UpdateUserDto } from './dto/user.dto';
 import { User } from './entities/user.entity';
-import { UserService } from './user.service';
+import { UserSyncService } from './services/user-sync.service';
+import { UserService } from './services/user.service';
 
-@Controller('User')
+@Controller('users')
 export class UserController {
-	constructor(private readonly userService: UserService) {}
+	constructor(
+		private readonly userService: UserService,
+		private readonly userSyncService: UserSyncService,
+	) {}
 
 	@Post()
 	async create(
-		@Body() createUserDto: CreateUserDto,
+		@Body() payload: CreateUserDto,
 	): Promise<ResponseSuccess<User>> {
-		const result = await this.userService.create(createUserDto);
+		const result = await this.userService.create(payload);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -37,22 +29,27 @@ export class UserController {
 
 	@Get()
 	async getList(
-		@Query() query: QueryGetListUserDto,
+		@Query() query: GetListUserDto,
 	): Promise<ResponseSuccess<PageDto<User>>> {
 		const result = await this.userService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Sync user data from Auth0' })
+	@Post('sync-data')
+	async syncUserFromAuth0() {
+		await this.userSyncService.syncUserFromAuth0();
+		return new ResponseSuccess({
+			message: 'Sync user data from Auth0 successfully',
+		});
+	}
+
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
-		@Body() updateUserDto: UpdateUserDto,
-	): Promise<User> {
-		return await this.userService.update(id, updateUserDto);
-	}
-
-	@Delete(':id')
-	async remove(@Param('id') id: string): Promise<void> {
-		return await this.userService.remove(id);
+		@Body() payload: UpdateUserDto,
+	): Promise<ResponseSuccess<User>> {
+		const result = await this.userService.update(id, payload);
+		return new ResponseSuccess({ data: result });
 	}
 }
