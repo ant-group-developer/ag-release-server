@@ -1,5 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import {
+	ArrayNotEmpty,
+	IsArray,
 	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
@@ -42,6 +44,14 @@ export class CreateDspDto {
 	})
 	@IsBoolean()
 	canLinkArtistProfile: boolean;
+
+	@IsNotEmpty()
+	@IsNotEmpty({ each: true })
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	@MaxLength(100, { each: true })
+	formatLinks: string[];
 }
 
 export class UpdateDspDto extends PartialType(CreateDspDto) {
@@ -50,6 +60,15 @@ export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@MaxLength(100)
 	@IsNotEmpty()
 	name: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsNotEmpty()
+	@IsNotEmpty({ each: true })
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	@MaxLength(100, { each: true })
+	formatLinks?: string[];
 }
 
 export class QueryGetListDspDto extends BaseQueryDto {

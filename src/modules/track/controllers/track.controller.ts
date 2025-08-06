@@ -12,11 +12,8 @@ import {
 	SubmitCreateTrackDto,
 	UpdateTrackDto,
 } from '../dto/track.dto';
-import {
-	ITrack,
-	ITrackDetails,
-	ITrackNonDraft,
-} from '../interfaces/track.interface';
+import { Track } from '../entities/track.entity';
+import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
 import { TrackService } from '../services/track.service';
 
 @ApiTags('Tracks')
@@ -58,10 +55,24 @@ export class TrackController {
 	}
 
 	@Get(':id')
-	async getDetail(
-		@Param('id') id: string,
-	): Promise<ResponseSuccess<ITrackDetails>> {
+	async getDetail(@Param('id') id: string): Promise<ResponseSuccess<Track>> {
 		const result = await this.trackService.getDetail(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/metadata')
+	async getDetailMetadata(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<Track>> {
+		const result = await this.trackService.getDetailMetadata(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/audio-file')
+	async getDetailAudioFile(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<Track>> {
+		const result = await this.trackService.getDetailAudioFile(id);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -73,7 +84,7 @@ export class TrackController {
 	})
 	async getList(
 		@Query() query: QueryGetListTrackDto,
-	): Promise<ResponseSuccess<PageDto<ITrackDetails>>> {
+	): Promise<ResponseSuccess<PageDto<Track>>> {
 		const result = await this.trackService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}

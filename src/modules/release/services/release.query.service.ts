@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { ReleaseMessageError } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
+import { VirtualColumnRelease } from '../enum/release.enum';
 
 @Injectable()
 export class ReleaseQueryService {
@@ -35,6 +36,12 @@ export class ReleaseQueryService {
 
 			albumFormatId,
 			status,
+			primaryGenreId,
+			subGenreId,
+
+			labelId,
+
+			artistId,
 
 			fieldOrder,
 			orderBy,
@@ -74,7 +81,6 @@ export class ReleaseQueryService {
 		}
 
 		if (startDateRelease && endDateRelease) {
-			console.log(startDateRelease, endDateRelease);
 			queryBuilder.andWhere(
 				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
 				{
@@ -90,13 +96,47 @@ export class ReleaseQueryService {
 			});
 		}
 
+		if (primaryGenreId) {
+			queryBuilder.andWhere(`release.primaryGenreId = :primaryGenreId`, {
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId) {
+			queryBuilder.andWhere(`release.subGenreId = :subGenreId`, {
+				subGenreId,
+			});
+		}
+
+		if (labelId) {
+			queryBuilder.andWhere(`release.labelId = :labelId`, {
+				labelId,
+			});
+		}
+
+		if (artistId) {
+			queryBuilder.leftJoin('release.releaseArtists', 'releaseArtist');
+			queryBuilder.andWhere('releaseArtist.artistId = :artistId', {
+				artistId,
+			});
+		}
+
 		if (status) {
 			queryBuilder.andWhere(`release.status = :status`, {
 				status,
 			});
 		}
 
-		queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
+		if (
+			(Object.values(VirtualColumnRelease) as string[]).includes(
+				fieldOrder,
+			)
+		) {
+			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
+		}
+
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
@@ -119,8 +159,10 @@ export class ReleaseQueryService {
 		return release;
 	}
 
-	async getListDetail(query: QueryGetListReleaseDto) {
+	async getManyAndCount(query: QueryGetListReleaseDto) {
 		const queryGetList = this.createQueryGetList(query);
+
+		// left join
 		queryGetList
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
@@ -130,9 +172,64 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
 
 			.leftJoinAndSelect('release.label', 'label')
-			.loadRelationCountAndMap('release.tracksCount', 'release.tracks');
 
-		return await queryGetList.getManyAndCount();
+			// virtual
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(track.id)')
+					.from('tracks', 'track')
+					.where('track.releaseId = release.id');
+			}, VirtualColumnRelease.TRACKS_COUNT)
+
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('SUM(audioFile.duration)')
+					.from('tracks', 'track')
+					.leftJoin('track.audioFile', 'audioFile')
+					.where('track.releaseId = release.id');
+			}, VirtualColumnRelease.TOTAL_DURATION);
+
+		const [dataFromDb, totalItems]: [
+			{
+				entities: Release[];
+				raw: {
+					release_id: string;
+					tracks_count: string;
+					total_duration: string;
+				}[];
+			},
+			number,
+		] = await Promise.all([
+			queryGetList.getRawAndEntities(),
+			queryGetList.getCount(),
+		]);
+
+		const releases = this.assigneeVirtualColumn(dataFromDb);
+
+		return {
+			totalItems,
+			releases,
+		};
+	}
+
+	private assigneeVirtualColumn(dataFromDb: {
+		entities: Release[];
+		raw: {
+			release_id: string;
+			tracks_count: string;
+			total_duration: string;
+		}[];
+	}) {
+		return dataFromDb.entities.map((entity) => {
+			const dataRawOfRelease = dataFromDb.raw.find(
+				(item) => item.release_id === entity.id,
+			);
+
+			entity.tracksCount = Number(dataRawOfRelease?.tracks_count);
+			entity.totalDuration = Number(dataRawOfRelease?.total_duration);
+
+			return entity;
+		});
 	}
 
 	async getOneDetail(id: string): Promise<Release> {
