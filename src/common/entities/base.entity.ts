@@ -3,14 +3,13 @@ import {
 	BeforeInsert,
 	CreateDateColumn,
 	PrimaryColumn,
-	PrimaryGeneratedColumn,
 	UpdateDateColumn,
 } from 'typeorm';
 
 export abstract class BaseUUIDEntity {
-	// @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
+	@PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
 	// @PrimaryColumn('uuid')
-	@PrimaryGeneratedColumn('uuid')
+	// @PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@CreateDateColumn({ type: 'timestamptz' })

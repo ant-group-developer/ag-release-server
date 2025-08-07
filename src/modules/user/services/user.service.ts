@@ -107,8 +107,8 @@ export class UserService {
 			}
 		}
 
-		if (type) {
-			queryBuilder.andWhere('user.type = :type', { type });
+		if (type?.length) {
+			queryBuilder.andWhere('user.type IN (:...type)', { type });
 		}
 
 		if (keyword) {

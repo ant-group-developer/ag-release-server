@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from './dto/user.dto';
 import { User } from './entities/user.entity';
 import { UserSyncService } from './services/user-sync.service';
 import { UserService } from './services/user.service';
 
+@ApiTags('Users')
 @Controller('users')
 export class UserController {
 	constructor(

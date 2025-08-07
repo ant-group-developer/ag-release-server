@@ -8,6 +8,7 @@ import {
 	Length,
 	Matches,
 } from 'class-validator';
+import { CsvEnumArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { UserOrderBy, UserType } from '../enum/user.enum';
 
@@ -87,10 +88,13 @@ export class GetListUserDto extends BaseQueryDto {
 	@IsString()
 	id?: string;
 
-	@ApiPropertyOptional({ enum: UserType })
-	@IsOptional()
-	@IsEnum(UserType)
-	type?: UserType;
+	@ApiPropertyOptional({
+		description: 'List user types to filter (comma-separated)',
+		example: 'a,b,c',
+		required: false,
+	})
+	@CsvEnumArray(UserType)
+	type?: UserType[];
 
 	@ApiPropertyOptional()
 	@IsOptional()
