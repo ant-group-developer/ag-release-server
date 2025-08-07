@@ -77,7 +77,9 @@ export class TrackDraftService {
 		return {
 			...track,
 
+			pLineYear: releaseOfTracks?.pLineYear,
 			pLineOwner: releaseOfTracks?.pLineOwner,
+
 			primaryGenreId: releaseOfTracks?.primaryGenreId,
 			subGenreId: releaseOfTracks?.subGenreId,
 			version: releaseOfTracks?.version,
