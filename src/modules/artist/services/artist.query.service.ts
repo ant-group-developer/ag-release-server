@@ -30,6 +30,10 @@ export class ArtistQueryService {
 
 		const queryBuilder = this.artistRepo.createQueryBuilder('artist');
 
+		queryBuilder
+			.leftJoinAndSelect('artist.artistProfiles', 'artistProfile')
+			.leftJoinAndSelect('artistProfile.dsp', 'dsp');
+
 		if (keyword) {
 			queryBuilder.andWhere('artist.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
@@ -88,5 +92,39 @@ export class ArtistQueryService {
 			);
 
 		return await queryBuilder.getOne();
+	}
+
+	async findOneLite(id: string) {
+		const query = this.artistRepo.createQueryBuilder('artist');
+		query.where('artist.id = :id', {
+			id,
+		});
+
+		query
+			.leftJoin('artist.artistProfiles', 'artistProfile')
+			.leftJoin('artistProfile.dsp', 'dsp');
+
+		query
+			.select([
+				'artist.id',
+				'artist.name',
+				'artist.picture',
+				'artist.biography',
+			])
+			.addSelect([
+				'artistProfile.id',
+				'artistProfile.name',
+				'artistProfile.url',
+				'artistProfile.dspId',
+			])
+			.addSelect([
+				'dsp.id',
+				'dsp.name',
+				'dsp.picture',
+				'dsp.canLinkArtistProfile',
+				'dsp.formatLinks',
+			]);
+
+		return await query.getOne();
 	}
 }
