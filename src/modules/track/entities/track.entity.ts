@@ -42,6 +42,13 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	releaseId: string;
 
 	@Column({
+		type: 'int',
+		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE,
+		nullable: true,
+	})
+	pLineYear: number | null;
+
+	@Column({
 		type: 'varchar',
 		length: 200,
 		comment:

@@ -5,6 +5,7 @@ import {
 	IsBoolean,
 	IsInt,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
@@ -53,6 +54,13 @@ class CreateTrackDraftDto {
 	@IsUUID()
 	@IsNotEmpty()
 	releaseId: string;
+
+	@ApiProperty({ example: 2025 })
+	@IsNumber()
+	@IsOptional()
+	@Min(1000)
+	@Max(9999)
+	pLineYear?: number | null;
 
 	@ApiProperty({ example: '2025 Exclusive Licensed AMG', required: false })
 	@IsOptional()

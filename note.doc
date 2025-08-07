@@ -1,199 +1,151 @@
-user.email: unique
-language.code: unique
-permission.name: unique chưa sửa
-
-artist_role.id length = uuid
-track_artist oke
-release_artist
-
-release.id => uuid
-track
-release_artist
-release_localize
-release_language
- 
-countries
-phonecode => phone_code
-
-21/6
-
-export abstract class BaseCustomIDEntity {
-	@PrimaryColumn({ default: generateId(), length: 10 })
-	id: string;
-
-	@CreateDateColumn({ type: 'timestamptz' })
-	createdAt: Date;
-
-	@UpdateDateColumn({ type: 'timestamptz' })
-	updatedAt: Date;
-}
-
-default phai la hang so khi init db
-
-ant-music-assets/labels/
-
-thay đổi track
-{
-	"id": "55T0f7i0G7",
-	"createdAt": "2025-07-14T09:18:08.829Z",
-	"updatedAt": "2025-07-14T09:18:08.829Z",
-	"title": "Waiting by the Window",
-	"version": null,
-	"isrc": null,
-	"iswc": null,
-	"releaseId": "272a3d39-893d-4d6b-a364-6af5cda39d96",
-	"pLineOwner": null,
-	"primaryGenreId": null,
-	"subGenreId": null,
-	"trackArtists": [],
-	"audioFileBucket": { 
-		"id": "c81efa4d-2d80-4a54-bb37-4d5346af4e9e",
-		"createdAt": "2025-07-14T09:18:08.849Z",
-		"updatedAt": "2025-07-14T09:18:08.849Z",
-		"sampleRate": "44100",
-		"bitrate": "1411200",
-		"bitDepth": 16,
-		"duration": 124,
-		"hook": null,
-		"trackId": "55T0f7i0G7",
-		"fileId": "1618cd14-4a08-4d8a-ade1-2d1e76893a3c",
-		"peakId": "0ed895f6-f477-48d5-a1ba-6840b532474f",
-		"file": "string"
-		"peak": "string"
-	}
-},
-
-vs
-
-{
-	"id": "NxpYrcNHc6",
-	"createdAt": "2025-07-05T08:31:52.199Z",
-	"updatedAt": "2025-07-05T08:31:52.199Z",
-	"title": "Autumn Without You",
-	"version": null,
-	"isrc": null,
-	"iswc": null,
-	"releaseId": "ef4ca945-ca1f-4fde-9455-f3f5e6cb4d70",
-	"pLineOwner": null,
-	"primaryGenreId": null,
-	"subGenreId": null,
-	"order": 0,
-	"originType": "original",
-	"isSensitiveContent": null,
-	"lyric": null,
-	"trackArtists": [],
-	"trackLanguage": null,
-	"audioFile": {
-		"id": "44cd991c-4896-44a7-90a8-8dc54db9a94f",
-		"createdAt": "2025-07-09T03:57:36.596Z",
-		"updatedAt": "2025-07-09T03:57:36.596Z",
-		"sampleRate": "44100",
-		"bitrate": null,
-		"bitDepth": 16,
-		"duration": 180,
-		"hook": 30,
-		"preview": null,
-		"trackId": "NxpYrcNHc6",
-		"fileId": "6244d258-5149-412d-ac85-f5ab1438d709",
-		"peakId": "7847c6bd-3e06-45c6-a4e0-734a33dc85f2",
-		"file": {
-			"id": "6244d258-5149-412d-ac85-f5ab1438d709",
-			"createdAt": "2025-07-08T04:01:09.612Z",
-			"updatedAt": "2025-07-08T04:01:09.612Z",
-			"isSubmitted": false,
-			"fileName": "20250708110109_my_song.mp3",
-			"key": "tracks/audio/20250708110109_my_song.mp3",
-			"contentType": "audio/mpeg",
-			"extension": "mp3",
-			"fileSize": "5120000",
-			"bucket": "ant-music-assets-protected",
-			"urlRead": "string"
-		},
-		"peak": {
-			"id": "7847c6bd-3e06-45c6-a4e0-734a33dc85f2",
-			"createdAt": "2025-07-08T04:01:18.429Z",
-			"updatedAt": "2025-07-08T04:01:18.429Z",
-			"isSubmitted": false,
-			"fileName": "20250708110118_my_song.mp3",
-			"key": "tracks/audio/20250708110118_my_song.mp3",
-			"contentType": "audio/mpeg",
-			"extension": "mp3",
-			"fileSize": "5120000",
-			"bucket": "ant-music-assets-protected",
-			"urlRead": "string"	
-		}
-	}
-}
-
-
-[
-	{
-		ten chau luc: string,
-		countries: []
-	}
-]
-
 {
     "statusCode": 200,
     "message": "Success",
     "messageCode": "success",
     "data": {
-        "id": "ydbKjo4bsq",
-        "createdAt": "2025-07-09T03:37:05.131Z",
-        "updatedAt": "2025-07-09T03:37:05.131Z",
-        "title": "Con mua ngang qua",
-        "version": null,
+        "id": "GqaakYjn7G",
+        "createdAt": "2025-07-31T07:29:58.428Z",
+        "updatedAt": "2025-07-31T07:29:58.428Z",
+        "title": "Yellow Leaves",
+        "version": "",
         "isrc": null,
         "iswc": null,
-        "releaseId": "ef4ca945-ca1f-4fde-9455-f3f5e6cb4d70",
-        "pLineOwner": null,
-        "primaryGenreId": null,
-        "subGenreId": null,
+        "releaseId": "97860665-3d68-4be1-83de-0163e4b444b4",
+        "pLineOwner": "2025 ExclusiveAMG",
+        "primaryGenreId": "muLS9sHg22",
+        "subGenreId": "GMaRiKhY1z",
         "order": 0,
-        "trackTypeId": "d6fca634-6974-436b-8cce-8f655ada1d33",
-        "trackOriginTypeId": "5b036eba-8a3c-48e1-b218-c2b9f9c784b4",
+        "trackTypeId": null,
+        "trackOriginTypeId": null,
         "isSensitiveContent": null,
         "lyric": null,
-        "trackArtists": [],
-        "trackLanguage": null,
+        "copyArtistsFromRelease": false,
         "audioFile": {
-            "id": "6f224dac-6ae7-485a-97c2-4c514106e271",
-            "createdAt": "2025-07-09T03:39:12.856Z",
-            "updatedAt": "2025-07-09T03:39:12.856Z",
+            "id": "2d77f8b0-69f2-4189-b8eb-6b49dfb6d187",
+            "createdAt": "2025-07-31T07:29:58.454Z",
+            "updatedAt": "2025-07-31T07:29:58.454Z",
             "sampleRate": "44100",
-            "bitrate": null,
+            "bitrate": "1411200",
             "bitDepth": 16,
-            "duration": 180,
-            "hook": 30,
+            "duration": 157,
+            "hook": null,
             "preview": null,
-            "trackId": "ydbKjo4bsq",
-            "fileId": "76786a5c-dd99-4568-82ca-2f3e8e651840",
-            "peakId": "99f6dd87-c385-4457-8909-441e2efb8992",
+            "trackId": "GqaakYjn7G",
+            "fileId": "a074e292-b6a8-49b7-b4b1-d43d4b54cc97",
+            "peakId": "0d927bf0-4b5f-4afc-bdda-49c94393dfae",
             "file": {
-                "id": "76786a5c-dd99-4568-82ca-2f3e8e651840",
-                "createdAt": "2025-07-09T03:30:43.763Z",
-                "updatedAt": "2025-07-09T03:34:53.590Z",
+                "id": "a074e292-b6a8-49b7-b4b1-d43d4b54cc97",
+                "createdAt": "2025-07-31T07:29:48.562Z",
+                "updatedAt": "2025-07-31T07:29:58.004Z",
                 "isSubmitted": true,
-                "fileName": "20250709103043_conmuangangqua.mp3",
-                "key": "tracks/audio/20250709103043_conmuangangqua.mp3",
-                "contentType": "audio/mpeg",
-                "extension": "mp3",
-                "fileSize": "5120000",
-                "bucket": "ant-music-assets-protected",
-                "urlRead": "https://storage.googleapis.com/ant-music-assets-protected/tracks/audio/20250709103043_conmuangangqua.mp3?GoogleAccessId=vinctuan02%40antmusic-381907.iam.gserviceaccount.com&Expires=1752665564&Signature=hXRrkKS1R32nKcdUyUF3BpUEuAWlK9uUCctdgqfaNaMK%2BDm8JVUwikTdOJQIGoUFOGkiNTxaxPbYN9RrN1n8rFuo2TbqgrzuiNcHqS2T30FvGEJ5Ru2OQj6PMCVaVsDAYKGUKTREU7hw9mUmEjIyQ7KONYc4GJ%2BtyH8nSkm8rJQ0VYcrQ02jFfyiHoNxyyUSz%2FvXC8%2FMbp4jPNeSDqerc%2F34faRcLyzqKw1Qo90GtkZPyVm%2BkgPRItiP6x3vmJYQQsuxwoMO5ueM582AVe%2BqR9uPab2wvSri5GnEO%2BScIBI7rhgNvaOJh%2Byo0qbV%2F11u2SRxWe3%2FCRNOVmNH7w%2BDLg%3D%3D"
+                "fileName": "Yellow Leaves.wav",
+                "key": "2025_07_31/releases/97860665-3d68-4be1-83de-0163e4b444b4/tracks/Yellow Leaves/20250731142948_Yellow Leaves.wav",
+                "contentType": "audio/wav",
+                "extension": "wav",
+                "fileSize": "27718608",
+                "bucket": "ant-music-assets-protected"
             },
             "peak": {
-                "id": "99f6dd87-c385-4457-8909-441e2efb8992",
-                "createdAt": "2025-07-09T03:30:43.778Z",
-                "updatedAt": "2025-07-09T03:34:53.773Z",
+                "id": "0d927bf0-4b5f-4afc-bdda-49c94393dfae",
+                "createdAt": "2025-07-31T07:29:48.538Z",
+                "updatedAt": "2025-07-31T07:29:56.479Z",
                 "isSubmitted": true,
-                "fileName": "20250709103043_conmuangangqua.json",
-                "key": "tracks/peak/20250709103043_conmuangangqua.json",
+                "fileName": "Yellow Leaves.json",
+                "key": "2025_07_31/releases/97860665-3d68-4be1-83de-0163e4b444b4/tracks/Yellow Leaves/20250731142948_Yellow Leaves.json",
                 "contentType": "application/json",
                 "extension": "json",
-                "fileSize": "18000",
-                "bucket": "ant-music-assets-protected",
-                "urlRead": "https://storage.googleapis.com/ant-music-assets-protected/tracks/peak/20250709103043_conmuangangqua.json?GoogleAccessId=vinctuan02%40antmusic-381907.iam.gserviceaccount.com&Expires=1752665564&Signature=YD%2B3D%2BcxS2ZRPwBPX0BIRcuDRY7ZbYHJGMmPVYjleyRgfiNSvPN0ryd1RaPBgMYppcP73d5BurJfwMwal8318kwSVCO28RQoBRwpvslYlX8SOxUpW3AKwTT7HuLJJp%2B%2BwXcCfejw1LSRUMEGOZg0mIei3lvRuedsRed%2FVb7OE7%2Fe3yk2hF5yrVSLgE43NPFuM8ebLD9NqCMLXw0gGYATg0x%2B7qq2XJySxE37TlxH6mvd84AQz%2BdZtgpJ7LD%2B61XiONCeztjg7jENRLqnZpzYgjM%2F8k%2FC5gxqniWDB8%2FD6O0lypiz6AUB5D8KCIajAxVBGd%2FA4t8NCaDTkYw5icLhOA%3D%3D"
+                "fileSize": "19654",
+                "bucket": "ant-music-assets-protected"
+            }
+        },
+        "trackArtists": [
+            {
+                "id": "e5a1f4da-95ee-406a-ba1c-ad2a109b7279",
+                "createdAt": "2025-07-31T07:29:58.484Z",
+                "updatedAt": "2025-07-31T07:29:58.484Z",
+                "artistId": "7MgW_15r5S",
+                "artistRoleId": "599858ad-2c4b-4d0f-8036-e74e28da7717",
+                "trackId": "GqaakYjn7G",
+                "releaseArtistId": "d7410c06-ef23-49d1-8610-84b82dfd73be",
+                "isFromReleaseAction": true,
+                "isFromTrackAction": false,
+                "artistRole": {
+                    "id": "599858ad-2c4b-4d0f-8036-e74e28da7717",
+                    "createdAt": "2025-07-31T06:27:48.786Z",
+                    "updatedAt": "2025-07-31T06:27:48.786Z",
+                    "creatorId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "modifierId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "name": "Main Artist",
+                    "value": "main_artist"
+                },
+                "artist": {
+                    "id": "7MgW_15r5S",
+                    "createdAt": "2025-07-31T06:32:38.498Z",
+                    "updatedAt": "2025-07-31T08:23:13.681Z",
+                    "creatorId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "modifierId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "name": "Eric Dietz",
+                    "picture": "https://ui-avatars.com/api/?name=Eric%20Dietz&background=29b6f6&color=fff&size=128&bold=true&length=2",
+                    "biography": null
+                }
+            }
+        ],
+        "trackLanguage": {
+            "id": "bfae48b8-d61e-449f-ade3-f31b55d9e68b",
+            "createdAt": "2025-07-31T07:11:57.557Z",
+            "updatedAt": "2025-07-31T07:18:37.289Z",
+            "metadataLanguageCountryId": "11741384-a922-45a4-bf60-1f44d86dd23c",
+            "audioLanguageId": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+            "metadataLanguageId": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+            "trackId": "GqaakYjn7G",
+            "recordingCountryId": "11741384-a922-45a4-bf60-1f44d86dd23c",
+            "metadataLanguageCountry": {
+                "id": "11741384-a922-45a4-bf60-1f44d86dd23c",
+                "createdAt": "2025-07-31T06:26:37.408Z",
+                "updatedAt": "2025-07-31T06:26:37.408Z",
+                "name": "Armenia",
+                "iso3": "ARM",
+                "iso2": "AM",
+                "numericCode": "51",
+                "phoneCode": "374",
+                "capital": "Yerevan",
+                "currency": "AMD",
+                "currencyName": "Armenian Dram",
+                "currencySymbol": "֏",
+                "regionId": 1,
+                "nationality": "Armenian",
+                "continent": "Asia"
+            },
+            "recordingCountry": {
+                "id": "11741384-a922-45a4-bf60-1f44d86dd23c",
+                "createdAt": "2025-07-31T06:26:37.408Z",
+                "updatedAt": "2025-07-31T06:26:37.408Z",
+                "name": "Armenia",
+                "iso3": "ARM",
+                "iso2": "AM",
+                "numericCode": "51",
+                "phoneCode": "374",
+                "capital": "Yerevan",
+                "currency": "AMD",
+                "currencyName": "Armenian Dram",
+                "currencySymbol": "֏",
+                "regionId": 1,
+                "nationality": "Armenian",
+                "continent": "Asia"
+            },
+            "audioLanguage": {
+                "id": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+                "createdAt": "2025-07-31T06:27:20.757Z",
+                "updatedAt": "2025-07-31T06:27:20.757Z",
+                "name": "English",
+                "code": "en"
+            },
+            "metadataLanguage": {
+                "id": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+                "createdAt": "2025-07-31T06:27:20.757Z",
+                "updatedAt": "2025-07-31T06:27:20.757Z",
+                "name": "English",
+                "code": "en"
             }
         }
     }

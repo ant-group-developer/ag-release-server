@@ -47,6 +47,7 @@ export interface ICreateTrackDraft {
 	isrc?: string;
 	iswc?: string;
 	releaseId: string;
+	pLineYear?: number | null;
 	pLineOwner?: string | null;
 	primaryGenreId?: string | null;
 	subGenreId?: string | null;

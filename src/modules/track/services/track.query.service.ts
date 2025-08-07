@@ -177,32 +177,63 @@ export class TrackQueryService {
 		});
 
 		query
-			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
-			.leftJoinAndSelect('track.subGenre', 'subGenre')
+			.leftJoin('track.primaryGenre', 'primaryGenre')
+			.leftJoin('track.subGenre', 'subGenre')
 
-			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
-			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
-			.leftJoinAndSelect('trackArtists.artist', 'artist')
+			.leftJoin('track.trackArtists', 'trackArtist')
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist')
 
-			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
-			.leftJoinAndSelect(
+			.leftJoin('track.trackLanguage', 'trackLanguage')
+			.leftJoin(
 				'trackLanguage.metadataLanguageCountry',
 				'metadataLanguageCountry',
 			)
-			.leftJoinAndSelect(
-				'trackLanguage.recordingCountry',
-				'recordingCountry',
-			)
-			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
-			.leftJoinAndSelect(
-				'trackLanguage.metadataLanguage',
-				'metadataLanguage',
-			)
+			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
+			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage')
 
-			.leftJoinAndSelect('track.trackLocalizes', 'trackLocalizes')
+			.leftJoin('track.trackLocalizes', 'trackLocalize')
 
-			.leftJoinAndSelect('track.trackType', 'trackType')
-			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
+			.leftJoin('track.trackType', 'trackType')
+			.leftJoin('track.trackOriginType', 'trackOriginType');
+
+		// select
+		query.select([
+			'track.title',
+			'track.version',
+			'track.isrc',
+			'track.isSensitiveContent',
+			'track.pLineYear',
+			'track.pLineOwner',
+		]);
+
+		query
+			.addSelect(['trackArtist.id'])
+			.addSelect(['artistRole.name'])
+			.addSelect(['artist.name', 'artist.picture']);
+
+		query.addSelect([
+			'primaryGenre.name',
+			'primaryGenre.value',
+			'primaryGenre.picture',
+		]);
+
+		query.addSelect([
+			'subGenre.name',
+			'subGenre.value',
+			'subGenre.picture',
+		]);
+
+		query
+			.addSelect(['trackLanguage.id'])
+			.addSelect(['metadataLanguageCountry.name'])
+			.addSelect(['recordingCountry.name'])
+			.addSelect(['audioLanguage.name'])
+			.addSelect(['metadataLanguage.name']);
+
+		query.addSelect(['trackType.name']);
+		query.addSelect(['trackOriginType.name']);
 
 		const track = await query.getOne();
 
@@ -224,9 +255,21 @@ export class TrackQueryService {
 		});
 
 		query
-			.leftJoinAndSelect('track.audioFile', 'audioFile')
-			.leftJoinAndSelect('audioFile.file', 'file')
-			.leftJoinAndSelect('audioFile.peak', 'peak');
+			.leftJoin('track.audioFile', 'audioFile')
+			.leftJoin('audioFile.file', 'file')
+			.leftJoin('audioFile.peak', 'peak');
+
+		query.select(['track.title']);
+
+		query.addSelect([
+			'audioFile.bitrate',
+			'audioFile.bitDepth',
+			'audioFile.sampleRate',
+			'audioFile.fileId',
+			'audioFile.peakId',
+		]);
+
+		query.addSelect(['file.id', 'peak.id']);
 
 		const track = await query.getOne();
 
