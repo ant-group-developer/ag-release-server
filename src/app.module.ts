@@ -27,6 +27,7 @@ import { ReleaseArtistModule } from './modules/release-artist/release-artist.mod
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
+import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
@@ -83,7 +84,6 @@ import { UserModule } from './modules/user/user.module';
 		ArtistRoleModule,
 		ArtistProfileModule,
 
-		UserModule,
 		OrganizationDspModule,
 		OrganizationUserModule,
 		UserPermissionModule,
@@ -92,6 +92,8 @@ import { UserModule } from './modules/user/user.module';
 
 		AppConfigModule,
 		Auth0Module,
+		TenantModule,
+		UserModule,
 		// ScheduleModule,
 	],
 	controllers: [AppController],

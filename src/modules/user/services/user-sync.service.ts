@@ -59,26 +59,23 @@ export class UserSyncService {
 		const auth0UserMap = new Map<string, GetUsers200ResponseOneOfInner>();
 		userAuth0List.forEach((u) => {
 			if (u.user_id) {
-				const userId = u.user_id.split('|')[1];
-				if (userId) {
-					auth0UserIdSet.add(userId);
-					auth0UserMap.set(userId, u);
-				}
+				auth0UserIdSet.add(u.user_id);
+				auth0UserMap.set(u.user_id, u);
 			}
 		});
 
 		// Map userId của user DB để lookup nhanh (giả sử userEntity.id là uuid)
 		const userServerMap = new Map<string, User>();
 		userServerList.forEach((u) => {
-			if (u.id) userServerMap.set(u.id, u);
+			if (u.auth0UserId) userServerMap.set(u.auth0UserId, u);
 		});
 
 		const usersToUpdate: User[] = [];
 		const usersToCreate: User[] = [];
 
 		// 1. Xử lý user tồn tại trong Auth0 (update hoặc tạo mới)
-		for (const [userId, auth0User] of auth0UserMap.entries()) {
-			let userEntity = userServerMap.get(userId);
+		for (const [auth0UserId, auth0User] of auth0UserMap.entries()) {
+			let userEntity = userServerMap.get(auth0UserId);
 
 			if (userEntity) {
 				let updated = false;
@@ -172,8 +169,8 @@ export class UserSyncService {
 		}
 
 		// 2. Vô hiệu hóa user trong DB không còn trong Auth0
-		for (const [userId, userEntity] of userServerMap) {
-			if (!auth0UserIdSet.has(userId) && userEntity.isActive) {
+		for (const [auth0UserId, userEntity] of userServerMap) {
+			if (!auth0UserIdSet.has(auth0UserId) && userEntity.isActive) {
 				userEntity.isActive = false;
 				usersToUpdate.push(userEntity);
 			}

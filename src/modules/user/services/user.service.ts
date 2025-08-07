@@ -107,8 +107,8 @@ export class UserService {
 			}
 		}
 
-		if (type) {
-			queryBuilder.andWhere('user.type = :type', { type });
+		if (type?.length) {
+			queryBuilder.andWhere('user.type IN (:...type)', { type });
 		}
 
 		if (keyword) {
@@ -151,7 +151,12 @@ export class UserService {
 			email: formattedEmail ?? user.email,
 			password: user.password,
 		});
-		await this.auth0UserService.update(savedData.auth0UserId, savedData);
+		if (savedData.auth0UserId) {
+			await this.auth0UserService.update(
+				savedData.auth0UserId,
+				savedData,
+			);
+		}
 
 		return this.findOne(savedData.id);
 	}
