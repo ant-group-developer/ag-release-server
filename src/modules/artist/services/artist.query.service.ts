@@ -125,6 +125,16 @@ export class ArtistQueryService {
 				'dsp.formatLinks',
 			]);
 
+		query
+			.loadRelationCountAndMap(
+				'artist.releaseCount',
+				'artist.releaseArtists',
+			)
+			.loadRelationCountAndMap(
+				'artist.trackCount',
+				'artist.trackArtists',
+			);
+
 		return await query.getOne();
 	}
 }

@@ -27,6 +27,8 @@ export class TrackQueryService {
 
 			releaseId,
 
+			artistId,
+
 			startCreatedAt,
 			endCreatedAt,
 			startUpdatedAt,
@@ -46,9 +48,9 @@ export class TrackQueryService {
 			.leftJoinAndSelect('audioFile.file', 'file')
 			.leftJoinAndSelect('audioFile.peak', 'peak')
 
-			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
-			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
-			.leftJoinAndSelect('trackArtists.artist', 'artist')
+			.leftJoinAndSelect('track.trackArtists', 'trackArtist')
+			.leftJoinAndSelect('trackArtist.artistRole', 'artistRole')
+			.leftJoinAndSelect('trackArtist.artist', 'artist')
 
 			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
 			.leftJoinAndSelect(
@@ -74,6 +76,12 @@ export class TrackQueryService {
 		}
 
 		if (releaseId) {
+			queryBuilder.andWhere('track.releaseId = :releaseId', {
+				releaseId: releaseId,
+			});
+		}
+
+		if (artistId) {
 			queryBuilder.andWhere('track.releaseId = :releaseId', {
 				releaseId: releaseId,
 			});
@@ -138,9 +146,9 @@ export class TrackQueryService {
 			.leftJoinAndSelect('audioFile.file', 'file')
 			.leftJoinAndSelect('audioFile.peak', 'peak')
 
-			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
-			.leftJoinAndSelect('trackArtists.artistRole', 'artistRole')
-			.leftJoinAndSelect('trackArtists.artist', 'artist')
+			.leftJoinAndSelect('track.trackArtists', 'trackArtist')
+			.leftJoinAndSelect('trackArtist.artistRole', 'artistRole')
+			.leftJoinAndSelect('trackArtist.artist', 'artist')
 
 			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
 			.leftJoinAndSelect(

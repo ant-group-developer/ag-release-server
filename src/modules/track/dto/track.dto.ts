@@ -107,6 +107,11 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 	@IsOptional()
 	releaseId?: string;
 
+	@IsOptional()
+	@IsString()
+	@Length(10, 10)
+	artistId?: string | null;
+
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;
 }

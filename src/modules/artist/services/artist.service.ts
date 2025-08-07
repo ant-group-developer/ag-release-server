@@ -69,7 +69,7 @@ export class ArtistService {
 	}
 
 	// read
-	async findOne(id: string): Promise<Artist> {
+	private async findOne(id: string): Promise<Artist> {
 		const artist = await this.artistRepo.findOne({ where: { id } });
 		if (!artist) {
 			throw new ResponseError({

@@ -115,7 +115,6 @@ export class ReleaseQueryService {
 		}
 
 		if (artistId) {
-			queryBuilder.leftJoin('release.releaseArtists', 'releaseArtist');
 			queryBuilder.andWhere('releaseArtist.artistId = :artistId', {
 				artistId,
 			});
@@ -165,11 +164,11 @@ export class ReleaseQueryService {
 		// left join
 		queryGetList
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
-			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArt')
 
-			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
-			.leftJoinAndSelect('releaseArtists.artist', 'artist')
-			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
+			.leftJoinAndSelect('releaseArtist.artist', 'artist')
+			.leftJoinAndSelect('releaseArtist.artistRole', 'artistRole')
 
 			.leftJoinAndSelect('release.label', 'label')
 
