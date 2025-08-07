@@ -1,5 +1,3 @@
-import { IFileBucket } from 'src/modules/bucket/interfaces/bucket.interface';
-
 export interface ICreateAudioFile {
 	sampleRate: string;
 	bitrate?: string | null;
@@ -35,20 +33,6 @@ export interface IAudioFile {
 	trackId: string;
 	fileId: string;
 	peakId: string;
-}
-
-export interface IAudioFileBucket {
-	sampleRate: string;
-	bitrate: string | null;
-	bitDepth: number | null;
-	duration: number;
-	hook: number | null;
-	trackId: string;
-	fileId: string;
-	peakId: string;
-
-	file: IFileBucket;
-	peak: IFileBucket;
 }
 
 export interface IAudioFileDraft {

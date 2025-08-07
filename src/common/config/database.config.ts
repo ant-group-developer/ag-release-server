@@ -24,7 +24,9 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 			namingStrategy: new SnakeNamingStrategy(),
 
 			// Tắt synchronize, dùng migration hoặc sql khi cần thay đổi db
-			synchronize: false,
+
+			synchronize:
+				this.configService.get<boolean>('SYNCHRONIZE') === true,
 
 			// logging: true,
 		};

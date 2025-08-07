@@ -38,7 +38,7 @@ export class ArtistController {
 	async create(
 		@Body() createArtistDto: CreateArtistDto,
 	): Promise<ResponseSuccess<Artist>> {
-		const result = await this.artistService.create(createArtistDto);
+		const result = await this.artistService.handleCreate(createArtistDto);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ArtistMessageCodeSuccess.CREATE,
@@ -50,7 +50,7 @@ export class ArtistController {
 	@ApiResponse({ status: 200, description: 'Successfully retrieved artist' })
 	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Artist>> {
-		const result = await this.artistService.findOne(id);
+		const result = await this.artistService.findOneLite(id);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -74,9 +74,9 @@ export class ArtistController {
 	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async update(
 		@Param('id') id: string,
-		@Body() updateArtistDto: UpdateArtistDto,
+		@Body() data: UpdateArtistDto,
 	): Promise<ResponseSuccess<Artist>> {
-		const result = await this.artistService.update(id, updateArtistDto);
+		const result = await this.artistService.handleUpdate(id, data);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ArtistMessageCodeSuccess.UPDATE,
@@ -87,8 +87,18 @@ export class ArtistController {
 	@ApiOperation({ summary: 'Delete an artist by ID' })
 	@ApiResponse({ status: 200, description: ArtistMessageSuccess.DELETE })
 	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.artistService.delete(id);
+		return new ResponseSuccess({
+			messageCode: ArtistMessageCodeSuccess.DELETE,
+		});
+	}
+
+	@Delete(':id/artist-profiles/:artistProfileId')
+	async deleteArtistProfile(
+		@Param('artistProfileId') artistProfileId: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.artistService.deleteArtistProfile(artistProfileId);
 		return new ResponseSuccess({
 			messageCode: ArtistMessageCodeSuccess.DELETE,
 		});

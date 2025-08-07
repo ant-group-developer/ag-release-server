@@ -1,4 +1,5 @@
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
+import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -30,6 +31,9 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.artist)
+	artistProfiles: ArtistProfile[] | [];
 
 	// count relation
 	releaseCount?: number;
