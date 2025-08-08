@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { generateFileNameWithTimestamp } from 'src/utils/date';
+import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { folderMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,

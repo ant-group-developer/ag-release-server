@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
-import { buildTree, TreeNode } from 'src/utils/build-tree';
+import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { TreeRepository } from 'typeorm';
 import { UserService } from '../user/services/user.service';
 import {

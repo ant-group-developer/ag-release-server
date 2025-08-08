@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { htmlToText } from 'html-to-text';
-import { renderTemplate } from 'src/utils/template.util';
+import { renderTemplate } from 'src/utils/util';
 import { EmailService } from './notification.email-service';
 import { TelegramService } from './notification.telegram-service';
 import { NotificationUserService } from './notification.user-service';

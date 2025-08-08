@@ -9,7 +9,7 @@ import {
 	Max,
 	MaxLength,
 } from 'class-validator';
-import { generateFileNameWithTimestamp } from 'src/utils/date';
+import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { EntityTypePicture } from '../enum/bucket.enum';
 
 // non file
