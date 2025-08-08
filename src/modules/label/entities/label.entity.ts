@@ -28,4 +28,5 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 
 	// count relation
 	releaseCount?: number;
+	trackCount?: number;
 }

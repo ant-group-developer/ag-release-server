@@ -66,13 +66,58 @@ export class LabelQueryService {
 		return await queryGetList.getManyAndCount();
 	}
 
-	async findOneWithCountRelation(id: string) {
+	private createQueryFindOneWithCountRelation(id: string) {
 		const queryBuilder = this.labelRepo
 			.createQueryBuilder('label')
 			.where('label.id = :id', { id })
 
-			.loadRelationCountAndMap('label.releaseCount', 'label.releases');
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(DISTINCT(track.id))')
+					.from('tracks', 'track')
+					.leftJoin('track.release', 'release')
+					.where('release.labelId = label.id');
+			}, 'track_count')
 
-		return await queryBuilder.getOne();
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(DISTINCT(release.id))')
+					.from('releases', 'release')
+					.where('release.labelId = label.id');
+			}, 'release_count');
+
+		return queryBuilder;
 	}
+
+	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {
+		return dataFromDb.entities.map((entity) => {
+			const dataRawOfLabel = dataFromDb.raw.find(
+				(item) => item.label_id === entity.id,
+			);
+
+			entity.trackCount = Number(dataRawOfLabel?.track_count);
+			entity.releaseCount = Number(dataRawOfLabel?.release_count);
+
+			return entity;
+		});
+	}
+
+	async findOneWithCountRelation(id: string) {
+		const queryBuilder = this.createQueryFindOneWithCountRelation(id);
+
+		// length = 1
+		const dataFromDb: IDataFromDb = await queryBuilder.getRawAndEntities();
+		const label = this.assigneeVirtualColumn(dataFromDb);
+		return label[0];
+	}
+}
+
+// type
+interface IDataFromDb {
+	entities: Label[];
+	raw: {
+		label_id: string;
+		track_count: string;
+		release_count: string;
+	}[];
 }

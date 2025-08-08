@@ -26,15 +26,29 @@ export class LabelService {
 		private readonly labelQueryService: LabelQueryService,
 	) {}
 
-	async create(createLabelDto: CreateLabelDto): Promise<Label> {
-		await this.validate({ name: createLabelDto.name });
+	// create
+	async create(data: CreateLabelDto): Promise<Label> {
+		await this.validate({ name: data.name });
 
-		const label = this.labelRepo.create(createLabelDto);
+		const label = this.labelRepo.create(data);
 		return await this.labelRepo.save(label);
 	}
 
-	async findOne(id: string): Promise<Label> {
+	// read
+	private async findOne(id: string): Promise<Label> {
 		const label = await this.labelRepo.findOne({ where: { id } });
+		if (!label) {
+			throw new ResponseError({
+				message: LabelMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return label;
+	}
+
+	async findOneWithCountRelation(id: string): Promise<Label> {
+		const label = await this.labelQueryService.findOneWithCountRelation(id);
 		if (!label) {
 			throw new ResponseError({
 				message: LabelMessageError.NOT_FOUND,
@@ -61,13 +75,14 @@ export class LabelService {
 		});
 	}
 
-	async update(id: string, updateLabelDto: UpdateLabelDto): Promise<Label> {
-		const { name, picture } = updateLabelDto;
+	// update
+	async update(id: string, data: UpdateLabelDto): Promise<Label> {
+		const { name, picture } = data;
 
 		const label = await this.findOne(id);
 
 		if (name && name !== label.name) {
-			await this.validate({ name: updateLabelDto.name });
+			await this.validate({ name: data.name });
 		}
 
 		if (
@@ -78,19 +93,13 @@ export class LabelService {
 			await this.bucketService.deletePublicFile(label.picture);
 		}
 
-		await this.labelRepo.update(id, updateLabelDto);
+		await this.labelRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const label = await this.labelQueryService.findOneWithCountRelation(id);
-
-		if (!label) {
-			throw new ResponseError({
-				message: 'Artist role not found.',
-				statusCode: 404,
-			});
-		}
+		const label = await this.findOneWithCountRelation(id);
 
 		if ((label.releaseCount ?? 0) > 0) {
 			throw new ResponseError({

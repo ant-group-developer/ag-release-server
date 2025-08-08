@@ -59,7 +59,7 @@ export class LabelController {
 		description: LabelMessageError.NOT_FOUND,
 	})
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.findOne(id);
+		const result = await this.labelService.findOneWithCountRelation(id);
 		return new ResponseSuccess({ data: result });
 	}
 
