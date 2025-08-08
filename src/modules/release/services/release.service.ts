@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
+import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
 	QueryGetListReleaseDto,
@@ -70,8 +71,7 @@ export class ReleaseService {
 
 		const { releaseCoverArts, ...restOfRelease } = release;
 
-		const coverArtThumbnails =
-			this.releaseCoverArtService.getCoverArtThumbnails(releaseCoverArts);
+		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
 		return {
 			...restOfRelease,
@@ -103,10 +103,7 @@ export class ReleaseService {
 		return releases.map((release) => {
 			const { releaseCoverArts, ...restOfRelease } = release;
 
-			const coverArtThumbnails =
-				this.releaseCoverArtService.getCoverArtThumbnails(
-					releaseCoverArts,
-				);
+			const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
 			return {
 				...restOfRelease,

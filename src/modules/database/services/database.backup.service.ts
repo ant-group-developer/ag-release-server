@@ -6,7 +6,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { DateFormat } from 'src/common/enums/common';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
-import { generateFileNameWithTimestamp } from 'src/utils/date';
+import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { promisify } from 'util';
 import { BackupDto } from '../dto/database.dto';
 

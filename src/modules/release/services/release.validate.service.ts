@@ -344,7 +344,7 @@ export class ReleaseValidateService {
 		}
 
 		// cover arts validation
-		if (release.releaseCoverArts.length === 0) {
+		if (release.releaseCoverArts?.length === 0) {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',
@@ -488,6 +488,15 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.pLineOwner`,
+					}),
+				);
+			}
+
+			if (!track.pLineYear) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.pLineYear`,
 					}),
 				);
 			}

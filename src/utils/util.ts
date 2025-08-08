@@ -1,0 +1,58 @@
+import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
+
+import { nanoid } from 'nanoid';
+import { ResponseError } from 'src/common/dtos/response.dto';
+
+import * as fs from 'fs';
+import * as Handlebars from 'handlebars';
+
+export function getCoverArtThumbnails(
+	coverArts: ReleaseCoverArt[] | undefined,
+): ICoverArtThumbnails {
+	const result: ICoverArtThumbnails = {
+		'75x75': null,
+		'100x100': null,
+		'160x160': null,
+		'300x300': null,
+		original: null,
+	};
+
+	if (!coverArts) return result;
+
+	for (const { type, fileId } of coverArts) {
+		if (
+			['75x75', '100x100', '160x160', '300x300', 'original'].includes(
+				type,
+			)
+		) {
+			result[type as keyof ICoverArtThumbnails] = fileId ?? null;
+		}
+	}
+
+	return result;
+}
+
+export function generateId(length: number = 10) {
+	return nanoid(length);
+}
+
+export function ensureUUID(id: string) {
+	if (
+		!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+			id,
+		)
+	) {
+		throw new ResponseError({ message: 'Invalid UUID' });
+	}
+}
+
+export function renderTemplate(
+	filePath: string,
+	data: Record<string, any>,
+): string {
+	// const filePath = path.join(__dirname, '..', 'templates', templateName);
+	const templateSource = fs.readFileSync(filePath, 'utf8');
+	const template = Handlebars.compile(templateSource);
+	return template(data);
+}

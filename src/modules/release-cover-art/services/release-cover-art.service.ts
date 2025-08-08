@@ -5,7 +5,6 @@ import sharp from 'sharp';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 import { Repository } from 'typeorm';
 import { CreateReleaseCoverArtDto } from '../dto/release-cover-art.dto';
 import { ReleaseCoverArt } from '../entities/release-cover-art.entity';
@@ -193,30 +192,6 @@ export class ReleaseCoverArtService {
 		}
 
 		return format as ValidFormatCoverArt;
-	}
-
-	// read
-	getCoverArtThumbnails(coverArts: ReleaseCoverArt[]): ICoverArtThumbnails {
-		const result: ICoverArtThumbnails = {
-			'75x75': null,
-			'100x100': null,
-			'160x160': null,
-			'300x300': null,
-			original: null,
-		};
-
-		for (const coverArt of coverArts) {
-			if (
-				['75x75', '100x100', '160x160', '300x300', 'original'].includes(
-					coverArt.type,
-				)
-			) {
-				result[coverArt.type as keyof ICoverArtThumbnails] =
-					coverArt.fileId ?? null;
-			}
-		}
-
-		return result;
 	}
 
 	// delete
