@@ -94,13 +94,13 @@ export class TenantService {
 	async findOne(id: string): Promise<Tenant> {
 		const node = await this.tenantTreeRepo.findOne({
 			where: { id },
-			relations: ['parent'],
+			relations: ['parent', 'owner'],
 		});
 		if (!node) {
 			throw new NotFoundException(`Tenant with ID ${id} not found`);
 		}
 		const tree = await this.tenantTreeRepo.findDescendantsTree(node, {
-			relations: ['parent'],
+			relations: ['parent', 'owner'],
 		});
 		return tree;
 	}
