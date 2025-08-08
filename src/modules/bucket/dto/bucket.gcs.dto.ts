@@ -51,9 +51,9 @@ export class GeneratePublicUploadUrlDto {
 		example: 'image/jpeg',
 	})
 	@IsNotEmpty()
-	@Matches(/^image\/(jpeg|png|gif|webp|jpg)$/i, {
+	@Matches(/^image\/(jpeg|png|webp|jpg|svg\+xml|x-icon)$/i, {
 		message:
-			'Only image content types are allowed (jpeg, png, gif, webp, jpg)',
+			'Only image content types are allowed (jpeg, png, webp, jpg, svg, ico)',
 	})
 	contentType: string;
 }

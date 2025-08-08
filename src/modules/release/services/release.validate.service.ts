@@ -492,6 +492,15 @@ export class ReleaseValidateService {
 				);
 			}
 
+			if (!track.pLineYear) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.pLineYear`,
+					}),
+				);
+			}
+
 			if (!track.trackTypeId) {
 				result.push(
 					new FieldErrorDetails({

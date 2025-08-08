@@ -28,6 +28,7 @@ export class TrackQueryService {
 			releaseId,
 
 			artistId,
+			labelId,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -74,7 +75,7 @@ export class TrackQueryService {
 
 		// select
 		queryBuilder
-			.addSelect(['release.id', 'release.title'])
+			.addSelect(['release.id', 'release.title', 'release.labelId'])
 			.addSelect([
 				'releaseCoverArt.id',
 				'releaseCoverArt.fileId',
@@ -89,13 +90,19 @@ export class TrackQueryService {
 
 		if (releaseId) {
 			queryBuilder.andWhere('track.releaseId = :releaseId', {
-				releaseId: releaseId,
+				releaseId,
+			});
+		}
+
+		if (labelId) {
+			queryBuilder.andWhere('release.labelId = :labelId', {
+				labelId,
 			});
 		}
 
 		if (artistId) {
-			queryBuilder.andWhere('track.releaseId = :releaseId', {
-				releaseId: releaseId,
+			queryBuilder.andWhere('trackArtist.artistId = :artistId', {
+				artistId,
 			});
 		}
 
