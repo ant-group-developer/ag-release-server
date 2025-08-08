@@ -44,6 +44,9 @@ export class TrackQueryService {
 		const queryBuilder = this.trackRepo.createQueryBuilder('track');
 
 		queryBuilder
+			.leftJoin('track.release', 'release')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
 			.leftJoinAndSelect('audioFile.file', 'file')
 			.leftJoinAndSelect('audioFile.peak', 'peak')
@@ -68,6 +71,15 @@ export class TrackQueryService {
 
 			.leftJoinAndSelect('track.trackType', 'trackType')
 			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
+
+		// select
+		queryBuilder
+			.addSelect(['release.id', 'release.title'])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.type',
+			]);
 
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
@@ -134,7 +146,7 @@ export class TrackQueryService {
 		return track;
 	}
 
-	async getDetail(id: string): Promise<Track> {
+	async getDetailOne(id: string): Promise<Track> {
 		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
 
 		query.where('track.id = :id', {
@@ -142,6 +154,10 @@ export class TrackQueryService {
 		});
 
 		query
+			.leftJoin('track.release', 'release')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoin('release.label', 'label')
+
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
 			.leftJoinAndSelect('audioFile.file', 'file')
 			.leftJoinAndSelect('audioFile.peak', 'peak')
@@ -165,6 +181,21 @@ export class TrackQueryService {
 				'metadataLanguage',
 			);
 
+		// select
+		query
+			.addSelect(['release.id', 'release.title'])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.picture',
+				'label.description',
+			]);
+
 		const track = await query.getOne();
 
 		if (!track) {
@@ -177,7 +208,7 @@ export class TrackQueryService {
 		return track;
 	}
 
-	async getDetailMetadata(id: string): Promise<Track> {
+	async getDetailMetadataOne(id: string): Promise<Track> {
 		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
 
 		query.where('track.id = :id', {
@@ -255,7 +286,7 @@ export class TrackQueryService {
 		return track;
 	}
 
-	async getDetailAudioFile(id: string): Promise<Track> {
+	async getDetailAudioFileOne(id: string): Promise<Track> {
 		const query = this.trackRepo.createQueryBuilder(this.mainAlias);
 
 		query.where('track.id = :id', {

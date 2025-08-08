@@ -156,7 +156,7 @@ export class TrackDraftService {
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
 		const { audioFile, trackLanguage, ...restOfTrack } = data;
 
-		const track = await this.trackQueryService.getDetail(id);
+		const track = await this.trackQueryService.getDetailOne(id);
 
 		await this.trackValidateService.handleValidateDataUpdate({
 			trackDb: track,
@@ -171,7 +171,7 @@ export class TrackDraftService {
 		});
 
 		await this.trackRepo.update(id, restOfTrack);
-		const result = await this.trackQueryService.getDetail(id);
+		const result = await this.trackQueryService.getDetailOne(id);
 
 		return this.trackValidateService.ensureDraftTrack(result);
 	}

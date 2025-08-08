@@ -344,7 +344,7 @@ export class ReleaseValidateService {
 		}
 
 		// cover arts validation
-		if (release.releaseCoverArts.length === 0) {
+		if (release.releaseCoverArts?.length === 0) {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
+import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
 	QueryGetListTrackDto,
@@ -20,20 +21,6 @@ export class TrackService {
 		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 	) {}
-
-	// async create(data: CreateTrackDto): Promise<Track> {
-	// 	const { labelId, primaryGenreId, subGenreId, trackTimezoneId } = data;
-
-	// 	await this.trackValidateService.validate({
-	// 		labelId,
-	// 		primaryGenreId,
-	// 		subGenreId,
-	// 		trackTimezoneId,
-	// 	});
-
-	// 	const track = this.trackRepo.create(data);
-	// 	return await this.trackRepo.save(track);
-	// }
 
 	async submit(
 		id: string,
@@ -55,26 +42,31 @@ export class TrackService {
 		return this.trackValidateService.ensureNonDraftTrack(result);
 	}
 
+	// read
 	async getDetail(id: string): Promise<Track> {
-		return await this.trackQueryService.getDetail(id);
+		const trackDb = await this.trackQueryService.getDetailOne(id);
+
+		return this.enhanceDetailsOne(trackDb);
 	}
 
 	async getDetailMetadata(id: string): Promise<Track> {
-		return await this.trackQueryService.getDetailMetadata(id);
+		return await this.trackQueryService.getDetailMetadataOne(id);
 	}
 
 	async getDetailAudioFile(id: string): Promise<Track> {
-		return await this.trackQueryService.getDetailAudioFile(id);
+		return await this.trackQueryService.getDetailAudioFileOne(id);
 	}
 
 	async getList(query: QueryGetListTrackDto): Promise<PageDto<Track>> {
 		const { page, pageSize } = query;
 
-		const [tracks, totalItems] =
+		const [tracksDb, totalItems] =
 			await this.trackQueryService.getList(query);
 
+		const enhancedTracks = this.enhanceDetailsList(tracksDb);
+
 		return new PageDto({
-			items: tracks,
+			items: enhancedTracks,
 			metadata: {
 				currentPage: page,
 				pageSize,
@@ -83,6 +75,21 @@ export class TrackService {
 		});
 	}
 
+	// enhance
+	private enhanceDetailsOne(track: Track) {
+		track.release.coverArtThumbnails = getCoverArtThumbnails(
+			track.release.releaseCoverArts,
+		);
+
+		track.release.releaseCoverArts = undefined;
+		return track;
+	}
+
+	private enhanceDetailsList(tracks: Track[]) {
+		return tracks.map((track) => this.enhanceDetailsOne(track));
+	}
+
+	// update
 	async update(id: string, data: UpdateTrackDto): Promise<ITrack> {
 		const {
 			//  releaseId,
@@ -91,12 +98,6 @@ export class TrackService {
 		} = data;
 
 		const track = await this.trackQueryService.findOne(id);
-
-		// if (releaseId && releaseId !== track.releaseId) {
-		// 	await this.trackValidateService.validate({
-		// 		releaseId,
-		// 	});
-		// }
 
 		if (primaryGenreId && primaryGenreId !== track.primaryGenreId) {
 			await this.trackValidateService.validate({
@@ -113,9 +114,4 @@ export class TrackService {
 		await this.trackRepo.update(id, data);
 		return await this.trackQueryService.findOne(id);
 	}
-
-	// async remove(id: string) {
-	// 	await this.trackRepo.delete(id);
-	// 	// xoa con
-	// }
 }

@@ -9,6 +9,7 @@ import { ReleaseLanguageDraftService } from 'src/modules/release-language/servic
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { ReleaseTerritoryService } from 'src/modules/release-territory/services/release-territory.service';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
+import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
 	CreateReleaseDraftDto,
@@ -111,8 +112,7 @@ export class ReleaseDraftService {
 
 		const { releaseCoverArts, ...restOfRelease } = releaseDb;
 
-		const coverArtThumbnails =
-			this.releaseCoverArtService.getCoverArtThumbnails(releaseCoverArts);
+		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
 		return {
 			...restOfRelease,

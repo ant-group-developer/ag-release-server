@@ -22,6 +22,7 @@ import {
 	OneToOne,
 } from 'typeorm';
 import { ReleaseStatus } from '../enum/release.enum';
+import { ICoverArtThumbnails } from '../interfaces/release.interface';
 
 @Entity('releases')
 export class Release extends BaseUserTrackedUUIDEntity {
@@ -170,7 +171,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		() => ReleaseCoverArt,
 		(releaseCoverArt) => releaseCoverArt.release,
 	)
-	releaseCoverArts: ReleaseCoverArt[];
+	releaseCoverArts?: ReleaseCoverArt[];
 
 	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
 	releaseDsp: ReleaseDsp[];
@@ -184,6 +185,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	// count relation
 	tracksCount?: number;
 	totalDuration?: number;
+
+	// virtual column
+	coverArtThumbnails?: ICoverArtThumbnails;
 }
 
 // @Entity('releases')
