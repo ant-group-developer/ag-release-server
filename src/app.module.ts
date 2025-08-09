@@ -11,7 +11,6 @@ import { ArtistProfileModule } from './modules/artist-profile/artist-profile.mod
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
 import { ArtistModule } from './modules/artist/artist.module';
 import { AudioFileModule } from './modules/audio-file/audio-file.module';
-import { Auth0Module } from './modules/auth0/auth0.module';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CountryModule } from './modules/country/country.module';
 import { DatabaseModule } from './modules/database/database.module';
@@ -91,7 +90,6 @@ import { UserModule } from './modules/user/user.module';
 		TimezoneModule,
 
 		AppConfigModule,
-		Auth0Module,
 		TenantModule,
 		UserModule,
 		// ScheduleModule,

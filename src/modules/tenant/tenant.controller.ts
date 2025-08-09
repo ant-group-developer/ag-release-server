@@ -23,6 +23,13 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('active')
+	@ApiOperation({ summary: 'Get all tenants flatten which is actived' })
+	async findAllFlattenActive(): Promise<ResponseSuccess<PageDto<Tenant>>> {
+		const result = await this.tenantService.findAllFlattenActive();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Tenant>> {
 		const result = await this.tenantService.findOne(id);

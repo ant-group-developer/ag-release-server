@@ -7,17 +7,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
 import { PageDto } from 'src/common/dtos/response.dto';
-import { Auth0UserService } from 'src/modules/auth0/services/auth0-user.service';
 import { Brackets, Repository } from 'typeorm';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
+import { getAvatarUrl } from '../user.util';
 
 @Injectable()
 export class UserService {
 	constructor(
 		@InjectRepository(User)
 		private readonly userRepository: Repository<User>,
-		private readonly auth0UserService: Auth0UserService,
 	) {}
 
 	private async checkEmailUniqueness(email: string): Promise<void> {
@@ -46,19 +45,9 @@ export class UserService {
 			email: formattedEmail,
 			password: hashedPassword,
 			emailVerified: true,
+			avatar: getAvatarUrl(formattedEmail),
 		});
 		const savedData = await this.userRepository.save(user);
-		const auth0Data = await this.auth0UserService.create(
-			savedData,
-			password,
-		);
-
-		if (auth0Data) {
-			await this.userRepository.update(savedData.id, {
-				auth0UserId: auth0Data.data.user_id,
-				avatar: auth0Data.data.picture,
-			});
-		}
 
 		return this.findOne(savedData.id);
 	}
@@ -139,10 +128,12 @@ export class UserService {
 		const { email } = payload;
 
 		const user = await this.findOne(id);
+		let avatar = user.avatar;
 
 		const formattedEmail = email ? email.toLowerCase() : null;
 		if (formattedEmail && formattedEmail !== user.email) {
 			await this.checkEmailUniqueness(formattedEmail);
+			avatar = getAvatarUrl(formattedEmail);
 		}
 
 		const savedData = await this.userRepository.save({
@@ -150,13 +141,8 @@ export class UserService {
 			...payload,
 			email: formattedEmail ?? user.email,
 			password: user.password,
+			avatar,
 		});
-		if (savedData.auth0UserId) {
-			await this.auth0UserService.update(
-				savedData.auth0UserId,
-				savedData,
-			);
-		}
 
 		return this.findOne(savedData.id);
 	}

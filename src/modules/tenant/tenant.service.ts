@@ -14,6 +14,8 @@ import {
 	UpdateTenantDto,
 } from './dtos/tenant.dto';
 import { Tenant } from './tenant.entity';
+import { TenantType } from './tenant.enum';
+import { parentFirstSort } from './tenant.util';
 
 @Injectable()
 export class TenantService {
@@ -90,6 +92,40 @@ export class TenantService {
 		});
 	}
 
+	async findAllFlattenActive(): Promise<PageDto<Tenant>> {
+		const data = await this.tenantTreeRepo
+			.createQueryBuilder('tenant')
+			.select([
+				'tenant.id',
+				'tenant.name',
+				'tenant.title',
+				'tenant.logo',
+				'tenant.icon',
+				'tenant.type',
+				'owner.id',
+				'owner.name',
+				'owner.email',
+				'parent.id',
+				'parent.name',
+			])
+			.leftJoin('tenant.owner', 'owner')
+			.leftJoin('tenant.parent', 'parent')
+			.where('tenant.isActive = :isActive', { isActive: true })
+			.orderBy('tenant.name', 'ASC')
+			.getMany();
+
+		const sorted = parentFirstSort(data);
+
+		return new PageDto({
+			items: sorted,
+			metadata: {
+				currentPage: 1,
+				pageSize: sorted.length,
+				totalItems: sorted.length,
+			},
+		});
+	}
+
 	/** Lấy một node cùng toàn bộ descendants */
 	async findOne(id: string): Promise<Tenant> {
 		const node = await this.tenantTreeRepo.findOne({
@@ -115,9 +151,9 @@ export class TenantService {
 			throw new ConflictException(`Tenant '${dto.name}' already exists`);
 		}
 
-		// Check parent's type if parent exists
+		// Check parent's type if parent exists. Only type label can have parent
 		let parent: Tenant | undefined;
-		if (dto.parentId) {
+		if (dto.parentId && dto.type === TenantType.LABEL) {
 			const foundParent = await this.tenantTreeRepo.findOne({
 				where: { id: dto.parentId },
 			});
@@ -167,7 +203,9 @@ export class TenantService {
 		}
 
 		// Parent: null → gỡ, id → set, undefined → giữ nguyên
-		if (dto.parentId !== undefined) {
+		if (dto.type === TenantType.WHITE_LABEL) {
+			tenant.parent = null;
+		} else if (dto.parentId !== undefined) {
 			if (dto.parentId === null) {
 				tenant.parent = null;
 			} else {
