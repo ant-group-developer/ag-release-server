@@ -35,3 +35,61 @@ Common types according to [commitlint-config-conventional (based on the Angular 
 - revert
 - style
 - test
+
+## Build docker
+
+```
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+```
+docker compose -f docker-compose.dev.yml up --build -d
+```
+
+## Set CORS for buckets
+
+- Create json file:
+
+```
+echo '[{"origin": ["http://localhost:6200/", "https://release.antmusic.net/"],"responseHeader": ["*"],"method": ["*"],"maxAgeSeconds": 3600}]' > cors-config.json
+```
+
+- Set CORS for buckets:
+
+```
+gsutil cors set cors-config.json gs://ant-music-assets
+```
+
+```
+gsutil cors set cors-config.json gs://ant-music-assets-protected
+```
+
+- View config CORS for buckets:
+
+```
+gsutil cors get gs://ant-music-assets
+```
+
+```
+gsutil cors get gs://ant-music-assets-protected
+```
+
+## Generate secrets
+
+- Create folder secrets
+
+```
+mkdir secrets
+```
+
+- Create private key
+
+```
+openssl genrsa -out "secrets/jwtRS256.key" 2048
+```
+
+- Create public key
+
+```
+openssl rsa -in "secrets/jwtRS256.key" -pubout -out "secrets/jwtRS256.key.pub"
+```

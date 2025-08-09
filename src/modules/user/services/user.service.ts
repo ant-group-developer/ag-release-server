@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
 import { PageDto } from 'src/common/dtos/response.dto';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, FindOneOptions, Repository } from 'typeorm';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
 import { getAvatarUrl } from '../user.util';
@@ -52,8 +52,22 @@ export class UserService {
 		return this.findOne(savedData.id);
 	}
 
-	async findOne(id: string): Promise<User> {
-		const user = await this.userRepository.findOne({ where: { id } });
+	async findOne(id: string, options?: FindOneOptions<User>): Promise<User> {
+		const user = await this.userRepository.findOne({
+			...options,
+			where: { id },
+		});
+		if (!user) {
+			throw new NotFoundException('User not found');
+		}
+		return user;
+	}
+
+	async findOneByEmail(email: string): Promise<User> {
+		const user = await this.userRepository.findOne({
+			where: { email },
+			select: ['id', 'email', 'isActive', 'password'],
+		});
 		if (!user) {
 			throw new NotFoundException('User not found');
 		}
@@ -125,7 +139,7 @@ export class UserService {
 	}
 
 	async update(id: string, payload: UpdateUserDto): Promise<User> {
-		const { email } = payload;
+		const { email, password } = payload;
 
 		const user = await this.findOne(id);
 		let avatar = user.avatar;
@@ -136,11 +150,15 @@ export class UserService {
 			avatar = getAvatarUrl(formattedEmail);
 		}
 
+		const hashedPassword = password
+			? await this.hashPassword(password)
+			: undefined;
+
 		const savedData = await this.userRepository.save({
 			...user,
 			...payload,
 			email: formattedEmail ?? user.email,
-			password: user.password,
+			password: hashedPassword || user.password,
 			avatar,
 		});
 

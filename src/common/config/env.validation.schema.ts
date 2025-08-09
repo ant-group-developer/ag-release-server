@@ -30,4 +30,13 @@ export const envValidationSchema = Joi.object({
 	// Path
 	PATH_GCS_KEY: Joi.string().required(),
 	// PATH_TEMPLATES: Joi.string().required(),
+
+	// JWT
+	JWT_PRIVATE_KEY_PATH: Joi.string().required(),
+	JWT_PUBLIC_KEY_PATH: Joi.string().required(),
+	JWT_ISSUER: Joi.string().required(),
+	JWT_AUDIENCE: Joi.string().required(),
+	JWT_EXPIRES_IN: Joi.string().default('15m'),
+	JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+	JWT_KID: Joi.string().default('v1'),
 });
