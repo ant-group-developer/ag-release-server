@@ -1,8 +1,4 @@
-import {
-	ForbiddenException,
-	Injectable,
-	UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
@@ -68,16 +64,16 @@ export class AuthService {
 		}
 
 		// Check DB record
-		const record = await this.refreshSvc.findActiveByJti(payload.jti);
-		if (!record) {
-			// Token reuse or already revoked -> lock down (optional)
-			throw new ForbiddenException(AuthMessages.TOKEN_REVOKED);
-		}
-		if (!this.refreshSvc.isSameToken(record, oldRefreshToken)) {
-			// Token hash mismatch -> possible tampering
-			await this.refreshSvc.revokeAllForUser(payload.sub);
-			throw new ForbiddenException(AuthMessages.REUSE_TOKEN);
-		}
+		// const record = await this.refreshSvc.findActiveByJti(payload.jti);
+		// if (!record) {
+		// 	// Token reuse or already revoked -> lock down (optional)
+		// 	throw new ForbiddenException(AuthMessages.TOKEN_REVOKED);
+		// }
+		// if (!this.refreshSvc.isSameToken(record, oldRefreshToken)) {
+		// 	// Token hash mismatch -> possible tampering
+		// 	await this.refreshSvc.revokeAllForUser(payload.sub);
+		// 	throw new ForbiddenException(AuthMessages.REUSE_TOKEN);
+		// }
 
 		// Rotate: revoke old, issue new pair
 		const base = {
@@ -85,20 +81,20 @@ export class AuthService {
 			permissions: payload.permissions ?? [],
 		};
 		const accessToken = await this.tokens.signAccessToken(base);
-		const { token: newRefreshToken, jti: newJti } =
-			await this.tokens.signRefreshToken(base);
+		// const { token: newRefreshToken, jti: newJti } =
+		// 	await this.tokens.signRefreshToken(base);
 
-		await this.refreshSvc.revokeByJti(record.jti, newJti);
-		const decoded = this.tokens.decode<{ exp?: number }>(newRefreshToken);
-		const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : null;
-		await this.refreshSvc.persist(
-			payload.sub,
-			newJti,
-			newRefreshToken,
-			expiresAt,
-		);
+		// await this.refreshSvc.revokeByJti(record.jti, newJti);
+		// const decoded = this.tokens.decode<{ exp?: number }>(newRefreshToken);
+		// const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : null;
+		// await this.refreshSvc.persist(
+		// 	payload.sub,
+		// 	newJti,
+		// 	newRefreshToken,
+		// 	expiresAt,
+		// );
 
-		return { accessToken, refreshToken: newRefreshToken };
+		return { accessToken, refreshToken: oldRefreshToken };
 	}
 
 	async logout(refreshToken: string) {
