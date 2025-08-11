@@ -22,7 +22,7 @@
     
     # 2. Lấy dist và keys từ stage build
     COPY --from=builder /app/dist ./dist
-    # COPY --from=builder /app/keys ./keys
+    COPY --from=builder /app/keys ./keys
     
     ENV NODE_ENV=production
     EXPOSE 3000

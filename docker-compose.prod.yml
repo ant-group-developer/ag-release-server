@@ -14,5 +14,6 @@ services:
         restart: unless-stopped
         volumes:
             - ./credential.json:/app/credential.json:ro
+            - ./secrets:/app/secrets:ro
         mem_limit: 2g # Set max memory to 2 GB
         cpus: 2 # Set max CPU to 2 CPU core
