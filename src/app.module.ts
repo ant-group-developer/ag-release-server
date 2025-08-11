@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import appConfig from './common/config/app.config';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
@@ -11,7 +11,9 @@ import { ArtistProfileModule } from './modules/artist-profile/artist-profile.mod
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
 import { ArtistModule } from './modules/artist/artist.module';
 import { AudioFileModule } from './modules/audio-file/audio-file.module';
-import { Auth0Module } from './modules/auth0/auth0.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CountryModule } from './modules/country/country.module';
 import { DatabaseModule } from './modules/database/database.module';
@@ -29,6 +31,7 @@ import { ReleaseLocalizeModule } from './modules/release-localize/release-locali
 import { ReleaseModule } from './modules/release/release.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
+import { TokenModule } from './modules/token/token.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
@@ -42,7 +45,6 @@ import { UserModule } from './modules/user/user.module';
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
-			load: [appConfig],
 			validationSchema: envValidationSchema,
 		}),
 		// TypeOrmModule.forRootAsync({
@@ -91,12 +93,17 @@ import { UserModule } from './modules/user/user.module';
 		TimezoneModule,
 
 		AppConfigModule,
-		Auth0Module,
 		TenantModule,
 		UserModule,
+		AuthModule,
+		TokenModule,
 		// ScheduleModule,
 	],
 	controllers: [AppController],
-	providers: [AppService],
+	providers: [
+		{ provide: APP_GUARD, useClass: JwtAuthGuard }, // 1) require JWT by default, skip @Public
+		{ provide: APP_GUARD, useClass: PolicyGuard }, // 2) permissions + tenant-owner
+		AppService,
+	],
 })
 export class AppModule {}
