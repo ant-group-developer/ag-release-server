@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
+// filter
 class TrackScanFilterDto {
 	@IsDate()
 	@IsOptional()
@@ -44,7 +45,11 @@ export class CreateTrackScanStatusDto {
 	filter: TrackScanFilterDto;
 }
 
-//
+export class QueryGetListFilter extends BaseQueryDto {
+	fieldOrder: string = 'createdAt';
+}
+
+// result
 export class ScanTrackDto {
 	@IsString()
 	trackId: string;

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { CreateTrackScanStatusDto } from '../dtos/copryright.dto';
+import { CreateTrackScanStatusDto, QueryGetListFilter, QueryGetListResultScan } from '../dtos/copryright.dto';
 import { TrackScanStatus } from '../entities/track-scan-status.entity';
 import { ScanStatus } from '../enums/copyright.enum';
 import { CopyrightAcrService } from './sub-services/copyright.acr.service';
@@ -19,7 +19,7 @@ export class CopyrightService {
 		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightFilterService: CopyrightFilterService,
 		private readonly copyrightResultService: CopyrightResultService,
-	) {}
+	) { }
 
 	// filter
 	async handleCreateFilter(
@@ -27,7 +27,7 @@ export class CopyrightService {
 	): Promise<TrackScanStatus> {
 		const filter = await this.copyrightFilterService.create(data);
 
-		this.scanByFilter(filter).catch(() => {});
+		this.scanByFilter(filter).catch(() => { });
 
 		return filter;
 	}
@@ -58,9 +58,17 @@ export class CopyrightService {
 		);
 	}
 
+	async getListFilter(query: QueryGetListFilter) {
+		return await this.copyrightFilterService.getListFilter(query)
+	}
+
 	// result
 	async getResultOfTrack(id: string) {
 		return this.copyrightResultService.getResultOfTrack(id);
+	}
+
+	async getListResult(data: QueryGetListResultScan) {
+		await this.copyrightResultService.getListResult(data)
 	}
 
 	// acr

@@ -192,6 +192,37 @@ export class CopyrightAcrService {
 		return out;
 	}
 
+	private getChunks({
+		buffer,
+		duration,
+		windowSec
+	}: {
+		buffer: Buffer,
+		duration: number,
+		windowSec: number
+	}) {
+		const chunks: {
+			buffer: Buffer;
+			key: {
+				startSecond: number;
+				endSecond: number
+			}
+		}[] = [];
+
+		for (let startSec = 0; startSec < duration; startSec += windowSec) {
+			const lenSec = Math.min(windowSec, duration - startSec);
+			chunks.push({
+				key: {
+					startSecond: startSec,
+					endSecond: startSec + lenSec,
+				},
+				buffer: this.sliceWavSegment(buffer, startSec, lenSec),
+			});
+		}
+
+		return chunks;
+	}
+
 	// public
 	async scanBufferCopyright({
 		buffer,
@@ -200,28 +231,14 @@ export class CopyrightAcrService {
 		buffer: Buffer;
 		duration: number;
 	}): Promise<ResultScan[]> {
-		const windowSec = 10;
+		const chunks = this.getChunks({ buffer, duration, windowSec: 10 });
 
-		const tasks = [];
-
-		for (let startSec = 0; startSec < duration; startSec += windowSec) {
-			const lenSec = Math.min(windowSec, duration - startSec);
-			const chunk = this.sliceWavSegment(buffer, startSec, lenSec);
-			const key = {
-				startSecond: startSec,
-				endSecond: startSec + lenSec,
-			};
-
-			tasks.push(
-				this.recognizeByBuffer({
-					buffer: chunk,
-					key,
-				}).catch((e) => {
-					this.logger.log(e);
-					return null;
-				}),
-			);
-		}
+		const tasks = chunks.map(({ buffer, key }) =>
+			this.recognizeByBuffer({ buffer, key }).catch(e => {
+				this.logger.log(e);
+				return null;
+			}),
+		);
 
 		const results = await Promise.all(tasks);
 		return results.filter((r): r is ResultScan => r !== null);
