@@ -15,6 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
+import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DspModule } from './modules/dsp/dsp.module';
@@ -98,6 +99,8 @@ import { UserModule } from './modules/user/user.module';
 		AuthModule,
 		TokenModule,
 		// ScheduleModule,
+
+		CopyrightModule,
 	],
 	controllers: [AppController],
 	providers: [
