@@ -26,7 +26,7 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 			// Tắt synchronize, dùng migration hoặc sql khi cần thay đổi db
 
 			synchronize:
-				this.configService.get<boolean>('SYNCHRONIZE') === true,
+				this.configService.get<string>('SYNCHRONIZE') === 'true',
 
 			// logging: true,
 		};
