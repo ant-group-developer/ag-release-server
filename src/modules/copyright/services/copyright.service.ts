@@ -3,14 +3,14 @@ import { ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import {
 	CreateTrackScanStatusDto,
-	QueryGetListFilter,
 	QueryGetListResultScan,
+	QueryGetListTask,
 } from '../dtos/copyright.dto';
 import { TrackScanStatus } from '../entities/track-scan-status.entity';
 import { ScanStatus } from '../enums/copyright.enum';
 import { CopyrightAcrService } from './sub-services/copyright.acr.service';
-import { CopyrightFilterService } from './sub-services/copyright.filter.service';
 import { CopyrightResultService } from './sub-services/copyright.result.service';
+import { CopyrightTaskService } from './sub-services/copyright.task.service';
 import { CopyrightTrackService } from './sub-services/copyright.track.service';
 
 @Injectable()
@@ -23,106 +23,111 @@ export class CopyrightService {
 		private readonly copyrightAcrService: CopyrightAcrService,
 
 		private readonly copyrightTrackService: CopyrightTrackService,
-		private readonly copyrightFilterService: CopyrightFilterService,
+		private readonly copyrightTaskService: CopyrightTaskService,
 		private readonly copyrightResultService: CopyrightResultService,
 	) {}
 
-	// filter
-	async handleCreateFilter(
+	// task
+	async handleCreateTask(
 		data: CreateTrackScanStatusDto,
 	): Promise<TrackScanStatus> {
-		const trackIdsToScan = await this.copyrightTrackService.getTrackIds(
-			data.filter,
-		);
+		const { filter } = data;
 
-		const filter = await this.copyrightFilterService.create(
-			data,
-			ScanStatus.RUNNING,
-			trackIdsToScan,
-		);
+		const trackNeedScanIds =
+			await this.copyrightTrackService.getTrackIds(filter);
 
-		this.startScan(filter).catch(() => {});
+		const taskDb = await this.copyrightTaskService.create({
+			filter,
+			status: ScanStatus.RUNNING,
+			trackNeedScanIds,
+		});
 
-		return filter;
+		this.startScan(taskDb).catch((e) => {
+			this.logger.error(
+				`Failed to start scan for task ${taskDb.id}: ${e.message}`,
+			);
+		});
+
+		return taskDb;
 	}
 
-	private async startScan(filter: TrackScanStatus) {
+	private async startScan(task: TrackScanStatus) {
 		//
 		const controller = new AbortController();
-		this.scanControllers.set(filter.id, controller);
+		this.scanControllers.set(task.id, controller);
 		const signal = controller.signal;
 
 		//
-		await this.copyrightFilterService.updateStatus(
-			filter.id,
+		await this.copyrightTaskService.updateStatus(
+			task.id,
 			ScanStatus.RUNNING,
 		);
 
 		if (signal.aborted) {
-			await this.copyrightFilterService.updateStatus(
-				filter.id,
+			this.logger.warn(`Scan cancelled for task ${task.id}`);
+
+			await this.copyrightTaskService.updateStatus(
+				task.id,
 				ScanStatus.CANCEL,
 			);
 			return;
 		}
 
-		let trackScannedCount = 0;
-		for (const id of filter.trackIdsToScan) {
+		for (const id of task.trackNeedScanIds) {
 			if (signal.aborted) {
-				this.logger.warn(`Scan cancelled for filter ${filter.id}`);
+				this.logger.warn(`Scan cancelled for task ${task.id}`);
 
-				await this.copyrightFilterService.updateStatus(
-					filter.id,
+				await this.copyrightTaskService.updateStatus(
+					task.id,
 					ScanStatus.CANCEL,
 				);
 
 				return;
-			} else {
-				try {
-					await this.scanTrackCopyright(id);
-					trackScannedCount += 1;
-					await this.copyrightFilterService.updateTrackScannedCount(
-						filter.id,
-						trackScannedCount,
-					);
+			}
 
-					this.logger.log(`Track scanned successfully: ${id}`);
-				} catch (e) {
-					this.logger.error(e);
+			try {
+				await this.scanTrackCopyright(id);
+				await this.copyrightTaskService.addScannedTrackId(task.id, id);
 
-					await this.copyrightFilterService.updateStatus(
-						filter.id,
-						ScanStatus.FAILED,
-					);
+				this.logger.log(`Track scanned successfully: ${id}`);
+			} catch (e) {
+				await this.copyrightTaskService.updateStatus(
+					task.id,
+					ScanStatus.FAILED,
+				);
 
-					return;
-				}
+				this.scanControllers.delete(task.id);
+
+				this.logger.error(`Failed to scan track ${id}:`, e.message);
+				return;
 			}
 		}
 
-		this.scanControllers.delete(filter.id);
-		await this.copyrightFilterService.updateStatus(
-			filter.id,
+		this.scanControllers.delete(task.id);
+		await this.copyrightTaskService.updateStatus(
+			task.id,
 			ScanStatus.FINISHED,
 		);
+
+		this.logger.log('List tracks scanned successfully');
 	}
 
-	async cancelScan(filterId: string) {
-		const filter = await this.getDetailFilter(filterId);
+	async cancelScan(taskId: string) {
+		const task = await this.copyrightTaskService.findOne(taskId);
 
 		if (
-			filter.status === ScanStatus.RUNNING ||
-			filter.status === ScanStatus.PENDING
+			task.status === ScanStatus.RUNNING ||
+			task.status === ScanStatus.PENDING
 		) {
-			const controller = this.scanControllers.get(filterId);
+			const controller = this.scanControllers.get(taskId);
 			if (controller) {
 				controller.abort();
-				this.scanControllers.delete(filterId);
+				this.scanControllers.delete(taskId);
 				return true;
 			}
 
-			await this.copyrightFilterService.updateStatus(
-				filterId,
+			await this.copyrightTaskService.updateStatus(
+				taskId,
 				ScanStatus.CANCEL,
 			);
 
@@ -134,22 +139,26 @@ export class CopyrightService {
 		});
 	}
 
-	async reScan(filterId: string) {
-		const filter = await this.getDetailFilter(filterId);
-		this.startScan(filter).catch(() => {});
+	async reScan(taskId: string) {
+		const task = await this.copyrightTaskService.findOne(taskId);
+		this.startScan(task).catch(() => {});
 	}
 
-	async getDetailFilter(filterId: string) {
-		return await this.copyrightFilterService.getDetailFilter(filterId);
+	async getDetailTask(taskId: string) {
+		return await this.copyrightTaskService.getDetailTask(taskId);
 	}
 
-	async getListFilter(query: QueryGetListFilter) {
-		return await this.copyrightFilterService.getListFilter(query);
+	async getListTask(query: QueryGetListTask) {
+		return await this.copyrightTaskService.getListTask(query);
 	}
 
 	// result
-	async getResultOfTrack(id: string) {
-		return this.copyrightResultService.getResultOfTrack(id);
+	async getOneResult(id: string) {
+		return this.copyrightResultService.getOneResult(id);
+	}
+
+	async getResultOfTrack(trackId: string) {
+		return this.copyrightResultService.getResultOfTrack(trackId);
 	}
 
 	async getListResult(data: QueryGetListResultScan) {

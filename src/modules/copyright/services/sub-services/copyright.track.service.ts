@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { Brackets, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { TrackScanFilter } from '../../interface/copyright.interface';
 
 @Injectable()
@@ -50,38 +50,12 @@ export class CopyrightTrackService {
 	}
 
 	private createQueryGetTrackIds(filter: TrackScanFilter) {
-		const { trackCreatedAtStart, trackCreatedAtEnd, releaseIds, trackIds } =
-			filter;
+		const { trackIds } = filter;
 
-		const query = this.trackRepo
+		return this.trackRepo
 			.createQueryBuilder('track')
 			.select(['track.id', 'track.isScanned'])
-			.leftJoin('track.release', 'release');
-
-		query.where(
-			new Brackets((qb) => {
-				if (trackIds?.length) {
-					qb.orWhere('track.id IN (:...trackIds)', { trackIds });
-				}
-
-				if (releaseIds?.length) {
-					qb.orWhere('release.id IN (:...releaseIds)', {
-						releaseIds,
-					});
-				}
-
-				if (trackCreatedAtStart && trackCreatedAtEnd) {
-					qb.orWhere(
-						'track.createdAt BETWEEN :trackCreatedAtStart AND :trackCreatedAtEnd',
-						{
-							trackCreatedAtStart,
-							trackCreatedAtEnd,
-						},
-					);
-				}
-			}),
-		);
-
-		return query;
+			.leftJoin('track.release', 'release')
+			.where('track.id IN (:...ids)', { ids: trackIds });
 	}
 }

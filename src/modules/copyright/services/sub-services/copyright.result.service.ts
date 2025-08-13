@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Raw, Repository } from 'typeorm';
 import { QueryGetListResultScan } from '../../dtos/copyright.dto';
 import { TrackScanHistory } from '../../entities/track-scan-history.entity';
@@ -19,10 +19,20 @@ export class CopyrightResultService {
 		return await this.trackScanHistoryRepo.save(trackScanHistory);
 	}
 
-	async getResultOfTrack(id: string) {
+	async getOneResult(id: string) {
+		const result = await this.trackScanHistoryRepo.find({ where: { id } });
+
+		if (!result) {
+			throw new ResponseError({ message: 'Result not found' });
+		}
+
+		return result;
+	}
+
+	async getResultOfTrack(trackId: string) {
 		return await this.trackScanHistoryRepo.find({
 			where: {
-				trackId: id,
+				trackId,
 				result: Raw(
 					(alias) =>
 						`${alias} IS NOT NULL AND jsonb_array_length(${alias}) > 0`,

@@ -12,11 +12,14 @@ export class TrackScanStatus extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'jsonb' })
 	filter: TrackScanFilter;
 
-	@Column({ type: 'int', default: 0 })
-	trackNeedScanCount: number;
-
-	@Column({ type: 'int', default: 0 })
-	trackScannedCount: number;
+	@Column({
+		type: 'varchar',
+		length: 10,
+		array: true,
+		nullable: false,
+		default: '{}',
+	})
+	trackNeedScanIds: string[];
 
 	@Column({
 		type: 'varchar',
@@ -25,7 +28,7 @@ export class TrackScanStatus extends BaseUserTrackedUUIDEntity {
 		nullable: false,
 		default: '{}',
 	})
-	trackIdsToScan: string[];
+	trackScannedIds: string[];
 
 	// relation
 	@ManyToOne(() => User)
@@ -37,7 +40,12 @@ export class TrackScanStatus extends BaseUserTrackedUUIDEntity {
 	modifier: User;
 
 	// virtual column
-	tracksToScan?: {
+	trackNeedScan?: {
+		id: string | null;
+		title: string | null;
+	}[];
+
+	trackScanned?: {
 		id: string | null;
 		title: string | null;
 	}[];
