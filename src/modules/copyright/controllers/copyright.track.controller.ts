@@ -13,8 +13,8 @@ export class CopyrightTrackController {
 	}
 
 	@Get()
-	async getResultOfTrack(@Param('id') id: string) {
-		const result = await this.copyrightService.getResultOfTrack(id);
+	async getResultOfTrack(@Param('id') trackId: string) {
+		const result = await this.copyrightService.getResultOfTrack(trackId);
 		return new ResponseSuccess({ data: result });
 	}
 }

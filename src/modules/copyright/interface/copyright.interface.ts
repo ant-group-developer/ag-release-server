@@ -1,3 +1,12 @@
+import { ScanStatus } from '../enums/copyright.enum';
+
+// task
+export interface ICreateTask {
+	status: ScanStatus;
+	filter: TrackScanFilter;
+	trackNeedScanIds: string[];
+}
+
 interface AcrArtist {
 	name: string;
 	langs?: { name: string; code: string }[];

@@ -13,8 +13,8 @@ import {
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { ScanStatus } from '../enums/copyright.enum';
 
-// filter
-class TrackScanFilterDto {
+// task
+class TrackScanTaskDto {
 	@IsDate()
 	@IsOptional()
 	@Type(() => Date)
@@ -43,11 +43,11 @@ class TrackScanFilterDto {
 
 export class CreateTrackScanStatusDto {
 	@ValidateNested()
-	@Type(() => TrackScanFilterDto)
-	filter: TrackScanFilterDto;
+	@Type(() => TrackScanTaskDto)
+	filter: TrackScanTaskDto;
 }
 
-export class QueryGetListFilter extends BaseQueryDto {
+export class QueryGetListTask extends BaseQueryDto {
 	@IsEnum(ScanStatus)
 	@IsOptional()
 	status?: ScanStatus;
