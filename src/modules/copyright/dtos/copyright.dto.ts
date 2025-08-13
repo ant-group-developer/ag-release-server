@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
 	IsArray,
 	IsDate,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -10,6 +11,7 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { ScanStatus } from '../enums/copyright.enum';
 
 // filter
 class TrackScanFilterDto {
@@ -46,6 +48,11 @@ export class CreateTrackScanStatusDto {
 }
 
 export class QueryGetListFilter extends BaseQueryDto {
+	@IsEnum(ScanStatus)
+	@IsOptional()
+	status?: ScanStatus;
+
+	@IsString()
 	fieldOrder: string = 'createdAt';
 }
 

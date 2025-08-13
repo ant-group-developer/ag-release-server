@@ -195,18 +195,18 @@ export class CopyrightAcrService {
 	private getChunks({
 		buffer,
 		duration,
-		windowSec
+		windowSec,
 	}: {
-		buffer: Buffer,
-		duration: number,
-		windowSec: number
+		buffer: Buffer;
+		duration: number;
+		windowSec: number;
 	}) {
 		const chunks: {
 			buffer: Buffer;
 			key: {
 				startSecond: number;
-				endSecond: number
-			}
+				endSecond: number;
+			};
 		}[] = [];
 
 		for (let startSec = 0; startSec < duration; startSec += windowSec) {
@@ -234,7 +234,7 @@ export class CopyrightAcrService {
 		const chunks = this.getChunks({ buffer, duration, windowSec: 10 });
 
 		const tasks = chunks.map(({ buffer, key }) =>
-			this.recognizeByBuffer({ buffer, key }).catch(e => {
+			this.recognizeByBuffer({ buffer, key }).catch((e) => {
 				this.logger.log(e);
 				return null;
 			}),

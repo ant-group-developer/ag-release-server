@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BucketModule } from '../bucket/bucket.module';
 import { Track } from '../track/entities/track.entity';
 import { CopyrightFilterController } from './controllers/copyright.filter.controller';
+import { CopyrightResultController } from './controllers/copyright.result.controller';
 import { CopyrightTrackController } from './controllers/copyright.track.controller';
 import { TrackScanHistory } from './entities/track-scan-history.entity';
 import { TrackScanStatus } from './entities/track-scan-status.entity';
@@ -19,7 +20,11 @@ import { CopyrightTrackService } from './services/sub-services/copyright.track.s
 		HttpModule,
 		BucketModule,
 	],
-	controllers: [CopyrightTrackController, CopyrightFilterController],
+	controllers: [
+		CopyrightResultController,
+		CopyrightTrackController,
+		CopyrightFilterController,
+	],
 	providers: [
 		CopyrightService,
 

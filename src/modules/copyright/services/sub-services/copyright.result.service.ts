@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
-import { QueryGetListResultScan } from '../../dtos/copryright.dto';
+import { Raw, Repository } from 'typeorm';
+import { QueryGetListResultScan } from '../../dtos/copyright.dto';
 import { TrackScanHistory } from '../../entities/track-scan-history.entity';
 import { ICreateResultScan } from '../../interface/copyright.interface';
 
@@ -21,7 +21,13 @@ export class CopyrightResultService {
 
 	async getResultOfTrack(id: string) {
 		return await this.trackScanHistoryRepo.find({
-			where: { trackId: id },
+			where: {
+				trackId: id,
+				result: Raw(
+					(alias) =>
+						`${alias} IS NOT NULL AND jsonb_array_length(${alias}) > 0`,
+				),
+			},
 			order: { createdAt: 'DESC' },
 		});
 	}
