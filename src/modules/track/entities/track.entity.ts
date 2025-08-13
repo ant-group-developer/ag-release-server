@@ -15,6 +15,7 @@ import {
 	OneToOne,
 } from 'typeorm';
 
+import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
@@ -86,6 +87,9 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'text', nullable: true })
 	lyric: string;
 
+	@Column({ type: 'boolean', default: false })
+	isScanned: boolean;
+
 	//
 	@Column({ type: 'boolean', default: false })
 	copyArtistsFromRelease: boolean;
@@ -122,6 +126,12 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@ManyToOne(() => TrackOriginType)
 	@JoinColumn({ name: 'track_origin_type_id' })
 	trackOriginType: TrackOriginType | null;
+
+	@OneToMany(
+		() => TrackScanHistory,
+		(trackScanHistory) => trackScanHistory.track,
+	)
+	trackScanHistories?: TrackScanHistory[];
 }
 
 // @Entity('tracks')

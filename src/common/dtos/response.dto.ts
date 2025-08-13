@@ -110,8 +110,8 @@ export class Metadata {
 }
 
 export class PageDto<T> {
-	items: T[];
 	metadata: Metadata;
+	items: T[];
 
 	constructor({
 		items,
@@ -120,12 +120,13 @@ export class PageDto<T> {
 		items: T[];
 		metadata?: Partial<Metadata>;
 	}) {
-		this.items = items;
 		this.metadata = new Metadata({
 			currentPage: metadata?.currentPage ?? 1,
 			pageSize: metadata?.pageSize ?? items.length,
 			totalItems: metadata?.totalItems ?? items.length,
 		});
+
+		this.items = items;
 	}
 }
 
