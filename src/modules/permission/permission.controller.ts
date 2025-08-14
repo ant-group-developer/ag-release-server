@@ -61,7 +61,7 @@ export class PermissionController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Delete('bulk')
+	@Post('bulk-delete')
 	async bulkDelete(@Body() data: BulkDeletePermissionDto) {
 		const result = await this.PermissionService.bulkDelete(data);
 		return new ResponseSuccess({ ...result });

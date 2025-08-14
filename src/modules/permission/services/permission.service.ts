@@ -93,7 +93,17 @@ export class PermissionService {
 
 	// update
 	async update(id: string, data: UpdatePermissionDto): Promise<Permission> {
-		await this.permissionQueryService.validate(data);
+		const { name, value } = data;
+
+		const permission = await this.findOne(id);
+
+		if (name && name !== permission.name) {
+			await this.permissionQueryService.validate({ name });
+		}
+
+		if (value && value !== permission.value) {
+			await this.permissionQueryService.validate({ value });
+		}
 
 		await this.permissionRepo.update(id, data);
 		return await this.findOne(id);
