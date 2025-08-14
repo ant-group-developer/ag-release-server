@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AudioFileModule } from '../audio-file/audio-file.module';
+import { CopyrightModule } from '../copyright/copyright.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Release } from '../release/entities/release.entity';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
@@ -29,6 +30,7 @@ import { TrackValidateService } from './services/track.validate.service';
 		AudioFileModule,
 		TrackLanguageModule,
 		TrackArtistModule,
+		CopyrightModule,
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
@@ -16,6 +16,8 @@ import { TrackArtistValidateService } from './track-artist.validate.service';
 
 @Injectable()
 export class TrackArtistService {
+	private readonly logger = new Logger(TrackArtistService.name);
+
 	constructor(
 		@InjectRepository(TrackArtist)
 		private readonly trackArtistRepo: Repository<TrackArtist>,
@@ -264,6 +266,18 @@ export class TrackArtistService {
 		await this.trackArtistRepo.delete({ trackId });
 	}
 
+	async deleteRecordOfTrackSafe({
+		trackId,
+	}: {
+		trackId: string;
+	}): Promise<void> {
+		await this.deleteRecordOfTrack({ trackId })
+			.catch()
+			.catch((e) =>
+				this.logger.warn(`Skip delete, reason: ${e.message}`),
+			);
+	}
+
 	async deleteArtistSource1(trackId: string) {
 		await this.trackArtistRepo
 			.createQueryBuilder()
@@ -317,7 +331,11 @@ export class TrackArtistService {
 		}
 	}
 
-	async deleteByReleaseArtist(releaseArtistId: string) {
-		await this.trackArtistRepo.delete({ releaseArtistId });
+	async deleteByReleaseArtistSafe(releaseArtistId: string) {
+		await this.trackArtistRepo
+			.delete({ releaseArtistId })
+			.catch((e) =>
+				this.logger.warn(`Skip delete, reason: ${e.message}`),
+			);
 	}
 }

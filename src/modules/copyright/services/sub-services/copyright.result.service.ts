@@ -61,6 +61,11 @@ export class CopyrightResultService {
 		});
 	}
 
+	async deleteByTrackId(trackId: string) {
+		await this.trackScanHistoryRepo.delete({ trackId });
+	}
+
+	// query
 	private createQueryGetListHistoryScan(query: QueryGetListResultScan) {
 		const {
 			startCreatedAt,

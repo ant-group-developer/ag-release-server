@@ -69,7 +69,7 @@ export class ReleaseDraftController {
 		description: ReleaseMessageSuccess.DELETE,
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseDraftService.mainDelete(id);
+		await this.releaseDraftService.handleDeleteSafe(id);
 		return new ResponseSuccess({
 			messageCode: ReleaseMessageCodeSuccess.DELETE,
 		});

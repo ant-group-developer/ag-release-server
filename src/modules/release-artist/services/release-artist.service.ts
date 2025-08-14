@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
@@ -14,6 +14,8 @@ import { ReleaseArtistValidateService } from './release-artist.validate.service'
 
 @Injectable()
 export class ReleaseArtistService {
+	private readonly logger = new Logger(ReleaseArtistService.name);
+
 	constructor(
 		@InjectRepository(ReleaseArtist)
 		private readonly releaseArtistRepo: Repository<ReleaseArtist>,
@@ -157,8 +159,20 @@ export class ReleaseArtistService {
 		}
 	}
 
-	//delete
-	async deleteRecordOfRelease({
+	// delete
+	async delete(id: string) {
+		await this.releaseArtistRepo.delete(id);
+	}
+
+	async deleteSafe(id: string) {
+		await this.releaseArtistRepo
+			.delete(id)
+			.catch((e) =>
+				this.logger.warn(`Skip delete, reason: ${e.message}`),
+			);
+	}
+
+	async deleteRecordOfReleaseSafe({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -167,17 +181,19 @@ export class ReleaseArtistService {
 			where: { releaseId },
 		});
 
-		for (const item of releaseArtists) {
-			await this.delete(item.id);
-		}
+		await Promise.all(
+			releaseArtists.map((item) => this.handleDeleteSafe(item.id)),
+		);
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.deleteRelatedRecords(id);
-		await this.releaseArtistRepo.delete(id);
+	async handleDeleteSafe(id: string): Promise<void> {
+		await this.deleteRelatedRecordsSafe(id);
+		await this.deleteSafe(id);
 	}
 
-	async deleteRelatedRecords(releaseArtistId: string) {
-		await this.trackDraftService.deleteByReleaseArtist(releaseArtistId);
+	async deleteRelatedRecordsSafe(releaseArtistId: string) {
+		await this.trackDraftService.deleteTrackArtistByReleaseArtistSafe(
+			releaseArtistId,
+		);
 	}
 }
