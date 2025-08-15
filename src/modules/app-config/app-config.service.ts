@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { DEFAULT_CHUNK_DURATION } from 'src/common/constants/common.default.constants';
 import { Repository } from 'typeorm';
 import { UpdateConfigDto } from './app-config.dto';
 import { AppConfig } from './app-config.entity';
@@ -26,5 +27,13 @@ export class AppConfigService {
 			await this.appConfig.save(config);
 		}
 		return this.get();
+	}
+
+	async getChunkDuration() {
+		const appConfig = await this.get();
+
+		const result =
+			appConfig?.config.website.chunkDuration ?? DEFAULT_CHUNK_DURATION;
+		return result;
 	}
 }

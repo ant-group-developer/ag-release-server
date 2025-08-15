@@ -117,7 +117,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	trackLocalizes: TrackLocalize[];
 
 	@OneToOne(() => AudioFile, (audioFile) => audioFile.track)
-	audioFile: AudioFile;
+	audioFile: AudioFile | null;
 
 	@ManyToOne(() => TrackType)
 	@JoinColumn({ name: 'track_type_id' })

@@ -13,6 +13,9 @@ export interface WebsiteConfig {
 	title: string;
 	description: string;
 	timeBackupDatabase: string;
+
+	// track
+	chunkDuration: number;
 }
 
 export interface AppConfigShape {

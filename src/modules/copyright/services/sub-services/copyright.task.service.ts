@@ -23,12 +23,18 @@ export class CopyrightTaskService {
 		await this.trackScanStatusRepo.update(id, { status });
 	}
 
-	async addScannedTrackId(id: string, trackId: string) {
-		const task = await this.findOne(id);
+	async addScannedTrackId({
+		taskId,
+		trackId,
+	}: {
+		taskId: string;
+		trackId: string;
+	}) {
+		const task = await this.findOne(taskId);
 
 		if (!task.trackScannedIds.includes(trackId)) {
 			task.trackScannedIds.push(trackId);
-			await this.trackScanStatusRepo.update(id, {
+			await this.trackScanStatusRepo.update(taskId, {
 				trackScannedIds: task.trackScannedIds,
 			});
 		}
