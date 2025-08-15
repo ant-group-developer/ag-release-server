@@ -29,6 +29,7 @@ export class TrackQueryService {
 
 			artistId,
 			labelId,
+			isScanned,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -103,6 +104,12 @@ export class TrackQueryService {
 		if (artistId) {
 			queryBuilder.andWhere('trackArtist.artistId = :artistId', {
 				artistId,
+			});
+		}
+
+		if (isScanned !== undefined) {
+			queryBuilder.andWhere('track.isScanned = :isScanned', {
+				isScanned,
 			});
 		}
 

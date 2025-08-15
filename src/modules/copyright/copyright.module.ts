@@ -33,6 +33,6 @@ import { CopyrightTrackService } from './services/sub-services/copyright.track.s
 		CopyrightTaskService,
 		CopyrightResultService,
 	],
-	exports: [],
+	exports: [CopyrightService],
 })
 export class CopyrightModule {}

@@ -18,24 +18,24 @@ class TrackScanTaskDto {
 	@IsDate()
 	@IsOptional()
 	@Type(() => Date)
-	trackCreatedAtStart?: Date;
+	trackCreatedAtStart?: Date | null;
 
 	@IsDate()
 	@IsOptional()
 	@Type(() => Date)
-	trackCreatedAtEnd?: Date;
+	trackCreatedAtEnd?: Date | null;
 
 	@IsOptional()
 	@IsArray()
 	@IsUUID('4', { each: true })
 	@IsNotEmpty({ each: true })
-	releaseIds: string[];
+	releaseIds: string[] | null[];
 
 	@IsOptional()
 	@IsArray()
 	@Length(10, 10, { each: true })
 	@IsNotEmpty({ each: true })
-	trackIds: string[];
+	trackIds: string[] | null[];
 
 	@IsOptional()
 	ignoreTrackScanned: boolean = true;

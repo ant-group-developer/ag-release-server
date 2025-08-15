@@ -108,7 +108,7 @@ export class ReleaseArtistController {
 		description: ReleaseArtistMessageSuccess.DELETE,
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseArtistService.delete(id);
+		await this.releaseArtistService.handleDeleteSafe(id);
 		return new ResponseSuccess({
 			messageCode: ReleaseArtistMessageCodeSuccess.DELETE,
 		});

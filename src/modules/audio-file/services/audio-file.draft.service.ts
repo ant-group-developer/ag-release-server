@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AudioFile } from '../entities/audio-file.entity';
@@ -15,6 +15,8 @@ import { AudioFileValidateService } from './audio-file.validate.service';
 
 @Injectable()
 export class AudioFileDraftService {
+	private readonly logger = new Logger(AudioFileDraftService.name);
+
 	constructor(
 		@InjectRepository(AudioFile)
 		private readonly audioFileRepo: Repository<AudioFile>,
@@ -103,7 +105,13 @@ export class AudioFileDraftService {
 				trackId,
 			});
 
-		await this.mainDelete(audioFileOfTrack.id);
+		await this.handleDelete(audioFileOfTrack.id);
+	}
+
+	async handleDelete(id: string) {
+		const audioFile = await this.audioFileQueryService.findOne(id);
+		await this.audioFileRepo.delete(id);
+		await this.deleteAudioAndPeak(audioFile);
 	}
 
 	async deleteAudioAndPeak(audioFile: AudioFile) {
@@ -111,9 +119,9 @@ export class AudioFileDraftService {
 		await this.bucketService.delete(audioFile.peakId);
 	}
 
-	async mainDelete(id: string) {
-		const audioFile = await this.audioFileQueryService.findOne(id);
-		await this.audioFileRepo.delete(id);
-		await this.deleteAudioAndPeak(audioFile);
+	async deleteRecordOfTrackSafe({ trackId }: { trackId: string }) {
+		await this.deleteRecordOfTrack({ trackId }).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
 	}
 }

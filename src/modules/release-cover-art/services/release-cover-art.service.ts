@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import sharp from 'sharp';
@@ -17,6 +17,8 @@ import { ReleaseCoverArtValidateService } from './release-cover-art.validate.ser
 
 @Injectable()
 export class ReleaseCoverArtService {
+	private readonly logger = new Logger(ReleaseCoverArtService.name);
+
 	constructor(
 		@InjectRepository(ReleaseCoverArt)
 		private readonly releaseCoverArtRepo: Repository<ReleaseCoverArt>,
@@ -41,7 +43,7 @@ export class ReleaseCoverArtService {
 		if (releaseCoverArt !== undefined) {
 			// delete
 			if (releaseCoverArt === null) {
-				await this.deleteRecordOfRelease({
+				await this.deleteRecordOfReleaseSafe({
 					releaseId,
 				});
 			}
@@ -54,7 +56,7 @@ export class ReleaseCoverArtService {
 					fileId: fileCoverArtOriginalId,
 				});
 
-				await this.deleteRecordOfRelease({ releaseId });
+				await this.deleteRecordOfReleaseSafe({ releaseId });
 
 				await this.genArtOnBucketAndSaveToDb({
 					fileCoverArtOriginalId,
@@ -199,7 +201,13 @@ export class ReleaseCoverArtService {
 		await this.releaseCoverArtRepo.delete(id);
 	}
 
-	async deleteRecordOfRelease({
+	async deleteSafe(id: string) {
+		await this.delete(id).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
+	}
+
+	async deleteRecordOfReleaseSafe({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -208,12 +216,14 @@ export class ReleaseCoverArtService {
 			where: { releaseId },
 		});
 
-		const fileIds = releaseCoverArts.map((item) => item.fileId);
-
-		await this.releaseCoverArtRepo.delete({ releaseId });
+		await Promise.all(
+			releaseCoverArts.map((item) => this.deleteSafe(item.id)),
+		);
 
 		await Promise.all(
-			fileIds.map((fileId) => this.bucketService.delete(fileId)),
+			releaseCoverArts.map((item) =>
+				this.bucketService.deleteSafe(item.fileId),
+			),
 		);
 	}
 }

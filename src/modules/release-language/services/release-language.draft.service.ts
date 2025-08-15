@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
@@ -13,6 +13,8 @@ import { ReleaseLanguageValidateService } from './release-language.validate.serv
 
 @Injectable()
 export class ReleaseLanguageDraftService {
+	private readonly logger = new Logger(ReleaseLanguageDraftService.name);
+
 	constructor(
 		@InjectRepository(ReleaseLanguage)
 		private readonly releaseLanguageRepo: Repository<ReleaseLanguage>,
@@ -107,11 +109,13 @@ export class ReleaseLanguageDraftService {
 		await this.releaseLanguageRepo.update(id, dataUpdate);
 	}
 
-	async deleteRecordOfRelease({
+	async deleteRecordOfReleaseSafe({
 		releaseId,
 	}: {
 		releaseId: string;
 	}): Promise<void> {
-		await this.releaseLanguageRepo.delete({ releaseId });
+		await this.releaseLanguageRepo.delete({ releaseId }).catch((e) => {
+			this.logger.warn(`Skip delete, reason: ${e.message}`);
+		});
 	}
 }

@@ -141,7 +141,13 @@ export class CopyrightService {
 
 	async reScan(taskId: string) {
 		const task = await this.copyrightTaskService.findOne(taskId);
-		this.startScan(task).catch(() => {});
+
+		await this.handleCreateTask({
+			filter: {
+				...task.filter,
+				ignoreTrackScanned: false,
+			},
+		});
 	}
 
 	async getDetailTask(taskId: string) {
@@ -163,6 +169,16 @@ export class CopyrightService {
 
 	async getListResult(data: QueryGetListResultScan) {
 		return await this.copyrightResultService.getListResult(data);
+	}
+
+	async deleteResultOfTrack({ trackId }: { trackId: string }) {
+		await this.copyrightResultService.deleteByTrackId(trackId);
+	}
+
+	async deleteResultOfTrackSafe({ trackId }: { trackId: string }) {
+		await this.deleteResultOfTrack({ trackId }).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
 	}
 
 	// acr

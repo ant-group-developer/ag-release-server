@@ -5,12 +5,13 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('permissions')
 export class Permission extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: 50 })
+	@Column({ type: 'varchar', length: 50, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 50 })
+	@Column({ type: 'varchar', length: 50, unique: true })
 	value: string;
 
+	// relation
 	@OneToMany(
 		() => UserPermission,
 		(userPermission) => userPermission.permission,
@@ -24,4 +25,7 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	// virtual column
+	userCount?: number;
 }

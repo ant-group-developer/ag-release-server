@@ -54,7 +54,7 @@ export class TrackDraftController {
 
 	@Delete(':id')
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.trackDraftService.mainDelete(id);
+		await this.trackDraftService.handleDelete(id);
 		return new ResponseSuccess({
 			messageCode: TrackMessageCodeSuccess.DELETE,
 		});
