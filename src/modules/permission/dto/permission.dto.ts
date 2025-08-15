@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
 	IsArray,
 	IsNotEmpty,
+	IsOptional,
 	IsString,
 	IsUUID,
 	MaxLength,
@@ -22,6 +23,11 @@ export class CreatePermissionDto {
 	@MaxLength(50)
 	@IsNotEmpty()
 	value: string;
+
+	@IsString()
+	@IsOptional()
+	@MaxLength(1000)
+	note?: string;
 }
 
 export class BulkCreatePermissionDto {
