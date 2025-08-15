@@ -1,13 +1,14 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import FormData from 'form-data';
 import { lastValueFrom } from 'rxjs';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { AcrResponse, ResultScan } from '../../interface/copyright.interface';
 
 @Injectable()
-export class CopyrightAcrService {
+export class CopyrightAcrService implements OnModuleInit {
 	private readonly logger = new Logger(CopyrightAcrService.name);
 
 	private ACR_HOST: string;
@@ -16,10 +17,12 @@ export class CopyrightAcrService {
 	private ENDPOINT = '/v1/identify';
 	private SIGNATURE_VERSION = '1';
 	private DATA_TYPE = 'audio';
+	private chunkDuration: number;
 
 	constructor(
 		private readonly http: HttpService,
 		private readonly config: ConfigService,
+		private readonly appConfigService: AppConfigService,
 	) {
 		this.ACR_HOST = this.config.get<string>('ACR_HOST', '');
 		this.ACR_ACCESS_KEY = this.config.get<string>('ACR_ACCESS_KEY', '');
@@ -27,6 +30,10 @@ export class CopyrightAcrService {
 			'ACR_ACCESS_SECRET',
 			'',
 		);
+	}
+
+	async onModuleInit() {
+		this.chunkDuration = await this.appConfigService.getChunkDuration();
 	}
 
 	private sign({
@@ -231,7 +238,11 @@ export class CopyrightAcrService {
 		buffer: Buffer;
 		duration: number;
 	}): Promise<ResultScan[]> {
-		const chunks = this.getChunks({ buffer, duration, windowSec: 10 });
+		const chunks = this.getChunks({
+			buffer,
+			duration,
+			windowSec: this.chunkDuration,
+		});
 
 		const tasks = chunks.map(({ buffer, key }) =>
 			this.recognizeByBuffer({ buffer, key }).catch((e) => {

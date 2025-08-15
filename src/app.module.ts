@@ -30,6 +30,7 @@ import { ReleaseArtistModule } from './modules/release-artist/release-artist.mod
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
+import { RoleModule } from './modules/role/role.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
@@ -65,7 +66,6 @@ import { UserModule } from './modules/user/user.module';
 		LabelModule,
 
 		OrganizationModule,
-		PermissionModule,
 
 		ReleaseModule,
 		AlbumFormatModule,
@@ -79,6 +79,7 @@ import { UserModule } from './modules/user/user.module';
 		TrackArtistModule,
 		TrackLanguageModule,
 		TrackLocalizeModule,
+		CopyrightModule,
 		AudioFileModule,
 		TrackTypeModule,
 		TrackOriginTypeModule,
@@ -89,7 +90,7 @@ import { UserModule } from './modules/user/user.module';
 
 		OrganizationDspModule,
 		OrganizationUserModule,
-		UserPermissionModule,
+
 		BucketModule,
 		TimezoneModule,
 
@@ -98,9 +99,12 @@ import { UserModule } from './modules/user/user.module';
 		UserModule,
 		AuthModule,
 		TokenModule,
-		// ScheduleModule,
 
-		CopyrightModule,
+		UserPermissionModule,
+		PermissionModule,
+		RoleModule,
+
+		// ScheduleModule,
 	],
 	controllers: [AppController],
 	providers: [

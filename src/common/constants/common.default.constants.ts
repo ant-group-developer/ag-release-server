@@ -11,3 +11,5 @@ export const FILED_ORDER_DEFAULT = 'name';
 export const COMMENT_FOR_NULLABLE = 'Nullable when status is draft';
 
 export const DEFAULT_TIME_SYNC = '04:00';
+
+export const DEFAULT_CHUNK_DURATION = 10;

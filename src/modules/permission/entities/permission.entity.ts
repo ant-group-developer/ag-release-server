@@ -11,6 +11,9 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: 50, unique: true })
 	value: string;
 
+	@Column({ type: 'varchar', length: 1000, nullable: true })
+	note: string | null;
+
 	// relation
 	@OneToMany(
 		() => UserPermission,

@@ -211,10 +211,12 @@ export class TrackDraftService {
 		}
 
 		if (audioFile) {
-			await this.audioFileDraftService.update({
-				audioFileId: track.audioFile.id,
-				dataUpdate: audioFile,
-			});
+			if (track.audioFile) {
+				await this.audioFileDraftService.update({
+					audioFileId: track.audioFile.id,
+					dataUpdate: audioFile,
+				});
+			}
 		}
 
 		//
