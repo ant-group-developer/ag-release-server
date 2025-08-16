@@ -63,10 +63,20 @@ export class UserService {
 		return user;
 	}
 
-	async findOneByEmail(email: string): Promise<User> {
+	async findOneByEmail(
+		email: string,
+		options?: FindOneOptions<User>,
+	): Promise<User> {
 		const user = await this.userRepository.findOne({
-			where: { email },
-			select: ['id', 'email', 'isActive', 'password'],
+			...options,
+			select: {
+				...options?.select,
+				id: true,
+				email: true,
+				isActive: true,
+				password: true,
+			},
+			where: { ...options?.where, email },
 		});
 		if (!user) {
 			throw new NotFoundException('User not found');
@@ -82,6 +92,7 @@ export class UserService {
 			.createQueryBuilder('user')
 			.leftJoin('user.creator', 'creator')
 			.leftJoin('user.modifier', 'modifier')
+			.leftJoin('user.tenantUser', 'tenantUser')
 			.select([
 				'user.id',
 				'user.name',
@@ -98,16 +109,15 @@ export class UserService {
 				'modifier.id',
 				'modifier.email',
 			])
+			// .andWhere(new Brackets(qb => {
+			// 	qb.where('tenantUser.tenantId = :tenantId', {tenantUser: })
+			// }))
 			.skip(skip)
 			.take(pageSize)
 			.orderBy(`user.${fieldOrder}`, orderBy);
 
-		if (id) {
-			if (isUUID(id)) {
-				queryBuilder.andWhere('user.id = :id', { id });
-			} else {
-				queryBuilder.andWhere('user.auth0UserId = :id', { id });
-			}
+		if (isUUID(id)) {
+			queryBuilder.andWhere('user.id = :id', { id });
 		}
 
 		if (type?.length) {

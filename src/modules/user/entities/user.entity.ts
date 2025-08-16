@@ -1,16 +1,8 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { OrganizationUser } from 'src/modules/organization-user/entities/organization-user.entity';
-import { Organization } from 'src/modules/organization/entities/organization.entity';
 import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
-import {
-	Column,
-	Entity,
-	JoinColumn,
-	ManyToOne,
-	OneToMany,
-	OneToOne,
-} from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { UserType } from '../enum/user.enum';
+import { TenantUser } from './tenant-user.entity';
 
 @Entity('users')
 export class User extends BaseUUIDEntity {
@@ -38,11 +30,11 @@ export class User extends BaseUUIDEntity {
 	@Column({ default: false, name: 'email_verified' })
 	emailVerified: boolean;
 
-	@Column({ name: 'auth0_user_id', nullable: true })
-	auth0UserId: string;
-
 	@Column({ name: 'last_login', nullable: true })
 	lastLogin: Date;
+
+	@Column({ name: 'last_active', nullable: true })
+	lastActive: Date;
 
 	@Column({ name: 'last_ip', nullable: true })
 	lastIp: string;
@@ -53,14 +45,8 @@ export class User extends BaseUUIDEntity {
 	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
 	userPermissions: UserPermission[];
 
-	@OneToOne(() => Organization, (organization) => organization.owner)
-	organization: Organization | null;
-
-	@OneToOne(
-		() => OrganizationUser,
-		(organizationUser) => organizationUser.user,
-	)
-	organizationUser: OrganizationUser | null;
+	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.user)
+	tenantUser: TenantUser[];
 
 	@Column({ type: 'uuid', nullable: true })
 	creatorId: string;

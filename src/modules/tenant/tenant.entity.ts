@@ -5,11 +5,13 @@ import {
 	Entity,
 	JoinColumn,
 	ManyToOne,
+	OneToMany,
 	Tree,
 	TreeChildren,
 	TreeParent,
 } from 'typeorm';
 import { LENGTH_PICTURE } from '../database/constants/database.constants';
+import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
 import { TenantType } from './tenant.enum';
 
@@ -81,13 +83,6 @@ export class Tenant extends BaseUUIDEntity {
 	})
 	primaryColor: string;
 
-	@Column({ type: 'uuid' })
-	ownerId: string;
-
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'owner_id' })
-	owner: User;
-
 	@Column({ type: 'boolean', default: true })
 	isActive: boolean;
 
@@ -104,4 +99,7 @@ export class Tenant extends BaseUUIDEntity {
 	@Expose()
 	@Type(() => Tenant)
 	children: Tenant[];
+
+	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.tenant)
+	tenantUser: TenantUser[];
 }

@@ -7,7 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { TreeRepository } from 'typeorm';
-import { UserService } from '../user/services/user.service';
+import { TenantUserType } from '../user/enum/user.enum';
+import { TenantUserService } from '../user/services/tenant-user.service';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -22,7 +23,7 @@ export class TenantService {
 	constructor(
 		@InjectRepository(Tenant)
 		private readonly tenantTreeRepo: TreeRepository<Tenant>,
-		private readonly userService: UserService,
+		private readonly tenantUserService: TenantUserService,
 	) {}
 
 	async findAll(
@@ -33,9 +34,30 @@ export class TenantService {
 
 		// 2. Lấy toàn bộ categories flat kèm relation parent
 		const allTenants = await this.tenantTreeRepo.find({
-			relations: ['parent', 'owner'],
+			relations: {
+				parent: true,
+				tenantUser: {
+					user: true,
+				},
+			},
+			where: {
+				tenantUser: {
+					type: TenantUserType.OWNER,
+				},
+			},
 			order: {
 				[query.fieldOrder]: query.orderBy,
+			},
+			select: {
+				tenantUser: {
+					id: true,
+					type: true,
+					user: {
+						id: true,
+						name: true,
+						email: true,
+					},
+				},
 			},
 		});
 
@@ -102,15 +124,24 @@ export class TenantService {
 				'tenant.logo',
 				'tenant.icon',
 				'tenant.type',
-				'owner.id',
-				'owner.name',
-				'owner.email',
+				'user.id',
+				'user.name',
+				'user.email',
 				'parent.id',
 				'parent.name',
+				'tenantUser.id',
+				'tenantUser.type',
+				'user.id',
+				'user.name',
+				'user.email',
 			])
-			.leftJoin('tenant.owner', 'owner')
+			.leftJoin('tenant.tenantUser', 'tenantUser')
+			.leftJoin('tenantUser.user', 'user')
 			.leftJoin('tenant.parent', 'parent')
 			.where('tenant.isActive = :isActive', { isActive: true })
+			.andWhere('tenantUser.type = :type', {
+				type: TenantUserType.OWNER,
+			})
 			.orderBy('tenant.name', 'ASC')
 			.getMany();
 
@@ -130,19 +161,35 @@ export class TenantService {
 	async findOne(id: string): Promise<Tenant> {
 		const node = await this.tenantTreeRepo.findOne({
 			where: { id },
-			relations: ['parent', 'owner'],
+			relations: {
+				parent: true,
+				tenantUser: {
+					user: true,
+				},
+			},
+			select: {
+				tenantUser: {
+					id: true,
+					type: true,
+					user: {
+						id: true,
+						name: true,
+						email: true,
+					},
+				},
+			},
 		});
 		if (!node) {
 			throw new NotFoundException(`Tenant with ID ${id} not found`);
 		}
 		const tree = await this.tenantTreeRepo.findDescendantsTree(node, {
-			relations: ['parent', 'owner'],
+			relations: ['parent', 'tenantUser'],
 		});
 		return tree;
 	}
 
 	/** Tạo mới, gán parent nếu có và tự động lưu closure-table */
-	async create(dto: CreateTenantDto): Promise<Tenant> {
+	async create({ ownerId, ...dto }: CreateTenantDto): Promise<Tenant> {
 		// Check duplicate name
 		const dup = await this.tenantTreeRepo.findOne({
 			where: { name: dto.name },
@@ -177,6 +224,14 @@ export class TenantService {
 		}
 
 		const saved = await this.tenantTreeRepo.save(tenant);
+
+		// Create owner
+		await this.tenantUserService.addUserToTenant(
+			saved.id,
+			ownerId,
+			TenantUserType.OWNER,
+		);
+
 		return this.findOne(saved.id);
 	}
 

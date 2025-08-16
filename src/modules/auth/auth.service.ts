@@ -24,7 +24,18 @@ export class AuthService {
 
 	// Call after validating user credentials
 	async login(body: SiginDto) {
-		const user = await this.userService.findOneByEmail(body.email);
+		const user = await this.userService.findOneByEmail(body.email, {
+			relations: {
+				tenantUser: true,
+			},
+			select: {
+				tenantUser: {
+					id: true,
+					type: true,
+					tenantId: true,
+				},
+			},
+		});
 		if (!user.isActive)
 			throw new UnauthorizedException(AuthMessages.USER_NOT_FOUND);
 
@@ -32,7 +43,10 @@ export class AuthService {
 		if (!valid)
 			throw new UnauthorizedException(AuthMessages.INVALID_CREDENTIALS);
 
-		const payload = { sub: user.id };
+		const payload = {
+			sub: user.id,
+			tenantId: user.tenantUser[0]?.tenantId,
+		};
 
 		const accessToken = await this.tokens.signAccessToken(payload);
 
@@ -78,7 +92,7 @@ export class AuthService {
 		// Rotate: revoke old, issue new pair
 		const base = {
 			sub: payload.sub,
-			permissions: payload.permissions ?? [],
+			tenantId: payload.tenantId,
 		};
 		const accessToken = await this.tokens.signAccessToken(base);
 		// const { token: newRefreshToken, jti: newJti } =
