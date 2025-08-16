@@ -22,14 +22,6 @@ export class Tenant extends BaseUUIDEntity {
 	@Column({ type: 'uuid', nullable: true })
 	modifierId: string;
 
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'creator_id' })
-	creator: User | null;
-
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'modifier_id' })
-	modifier: User | null;
-
 	@Column({
 		length: LENGTH_PICTURE,
 		nullable: true,
@@ -84,15 +76,24 @@ export class Tenant extends BaseUUIDEntity {
 	@Column({ type: 'uuid' })
 	ownerId: string;
 
-	@ManyToOne(() => User)
-	@JoinColumn({ name: 'owner_id' })
-	owner: User;
-
 	@Column({ type: 'boolean', default: true })
 	isActive: boolean;
 
 	@Column({ type: 'enum', enum: TenantType, default: TenantType.LABEL })
 	type: TenantType;
+
+	// relation
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User | null;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User | null;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'owner_id' })
+	owner: User;
 
 	@TreeParent({ onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'parent_id' })

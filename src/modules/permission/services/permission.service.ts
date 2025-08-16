@@ -7,10 +7,6 @@ import {
 } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
-	PermissionMessageCodeError,
-	PermissionMessageError,
-} from '../constants/permission.constant';
-import {
 	BulkCreatePermissionDto,
 	BulkDeletePermissionDto,
 	CreatePermissionDto,
@@ -110,7 +106,7 @@ export class PermissionService {
 
 	// update
 	async update(id: string, data: UpdatePermissionDto): Promise<Permission> {
-		const { name, value } = data;
+		const { name, code } = data;
 
 		const permission = await this.findOne(id);
 
@@ -118,8 +114,8 @@ export class PermissionService {
 			await this.permissionQueryService.validate({ name });
 		}
 
-		if (value && value !== permission.value) {
-			await this.permissionQueryService.validate({ value });
+		if (code && code !== permission.code) {
+			await this.permissionQueryService.validate({ code });
 		}
 
 		await this.permissionRepo.update(id, data);
@@ -151,35 +147,7 @@ export class PermissionService {
 
 	async delete(id: string): Promise<void> {
 		const permission = await this.findOneWithCountRelation(id);
-
-		if ((permission.userCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
-				messageCode:
-					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
-				messageWarning:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS +
-					': ' +
-					id,
-				statusCode: 400,
-			});
-		}
-
-		if ((permission.rolePermissionCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
-				messageCode:
-					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
-				messageWarning:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS +
-					': ' +
-					id,
-				statusCode: 400,
-			});
-		}
-
+		this.permissionQueryService.validateDelete(permission);
 		await this.permissionRepo.delete(id);
 	}
 }

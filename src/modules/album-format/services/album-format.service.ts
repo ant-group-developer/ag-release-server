@@ -26,6 +26,7 @@ export class AlbumFormatService implements OnModuleInit {
 		private readonly albumFormatQueryService: AlbumFormatQueryService,
 	) {}
 
+	// init data
 	async onModuleInit() {
 		await this.initializeData();
 	}
@@ -48,16 +49,34 @@ export class AlbumFormatService implements OnModuleInit {
 		}
 	}
 
+	// create
 	async create(data: CreateAlbumFormatDto): Promise<AlbumFormat> {
-		await this.validate({ name: data.name, value: data.value });
+		const { name, code } = data;
+
+		await this.albumFormatQueryService.validate({ name, code });
 		const albumFormat = this.albumFormatRepo.create(data);
 		return await this.albumFormatRepo.save(albumFormat);
 	}
 
+	// read
 	async findOne(id: string): Promise<AlbumFormat> {
 		const albumFormat = await this.albumFormatRepo.findOne({
 			where: { id },
 		});
+
+		if (!albumFormat) {
+			throw new ResponseError({
+				message: AlbumFormatMessageError.NOT_FOUND,
+				messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+		return albumFormat;
+	}
+
+	private async findOneWithCountRelation(id: string): Promise<AlbumFormat> {
+		const albumFormat =
+			await this.albumFormatQueryService.findOneWithCountRelation(id);
 
 		if (!albumFormat) {
 			throw new ResponseError({
@@ -88,82 +107,25 @@ export class AlbumFormatService implements OnModuleInit {
 	}
 
 	async update(id: string, data: UpdateAlbumFormatDto): Promise<AlbumFormat> {
-		const { value, name } = data;
+		const { code, name } = data;
 
 		const albumFormat = await this.findOne(id);
 
 		if (name && name !== albumFormat.name) {
-			await this.validate({ name });
+			await this.albumFormatQueryService.validate({ name });
 		}
-		if (value && value !== albumFormat.value) {
-			await this.validate({ value });
+		if (code && code !== albumFormat.code) {
+			await this.albumFormatQueryService.validate({ code });
 		}
 
 		await this.albumFormatRepo.update(id, data);
 		return this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const albumFormat =
-			await this.albumFormatQueryService.findOneWithCountRelation(id);
-
-		if (!albumFormat) {
-			throw new ResponseError({
-				message: AlbumFormatMessageError.NOT_FOUND,
-				messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((albumFormat?.releasesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					AlbumFormatMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					AlbumFormatMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
-		}
+		const albumFormat = await this.findOneWithCountRelation(id);
+		this.albumFormatQueryService.validateDelete(albumFormat);
 		await this.albumFormatRepo.delete(id);
-	}
-
-	async validate({
-		name,
-		value,
-	}: {
-		name?: string;
-		value?: string;
-	}): Promise<void> {
-		if (name) {
-			const existingName = await this.albumFormatRepo.findOne({
-				where: { name },
-			});
-
-			if (existingName) {
-				throw new ResponseError({
-					message:
-						AlbumFormatMessageError.DUPLICATE_NAME_ALBUM_FORMAT,
-					messageCode:
-						AlbumFormatMessageCodeError.DUPLICATE_NAME_ALBUM_FORMAT,
-					statusCode: 409,
-				});
-			}
-		}
-
-		if (value) {
-			const existingValue = await this.albumFormatRepo.findOne({
-				where: { value },
-			});
-
-			if (existingValue) {
-				throw new ResponseError({
-					message:
-						AlbumFormatMessageError.DUPLICATE_VALUE_ALBUM_FORMAT,
-					messageCode:
-						AlbumFormatMessageCodeError.DUPLICATE_VALUE_ALBUM_FORMAT,
-					statusCode: 409,
-				});
-			}
-		}
 	}
 }

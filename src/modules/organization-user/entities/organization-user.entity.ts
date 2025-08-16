@@ -8,12 +8,13 @@ export class OrganizationUser extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid' })
 	userId: string;
 
+	@Column({ type: 'uuid' })
+	organizationId: string;
+
+	// relation
 	@OneToOne(() => User)
 	@JoinColumn({ name: 'user_id' })
 	user: User;
-
-	@Column({ type: 'uuid' })
-	organizationId: string;
 
 	@ManyToOne(() => Organization)
 	@JoinColumn({ name: 'organization_id' })

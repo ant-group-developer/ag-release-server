@@ -22,7 +22,7 @@ export class CreatePermissionDto {
 	@IsString()
 	@MaxLength(50)
 	@IsNotEmpty()
-	value: string;
+	code: string;
 
 	@IsString()
 	@IsOptional()
@@ -48,7 +48,7 @@ export class UpdatePermissionDto extends PartialType(CreatePermissionDto) {
 	@IsString()
 	@MaxLength(50)
 	@IsNotEmpty()
-	value: string;
+	code: string;
 }
 
 export class QueryGetListPermissionDto extends BaseQueryDto {

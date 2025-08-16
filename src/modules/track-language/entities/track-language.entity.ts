@@ -43,35 +43,3 @@ export class TrackLanguage extends BaseUUIDEntity {
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
 }
-
-// @Entity('track_language')
-// export class TrackLanguage extends BaseUUIDEntity {
-// 	@Column({ type: 'uuid' })
-// 	metadataLanguageCountryId: string;
-
-// 	@Column({ type: 'uuid' })
-// 	audioLanguageId: string;
-
-// 	@Column({ type: 'uuid' })
-// 	metadataLanguageId: string;
-
-// 	@Column({ type: 'varchar', length: 10 })
-// 	trackId: string;
-
-// 	// relation
-// 	@ManyToOne(() => Country)
-// 	@JoinColumn({ name: 'metadata_language_country_id' })
-// 	metadataLanguageCountry: Country;
-
-// 	@ManyToOne(() => Language)
-// 	@JoinColumn({ name: 'audio_language_id' })
-// 	audioLanguage: Language;
-
-// 	@ManyToOne(() => Language)
-// 	@JoinColumn({ name: 'metadata_language_id' })
-// 	metadataLanguage: Language;
-
-// 	@OneToOne(() => Track, (track) => track.trackLanguage)
-// 	@JoinColumn({ name: 'track_id' })
-// 	track: Track;
-// }

@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { PartialType } from '@nestjs/swagger';
 import {
 	IsEnum,
 	IsInt,
@@ -6,41 +6,43 @@ import {
 	IsOptional,
 	IsString,
 	MaxLength,
+	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderAlbumFormat } from '../enums/album-format.enum';
 
 export class CreateAlbumFormatDto {
-	@ApiProperty({ description: 'Name of the album format', example: 'LP' })
 	@IsString()
 	@MaxLength(100)
 	@IsNotEmpty()
 	name: string;
 
-	@ApiProperty({ description: 'Value for the album format', example: 'lp' })
 	@IsString()
 	@MaxLength(50)
 	@IsNotEmpty()
-	value: string;
+	code: string;
 
-	@ApiProperty({
-		description: 'Minimum track count for the album format',
-		example: 1,
-	})
 	@IsInt()
 	@IsNotEmpty()
 	minTrackCount: number;
 
-	@ApiProperty({
-		description: 'Maximum track count for the album format',
-		example: 15,
-	})
 	@IsInt()
 	@IsNotEmpty()
 	maxTrackCount: number;
 }
 
-export class UpdateAlbumFormatDto extends PartialType(CreateAlbumFormatDto) {}
+export class UpdateAlbumFormatDto extends PartialType(CreateAlbumFormatDto) {
+	@IsNotEmpty()
+	@IsString()
+	@MaxLength(100)
+	@ValidateIf((_, value) => value !== undefined)
+	name: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(50)
+	code: string;
+}
 
 export class QueryGetListAlbumFormatDto extends BaseQueryDto {
 	@IsOptional()

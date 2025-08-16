@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	TrackOriginTypeMessageCodeError,
-	TrackOriginTypeMessageError,
-} from '../constants/track-origin-type.constant';
+import { TrackOriginTypeMessageError } from '../constants/track-origin-type.constant';
 import {
 	CreateTrackOriginTypeDto,
 	QueryGetListTrackOriginTypeDto,
@@ -23,20 +20,36 @@ export class TrackOriginTypeService {
 		private readonly trackOriginTypeQueryService: TrackOriginTypeQueryService,
 	) {}
 
+	// create
 	async create(data: CreateTrackOriginTypeDto): Promise<TrackOriginType> {
-		const { name, value } = data;
+		const { name, code } = data;
 
-		await this.validate({ name, value });
+		await this.trackOriginTypeQueryService.validate({ name, code });
 
 		const trackOriginType = this.trackOriginTypeRepo.create(data);
 
 		return await this.trackOriginTypeRepo.save(trackOriginType);
 	}
 
+	// read
 	async findOne(id: string): Promise<TrackOriginType> {
 		const trackOriginType = await this.trackOriginTypeRepo.findOne({
 			where: { id },
 		});
+		if (!trackOriginType) {
+			throw new ResponseError({
+				message: TrackOriginTypeMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return trackOriginType;
+	}
+
+	async findOneWithCountRelation(id: string): Promise<TrackOriginType> {
+		const trackOriginType =
+			await this.trackOriginTypeQueryService.findOneWithCountRelation(id);
+
 		if (!trackOriginType) {
 			throw new ResponseError({
 				message: TrackOriginTypeMessageError.NOT_FOUND,
@@ -68,82 +81,30 @@ export class TrackOriginTypeService {
 		});
 	}
 
+	// update
 	async update(
 		id: string,
 		data: UpdateTrackOriginTypeDto,
 	): Promise<TrackOriginType> {
-		const { name, value } = data;
+		const { name, code } = data;
 		const trackOriginType = await this.findOne(id);
 
 		if (name && name !== trackOriginType.name) {
-			await this.validate({ name });
+			await this.trackOriginTypeQueryService.validate({ name });
 		}
 
-		if (value && value !== trackOriginType.value) {
-			await this.validate({ value });
+		if (code && code !== trackOriginType.code) {
+			await this.trackOriginTypeQueryService.validate({ code });
 		}
 
 		await this.trackOriginTypeRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
-	// async delete(id: string): Promise<void> {
-	// 	await this.trackOriginTypeRepo.delete(id);
-	// }
-
+	// delete
 	async delete(id: string): Promise<void> {
-		const originType =
-			await this.trackOriginTypeQueryService.findOneWithCountRelation(id);
-
-		if (!originType) {
-			throw new ResponseError({
-				message: TrackOriginTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((originType.tracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					TrackOriginTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					TrackOriginTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
-		}
-
+		const trackOriginType = await this.findOneWithCountRelation(id);
+		this.trackOriginTypeQueryService.validateDelete(trackOriginType);
 		await this.trackOriginTypeRepo.delete(id);
-	}
-
-	async validate({ name, value }: { name?: string; value?: string }) {
-		if (name) {
-			const trackOriginType = await this.trackOriginTypeRepo.findOne({
-				where: { name },
-			});
-
-			if (trackOriginType) {
-				throw new ResponseError({
-					messageCode:
-						TrackOriginTypeMessageCodeError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
-					message:
-						TrackOriginTypeMessageError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
-				});
-			}
-		}
-
-		if (value) {
-			const trackOriginType = await this.trackOriginTypeRepo.findOne({
-				where: { value },
-			});
-
-			if (trackOriginType) {
-				throw new ResponseError({
-					messageCode:
-						TrackOriginTypeMessageCodeError.DUPLICATE_VALUE_TRACK_ORIGIN_TYPE,
-					message:
-						TrackOriginTypeMessageError.DUPLICATE_VALUE_TRACK_ORIGIN_TYPE,
-				});
-			}
-		}
 	}
 }

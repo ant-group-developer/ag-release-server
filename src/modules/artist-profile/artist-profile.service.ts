@@ -9,13 +9,13 @@ import { Repository } from 'typeorm';
 import {
 	ArtistProfileMessageCodeError,
 	ArtistProfileMessageError,
-} from '../constants/artist-profile.constants';
+} from './constants/artist-profile.constants';
+import { ArtistProfile } from './entities/artist-profile.entity';
 import {
 	IBulkUpdateArtistProfile,
 	ICreateArtistProfile,
 	IUpdateArtistProfile,
-} from '../interfaces/artist-profile.interface';
-import { ArtistProfile } from './artist-profile.entity';
+} from './interfaces/artist-profile.interface';
 
 @Injectable()
 export class ArtistProfileService {

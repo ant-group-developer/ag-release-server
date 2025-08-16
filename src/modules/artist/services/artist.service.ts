@@ -1,13 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
-import { ArtistProfileService } from 'src/modules/artist-profile/entities/artist-profile.service';
+import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import {
-	ArtistMessageCodeError,
-	ArtistMessageError,
-} from '../constants/artist.constant';
+import { ArtistMessageError } from '../constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
@@ -45,7 +42,7 @@ export class ArtistService {
 
 	private async create(data: ICreateArtist): Promise<Artist> {
 		const { name } = data;
-		await this.validate({ name });
+		await this.artistQueryService.validate({ name });
 
 		const artist = this.artistRepo.create(data);
 		return await this.artistRepo.save(artist);
@@ -71,6 +68,19 @@ export class ArtistService {
 	// read
 	private async findOne(id: string): Promise<Artist> {
 		const artist = await this.artistRepo.findOne({ where: { id } });
+		if (!artist) {
+			throw new ResponseError({
+				message: ArtistMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return artist;
+	}
+
+	private async findOneWithCountRelation(id: string): Promise<Artist> {
+		const artist =
+			await this.artistQueryService.findOneWithCountRelation(id);
 		if (!artist) {
 			throw new ResponseError({
 				message: ArtistMessageError.NOT_FOUND,
@@ -129,7 +139,7 @@ export class ArtistService {
 		const artist = await this.findOne(id);
 
 		if (name && name !== artist.name) {
-			await this.validate({ name });
+			await this.artistQueryService.validate({ name });
 		}
 
 		if (
@@ -169,34 +179,8 @@ export class ArtistService {
 
 	// delete
 	async delete(id: string): Promise<void> {
-		const artist =
-			await this.artistQueryService.findOneWithCountRelation(id);
-
-		if (!artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((artist.releaseCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
-		}
-
-		if ((artist.trackCount ?? 0) > 0) {
-			throw new ResponseError({
-				message: ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
-		}
+		const artist = await this.findOneWithCountRelation(id);
+		this.artistQueryService.validateDelete(artist);
 
 		if (artist.picture)
 			await this.bucketService.deletePublicFile(artist.picture);
@@ -205,20 +189,5 @@ export class ArtistService {
 
 	async deleteArtistProfile(artistProfileId: string) {
 		await this.artistProfileService.delete(artistProfileId);
-	}
-
-	// validate
-	async validate({ name }: { name: string }) {
-		const artist = await this.artistRepo.findOne({
-			where: { name },
-		});
-
-		if (artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.DUPLICATE_NAME_ARTIST,
-				messageCode: ArtistMessageCodeError.DUPLICATE_NAME_ARTIST,
-				statusCode: 409,
-			});
-		}
 	}
 }

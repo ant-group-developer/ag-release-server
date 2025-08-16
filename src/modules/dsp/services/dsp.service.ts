@@ -1,12 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import {
-	DspMessageCodeError,
-	DspMessageError,
-} from '../constants/dsp.constant';
+import { DspMessageError } from '../constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
 import { DspQueryService } from './dsp.query.service';
@@ -21,16 +18,27 @@ export class DspService {
 		private readonly dspQueryService: DspQueryService,
 	) {}
 
+	// create
 	async create(createDspDto: CreateDspDto): Promise<Dsp> {
-		await this.validate({ name: createDspDto.name });
+		await this.dspQueryService.validate({ name: createDspDto.name });
 		const dsp = this.dspRepo.create(createDspDto);
 		return await this.dspRepo.save(dsp);
 	}
 
+	// read
 	async findOne(id: string): Promise<Dsp> {
 		const dsp = await this.dspRepo.findOne({ where: { id } });
 		if (!dsp) {
-			throw new BadRequestException('Not found');
+			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
+		}
+
+		return dsp;
+	}
+
+	private async findOneWithCountRelation(id: string): Promise<Dsp> {
+		const dsp = await this.dspQueryService.findOneWithCountRelation(id);
+		if (!dsp) {
+			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
 		}
 
 		return dsp;
@@ -53,12 +61,13 @@ export class DspService {
 		});
 	}
 
+	// update
 	async update(id: string, updateDspDto: UpdateDspDto): Promise<Dsp> {
 		const { name, picture } = updateDspDto;
 		const dsp = await this.findOne(id);
 
 		if (name && name !== dsp.name) {
-			await this.validate({ name });
+			await this.dspQueryService.validate({ name });
 		}
 
 		if (picture !== undefined && picture !== dsp.picture && dsp.picture) {
@@ -69,55 +78,13 @@ export class DspService {
 		return await this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const dsp = await this.dspQueryService.findOneWithCountRelation(id);
-
-		if (!dsp) {
-			throw new ResponseError({
-				message: DspMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((dsp.organizationDspsCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
-				messageCode:
-					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
-				statusCode: 400,
-			});
-		}
-
-		if ((dsp.releaseDspsCount ?? 0) > 0) {
-			throw new ResponseError({
-				message: DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
-		}
-
+		const dsp = await this.findOneWithCountRelation(id);
+		this.dspQueryService.validateDelete(dsp);
 		if (dsp.picture) {
 			await this.bucketService.deletePublicFile(dsp.picture);
 		}
-
 		await this.dspRepo.delete(id);
-	}
-
-	async validate({ name }: { name?: string }) {
-		if (name) {
-			const dsp = await this.dspRepo.findOne({
-				where: { name },
-			});
-
-			if (dsp) {
-				throw new ResponseError({
-					message: DspMessageError.DUPLICATE_NAME_DSP,
-					messageCode: DspMessageCodeError.DUPLICATE_NAME_DSP,
-					statusCode: 409,
-				});
-			}
-		}
 	}
 }

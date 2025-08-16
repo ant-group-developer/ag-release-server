@@ -1,19 +1,19 @@
 const albumType = {
-	value: 'album',
+	code: 'album',
 	name: 'Album',
 	minTrackCount: 1,
 	maxTrackCount: 20,
 };
 
 const epType = {
-	value: 'ep',
+	code: 'ep',
 	name: 'Ep',
 	minTrackCount: 1,
 	maxTrackCount: 10,
 };
 
 const singleType = {
-	value: 'single',
+	code: 'single',
 	name: 'Single',
 	minTrackCount: 1,
 	maxTrackCount: 1,
@@ -36,8 +36,8 @@ export const AlbumFormatMessageSuccess = {
 export const AlbumFormatMessageCodeError = {
 	DUPLICATE_NAME_ALBUM_FORMAT:
 		'albumFormat.message.error.duplicateNameAlbumFormat',
-	DUPLICATE_VALUE_ALBUM_FORMAT:
-		'albumFormat.message.error.duplicateValueAlbumFormat',
+	DUPLICATE_CODE_ALBUM_FORMAT:
+		'albumFormat.message.error.duplicateCodeAlbumFormat',
 	NOT_FOUND: 'albumFormat.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'albumFormat.message.error.cannotDeleteBecauseLinkedReleases',
@@ -45,7 +45,7 @@ export const AlbumFormatMessageCodeError = {
 
 export const AlbumFormatMessageError = {
 	DUPLICATE_NAME_ALBUM_FORMAT: 'Duplicate album format name',
-	DUPLICATE_VALUE_ALBUM_FORMAT: 'Duplicate album format value',
+	DUPLICATE_CODE_ALBUM_FORMAT: 'Duplicate album format code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this album format because it is linked to releases.',

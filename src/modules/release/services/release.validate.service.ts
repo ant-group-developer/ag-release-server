@@ -18,7 +18,6 @@ import {
 	IRelease,
 	IReleaseDraft,
 	IReleaseNonDraft,
-	releaseSchema,
 } from '../interfaces/release.interface';
 
 @Injectable()
@@ -415,7 +414,7 @@ export class ReleaseValidateService {
 		if (
 			release.isVariousArtist === false &&
 			!release.releaseArtists.some(
-				(ra) => ra.artistRole.value === mainArtistRole.value,
+				(ra) => ra.artistRole.code === mainArtistRole.code,
 			)
 		) {
 			result.push(
@@ -513,7 +512,7 @@ export class ReleaseValidateService {
 			// track artists validation
 			if (
 				!track.trackArtists.some(
-					(ta) => ta.artistRole.value === mainArtistRole.value,
+					(ta) => ta.artistRole.code === mainArtistRole.code,
 				)
 			) {
 				result.push(
@@ -586,49 +585,5 @@ export class ReleaseValidateService {
 		}
 
 		return result;
-	}
-
-	// other
-	async validateSchemaRelease2(id: string) {
-		const release = await this.releaseRepo.findOne({
-			where: { id },
-			relations: {
-				releaseCoverArts: true,
-				releaseArtists: {
-					artistRole: true,
-				},
-				releaseLanguage: true,
-				tracks: {
-					trackLanguage: true,
-					audioFile: true,
-					trackArtists: {
-						artistRole: true,
-					},
-				},
-				releaseTerritory: true,
-			},
-		});
-
-		if (!release) return [];
-
-		return this.validateWithZod(release);
-	}
-
-	validateWithZod(data: Release) {
-		const result = releaseSchema.safeParse(data);
-
-		if (result.success) return [];
-
-		return result.error.issues.map((err) => {
-			try {
-				return JSON.parse(err.message) as FieldErrorDetails;
-			} catch {
-				return new FieldErrorDetails({
-					message: 'Invalid error message format',
-					page: 'unknown',
-					field: 'unknown',
-				});
-			}
-		});
 	}
 }

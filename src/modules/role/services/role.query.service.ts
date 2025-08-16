@@ -8,7 +8,6 @@ import {
 	RoleMessageError,
 } from '../constants/role.constant';
 import { GetListRole } from '../dtos/role.dto';
-import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
 
 @Injectable()
@@ -16,9 +15,6 @@ export class RoleQueryService {
 	constructor(
 		@InjectRepository(Role)
 		private readonly roleRepo: Repository<Role>,
-
-		@InjectRepository(RolePermission)
-		private readonly rolePermissionRepo: Repository<RolePermission>,
 
 		@InjectRepository(Permission)
 		private readonly permissionRepo: Repository<Permission>,

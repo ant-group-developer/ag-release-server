@@ -9,7 +9,7 @@ export class AlbumFormat extends BaseUserTrackedCustomIDEntity {
 	name: string;
 
 	@Column({ type: 'varchar', length: 50, unique: true })
-	value: string;
+	code: string;
 
 	@Column({ type: 'int' })
 	minTrackCount: number;

@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import {
-	CountryMessageCodeError,
-	CountryMessageError,
-} from '../constants/country.constant';
+import { CountryMessageError } from '../constants/country.constant';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -25,15 +22,32 @@ export class CountryService {
 		private readonly countryQueryService: CountryQueryService,
 	) {}
 
+	// create
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
-		await this.validate({ name: createCountryDto.name });
+		await this.countryQueryService.validate({
+			name: createCountryDto.name,
+		});
 
 		const country = this.countryRepo.create(createCountryDto);
 		return await this.countryRepo.save(country);
 	}
 
+	// read
 	async findOne(id: string): Promise<Country> {
 		const country = await this.countryRepo.findOne({ where: { id } });
+		if (!country) {
+			throw new ResponseError({
+				message: CountryMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return country;
+	}
+
+	private async findOneWithCountRelation(id: string): Promise<Country> {
+		const country =
+			await this.countryQueryService.findOneWithCountRelation(id);
 		if (!country) {
 			throw new ResponseError({
 				message: CountryMessageError.NOT_FOUND,
@@ -65,73 +79,26 @@ export class CountryService {
 		return await this.countryQueryService.getListContinent();
 	}
 
+	// update
 	async update(
 		id: string,
 		updateCountryDto: UpdateCountryDto,
 	): Promise<Country> {
 		const country = await this.findOne(id);
 		if (country?.name !== updateCountryDto.name) {
-			await this.validate({ name: updateCountryDto.name });
+			await this.countryQueryService.validate({
+				name: updateCountryDto.name,
+			});
 		}
 
 		await this.countryRepo.update(id, updateCountryDto);
 		return await this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const country =
-			await this.countryQueryService.findOneWithCountRelation(id);
-		if (!country) {
-			throw new ResponseError({
-				message: CountryMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((country.releaseMetadataLanguageCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
-		}
-
-		if ((country.trackMetadataLanguageCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
-		}
-
-		if ((country.trackRecordingCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
-				statusCode: 400,
-			});
-		}
-
+		const country = await this.findOneWithCountRelation(id);
+		this.countryQueryService.validateDelete(country);
 		await this.countryRepo.delete(id);
-	}
-
-	async validate({ name }: { name?: string }) {
-		if (name) {
-			const artist = await this.countryRepo.findOne({ where: { name } });
-
-			if (artist) {
-				throw new ResponseError({
-					message: CountryMessageError.DUPLICATE_NAME_COUNTRY,
-					messageCode: CountryMessageCodeError.DUPLICATE_NAME_COUNTRY,
-					statusCode: 409,
-				});
-			}
-		}
 	}
 }

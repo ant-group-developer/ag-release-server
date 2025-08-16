@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import {
+	ArtistMessageCodeError,
+	ArtistMessageError,
+} from '../constants/artist.constant';
 import { QueryGetListArtistDto } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
 
@@ -136,5 +141,41 @@ export class ArtistQueryService {
 			);
 
 		return await query.getOne();
+	}
+
+	// validate
+	async validate({ name }: { name: string }) {
+		const artist = await this.artistRepo.findOne({
+			where: { name },
+		});
+
+		if (artist) {
+			throw new ResponseError({
+				message: ArtistMessageError.DUPLICATE_NAME_ARTIST,
+				messageCode: ArtistMessageCodeError.DUPLICATE_NAME_ARTIST,
+				statusCode: 409,
+			});
+		}
+	}
+
+	validateDelete(artist: Artist) {
+		if ((artist.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				statusCode: 400,
+			});
+		}
+
+		if ((artist.trackCount ?? 0) > 0) {
+			throw new ResponseError({
+				message: ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				statusCode: 400,
+			});
+		}
 	}
 }

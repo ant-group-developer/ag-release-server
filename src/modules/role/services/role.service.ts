@@ -138,7 +138,7 @@ export class RoleService {
 	) {
 		const { name } = data;
 
-		if (roleDb && roleDb.name !== name) {
+		if (name && name !== roleDb.name) {
 			await this.roleQueryService.validate({ name });
 		}
 
