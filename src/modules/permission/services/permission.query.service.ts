@@ -135,6 +135,10 @@ export class PermissionQueryService {
 					messageCode:
 						PermissionMessageCodeError.DUPLICATE_NAME_PERMISSION,
 					message: PermissionMessageError.DUPLICATE_NAME_PERMISSION,
+					messageWarning:
+						PermissionMessageError.DUPLICATE_NAME_PERMISSION +
+						': ' +
+						name,
 				});
 			}
 		}
@@ -149,6 +153,10 @@ export class PermissionQueryService {
 					messageCode:
 						PermissionMessageCodeError.DUPLICATE_VALUE_PERMISSION,
 					message: PermissionMessageError.DUPLICATE_VALUE_PERMISSION,
+					messageWarning:
+						PermissionMessageError.DUPLICATE_VALUE_PERMISSION +
+						': ' +
+						value,
 				});
 			}
 		}

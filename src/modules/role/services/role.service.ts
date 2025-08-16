@@ -76,9 +76,11 @@ export class RoleService {
 	private async createRolePermissionSafe(data: ICreateRolePermission) {
 		try {
 			await this.createRolePermission(data);
-		} catch (e) {
-			this.logger.error(e.response.messageWarning);
-			return String(e.response.messageWarning);
+		} catch (error) {
+			const message = error?.response?.messageWarning ?? 'Unknown error';
+
+			this.logger.error(message);
+			return message;
 		}
 	}
 

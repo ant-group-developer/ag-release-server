@@ -39,26 +39,34 @@ export class PermissionService {
 		return await this.permissionRepo.save(permission);
 	}
 
+	async createSafe(data: CreatePermissionDto) {
+		try {
+			const entity = await this.create(data);
+			return { entity, messageWarning: null };
+		} catch (error) {
+			const messageWarning =
+				error?.response?.messageWarning ?? 'Unknown error';
+			this.logger.error(messageWarning);
+			return { entity: null, messageWarning };
+		}
+	}
+
 	async bulkCreate(data: BulkCreatePermissionDto) {
 		const { permissions } = data;
 
-		const errorMessages: string[] = [];
-
-		const results = await Promise.all(
-			permissions.map((p) =>
-				this.create(p).catch((e) => {
-					errorMessages.push(
-						`"${p.name}" skipped. Reason: ${e.message}`,
-					);
-					return null;
-				}),
-			),
+		const result = await Promise.all(
+			permissions.map((item) => this.createSafe(item)),
 		);
 
-		return {
-			data: results.filter((item): item is Permission => item !== null),
-			message: errorMessages.join('\n'),
-		};
+		return new ResponseSuccess({
+			data: result
+				.filter((item) => item.entity !== null)
+				.map((item) => item.entity),
+			messageWarning: result
+				.filter((item) => item.messageWarning !== null)
+				.map((item) => item.messageWarning)
+				.join('\n'),
+		});
 	}
 
 	// read
@@ -119,7 +127,6 @@ export class PermissionService {
 	}
 
 	// delete
-
 	async bulkDelete(data: BulkDeletePermissionDto) {
 		const { ids } = data;
 
@@ -135,9 +142,10 @@ export class PermissionService {
 	async deleteSafe(id: string) {
 		try {
 			await this.delete(id);
-		} catch (e) {
-			this.logger.error(e.response.messageWarning);
-			return String(e.response.messageWarning);
+		} catch (error) {
+			const messageWarning = error?.response?.messageWarning;
+			this.logger.error(messageWarning);
+			return messageWarning;
 		}
 	}
 

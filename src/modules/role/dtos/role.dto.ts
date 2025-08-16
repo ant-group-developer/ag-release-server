@@ -1,5 +1,4 @@
 import {
-	ArrayMaxSize,
 	IsArray,
 	IsNotEmpty,
 	IsOptional,
@@ -28,7 +27,6 @@ export class CreateRoleDto {
 
 	@IsNotEmpty()
 	@IsArray()
-	@ArrayMaxSize(10)
 	@IsUUID('4', { each: true })
 	permissionIds: string[];
 }
@@ -54,7 +52,6 @@ export class UpdateRoleDto {
 
 	@IsArray()
 	@IsNotEmpty()
-	@ArrayMaxSize(10)
 	@IsUUID('4', { each: true })
 	permissionIds: string[];
 }
