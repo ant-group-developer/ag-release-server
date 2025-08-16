@@ -18,6 +18,8 @@ export const PermissionMessageCodeError = {
 	NOT_FOUND: 'permission.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_USERS:
 		'permission.message.error.cannotDeleteBecauseLinkedUsers',
+	CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS:
+		'permission.message.error.cannotDeleteBecauseLinkedRolePermissions',
 };
 
 export const PermissionMessageError = {
@@ -26,4 +28,6 @@ export const PermissionMessageError = {
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_USERS:
 		'Cannot delete this genre because it is linked to users',
+	CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS:
+		'Cannot delete this permission because it is linked to role permissions',
 };

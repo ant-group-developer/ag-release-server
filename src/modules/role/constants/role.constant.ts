@@ -1,7 +1,7 @@
 export const RoleMessageCodeSuccess = {
-	CREATE: 'role.message.success.create',
-	UPDATE: 'role.message.success.update',
-	DELETE: 'role.message.success.delete',
+	CREATE: 'roles.message.success.create',
+	UPDATE: 'roles.message.success.update',
+	DELETE: 'roles.message.success.delete',
 };
 
 export const RoleMessageSuccess = {
@@ -11,11 +11,11 @@ export const RoleMessageSuccess = {
 };
 
 export const RoleMessageCodeError = {
-	DUPLICATE_NAME_ROLE: 'role.message.error.duplicateNameRole',
-	NOT_FOUND: 'role.message.error.notFound',
+	DUPLICATE_NAME_ROLE: 'roles.message.error.duplicateNameRole',
+	NOT_FOUND: 'roles.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_PERMISSIONS:
-		'role.message.error.cannotDeleteBecauseLinkedPermissions',
-	PERMISSION_NOT_FOUND: 'role.message.error.permissionNotFound',
+		'roles.message.error.cannotDeleteBecauseLinkedPermissions',
+	PERMISSION_NOT_FOUND: 'roles.message.error.permissionNotFound',
 };
 
 export const RoleMessageError = {

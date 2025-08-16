@@ -27,10 +27,21 @@ export class PermissionQueryService {
 				.where('user_permission.permission_id = permission.id');
 		}, 'user_count');
 
+		query.addSelect((subQuery) => {
+			return subQuery
+				.select('COUNT(role_permission.id)')
+				.from('role_permission', 'role_permission')
+				.where('role_permission.permission_id = permission.id');
+		}, 'role_permission_count');
+
 		query.where('permission.id = :id', { id });
 
 		const dataFromDb: {
-			raw: { permission_id: string; user_count: string }[];
+			raw: {
+				permission_id: string;
+				user_count: string;
+				role_permission_count: string;
+			}[];
 			entities: Permission[];
 		} = await query.getRawAndEntities();
 
@@ -39,7 +50,11 @@ export class PermissionQueryService {
 	}
 
 	private assigneeVirtualColumn(dataFromDb: {
-		raw: { permission_id: string; user_count: string }[];
+		raw: {
+			permission_id: string;
+			user_count: string;
+			role_permission_count: string;
+		}[];
 		entities: Permission[];
 	}) {
 		return dataFromDb.entities.map((entity) => {
@@ -48,6 +63,7 @@ export class PermissionQueryService {
 			);
 
 			entity.userCount = Number(dataRaw?.user_count);
+			entity.rolePermissionCount = Number(dataRaw?.role_permission_count);
 			return entity;
 		});
 	}

@@ -1,5 +1,3 @@
-import { PartialType } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
 import {
 	ArrayMaxSize,
 	IsArray,
@@ -9,15 +7,8 @@ import {
 	IsUUID,
 	MaxLength,
 	ValidateIf,
-	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-
-class RolePermissionDto {
-	@IsUUID()
-	@IsNotEmpty()
-	permissionId: string;
-}
 
 export class CreateRoleDto {
 	@IsString()
@@ -35,26 +26,15 @@ export class CreateRoleDto {
 	@MaxLength(1000)
 	note?: string;
 
+	@IsNotEmpty()
 	@IsArray()
 	@ArrayMaxSize(10)
-	@ValidateNested({ each: true })
-	@Type(() => RolePermissionDto)
-	@Transform(({ value }) => (value == null ? [] : value))
-	rolePermissions: RolePermissionDto[] | [];
+	@IsUUID('4', { each: true })
+	permissionIds: string[];
 }
 
 // update
-class UpdateRolePermissionDto {
-	@IsUUID()
-	@IsOptional()
-	id?: string;
-
-	@IsUUID()
-	@IsNotEmpty()
-	permissionId: string;
-}
-
-export class UpdateRoleDto extends PartialType(CreateRoleDto) {
+export class UpdateRoleDto {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@IsNotEmpty()
@@ -67,12 +47,16 @@ export class UpdateRoleDto extends PartialType(CreateRoleDto) {
 	@MaxLength(10)
 	color?: string;
 
+	@IsString()
+	@IsOptional()
+	@MaxLength(1000)
+	note?: string;
+
 	@IsArray()
+	@IsNotEmpty()
 	@ArrayMaxSize(10)
-	@ValidateNested({ each: true })
-	@Type(() => UpdateRolePermissionDto)
-	@Transform(({ value }) => (value == null ? [] : value))
-	rolePermissions: UpdateRolePermissionDto[];
+	@IsUUID('4', { each: true })
+	permissionIds: string[];
 }
 
 // query

@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import { PermissionMessageError } from '../constants/permission.constant';
 import {
@@ -15,6 +19,8 @@ import { PermissionQueryService } from './permission.query.service';
 
 @Injectable()
 export class PermissionService {
+	private readonly logger = new Logger(PermissionService.name);
+
 	constructor(
 		@InjectRepository(Permission)
 		private readonly permissionRepo: Repository<Permission>,
@@ -110,6 +116,28 @@ export class PermissionService {
 	}
 
 	// delete
+
+	async bulkDelete(data: BulkDeletePermissionDto) {
+		const { ids } = data;
+
+		const messageWarnings = await Promise.all(
+			ids.map((id) => this.deleteSafe(id)),
+		);
+
+		return new ResponseSuccess({
+			messageWarning: messageWarnings.join('\n'),
+		});
+	}
+
+	async deleteSafe(id: string) {
+		try {
+			await this.delete(id);
+		} catch (e) {
+			this.logger.error(e.response.messageWarning);
+			return String(e.response.messageWarning);
+		}
+	}
+
 	async delete(id: string): Promise<void> {
 		const permission = await this.findOneWithCountRelation(id);
 
@@ -119,28 +147,28 @@ export class PermissionService {
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
 				messageCode:
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
+				messageWarning:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS +
+					': ' +
+					id,
+				statusCode: 400,
+			});
+		}
+
+		if ((permission.rolePermissionCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+				messageCode:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+				messageWarning:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS +
+					': ' +
+					id,
 				statusCode: 400,
 			});
 		}
 
 		await this.permissionRepo.delete(id);
-	}
-
-	async bulkDelete(data: BulkDeletePermissionDto) {
-		const { ids } = data;
-
-		const errorMessages: string[] = [];
-
-		await Promise.all(
-			ids.map((id) =>
-				this.delete(id).catch((e) => {
-					errorMessages.push(`"${id}" skipped. Reason: ${e.message}`);
-				}),
-			),
-		);
-
-		return {
-			message: errorMessages.join('\n'),
-		};
 	}
 }

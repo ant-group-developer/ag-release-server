@@ -11,6 +11,10 @@ import {
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
+	RoleMessageCodeSuccess,
+	RoleMessageSuccess,
+} from './constants/role.constant';
+import {
 	BulkDeleteRoleDto,
 	CreateRoleDto,
 	GetListRole,
@@ -26,21 +30,31 @@ export class RoleController {
 	@Post()
 	async handleCreateRole(@Body() data: CreateRoleDto) {
 		const result = await this.roleService.handleCreateRole(data);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			...result,
+			message: RoleMessageSuccess.CREATE,
+			messageCode: RoleMessageCodeSuccess.CREATE,
+		});
 	}
 
 	// read
 	@Get(':id')
 	async getOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.roleService.getOne(id);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			message: 'Get detail successfully',
+			data: result,
+		});
 	}
 
 	@Get()
 	async getList(@Query() data: GetListRole) {
 		const result = await this.roleService.getList(data);
 
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			message: 'Get list successfully',
+			data: result,
+		});
 	}
 
 	// update
@@ -51,19 +65,23 @@ export class RoleController {
 	) {
 		const result = await this.roleService.handleUpdate(id, data);
 
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			...result,
+			message: RoleMessageSuccess.UPDATE,
+			messageCode: RoleMessageCodeSuccess.UPDATE,
+		});
 	}
 
 	// delete
 	@Post('bulk-delete')
 	async bulkDelete(@Body() data: BulkDeleteRoleDto) {
 		const result = await this.roleService.bulkDelete(data);
-		return new ResponseSuccess({ ...result });
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')
 	async delete(@Param('id', ParseUUIDPipe) id: string) {
-		await this.roleService.delete(id);
+		await this.roleService.handleDelete(id);
 		return new ResponseSuccess();
 	}
 

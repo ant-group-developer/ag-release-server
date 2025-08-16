@@ -147,6 +147,7 @@ export class RoleQueryService {
 				throw new ResponseError({
 					messageCode: RoleMessageCodeError.PERMISSION_NOT_FOUND,
 					message: RoleMessageError.PERMISSION_NOT_FOUND,
+					messageWarning: `${RoleMessageError.PERMISSION_NOT_FOUND}: ${permissionId}`,
 				});
 			}
 		}

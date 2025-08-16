@@ -1,4 +1,5 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { RolePermission } from 'src/modules/role/entities/role-permission.entity';
 import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
@@ -21,6 +22,12 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	)
 	userPermissions: UserPermission[];
 
+	@OneToMany(
+		() => RolePermission,
+		(rolePermission) => rolePermission.permission,
+	)
+	rolePermissions: RolePermission[];
+
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -31,4 +38,5 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 
 	// virtual column
 	userCount?: number;
+	rolePermissionCount?: number;
 }
