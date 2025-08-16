@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
 	BulkDeleteRoleDto,
@@ -18,6 +22,8 @@ import { RoleQueryService } from './role.query.service';
 
 @Injectable()
 export class RoleService {
+	private readonly logger = new Logger(RoleService.name);
+
 	constructor(
 		@InjectRepository(Role)
 		private readonly roleRepo: Repository<Role>,
@@ -30,20 +36,26 @@ export class RoleService {
 
 	// create
 	async handleCreateRole(data: CreateRoleDto) {
-		const { rolePermissions, ...restOfData } = data;
+		const { permissionIds, ...restOfData } = data;
 
 		const role = await this.createRole(restOfData);
 
-		const rolePermissionsResult = await Promise.all(
-			rolePermissions.map((item) =>
-				this.createRolePermission({
-					permissionId: item.permissionId,
+		// skip if error
+		const messageWarnings = await Promise.all(
+			permissionIds.map((permissionId) =>
+				this.createRolePermissionSafe({
+					permissionId,
 					roleId: role.id,
 				}),
 			),
 		);
 
-		return { ...role, rolePermissions: rolePermissionsResult };
+		const result = await this.getOne(role.id);
+
+		return new ResponseSuccess({
+			data: result,
+			messageWarning: messageWarnings.join('\n'),
+		});
 	}
 
 	private async createRole(data: ICreateRole) {
@@ -59,6 +71,15 @@ export class RoleService {
 		await this.roleQueryService.validate({ permissionId });
 
 		return await this.rolePermissionRepo.save(data);
+	}
+
+	private async createRolePermissionSafe(data: ICreateRolePermission) {
+		try {
+			await this.createRolePermission(data);
+		} catch (e) {
+			this.logger.error(e.response.messageWarning);
+			return String(e.response.messageWarning);
+		}
 	}
 
 	// read
@@ -89,28 +110,29 @@ export class RoleService {
 
 	// update
 	async handleUpdate(id: string, data: UpdateRoleDto) {
-		const { rolePermissions, ...rest } = data;
+		const { permissionIds, ...rest } = data;
 
 		const roleDb = await this.getOne(id);
 
 		await this.updateRole(roleDb, rest);
 
-		// update role permission
-		await this.deleteRolePermissionOfRole({ roleId: roleDb.id });
-
-		await Promise.all(
-			rolePermissions.map((item) =>
-				this.createRolePermission({
-					permissionId: item.permissionId,
-					roleId: roleDb.id,
-				}),
-			),
+		// skip if error
+		const messageWarnings = await this.updateRolePermissionSafe(
+			roleDb,
+			permissionIds,
 		);
+
+		const result = await this.getOne(id);
+
+		return new ResponseSuccess({
+			data: result,
+			messageWarning: messageWarnings.join('\n'),
+		});
 	}
 
 	private async updateRole(
 		roleDb: Role,
-		data: Omit<UpdateRoleDto, 'rolePermissions'>,
+		data: Omit<UpdateRoleDto, 'permissionIds'>,
 	) {
 		const { name } = data;
 
@@ -121,35 +143,40 @@ export class RoleService {
 		await this.roleRepo.update(roleDb.id, data);
 	}
 
-	// delete
-	async bulkDelete(data: BulkDeleteRoleDto) {
-		const { ids } = data;
+	private async updateRolePermissionSafe(
+		roleDb: Role,
+		permissionIds: UpdateRoleDto['permissionIds'],
+	) {
+		await this.deleteRolePermissionOfRole({ roleId: roleDb.id });
 
-		const errorMessages: string[] = [];
-
-		await Promise.all(
-			ids.map((id) =>
-				this.delete(id).catch((e) => {
-					errorMessages.push(`"${id}" skipped. Reason: ${e.message}`);
+		const messageWarnings = await Promise.all(
+			permissionIds.map((permissionId) =>
+				this.createRolePermissionSafe({
+					permissionId,
+					roleId: roleDb.id,
 				}),
 			),
 		);
 
-		return {
-			message: errorMessages.join('\n'),
-		};
+		return messageWarnings;
 	}
 
-	async delete(id: string): Promise<void> {
-		await this.rolePermissionRepo.delete({ roleId: id });
+	// delete
+	async bulkDelete(data: BulkDeleteRoleDto) {
+		const { ids } = data;
+		await Promise.all(ids.map((id) => this.handleDelete(id)));
+	}
+
+	async handleDelete(id: string): Promise<void> {
+		await this.deleteRolePermissionOfRole({ roleId: id });
+		await this.deleteRole(id);
+	}
+
+	async deleteRole(id: string) {
 		await this.roleRepo.delete(id);
 	}
 
-	async deleteRolePermissionOfRole({
-		roleId,
-	}: {
-		roleId: string;
-	}): Promise<void> {
+	async deleteRolePermissionOfRole({ roleId }: { roleId: string }) {
 		await this.rolePermissionRepo.delete({ roleId });
 	}
 
