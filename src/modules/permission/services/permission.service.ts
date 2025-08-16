@@ -6,7 +6,10 @@ import {
 	ResponseSuccess,
 } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { PermissionMessageError } from '../constants/permission.constant';
+import {
+	PermissionMessageCodeError,
+	PermissionMessageError,
+} from '../constants/permission.constant';
 import {
 	BulkCreatePermissionDto,
 	BulkDeletePermissionDto,
@@ -146,7 +149,7 @@ export class PermissionService {
 				message:
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
 				messageCode:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
+					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
 				messageWarning:
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS +
 					': ' +
@@ -160,7 +163,7 @@ export class PermissionService {
 				message:
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
 				messageCode:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
 				messageWarning:
 					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS +
 					': ' +
