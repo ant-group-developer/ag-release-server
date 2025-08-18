@@ -39,6 +39,26 @@ export class DspController {
 		});
 	}
 
+	@Get()
+	@ApiOperation({ summary: 'Get a list of DSPs' })
+	@ApiResponse({ status: 200, description: 'List of DSPs' })
+	async getList(
+		@Query() query: QueryGetListDspDto,
+	): Promise<ResponseSuccess<PageDto<Dsp>>> {
+		const result = await this.dspService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('with-actions')
+	@ApiOperation({ summary: 'Get a list of DSPs' })
+	@ApiResponse({ status: 200, description: 'List of DSPs' })
+	async getListWithActions(
+		@Query() query: QueryGetListDspDto,
+	): Promise<ResponseSuccess<PageDto<Dsp>>> {
+		const result = await this.dspService.getListWithActions(query);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get a DSP by ID' })
 	@ApiResponse({ status: 200, description: 'Successfully retrieved DSP' })
@@ -51,16 +71,6 @@ export class DspController {
 	@Get(':id/dsp-actions')
 	async getListActionsOfDsp(@Param('id') id: string) {
 		const result = await this.dspService.getListActionsOfDsp(id);
-		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	@ApiOperation({ summary: 'Get a list of DSPs' })
-	@ApiResponse({ status: 200, description: 'List of DSPs' })
-	async getList(
-		@Query() query: QueryGetListDspDto,
-	): Promise<ResponseSuccess<PageDto<Dsp>>> {
-		const result = await this.dspService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -31,16 +31,13 @@ export class DspService {
 		const { dspActions, ...rest } = data;
 
 		const dsp = await this.createDsp(rest);
-		const { dspActions: dspActionsDb, messageWarning } =
-			await this.createDspActionsSafe({
-				dspId: dsp.id,
-				dspActions,
-			});
-
-		dsp.dspActions = dspActionsDb;
+		const { messageWarning } = await this.createDspActionsSafe({
+			dspId: dsp.id,
+			dspActions,
+		});
 
 		return new ResponseSuccess({
-			data: dsp,
+			data: await this.findOne(dsp.id),
 			messageWarning,
 		});
 	}
@@ -108,9 +105,23 @@ export class DspService {
 	async getList(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
 		const { page, pageSize } = query;
 
-		const queryGetList = this.dspQueryService.createQueryGetList(query);
+		const [dsps, totalItems] = await this.dspQueryService.getList(query);
 
-		const [dsps, totalItems] = await queryGetList.getManyAndCount();
+		return new PageDto({
+			items: dsps,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getListWithActions(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
+		const { page, pageSize } = query;
+
+		const [dsps, totalItems] =
+			await this.dspQueryService.getListWithActions(query);
 
 		return new PageDto({
 			items: dsps,

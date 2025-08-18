@@ -28,13 +28,22 @@ export class DspQueryService {
 		return dsp;
 	}
 
-	createQueryFindOne(id: string) {
-		const qb = this.dspRepo.createQueryBuilder('dsp');
+	async getList(query: QueryGetListDspDto) {
+		const queryGetList = this.createQueryGetList(query);
+		return await queryGetList.getManyAndCount();
+	}
 
-		qb.leftJoin('dsp.dspActions', 'dspAction').leftJoin(
-			'dspAction.action',
-			'action',
-		);
+	async getListWithActions(query: QueryGetListDspDto) {
+		const queryGetListWithActions =
+			this.createQueryGetListWithActions(query);
+		return await queryGetListWithActions.getManyAndCount();
+	}
+
+	private createQueryFindOne(id: string) {
+		const qb = this.dspRepo
+			.createQueryBuilder('dsp')
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
 
 		qb.where('dsp.id = :id', { id });
 
@@ -53,7 +62,29 @@ export class DspQueryService {
 		return qb;
 	}
 
-	createQueryGetList(query: QueryGetListDspDto) {
+	private createQueryGetListWithActions(query: QueryGetListDspDto) {
+		const queryGetList = this.createQueryGetList(query);
+
+		const queryGetListWithActions = queryGetList.clone();
+
+		queryGetListWithActions
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
+
+		queryGetListWithActions
+			.select(['dsp.id', 'dsp.name'])
+			.addSelect(['dspAction.id', 'dspAction.isDefault'])
+			.addSelect([
+				'action.id',
+				'action.code',
+				'action.name',
+				'action.note',
+			]);
+
+		return queryGetListWithActions;
+	}
+
+	private createQueryGetList(query: QueryGetListDspDto) {
 		const {
 			keyword,
 
