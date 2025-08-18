@@ -77,9 +77,6 @@ export class Organization extends BaseUUIDEntity {
 	})
 	ownerId: string;
 
-	@OneToOne(() => User, (user) => user.organization)
-	owner: User;
-
 	@Column({
 		name: 'is_active',
 		type: 'boolean',
@@ -87,6 +84,10 @@ export class Organization extends BaseUUIDEntity {
 		comment: 'Indicates if the organization is active',
 	})
 	isActive: boolean;
+
+	// relation
+	@OneToOne(() => User, (user) => user.organization)
+	owner: User;
 
 	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
 	organizationDsps: OrganizationDsp[];

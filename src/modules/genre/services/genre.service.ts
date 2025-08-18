@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import {
-	GenreMessageCodeError,
-	GenreMessageError,
-} from '../constants/genre.constant';
+import { GenreMessageError } from '../constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -25,16 +22,31 @@ export class GenreService {
 		private readonly genreQueryService: GenreQueryService,
 	) {}
 
+	// create
 	async create(data: CreateGenreDto): Promise<Genre> {
-		const { name, value } = data;
-		await this.validate({ name, value });
+		const { name, code } = data;
+		await this.genreQueryService.validate({ name, code });
 
 		const genre = this.genreRepo.create(data);
 		return await this.genreRepo.save(genre);
 	}
 
+	// read
 	async findOne(id: string): Promise<Genre> {
 		const genre = await this.genreRepo.findOne({ where: { id } });
+		if (!genre) {
+			throw new ResponseError({
+				message: GenreMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return genre;
+	}
+
+	async findOneWithCountRelation(id: string): Promise<Genre> {
+		const genre = await this.genreQueryService.findOneWithCountRelation(id);
+
 		if (!genre) {
 			throw new ResponseError({
 				message: GenreMessageError.NOT_FOUND,
@@ -62,16 +74,17 @@ export class GenreService {
 		});
 	}
 
+	// update
 	async update(id: string, updateGenreDto: UpdateGenreDto): Promise<Genre> {
-		const { name, value, picture } = updateGenreDto;
+		const { name, code, picture } = updateGenreDto;
 		const genre = await this.findOne(id);
 
 		if (name && name !== genre.name) {
-			await this.validate({ name });
+			await this.genreQueryService.validate({ name });
 		}
 
-		if (value && value !== genre.value) {
-			await this.validate({ value });
+		if (code && code !== genre.code) {
+			await this.genreQueryService.validate({ code });
 		}
 
 		if (
@@ -86,82 +99,13 @@ export class GenreService {
 		return await this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const genre = await this.genreQueryService.findOneWithCountRelation(id);
-
-		if (!genre) {
-			if (!genre) {
-				throw new ResponseError({
-					message: GenreMessageError.NOT_FOUND,
-					statusCode: 404,
-				});
-			}
-		}
-
-		if ((genre.primaryGenreReleasesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
-				messageCode:
-					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
-				statusCode: 400,
-			});
-		}
-
-		if ((genre.subGenreReleasesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
-				messageCode:
-					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
-				statusCode: 400,
-			});
-		}
-
-		if ((genre.primaryGenreTracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
-				messageCode:
-					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
-				statusCode: 400,
-			});
-		}
-
-		if ((genre.subGenreTracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
-				messageCode:
-					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
-				statusCode: 400,
-			});
-		}
+		const genre = await this.findOneWithCountRelation(id);
+		this.genreQueryService.validateDelete(genre);
 
 		if (genre.picture)
 			await this.bucketService.deletePublicFile(genre.picture);
 		await this.genreRepo.delete(id);
-	}
-
-	async validate({ name, value }: { name?: string; value?: string }) {
-		if (name) {
-			const genre = await this.genreRepo.findOne({ where: { name } });
-			if (genre) {
-				throw new ResponseError({
-					messageCode: GenreMessageCodeError.DUPLICATE_NAME_GENRE,
-					message: GenreMessageError.DUPLICATE_NAME_GENRE,
-				});
-			}
-		}
-
-		if (value) {
-			const genre = await this.genreRepo.findOne({ where: { value } });
-			if (genre) {
-				throw new ResponseError({
-					messageCode: GenreMessageCodeError.DUPLICATE_VALUE_GENRE,
-					message: GenreMessageError.DUPLICATE_VALUE_GENRE,
-				});
-			}
-		}
 	}
 }

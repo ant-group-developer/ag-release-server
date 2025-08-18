@@ -10,7 +10,7 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	name: string;
 
 	@Column({ type: 'varchar', length: 50, unique: true })
-	value: string;
+	code: string;
 
 	@Column({ type: 'varchar', length: 1000, nullable: true })
 	note: string | null;

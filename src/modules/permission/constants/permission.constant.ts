@@ -13,8 +13,8 @@ export const PermissionMessageSuccess = {
 export const PermissionMessageCodeError = {
 	DUPLICATE_NAME_PERMISSION:
 		'permission.message.error.duplicateNamePermission',
-	DUPLICATE_VALUE_PERMISSION:
-		'permission.message.error.duplicateValuePermission',
+	DUPLICATE_CODE_PERMISSION:
+		'permission.message.error.duplicateCodePermission',
 	NOT_FOUND: 'permission.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_USERS:
 		'permission.message.error.cannotDeleteBecauseLinkedUsers',
@@ -24,10 +24,10 @@ export const PermissionMessageCodeError = {
 
 export const PermissionMessageError = {
 	DUPLICATE_NAME_PERMISSION: 'Duplicate permission name',
-	DUPLICATE_VALUE_PERMISSION: 'Duplicate permission value',
+	DUPLICATE_CODE_PERMISSION: 'Duplicate permission code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_USERS:
-		'Cannot delete this genre because it is linked to users',
+		'Cannot delete this permission because it is linked to users',
 	CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS:
 		'Cannot delete this permission because it is linked to role permissions',
 };

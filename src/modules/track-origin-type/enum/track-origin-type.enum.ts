@@ -1,6 +1,6 @@
 export enum FieldOrderTrackOriginType {
 	NAME = 'name',
-	VALUE = 'value',
+	CODE = 'code',
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
 }

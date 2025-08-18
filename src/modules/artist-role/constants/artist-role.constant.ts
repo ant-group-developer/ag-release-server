@@ -1,4 +1,4 @@
-export const mainArtistRole = { name: 'Main Artist', value: 'main_artist' };
+export const mainArtistRole = { name: 'Main Artist', code: 'main_artist' };
 
 export const ArtistRoleMessageCodeSuccess = {
 	CREATE: 'artistRole.message.success.create',
@@ -15,8 +15,8 @@ export const ArtistRoleMessageSuccess = {
 export const ArtistRoleMessageCodeError = {
 	DUPLICATE_NAME_ARTIST_ROLE:
 		'artistRole.message.error.duplicateNameArtistRole',
-	DUPLICATE_VALUE_ARTIST_ROLE:
-		'artistRole.message.error.duplicateValueArtistRole',
+	DUPLICATE_CODE_ARTIST_ROLE:
+		'artistRole.message.error.duplicateCodeArtistRole',
 	NOT_FOUND: 'artistRole.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'artistRole.message.error.cannotDeleteBecauseLinkedReleases',
@@ -26,7 +26,7 @@ export const ArtistRoleMessageCodeError = {
 
 export const ArtistRoleMessageError = {
 	DUPLICATE_NAME_ARTIST_ROLE: 'Duplicate artist role name',
-	DUPLICATE_VALUE_ARTIST_ROLE: 'Duplicate artist role value ',
+	DUPLICATE_CODE_ARTIST_ROLE: 'Duplicate artist role code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this artist role because it is linked to releases.',

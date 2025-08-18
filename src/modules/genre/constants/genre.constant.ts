@@ -12,7 +12,7 @@ export const GenreMessageSuccess = {
 
 export const GenreMessageCodeError = {
 	DUPLICATE_NAME_GENRE: 'genre.message.error.duplicateNameGenre',
-	DUPLICATE_VALUE_GENRE: 'genre.message.error.duplicateValueGenre',
+	DUPLICATE_CODE_GENRE: 'genre.message.error.duplicateCodeGenre',
 	NOT_FOUND: 'genre.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES:
 		'genre.message.error.cannotDeleteBecauseLinkedPrimaryReleases',
@@ -26,7 +26,7 @@ export const GenreMessageCodeError = {
 
 export const GenreMessageError = {
 	DUPLICATE_NAME_GENRE: 'Duplicate genre name',
-	DUPLICATE_VALUE_GENRE: 'Duplicate genre value',
+	DUPLICATE_CODE_GENRE: 'Duplicate genre code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES:
 		'Cannot delete this genre because it is linked to primary releases.',

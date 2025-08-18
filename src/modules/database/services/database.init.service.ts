@@ -3,7 +3,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { mainArtistRole } from 'src/modules/artist-role/constants/artist-role.constant';
 import { UserType } from 'src/modules/user/enum/user.enum';
 import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,7 +47,6 @@ export class DatabaseInitService implements OnModuleInit {
 				this.initCountry(),
 				this.initLanguage(),
 				this.initTimeZones(),
-				this.initMainArtistRole(),
 			]);
 		} catch (error) {
 			this.logger.error('Error initializing database:', error);
@@ -188,41 +186,6 @@ export class DatabaseInitService implements OnModuleInit {
 		} else {
 			this.logger.log(
 				'Timezones table already has data, skipping initialization',
-			);
-		}
-	}
-
-	private async initMainArtistRole() {
-		const countQuery = `
-			SELECT COUNT(*) FROM artist_roles
-			WHERE name = $1
-  		`;
-		const result = await this.dataSource.query(countQuery, [
-			mainArtistRole.name,
-		]);
-
-		if (result[0].count === '0') {
-			this.logger.log('Initializing main artist role');
-			const query = `
-      			INSERT INTO artist_roles (
-        			id, name, value, creator_id, modifier_id
-      			) VALUES (
-        			$1, $2, $3, $4, $5
-      			)
-    		`;
-
-			await this.dataSource.query(query, [
-				uuidv4(),
-				mainArtistRole.name,
-				mainArtistRole.value,
-				this.defaultUser.id,
-				this.defaultUser.id,
-			]);
-
-			this.logger.log('Main artist role inserted successfully');
-		} else {
-			this.logger.log(
-				'Artist role table already has data, skipping initialization',
 			);
 		}
 	}

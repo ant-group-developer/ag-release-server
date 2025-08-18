@@ -124,7 +124,7 @@ export class PermissionQueryService {
 	}
 
 	// validate
-	async validate({ name, value }: { name?: string; value?: string }) {
+	async validate({ name, code }: { name?: string; code?: string }) {
 		if (name) {
 			const entity = await this.permissionRepo.findOne({
 				where: { name },
@@ -135,22 +135,60 @@ export class PermissionQueryService {
 					messageCode:
 						PermissionMessageCodeError.DUPLICATE_NAME_PERMISSION,
 					message: PermissionMessageError.DUPLICATE_NAME_PERMISSION,
+					messageWarning:
+						PermissionMessageError.DUPLICATE_NAME_PERMISSION +
+						': ' +
+						name,
 				});
 			}
 		}
 
-		if (value) {
+		if (code) {
 			const entity = await this.permissionRepo.findOne({
-				where: { value },
+				where: { code },
 			});
 
 			if (entity) {
 				throw new ResponseError({
 					messageCode:
-						PermissionMessageCodeError.DUPLICATE_VALUE_PERMISSION,
-					message: PermissionMessageError.DUPLICATE_VALUE_PERMISSION,
+						PermissionMessageCodeError.DUPLICATE_CODE_PERMISSION,
+					message: PermissionMessageError.DUPLICATE_CODE_PERMISSION,
+					messageWarning:
+						PermissionMessageError.DUPLICATE_CODE_PERMISSION +
+						': ' +
+						code,
 				});
 			}
+		}
+	}
+
+	validateDelete(permission: Permission) {
+		if ((permission.userCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
+				messageCode:
+					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
+				messageWarning:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS +
+					': ' +
+					permission.id,
+				statusCode: 400,
+			});
+		}
+
+		if ((permission.rolePermissionCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+				messageCode:
+					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+				messageWarning:
+					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS +
+					': ' +
+					permission.id,
+				statusCode: 400,
+			});
 		}
 	}
 }
