@@ -2,6 +2,7 @@ import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
@@ -52,6 +53,9 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 
 	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.dsp)
 	artistProfiles: ArtistProfile[];
+
+	@OneToMany(() => DspAction, (dspAction) => dspAction.dsp)
+	dspActions: DspAction[] | [];
 
 	// count relation
 	organizationDspsCount?: number;

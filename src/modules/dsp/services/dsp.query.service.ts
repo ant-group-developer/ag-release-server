@@ -16,6 +16,43 @@ export class DspQueryService {
 		private readonly dspRepo: Repository<Dsp>,
 	) {}
 
+	async findOne(id: string): Promise<Dsp> {
+		const query = this.createQueryFindOne(id);
+
+		const dsp = await query.getOne();
+
+		if (!dsp) {
+			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
+		}
+
+		return dsp;
+	}
+
+	createQueryFindOne(id: string) {
+		const qb = this.dspRepo.createQueryBuilder('dsp');
+
+		qb.leftJoin('dsp.dspActions', 'dspAction').leftJoin(
+			'dspAction.action',
+			'action',
+		);
+
+		qb.where('dsp.id = :id', { id });
+
+		qb.addSelect([
+			'dspAction.id',
+			'dspAction.dspId',
+			'dspAction.actionId',
+			'dspAction.isDefault',
+
+			'action.id',
+			'action.name',
+			'action.code',
+			'action.note',
+		]);
+
+		return qb;
+	}
+
 	createQueryGetList(query: QueryGetListDspDto) {
 		const {
 			keyword,
@@ -75,6 +112,22 @@ export class DspQueryService {
 				'dsp.organizationDsps',
 			)
 			.loadRelationCountAndMap('dsp.releaseDspsCount', 'dsp.releaseDsps');
+
+		queryBuilder
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
+
+		queryBuilder.addSelect([
+			'dspAction.id',
+			'dspAction.dspId',
+			'dspAction.actionId',
+			'dspAction.isDefault',
+
+			'action.id',
+			'action.name',
+			'action.code',
+			'action.note',
+		]);
 
 		return await queryBuilder.getOne();
 	}

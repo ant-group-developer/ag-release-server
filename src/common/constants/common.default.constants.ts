@@ -15,3 +15,7 @@ export const COMMENT_FOR_NULLABLE = 'Nullable when status is draft';
 export const DEFAULT_TIME_SYNC = '04:00';
 
 export const DEFAULT_CHUNK_DURATION = 10;
+
+export const DEFAULT_LENGTH_NAME = 100;
+export const DEFAULT_LENGTH_CODE = 100;
+export const DEFAULT_LENGTH_NOTE = 500;

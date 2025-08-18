@@ -1,4 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	IsArray,
@@ -7,12 +8,24 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderDsp } from '../enum/dsp.enum';
+
+class CreateDspActionDto {
+	@IsUUID()
+	@IsNotEmpty()
+	actionId: string;
+
+	@IsBoolean()
+	@IsOptional()
+	isDefault: boolean = false;
+}
 
 export class CreateDspDto {
 	@ApiProperty({
@@ -52,6 +65,26 @@ export class CreateDspDto {
 	@IsString({ each: true })
 	@MaxLength(100, { each: true })
 	formatLinks: string[];
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => CreateDspActionDto)
+	dspActions?: CreateDspActionDto[];
+}
+
+class UpdateDspActionDto {
+	@IsUUID()
+	@IsOptional()
+	id?: string;
+
+	@IsUUID()
+	@IsNotEmpty()
+	actionId: string;
+
+	@IsBoolean()
+	@IsOptional()
+	isDefault: boolean = false;
 }
 
 export class UpdateDspDto extends PartialType(CreateDspDto) {
@@ -69,6 +102,12 @@ export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@IsString({ each: true })
 	@MaxLength(100, { each: true })
 	formatLinks?: string[];
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => UpdateDspActionDto)
+	dspActions?: UpdateDspActionDto[];
 }
 
 export class QueryGetListDspDto extends BaseQueryDto {
