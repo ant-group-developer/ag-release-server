@@ -5,12 +5,13 @@ import {
 	IsEnum,
 	IsOptional,
 	IsString,
+	IsUUID,
 	Length,
 	Matches,
 } from 'class-validator';
 import { CsvEnumArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-import { UserOrderBy, UserType } from '../enum/user.enum';
+import { TenantUserType, UserOrderBy, UserType } from '../enum/user.enum';
 
 export abstract class UpdateUserDto {
 	@ApiPropertyOptional()
@@ -80,6 +81,16 @@ export class CreateUserDto extends UpdateUserDto {
 	@IsEmail()
 	@Length(3, 50)
 	email: string;
+
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({ enum: TenantUserType })
+	@IsOptional()
+	@IsEnum(TenantUserType)
+	tenantType?: TenantUserType;
 }
 
 export class GetListUserDto extends BaseQueryDto {
@@ -87,6 +98,11 @@ export class GetListUserDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	id?: string;
+
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsString()
+	tenantId?: string;
 
 	@ApiPropertyOptional({
 		description: 'List user types to filter (comma-separated)',
@@ -100,4 +116,16 @@ export class GetListUserDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(UserOrderBy)
 	fieldOrder: UserOrderBy = UserOrderBy.UPDATED_AT;
+}
+
+export class InviteUserToTenantDto {
+	@ApiProperty()
+	@IsEmail()
+	@Length(3, 50)
+	email: string;
+
+	@ApiPropertyOptional({ enum: TenantUserType })
+	@IsOptional()
+	@IsEnum(TenantUserType)
+	type?: TenantUserType;
 }

@@ -1,5 +1,15 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+	Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateTenantDto,
@@ -18,8 +28,9 @@ export class TenantController {
 	@ApiOperation({ summary: 'Get all tenants' })
 	async findAll(
 		@Query() query: FindTenantsDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const result = await this.tenantService.findAll(query);
+		const result = await this.tenantService.findAll(query, req);
 		return new ResponseSuccess({ data: result });
 	}
 

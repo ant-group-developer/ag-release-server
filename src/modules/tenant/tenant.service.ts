@@ -1,13 +1,16 @@
 import {
+	BadRequestException,
 	ConflictException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Request } from 'express';
 import { PageDto } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
-import { TreeRepository } from 'typeorm';
-import { UserService } from '../user/services/user.service';
+import { Brackets, In, TreeRepository } from 'typeorm';
+import { TenantUserType } from '../user/enum/user.enum';
+import { TenantUserService } from '../user/services/tenant-user.service';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -22,41 +25,129 @@ export class TenantService {
 	constructor(
 		@InjectRepository(Tenant)
 		private readonly tenantTreeRepo: TreeRepository<Tenant>,
-		private readonly userService: UserService,
+		private readonly tenantUserService: TenantUserService,
 	) {}
 
 	async findAll(
 		query: FindTenantsDto,
+		req: Request,
 	): Promise<PageDto<TreeNode<Tenant, 'children'>>> {
-		// 1. Xây điều kiện filter từ DTO
-		const { keyword, type } = query;
+		const tenantId = req.user?.tenantId;
+		if (!tenantId) throw new BadRequestException('Missing tenantId');
 
-		// 2. Lấy toàn bộ categories flat kèm relation parent
-		const allTenants = await this.tenantTreeRepo.find({
-			relations: ['parent', 'owner'],
-			order: {
-				[query.fieldOrder]: query.orderBy,
+		// Whitelist sortable fields
+		const orderable: Record<string, string> = {
+			id: 't.id',
+			name: 't.name',
+			createdAt: 't.created_at',
+			updatedAt: 't.updated_at',
+			// add more as needed
+		};
+		const orderCol = orderable[query.fieldOrder] ?? 't.name';
+		const orderDir =
+			(query.orderBy ?? 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+		// 1) Fetch the root tenant and its direct children (no keyword/type filtering here),
+		//    attach tenantUserCount via loadRelationCountAndMap, avoid row duplication.
+		const baseTenants = await this.tenantTreeRepo
+			.createQueryBuilder('t')
+			.leftJoinAndSelect('t.parent', 'p')
+			.where(
+				new Brackets((w) =>
+					w
+						.where('t.id = :tid', { tid: tenantId })
+						.orWhere('p.id = :tid', { tid: tenantId }),
+				),
+			)
+			// Ensure OWNER exists without joining tenantUser (prevents row explosion)
+			.andWhere(
+				`EXISTS (
+					SELECT 1 FROM tenant_user tu
+					WHERE tu.tenant_id = t.id AND tu.type = :owner
+				)`,
+				{ owner: TenantUserType.OWNER },
+			)
+			// Count ALL tenant users per tenant:
+			.loadRelationCountAndMap('t.tenantUserCount', 't.tenantUser')
+			.orderBy(orderCol, orderDir)
+			.select([
+				't.id',
+				't.name',
+				't.title',
+				't.logo',
+				't.icon',
+				't.type',
+				'p.id',
+			])
+			.getMany();
+
+		if (!baseTenants.length) {
+			return new PageDto({
+				items: [],
+				metadata: { currentPage: 1, pageSize: 0, totalItems: 0 },
+			});
+		}
+
+		// 2) Second pass to get tenantUser -> user details (keeps main query lean)
+		const ids = baseTenants.map((t) => t.id);
+		const enriched = await this.tenantTreeRepo.find({
+			where: { id: In(ids) },
+			relations: {
+				parent: true,
+				tenantUser: { user: true },
+			},
+			select: {
+				id: true,
+				logo: true,
+				icon: true,
+				title: true,
+				name: true,
+				email: true,
+				isActive: true,
+				type: true,
+				parent: {
+					id: true,
+					logo: true,
+					icon: true,
+					title: true,
+					name: true,
+					email: true,
+					isActive: true,
+					type: true,
+				},
+				tenantUser: {
+					id: true,
+					type: true,
+					user: { id: true, name: true, email: true },
+				},
 			},
 		});
 
-		// 3. Tách ra những node THOẢ điều kiện filter
-		const matched = allTenants.filter((cat) => {
+		// 2.1) Re-attach counts onto enriched entities
+		const countMap = new Map(
+			baseTenants.map((t) => [
+				t.id,
+				(t as any).tenantUserCount as number,
+			]),
+		);
+		for (const t of enriched) {
+			(t as any).tenantUserCount = countMap.get(t.id) ?? 0;
+		}
+
+		// 3) In-memory filter to keep semantics and still include ancestors later
+		const { keyword, type } = query;
+		const matched = enriched.filter((cat) => {
 			if (
 				keyword &&
 				!cat.name.toLowerCase().includes(keyword.toLowerCase())
-			) {
+			)
 				return false;
-			}
-			if (type?.length && !type.includes(cat.type)) {
-				return false;
-			}
+			if (type?.length && !type.includes(cat.type as any)) return false;
 			return true;
 		});
 
-		// 4. Thu thập tất cả ancestor của mỗi matched node
-		const idToCat = new Map<string, Tenant>(
-			allTenants.map((c) => [c.id, c]),
-		);
+		// 4) Collect ancestors of matched nodes (from the already-loaded set)
+		const idToCat = new Map<string, Tenant>(enriched.map((c) => [c.id, c]));
 		const ancestorIds = new Set<string>();
 		for (const node of matched) {
 			let p = node.parent;
@@ -67,21 +158,21 @@ export class TenantService {
 			}
 		}
 
-		// 5. Xác định tập các node được giữ lại (matched + ancestors)
+		// 5) Keep matched + ancestors
 		const allowedIds = new Set<string>([
 			...matched.map((c) => c.id),
 			...ancestorIds,
 		]);
-		const allowedNodes = allTenants.filter((c) => allowedIds.has(c.id));
+		const allowedNodes = enriched.filter((c) => allowedIds.has(c.id));
 
-		// 6. Build tree
+		// 6) Build tree
 		const trees = buildTree(allowedNodes, {
 			idKey: 'id',
 			parentKey: 'parent',
 			childrenKey: 'children',
 		});
 
-		// 7. Trả về kèm metadata
+		// 7) Return
 		return new PageDto({
 			items: trees,
 			metadata: {
@@ -102,15 +193,24 @@ export class TenantService {
 				'tenant.logo',
 				'tenant.icon',
 				'tenant.type',
-				'owner.id',
-				'owner.name',
-				'owner.email',
+				'user.id',
+				'user.name',
+				'user.email',
 				'parent.id',
 				'parent.name',
+				'tenantUser.id',
+				'tenantUser.type',
+				'user.id',
+				'user.name',
+				'user.email',
 			])
-			.leftJoin('tenant.owner', 'owner')
+			.leftJoin('tenant.tenantUser', 'tenantUser')
+			.leftJoin('tenantUser.user', 'user')
 			.leftJoin('tenant.parent', 'parent')
 			.where('tenant.isActive = :isActive', { isActive: true })
+			.andWhere('tenantUser.type = :type', {
+				type: TenantUserType.OWNER,
+			})
 			.orderBy('tenant.name', 'ASC')
 			.getMany();
 
@@ -130,19 +230,35 @@ export class TenantService {
 	async findOne(id: string): Promise<Tenant> {
 		const node = await this.tenantTreeRepo.findOne({
 			where: { id },
-			relations: ['parent', 'owner'],
+			relations: {
+				parent: true,
+				tenantUser: {
+					user: true,
+				},
+			},
+			select: {
+				tenantUser: {
+					id: true,
+					type: true,
+					user: {
+						id: true,
+						name: true,
+						email: true,
+					},
+				},
+			},
 		});
 		if (!node) {
 			throw new NotFoundException(`Tenant with ID ${id} not found`);
 		}
 		const tree = await this.tenantTreeRepo.findDescendantsTree(node, {
-			relations: ['parent', 'owner'],
+			relations: ['parent', 'tenantUser'],
 		});
 		return tree;
 	}
 
 	/** Tạo mới, gán parent nếu có và tự động lưu closure-table */
-	async create(dto: CreateTenantDto): Promise<Tenant> {
+	async create({ ownerId, ...dto }: CreateTenantDto): Promise<Tenant> {
 		// Check duplicate name
 		const dup = await this.tenantTreeRepo.findOne({
 			where: { name: dto.name },
@@ -177,6 +293,14 @@ export class TenantService {
 		}
 
 		const saved = await this.tenantTreeRepo.save(tenant);
+
+		// Create owner
+		await this.tenantUserService.addUserToTenant(
+			saved.id,
+			ownerId,
+			TenantUserType.OWNER,
+		);
+
 		return this.findOne(saved.id);
 	}
 

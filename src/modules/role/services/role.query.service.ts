@@ -39,7 +39,7 @@ export class RoleQueryService {
 
 			'permission.id',
 			'permission.name',
-			'permission.value',
+			'permission.code',
 		]);
 
 		query.where('role.id = :id', { id });
@@ -81,7 +81,7 @@ export class RoleQueryService {
 
 			'permission.id',
 			'permission.name',
-			'permission.value',
+			'permission.code',
 		]);
 
 		if (keyword) {

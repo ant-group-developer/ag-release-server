@@ -76,10 +76,10 @@ export abstract class UpdateTenantDto {
 	@IsBoolean()
 	isActive?: boolean;
 
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsUUID()
-	ownerId?: string;
+	// @ApiPropertyOptional()
+	// @IsOptional()
+	// @IsUUID()
+	// ownerId?: string;
 
 	@ApiPropertyOptional({ enum: TenantType })
 	@IsOptional()

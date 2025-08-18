@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantModule } from '../tenant/tenant.module';
 import { TokenModule } from '../token/token.module';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
@@ -12,6 +13,7 @@ import { RefreshTokensService } from './refresh-tokens.service';
 		TypeOrmModule.forFeature([RefreshToken]),
 		TokenModule,
 		UserModule,
+		TenantModule,
 	],
 	controllers: [AuthController],
 	providers: [RefreshTokensService, AuthService],

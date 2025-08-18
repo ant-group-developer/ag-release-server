@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsString, IsUUID, Length, Matches } from 'class-validator';
 
 export class SiginDto {
 	@ApiProperty()
@@ -24,4 +24,10 @@ export class RefreshDto {
 	})
 	@IsString()
 	refreshToken: string;
+}
+
+export class SwitchTenantDto {
+	@ApiProperty()
+	@IsUUID()
+	tenantId: string;
 }

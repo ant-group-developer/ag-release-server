@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
-import { RefreshDto, SiginDto } from './auth.dto';
+import { RefreshDto, SiginDto, SwitchTenantDto } from './auth.dto';
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
 
@@ -17,10 +17,22 @@ export class AuthController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Get('tenant')
+	async tenant(@Req() req: Request) {
+		const data = await this.auth.tenant(req);
+		return new ResponseSuccess({ data });
+	}
+
 	@Public()
 	@Post('login')
 	async login(@Body() body: SiginDto) {
 		const data = await this.auth.login(body);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('switch-tenant')
+	async switchTenant(@Body() body: SwitchTenantDto, @Req() req: Request) {
+		const data = await this.auth.switchTenant(body.tenantId, req.user!.sub);
 		return new ResponseSuccess({ data });
 	}
 

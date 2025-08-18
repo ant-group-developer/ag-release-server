@@ -11,3 +11,9 @@ export enum UserOrderBy {
 	LAST_LOGIN = 'lastLogin',
 	LOGIN_COUNT = 'loginsCount',
 }
+
+export enum TenantUserType {
+	OWNER = 'owner',
+	ADMIN = 'admin',
+	MEMBER = 'member',
+}

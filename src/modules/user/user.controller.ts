@@ -1,21 +1,68 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+	Req,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import { CreateUserDto, GetListUserDto, UpdateUserDto } from './dto/user.dto';
+import { UserMessages } from './constants/messages';
+import {
+	CreateUserDto,
+	GetListUserDto,
+	InviteUserToTenantDto,
+	UpdateUserDto,
+} from './dto/user.dto';
 import { User } from './entities/user.entity';
+import { TenantUserType, UserType } from './enum/user.enum';
+import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
 
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
-	constructor(private readonly userService: UserService) {}
+	constructor(
+		private readonly userService: UserService,
+		private readonly tenantUserService: TenantUserService,
+	) {}
 
 	@Post()
 	async create(
 		@Body() payload: CreateUserDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<User>> {
 		const result = await this.userService.create(payload);
+		const tenantId =
+			req.user?.type === UserType.ADMIN
+				? (payload.tenantId ?? req.user?.tenantId)
+				: req.user!.tenantId;
+		await this.tenantUserService.addUserToTenant(
+			tenantId,
+			result.id,
+			payload.tenantType ?? TenantUserType.MEMBER,
+		);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('invite')
+	async inviteUserToTenant(
+		@Body() payload: InviteUserToTenantDto,
+		@Req() req: Request,
+	) {
+		const result = await this.tenantUserService.inviteUserToTenant(
+			req.user!.tenantId,
+			payload.email,
+			payload.type ?? TenantUserType.MEMBER,
+		);
+		return new ResponseSuccess({
+			...UserMessages.INVITE.SUCCESS,
+			data: result,
+		});
 	}
 
 	@Get(':id')
@@ -27,8 +74,9 @@ export class UserController {
 	@Get()
 	async getList(
 		@Query() query: GetListUserDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<User>>> {
-		const result = await this.userService.getList(query);
+		const result = await this.userService.getList(query, req);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -22,9 +22,6 @@ import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
 import { LabelModule } from './modules/label/label.module';
 import { LanguageModule } from './modules/language/language.module';
-import { OrganizationDspModule } from './modules/organization-dsp/organization-dsp.module';
-import { OrganizationUserModule } from './modules/organization-user/organization-user.module';
-import { OrganizationModule } from './modules/organization/organization.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
@@ -65,7 +62,7 @@ import { UserModule } from './modules/user/user.module';
 		JwtModule,
 		LabelModule,
 
-		OrganizationModule,
+		PermissionModule,
 
 		ReleaseModule,
 		AlbumFormatModule,
@@ -88,9 +85,7 @@ import { UserModule } from './modules/user/user.module';
 		ArtistRoleModule,
 		ArtistProfileModule,
 
-		OrganizationDspModule,
-		OrganizationUserModule,
-
+		UserPermissionModule,
 		BucketModule,
 		TimezoneModule,
 
