@@ -5,6 +5,7 @@ import {
 	IsEnum,
 	IsOptional,
 	IsString,
+	IsUUID,
 	Length,
 	Matches,
 } from 'class-validator';
@@ -80,6 +81,16 @@ export class CreateUserDto extends UpdateUserDto {
 	@IsEmail()
 	@Length(3, 50)
 	email: string;
+
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({ enum: TenantUserType })
+	@IsOptional()
+	@IsEnum(TenantUserType)
+	tenantType?: TenantUserType;
 }
 
 export class GetListUserDto extends BaseQueryDto {

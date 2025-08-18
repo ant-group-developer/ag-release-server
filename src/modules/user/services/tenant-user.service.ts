@@ -1,6 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import { UserMessages } from '../constants/messages';
 import { TenantUser } from '../entities/tenant-user.entity';
 import { TenantUserType } from '../enum/user.enum';
 import { UserService } from './user.service';
@@ -13,12 +15,25 @@ export class TenantUserService {
 		private readonly userService: UserService,
 	) {}
 
+	async checkExisted(tenantId: string, userId: string) {
+		const existData = await this.tenantUserRepository.findOne({
+			where: {
+				tenantId,
+				userId,
+			},
+		});
+		if (existData) {
+			throw new ResponseError(UserMessages.TENANT.CONFLICT);
+		}
+	}
+
 	async addUserToTenant(
 		tenantId: string,
 		userId: string,
 		type: TenantUserType,
 	): Promise<TenantUser> {
 		await this.userService.findOne(userId);
+		await this.checkExisted(tenantId, userId);
 		const tenantUser = this.tenantUserRepository.create({
 			tenantId,
 			userId,
@@ -36,7 +51,7 @@ export class TenantUserService {
 			where: { tenantId, userId },
 		});
 		if (!tenantUser) {
-			throw new ForbiddenException('User is not part of this tenant');
+			throw new ResponseError(UserMessages.TENANT.FORBIDDEN);
 		}
 		tenantUser.type = type;
 		return this.tenantUserRepository.save(tenantUser);
@@ -48,6 +63,7 @@ export class TenantUserService {
 		type: TenantUserType,
 	): Promise<TenantUser> {
 		const user = await this.userService.findOneByEmail(email);
+		await this.checkExisted(tenantId, user.id);
 		const tenantUser = this.tenantUserRepository.create({
 			tenantId,
 			userId: user.id,

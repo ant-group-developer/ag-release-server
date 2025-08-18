@@ -6,10 +6,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
+import { Request } from 'express';
 import { PageDto } from 'src/common/dtos/response.dto';
 import { Brackets, FindOneOptions, Repository } from 'typeorm';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
+import { UserType } from '../enum/user.enum';
 import { getAvatarUrl } from '../user.util';
 
 @Injectable()
@@ -33,7 +35,16 @@ export class UserService {
 	}
 
 	async create(payload: CreateUserDto): Promise<User> {
-		const { email, password } = payload;
+		const {
+			email,
+			password,
+			name,
+			avatar,
+			emailVerified,
+			isActive,
+			telegramId,
+			type,
+		} = payload;
 
 		const formattedEmail = email.toLowerCase();
 		await this.checkEmailUniqueness(formattedEmail);
@@ -41,11 +52,14 @@ export class UserService {
 		const hashedPassword = await this.hashPassword(password);
 
 		const user = this.userRepository.create({
-			...payload,
+			name,
+			isActive,
+			telegramId,
+			type,
 			email: formattedEmail,
 			password: hashedPassword,
-			emailVerified: true,
-			avatar: getAvatarUrl(formattedEmail),
+			emailVerified: emailVerified ?? true,
+			avatar: avatar || getAvatarUrl(formattedEmail),
 		});
 		const savedData = await this.userRepository.save(user);
 
@@ -84,15 +98,22 @@ export class UserService {
 		return user;
 	}
 
-	async getList(query: GetListUserDto): Promise<PageDto<User>> {
+	async getList(query: GetListUserDto, req: Request): Promise<PageDto<User>> {
 		const { page, pageSize, skip, type, keyword, id, orderBy, fieldOrder } =
 			query;
+
+		const tenantId = req.user?.tenantId;
 
 		const queryBuilder = this.userRepository
 			.createQueryBuilder('user')
 			.leftJoin('user.creator', 'creator')
 			.leftJoin('user.modifier', 'modifier')
-			.leftJoin('user.tenantUser', 'tenantUser')
+			.leftJoin(
+				'user.tenantUser',
+				'tenantUser',
+				'tenantUser.tenantId = :tenantId',
+				{ tenantId },
+			)
 			.select([
 				'user.id',
 				'user.name',
@@ -108,10 +129,21 @@ export class UserService {
 				'creator.email',
 				'modifier.id',
 				'modifier.email',
+				'tenantUser.type',
+				'tenantUser.tenantId',
 			])
-			// .andWhere(new Brackets(qb => {
-			// 	qb.where('tenantUser.tenantId = :tenantId', {tenantUser: })
-			// }))
+			.andWhere(
+				new Brackets((qb) => {
+					qb.where('tenantUser.tenantId = :tenantId', {
+						tenantId,
+					});
+					if (req.user?.type === UserType.ADMIN) {
+						qb.orWhere('user.type = :type', {
+							type: UserType.ADMIN,
+						});
+					}
+				}),
+			)
 			.skip(skip)
 			.take(pageSize)
 			.orderBy(`user.${fieldOrder}`, orderBy);
