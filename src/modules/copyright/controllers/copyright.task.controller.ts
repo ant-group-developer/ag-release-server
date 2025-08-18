@@ -24,6 +24,13 @@ export class CopyrightTaskController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id')
+	async getDetailTask(@Param('id', ParseUUIDPipe) id: string) {
+		const data = await this.copyrightService.getDetailTask(id);
+
+		return new ResponseSuccess({ data });
+	}
+
 	@Post(':id/cancel')
 	async cancelScan(@Param('id', ParseUUIDPipe) id: string) {
 		await this.copyrightService.cancelScan(id);
@@ -32,15 +39,11 @@ export class CopyrightTaskController {
 
 	@Post(':id/re-scan')
 	async reScan(@Param('id', ParseUUIDPipe) id: string) {
-		await this.copyrightService.reScan(id);
-		return new ResponseSuccess({ message: 'Re-scan successfully' });
-	}
-
-	@Get(':id')
-	async getDetailTask(@Param('id', ParseUUIDPipe) id: string) {
-		const data = await this.copyrightService.getDetailTask(id);
-
-		return new ResponseSuccess({ data });
+		const result = await this.copyrightService.reScan(id);
+		return new ResponseSuccess({
+			data: result,
+			message: 'Re-scan successfully',
+		});
 	}
 
 	@Get()

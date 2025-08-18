@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	TrackTypeMessageCodeError,
-	TrackTypeMessageError,
-} from '../constants/track-type.constant';
+import { TrackTypeMessageError } from '../constants/track-type.constant';
 import {
 	CreateTrackTypeDto,
 	QueryGetListTrackTypeDto,
@@ -23,16 +20,32 @@ export class TrackTypeService {
 		private readonly trackTypeQueryService: TrackTypeQueryService,
 	) {}
 
+	// create
 	async create(data: CreateTrackTypeDto): Promise<TrackType> {
-		const { name, value } = data;
-		await this.validate({ name, value });
+		const { name, code } = data;
+		await this.trackTypeQueryService.validate({ name, code });
 
 		const trackType = this.trackTypeRepo.create(data);
 		return await this.trackTypeRepo.save(trackType);
 	}
 
+	// read
 	async findOne(id: string): Promise<TrackType> {
 		const trackType = await this.trackTypeRepo.findOne({ where: { id } });
+		if (!trackType) {
+			throw new ResponseError({
+				message: TrackTypeMessageError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return trackType;
+	}
+
+	private async findOneWithCountRelation(id: string): Promise<TrackType> {
+		const trackType =
+			await this.trackTypeQueryService.findOneWithCountRelation(id);
+
 		if (!trackType) {
 			throw new ResponseError({
 				message: TrackTypeMessageError.NOT_FOUND,
@@ -63,72 +76,27 @@ export class TrackTypeService {
 		});
 	}
 
+	// update
 	async update(id: string, data: UpdateTrackTypeDto): Promise<TrackType> {
-		const { name, value } = data;
+		const { name, code } = data;
 		const trackType = await this.findOne(id);
 
 		if (name && name !== trackType.name) {
-			await this.validate({ name });
+			await this.trackTypeQueryService.validate({ name });
 		}
 
-		if (value && value !== trackType.value) {
-			await this.validate({ value });
+		if (code && code !== trackType.code) {
+			await this.trackTypeQueryService.validate({ code });
 		}
 
 		await this.trackTypeRepo.update(id, data);
 		return await this.findOne(id);
 	}
 
+	// delete
 	async delete(id: string): Promise<void> {
-		const trackType =
-			await this.trackTypeQueryService.findOneWithCountRelation(id);
-
-		if (!trackType) {
-			throw new ResponseError({
-				message: TrackTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
-		}
-
-		if ((trackType.tracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					TrackTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					TrackTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
-		}
-
+		const trackType = await this.findOneWithCountRelation(id);
+		this.trackTypeQueryService.validateDelete(trackType);
 		await this.trackTypeRepo.delete(id);
-	}
-
-	async validate({ name, value }: { name?: string; value?: string }) {
-		if (name) {
-			const trackType = await this.trackTypeRepo.findOne({
-				where: { name },
-			});
-
-			if (trackType) {
-				throw new ResponseError({
-					messageCode:
-						TrackTypeMessageCodeError.DUPLICATE_NAME_TRACK_TYPE,
-					message: TrackTypeMessageError.DUPLICATE_NAME_TRACK_TYPE,
-				});
-			}
-		}
-
-		if (value) {
-			const trackType = await this.trackTypeRepo.findOne({
-				where: { value },
-			});
-			if (trackType) {
-				throw new ResponseError({
-					messageCode:
-						TrackTypeMessageCodeError.DUPLICATE_VALUE_TRACK_TYPE,
-					message: TrackTypeMessageError.DUPLICATE_VALUE_TRACK_TYPE,
-				});
-			}
-		}
 	}
 }

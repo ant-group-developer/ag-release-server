@@ -8,12 +8,13 @@ export class UserPermission extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid' })
 	userId: string;
 
+	@Column({ type: 'uuid' })
+	permissionId: string;
+
+	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'user_id' })
 	user: User;
-
-	@Column({ type: 'uuid' })
-	permissionId: string;
 
 	@ManyToOne(() => Permission)
 	@JoinColumn({ name: 'permission_id' })

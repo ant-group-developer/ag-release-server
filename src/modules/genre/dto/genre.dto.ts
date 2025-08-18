@@ -1,6 +1,7 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
 	IsEnum,
+	IsNotEmpty,
 	IsOptional,
 	IsString,
 	MaxLength,
@@ -11,17 +12,15 @@ import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constant
 import { FieldOrderGenre } from '../enum/genre.enum';
 
 export class CreateGenreDto {
-	@ApiProperty({
-		description: 'The name of the genre',
-		example: 'Rock',
-	})
+	@IsNotEmpty()
 	@IsString()
 	@MaxLength(100)
 	name: string;
 
+	@IsNotEmpty()
 	@IsString()
 	@MaxLength(50)
-	value: string;
+	code: string;
 
 	@ApiPropertyOptional({
 		description: 'The picture associated with the genre, can be null',
@@ -45,15 +44,17 @@ export class CreateGenreDto {
 }
 
 export class UpdateGenreDto extends PartialType(CreateGenreDto) {
+	@IsNotEmpty()
 	@IsString()
 	@MaxLength(100)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 
+	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@MaxLength(50)
-	value: string;
+	code: string;
 }
 
 export class QueryGetListGenreDto extends BaseQueryDto {

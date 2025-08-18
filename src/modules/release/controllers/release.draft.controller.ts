@@ -55,13 +55,6 @@ export class ReleaseDraftController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Get(':id/validate2')
-	async validateSchemaRelease2(@Param('id') id: string) {
-		const result =
-			await this.releaseDraftService.validateSchemaRelease2(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
 	@ApiResponse({
@@ -69,7 +62,7 @@ export class ReleaseDraftController {
 		description: ReleaseMessageSuccess.DELETE,
 	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseDraftService.mainDelete(id);
+		await this.releaseDraftService.handleDeleteSafe(id);
 		return new ResponseSuccess({
 			messageCode: ReleaseMessageCodeSuccess.DELETE,
 		});

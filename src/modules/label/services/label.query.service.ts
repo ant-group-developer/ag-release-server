@@ -1,8 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import {
+	LabelMessageCodeError,
+	LabelMessageError,
+} from '../constants/label.constant';
 import { QueryGetListLabelDto } from '../dto/label.dto';
 import { Label } from '../entities/label.entity';
+import { IDataFromDb } from '../interfaces/label.interface';
 
 @Injectable()
 export class LabelQueryService {
@@ -110,14 +116,31 @@ export class LabelQueryService {
 		const label = this.assigneeVirtualColumn(dataFromDb);
 		return label[0];
 	}
-}
 
-// type
-interface IDataFromDb {
-	entities: Label[];
-	raw: {
-		label_id: string;
-		track_count: string;
-		release_count: string;
-	}[];
+	// validate
+	async validate({ name }: { name?: string }) {
+		if (name) {
+			const artist = await this.labelRepo.findOne({ where: { name } });
+
+			if (artist) {
+				throw new ResponseError({
+					message: LabelMessageError.DUPLICATE_NAME_LABEL,
+					messageCode: LabelMessageCodeError.DUPLICATE_NAME_LABEL,
+					statusCode: 409,
+				});
+			}
+		}
+	}
+
+	validateDelete(label: Label) {
+		if ((label.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					LabelMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					LabelMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				statusCode: 400,
+			});
+		}
+	}
 }

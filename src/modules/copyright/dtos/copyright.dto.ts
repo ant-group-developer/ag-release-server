@@ -1,6 +1,7 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsDate,
 	IsEnum,
 	IsNotEmpty,
@@ -15,30 +16,34 @@ import { ScanStatus } from '../enums/copyright.enum';
 
 // task
 class TrackScanTaskDto {
-	@IsDate()
 	@IsOptional()
-	@Type(() => Date)
-	trackCreatedAtStart?: Date;
-
+	@Transform(({ value }) => (value === undefined ? null : new Date(value)))
 	@IsDate()
-	@IsOptional()
-	@Type(() => Date)
-	trackCreatedAtEnd?: Date;
+	trackCreatedAtStart: Date | null;
 
 	@IsOptional()
+	@Transform(({ value }) => (value === undefined ? null : new Date(value)))
+	@IsDate()
+	trackCreatedAtEnd: Date | null;
+
+	@IsOptional()
+	@Transform(({ value }) => (value === undefined ? null : value))
 	@IsArray()
 	@IsUUID('4', { each: true })
 	@IsNotEmpty({ each: true })
-	releaseIds: string[];
+	releaseIds: string[] | null;
 
 	@IsOptional()
+	@Transform(({ value }) => (value === undefined ? null : value))
 	@IsArray()
 	@Length(10, 10, { each: true })
 	@IsNotEmpty({ each: true })
-	trackIds: string[];
+	trackIds: string[] | null;
 
 	@IsOptional()
-	ignoreTrackScanned: boolean = true;
+	@Transform(({ value }) => (value === undefined ? true : value))
+	@IsBoolean()
+	ignoreTrackScanned: boolean;
 }
 
 export class CreateTrackScanStatusDto {

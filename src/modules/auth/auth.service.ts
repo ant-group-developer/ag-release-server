@@ -2,8 +2,11 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
+import { TenantService } from '../tenant/tenant.service';
 import { JwtPayload } from '../token/token.interface';
 import { TokenService } from '../token/token.service';
+import { UserType } from '../user/enum/user.enum';
+import { TenantUserService } from '../user/services/tenant-user.service';
 import { UserService } from '../user/services/user.service';
 import { SiginDto } from './auth.dto';
 import { AuthMessages } from './auth.messages';
@@ -16,10 +19,16 @@ export class AuthService {
 		private readonly refreshSvc: RefreshTokensService,
 		private readonly cfg: ConfigService,
 		private readonly userService: UserService,
+		private readonly tenantUserService: TenantUserService,
+		private readonly tenantService: TenantService,
 	) {}
 
 	me(req: Request) {
 		return this.userService.findOne(req.user?.sub as string);
+	}
+
+	tenant(req: Request) {
+		return this.tenantService.findOne(req.user!.tenantId);
 	}
 
 	// Call after validating user credentials
@@ -36,8 +45,8 @@ export class AuthService {
 				},
 			},
 		});
-		if (!user.isActive)
-			throw new UnauthorizedException(AuthMessages.USER_NOT_FOUND);
+
+		this.userService.checkUserActive(user.isActive);
 
 		const valid = await verify(user.password, body.password);
 		if (!valid)
@@ -121,5 +130,34 @@ export class AuthService {
 			// ignore verification errors on logout to be idempotent
 		}
 		return { ok: true };
+	}
+
+	async switchTenant(tenantId: string, userId: string) {
+		const user = await this.userService.findOne(userId, {
+			select: {
+				id: true,
+				isActive: true,
+			},
+		});
+
+		this.userService.checkUserActive(user.isActive);
+		if (user.type !== UserType.ADMIN) {
+			await this.tenantUserService.checkMembership(tenantId, userId);
+		}
+
+		const payload = {
+			sub: user.id,
+			tenantId,
+		};
+
+		const accessToken = await this.tokens.signAccessToken(payload);
+
+		const { token: refreshToken, jti } =
+			await this.tokens.signRefreshToken(payload);
+		const decoded = this.tokens.decode<{ exp?: number }>(refreshToken);
+		const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : null;
+		await this.refreshSvc.persist(user.id, jti, refreshToken, expiresAt);
+
+		return { accessToken, refreshToken };
 	}
 }

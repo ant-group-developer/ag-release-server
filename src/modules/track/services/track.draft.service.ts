@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../interfaces/track.interface';
 
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
+import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
@@ -25,6 +26,8 @@ import { TrackValidateService } from './track.validate.service';
 
 @Injectable()
 export class TrackDraftService {
+	private readonly logger = new Logger(TrackDraftService.name);
+
 	constructor(
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
@@ -35,6 +38,7 @@ export class TrackDraftService {
 		private readonly trackLanguageDraftService: TrackLanguageDraftService,
 		private readonly trackArtistService: TrackArtistService,
 		private readonly trackReleaseService: TrackReleaseService,
+		private readonly copyrightService: CopyrightService,
 	) {}
 
 	// create
@@ -207,10 +211,12 @@ export class TrackDraftService {
 		}
 
 		if (audioFile) {
-			await this.audioFileDraftService.update({
-				audioFileId: track.audioFile.id,
-				dataUpdate: audioFile,
-			});
+			if (track.audioFile) {
+				await this.audioFileDraftService.update({
+					audioFileId: track.audioFile.id,
+					dataUpdate: audioFile,
+				});
+			}
 		}
 
 		//
@@ -235,7 +241,24 @@ export class TrackDraftService {
 	}
 
 	//delete
-	async deleteRecordOfRelease({
+	async handleDelete(id: string) {
+		await this.deleteRelatedRecords({ trackId: id });
+		await this.trackRepo.delete(id);
+	}
+
+	private async deleteRelatedRecords({ trackId }: { trackId: string }) {
+		await Promise.all([
+			this.audioFileDraftService.deleteRecordOfTrack({ trackId }),
+			this.trackArtistService.deleteRecordOfTrack({ trackId }),
+			this.trackLanguageDraftService.deleteRecordOfTrack({
+				trackId,
+			}),
+			this.copyrightService.deleteResultOfTrack({ trackId }),
+		]);
+	}
+
+	// safe
+	async deleteRecordOfReleaseSafe({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -244,20 +267,29 @@ export class TrackDraftService {
 			releaseId,
 		});
 
-		for (const track of tracks) {
-			await this.mainDelete(track.id);
-		}
+		await Promise.all(
+			tracks.map((track) => this.handleDeleteSafe(track.id)),
+		);
 	}
 
-	async mainDelete(id: string) {
-		await this.deleteRelatedRecords({ trackId: id });
-		await this.trackRepo.delete(id);
+	async handleDeleteSafe(id: string) {
+		await this.deleteRelatedRecordsSafe({ trackId: id });
+		await this.trackRepo
+			.delete(id)
+			.catch((e) =>
+				this.logger.warn(`Skip delete, reason: ${e.message}`),
+			);
 	}
 
-	private async deleteRelatedRecords({ trackId }: { trackId: string }) {
-		await this.audioFileDraftService.deleteRecordOfTrack({ trackId });
-		await this.trackArtistService.deleteRecordOfTrack({ trackId });
-		await this.trackLanguageDraftService.deleteRecordOfTrack({ trackId });
+	private async deleteRelatedRecordsSafe({ trackId }: { trackId: string }) {
+		await Promise.all([
+			this.audioFileDraftService.deleteRecordOfTrackSafe({ trackId }),
+			this.trackArtistService.deleteRecordOfTrackSafe({ trackId }),
+			this.trackLanguageDraftService.deleteRecordOfTrackSafe({
+				trackId,
+			}),
+			this.copyrightService.deleteResultOfTrackSafe({ trackId }),
+		]);
 	}
 
 	// artist
@@ -301,7 +333,9 @@ export class TrackDraftService {
 		await this.trackArtistService.updateByReleaseArtist(releaseArtist);
 	}
 
-	async deleteByReleaseArtist(releaseArtistId: string) {
-		await this.trackArtistService.deleteByReleaseArtist(releaseArtistId);
+	async deleteTrackArtistByReleaseArtistSafe(releaseArtistId: string) {
+		await this.trackArtistService.deleteByReleaseArtistSafe(
+			releaseArtistId,
+		);
 	}
 }

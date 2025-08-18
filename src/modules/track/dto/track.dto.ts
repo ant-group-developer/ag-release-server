@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -116,6 +117,11 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 	@Length(10, 10)
 	@IsString()
 	labelId?: string;
+
+	@Transform(({ value }) => value === 'true')
+	@IsBoolean()
+	@IsOptional()
+	isScanned?: boolean;
 
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;

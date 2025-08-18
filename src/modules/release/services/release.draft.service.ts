@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
@@ -23,6 +23,8 @@ import { ReleaseValidateService } from './release.validate.service';
 
 @Injectable()
 export class ReleaseDraftService {
+	private readonly logger = new Logger(ReleaseDraftService.name);
+
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
@@ -150,28 +152,51 @@ export class ReleaseDraftService {
 	}
 
 	// delete
-	async mainDelete(id: string): Promise<void> {
-		await this.deleteRelatedRecords({ releaseId: id });
+	async delete(id: string) {
 		await this.releaseRepo.delete(id);
 	}
 
-	private async deleteRelatedRecords({ releaseId }: { releaseId: string }) {
-		await this.releaseLanguageDraftService.deleteRecordOfRelease({
-			releaseId,
-		});
-		await this.releaseArtistService.deleteRecordOfRelease({ releaseId });
-		await this.releaseCoverArtService.deleteRecordOfRelease({ releaseId });
-		await this.trackDraftService.deleteRecordOfRelease({ releaseId });
-		await this.releaseTerritoryService.deleteRecordOfRelease({ releaseId });
+	async deleteSafe(id: string) {
+		await this.delete(id).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
+	}
+
+	async handleDeleteSafe(id: string): Promise<void> {
+		await this.deleteRelatedRecordsSafe({ releaseId: id });
+		await this.deleteSafe(id);
+	}
+
+	private async deleteRelatedRecordsSafe({
+		releaseId,
+	}: {
+		releaseId: string;
+	}) {
+		await Promise.all([
+			this.releaseLanguageDraftService.deleteRecordOfReleaseSafe({
+				releaseId,
+			}),
+
+			this.releaseArtistService.deleteRecordOfReleaseSafe({
+				releaseId,
+			}),
+
+			this.releaseCoverArtService.deleteRecordOfReleaseSafe({
+				releaseId,
+			}),
+
+			this.trackDraftService.deleteRecordOfReleaseSafe({
+				releaseId,
+			}),
+
+			this.releaseTerritoryService.deleteRecordOfReleaseSafe({
+				releaseId,
+			}),
+		]);
 	}
 
 	// other
 	async validateSchemaRelease(id: string) {
 		return await this.releaseValidateService.validateSchemaRelease(id);
-	}
-
-	// other
-	async validateSchemaRelease2(id: string) {
-		return await this.releaseValidateService.validateSchemaRelease2(id);
 	}
 }

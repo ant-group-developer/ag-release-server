@@ -8,7 +8,7 @@ export class TrackOriginType extends BaseUserTrackedUUIDEntity {
 	name: string;
 
 	@Column({ type: 'varchar', length: 50, unique: true })
-	value: string;
+	code: string;
 
 	@OneToMany(() => Track, (track) => track.trackOriginType)
 	tracks: Track[];

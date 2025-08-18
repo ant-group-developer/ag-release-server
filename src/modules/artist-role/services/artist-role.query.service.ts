@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import {
+	ArtistRoleMessageCodeError,
+	ArtistRoleMessageError,
+} from '../constants/artist-role.constant';
 import { QueryGetListArtistRoleDto } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
 
@@ -81,5 +86,60 @@ export class ArtistRoleQueryService {
 			);
 
 		return await queryBuilder.getOne();
+	}
+
+	// validate
+	validateDelete(artistRole: ArtistRole) {
+		if ((artistRole.releaseCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				messageCode:
+					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+				statusCode: 400,
+			});
+		}
+
+		if ((artistRole.trackCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				messageCode:
+					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				statusCode: 400,
+			});
+		}
+	}
+
+	async validate({ name, code }: { name?: string; code?: string }) {
+		if (name) {
+			const artistRole = await this.artistRoleRepo.findOne({
+				where: { name },
+			});
+
+			if (artistRole) {
+				throw new ResponseError({
+					message: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
+					messageCode:
+						ArtistRoleMessageCodeError.DUPLICATE_NAME_ARTIST_ROLE,
+					statusCode: 409,
+				});
+			}
+		}
+
+		if (code) {
+			const artistRole = await this.artistRoleRepo.findOne({
+				where: { code },
+			});
+
+			if (artistRole) {
+				throw new ResponseError({
+					message: ArtistRoleMessageError.DUPLICATE_CODE_ARTIST_ROLE,
+					messageCode:
+						ArtistRoleMessageCodeError.DUPLICATE_CODE_ARTIST_ROLE,
+					statusCode: 409,
+				});
+			}
+		}
 	}
 }

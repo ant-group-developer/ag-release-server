@@ -8,7 +8,7 @@ export class TrackType extends BaseUserTrackedUUIDEntity {
 	name: string;
 
 	@Column({ type: 'varchar', length: 50, unique: true })
-	value: string;
+	code: string;
 
 	// relation
 	@OneToMany(() => Track, (track) => track.trackType)

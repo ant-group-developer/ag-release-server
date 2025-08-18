@@ -27,6 +27,16 @@ export class TenantUserService {
 		}
 	}
 
+	async checkMembership(tenantId: string, userId: string) {
+		const tenantUser = await this.tenantUserRepository.findOne({
+			where: { tenantId, userId },
+		});
+		if (!tenantUser) {
+			throw new ResponseError(UserMessages.TENANT.FORBIDDEN);
+		}
+		return tenantUser;
+	}
+
 	async addUserToTenant(
 		tenantId: string,
 		userId: string,
@@ -47,12 +57,7 @@ export class TenantUserService {
 		userId: string,
 		type: TenantUserType,
 	): Promise<TenantUser> {
-		const tenantUser = await this.tenantUserRepository.findOne({
-			where: { tenantId, userId },
-		});
-		if (!tenantUser) {
-			throw new ResponseError(UserMessages.TENANT.FORBIDDEN);
-		}
+		const tenantUser = await this.checkMembership(tenantId, userId);
 		tenantUser.type = type;
 		return this.tenantUserRepository.save(tenantUser);
 	}

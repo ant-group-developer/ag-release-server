@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -12,6 +12,8 @@ import {
 
 @Injectable()
 export class ReleaseTerritoryService {
+	private readonly logger = new Logger(ReleaseTerritoryService.name);
+
 	constructor(
 		@InjectRepository(ReleaseTerritory)
 		private readonly releaseTerritoryRepo: Repository<ReleaseTerritory>,
@@ -86,5 +88,15 @@ export class ReleaseTerritoryService {
 		releaseId: string;
 	}): Promise<void> {
 		await this.releaseTerritoryRepo.delete({ releaseId });
+	}
+
+	async deleteRecordOfReleaseSafe({
+		releaseId,
+	}: {
+		releaseId: string;
+	}): Promise<void> {
+		await this.deleteRecordOfRelease({ releaseId }).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
 	}
 }

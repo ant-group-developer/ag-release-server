@@ -7,7 +7,7 @@ import {
 	QueryGetListTask,
 } from '../dtos/copyright.dto';
 import { TrackScanStatus } from '../entities/track-scan-status.entity';
-import { ScanStatus } from '../enums/copyright.enum';
+import { ErrorTask, ScanStatus } from '../enums/copyright.enum';
 import { CopyrightAcrService } from './sub-services/copyright.acr.service';
 import { CopyrightResultService } from './sub-services/copyright.result.service';
 import { CopyrightTaskService } from './sub-services/copyright.task.service';
@@ -21,9 +21,8 @@ export class CopyrightService {
 	constructor(
 		private readonly bucketService: BucketService,
 		private readonly copyrightAcrService: CopyrightAcrService,
-
-		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightTaskService: CopyrightTaskService,
+		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightResultService: CopyrightResultService,
 	) {}
 
@@ -38,11 +37,11 @@ export class CopyrightService {
 
 		const taskDb = await this.copyrightTaskService.create({
 			filter,
-			status: ScanStatus.RUNNING,
+			status: ScanStatus.PENDING,
 			trackNeedScanIds,
 		});
 
-		this.startScan(taskDb).catch((e) => {
+		this.startTask(taskDb).catch((e) => {
 			this.logger.error(
 				`Failed to start scan for task ${taskDb.id}: ${e.message}`,
 			);
@@ -51,87 +50,93 @@ export class CopyrightService {
 		return taskDb;
 	}
 
-	private async startScan(task: TrackScanStatus) {
-		//
-		const controller = new AbortController();
-		this.scanControllers.set(task.id, controller);
-		const signal = controller.signal;
+	private async startTask(task: TrackScanStatus) {
+		const { id: taskId } = task;
+		this.createSignal(taskId);
 
-		//
-		await this.copyrightTaskService.updateStatus(
-			task.id,
-			ScanStatus.RUNNING,
-		);
+		await this.updateTaskStatus(taskId, ScanStatus.RUNNING);
 
-		if (signal.aborted) {
-			this.logger.warn(`Scan cancelled for task ${task.id}`);
-
-			await this.copyrightTaskService.updateStatus(
-				task.id,
-				ScanStatus.CANCEL,
-			);
-			return;
-		}
-
-		for (const id of task.trackNeedScanIds) {
-			if (signal.aborted) {
-				this.logger.warn(`Scan cancelled for task ${task.id}`);
-
-				await this.copyrightTaskService.updateStatus(
-					task.id,
-					ScanStatus.CANCEL,
-				);
-
-				return;
+		// processListTracks
+		try {
+			await this.processTask(task);
+			await this.finishTask(task);
+		} catch (e) {
+			if (e.message === ErrorTask.CANCEL_TASK) {
+				await this.cancelTask(taskId);
+			} else {
+				await this.failTask(taskId);
 			}
+		} finally {
+			this.deleteSignal(taskId);
 
-			try {
-				await this.scanTrackCopyright(id);
-				await this.copyrightTaskService.addScannedTrackId(task.id, id);
-
-				this.logger.log(`Track scanned successfully: ${id}`);
-			} catch (e) {
-				await this.copyrightTaskService.updateStatus(
-					task.id,
-					ScanStatus.FAILED,
-				);
-
-				this.scanControllers.delete(task.id);
-
-				this.logger.error(`Failed to scan track ${id}:`, e.message);
-				return;
-			}
+			this.logger.log(this.scanControllers);
 		}
+	}
 
-		this.scanControllers.delete(task.id);
-		await this.copyrightTaskService.updateStatus(
-			task.id,
-			ScanStatus.FINISHED,
-		);
+	async processTask(task: TrackScanStatus) {
+		for (const trackId of task.trackNeedScanIds) {
+			this.checkAbort(task.id);
+			await this.processSubTask({ taskId: task.id, trackId });
+		}
+	}
 
-		this.logger.log('List tracks scanned successfully');
+	async processSubTask({
+		taskId,
+		trackId,
+	}: {
+		trackId: string;
+		taskId: string;
+	}) {
+		try {
+			await this.scanTrackCopyright(trackId);
+			await this.copyrightTaskService.addScannedTrackId({
+				taskId,
+				trackId,
+			});
+			this.logger.log(`Track scanned successfully: ${trackId}`);
+		} catch {
+			throw new ResponseError({
+				message: ErrorTask.FAIL_PROCESSING_SINGLE_TRACK,
+			});
+		}
+	}
+
+	private async cancelTask(taskId: string) {
+		await this.updateTaskStatus(taskId, ScanStatus.CANCEL);
+		this.logger.error(`Task ${taskId} cancel`);
+	}
+
+	private async failTask(taskId: string) {
+		await this.updateTaskStatus(taskId, ScanStatus.FAILED);
+		this.logger.error(`Task ${taskId} failed`);
+	}
+
+	private async finishTask(task: TrackScanStatus) {
+		await this.updateTaskStatus(task.id, ScanStatus.FINISHED);
+		this.logger.log(`Task ${task.id} finished successfully`);
+	}
+
+	private checkAbort(taskId: string) {
+		const signal = this.getSignal(taskId);
+
+		if (!signal || signal.aborted) {
+			this.logger.warn(`Scan cancelled for task ${taskId}`);
+			throw new ResponseError({ message: ErrorTask.CANCEL_TASK });
+		}
+	}
+
+	private async updateTaskStatus(taskId: string, status: ScanStatus) {
+		await this.copyrightTaskService.updateStatus(taskId, status);
 	}
 
 	async cancelScan(taskId: string) {
 		const task = await this.copyrightTaskService.findOne(taskId);
 
-		if (
-			task.status === ScanStatus.RUNNING ||
-			task.status === ScanStatus.PENDING
-		) {
+		if (task.status === ScanStatus.RUNNING) {
 			const controller = this.scanControllers.get(taskId);
 			if (controller) {
 				controller.abort();
-				this.scanControllers.delete(taskId);
-				return true;
 			}
-
-			await this.copyrightTaskService.updateStatus(
-				taskId,
-				ScanStatus.CANCEL,
-			);
-
-			return;
 		}
 
 		throw new ResponseError({
@@ -141,9 +146,34 @@ export class CopyrightService {
 
 	async reScan(taskId: string) {
 		const task = await this.copyrightTaskService.findOne(taskId);
-		this.startScan(task).catch(() => {});
+
+		const newTask = await this.handleCreateTask({
+			filter: {
+				...task.filter,
+				ignoreTrackScanned: false,
+			},
+		});
+
+		return newTask;
 	}
 
+	// signal
+	private createSignal(id: string) {
+		const controller = new AbortController();
+		this.scanControllers.set(id, controller);
+		return controller.signal;
+	}
+
+	private getSignal(id: string) {
+		const controller = this.scanControllers.get(id);
+		return controller?.signal;
+	}
+
+	private deleteSignal(id: string) {
+		this.scanControllers.delete(id);
+	}
+
+	//
 	async getDetailTask(taskId: string) {
 		return await this.copyrightTaskService.getDetailTask(taskId);
 	}
@@ -165,9 +195,24 @@ export class CopyrightService {
 		return await this.copyrightResultService.getListResult(data);
 	}
 
+	async deleteResultOfTrack({ trackId }: { trackId: string }) {
+		await this.copyrightResultService.deleteByTrackId(trackId);
+	}
+
+	async deleteResultOfTrackSafe({ trackId }: { trackId: string }) {
+		await this.deleteResultOfTrack({ trackId }).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
+	}
+
 	// acr
 	async scanTrackCopyright(id: string) {
 		const track = await this.copyrightTrackService.getTrack(id);
+
+		if (!track.audioFile) {
+			this.logger.warn(`Missing audio file of track ${id}`);
+			return;
+		}
 
 		const { fileBuffer } = await this.bucketService.getFileBuffer(
 			track.audioFile.fileId,

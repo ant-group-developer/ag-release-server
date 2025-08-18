@@ -1,14 +1,11 @@
-import {
-	ConflictException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
 import { Request } from 'express';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Brackets, FindOneOptions, Repository } from 'typeorm';
+import { UserMessages } from '../constants/messages';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
 import { UserType } from '../enum/user.enum';
@@ -72,9 +69,13 @@ export class UserService {
 			where: { id },
 		});
 		if (!user) {
-			throw new NotFoundException('User not found');
+			throw new ResponseError(UserMessages.NOT_FOUND);
 		}
 		return user;
+	}
+
+	checkUserActive(isActive: boolean) {
+		if (!isActive) throw new ResponseError(UserMessages.NOT_FOUND);
 	}
 
 	async findOneByEmail(
@@ -93,7 +94,7 @@ export class UserService {
 			where: { ...options?.where, email },
 		});
 		if (!user) {
-			throw new NotFoundException('User not found');
+			throw new ResponseError(UserMessages.NOT_FOUND);
 		}
 		return user;
 	}

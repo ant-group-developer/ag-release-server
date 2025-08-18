@@ -114,11 +114,11 @@ export interface ResultScan {
 
 // track scan status
 export interface TrackScanFilter {
-	trackCreatedAtStart?: Date | null;
-	trackCreatedAtEnd?: Date | null;
-	releaseIds: string[] | null[];
-	trackIds: string[] | null[];
-	ignoreTrackScanned: boolean | null;
+	trackCreatedAtStart: Date | null;
+	trackCreatedAtEnd: Date | null;
+	releaseIds: string[] | null;
+	trackIds: string[] | null;
+	ignoreTrackScanned: boolean;
 }
 
 //

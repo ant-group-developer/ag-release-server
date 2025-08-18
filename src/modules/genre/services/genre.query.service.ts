@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
+import {
+	GenreMessageCodeError,
+	GenreMessageError,
+} from '../constants/genre.constant';
 import { QueryGetListGenreDto } from '../dto/genre.dto';
 import { Genre } from '../entities/genre.entity';
 
@@ -85,5 +90,70 @@ export class GenreQueryService {
 			);
 
 		return await queryBuilder.getOne();
+	}
+
+	// validate
+	async validate({ name, code }: { name?: string; code?: string }) {
+		if (name) {
+			const genre = await this.genreRepo.findOne({ where: { name } });
+			if (genre) {
+				throw new ResponseError({
+					messageCode: GenreMessageCodeError.DUPLICATE_NAME_GENRE,
+					message: GenreMessageError.DUPLICATE_NAME_GENRE,
+				});
+			}
+		}
+
+		if (code) {
+			const genre = await this.genreRepo.findOne({ where: { code } });
+			if (genre) {
+				throw new ResponseError({
+					messageCode: GenreMessageCodeError.DUPLICATE_CODE_GENRE,
+					message: GenreMessageError.DUPLICATE_CODE_GENRE,
+				});
+			}
+		}
+	}
+
+	validateDelete(genre: Genre) {
+		if ((genre.primaryGenreReleasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_RELEASES,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.subGenreReleasesCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_RELEASES,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.primaryGenreTracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRIMARY_TRACKS,
+				statusCode: 400,
+			});
+		}
+
+		if ((genre.subGenreTracksCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					GenreMessageError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
+				messageCode:
+					GenreMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_SUB_TRACKS,
+				statusCode: 400,
+			});
+		}
 	}
 }

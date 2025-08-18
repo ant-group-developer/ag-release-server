@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
@@ -16,6 +16,8 @@ import { BucketGcsService } from './bucket.gcs.service';
 
 @Injectable()
 export class BucketService {
+	private readonly logger = new Logger(BucketService.name);
+
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
@@ -199,6 +201,12 @@ export class BucketService {
 		await this.bucketGcsService.deletePrivate(fileDb.key);
 
 		await this.bucketFileService.delete(id);
+	}
+
+	async deleteSafe(id: string) {
+		await this.delete(id).catch((e) =>
+			this.logger.warn(`Skip delete, reason: ${e.message}`),
+		);
 	}
 
 	// public

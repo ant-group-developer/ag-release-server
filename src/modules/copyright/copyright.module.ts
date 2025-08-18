@@ -1,6 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Track } from '../track/entities/track.entity';
 import { CopyrightResultController } from './controllers/copyright.result.controller';
@@ -19,6 +20,7 @@ import { CopyrightTrackService } from './services/sub-services/copyright.track.s
 		TypeOrmModule.forFeature([TrackScanHistory, TrackScanStatus, Track]),
 		HttpModule,
 		BucketModule,
+		AppConfigModule,
 	],
 	controllers: [
 		CopyrightTrackController,
@@ -33,6 +35,6 @@ import { CopyrightTrackService } from './services/sub-services/copyright.track.s
 		CopyrightTaskService,
 		CopyrightResultService,
 	],
-	exports: [],
+	exports: [CopyrightService],
 })
 export class CopyrightModule {}
