@@ -9,16 +9,17 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderTrackOriginType } from '../enum/track-origin-type.enum';
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateTrackOriginTypeDto {
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
 }
 
@@ -27,14 +28,14 @@ export class UpdateTrackOriginTypeDto extends PartialType(
 ) {
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
 }
 

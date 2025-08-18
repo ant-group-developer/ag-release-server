@@ -16,6 +16,7 @@ import {
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderDsp } from '../enum/dsp.enum';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 class CreateDspActionDto {
 	@IsUUID()
@@ -30,11 +31,11 @@ class CreateDspActionDto {
 export class CreateDspDto {
 	@ApiProperty({
 		description: 'Name of the DSP (Digital Service Provider)',
-		maxLength: 100,
+		maxLength: DEFAULT_LENGTH_NAME,
 		example: 'Spotify',
 	})
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
@@ -90,7 +91,7 @@ class UpdateDspActionDto {
 export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 

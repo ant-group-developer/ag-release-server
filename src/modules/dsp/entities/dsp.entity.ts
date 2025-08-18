@@ -1,3 +1,4 @@
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
@@ -10,7 +11,7 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('dsps')
 export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
-	@Column({ name: 'name', type: 'varchar', unique: true, length: 100 })
+	@Column({ name: 'name', type: 'varchar', unique: true, length: DEFAULT_LENGTH_NAME })
 	name: string;
 
 	@Column({

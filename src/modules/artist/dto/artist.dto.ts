@@ -16,6 +16,7 @@ import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { Type } from 'class-transformer';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderArtist } from '../enum/artist.enum';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 class CreateArtistProfileDto {
 	@IsNotEmpty()
@@ -38,7 +39,7 @@ export class CreateArtistDto {
 		example: 'John Doe',
 	})
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
@@ -93,7 +94,7 @@ class UpdateArtistProfileDto {
 
 export class UpdateArtistDto extends PartialType(CreateArtistDto) {
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;

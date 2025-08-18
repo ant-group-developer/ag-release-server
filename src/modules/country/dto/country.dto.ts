@@ -10,6 +10,7 @@ import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, MaxLength } from 'class-validator';
 import { FieldOrderCountry } from '../enum/country.enum';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateCountryDto {
 	@ApiProperty({
@@ -19,7 +20,7 @@ export class CreateCountryDto {
 	})
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@ApiProperty({
@@ -129,7 +130,7 @@ export class CreateCountryDto {
 export class UpdateCountryDto extends PartialType(CreateCountryDto) {
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@ValidateIf((_, value) => value !== undefined)
 	name?: string;
 

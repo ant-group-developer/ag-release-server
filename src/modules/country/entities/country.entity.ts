@@ -1,3 +1,4 @@
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
@@ -5,7 +6,7 @@ import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('countries')
 export class Country extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: 100, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	name: string;
 
 	@Column({ type: 'varchar', length: 10 })

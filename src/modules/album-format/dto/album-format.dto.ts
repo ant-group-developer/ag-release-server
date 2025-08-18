@@ -10,15 +10,16 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderAlbumFormat } from '../enums/album-format.enum';
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateAlbumFormatDto {
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	@IsNotEmpty()
 	code: string;
 
@@ -34,13 +35,13 @@ export class CreateAlbumFormatDto {
 export class UpdateAlbumFormatDto extends PartialType(CreateAlbumFormatDto) {
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
 }
 

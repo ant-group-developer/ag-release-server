@@ -1,10 +1,11 @@
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('timezones')
 export class Timezone extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: 100 })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
 	name: string;
 
 	@Column({ type: 'varchar', length: 10 })

@@ -1,3 +1,4 @@
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
@@ -7,10 +8,10 @@ import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity('languages')
 export class Language extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: 100, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 10, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
 	// release

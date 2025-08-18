@@ -1,3 +1,4 @@
+import { DEFAULT_LENGTH_CODE } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
 import { OrganizationUser } from 'src/modules/organization-user/entities/organization-user.entity';
@@ -32,7 +33,7 @@ export class Organization extends BaseUUIDEntity {
 	@Column({
 		name: 'name',
 		type: 'varchar',
-		length: 100,
+		length: DEFAULT_LENGTH_CODE,
 		comment: 'Example: ANT Music',
 	})
 	name: string;
