@@ -28,6 +28,10 @@ export class PriceTierService {
 			currencyId: dto.currencyId,
 		});
 
+		if (dto.isDefault === true) {
+			await this.priceTierQueryService.resetDefaultPriceTier();
+		}
+
 		const entity = this.priceTierRepo.create(dto);
 		return this.priceTierRepo.save(entity);
 	}
@@ -74,6 +78,10 @@ export class PriceTierService {
 		await this.priceTierQueryService.validateForeignKey({
 			currencyId: dto.currencyId,
 		});
+
+		if (dto?.isDefault === true && dto.isDefault !== entity.isDefault) {
+			await this.priceTierQueryService.resetDefaultPriceTier();
+		}
 
 		Object.assign(entity, dto);
 		return this.priceTierRepo.save(entity);

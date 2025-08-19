@@ -10,7 +10,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
-import { CountryMessageCodeSuccess } from '../country/constants/country.constant';
+import { CurrencyMessageCodeSuccess } from './constants/currency.constant';
 import {
 	CreateCurrencyDto,
 	QueryGetListCurrencyDto,
@@ -39,7 +39,7 @@ export class CurrencyController {
 		const data = await this.currencyService.create(dto);
 		return new ResponseSuccess({
 			data,
-			messageCode: CountryMessageCodeSuccess.CREATE,
+			messageCode: CurrencyMessageCodeSuccess.CREATE,
 		});
 	}
 
@@ -51,7 +51,7 @@ export class CurrencyController {
 		const data = await this.currencyService.update(id, dto);
 		return new ResponseSuccess({
 			data,
-			messageCode: CountryMessageCodeSuccess.UPDATE,
+			messageCode: CurrencyMessageCodeSuccess.UPDATE,
 		});
 	}
 
@@ -59,7 +59,7 @@ export class CurrencyController {
 	async delete(@Param('id', ParseUUIDPipe) id: string) {
 		await this.currencyService.delete(id);
 		return new ResponseSuccess({
-			messageCode: CountryMessageCodeSuccess.DELETE,
+			messageCode: CurrencyMessageCodeSuccess.DELETE,
 		});
 	}
 }

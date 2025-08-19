@@ -131,4 +131,12 @@ export class PriceTierQueryService {
 			});
 		}
 	}
+
+	async resetDefaultPriceTier() {
+		await this.priceTierRepo
+			.createQueryBuilder()
+			.update()
+			.set({ isDefault: false })
+			.execute();
+	}
 }
