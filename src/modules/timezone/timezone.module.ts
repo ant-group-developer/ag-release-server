@@ -11,4 +11,4 @@ import { TimezoneController } from './timezone.controller';
 	controllers: [TimezoneController],
 	providers: [TimezoneService, TimezoneQueryService],
 })
-export class TimezoneModule { }
+export class TimezoneModule {}

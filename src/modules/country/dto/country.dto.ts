@@ -9,8 +9,8 @@ import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, MaxLength } from 'class-validator';
-import { FieldOrderCountry } from '../enum/country.enum';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { FieldOrderCountry } from '../enum/country.enum';
 
 export class CreateCountryDto {
 	@ApiProperty({
