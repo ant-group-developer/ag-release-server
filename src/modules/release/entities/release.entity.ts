@@ -5,7 +5,7 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
@@ -36,7 +36,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	primaryGenreId: string | null;
 
@@ -47,7 +47,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	labelId: string | null;
 
@@ -55,7 +55,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 150,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	title: string;
 
@@ -67,7 +67,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025 ' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: 2025 ' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	cLineYear: number | null;
@@ -75,14 +75,17 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 200,
-		comment: 'Example: Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
+		comment:
+			'Example: Exclusive Licensed AMG' +
+			'&' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	cLineOwner: string | null;
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineYear: number | null;
@@ -90,7 +93,10 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 200,
-		comment: 'Example: Exclusive Licensed AMG' + '&' + COMMENT_FOR_NULLABLE,
+		comment:
+			'Example: Exclusive Licensed AMG' +
+			'&' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineOwner: string | null;
@@ -105,7 +111,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
 	releaseTimezoneId: string | null;
 
-	@Column({ type: 'date', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'date',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	releaseDate: Date | null;
 
 	@Column({

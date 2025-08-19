@@ -1,4 +1,4 @@
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
@@ -7,19 +7,35 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 @Entity('track_language')
 export class TrackLanguage extends BaseUUIDEntity {
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	metadataLanguageCountryId: string | null; // ngon ngu quoc gia
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	audioLanguageId: string | null; // ngon ngu bai hat
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	metadataLanguageId: string | null;
 
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	recordingCountryId: string | null;
 
 	// relation

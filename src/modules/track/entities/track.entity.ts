@@ -1,4 +1,4 @@
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -44,7 +44,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineYear: number | null;
@@ -55,7 +55,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		comment:
 			'Example: 2025 Exclusive Licensed AMG' +
 			' & ' +
-			COMMENT_FOR_NULLABLE,
+			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineOwner: string | null;
@@ -64,7 +64,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	primaryGenreId: string | null;
 
@@ -75,10 +75,18 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	order: number;
 
 	// other
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	trackTypeId: string | null;
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	trackOriginTypeId: string | null;
 
 	@Column({ type: Boolean, nullable: true })
