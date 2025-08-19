@@ -138,10 +138,6 @@ export class DspQueryService {
 		const queryBuilder = this.dspRepo
 			.createQueryBuilder('dsp')
 			.where('dsp.id = :id', { id })
-			.loadRelationCountAndMap(
-				'dsp.organizationDspsCount',
-				'dsp.organizationDsps',
-			)
 			.loadRelationCountAndMap('dsp.releaseDspsCount', 'dsp.releaseDsps');
 
 		queryBuilder
@@ -181,16 +177,6 @@ export class DspQueryService {
 	}
 
 	validateDelete(dsp: Dsp) {
-		if ((dsp.organizationDspsCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
-				messageCode:
-					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS,
-				statusCode: 400,
-			});
-		}
-
 		if ((dsp.releaseDspsCount ?? 0) > 0) {
 			throw new ResponseError({
 				message: DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
