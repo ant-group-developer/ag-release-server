@@ -26,6 +26,7 @@ import { GenreModule } from './modules/genre/genre.module';
 import { LabelModule } from './modules/label/label.module';
 import { LanguageModule } from './modules/language/language.module';
 import { PermissionModule } from './modules/permission/permission.module';
+import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
@@ -106,6 +107,7 @@ import { UserModule } from './modules/user/user.module';
 		DspActionModule,
 
 		CurrencyModule,
+		PriceTierModule,
 
 		// ScheduleModule,
 	],

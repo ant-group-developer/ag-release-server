@@ -11,14 +11,12 @@ import {
 import { Track } from '../entities/track.entity';
 import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
 import { TrackQueryService } from './track.query.service';
-import { TrackValidateService } from './track.validate.service';
 
 @Injectable()
 export class TrackService {
 	constructor(
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
-		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 	) {}
 
@@ -30,7 +28,7 @@ export class TrackService {
 		await this.trackQueryService.findOne(id);
 
 		// validate nonDraft
-		const trackNonDraft = this.trackValidateService.ensureNonDraftTrack({
+		const trackNonDraft = this.trackQueryService.ensureNonDraftTrack({
 			...data,
 			trackArtists: [],
 		});
@@ -39,7 +37,7 @@ export class TrackService {
 		const result = await this.trackQueryService.findOne(id);
 
 		// convert to ITrackNonDraft
-		return this.trackValidateService.ensureNonDraftTrack(result);
+		return this.trackQueryService.ensureNonDraftTrack(result);
 	}
 
 	// read
@@ -100,13 +98,13 @@ export class TrackService {
 		const track = await this.trackQueryService.findOne(id);
 
 		if (primaryGenreId && primaryGenreId !== track.primaryGenreId) {
-			await this.trackValidateService.validate({
+			await this.trackQueryService.validateForeignKey({
 				primaryGenreId,
 			});
 		}
 
 		if (subGenreId && subGenreId !== track.subGenreId) {
-			await this.trackValidateService.validate({
+			await this.trackQueryService.validateForeignKey({
 				subGenreId,
 			});
 		}

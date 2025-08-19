@@ -16,6 +16,7 @@ import {
 } from 'typeorm';
 
 import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
@@ -98,9 +99,15 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'boolean', default: false })
 	isScanned: boolean;
 
-	//
 	@Column({ type: 'boolean', default: false })
 	copyArtistsFromRelease: boolean;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	priceTierId: string | null;
 
 	// relation
 	@ManyToOne(() => Release)
@@ -140,4 +147,8 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		(trackScanHistory) => trackScanHistory.track,
 	)
 	trackScanHistories?: TrackScanHistory[];
+
+	@ManyToOne(() => PriceTier)
+	@JoinColumn({ name: 'price_tier_id' })
+	priceTier: PriceTier | null;
 }

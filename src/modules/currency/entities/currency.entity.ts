@@ -9,4 +9,7 @@ export class Currency extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'varchar', length: 3, unique: true })
 	code: string;
+
+	// virtual column
+	priceTierCount?: number;
 }

@@ -76,6 +76,17 @@ export class CurrencyService implements OnModuleInit {
 		return currency;
 	}
 
+	async findOneWithCountRelation(id: string) {
+		const currency =
+			await this.currencyQueryService.findOneWithCountRelation(id);
+
+		if (!currency) {
+			throw new ResponseError({ message: 'Currency not found' });
+		}
+
+		return currency;
+	}
+
 	async getList(query: QueryGetListCurrencyDto) {
 		const { page, pageSize } = query;
 
@@ -113,7 +124,8 @@ export class CurrencyService implements OnModuleInit {
 
 	// delete
 	async delete(id: string): Promise<void> {
-		const currency = await this.findOne(id);
-		await this.currencyRepo.remove(currency);
+		const currency = await this.findOneWithCountRelation(id);
+		this.currencyQueryService.validateDelete(currency);
+		await this.currencyRepo.delete(id);
 	}
 }

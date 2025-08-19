@@ -12,14 +12,16 @@ export const CurrencyMessageSuccess = {
 
 export const CurrencyMessageCodeError = {
 	NOT_FOUND: 'currency.message.error.notFound',
-	COUNTRY_NOT_FOUND: 'currency.message.error.countryNotFound',
 	UNIQUE_CONSTRAINT: 'currency.message.error.uniqueConstraint',
+	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
+		'currency.message.error.cannotDeleteBecauseLinkedPriceTiers',
 };
 
 export const CurrencyMessageError = {
 	NOT_FOUND: 'Currency not found',
-	COUNTRY_NOT_FOUND: 'Country not found',
 	UNIQUE_CONSTRAINT: 'Currency already exists',
+	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
+		'Cannot delete this currency because it is linked to price tiers',
 };
 
 // data init

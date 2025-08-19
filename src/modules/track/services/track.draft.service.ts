@@ -16,13 +16,10 @@ import {
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
-import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
-import { TrackReleaseService } from './track-release.service';
 import { TrackQueryService } from './track.query.service';
-import { TrackValidateService } from './track.validate.service';
 
 @Injectable()
 export class TrackDraftService {
@@ -32,64 +29,27 @@ export class TrackDraftService {
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
 
-		private readonly trackValidateService: TrackValidateService,
 		private readonly trackQueryService: TrackQueryService,
 		private readonly audioFileDraftService: AudioFileDraftService,
 		private readonly trackLanguageDraftService: TrackLanguageDraftService,
 		private readonly trackArtistService: TrackArtistService,
-		private readonly trackReleaseService: TrackReleaseService,
 		private readonly copyrightService: CopyrightService,
 	) {}
 
 	// create
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
-		const releaseIdOfTracks = trackDrafts[0].releaseId;
 
-		const releaseOfTracks =
-			await this.trackReleaseService.getReleaseById(releaseIdOfTracks);
-
-		return await Promise.all(
-			trackDrafts.map((track) => {
-				const trackDraft = this.buildTrackFromRelease({
-					track,
-					releaseOfTracks,
-				});
-
-				return this.handleCreateOne(trackDraft);
-			}),
+		const filledTrackDrafts = await this.trackQueryService.fillDataToTracks(
+			{
+				trackDrafts,
+				releaseId: trackDrafts[0].releaseId,
+			},
 		);
-	}
 
-	private buildTrackFromRelease({
-		track,
-		releaseOfTracks,
-	}: {
-		track: BulkCreateTrackDraft['trackDrafts'][number];
-		releaseOfTracks: Release | null;
-	}): IHandleCreateTrackOne {
-		const trackLanguage = releaseOfTracks?.releaseLanguage
-			? (({ id: _id, ...restOfReleaseLanguage }) => {
-					return {
-						...restOfReleaseLanguage,
-						recordingCountryId:
-							restOfReleaseLanguage.metadataLanguageCountryId,
-					};
-				})(releaseOfTracks.releaseLanguage)
-			: undefined;
-
-		return {
-			...track,
-
-			pLineYear: releaseOfTracks?.pLineYear,
-			pLineOwner: releaseOfTracks?.pLineOwner,
-
-			primaryGenreId: releaseOfTracks?.primaryGenreId,
-			subGenreId: releaseOfTracks?.subGenreId,
-			version: releaseOfTracks?.version,
-
-			trackLanguage,
-		};
+		return Promise.all(
+			filledTrackDrafts.map((item) => this.handleCreateOne(item)),
+		);
 	}
 
 	private async handleCreateOne(
@@ -104,16 +64,17 @@ export class TrackDraftService {
 			audioFile: audioFileDraft,
 		});
 
-		return this.trackValidateService.ensureDraftTrack(trackDb);
+		return this.trackQueryService.ensureDraftTrack(trackDb);
 	}
 
 	private async createTrackDraft(data: ICreateTrackDraft) {
-		const { releaseId, primaryGenreId, subGenreId } = data;
+		const { releaseId, primaryGenreId, subGenreId, priceTierId } = data;
 
-		await this.trackValidateService.validate({
+		await this.trackQueryService.validateForeignKey({
 			releaseId,
 			primaryGenreId,
 			subGenreId,
+			priceTierId,
 		});
 
 		const track = this.trackRepo.create(data);
@@ -162,7 +123,7 @@ export class TrackDraftService {
 
 		const track = await this.trackQueryService.getDetailOne(id);
 
-		await this.trackValidateService.handleValidateDataUpdate({
+		await this.trackQueryService.validateDataUpdate({
 			trackDb: track,
 			dataUpdate: data,
 		});
@@ -177,7 +138,7 @@ export class TrackDraftService {
 		await this.trackRepo.update(id, restOfTrack);
 		const result = await this.trackQueryService.getDetailOne(id);
 
-		return this.trackValidateService.ensureDraftTrack(result);
+		return this.trackQueryService.ensureDraftTrack(result);
 	}
 
 	private async updateSubEntities({

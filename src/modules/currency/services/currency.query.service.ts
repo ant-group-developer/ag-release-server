@@ -112,4 +112,62 @@ export class CurrencyQueryService {
 		const qb = this.createQueryGetList(query);
 		return qb.getManyAndCount();
 	}
+
+	async findOneWithCountRelation(id: string) {
+		const query = this.currencyRepo.createQueryBuilder('currency');
+
+		// virtual
+		query.addSelect((subQuery) => {
+			return subQuery
+				.select('COUNT(price_tier.id)')
+				.from('price_tiers', 'price_tier')
+				.where('price_tier.currency_id = currency.id');
+		}, 'price_tier_count');
+
+		query.where('currency.id = :id', { id });
+
+		const dataFromDb: {
+			raw: {
+				currency_id: string;
+				price_tier_count: string;
+			}[];
+			entities: Currency[];
+		} = await query.getRawAndEntities();
+
+		const currencies = this.assigneeVirtualColumn(dataFromDb);
+		return currencies[0];
+	}
+
+	validateDelete(currency: Currency) {
+		if ((currency.priceTierCount ?? 0) > 0) {
+			throw new ResponseError({
+				message:
+					CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+				messageCode:
+					CurrencyMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+				messageWarning:
+					CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS +
+					': ' +
+					currency.id,
+				statusCode: 400,
+			});
+		}
+	}
+
+	private assigneeVirtualColumn(dataFromDb: {
+		raw: {
+			currency_id: string;
+			price_tier_count: string;
+		}[];
+		entities: Currency[];
+	}) {
+		return dataFromDb.entities.map((entity) => {
+			const dataRaw = dataFromDb.raw.find(
+				(item) => item.currency_id === entity.id,
+			);
+
+			entity.priceTierCount = Number(dataRaw?.price_tier_count);
+			return entity;
+		});
+	}
 }
