@@ -18,6 +18,7 @@ import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
+import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
@@ -103,6 +104,8 @@ import { UserModule } from './modules/user/user.module';
 
 		ActionModule,
 		DspActionModule,
+
+		CurrencyModule,
 
 		// ScheduleModule,
 	],
