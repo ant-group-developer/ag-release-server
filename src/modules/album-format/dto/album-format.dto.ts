@@ -8,9 +8,12 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderAlbumFormat } from '../enums/album-format.enum';
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateAlbumFormatDto {
 	@IsString()

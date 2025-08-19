@@ -1,4 +1,7 @@
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';

@@ -7,9 +7,12 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderArtistRole } from '../enum/artist-role.enum';
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateArtistRoleDto {
 	@IsNotEmpty()

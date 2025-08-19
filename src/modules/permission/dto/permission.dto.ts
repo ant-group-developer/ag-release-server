@@ -10,9 +10,13 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+	DEFAULT_LENGTH_NOTE,
+} from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderPermission } from '../enums/permission.enum';
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME, DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
 
 export class CreatePermissionDto {
 	@IsString()

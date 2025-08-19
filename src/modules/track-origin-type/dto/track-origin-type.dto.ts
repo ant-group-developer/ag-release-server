@@ -7,9 +7,12 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderTrackOriginType } from '../enum/track-origin-type.enum';
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateTrackOriginTypeDto {
 	@IsNotEmpty()

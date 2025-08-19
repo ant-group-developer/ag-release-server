@@ -45,6 +45,21 @@ export class ActionService {
 		return action;
 	}
 
+	async findOneWithCountRelation(id: string) {
+		const action =
+			await this.actionQueryService.findOneWithCountRelation(id);
+
+		if (!action) {
+			throw new ResponseError({
+				message: ActionMessageError.NOT_FOUND,
+				messageCode: ActionMessageCodeError.NOT_FOUND,
+				statusCode: 404,
+			});
+		}
+
+		return action;
+	}
+
 	async getList(query: QueryGetListActionDto): Promise<PageDto<Action>> {
 		const { page, pageSize } = query;
 		const [actions, totalItems] =
@@ -72,7 +87,7 @@ export class ActionService {
 	}
 
 	async delete(id: string): Promise<void> {
-		const action = await this.findOne(id);
+		const action = await this.findOneWithCountRelation(id);
 		this.actionQueryService.validateDelete(action);
 		await this.actionRepo.delete(id);
 	}

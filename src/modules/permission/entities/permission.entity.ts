@@ -1,4 +1,8 @@
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME, DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+	DEFAULT_LENGTH_NOTE,
+} from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { RolePermission } from 'src/modules/role/entities/role-permission.entity';
 import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';

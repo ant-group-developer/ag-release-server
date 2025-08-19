@@ -60,6 +60,5 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	dspActions: DspAction[] | [];
 
 	// count relation
-	organizationDspsCount?: number;
 	releaseDspsCount?: number;
 }

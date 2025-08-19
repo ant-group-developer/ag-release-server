@@ -1,4 +1,4 @@
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -16,6 +16,7 @@ import {
 } from 'typeorm';
 
 import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
@@ -44,7 +45,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE,
+		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineYear: number | null;
@@ -55,7 +56,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		comment:
 			'Example: 2025 Exclusive Licensed AMG' +
 			' & ' +
-			COMMENT_FOR_NULLABLE,
+			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	pLineOwner: string | null;
@@ -64,7 +65,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	primaryGenreId: string | null;
 
@@ -75,10 +76,18 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	order: number;
 
 	// other
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	trackTypeId: string | null;
 
-	@Column({ type: 'uuid', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'uuid',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	trackOriginTypeId: string | null;
 
 	@Column({ type: Boolean, nullable: true })
@@ -90,9 +99,15 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'boolean', default: false })
 	isScanned: boolean;
 
-	//
 	@Column({ type: 'boolean', default: false })
 	copyArtistsFromRelease: boolean;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	priceTierId: string | null;
 
 	// relation
 	@ManyToOne(() => Release)
@@ -132,4 +147,8 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		(trackScanHistory) => trackScanHistory.track,
 	)
 	trackScanHistories?: TrackScanHistory[];
+
+	@ManyToOne(() => PriceTier)
+	@JoinColumn({ name: 'price_tier_id' })
+	priceTier: PriceTier | null;
 }

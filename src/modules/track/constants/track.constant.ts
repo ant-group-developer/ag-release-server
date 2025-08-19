@@ -17,6 +17,7 @@ export const TrackMessageCodeError = {
 	TRACK_TYPE_NOT_FOUND: 'track.message.error.trackTypeNotFound',
 	TRACK_ORIGIN_TYPE_NOT_FOUND: 'track.message.error.trackOriginTypeNotFound',
 	RELEASE_NOT_FOUND: 'track.message.error.releaseNotFound',
+	PRICE_TIER_NOT_FOUND: 'track.message.error.priceTierNotFound',
 };
 
 export const TrackMessageError = {
@@ -26,4 +27,5 @@ export const TrackMessageError = {
 	TRACK_TYPE_NOT_FOUND: 'Track type not found',
 	TRACK_ORIGIN_TYPE_NOT_FOUND: 'Track origin type not found',
 	RELEASE_NOT_FOUND: 'Release not found',
+	PRICE_TIER_NOT_FOUND: 'Price tier not found',
 };

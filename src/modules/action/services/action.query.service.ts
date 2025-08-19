@@ -92,12 +92,54 @@ export class ActionQueryService {
 		}
 	}
 
+	async findOneWithCountRelation(id: string) {
+		const query = this.actionRepo.createQueryBuilder('action');
+
+		// virtual count dsp_actions
+		query.addSelect((subQuery) => {
+			return subQuery
+				.select('COUNT(dsp_action.id)')
+				.from('dsp_action', 'dsp_action')
+				.where('dsp_action.action_id = action.id');
+		}, 'dsp_action_count');
+
+		query.where('action.id = :id', { id });
+
+		const dataFromDb: {
+			raw: {
+				action_id: string;
+				dsp_action_count: string;
+			}[];
+			entities: Action[];
+		} = await query.getRawAndEntities();
+
+		const actions = this.assigneeVirtualColumn(dataFromDb);
+		return actions[0];
+	}
+
+	private assigneeVirtualColumn(dataFromDb: {
+		raw: { action_id: string; dsp_action_count: string }[];
+		entities: Action[];
+	}) {
+		return dataFromDb.entities.map((entity) => {
+			const dataRaw = dataFromDb.raw.find(
+				(item) => item.action_id === entity.id,
+			);
+
+			entity.dspActionCount = Number(dataRaw?.dsp_action_count);
+			return entity;
+		});
+	}
+
 	validateDelete(action: Action) {
-		if (!action) {
+		if ((action.dspActionCount ?? 0) > 0) {
 			throw new ResponseError({
-				message: ActionMessageError.NOT_FOUND,
-				messageCode: ActionMessageCodeError.NOT_FOUND,
-				statusCode: 404,
+				message:
+					ActionMessageError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS,
+				messageCode:
+					ActionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS,
+				messageWarning: `${ActionMessageError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS}: ${action.id}`,
+				statusCode: 400,
 			});
 		}
 	}
