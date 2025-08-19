@@ -10,16 +10,17 @@ import {
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderGenre } from '../enum/genre.enum';
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateGenreDto {
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
 
 	@ApiPropertyOptional({
@@ -46,14 +47,14 @@ export class CreateGenreDto {
 export class UpdateGenreDto extends PartialType(CreateGenreDto) {
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 
 	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
 }
 

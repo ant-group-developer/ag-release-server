@@ -7,22 +7,23 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME, DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
 export class CreateRoleDto {
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(10)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	color: string;
 
 	@IsString()
 	@IsOptional()
-	@MaxLength(1000)
+	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
 
 	@IsNotEmpty()
@@ -36,7 +37,7 @@ export class UpdateRoleDto {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name?: string;
 
 	@ValidateIf((_, value) => value !== undefined)
@@ -47,7 +48,7 @@ export class UpdateRoleDto {
 
 	@IsString()
 	@IsOptional()
-	@MaxLength(1000)
+	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
 
 	@IsArray()
@@ -57,7 +58,7 @@ export class UpdateRoleDto {
 }
 
 // query
-export class GetListRole extends BaseQueryDto {}
+export class GetListRole extends BaseQueryDto { }
 
 // delete
 export class BulkDeleteRoleDto {

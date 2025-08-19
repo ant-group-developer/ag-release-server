@@ -1,4 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	IsArray,
@@ -7,21 +8,34 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderDsp } from '../enum/dsp.enum';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+
+class CreateDspActionDto {
+	@IsUUID()
+	@IsNotEmpty()
+	actionId: string;
+
+	@IsBoolean()
+	@IsOptional()
+	isDefault: boolean = false;
+}
 
 export class CreateDspDto {
 	@ApiProperty({
 		description: 'Name of the DSP (Digital Service Provider)',
-		maxLength: 100,
+		maxLength: DEFAULT_LENGTH_NAME,
 		example: 'Spotify',
 	})
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
@@ -52,12 +66,32 @@ export class CreateDspDto {
 	@IsString({ each: true })
 	@MaxLength(100, { each: true })
 	formatLinks: string[];
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => CreateDspActionDto)
+	dspActions?: CreateDspActionDto[];
+}
+
+class UpdateDspActionDto {
+	@IsUUID()
+	@IsOptional()
+	id?: string;
+
+	@IsUUID()
+	@IsNotEmpty()
+	actionId: string;
+
+	@IsBoolean()
+	@IsOptional()
+	isDefault: boolean = false;
 }
 
 export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
@@ -69,6 +103,12 @@ export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@IsString({ each: true })
 	@MaxLength(100, { each: true })
 	formatLinks?: string[];
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => UpdateDspActionDto)
+	dspActions?: UpdateDspActionDto[];
 }
 
 export class QueryGetListDspDto extends BaseQueryDto {

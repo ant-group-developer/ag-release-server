@@ -21,7 +21,7 @@ export const DspMessageCodeError = {
 
 export const DspMessageError = {
 	DUPLICATE_NAME_DSP: 'Duplicate DSP name',
-	NOT_FOUND: 'Not found',
+	NOT_FOUND: 'Dsp not found',
 	CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS:
 		'Cannot delete this DSP because it is linked to organizations.',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:

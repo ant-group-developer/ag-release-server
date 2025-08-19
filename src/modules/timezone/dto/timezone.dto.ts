@@ -9,11 +9,12 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldTimezoneArtist } from '../enum/timezone.enum';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateTimezoneDto {
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@IsNotEmpty()
@@ -30,7 +31,7 @@ export class UpdateTimezoneDto extends PartialType(CreateTimezoneDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsNotEmpty()
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name?: string;
 
 	@ValidateIf((_, value) => value !== undefined)

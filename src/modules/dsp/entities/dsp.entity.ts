@@ -1,14 +1,21 @@
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('dsps')
 export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
-	@Column({ name: 'name', type: 'varchar', unique: true, length: 100 })
+	@Column({
+		name: 'name',
+		type: 'varchar',
+		unique: true,
+		length: DEFAULT_LENGTH_NAME,
+	})
 	name: string;
 
 	@Column({
@@ -48,6 +55,9 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 
 	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.dsp)
 	artistProfiles: ArtistProfile[];
+
+	@OneToMany(() => DspAction, (dspAction) => dspAction.dsp)
+	dspActions: DspAction[] | [];
 
 	// count relation
 	organizationDspsCount?: number;

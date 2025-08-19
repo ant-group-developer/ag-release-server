@@ -244,4 +244,12 @@ export class BucketService {
 		);
 		await this.bucketGcsService.deletePublicFile(key);
 	}
+
+	async deletePublicFileSafe(urlPublic: string) {
+		return await this.deletePublicFile(urlPublic).catch((error) => {
+			const messageWarning = error?.response?.message;
+			this.logger.error(messageWarning);
+			return messageWarning ?? 'Unknown error';
+		});
+	}
 }

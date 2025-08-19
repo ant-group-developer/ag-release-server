@@ -31,23 +31,12 @@ export class DspController {
 		status: 409,
 		description: DspMessageError.DUPLICATE_NAME_DSP,
 	})
-	async create(
-		@Body() createDspDto: CreateDspDto,
-	): Promise<ResponseSuccess<Dsp>> {
-		const result = await this.dspService.create(createDspDto);
+	async create(@Body() createDspDto: CreateDspDto) {
+		const result = await this.dspService.handleCreate(createDspDto);
 		return new ResponseSuccess({
-			data: result,
+			...result,
 			messageCode: DspMessageCodeSuccess.CREATE,
 		});
-	}
-
-	@Get(':id')
-	@ApiOperation({ summary: 'Get a DSP by ID' })
-	@ApiResponse({ status: 200, description: 'Successfully retrieved DSP' })
-	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
-		const result = await this.dspService.findOne(id);
-		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
@@ -60,6 +49,31 @@ export class DspController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('with-actions')
+	@ApiOperation({ summary: 'Get a list of DSPs' })
+	@ApiResponse({ status: 200, description: 'List of DSPs' })
+	async getListWithActions(
+		@Query() query: QueryGetListDspDto,
+	): Promise<ResponseSuccess<PageDto<Dsp>>> {
+		const result = await this.dspService.getListWithActions(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	@ApiOperation({ summary: 'Get a DSP by ID' })
+	@ApiResponse({ status: 200, description: 'Successfully retrieved DSP' })
+	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
+		const result = await this.dspService.findOne(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/dsp-actions')
+	async getListActionsOfDsp(@Param('id') id: string) {
+		const result = await this.dspService.getListActionsOfDsp(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Put(':id')
 	@ApiOperation({ summary: 'Update a DSP by ID' })
 	@ApiResponse({ status: 200, description: DspMessageSuccess.UPDATE })
@@ -68,23 +82,27 @@ export class DspController {
 		description: DspMessageError.DUPLICATE_NAME_DSP,
 	})
 	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
-	async update(
-		@Param('id') id: string,
-		@Body() updateDspDto: UpdateDspDto,
-	): Promise<ResponseSuccess<Dsp>> {
-		const result = await this.dspService.update(id, updateDspDto);
+	async handleUpdate(@Param('id') id: string, @Body() data: UpdateDspDto) {
+		const result = await this.dspService.handleUpdate({ dspId: id, data });
 		return new ResponseSuccess({
-			data: result,
+			...result,
 			messageCode: DspMessageCodeSuccess.UPDATE,
 		});
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a DSP by ID' })
-	@ApiResponse({ status: 200, description: DspMessageSuccess.DELETE })
-	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
-	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.dspService.delete(id);
+	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
+		await this.dspService.handleDelete(id);
+		return new ResponseSuccess({
+			messageCode: DspMessageCodeSuccess.DELETE,
+		});
+	}
+
+	@Delete(':id/dsp-actions/:dspActionId')
+	async deleteDspAction(
+		@Param('dspActionId') dspActionId: string,
+	): Promise<ResponseSuccess<void>> {
+		await this.dspService.deleteDspAction(dspActionId);
 		return new ResponseSuccess({
 			messageCode: DspMessageCodeSuccess.DELETE,
 		});

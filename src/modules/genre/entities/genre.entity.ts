@@ -1,3 +1,4 @@
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -7,10 +8,10 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('genres')
 export class Genre extends BaseUserTrackedCustomIDEntity {
-	@Column({ type: 'varchar', length: 100, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	name: string;
 
-	@Column({ type: 'varchar', length: 50, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
 	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })

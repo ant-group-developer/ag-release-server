@@ -16,7 +16,75 @@ export class DspQueryService {
 		private readonly dspRepo: Repository<Dsp>,
 	) {}
 
-	createQueryGetList(query: QueryGetListDspDto) {
+	async findOne(id: string): Promise<Dsp> {
+		const query = this.createQueryFindOne(id);
+
+		const dsp = await query.getOne();
+
+		if (!dsp) {
+			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
+		}
+
+		return dsp;
+	}
+
+	async getList(query: QueryGetListDspDto) {
+		const queryGetList = this.createQueryGetList(query);
+		return await queryGetList.getManyAndCount();
+	}
+
+	async getListWithActions(query: QueryGetListDspDto) {
+		const queryGetListWithActions =
+			this.createQueryGetListWithActions(query);
+		return await queryGetListWithActions.getManyAndCount();
+	}
+
+	private createQueryFindOne(id: string) {
+		const qb = this.dspRepo
+			.createQueryBuilder('dsp')
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
+
+		qb.where('dsp.id = :id', { id });
+
+		qb.addSelect([
+			'dspAction.id',
+			'dspAction.dspId',
+			'dspAction.actionId',
+			'dspAction.isDefault',
+
+			'action.id',
+			'action.name',
+			'action.code',
+			'action.note',
+		]);
+
+		return qb;
+	}
+
+	private createQueryGetListWithActions(query: QueryGetListDspDto) {
+		const queryGetList = this.createQueryGetList(query);
+
+		const queryGetListWithActions = queryGetList.clone();
+
+		queryGetListWithActions
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
+
+		queryGetListWithActions
+			.select(['dsp.id', 'dsp.name'])
+			.addSelect(['dspAction.id', 'dspAction.isDefault'])
+			.addSelect([
+				'action.id',
+				'action.code',
+				'action.name',
+				'action.note',
+			]);
+
+		return queryGetListWithActions;
+	}
+
+	private createQueryGetList(query: QueryGetListDspDto) {
 		const {
 			keyword,
 
@@ -75,6 +143,22 @@ export class DspQueryService {
 				'dsp.organizationDsps',
 			)
 			.loadRelationCountAndMap('dsp.releaseDspsCount', 'dsp.releaseDsps');
+
+		queryBuilder
+			.leftJoin('dsp.dspActions', 'dspAction')
+			.leftJoin('dspAction.action', 'action');
+
+		queryBuilder.addSelect([
+			'dspAction.id',
+			'dspAction.dspId',
+			'dspAction.actionId',
+			'dspAction.isDefault',
+
+			'action.id',
+			'action.name',
+			'action.code',
+			'action.note',
+		]);
 
 		return await queryBuilder.getOne();
 	}

@@ -12,21 +12,22 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldOrderPermission } from '../enums/permission.enum';
+import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME, DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
 
 export class CreatePermissionDto {
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	@IsNotEmpty()
 	code: string;
 
 	@IsString()
 	@IsOptional()
-	@MaxLength(1000)
+	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
 }
 
@@ -40,13 +41,13 @@ export class BulkCreatePermissionDto {
 export class UpdatePermissionDto extends PartialType(CreatePermissionDto) {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_CODE)
 	@IsNotEmpty()
 	code: string;
 }

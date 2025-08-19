@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './common/config/env.validation.schema';
+import { ActionModule } from './modules/action/action.module';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistProfileModule } from './modules/artist-profile/artist-profile.module';
@@ -18,6 +19,7 @@ import { BucketModule } from './modules/bucket/bucket.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { DatabaseModule } from './modules/database/database.module';
+import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
 import { LabelModule } from './modules/label/label.module';
@@ -98,6 +100,9 @@ import { UserModule } from './modules/user/user.module';
 		UserPermissionModule,
 		PermissionModule,
 		RoleModule,
+
+		ActionModule,
+		DspActionModule,
 
 		// ScheduleModule,
 	],
