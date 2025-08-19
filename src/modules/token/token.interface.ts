@@ -1,4 +1,4 @@
-import { UserType } from '../user/enum/user.enum';
+import { TenantUserType, UserType } from '../user/enum/user.enum';
 
 export interface JwtPayload {
 	sub: string;
@@ -13,4 +13,6 @@ export interface UserFromRequest extends JwtPayload {
 	email: string;
 	type: UserType;
 	isActive: boolean;
+	tenantType: TenantUserType;
+	permission: string[];
 }

@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { TenantService } from '../tenant/tenant.service';
 import { JwtPayload } from '../token/token.interface';
 import { TokenService } from '../token/token.service';
@@ -9,7 +10,7 @@ import { UserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import { UserService } from '../user/services/user.service';
 import { SiginDto } from './auth.dto';
-import { AuthMessages } from './auth.messages';
+import { AuthMessages } from './constants/messages';
 import { RefreshTokensService } from './refresh-tokens.service';
 
 @Injectable()
@@ -49,8 +50,7 @@ export class AuthService {
 		this.userService.checkUserActive(user.isActive);
 
 		const valid = await verify(user.password, body.password);
-		if (!valid)
-			throw new UnauthorizedException(AuthMessages.INVALID_CREDENTIALS);
+		if (!valid) throw new ResponseError(AuthMessages.INVALID_CREDENTIAL);
 
 		const payload = {
 			sub: user.id,
@@ -75,15 +75,11 @@ export class AuthService {
 		try {
 			payload = await this.tokens.verify<JwtPayload>(oldRefreshToken);
 		} catch {
-			throw new UnauthorizedException(
-				AuthMessages.INVALID_OR_EXPIRED_TOKEN,
-			);
+			throw new ResponseError(AuthMessages.SESSION_EXPIRED);
 		}
 
 		if (payload.tokenType !== 'refresh' || !payload.jti || !payload.sub) {
-			throw new UnauthorizedException(
-				AuthMessages.INVALID_OR_EXPIRED_TOKEN,
-			);
+			throw new ResponseError(AuthMessages.INVALID_TOKEN_TYPE);
 		}
 
 		// Check DB record

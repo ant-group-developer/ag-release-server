@@ -135,32 +135,32 @@ export class PageDto<T> {
 	}
 }
 
-export class ResponseError extends HttpException {
+export class ResponseError<T = any> extends HttpException {
 	statusCode: number;
 	message: string;
 	messageCode: string;
 	messageWarning: string;
-	// data?: T;
+	data?: T;
 
 	constructor({
 		statusCode = ERROR_STATUS_CODE_DEFAULT,
 		message = ERROR_MESSAGE_DEFAULT,
 		messageCode = ERROR_MESSAGE_CODE_DEFAULT,
-		messageWarning = WARNING_MESSAGE_DEFAULT,
-		// data,
+		messageWarning,
+		data,
 	}: {
 		statusCode?: number;
 		message?: string;
 		messageCode?: string;
 		messageWarning?: string;
-		// data?: T;
+		data?: T;
 	}) {
 		const response = {
 			statusCode,
 			message,
 			messageCode,
 			messageWarning,
-			// data,
+			data,
 		};
 
 		super(response, statusCode);

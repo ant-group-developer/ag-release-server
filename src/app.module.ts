@@ -39,7 +39,7 @@ import { TrackLocalizeModule } from './modules/track-localize/track-localize.mod
 import { TrackOriginTypeModule } from './modules/track-origin-type/track-origin-type.module';
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
-import { UserPermissionModule } from './modules/user-permission/user-permission.module';
+import { UserRoleModule } from './modules/user-role/user-role.module';
 import { UserModule } from './modules/user/user.module';
 
 @Module({
@@ -87,7 +87,6 @@ import { UserModule } from './modules/user/user.module';
 		ArtistRoleModule,
 		ArtistProfileModule,
 
-		UserPermissionModule,
 		BucketModule,
 		TimezoneModule,
 
@@ -97,7 +96,7 @@ import { UserModule } from './modules/user/user.module';
 		AuthModule,
 		TokenModule,
 
-		UserPermissionModule,
+		UserRoleModule,
 		PermissionModule,
 		RoleModule,
 

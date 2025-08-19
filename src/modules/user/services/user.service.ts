@@ -9,7 +9,7 @@ import { UserMessages } from '../constants/messages';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
 import { UserType } from '../enum/user.enum';
-import { getAvatarUrl } from '../user.util';
+import { getAvatarUrl } from '../utils/user-ava.util';
 
 @Injectable()
 export class UserService {

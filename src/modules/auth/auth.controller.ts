@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { RefreshDto, SiginDto, SwitchTenantDto } from './auth.dto';
 import { AuthService } from './auth.service';
-import { Public } from './decorators/public.decorator';
+import { PublicRoute } from './decorators/auth.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -23,7 +23,7 @@ export class AuthController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Public()
+	@PublicRoute()
 	@Post('login')
 	async login(@Body() body: SiginDto) {
 		const data = await this.auth.login(body);
@@ -36,14 +36,14 @@ export class AuthController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Public()
+	@PublicRoute()
 	@Post('refresh')
 	async refresh(@Body() body: RefreshDto) {
 		const data = await this.auth.refresh(body.refreshToken);
 		return new ResponseSuccess({ data });
 	}
 
-	@Public()
+	@PublicRoute()
 	@Post('logout')
 	async logout(@Body() body: RefreshDto) {
 		return this.auth.logout(body.refreshToken);

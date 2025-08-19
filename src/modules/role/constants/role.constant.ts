@@ -25,3 +25,11 @@ export const RoleMessageError = {
 		'Cannot delete this role because it is linked to permissions.',
 	PERMISSION_NOT_FOUND: 'Permission not found',
 };
+
+export const RoleMessages = {
+	NOT_FOUND: {
+		statusCode: 404,
+		message: 'No role was found with the provided information',
+		messageCode: 'role.message.error.notFound',
+	},
+};

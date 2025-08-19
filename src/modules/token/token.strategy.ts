@@ -1,8 +1,13 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, SecretOrKeyProvider, Strategy } from 'passport-jwt';
+import { ResponseError } from 'src/common/dtos/response.dto';
+import { AuthMessages } from '../auth/constants/messages';
+import { UserRoleService } from '../user-role/user-role.service';
+import { UserMessages } from '../user/constants/messages';
+import { UserTypeService } from '../user/services/user-type.service';
 import { UserService } from '../user/services/user.service';
 import { JwtPayload } from './token.interface';
 
@@ -12,6 +17,8 @@ export type PublicKeysMap = Record<string, string>;
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 	constructor(
 		private readonly userService: UserService,
+		private readonly userRoleService: UserRoleService,
+		private readonly userTypeService: UserTypeService,
 		private readonly cfg: ConfigService,
 		@Inject('PUBLIC_KEYS') publicKeys: PublicKeysMap, // capture as local
 	) {
@@ -57,22 +64,34 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
 	async validate(claims: JwtPayload) {
 		if (claims.tokenType && claims.tokenType !== 'access') {
-			throw new UnauthorizedException('Wrong token type');
+			throw new ResponseError(AuthMessages.INVALID_TOKEN_TYPE);
 		}
 
 		const user = await this.userService.findOne(claims.sub, {
 			select: ['type', 'isActive', 'email', 'name'],
 		});
-		if (!user) throw new UnauthorizedException('User not found');
+		if (!user) throw new ResponseError(UserMessages.NOT_FOUND);
 
 		if (!user.isActive) {
-			throw new UnauthorizedException('User disabled');
+			throw new ResponseError(UserMessages.BLOCKED);
 		}
+
+		const permission = await this.userRoleService.getPermission(
+			claims.tenantId,
+			user.id,
+		);
+
+		const tenantType = await this.userTypeService.getTenantType(
+			claims.tenantId,
+			user.id,
+		);
 
 		// merge claims + safe DB fields
 		return {
 			...claims, // sub, permissions, tenantId, jti
 			...user, // id/email/name/avatar/status
+			permission: permission.map((item) => item.code),
+			tenantType,
 		};
 	}
 }

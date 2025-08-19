@@ -4,6 +4,11 @@ export const UserMessages = {
 		message: 'No user was found with the provided information',
 		messageCode: 'user.message.error.notFound',
 	},
+	BLOCKED: {
+		statusCode: 403,
+		message: 'User blocked',
+		messageCode: 'user.message.error.blocked',
+	},
 	EMAIL: {
 		CONFLICT: {
 			statusCode: 409,

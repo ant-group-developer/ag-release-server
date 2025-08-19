@@ -1,93 +1,121 @@
-import {
-	BadRequestException,
-	CanActivate,
-	ExecutionContext,
-	ForbiddenException,
-	Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import {
-	IS_PUBLIC_KEY,
+	checkIsSystemAdmin,
+	checkIsTenantOwner,
+	checkIsTenantOwnerOrAdmin,
+} from 'src/modules/user/utils/user-type.util';
+import {
+	AUTH_PERMISSIONS_KEY,
+	AUTH_PUBLIC_KEY,
+	AUTH_SYSTEM_ADMIN_ONLY,
+	AUTH_TENANT_OWNER_ONLY_KEY,
+	AUTH_TENANT_OWNER_OR_ADMIN_ONLY_KEY,
 	Permission,
-	PERMISSIONS_KEY,
-	TENANT_OWNER_ONLY_KEY,
-} from '../auth.constants';
-// Implement this in your tenants module and export the service:
-
-function extractTenantId(req: Request): string | undefined {
-	const p = req.params as any,
-		q = req.query as any,
-		b = req.body,
-		h = req.headers as any;
-	return (
-		p?.tenantId ??
-		p?.tenant ??
-		q?.tenantId ??
-		q?.tenant ??
-		b?.tenantId ??
-		b?.tenant ??
-		h?.['x-tenant-id']
-	);
-}
+} from '../constants/key';
+import {
+	AuthMessages,
+	buildInsufficientPermissionsMessage,
+} from '../constants/messages';
 
 @Injectable()
 export class PolicyGuard implements CanActivate {
-	constructor(
-		private readonly reflector: Reflector,
-		// private readonly tenants: TenantsService, // ensure it's provided by TenantsModule
-	) {}
+	constructor(private readonly reflector: Reflector) {}
 
-	async canActivate(context: ExecutionContext): Promise<boolean> {
+	canActivate(context: ExecutionContext): boolean {
+		const handler = context.getHandler();
+		const clazz = context.getClass();
+
+		/** 1) Public route */
 		const isPublic = this.reflector.getAllAndOverride<boolean>(
-			IS_PUBLIC_KEY,
-			[context.getHandler(), context.getClass()],
+			AUTH_PUBLIC_KEY,
+			[handler, clazz],
 		);
 		if (isPublic) return true;
 
+		/** 2) User presence */
 		const req = context.switchToHttp().getRequest<Request>();
-		const user = req.user as
-			| { sub: string; permissions?: Permission[] | Permission }
-			| undefined;
-		if (!user) throw new ForbiddenException('Authentication required');
+		const user = req.user;
+		if (!user) throw new ResponseError(AuthMessages.UNAUTHORIZED);
 
+		const isSysAdmin = checkIsSystemAdmin(user.type);
+
+		/** 3) System admins bypass remaining checks */
+		if (isSysAdmin) return true;
+
+		/** 4) SystemAdminOnly — strictly enforce */
+		const systemAdminOnly =
+			this.reflector.getAllAndOverride<boolean>(AUTH_SYSTEM_ADMIN_ONLY, [
+				handler,
+				clazz,
+			]) ?? false;
+
+		if (systemAdminOnly) {
+			throw new ResponseError(AuthMessages.SYSTEM_ADMIN_ONLY);
+		}
+
+		// Require tenantId because get user's permissions by tenantId and userId
+		if (!user.tenantId) {
+			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
+		}
+
+		/** 5) Permissions (ANY-of) */
 		const requiredPerms =
-			this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, [
-				context.getHandler(),
-				context.getClass(),
-			]) || [];
-
-		const tenantOwnerOnly =
-			this.reflector.getAllAndOverride<boolean>(TENANT_OWNER_ONLY_KEY, [
-				context.getHandler(),
-				context.getClass(),
-			]) || false;
-
-		if (!requiredPerms.length && !tenantOwnerOnly) return true;
-
-		const userPerms = new Set(
-			(Array.isArray(user.permissions)
-				? user.permissions
-				: [user.permissions]
-			).filter(Boolean) as string[],
-		);
+			this.reflector.getAllAndOverride<Permission[]>(
+				AUTH_PERMISSIONS_KEY,
+				[handler, clazz],
+			) ?? [];
 
 		if (requiredPerms.length) {
-			const ok = requiredPerms.some((p) => userPerms.has(p)); // ANY-of
-			if (!ok)
-				throw new ForbiddenException('Missing required permission');
+			const userPerms = new Set<string>(
+				Array.isArray(user.permission) ? user.permission : [],
+			);
+			const hasAny = requiredPerms.some((p) => userPerms.has(p));
+			if (!hasAny) {
+				throw new ResponseError(
+					buildInsufficientPermissionsMessage(requiredPerms),
+				);
+			}
+		}
+
+		/** 6) Tenant gates */
+		const tenantOwnerOnly =
+			this.reflector.getAllAndOverride<boolean>(
+				AUTH_TENANT_OWNER_ONLY_KEY,
+				[handler, clazz],
+			) ?? false;
+
+		const tenantOwnerOrAdminOnly =
+			this.reflector.getAllAndOverride<boolean>(
+				AUTH_TENANT_OWNER_OR_ADMIN_ONLY_KEY,
+				[handler, clazz],
+			) ?? false;
+
+		if (tenantOwnerOrAdminOnly) {
+			const ok = checkIsTenantOwnerOrAdmin(user.tenantType);
+			if (!ok) {
+				throw new ResponseError(
+					AuthMessages.TENANT_OWNER_OR_ADMIN_ONLY,
+				);
+			}
 		}
 
 		if (tenantOwnerOnly) {
-			if (userPerms.has('admin')) return true; // admin bypass
-			const tenantId = extractTenantId(req);
-			if (!tenantId) throw new BadRequestException('Missing tenantId');
-			// const isOwner = await this.tenants.isOwner(
-			// 	user.sub,
-			// 	String(tenantId),
-			// );
-			const isOwner = true;
-			if (!isOwner) throw new ForbiddenException('Tenant owner required');
+			const ok = checkIsTenantOwner(user.tenantType);
+			if (!ok) {
+				throw new ResponseError(AuthMessages.TENANT_OWNER_ONLY);
+			}
+		}
+
+		if (tenantOwnerOrAdminOnly) {
+			const ok = checkIsTenantOwnerOrAdmin(user.tenantType);
+			if (!ok) {
+				throw new ResponseError(
+					AuthMessages.TENANT_OWNER_OR_ADMIN_ONLY,
+				);
+			}
 		}
 
 		return true;

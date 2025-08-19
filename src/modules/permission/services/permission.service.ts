@@ -75,17 +75,6 @@ export class PermissionService {
 		return permission;
 	}
 
-	async findOneWithCountRelation(id: string) {
-		const permission =
-			await this.permissionQueryService.findOneWithCountRelation(id);
-
-		if (!permission) {
-			throw new ResponseError({ message: 'Permission not found' });
-		}
-
-		return permission;
-	}
-
 	async getList(
 		query: QueryGetListPermissionDto,
 	): Promise<PageDto<Permission>> {
@@ -101,6 +90,12 @@ export class PermissionService {
 				pageSize,
 				totalItems,
 			},
+		});
+	}
+
+	async getAll() {
+		return this.permissionRepo.find({
+			select: ['id', 'name', 'code', 'note'],
 		});
 	}
 
@@ -146,8 +141,6 @@ export class PermissionService {
 	}
 
 	async delete(id: string): Promise<void> {
-		const permission = await this.findOneWithCountRelation(id);
-		this.permissionQueryService.validateDelete(permission);
 		await this.permissionRepo.delete(id);
 	}
 }

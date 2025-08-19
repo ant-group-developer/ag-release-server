@@ -1,7 +1,10 @@
-import { DEFAULT_LENGTH_CODE, DEFAULT_LENGTH_NAME, DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+	DEFAULT_LENGTH_NOTE,
+} from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { RolePermission } from 'src/modules/role/entities/role-permission.entity';
-import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -15,13 +18,6 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
 	note: string | null;
-
-	// relation
-	@OneToMany(
-		() => UserPermission,
-		(userPermission) => userPermission.permission,
-	)
-	userPermissions: UserPermission[];
 
 	@OneToMany(
 		() => RolePermission,

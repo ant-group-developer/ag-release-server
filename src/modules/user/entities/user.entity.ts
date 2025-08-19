@@ -1,5 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
+import { UserRole } from 'src/modules/user-role/user-role.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { UserType } from '../enum/user.enum';
 import { TenantUser } from './tenant-user.entity';
@@ -42,8 +42,8 @@ export class User extends BaseUUIDEntity {
 	@Column({ name: 'logins_count', default: 0 })
 	loginsCount: number;
 
-	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
-	userPermissions: UserPermission[];
+	@OneToMany(() => UserRole, (userRole) => userRole.user)
+	userRoles: UserRole[];
 
 	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.user)
 	tenantUser: TenantUser[];

@@ -15,22 +15,25 @@ export class TenantUserService {
 		private readonly userService: UserService,
 	) {}
 
-	async checkExisted(tenantId: string, userId: string) {
-		const existData = await this.tenantUserRepository.findOne({
+	async findOne(tenantId: string, userId: string) {
+		return this.tenantUserRepository.findOne({
 			where: {
 				tenantId,
 				userId,
 			},
 		});
+	}
+
+	async checkExisted(tenantId: string, userId: string) {
+		const existData = await this.findOne(tenantId, userId);
 		if (existData) {
 			throw new ResponseError(UserMessages.TENANT.CONFLICT);
 		}
+		return existData;
 	}
 
 	async checkMembership(tenantId: string, userId: string) {
-		const tenantUser = await this.tenantUserRepository.findOne({
-			where: { tenantId, userId },
-		});
+		const tenantUser = await this.findOne(tenantId, userId);
 		if (!tenantUser) {
 			throw new ResponseError(UserMessages.TENANT.FORBIDDEN);
 		}

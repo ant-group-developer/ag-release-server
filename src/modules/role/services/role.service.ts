@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import difference from 'lodash/difference';
 import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { RoleMessages } from '../constants/role.constant';
 import {
 	BulkDeleteRoleDto,
 	CreateRoleDto,
@@ -110,6 +112,12 @@ export class RoleService {
 		});
 	}
 
+	async getAll() {
+		return this.roleRepo.find({
+			select: ['id', 'name', 'code', 'note'],
+		});
+	}
+
 	// update
 	async handleUpdate(id: string, data: UpdateRoleDto) {
 		const { permissionIds, ...rest } = data;
@@ -184,5 +192,23 @@ export class RoleService {
 
 	async deleteRolePermission(rolePermissionId: string): Promise<void> {
 		await this.rolePermissionRepo.delete(rolePermissionId);
+	}
+
+	async validateExisted(roleIds: string[]) {
+		const listRole = await this.roleRepo.find({
+			where: {
+				id: In(roleIds),
+			},
+			select: ['id'],
+		});
+		const data = listRole.map((item) => item.id);
+
+		if (data.length !== roleIds.length) {
+			const between = difference(roleIds, data);
+			throw new ResponseError({
+				...RoleMessages.NOT_FOUND,
+				data: between,
+			});
+		}
 	}
 }

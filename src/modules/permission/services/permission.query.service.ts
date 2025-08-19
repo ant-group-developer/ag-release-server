@@ -16,39 +16,6 @@ export class PermissionQueryService {
 		private readonly permissionRepo: Repository<Permission>,
 	) {}
 
-	async findOneWithCountRelation(id: string) {
-		const query = this.permissionRepo.createQueryBuilder('permission');
-
-		// virtual
-		query.addSelect((subQuery) => {
-			return subQuery
-				.select('COUNT(user_permission.id)')
-				.from('user_permissions', 'user_permission')
-				.where('user_permission.permission_id = permission.id');
-		}, 'user_count');
-
-		query.addSelect((subQuery) => {
-			return subQuery
-				.select('COUNT(role_permission.id)')
-				.from('role_permission', 'role_permission')
-				.where('role_permission.permission_id = permission.id');
-		}, 'role_permission_count');
-
-		query.where('permission.id = :id', { id });
-
-		const dataFromDb: {
-			raw: {
-				permission_id: string;
-				user_count: string;
-				role_permission_count: string;
-			}[];
-			entities: Permission[];
-		} = await query.getRawAndEntities();
-
-		const permissions = this.assigneeVirtualColumn(dataFromDb);
-		return permissions[0];
-	}
-
 	private assigneeVirtualColumn(dataFromDb: {
 		raw: {
 			permission_id: string;
