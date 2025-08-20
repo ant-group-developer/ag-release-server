@@ -10,12 +10,12 @@ export const ERROR_MESSAGE_CODE_DEFAULT = 'error';
 
 export const FILED_ORDER_DEFAULT = 'name';
 
-export const COMMENT_FOR_NULLABLE = 'Nullable when status is draft';
+export const COMMENT_FOR_NULLABLE_DRAFT = 'Nullable when status is draft';
 
 export const DEFAULT_TIME_SYNC = '04:00';
 
 export const DEFAULT_CHUNK_DURATION = 10;
 
-export const DEFAULT_LENGTH_NAME = 100;
-export const DEFAULT_LENGTH_CODE = 100;
+export const DEFAULT_LENGTH_NAME = 200;
+export const DEFAULT_LENGTH_CODE = 200;
 export const DEFAULT_LENGTH_NOTE = 500;

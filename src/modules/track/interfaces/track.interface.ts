@@ -51,6 +51,7 @@ export interface ICreateTrackDraft {
 	pLineOwner?: string | null;
 	primaryGenreId?: string | null;
 	subGenreId?: string | null;
+	priceTierId?: string | null;
 }
 
 interface ITrackLanguage {

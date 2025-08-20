@@ -7,9 +7,9 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { FieldTimezoneArtist } from '../enum/timezone.enum';
-import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 
 export class CreateTimezoneDto {
 	@IsNotEmpty()

@@ -124,7 +124,7 @@ export class DspService {
 			await this.dspQueryService.getListWithActions(query);
 
 		return new PageDto({
-			items: dsps,
+			items: dsps.filter((item) => item.dspActions.length > 0),
 			metadata: {
 				currentPage: page,
 				pageSize,

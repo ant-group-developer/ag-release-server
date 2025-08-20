@@ -1,4 +1,4 @@
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
@@ -12,7 +12,7 @@ export class ReleaseTerritory extends BaseUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: true,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	distributeWorldwide: boolean | null;
@@ -20,7 +20,7 @@ export class ReleaseTerritory extends BaseUUIDEntity {
 	@Column({
 		type: 'enum',
 		enum: DistributionType,
-		comment: COMMENT_FOR_NULLABLE,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	distributionType: DistributionType | null;

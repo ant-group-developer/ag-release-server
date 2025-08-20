@@ -18,6 +18,7 @@ import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
+import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
@@ -25,6 +26,7 @@ import { GenreModule } from './modules/genre/genre.module';
 import { LabelModule } from './modules/label/label.module';
 import { LanguageModule } from './modules/language/language.module';
 import { PermissionModule } from './modules/permission/permission.module';
+import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
@@ -102,6 +104,9 @@ import { UserModule } from './modules/user/user.module';
 
 		ActionModule,
 		DspActionModule,
+
+		CurrencyModule,
+		PriceTierModule,
 
 		// ScheduleModule,
 	],

@@ -1,4 +1,4 @@
-import { COMMENT_FOR_NULLABLE } from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -14,7 +14,7 @@ export class AudioFile extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
-		comment: 'Mbps' + ' & ' + COMMENT_FOR_NULLABLE,
+		comment: 'Mbps' + ' & ' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 		length: 10,
 	})
@@ -22,7 +22,7 @@ export class AudioFile extends BaseUUIDEntity {
 
 	@Column({
 		type: 'smallint',
-		comment: ' & ' + COMMENT_FOR_NULLABLE,
+		comment: ' & ' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	bitDepth: number | null;
@@ -35,12 +35,16 @@ export class AudioFile extends BaseUUIDEntity {
 		comment:
 			'This is where the track will begin playing when listeners are previewing the sample' +
 			' & ' +
-			COMMENT_FOR_NULLABLE,
+			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
 	hook: number | null;
 
-	@Column({ type: 'int', comment: COMMENT_FOR_NULLABLE, nullable: true })
+	@Column({
+		type: 'int',
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		nullable: true,
+	})
 	preview: number | null;
 
 	@Column({ type: 'varchar' })

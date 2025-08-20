@@ -4,8 +4,9 @@ import {
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('actions')
 export class Action extends BaseUserTrackedUUIDEntity {
@@ -22,8 +23,6 @@ export class Action extends BaseUserTrackedUUIDEntity {
 	})
 	note: string | null;
 
-	// relation
-
 	//user
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
@@ -32,4 +31,11 @@ export class Action extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	// relation
+	@OneToMany(() => DspAction, (dspAction) => dspAction.action)
+	dspActions: DspAction[];
+
+	// virtual
+	dspActionCount?: number;
 }

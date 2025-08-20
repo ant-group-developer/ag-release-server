@@ -13,8 +13,6 @@ export const DspMessageSuccess = {
 export const DspMessageCodeError = {
 	DUPLICATE_NAME_DSP: 'dsp.message.error.duplicateNameDsp',
 	NOT_FOUND: 'dsp.message.error.notFound',
-	CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS:
-		'dsp.message.error.cannotDeleteBecauseLinkedOrganizations',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'dsp.message.error.cannotDeleteBecauseLinkedReleases',
 };
@@ -22,8 +20,6 @@ export const DspMessageCodeError = {
 export const DspMessageError = {
 	DUPLICATE_NAME_DSP: 'Duplicate DSP name',
 	NOT_FOUND: 'Dsp not found',
-	CANNOT_DELETE_BECAUSE_LINKED_ORGANIZATIONS:
-		'Cannot delete this DSP because it is linked to organizations.',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this DSP because it is linked to releases.',
 };

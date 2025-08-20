@@ -84,6 +84,10 @@ class CreateTrackDraftDto {
 	@ValidateNested()
 	@Type(() => CreateAudioFileDraftDto)
 	audioFileDraft: CreateAudioFileDraftDto;
+
+	@IsOptional()
+	@IsUUID()
+	priceTierId?: string | null;
 }
 
 export class BulkCreateTrackDraft {
@@ -153,6 +157,10 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@IsString()
 	@MaxLength(5000)
 	lyric?: string;
+
+	@IsOptional()
+	@IsUUID()
+	priceTierId?: string;
 
 	//
 	@IsOptional()
