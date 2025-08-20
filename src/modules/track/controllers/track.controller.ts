@@ -21,25 +21,18 @@ import { TrackService } from '../services/track.service';
 export class TrackController {
 	constructor(private readonly trackService: TrackService) {}
 
-	// @Post()
-	// @ApiOperation({ summary: 'Create a new track' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: TrackMessageSuccess.CREATE,
-	// })
-	// @ApiResponse({
-	// 	status: 400,
-	// 	description: TrackMessageError.PRIMARY_GENRE_NOT_FOUND,
-	// })
-	// async create(
-	// 	@Body() createTrackDto: CreateTrackDto,
-	// ): Promise<ResponseSuccess<Track>> {
-	// 	const result = await this.trackService.create(createTrackDto);
-	// 	return new ResponseSuccess({
-	// 		data: result,
-	// 		messageCode: TrackMessageCodeSuccess.CREATE,
-	// 	});
-	// }
+	@Get()
+	@ApiOperation({ summary: 'Get a list of tracks' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of tracks',
+	})
+	async getList(
+		@Query() query: QueryGetListTrackDto,
+	): Promise<ResponseSuccess<PageDto<Track>>> {
+		const result = await this.trackService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
 
 	@Post(':id/submit')
 	async submit(
@@ -73,19 +66,6 @@ export class TrackController {
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<Track>> {
 		const result = await this.trackService.getDetailAudioFile(id);
-		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	@ApiOperation({ summary: 'Get a list of tracks' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of tracks',
-	})
-	async getList(
-		@Query() query: QueryGetListTrackDto,
-	): Promise<ResponseSuccess<PageDto<Track>>> {
-		const result = await this.trackService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 

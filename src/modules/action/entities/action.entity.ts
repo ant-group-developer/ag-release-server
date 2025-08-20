@@ -5,6 +5,7 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -35,6 +36,9 @@ export class Action extends BaseUserTrackedUUIDEntity {
 	// relation
 	@OneToMany(() => DspAction, (dspAction) => dspAction.action)
 	dspActions: DspAction[];
+
+	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.action)
+	trackPolicies?: TrackPolicy[];
 
 	// virtual
 	dspActionCount?: number;

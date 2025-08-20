@@ -8,6 +8,7 @@ import { Release } from '../release/entities/release.entity';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackOriginType } from '../track-origin-type/entities/track-origin-type.entity';
+import { TrackPolicyModule } from '../track-policy/track-policy.module';
 import { TrackType } from '../track-type/entities/track-type.entity';
 import { TrackController } from './controllers/track.controller';
 import { TrackDraftController } from './controllers/track.draft.controller';
@@ -31,6 +32,7 @@ import { TrackService } from './services/track.service';
 		TrackLanguageModule,
 		TrackArtistModule,
 		CopyrightModule,
+		TrackPolicyModule,
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [TrackService, TrackDraftService, TrackQueryService],

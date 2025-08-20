@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Param, Post, Put } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
@@ -7,7 +16,9 @@ import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
 	UpdateTrackDraftDto,
+	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
+import { QueryGetListTrackDto } from '../dto/track.dto';
 import { ITrackDraft } from '../interfaces/track.interface';
 import { TrackDraftService } from '../services/track.draft.service';
 
@@ -15,6 +26,12 @@ import { TrackDraftService } from '../services/track.draft.service';
 @Controller('tracks/draft')
 export class TrackDraftController {
 	constructor(private readonly trackDraftService: TrackDraftService) {}
+
+	@Get('policy')
+	async getListWithPolicy(@Query() query: QueryGetListTrackDto) {
+		const result = await this.trackDraftService.getListWithPolicy(query);
+		return new ResponseSuccess({ data: result });
+	}
 
 	@Post('bulk')
 	async bulkCreate(
@@ -40,12 +57,36 @@ export class TrackDraftController {
 		});
 	}
 
+	@Get(':id/trackPolicies')
+	async getTrackPolicies(@Param('id') id: string) {
+		const result = await this.trackDraftService.getTrackPolicies({
+			trackId: id,
+		});
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
 		@Body() data: UpdateTrackDraftDto,
 	): Promise<ResponseSuccess<ITrackDraft>> {
 		const result = await this.trackDraftService.update(id, data);
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackMessageCodeSuccess.UPDATE,
+		});
+	}
+
+	@Put(':id/trackPolicies/:trackPolicyId')
+	async updateTrackPolicy(
+		@Param('trackPolicyId') trackPolicyId: string,
+		@Body() data: UpdateTrackPolicyDto,
+	) {
+		const result = await this.trackDraftService.updateTrackPolicy({
+			trackPolicyId,
+			data,
+		});
+
 		return new ResponseSuccess({
 			data: result,
 			messageCode: TrackMessageCodeSuccess.UPDATE,

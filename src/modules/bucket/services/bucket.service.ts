@@ -55,16 +55,9 @@ export class BucketService {
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
-		const result: IResCreateBucket[] = [];
-
-		await Promise.all(
-			data.bucketDtos.map(async (item) => {
-				const newBucket = await this.create(item);
-				result.push(newBucket);
-			}),
+		return await Promise.all(
+			data.bucketDtos.map((item) => this.create(item)),
 		);
-
-		return result;
 	}
 
 	// folder
