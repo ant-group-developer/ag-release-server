@@ -159,7 +159,12 @@ export class TrackQueryService {
 				'trackPolicy.dspId',
 			])
 			.addSelect(['dsp.id', 'dsp.name', 'dsp.picture'])
-			.addSelect(['action.id', 'action.code', 'action.note']);
+			.addSelect([
+				'action.id',
+				'action.code',
+				'action.name',
+				'action.note',
+			]);
 
 		return qb;
 	}
