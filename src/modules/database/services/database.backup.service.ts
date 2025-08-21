@@ -14,8 +14,8 @@ import { NotificationService } from 'src/modules/notification/services/notificat
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
 import { promisify } from 'util';
-import { BackupDto } from '../dto/database.dto';
-import { Backup } from '../entities/database.entity';
+import { BackupDto, QueryGetListBackup } from '../dto/database.dto';
+import { Backup } from '../entities/database.backup.entity';
 import { StatusBackup } from '../enums/database.enum';
 
 @Injectable()
@@ -35,6 +35,9 @@ export class DatabaseBackupService implements OnModuleInit {
 	private toDrive: boolean;
 	private toGcs: boolean;
 
+	private baseUrlDrive: string;
+	private baseUrlGcs: string;
+
 	constructor(
 		@InjectRepository(Backup)
 		private readonly backupRepo: Repository<Backup>,
@@ -51,6 +54,9 @@ export class DatabaseBackupService implements OnModuleInit {
 			password: this.configService.get<string>('DB_PASSWORD')!,
 			database: this.configService.get<string>('DB_DATABASE')!,
 		};
+
+		this.baseUrlDrive = 'https://drive.google.com/file/d/';
+		this.baseUrlGcs = 'https://storage.cloud.google.com';
 	}
 
 	onModuleInit() {
@@ -77,22 +83,23 @@ export class DatabaseBackupService implements OnModuleInit {
 	private async backup(data: BackupDto) {
 		const { toDrive, toGcs } = data;
 
-		const timeStart = Date.now();
-		const result = this.backupRepo.create({
-			fileDirDrive: 'fileDirDrive',
-			fileDirGcs: 'fileDirGcs',
-			status: StatusBackup.RUNNING,
-		});
-
-		const exec = promisify(execCallback);
-
-		const filename = generateFileNameWithTimestamp(
+		const fileName = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
 			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
 
+		const timeStart = Date.now();
+		const result = this.backupRepo.create({
+			urlDrive: '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link',
+			urlGcs: `${this.baseUrlGcs}/ant-music-assets-protected/backups/2025-07-11_14-22-21_backup_ant_release.sql`,
+			status: StatusBackup.RUNNING,
+			fileName,
+		});
+
+		const exec = promisify(execCallback);
+
 		const backupDir = path.join(os.homedir(), 'backups');
-		const backupPath = path.join(backupDir, filename);
+		const backupPath = path.join(backupDir, fileName);
 
 		if (!fs.existsSync(backupDir)) {
 			fs.mkdirSync(backupDir, { recursive: true });
@@ -155,13 +162,50 @@ export class DatabaseBackupService implements OnModuleInit {
 		return await this.backupRepo.save(result);
 	}
 
-	async getList() {
-		const qb = this.backupRepo.createQueryBuilder();
+	async getList(query: QueryGetListBackup) {
+		const { page, pageSize } = query;
+
+		const qb = this.createQueryGetList(query);
 
 		const [items, totalItems] = await qb.getManyAndCount();
 
 		return new PageDto({
 			items,
+			metadata: { pageSize, currentPage: page, totalItems },
 		});
+	}
+
+	private createQueryGetList(query: QueryGetListBackup) {
+		const {
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+			fieldOrder,
+			orderBy,
+			skip,
+			pageSize,
+		} = query;
+
+		const qb = this.backupRepo.createQueryBuilder('backup');
+
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`backup.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{ startCreatedAt, endCreatedAt },
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			qb.andWhere(
+				`backup.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{ startUpdatedAt, endUpdatedAt },
+			);
+		}
+
+		qb.orderBy(`backup.${fieldOrder}`, orderBy);
+		qb.skip(skip).take(pageSize);
+
+		return qb;
 	}
 }

@@ -3,3 +3,8 @@ export enum StatusBackup {
 	SUCCESS = 'success',
 	FAILED = 'failed',
 }
+
+export enum FieldOrderBackup {
+	CREATED_AT = 'createdAt',
+	UPDATED_AT = 'updatedAt',
+}

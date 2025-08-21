@@ -1,5 +1,7 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { OrderDirection } from 'src/common/enums/common';
+import { FieldOrderBackup } from '../enums/database.enum';
 
 export class BackupDto {
 	@IsOptional()
@@ -11,4 +13,10 @@ export class BackupDto {
 	toGcs?: boolean;
 }
 
-export class QueryGetListBackup extends BaseQueryDto {}
+export class QueryGetListBackup extends BaseQueryDto {
+	@IsEnum(FieldOrderBackup)
+	fieldOrder: FieldOrderBackup = FieldOrderBackup.CREATED_AT;
+
+	@IsEnum(OrderDirection)
+	orderBy: OrderDirection = OrderDirection.DESC;
+}
