@@ -293,6 +293,7 @@ export class TrackQueryService {
 
 	async getListWithPolicy(query: QueryGetListTrackDto) {
 		const queryGetListWithPolicy = this.createQueryGetListWithPolicy(query);
+		queryGetListWithPolicy.addOrderBy('dsp.name', 'ASC');
 
 		return await queryGetListWithPolicy.getManyAndCount();
 	}

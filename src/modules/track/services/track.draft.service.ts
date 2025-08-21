@@ -252,7 +252,7 @@ export class TrackDraftService {
 		trackPolicyId: string;
 		data: UpdateTrackPolicyDto;
 	}) {
-		await this.trackPolicyService.update({ trackPolicyId, data });
+		return await this.trackPolicyService.update({ trackPolicyId, data });
 	}
 
 	//delete
