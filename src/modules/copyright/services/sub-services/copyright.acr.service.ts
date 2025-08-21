@@ -1,10 +1,12 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
 import * as crypto from 'crypto';
 import FormData from 'form-data';
 import { lastValueFrom } from 'rxjs';
+import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { AcrResponse, ResultScan } from '../../interface/copyright.interface';
 
 @Injectable()
@@ -21,19 +23,29 @@ export class CopyrightAcrService implements OnModuleInit {
 
 	constructor(
 		private readonly http: HttpService,
-		private readonly config: ConfigService,
 		private readonly appConfigService: AppConfigService,
-	) {
-		this.ACR_HOST = this.config.get<string>('ACR_HOST', '');
-		this.ACR_ACCESS_KEY = this.config.get<string>('ACR_ACCESS_KEY', '');
-		this.ACR_ACCESS_SECRET = this.config.get<string>(
-			'ACR_ACCESS_SECRET',
-			'',
+	) {}
+
+	onModuleInit() {
+		this.reloadConfig();
+	}
+
+	private reloadConfig() {
+		this.ACR_HOST = this.appConfigService.getValue(AppConfigKey.ACR_HOST);
+		this.ACR_ACCESS_KEY = this.appConfigService.getValue(
+			AppConfigKey.ACR_ACCESS_KEY,
+		);
+		this.ACR_ACCESS_SECRET = this.appConfigService.getValue(
+			AppConfigKey.ACR_ACCESS_SECRET,
+		);
+		this.chunkDuration = this.appConfigService.getValue(
+			AppConfigKey.CHUNK_DURATION,
 		);
 	}
 
-	async onModuleInit() {
-		this.chunkDuration = await this.appConfigService.getChunkDuration();
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.reloadConfig();
 	}
 
 	private sign({

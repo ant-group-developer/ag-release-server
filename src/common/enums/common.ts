@@ -15,4 +15,6 @@ export enum DateFormat {
 
 export enum AppEvent {
 	CHANGE_TIME_SYNC_DATA = 'CHANGE_TIME_SYNC_DATA',
+	UPDATE_APP_CONFIG = 'app_config.update',
+	DELETE_LOGO = 'DELETE_LOGO',
 }

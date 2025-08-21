@@ -10,6 +10,7 @@ export enum EntityTypePicture {
 	GENRE = 'genres',
 	TRACK = 'tracks',
 	TENANT = 'tenants',
+	LOGO = 'logo',
 }
 
 export enum UploadPurpose {

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { folderMap } from '../constants/bucket.constant';
 import {
@@ -22,6 +24,11 @@ export class BucketService {
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
 	) {}
+
+	@OnEvent(AppEvent.DELETE_LOGO)
+	handleDeleteLogo(urlPublic: string) {
+		this.deletePublicFileSafe(urlPublic).catch((_e) => {});
+	}
 
 	// create
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {

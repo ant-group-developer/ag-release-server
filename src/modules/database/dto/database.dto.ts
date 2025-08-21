@@ -1,4 +1,5 @@
 import { IsBoolean, IsOptional } from 'class-validator';
+import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
 export class BackupDto {
 	@IsOptional()
@@ -9,3 +10,5 @@ export class BackupDto {
 	@IsBoolean()
 	toGcs?: boolean;
 }
+
+export class QueryGetListBackup extends BaseQueryDto {}
