@@ -18,8 +18,8 @@ export class NotificationService {
 		this.PATH_TEMPLATES = './src/modules/notification/templates';
 	}
 
-	async sendNotificationBackupSuccess(data: { filename: string }) {
-		const { filename } = data;
+	async sendNotificationBackupSuccess(data: { fileName: string }) {
+		const { fileName } = data;
 
 		const time = new Date().toLocaleString('vi-VN', {
 			timeZone: 'Asia/Ho_Chi_Minh',
@@ -29,7 +29,7 @@ export class NotificationService {
 
 		const html = renderTemplate(
 			`${this.PATH_TEMPLATES}/backup-success.hbs`,
-			{ time, filename },
+			{ time, fileName },
 		);
 
 		await this.sendToDev(subject, html);

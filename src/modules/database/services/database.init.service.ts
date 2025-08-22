@@ -20,6 +20,7 @@ export class DatabaseInitService implements OnModuleInit {
 		id: string;
 		name: string;
 		email: string;
+		password: string;
 		type: UserType;
 		creatorId: string;
 		modifierId: string;
@@ -34,6 +35,7 @@ export class DatabaseInitService implements OnModuleInit {
 			id: this.configService.get<string>('DEFAULT_USER_ID')!,
 			name: this.configService.get<string>('DEFAULT_NAME')!,
 			email: this.configService.get<string>('DEFAULT_EMAIL')!,
+			password: this.configService.get<string>('DEFAULT_PASS') ?? '',
 			type: this.configService.get<UserType>('USER_TYPE')!,
 			creatorId: this.configService.get<string>('DEFAULT_USER_ID')!,
 			modifierId: this.configService.get<string>('DEFAULT_USER_ID')!,

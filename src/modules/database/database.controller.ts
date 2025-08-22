@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
-import { DatabaseBackupService } from './services/database.backup.service';
 import { QueryGetListBackup } from './dto/database.dto';
+import { DatabaseBackupService } from './services/database.backup.service';
 
 @Controller('database')
 export class DatabaseController {
-	constructor(private readonly databaseService: DatabaseBackupService) { }
+	constructor(private readonly databaseService: DatabaseBackupService) {}
 
 	@Post()
 	async create() {

@@ -35,6 +35,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	private toDrive: boolean;
 	private toGcs: boolean;
 
+	private folderBackupDriveId: string;
 	private baseUrlDrive: string;
 	private baseUrlGcs: string;
 
@@ -91,7 +92,7 @@ export class DatabaseBackupService implements OnModuleInit {
 		const timeStart = Date.now();
 		const result = this.backupRepo.create({
 			urlDrive: '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link',
-			urlGcs: `${this.baseUrlGcs}/ant-music-assets-protected/backups/2025-07-11_14-22-21_backup_ant_release.sql`,
+			urlGcs: `${this.baseUrlGcs}/ant-music-assets-protected/backups/${fileName}`,
 			status: StatusBackup.RUNNING,
 			fileName,
 		});
@@ -117,24 +118,24 @@ export class DatabaseBackupService implements OnModuleInit {
 			});
 
 			// backup
-			// if (toDrive) {
-			// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
+			if (toDrive) {
+				const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
 
-			// 	await exec(driveUploadCommand, { shell: shellPath });
-			// }
+				await exec(driveUploadCommand, { shell: shellPath });
+			}
 
-			// if (toGcs) {
-			// 	const bucketName =
-			// 		this.configService.get<string>('PROTECTED_BUCKET');
-			// 	const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
+			if (toGcs) {
+				const bucketName =
+					this.configService.get<string>('PROTECTED_BUCKET');
+				const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
 
-			// 	await exec(gcsUploadCommand, {
-			// 		shell: shellPath,
-			// 	});
-			// }
+				await exec(gcsUploadCommand, {
+					shell: shellPath,
+				});
+			}
 
 			// await this.notificationService.sendNotificationBackupSuccess({
-			// 	filename,
+			// 	fileName,
 			// });
 
 			result.status = StatusBackup.SUCCESS;
