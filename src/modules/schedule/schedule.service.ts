@@ -25,7 +25,7 @@ export class ScheduleService {
 	@Cron('0 3 * * *')
 	async handleDailyTask() {
 		console.log('This task runs every day at 3:00 AM');
-		await this.databaseBackupService.backup({});
+		// await this.databaseBackupService.backup({});
 	}
 
 	@Cron('0 10 * * 0')

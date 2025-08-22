@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -55,6 +56,8 @@ import { UserModule } from './modules/user/user.module';
 		// 	imports: [ConfigModule],
 		// 	useClass: DatabaseConfigService,
 		// }),
+
+		EventEmitterModule.forRoot(),
 
 		DatabaseModule,
 		// ... other modules

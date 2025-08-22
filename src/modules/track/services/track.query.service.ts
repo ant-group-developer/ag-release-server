@@ -47,7 +47,7 @@ export class TrackQueryService {
 	) {}
 
 	// private
-	private createQueryGetList(query: QueryGetListTrackDto) {
+	private baseQueryGetList(query: QueryGetListTrackDto) {
 		const {
 			keyword,
 
@@ -71,43 +71,10 @@ export class TrackQueryService {
 
 		const queryBuilder = this.trackRepo.createQueryBuilder('track');
 
+		// join for filter
 		queryBuilder
 			.leftJoin('track.release', 'release')
-			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
-
-			.leftJoinAndSelect('track.audioFile', 'audioFile')
-			.leftJoinAndSelect('audioFile.file', 'file')
-			.leftJoinAndSelect('audioFile.peak', 'peak')
-
-			.leftJoinAndSelect('track.trackArtists', 'trackArtist')
-			.leftJoinAndSelect('trackArtist.artistRole', 'artistRole')
-			.leftJoinAndSelect('trackArtist.artist', 'artist')
-
-			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
-			.leftJoinAndSelect(
-				'trackLanguage.metadataLanguageCountry',
-				'metadataLanguageCountry',
-			)
-			.leftJoinAndSelect(
-				'trackLanguage.recordingCountry',
-				'recordingCountry',
-			)
-			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
-
-			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
-			.leftJoinAndSelect('track.subGenre', 'subGenre')
-
-			.leftJoinAndSelect('track.trackType', 'trackType')
-			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
-
-		// select
-		queryBuilder
-			.addSelect(['release.id', 'release.title', 'release.labelId'])
-			.addSelect([
-				'releaseCoverArt.id',
-				'releaseCoverArt.fileId',
-				'releaseCoverArt.type',
-			]);
+			.leftJoin('track.trackArtists', 'trackArtist');
 
 		if (keyword) {
 			queryBuilder.andWhere('track.title ILIKE :keyword', {
@@ -165,10 +132,170 @@ export class TrackQueryService {
 		return queryBuilder;
 	}
 
+	private createQueryGetListWithPolicy(query: QueryGetListTrackDto) {
+		const queryGetList = this.baseQueryGetList(query);
+
+		const qb = queryGetList.clone();
+		qb.leftJoin('track.priceTier', 'priceTier')
+			.leftJoin('priceTier.currency', 'currency')
+
+			.leftJoin('track.trackPolicies', 'trackPolicy')
+			.leftJoin('trackPolicy.dsp', 'dsp')
+			.leftJoin('trackPolicy.action', 'action')
+
+			.select([
+				'track.id',
+				'track.title',
+				'track.releaseId',
+				'track.createdAt',
+				'track.order',
+			])
+			.addSelect(['priceTier.id', 'priceTier.amount'])
+			.addSelect(['currency.id', 'currency.name', 'currency.code'])
+
+			.addSelect([
+				'trackPolicy.id',
+				'trackPolicy.actionId',
+				'trackPolicy.dspId',
+			])
+			.addSelect(['dsp.id', 'dsp.name', 'dsp.picture'])
+			.addSelect([
+				'action.id',
+				'action.code',
+				'action.name',
+				'action.note',
+			]);
+
+		return qb;
+	}
+
+	// public
 	async getList(query: QueryGetListTrackDto) {
-		const queryGetList = this.createQueryGetList(query);
+		const queryGetList = this.baseQueryGetList(query);
+
+		queryGetList
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+
+			.leftJoin('track.audioFile', 'audioFile')
+			.leftJoin('audioFile.file', 'file')
+			.leftJoin('audioFile.peak', 'peak')
+
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist')
+
+			.leftJoin('track.trackLanguage', 'trackLanguage')
+			.leftJoin(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
+			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
+
+			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
+			.leftJoinAndSelect('track.subGenre', 'subGenre')
+
+			.leftJoinAndSelect('track.trackType', 'trackType')
+			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
+
+		// select
+		queryGetList
+			.addSelect(['release.id', 'release.title', 'release.labelId'])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'audioFile.id',
+				'audioFile.sampleRate',
+				'audioFile.bitrate',
+				'audioFile.bitDepth',
+				'audioFile.duration',
+				'audioFile.hook',
+				'audioFile.preview',
+				'audioFile.fileId',
+				'audioFile.peakId',
+			])
+
+			.addSelect(['file.id', 'file.fileName'])
+			.addSelect(['peak.id'])
+
+			.addSelect([
+				'trackArtist.id',
+				'trackArtist.artistId',
+				'trackArtist.artistRoleId',
+			])
+
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect(['artist.id', 'artist.name', 'artist.picture'])
+
+			.addSelect(['trackLanguage.id'])
+			.addSelect([
+				'metadataLanguageCountry.id',
+				'metadataLanguageCountry.name',
+				'metadataLanguageCountry.iso3',
+				'metadataLanguageCountry.iso2',
+				'metadataLanguageCountry.numericCode',
+				'metadataLanguageCountry.phoneCode',
+				'metadataLanguageCountry.capital',
+				'metadataLanguageCountry.currency',
+				'metadataLanguageCountry.currencyName',
+				'metadataLanguageCountry.currencySymbol',
+				'metadataLanguageCountry.regionId',
+				'metadataLanguageCountry.nationality',
+				'metadataLanguageCountry.continent',
+			])
+			.addSelect([
+				'recordingCountry.id',
+				'recordingCountry.name',
+				'recordingCountry.iso3',
+				'recordingCountry.iso2',
+				'recordingCountry.numericCode',
+				'recordingCountry.phoneCode',
+				'recordingCountry.capital',
+				'recordingCountry.currency',
+				'recordingCountry.currencyName',
+				'recordingCountry.currencySymbol',
+				'recordingCountry.regionId',
+				'recordingCountry.nationality',
+				'recordingCountry.continent',
+			])
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
+			.addSelect([
+				'primaryGenre.id',
+				'primaryGenre.name',
+				'primaryGenre.code',
+				'primaryGenre.picture',
+				'primaryGenre.description',
+			])
+			.addSelect([
+				'subGenre.id',
+				'subGenre.name',
+				'subGenre.code',
+				'subGenre.picture',
+				'subGenre.description',
+			])
+
+			.addSelect(['trackType.id', 'trackType.name', 'trackType.code'])
+			.addSelect([
+				'trackOriginType.id',
+				'trackOriginType.name',
+				'trackOriginType.code',
+			]);
 
 		return await queryGetList.getManyAndCount();
+	}
+
+	async getListWithPolicy(query: QueryGetListTrackDto) {
+		const queryGetListWithPolicy = this.createQueryGetListWithPolicy(query);
+		queryGetListWithPolicy.addOrderBy('dsp.name', 'ASC');
+
+		return await queryGetListWithPolicy.getManyAndCount();
 	}
 
 	async findOne(id: string): Promise<Track> {

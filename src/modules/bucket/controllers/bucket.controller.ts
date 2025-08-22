@@ -12,6 +12,7 @@ import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
+	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { BucketService } from '../services/bucket.service';
@@ -127,6 +128,13 @@ export class BucketGcsController {
 		return new ResponseSuccess({
 			data: result,
 		});
+	}
+
+	@Get('non-file/download')
+	async getUrlDownNonFile(@Body() payload: GetUrlDownNonFile) {
+		const data = await this.bucketService.getUrlDownNonFile(payload);
+
+		return new ResponseSuccess({ data });
 	}
 
 	@Post('public/:urlPublic/delete')

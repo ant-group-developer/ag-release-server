@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { folderMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
 	CreateBucketDto,
+	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
@@ -22,6 +25,11 @@ export class BucketService {
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
 	) {}
+
+	@OnEvent(AppEvent.DELETE_LOGO)
+	handleDeleteLogo(urlPublic: string) {
+		this.deletePublicFileSafe(urlPublic).catch((_e) => {});
+	}
 
 	// create
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
@@ -55,16 +63,9 @@ export class BucketService {
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
-		const result: IResCreateBucket[] = [];
-
-		await Promise.all(
-			data.bucketDtos.map(async (item) => {
-				const newBucket = await this.create(item);
-				result.push(newBucket);
-			}),
+		return await Promise.all(
+			data.bucketDtos.map((item) => this.create(item)),
 		);
-
-		return result;
 	}
 
 	// folder
@@ -237,12 +238,33 @@ export class BucketService {
 		};
 	}
 
-	async deletePublicFile(urlPublic: string): Promise<void> {
+	async getUrlDownNonFile(payload: GetUrlDownNonFile) {
+		const { url, isPublic, fileName } = payload;
+
+		const baseUrl = isPublic
+			? this.bucketGcsService.getBaseUrlPublic() + '/'
+			: this.bucketGcsService.getBaseUrlPrivate() + '/';
+
+		const key = url.replace(baseUrl, '');
+
+		return await this.bucketGcsService.getSignedUrlDown({
+			key,
+			isPublic,
+			fileName,
+		});
+	}
+
+	async deletePublicFile(urlPublic: string) {
 		const key = urlPublic.replace(
 			this.bucketGcsService.getBaseUrlPublic() + '/',
 			'',
 		);
-		await this.bucketGcsService.deletePublicFile(key);
+
+		return await this.bucketGcsService.getSignedUrlDown({
+			fileName: 'backUp',
+			key,
+			isPublic: true,
+		});
 	}
 
 	async deletePublicFileSafe(urlPublic: string) {

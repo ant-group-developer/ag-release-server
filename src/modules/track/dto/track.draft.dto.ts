@@ -177,3 +177,9 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@IsBoolean()
 	copyArtistsFromRelease?: boolean;
 }
+
+export class UpdateTrackPolicyDto {
+	@IsUUID()
+	@ValidateIf((_, value) => value !== undefined)
+	actionId?: string;
+}
