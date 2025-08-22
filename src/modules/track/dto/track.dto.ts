@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsArray,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -103,23 +104,64 @@ export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 }
 
 export class QueryGetListTrackDto extends BaseQueryDto {
-	@IsUUID()
 	@IsOptional()
-	releaseId?: string;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseId?: string[];
 
 	@IsOptional()
-	@IsString()
-	@Length(10, 10)
-	artistId?: string | null;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	@IsArray()
+	artistId?: string[];
 
 	@IsOptional()
-	@Length(10, 10)
-	@IsString()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	@IsArray()
 	labelId?: string;
 
-	@IsEnum(ScanCopyrightStatus)
 	@IsOptional()
-	scanCopyrightStatus?: ScanCopyrightStatus;
+	@IsArray()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsEnum(ScanCopyrightStatus, { each: true })
+	scanCopyrightStatus?: ScanCopyrightStatus[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	primaryGenreId?: string[];
 
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;

@@ -6,7 +6,7 @@ import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import {
 	TrackMessageCodeError,
 	TrackMessageError,
@@ -56,6 +56,7 @@ export class TrackQueryService {
 			artistId,
 			labelId,
 			scanCopyrightStatus,
+			primaryGenreId,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -77,34 +78,48 @@ export class TrackQueryService {
 			.leftJoin('track.trackArtists', 'trackArtist');
 
 		if (keyword) {
-			queryBuilder.andWhere('track.title ILIKE :keyword', {
-				keyword: `%${keyword}%`,
-			});
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.where('track.title ILIKE :keyword')
+						.orWhere('track.lyric ILIKE :keyword')
+						.orWhere('track.version ILIKE :keyword');
+				}),
+				{ keyword: `%${keyword}%` },
+			);
 		}
 
-		if (releaseId) {
-			queryBuilder.andWhere('track.releaseId = :releaseId', {
+		if (releaseId?.length) {
+			queryBuilder.andWhere('track.releaseId IN (:...releaseId)', {
 				releaseId,
 			});
 		}
 
-		if (labelId) {
-			queryBuilder.andWhere('release.labelId = :labelId', {
+		if (labelId?.length) {
+			queryBuilder.andWhere('release.labelId IN (:...labelId)', {
 				labelId,
 			});
 		}
 
-		if (artistId) {
-			queryBuilder.andWhere('trackArtist.artistId = :artistId', {
+		if (artistId?.length) {
+			queryBuilder.andWhere('trackArtist.artistId IN (:...artistId)', {
 				artistId,
 			});
 		}
 
-		if (scanCopyrightStatus) {
+		if (scanCopyrightStatus?.length) {
 			queryBuilder.andWhere(
-				'track.scanCopyrightStatus = :scanCopyrightStatus',
+				'track.scanCopyrightStatus IN (:...scanCopyrightStatus)',
 				{
 					scanCopyrightStatus,
+				},
+			);
+		}
+
+		if (primaryGenreId?.length) {
+			queryBuilder.andWhere(
+				'track.primaryGenreId IN (:...primaryGenreId)',
+				{
+					primaryGenreId,
 				},
 			);
 		}

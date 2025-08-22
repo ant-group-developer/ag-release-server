@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { ReleaseMessageError } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
@@ -38,10 +38,9 @@ export class ReleaseQueryService {
 			status,
 			primaryGenreId,
 			subGenreId,
-
 			labelId,
-
 			artistId,
+			isVariousArtist,
 
 			fieldOrder,
 			orderBy,
@@ -55,9 +54,15 @@ export class ReleaseQueryService {
 		);
 
 		if (keyword) {
-			queryBuilder.andWhere('release.title ILIKE :keyword', {
-				keyword: `%${keyword}%`,
-			});
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.where('release.title ILIKE :keyword')
+						.orWhere('albumFormat.name ILIKE :keyword')
+						.orWhere('artist.name ILIKE :keyword')
+						.orWhere('label.name ILIKE :keyword');
+				}),
+				{ keyword: `%${keyword}%` },
+			);
 		}
 
 		if (startCreatedAt && endCreatedAt) {
@@ -90,40 +95,55 @@ export class ReleaseQueryService {
 			);
 		}
 
-		if (albumFormatId) {
-			queryBuilder.andWhere(`release.albumFormatId = :albumFormatId`, {
-				albumFormatId,
-			});
+		if (albumFormatId?.length) {
+			queryBuilder.andWhere(
+				'release.albumFormatId IN (:...albumFormatId)',
+				{
+					albumFormatId,
+				},
+			);
 		}
 
-		if (primaryGenreId) {
-			queryBuilder.andWhere(`release.primaryGenreId = :primaryGenreId`, {
-				primaryGenreId,
-			});
+		if (primaryGenreId?.length) {
+			queryBuilder.andWhere(
+				'release.primaryGenreId IN (:...primaryGenreId)',
+				{
+					primaryGenreId,
+				},
+			);
 		}
 
-		if (subGenreId) {
-			queryBuilder.andWhere(`release.subGenreId = :subGenreId`, {
+		if (subGenreId?.length) {
+			queryBuilder.andWhere('release.subGenreId IN (:...subGenreId)', {
 				subGenreId,
 			});
 		}
 
-		if (labelId) {
-			queryBuilder.andWhere(`release.labelId = :labelId`, {
+		if (labelId?.length) {
+			queryBuilder.andWhere('release.labelId IN (:...labelId)', {
 				labelId,
 			});
 		}
 
-		if (artistId) {
-			queryBuilder.andWhere('releaseArtist.artistId = :artistId', {
+		if (artistId?.length) {
+			queryBuilder.andWhere('releaseArtist.artistId IN (:...artistId)', {
 				artistId,
 			});
 		}
 
-		if (status) {
-			queryBuilder.andWhere(`release.status = :status`, {
+		if (status?.length) {
+			queryBuilder.andWhere('release.status IN (:...status)', {
 				status,
 			});
+		}
+
+		if (isVariousArtist !== undefined) {
+			queryBuilder.andWhere(
+				'release.isVariousArtist = :isVariousArtist',
+				{
+					isVariousArtist,
+				},
+			);
 		}
 
 		if (
