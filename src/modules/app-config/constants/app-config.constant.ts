@@ -41,7 +41,7 @@ export const appConfigDefault: AppConfigShape = {
 
 		// Đích lưu trữ
 		toDrive: false,
-		toGcs: false,
+		toGcs: true,
 	},
 
 	telegram: {

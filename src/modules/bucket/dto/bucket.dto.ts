@@ -82,11 +82,14 @@ export class BulkSubmitDto {
 
 export class GetUrlDownNonFile {
 	@IsString()
+	@IsNotEmpty()
 	url: string;
 
 	@IsBoolean()
+	@Type(() => Boolean)
 	isPublic: boolean;
 
 	@IsString()
+	@IsNotEmpty()
 	fileName: string = 'file_name';
 }

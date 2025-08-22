@@ -37,4 +37,10 @@ export enum AppConfigKey {
 	// backup
 	DATABASE_TO_DRIVE = 'database_to_drive',
 	DATABASE_TO_GCS = 'database_to_gcs',
+	NOTIFY_ON_SUCCESS = 'notify_on_success',
+	NOTIFY_ON_FAILED = 'notify_on_failed',
+
+	// telegram
+	TELEGRAM_TOKEN = 'telegram_token',
+	CHAT_ID = 'chat_id',
 }

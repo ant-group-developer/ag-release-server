@@ -130,7 +130,7 @@ export class BucketGcsController {
 		});
 	}
 
-	@Get('non-file/download')
+	@Post('non-file/download')
 	async getUrlDownNonFile(@Body() payload: GetUrlDownNonFile) {
 		const data = await this.bucketService.getUrlDownNonFile(payload);
 
