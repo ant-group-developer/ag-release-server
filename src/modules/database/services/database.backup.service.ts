@@ -1,17 +1,25 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
 import { exec as execCallback } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { DateFormat } from 'src/common/enums/common';
+import { PageDto } from 'src/common/dtos/response.dto';
+import { AppEvent, DateFormat } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
+import { Repository } from 'typeorm';
 import { promisify } from 'util';
-import { BackupDto } from '../dto/database.dto';
+import { BackupDto, QueryGetListBackup } from '../dto/database.dto';
+import { Backup } from '../entities/database.backup.entity';
+import { StatusBackup } from '../enums/database.enum';
 
 @Injectable()
-export class DatabaseBackupService {
+export class DatabaseBackupService implements OnModuleInit {
 	private configDB: {
 		type: string;
 		host: string;
@@ -21,7 +29,20 @@ export class DatabaseBackupService {
 		database: string;
 	};
 
+	private notifyOnFailed: boolean;
+	private notifyOnSuccess: boolean;
+
+	private toDrive: boolean;
+	private toGcs: boolean;
+
+	private baseUrlDrive: string;
+	private baseUrlGcs: string;
+
 	constructor(
+		@InjectRepository(Backup)
+		private readonly backupRepo: Repository<Backup>,
+
+		private readonly appConfigService: AppConfigService,
 		private readonly configService: ConfigService,
 		private readonly notificationService: NotificationService,
 	) {
@@ -33,20 +54,52 @@ export class DatabaseBackupService {
 			password: this.configService.get<string>('DB_PASSWORD')!,
 			database: this.configService.get<string>('DB_DATABASE')!,
 		};
+
+		this.baseUrlDrive = 'https://drive.google.com/file/d/';
+		this.baseUrlGcs = 'https://storage.cloud.google.com';
 	}
 
-	async backup(data: BackupDto) {
+	onModuleInit() {
+		this.reloadConfig();
+	}
+
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.reloadConfig();
+
+		console.log(this.toDrive, this.toGcs);
+	}
+
+	private reloadConfig() {
+		this.toDrive = this.appConfigService.getValue(
+			AppConfigKey.DATABASE_TO_DRIVE,
+		);
+
+		this.toGcs = this.appConfigService.getValue(
+			AppConfigKey.DATABASE_TO_GCS,
+		);
+	}
+
+	private async backup(data: BackupDto) {
 		const { toDrive, toGcs } = data;
 
-		const exec = promisify(execCallback);
-
-		const filename = generateFileNameWithTimestamp(
+		const fileName = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
 			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
 
+		const timeStart = Date.now();
+		const result = this.backupRepo.create({
+			urlDrive: '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link',
+			urlGcs: `${this.baseUrlGcs}/ant-music-assets-protected/backups/2025-07-11_14-22-21_backup_ant_release.sql`,
+			status: StatusBackup.RUNNING,
+			fileName,
+		});
+
+		const exec = promisify(execCallback);
+
 		const backupDir = path.join(os.homedir(), 'backups');
-		const backupPath = path.join(backupDir, filename);
+		const backupPath = path.join(backupDir, fileName);
 
 		if (!fs.existsSync(backupDir)) {
 			fs.mkdirSync(backupDir, { recursive: true });
@@ -64,32 +117,95 @@ export class DatabaseBackupService {
 			});
 
 			// backup
-			if (toDrive) {
-				const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
+			// if (toDrive) {
+			// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
 
-				await exec(driveUploadCommand, { shell: shellPath });
-			}
+			// 	await exec(driveUploadCommand, { shell: shellPath });
+			// }
 
-			if (toGcs) {
-				const bucketName =
-					this.configService.get<string>('PROTECTED_BUCKET');
-				const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
+			// if (toGcs) {
+			// 	const bucketName =
+			// 		this.configService.get<string>('PROTECTED_BUCKET');
+			// 	const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
 
-				await exec(gcsUploadCommand, {
-					shell: shellPath,
-				});
-			}
+			// 	await exec(gcsUploadCommand, {
+			// 		shell: shellPath,
+			// 	});
+			// }
 
-			await this.notificationService.sendNotificationBackupSuccess({
-				filename,
-			});
+			// await this.notificationService.sendNotificationBackupSuccess({
+			// 	filename,
+			// });
+
+			result.status = StatusBackup.SUCCESS;
 		} catch (err) {
-			await this.notificationService.sendNotificationBackupFail({
-				filename,
-				error: err instanceof Error ? err.message : String(err),
-			});
+			// await this.notificationService.sendNotificationBackupFail({
+			// 	filename,
+			// 	error: err instanceof Error ? err.message : String(err),
+			// });
 
-			throw new BadRequestException('Database backup failed');
+			result.status = StatusBackup.FAILED;
+		} finally {
+			const timeEnd = Date.now();
+			result.elapsedTime = Math.floor((timeEnd - timeStart) / 1000);
 		}
+
+		return result;
+	}
+
+	async handleCreate() {
+		const result = await this.backup({
+			toDrive: this.toDrive,
+			toGcs: this.toGcs,
+		});
+
+		return await this.backupRepo.save(result);
+	}
+
+	async getList(query: QueryGetListBackup) {
+		const { page, pageSize } = query;
+
+		const qb = this.createQueryGetList(query);
+
+		const [items, totalItems] = await qb.getManyAndCount();
+
+		return new PageDto({
+			items,
+			metadata: { pageSize, currentPage: page, totalItems },
+		});
+	}
+
+	private createQueryGetList(query: QueryGetListBackup) {
+		const {
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+			fieldOrder,
+			orderBy,
+			skip,
+			pageSize,
+		} = query;
+
+		const qb = this.backupRepo.createQueryBuilder('backup');
+
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`backup.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{ startCreatedAt, endCreatedAt },
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			qb.andWhere(
+				`backup.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{ startUpdatedAt, endUpdatedAt },
+			);
+		}
+
+		qb.orderBy(`backup.${fieldOrder}`, orderBy);
+		qb.skip(skip).take(pageSize);
+
+		return qb;
 	}
 }

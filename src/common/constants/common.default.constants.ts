@@ -15,6 +15,8 @@ export const COMMENT_FOR_NULLABLE_DRAFT = 'Nullable when status is draft';
 export const DEFAULT_TIME_SYNC = '04:00';
 
 export const DEFAULT_CHUNK_DURATION = 10;
+export const DEFAULT_SCORE_WARNING = 60;
+export const DEFAULT_AUTO_SCAN_TIME = '01:00';
 
 export const DEFAULT_LENGTH_NAME = 200;
 export const DEFAULT_LENGTH_CODE = 200;

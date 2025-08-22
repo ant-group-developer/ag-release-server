@@ -5,6 +5,7 @@ import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
 	UpdateTrackDraftDto,
+	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
 import { Track } from '../entities/track.entity';
 import {
@@ -13,12 +14,15 @@ import {
 	ITrackDraft,
 } from '../interfaces/track.interface';
 
+import { PageDto } from 'src/common/dtos/response.dto';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
+import { TrackPolicyService } from 'src/modules/track-policy/services/track-policy.service';
+import { QueryGetListTrackDto } from '../dto/track.dto';
 import { TrackQueryService } from './track.query.service';
 
 @Injectable()
@@ -34,6 +38,7 @@ export class TrackDraftService {
 		private readonly trackLanguageDraftService: TrackLanguageDraftService,
 		private readonly trackArtistService: TrackArtistService,
 		private readonly copyrightService: CopyrightService,
+		private readonly trackPolicyService: TrackPolicyService,
 	) {}
 
 	// create
@@ -104,16 +109,55 @@ export class TrackDraftService {
 
 		await this.trackArtistService.copyArtistFromReleaseSource2({
 			releaseId: track.releaseId,
-			trackId: track.id,
+			trackId,
+		});
+
+		await this.trackPolicyService.createTrackPoliciesOfTrack({ trackId });
+	}
+
+	// read
+	async getTrackPolicies({ trackId }: { trackId: string }) {
+		return await this.trackPolicyService.getListOfTrack({ trackId });
+	}
+
+	async getListWithPolicy(query: QueryGetListTrackDto) {
+		const { page, pageSize } = query;
+
+		const [tracksDb, totalItems] =
+			await this.trackQueryService.getListWithPolicy(query);
+
+		// const trackIdsMissingPolicies = tracksDb
+		// 	.filter(
+		// 		(track) =>
+		// 			!track.trackPolicies || track.trackPolicies.length === 0,
+		// 	)
+		// 	.map((track) => track.id);
+
+		// if (trackIdsMissingPolicies.length > 0) {
+		// 	await this.trackPolicyService.createTrackPoliciesForMultipleTracks(
+		// 		trackIdsMissingPolicies,
+		// 	);
+		// }
+
+		return new PageDto({
+			items: tracksDb,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
 		});
 	}
 
 	// update
 	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
-		for (const track of trackDrafts) {
-			await this.trackQueryService.findOne(track.id);
-		}
+
+		await Promise.all(
+			trackDrafts.map((track) =>
+				this.trackQueryService.findOne(track.id),
+			),
+		);
 
 		return await this.trackRepo.save(trackDrafts);
 	}
@@ -199,6 +243,16 @@ export class TrackDraftService {
 				await this.trackArtistService.deleteArtistSource1(track.id);
 			}
 		}
+	}
+
+	async updateTrackPolicy({
+		trackPolicyId,
+		data,
+	}: {
+		trackPolicyId: string;
+		data: UpdateTrackPolicyDto;
+	}) {
+		return await this.trackPolicyService.update({ trackPolicyId, data });
 	}
 
 	//delete

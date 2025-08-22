@@ -18,6 +18,7 @@ import {
 import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ITrack } from '../interfaces/track.interface';
 
@@ -151,4 +152,7 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@ManyToOne(() => PriceTier)
 	@JoinColumn({ name: 'price_tier_id' })
 	priceTier: PriceTier | null;
+
+	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.track)
+	trackPolicies?: TrackPolicy[];
 }

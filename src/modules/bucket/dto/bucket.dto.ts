@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
 	IsArray,
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
@@ -77,4 +78,15 @@ export class BulkSubmitDto {
 	@ArrayMinSize(1)
 	@IsUUID('4', { each: true })
 	ids: string[];
+}
+
+export class GetUrlDownNonFile {
+	@IsString()
+	url: string;
+
+	@IsBoolean()
+	isPublic: boolean;
+
+	@IsString()
+	fileName: string = 'file_name';
 }

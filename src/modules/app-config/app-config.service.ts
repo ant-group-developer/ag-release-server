@@ -1,39 +1,121 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DEFAULT_CHUNK_DURATION } from 'src/common/constants/common.default.constants';
+import { AppEvent } from 'src/common/enums/common';
 import { Repository } from 'typeorm';
-import { UpdateConfigDto } from './app-config.dto';
-import { AppConfig } from './app-config.entity';
+import { appConfigDefault } from './constants/app-config.constant';
+import { UpdateConfigDto } from './dtos/app-config.dto';
+import { AppConfig } from './entities/app-config.entity';
+import { AppConfigKey } from './enums/app-config.enum';
+import {
+	AppConfigShape,
+	AppConfigValueMap,
+} from './interfaces/app-config.type';
 
 @Injectable()
-export class AppConfigService {
+export class AppConfigService implements OnModuleInit {
+	private readonly logger = new Logger(AppConfigService.name);
+	private config: AppConfigShape;
+
 	constructor(
 		@InjectRepository(AppConfig)
-		private readonly appConfig: Repository<AppConfig>,
+		private readonly appConfigRepo: Repository<AppConfig>,
+		private readonly eventEmitter: EventEmitter2,
 	) {}
 
-	async get() {
-		return this.appConfig.createQueryBuilder().getOne();
+	async onModuleInit() {
+		const result = await this.initDataDefault();
+		this.config = result.config;
 	}
 
-	async update(payload: UpdateConfigDto) {
-		const data = await this.get();
-		if (data) {
-			await this.appConfig.update(data.id, {
-				config: payload,
+	private async initDataDefault() {
+		const appConfig = await this.findOne();
+
+		if (!appConfig) {
+			this.logger.log('Initializing default AppConfig');
+			const entity = this.appConfigRepo.create({
+				config: appConfigDefault,
 			});
-		} else {
-			const config = this.appConfig.create({ config: payload });
-			await this.appConfig.save(config);
+			return this.appConfigRepo.save(entity);
 		}
-		return this.get();
+
+		this.logger.log('AppConfig already exists, skipping initialization.');
+		return appConfig;
 	}
 
-	async getChunkDuration() {
-		const appConfig = await this.get();
+	private emitEventUpdate() {
+		this.logger.log(`Event: ${AppEvent.UPDATE_APP_CONFIG}}`);
+		this.eventEmitter.emit(AppEvent.UPDATE_APP_CONFIG);
+	}
 
-		const result =
-			appConfig?.config.website.chunkDuration ?? DEFAULT_CHUNK_DURATION;
+	private async findOne() {
+		return await this.appConfigRepo.createQueryBuilder().getOne();
+	}
+
+	private async getOneOrCreate(): Promise<AppConfig> {
+		const result = new AppConfig();
+		result.config = this.config;
+
+		if (!result || !result.config) {
+			return this.initDataDefault();
+		}
+
 		return result;
+	}
+
+	// public
+	async update(payload: UpdateConfigDto) {
+		const { website, telegram, acrCloud, backupDatabase } = payload;
+
+		const data = await this.getOneOrCreate();
+		const { config: configDb } = data;
+
+		const {
+			website: websiteDb,
+			telegram: telegramDb,
+			acrCloud: acrCloudDb,
+			backupDatabase: backupDatabaseDb,
+		} = configDb;
+
+		data.config.website = website ?? websiteDb;
+
+		if (
+			website?.logo !== undefined &&
+			websiteDb.logo &&
+			website.logo !== websiteDb.logo
+		) {
+			this.eventEmitter.emit(AppEvent.DELETE_LOGO, websiteDb.logo);
+		}
+
+		data.config.telegram = telegram ?? telegramDb;
+		data.config.acrCloud = acrCloud ?? acrCloudDb;
+		data.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
+
+		// const
+		const dataDb = await this.appConfigRepo.save(data);
+
+		this.config = dataDb.config;
+		this.emitEventUpdate();
+		return this.config;
+	}
+
+	getValue<K extends AppConfigKey>(key: K): AppConfigValueMap[K] {
+		const { acrCloud, telegram, website, backupDatabase } = this.config;
+
+		const values: AppConfigValueMap = {
+			[AppConfigKey.ALL]: this.config,
+
+			[AppConfigKey.WEBSITE]: website,
+			[AppConfigKey.ACR_HOST]: acrCloud.acrHost,
+			[AppConfigKey.ACR_ACCESS_KEY]: acrCloud.acrAccessKey,
+			[AppConfigKey.ACR_ACCESS_SECRET]: acrCloud.acrAccessSecret,
+			[AppConfigKey.CHUNK_DURATION]: acrCloud.chunkDuration,
+
+			// backup
+			[AppConfigKey.DATABASE_TO_DRIVE]: backupDatabase.toDrive,
+			[AppConfigKey.DATABASE_TO_GCS]: backupDatabase.toGcs,
+		};
+
+		return values[key];
 	}
 }
