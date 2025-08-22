@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_COLOR,
 	DEFAULT_LENGTH_NAME,
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
@@ -23,6 +24,11 @@ export class CreateRoleDto {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(DEFAULT_LENGTH_CODE)
+	code: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(DEFAULT_LENGTH_COLOR)
 	color: string;
 
 	@IsString()
@@ -47,7 +53,13 @@ export class UpdateRoleDto {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(10)
+	@MaxLength(DEFAULT_LENGTH_CODE)
+	code?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(DEFAULT_LENGTH_COLOR)
 	color?: string;
 
 	@IsString()

@@ -33,7 +33,7 @@ export class AppConfigService {
 		const appConfig = await this.get();
 
 		const result =
-			appConfig?.config.website.chunkDuration ?? DEFAULT_CHUNK_DURATION;
+			appConfig?.config.website?.chunkDuration ?? DEFAULT_CHUNK_DURATION;
 		return result;
 	}
 }

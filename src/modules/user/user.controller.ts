@@ -1,6 +1,7 @@
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	Param,
 	Post,
@@ -11,6 +12,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { DeleteResult } from 'typeorm';
 import { UserMessages } from './constants/messages';
 import {
 	CreateUserDto,
@@ -95,6 +97,15 @@ export class UserController {
 		@Body() payload: UpdateUserDto,
 	): Promise<ResponseSuccess<User>> {
 		const result = await this.userService.update(id, payload);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Delete(':id')
+	async remove(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<DeleteResult>> {
+		const result = await this.tenantUserService.remove(req, id);
 		return new ResponseSuccess({ data: result });
 	}
 }

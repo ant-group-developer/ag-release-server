@@ -5,3 +5,5 @@ export const TenantMessages = {
 		messageCode: 'tenant.message.error.notFound',
 	},
 };
+
+export const SYSTEM_TENANT_ID = 'system-tenant';

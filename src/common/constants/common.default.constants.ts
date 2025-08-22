@@ -19,3 +19,4 @@ export const DEFAULT_CHUNK_DURATION = 10;
 export const DEFAULT_LENGTH_NAME = 200;
 export const DEFAULT_LENGTH_CODE = 200;
 export const DEFAULT_LENGTH_NOTE = 500;
+export const DEFAULT_LENGTH_COLOR = 10;

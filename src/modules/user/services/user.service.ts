@@ -8,8 +8,8 @@ import { Brackets, FindOneOptions, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
 import { User } from '../entities/user.entity';
-import { UserType } from '../enum/user.enum';
 import { getAvatarUrl } from '../utils/user-ava.util';
+import { checkIsSystemTenant } from '../utils/user-type.util';
 
 @Injectable()
 export class UserService {
@@ -103,18 +103,24 @@ export class UserService {
 		const { page, pageSize, skip, type, keyword, id, orderBy, fieldOrder } =
 			query;
 
-		const tenantId = req.user?.tenantId;
+		const tenantId = req.user!.tenantId;
 
-		const queryBuilder = this.userRepository
-			.createQueryBuilder('user')
-			.leftJoin('user.creator', 'creator')
-			.leftJoin('user.modifier', 'modifier')
-			.leftJoin(
+		const queryBuilder = this.userRepository.createQueryBuilder('user');
+
+		if (checkIsSystemTenant(tenantId)) {
+			queryBuilder.leftJoin('user.tenantUser', 'tenantUser');
+		} else {
+			queryBuilder.innerJoin(
 				'user.tenantUser',
 				'tenantUser',
 				'tenantUser.tenantId = :tenantId',
 				{ tenantId },
-			)
+			);
+		}
+		queryBuilder
+			.leftJoin('tenantUser.tenant', 'tenant')
+			// .leftJoin('user.creator', 'creator')
+			// .leftJoin('user.modifier', 'modifier')
 			.select([
 				'user.id',
 				'user.name',
@@ -126,25 +132,25 @@ export class UserService {
 				'user.loginsCount',
 				'user.createdAt',
 				'user.updatedAt',
-				'creator.id',
-				'creator.email',
-				'modifier.id',
-				'modifier.email',
+				// 'creator.id',
+				// 'creator.email',
+				// 'modifier.id',
+				// 'modifier.email',
+				'tenantUser.id',
 				'tenantUser.type',
 				'tenantUser.tenantId',
+				'tenant.id',
+				'tenant.name',
 			])
-			.andWhere(
-				new Brackets((qb) => {
-					qb.where('tenantUser.tenantId = :tenantId', {
-						tenantId,
-					});
-					if (req.user?.type === UserType.ADMIN) {
-						qb.orWhere('user.type = :type', {
-							type: UserType.ADMIN,
-						});
-					}
-				}),
-			)
+			// .andWhere(
+			// 	new Brackets((qb) => {
+			// 		if (checkIsSystemAdmin(req.user!.type)) {
+			// 			qb.orWhere('user.type = :type', {
+			// 				type: UserType.ADMIN,
+			// 			});
+			// 		}
+			// 	}),
+			// )
 			.skip(skip)
 			.take(pageSize)
 			.orderBy(`user.${fieldOrder}`, orderBy);

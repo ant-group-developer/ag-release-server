@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { Brackets, In, TreeRepository } from 'typeorm';
 import { TenantUserType } from '../user/enum/user.enum';
@@ -16,6 +16,7 @@ import {
 	FindTenantsDto,
 	UpdateTenantDto,
 } from './dtos/tenant.dto';
+import { TenantMessages } from './tenant.constant';
 import { Tenant } from './tenant.entity';
 import { TenantType } from './tenant.enum';
 import { parentFirstSort } from './tenant.util';
@@ -355,5 +356,17 @@ export class TenantService {
 
 		await this.tenantTreeRepo.save(tenant);
 		return this.findOne(id);
+	}
+
+	async validateExisted(id: string) {
+		const data = await this.tenantTreeRepo.findOne({
+			where: {
+				id,
+			},
+			select: ['id'],
+		});
+		if (!data) {
+			throw new ResponseError(TenantMessages.NOT_FOUND);
+		}
 	}
 }

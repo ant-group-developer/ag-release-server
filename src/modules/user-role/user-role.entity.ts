@@ -1,6 +1,7 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Role } from '../role/entities/role.entity';
+import { Tenant } from '../tenant/tenant.entity';
 import { User } from '../user/entities/user.entity';
 
 @Entity('user_role')
@@ -21,6 +22,10 @@ export class UserRole extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => Role)
 	@JoinColumn({ name: 'role_id' })
 	role: Role;
+
+	@ManyToOne(() => Tenant)
+	@JoinColumn({ name: 'tenant_id' })
+	tenant: Tenant;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

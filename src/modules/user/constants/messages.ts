@@ -27,6 +27,31 @@ export const UserMessages = {
 			message: 'User does not belong to this workspace',
 			messageCode: 'user.message.error.tenant.forbidden',
 		},
+		NOT_FOUND: {
+			statusCode: 404,
+			message: 'User does not belong to any workspace',
+			messageCode: 'user.message.error.tenant.notFound',
+		},
+		DELETE: {
+			DECLINE_DELETE_SYSTEM_ADMIN: {
+				statusCode: 403,
+				message: 'Cannot delete system admin',
+				messageCode:
+					'user.message.error.tenant.delete.declineDeleteSystemAdmin',
+			},
+			DECLINE_DELETE_TENANT_OWNER: {
+				statusCode: 403,
+				message: 'Cannot delete tenant owner',
+				messageCode:
+					'user.message.error.tenant.delete.declineDeleteTenantOwner',
+			},
+			DECLINE_DELETE_TENANT_ADMIN: {
+				statusCode: 403,
+				message: 'You do not have permission to delete tenant admin',
+				messageCode:
+					'user.message.error.tenant.delete.declineDeleteTenantAdmin',
+			},
+		},
 	},
 	INVITE: {
 		SUCCESS: {

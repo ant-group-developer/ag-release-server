@@ -7,8 +7,10 @@ import { ResponseError } from 'src/common/dtos/response.dto';
 import { AuthMessages } from '../auth/constants/messages';
 import { UserRoleService } from '../user-role/user-role.service';
 import { UserMessages } from '../user/constants/messages';
+import { TenantUserType } from '../user/enum/user.enum';
 import { UserTypeService } from '../user/services/user-type.service';
 import { UserService } from '../user/services/user.service';
+import { checkIsSystemAdmin } from '../user/utils/user-type.util';
 import { JwtPayload } from './token.interface';
 
 export type PublicKeysMap = Record<string, string>;
@@ -68,7 +70,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 		}
 
 		const user = await this.userService.findOne(claims.sub, {
-			select: ['type', 'isActive', 'email', 'name'],
+			select: ['type', 'isActive', 'email', 'name', 'avatar'],
 		});
 		if (!user) throw new ResponseError(UserMessages.NOT_FOUND);
 
@@ -81,10 +83,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 			user.id,
 		);
 
-		const tenantType = await this.userTypeService.getTenantType(
-			claims.tenantId,
-			user.id,
-		);
+		let tenantType = TenantUserType.OWNER;
+		if (!checkIsSystemAdmin(user.type)) {
+			tenantType = await this.userTypeService.getTenantType(
+				claims.tenantId,
+				user.id,
+			);
+		}
 
 		// merge claims + safe DB fields
 		return {

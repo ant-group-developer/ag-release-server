@@ -36,12 +36,12 @@ export abstract class UpdateUserDto {
 	@Length(3, 50)
 	email?: string;
 
-	@ApiPropertyOptional()
+	@ApiPropertyOptional({ type: 'string' })
 	@IsOptional()
 	@IsString()
 	avatar?: string | null;
 
-	@ApiPropertyOptional()
+	@ApiPropertyOptional({ type: 'string' })
 	@IsOptional()
 	@IsString()
 	telegramId?: string | null;
