@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsUUID, Length, Matches } from 'class-validator';
+import {
+	IsEmail,
+	IsString,
+	IsUUID,
+	Length,
+	Matches,
+	ValidateIf,
+} from 'class-validator';
+import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 
 export class SiginDto {
 	@ApiProperty()
@@ -28,6 +36,7 @@ export class RefreshDto {
 
 export class SwitchTenantDto {
 	@ApiProperty()
-	@IsUUID()
+	@ValidateIf((obj, value) => value !== SYSTEM_TENANT_ID)
+	@IsUUID('4')
 	tenantId: string;
 }

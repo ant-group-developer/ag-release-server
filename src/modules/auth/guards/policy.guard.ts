@@ -42,45 +42,27 @@ export class PolicyGuard implements CanActivate {
 
 		const isSysAdmin = checkIsSystemAdmin(user.type);
 
-		/** 3) System admins bypass remaining checks */
-		if (isSysAdmin) return true;
-
-		/** 4) SystemAdminOnly — strictly enforce */
+		/** 3) SystemAdminOnly — explicitly enforce first */
 		const systemAdminOnly =
 			this.reflector.getAllAndOverride<boolean>(AUTH_SYSTEM_ADMIN_ONLY, [
 				handler,
 				clazz,
 			]) ?? false;
 
-		if (systemAdminOnly) {
+		if (systemAdminOnly && !isSysAdmin) {
 			throw new ResponseError(AuthMessages.SYSTEM_ADMIN_ONLY);
 		}
 
-		// Require tenantId because get user's permissions by tenantId and userId
-		if (!user.tenantId) {
-			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
-		}
+		/** 4) System admins bypass remaining checks */
+		if (isSysAdmin) return true;
 
-		/** 5) Permissions (ANY-of) */
+		/** 5) Gather metadata once */
 		const requiredPerms =
 			this.reflector.getAllAndOverride<Permission[]>(
 				AUTH_PERMISSIONS_KEY,
 				[handler, clazz],
 			) ?? [];
 
-		if (requiredPerms.length) {
-			const userPerms = new Set<string>(
-				Array.isArray(user.permission) ? user.permission : [],
-			);
-			const hasAny = requiredPerms.some((p) => userPerms.has(p));
-			if (!hasAny) {
-				throw new ResponseError(
-					buildInsufficientPermissionsMessage(requiredPerms),
-				);
-			}
-		}
-
-		/** 6) Tenant gates */
 		const tenantOwnerOnly =
 			this.reflector.getAllAndOverride<boolean>(
 				AUTH_TENANT_OWNER_ONLY_KEY,
@@ -93,29 +75,38 @@ export class PolicyGuard implements CanActivate {
 				[handler, clazz],
 			) ?? false;
 
-		if (tenantOwnerOrAdminOnly) {
-			const ok = checkIsTenantOwnerOrAdmin(user.tenantType);
-			if (!ok) {
+		/** 6) Require tenantId only when tenant context is needed */
+		const needsTenantContext =
+			requiredPerms.length > 0 ||
+			tenantOwnerOnly ||
+			tenantOwnerOrAdminOnly;
+		if (needsTenantContext && !user.tenantId) {
+			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
+		}
+
+		/** 7) Permissions (ANY-of) */
+		if (requiredPerms.length) {
+			const userPerms = new Set<string>(
+				Array.isArray(user.permission) ? user.permission : [],
+			);
+			const hasAny = requiredPerms.some((p) => userPerms.has(p));
+			if (!hasAny) {
 				throw new ResponseError(
-					AuthMessages.TENANT_OWNER_OR_ADMIN_ONLY,
+					buildInsufficientPermissionsMessage(requiredPerms),
 				);
 			}
 		}
 
+		/** 8) Tenant gates (mutually exclusive; owner is stricter) */
 		if (tenantOwnerOnly) {
 			const ok = checkIsTenantOwner(user.tenantType);
-			if (!ok) {
-				throw new ResponseError(AuthMessages.TENANT_OWNER_ONLY);
-			}
-		}
-
-		if (tenantOwnerOrAdminOnly) {
+			if (!ok) throw new ResponseError(AuthMessages.TENANT_OWNER_ONLY);
+		} else if (tenantOwnerOrAdminOnly) {
 			const ok = checkIsTenantOwnerOrAdmin(user.tenantType);
-			if (!ok) {
+			if (!ok)
 				throw new ResponseError(
 					AuthMessages.TENANT_OWNER_OR_ADMIN_ONLY,
 				);
-			}
 		}
 
 		return true;

@@ -33,6 +33,7 @@ import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
+import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
@@ -97,6 +98,7 @@ import { UserModule } from './modules/user/user.module';
 
 		AppConfigModule,
 		TenantModule,
+		TenantDspModule,
 		UserModule,
 		AuthModule,
 		TokenModule,

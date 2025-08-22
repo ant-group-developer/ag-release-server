@@ -1,3 +1,4 @@
+import { SYSTEM_TENANT_ID } from 'src/modules/tenant/tenant.constant';
 import { TenantUserType, UserType } from '../enum/user.enum';
 
 export const checkIsTenantAdmin = (type: TenantUserType): boolean => {
@@ -26,3 +27,6 @@ export const checkCanAccessTenantAll = (
 	const isTenantOwnerOrAdmin = checkIsTenantOwnerOrAdmin(tenantType);
 	return isSystemAdmin || isTenantOwnerOrAdmin;
 };
+
+export const checkIsSystemTenant = (tenantId: string) =>
+	tenantId === SYSTEM_TENANT_ID;

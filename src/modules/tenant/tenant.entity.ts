@@ -11,6 +11,7 @@ import {
 	TreeParent,
 } from 'typeorm';
 import { LENGTH_PICTURE } from '../database/constants/database.constants';
+import { TenantDsp } from '../tenant-dsp/tenant-dsp.entity';
 import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
 import { TenantType } from './tenant.enum';
@@ -107,4 +108,7 @@ export class Tenant extends BaseUUIDEntity {
 
 	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.tenant)
 	tenantUser: TenantUser[];
+
+	@OneToMany(() => TenantDsp, (tenantDsp) => tenantDsp.tenant)
+	tenantDsp: TenantDsp[];
 }

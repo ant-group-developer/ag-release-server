@@ -3,12 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 import { TenantService } from '../tenant/tenant.service';
 import { JwtPayload } from '../token/token.interface';
 import { TokenService } from '../token/token.service';
-import { UserType } from '../user/enum/user.enum';
+import { UserMessages } from '../user/constants/messages';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import { UserService } from '../user/services/user.service';
+import { checkIsSystemAdmin } from '../user/utils/user-type.util';
 import { SiginDto } from './auth.dto';
 import { AuthMessages } from './constants/messages';
 import { RefreshTokensService } from './refresh-tokens.service';
@@ -25,7 +27,19 @@ export class AuthService {
 	) {}
 
 	me(req: Request) {
-		return this.userService.findOne(req.user?.sub as string);
+		// return this.userService.findOne(req.user?.sub as string);
+		const user = req.user;
+		return {
+			id: user!.sub,
+			name: user!.name,
+			email: user!.email,
+			avatar: user!.avatar,
+			type: user!.type,
+			isActive: user!.isActive,
+			permission: user!.permission,
+			tenantId: user!.tenantId,
+			tenantType: user!.tenantType,
+		};
 	}
 
 	tenant(req: Request) {
@@ -39,11 +53,10 @@ export class AuthService {
 				tenantUser: true,
 			},
 			select: {
-				tenantUser: {
-					id: true,
-					type: true,
-					tenantId: true,
-				},
+				id: true,
+				isActive: true,
+				type: true,
+				password: true,
 			},
 		});
 
@@ -52,9 +65,23 @@ export class AuthService {
 		const valid = await verify(user.password, body.password);
 		if (!valid) throw new ResponseError(AuthMessages.INVALID_CREDENTIAL);
 
+		let tenantId;
+		if (checkIsSystemAdmin(user.type)) {
+			tenantId = SYSTEM_TENANT_ID;
+		} else {
+			const tenantUser = await this.tenantUserService.getDefaultTenant(
+				user.id,
+			);
+			if (tenantUser) {
+				tenantId = tenantUser.id;
+			} else {
+				throw new ResponseError(UserMessages.TENANT.NOT_FOUND);
+			}
+		}
+
 		const payload = {
 			sub: user.id,
-			tenantId: user.tenantUser[0]?.tenantId,
+			tenantId,
 		};
 
 		const accessToken = await this.tokens.signAccessToken(payload);
@@ -133,11 +160,12 @@ export class AuthService {
 			select: {
 				id: true,
 				isActive: true,
+				type: true,
 			},
 		});
 
 		this.userService.checkUserActive(user.isActive);
-		if (user.type !== UserType.ADMIN) {
+		if (!checkIsSystemAdmin(user.type)) {
 			await this.tenantUserService.checkMembership(tenantId, userId);
 		}
 

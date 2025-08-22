@@ -21,3 +21,4 @@ export const DEFAULT_AUTO_SCAN_TIME = '01:00';
 export const DEFAULT_LENGTH_NAME = 200;
 export const DEFAULT_LENGTH_CODE = 200;
 export const DEFAULT_LENGTH_NOTE = 500;
+export const DEFAULT_LENGTH_COLOR = 10;

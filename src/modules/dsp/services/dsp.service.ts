@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import difference from 'lodash/difference';
 import {
 	PageDto,
 	ResponseError,
@@ -8,8 +9,9 @@ import {
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DspMessageError } from '../constants/dsp.constant';
+import { DspMessages } from '../constants/dsp.message';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
 import { DspQueryService } from './dsp.query.service';
@@ -234,5 +236,23 @@ export class DspService {
 
 	async deleteDspAction(dspActionId: string) {
 		await this.dspActionService.delete(dspActionId);
+	}
+
+	async validateExisted(roleIds: string[]) {
+		const listDsp = await this.dspRepo.find({
+			where: {
+				id: In(roleIds),
+			},
+			select: ['id'],
+		});
+		const data = listDsp.map((item) => item.id);
+
+		if (data.length !== roleIds.length) {
+			const between = difference(roleIds, data);
+			throw new ResponseError({
+				...DspMessages.NOT_FOUND,
+				data: between,
+			});
+		}
 	}
 }
