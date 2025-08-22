@@ -114,6 +114,7 @@ export class AppConfigService implements OnModuleInit {
 			[AppConfigKey.ACR_ACCESS_KEY]: acrCloud.acrAccessKey,
 			[AppConfigKey.ACR_ACCESS_SECRET]: acrCloud.acrAccessSecret,
 			[AppConfigKey.CHUNK_DURATION]: acrCloud.chunkDuration,
+			[AppConfigKey.SCORE_WARNING]: acrCloud.scoreWarning,
 
 			// backup
 			[AppConfigKey.DATABASE_TO_DRIVE]: backupDatabase.toDrive,

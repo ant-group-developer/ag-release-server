@@ -1,7 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
-	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -13,7 +12,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
-import { FieldOrderTrack } from '../enum/track.enum';
+import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
 
 export class CreateTrackDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -118,10 +117,9 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 	@IsString()
 	labelId?: string;
 
-	@Transform(({ value }) => value === 'true')
-	@IsBoolean()
+	@IsEnum(ScanCopyrightStatus)
 	@IsOptional()
-	isScanned?: boolean;
+	scanCopyrightStatus?: ScanCopyrightStatus;
 
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;

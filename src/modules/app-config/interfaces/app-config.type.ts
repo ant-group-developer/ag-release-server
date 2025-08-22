@@ -74,12 +74,15 @@ export type AppConfigValueMap = {
 	[AppConfigKey.ACR_ACCESS_KEY]: string;
 	[AppConfigKey.ACR_ACCESS_SECRET]: string;
 	[AppConfigKey.CHUNK_DURATION]: number;
+	[AppConfigKey.SCORE_WARNING]: number;
+
+	//
 	[AppConfigKey.DATABASE_TO_DRIVE]: boolean;
 	[AppConfigKey.DATABASE_TO_GCS]: boolean;
-
-	[AppConfigKey.TELEGRAM_TOKEN]: string;
-	[AppConfigKey.CHAT_ID]: string;
-
 	[AppConfigKey.NOTIFY_ON_SUCCESS]: boolean;
 	[AppConfigKey.NOTIFY_ON_FAILED]: boolean;
+
+	//
+	[AppConfigKey.TELEGRAM_TOKEN]: string;
+	[AppConfigKey.CHAT_ID]: string;
 };

@@ -55,7 +55,7 @@ export class TrackQueryService {
 
 			artistId,
 			labelId,
-			isScanned,
+			scanCopyrightStatus,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -100,10 +100,13 @@ export class TrackQueryService {
 			});
 		}
 
-		if (isScanned !== undefined) {
-			queryBuilder.andWhere('track.isScanned = :isScanned', {
-				isScanned,
-			});
+		if (scanCopyrightStatus) {
+			queryBuilder.andWhere(
+				'track.scanCopyrightStatus = :scanCopyrightStatus',
+				{
+					scanCopyrightStatus,
+				},
+			);
 		}
 
 		if (startCreatedAt && endCreatedAt) {

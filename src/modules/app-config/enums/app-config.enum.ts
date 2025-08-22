@@ -33,6 +33,7 @@ export enum AppConfigKey {
 	ACR_ACCESS_KEY = 'acr_access_key',
 	ACR_ACCESS_SECRET = 'acr_access_secret',
 	CHUNK_DURATION = 'chunk_duration',
+	SCORE_WARNING = 'score_warning',
 
 	// backup
 	DATABASE_TO_DRIVE = 'database_to_drive',
