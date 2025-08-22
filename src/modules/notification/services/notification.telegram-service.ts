@@ -26,21 +26,7 @@ export class TelegramService implements OnModuleInit {
 
 	private reloadConfig() {
 		this.stopBotSafe();
-
-		this.token = this.appConfigService.getValue(
-			AppConfigKey.TELEGRAM_TOKEN,
-		);
-
-		if (this.token) {
-			this.bot = new TelegramBot(this.token, { polling: true });
-
-			this.chatIdDev = Number(
-				this.appConfigService.getValue(AppConfigKey.CHAT_ID),
-			);
-
-			this.applyReplyPing();
-			this.sendHelloGroup();
-		}
+		this.newBot();
 	}
 
 	private sendMessageSafe({
@@ -65,6 +51,23 @@ export class TelegramService implements OnModuleInit {
 			this.bot.stopPolling().catch((_e) => {
 				this.logger.error(_e);
 			});
+		}
+	}
+
+	private newBot() {
+		this.token = this.appConfigService.getValue(
+			AppConfigKey.TELEGRAM_TOKEN,
+		);
+
+		if (this.token) {
+			this.bot = new TelegramBot(this.token, { polling: true });
+
+			this.chatIdDev = Number(
+				this.appConfigService.getValue(AppConfigKey.CHAT_ID),
+			);
+
+			this.applyReplyPing();
+			this.sendHelloGroup();
 		}
 	}
 
