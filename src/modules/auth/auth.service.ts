@@ -93,6 +93,8 @@ export class AuthService {
 		const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : null;
 		await this.refreshSvc.persist(user.id, jti, refreshToken, expiresAt);
 
+		this.userService.updateLastLogin(user.id);
+
 		return { accessToken, refreshToken };
 	}
 

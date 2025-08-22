@@ -11,6 +11,8 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { TenantUserService } from '../user/services/tenant-user.service';
+import { checkIsSystemAdmin } from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -22,7 +24,10 @@ import { TenantService } from './tenant.service';
 @ApiTags('Tenants')
 @Controller('tenants')
 export class TenantController {
-	constructor(private readonly tenantService: TenantService) {}
+	constructor(
+		private readonly tenantService: TenantService,
+		private readonly TenantUserService: TenantUserService,
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: 'Get all tenants' })
@@ -58,9 +63,13 @@ export class TenantController {
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
-		@Body() payload: UpdateTenantDto,
+		@Body() { ownerId, ...payload }: UpdateTenantDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Tenant>> {
 		const result = await this.tenantService.update(id, payload);
+		if (ownerId && checkIsSystemAdmin(req.user!.type)) {
+			await this.TenantUserService.updateOwner(result.id, ownerId);
+		}
 		return new ResponseSuccess({ data: result });
 	}
 }

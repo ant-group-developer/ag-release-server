@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { TenantService } from 'src/modules/tenant/tenant.service';
+import { In, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
+import { BulkUpdateTenantUserDto } from '../dto/user.dto';
 import { TenantUser } from '../entities/tenant-user.entity';
 import { TenantUserType } from '../enum/user.enum';
 import {
@@ -19,6 +21,7 @@ export class TenantUserService {
 		@InjectRepository(TenantUser)
 		private readonly tenantUserRepository: Repository<TenantUser>,
 		private readonly userService: UserService,
+		private readonly tenantService: TenantService,
 	) {}
 
 	async getDefaultTenant(userId: string) {
@@ -69,7 +72,6 @@ export class TenantUserService {
 		if (existData) {
 			throw new ResponseError(UserMessages.TENANT.CONFLICT);
 		}
-		return existData;
 	}
 
 	async checkMembership(tenantId: string, userId: string) {
@@ -81,8 +83,6 @@ export class TenantUserService {
 		userId: string,
 		type: TenantUserType,
 	): Promise<TenantUser> {
-		await this.userService.findOne(userId);
-		await this.checkExisted(tenantId, userId);
 		const tenantUser = this.tenantUserRepository.create({
 			tenantId,
 			userId,
@@ -108,12 +108,7 @@ export class TenantUserService {
 	): Promise<TenantUser> {
 		const user = await this.userService.findOneByEmail(email);
 		await this.checkExisted(tenantId, user.id);
-		const tenantUser = this.tenantUserRepository.create({
-			tenantId,
-			userId: user.id,
-			type,
-		});
-		return this.tenantUserRepository.save(tenantUser);
+		return this.addUserToTenant(tenantId, user.id, type);
 	}
 
 	async remove(req: Request, userId: string) {
@@ -144,5 +139,52 @@ export class TenantUserService {
 		}
 
 		return this.tenantUserRepository.delete({ tenantId, userId });
+	}
+
+	async bulkUpdateTenantUser({ userId, data }: BulkUpdateTenantUserDto) {
+		await this.userService.findOne(userId);
+		await this.tenantService.validateExisted(
+			data.map((item) => item.tenantId),
+		);
+		await this.tenantUserRepository.delete({
+			type: In([TenantUserType.ADMIN, TenantUserType.MEMBER]),
+			userId,
+		});
+		const newData = data.map((item) =>
+			this.tenantUserRepository.create({
+				tenantId: item.tenantId,
+				type: item.type,
+				userId,
+			}),
+		);
+		return this.tenantUserRepository.save(newData);
+	}
+
+	async removeCurrentOwner(tenantId: string) {
+		await this.tenantUserRepository.delete({
+			tenantId,
+			type: TenantUserType.OWNER,
+		});
+	}
+
+	async updateOwner(tenantId: string, ownerId: string) {
+		await this.userService.findOne(ownerId);
+		const tenantUser = await this.findOne(tenantId, ownerId);
+		if (tenantUser) {
+			if (checkIsTenantOwner(tenantUser.type)) {
+				return tenantUser;
+			} else {
+				await this.removeCurrentOwner(tenantId);
+				tenantUser.type = TenantUserType.OWNER;
+				return this.tenantUserRepository.save(tenantUser);
+			}
+		} else {
+			await this.removeCurrentOwner(tenantId);
+			return this.addUserToTenant(
+				tenantId,
+				ownerId,
+				TenantUserType.OWNER,
+			);
+		}
 	}
 }

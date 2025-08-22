@@ -9,21 +9,29 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
 import { DeleteResult } from 'typeorm';
+import { AuthMessages } from '../auth/constants/messages';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { UserMessages } from './constants/messages';
 import {
+	BulkUpdateTenantUserDto,
 	CreateUserDto,
 	GetListUserDto,
 	InviteUserToTenantDto,
 	UpdateUserDto,
 } from './dto/user.dto';
 import { User } from './entities/user.entity';
-import { TenantUserType, UserType } from './enum/user.enum';
+import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
+import { checkIsSystemTenant } from './utils/user-type.util';
 
 @ApiTags('Users')
 @Controller('users')
@@ -38,11 +46,14 @@ export class UserController {
 		@Body() payload: CreateUserDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<User>> {
+		const tenantId = checkIsSystemTenant(req.user!.tenantId)
+			? payload.tenantId
+			: req.user!.tenantId;
+		if (!tenantId) {
+			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
+		}
+
 		const result = await this.userService.create(payload);
-		const tenantId =
-			req.user?.type === UserType.ADMIN
-				? (payload.tenantId ?? req.user?.tenantId)
-				: req.user!.tenantId;
 		await this.tenantUserService.addUserToTenant(
 			tenantId,
 			result.id,
@@ -69,7 +80,23 @@ export class UserController {
 
 	@Get(':id')
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<User>> {
-		const result = await this.userService.findOne(id);
+		const result = await this.userService.findOne(id, {
+			relations: {
+				tenantUser: {
+					tenant: true,
+				},
+			},
+			select: {
+				tenantUser: {
+					id: true,
+					type: true,
+					tenant: {
+						id: true,
+						name: true,
+					},
+				},
+			},
+		});
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -90,6 +117,17 @@ export class UserController {
 	// 		message: 'Sync user data from Auth0 successfully',
 	// 	});
 	// }
+
+	@ApiOperation({
+		summary:
+			'Bulk update tenant user (accept tenant type member or admin only',
+	})
+	@SystemAdminOnly()
+	@Post('bulk-update-tenant-user')
+	async bulkUpdateTenantUser(@Body() payload: BulkUpdateTenantUserDto) {
+		const data = await this.tenantUserService.bulkUpdateTenantUser(payload);
+		return new ResponseSuccess({ data });
+	}
 
 	@Put(':id')
 	async update(

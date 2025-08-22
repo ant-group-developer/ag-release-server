@@ -1,16 +1,20 @@
 import {
 	BadRequestException,
 	ConflictException,
+	forwardRef,
+	Inject,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
+import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { Brackets, In, TreeRepository } from 'typeorm';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
+import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -26,6 +30,7 @@ export class TenantService {
 	constructor(
 		@InjectRepository(Tenant)
 		private readonly tenantTreeRepo: TreeRepository<Tenant>,
+		@Inject(forwardRef(() => TenantUserService))
 		private readonly tenantUserService: TenantUserService,
 	) {}
 
@@ -50,16 +55,9 @@ export class TenantService {
 
 		// 1) Fetch the root tenant and its direct children (no keyword/type filtering here),
 		//    attach tenantUserCount via loadRelationCountAndMap, avoid row duplication.
-		const baseTenants = await this.tenantTreeRepo
+		const queryBuilder = this.tenantTreeRepo
 			.createQueryBuilder('t')
 			.leftJoinAndSelect('t.parent', 'p')
-			.where(
-				new Brackets((w) =>
-					w
-						.where('t.id = :tid', { tid: tenantId })
-						.orWhere('p.id = :tid', { tid: tenantId }),
-				),
-			)
 			// Ensure OWNER exists without joining tenantUser (prevents row explosion)
 			.andWhere(
 				`EXISTS (
@@ -79,8 +77,19 @@ export class TenantService {
 				't.icon',
 				't.type',
 				'p.id',
-			])
-			.getMany();
+			]);
+
+		if (!checkIsSystemTenant(tenantId)) {
+			queryBuilder.andWhere(
+				new Brackets((w) =>
+					w
+						.where('t.id = :tid', { tid: tenantId })
+						.orWhere('p.id = :tid', { tid: tenantId }),
+				),
+			);
+		}
+
+		const baseTenants = await queryBuilder.getMany();
 
 		if (!baseTenants.length) {
 			return new PageDto({
@@ -358,15 +367,34 @@ export class TenantService {
 		return this.findOne(id);
 	}
 
-	async validateExisted(id: string) {
-		const data = await this.tenantTreeRepo.findOne({
-			where: {
-				id,
-			},
-			select: ['id'],
-		});
-		if (!data) {
-			throw new ResponseError(TenantMessages.NOT_FOUND);
+	async validateExisted(id: string | string[]) {
+		if (Array.isArray(id)) {
+			const list = await this.tenantTreeRepo.find({
+				where: {
+					id: In(id),
+				},
+				select: ['id'],
+			});
+			if (list.length !== id.length) {
+				const diffIds = differenceBy(
+					id,
+					list.map((item) => item.id),
+				);
+				throw new ResponseError({
+					...TenantMessages.NOT_FOUND,
+					data: diffIds,
+				});
+			}
+		} else {
+			const data = await this.tenantTreeRepo.findOne({
+				where: {
+					id,
+				},
+				select: ['id'],
+			});
+			if (!data) {
+				throw new ResponseError(TenantMessages.NOT_FOUND);
+			}
 		}
 	}
 }

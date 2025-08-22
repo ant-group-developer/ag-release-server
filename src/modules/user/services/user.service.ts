@@ -100,8 +100,17 @@ export class UserService {
 	}
 
 	async getList(query: GetListUserDto, req: Request): Promise<PageDto<User>> {
-		const { page, pageSize, skip, type, keyword, id, orderBy, fieldOrder } =
-			query;
+		const {
+			page,
+			pageSize,
+			skip,
+			type,
+			keyword,
+			id,
+			orderBy,
+			fieldOrder,
+			tenantIds,
+		} = query;
 
 		const tenantId = req.user!.tenantId;
 
@@ -129,7 +138,7 @@ export class UserService {
 				'user.type',
 				'user.isActive',
 				'user.lastLogin',
-				'user.loginsCount',
+				'user.lastActive',
 				'user.createdAt',
 				'user.updatedAt',
 				// 'creator.id',
@@ -138,7 +147,7 @@ export class UserService {
 				// 'modifier.email',
 				'tenantUser.id',
 				'tenantUser.type',
-				'tenantUser.tenantId',
+				// 'tenantUser.tenantId',
 				'tenant.id',
 				'tenant.name',
 			])
@@ -161,6 +170,12 @@ export class UserService {
 
 		if (type?.length) {
 			queryBuilder.andWhere('user.type IN (:...type)', { type });
+		}
+
+		if (tenantIds?.length) {
+			queryBuilder.andWhere('tenantUser.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
 		}
 
 		if (keyword) {
@@ -212,5 +227,23 @@ export class UserService {
 		});
 
 		return this.findOne(savedData.id);
+	}
+
+	updateLastActive(userId: string) {
+		try {
+			this.userRepository.update(userId, {
+				lastActive: new Date(),
+			});
+		} catch (error) {
+			console.log('error:', error);
+		}
+	}
+
+	updateLastLogin(userId: string) {
+		try {
+			this.userRepository.update(userId, { lastLogin: new Date() });
+		} catch (error) {
+			console.log('error:', error);
+		}
 	}
 }

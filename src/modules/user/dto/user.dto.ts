@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+	IsArray,
 	IsBoolean,
 	IsEmail,
 	IsEnum,
@@ -8,8 +10,12 @@ import {
 	IsUUID,
 	Length,
 	Matches,
+	ValidateNested,
 } from 'class-validator';
-import { CsvEnumArray } from 'src/common/decorators/csv.decorators';
+import {
+	CsvEnumArray,
+	CsvUuidArray,
+} from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { TenantUserType, UserOrderBy, UserType } from '../enum/user.enum';
 
@@ -87,10 +93,15 @@ export class CreateUserDto extends UpdateUserDto {
 	@IsUUID()
 	tenantId?: string;
 
-	@ApiPropertyOptional({ enum: TenantUserType })
+	@ApiPropertyOptional({
+		enum: [TenantUserType.ADMIN, TenantUserType.MEMBER],
+	})
 	@IsOptional()
-	@IsEnum(TenantUserType)
-	tenantType?: TenantUserType;
+	@IsEnum([TenantUserType.ADMIN, TenantUserType.MEMBER], {
+		message: (option) =>
+			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
+	})
+	tenantType?: TenantUserType.ADMIN | TenantUserType.MEMBER;
 }
 
 export class GetListUserDto extends BaseQueryDto {
@@ -116,6 +127,14 @@ export class GetListUserDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(UserOrderBy)
 	fieldOrder: UserOrderBy = UserOrderBy.UPDATED_AT;
+
+	@ApiPropertyOptional({
+		description: 'Tenant IDs to filter users (comma-separated)',
+		type: 'string',
+		format: 'uuid',
+	})
+	@CsvUuidArray()
+	tenantIds?: string[];
 }
 
 export class InviteUserToTenantDto {
@@ -124,8 +143,39 @@ export class InviteUserToTenantDto {
 	@Length(3, 50)
 	email: string;
 
-	@ApiPropertyOptional({ enum: TenantUserType })
-	@IsOptional()
-	@IsEnum(TenantUserType)
-	type?: TenantUserType;
+	@ApiProperty({
+		enum: [TenantUserType.ADMIN, TenantUserType.MEMBER],
+	})
+	@IsEnum([TenantUserType.ADMIN, TenantUserType.MEMBER], {
+		message: (option) =>
+			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
+	})
+	type: TenantUserType.ADMIN | TenantUserType.MEMBER;
+}
+
+export class UpdateTenantUserDto {
+	@ApiProperty({
+		enum: [TenantUserType.ADMIN, TenantUserType.MEMBER],
+	})
+	@IsEnum([TenantUserType.ADMIN, TenantUserType.MEMBER], {
+		message: (option) =>
+			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
+	})
+	type: TenantUserType.ADMIN | TenantUserType.MEMBER;
+
+	@ApiProperty()
+	@IsUUID()
+	tenantId: string;
+}
+
+export class BulkUpdateTenantUserDto {
+	@ApiProperty({ type: [UpdateTenantUserDto] })
+	@ValidateNested({ each: true })
+	@Type(() => UpdateTenantUserDto)
+	@IsArray()
+	data: UpdateTenantUserDto[];
+
+	@ApiProperty()
+	@IsUUID()
+	userId: string;
 }

@@ -9,7 +9,6 @@ export enum UserOrderBy {
 	NAME = 'name',
 	EMAIL = 'email',
 	LAST_LOGIN = 'lastLogin',
-	LOGIN_COUNT = 'loginsCount',
 }
 
 export enum TenantUserType {
