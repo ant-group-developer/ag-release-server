@@ -96,7 +96,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	}
 
 	private async backup(data: BackupDto) {
-		const { toDrive, toGcs } = data;
+		const { toDrive, toGcs } = this;
 
 		const fileName = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
@@ -173,6 +173,28 @@ export class DatabaseBackupService implements OnModuleInit {
 
 		const resultDb = await this.backupRepo.save(result);
 		await this.sendNotificationBackup(resultDb);
+	}
+
+	async a() {
+		const { toDrive, toGcs } = this;
+
+		const fileName = generateFileNameWithTimestamp(
+			'backup_ant_release.sql',
+			DateFormat['YYYY-MM-DD_HH-mm-ss'],
+		);
+
+		const a = await this.backupRepo.create({
+			urlDrive: toDrive
+				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+				: null,
+			urlGcs: toGcs
+				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+				: null,
+			status: StatusBackup.RUNNING,
+			fileName,
+		});
+
+		await this.backupRepo.save(a);
 	}
 
 	handleCreateSafe() {
