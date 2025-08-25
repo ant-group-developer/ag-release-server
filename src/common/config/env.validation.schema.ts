@@ -39,4 +39,8 @@ export const envValidationSchema = Joi.object({
 	JWT_EXPIRES_IN: Joi.string().default('15m'),
 	JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 	JWT_KID: Joi.string().default('v1'),
+
+	// BACK UP
+	BASE_URL_GCS: Joi.string().required(),
+	BASE_URL_CONSOLE_GCS_BACKUP: Joi.string().required(),
 });
