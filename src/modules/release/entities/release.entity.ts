@@ -10,6 +10,7 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territoty.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
@@ -198,4 +199,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	// virtual column
 	coverArtThumbnails?: ICoverArtThumbnails;
+
+	@Column({ type: 'uuid' })
+	tenantId: string;
+
+	@ManyToOne(() => Tenant)
+	@JoinColumn({ name: 'tenant_id' })
+	tenant: Tenant;
 }

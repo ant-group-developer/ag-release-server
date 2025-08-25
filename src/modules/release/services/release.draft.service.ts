@@ -40,7 +40,10 @@ export class ReleaseDraftService {
 	) {}
 
 	// create
-	async create(data: CreateReleaseDraftDto): Promise<Release> {
+	async create(
+		data: CreateReleaseDraftDto,
+		tenantId: string,
+	): Promise<Release> {
 		const {
 			albumFormatId,
 			labelId,
@@ -57,7 +60,7 @@ export class ReleaseDraftService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create(data);
+		const release = this.releaseRepo.create({ ...data, tenantId });
 		const releaseDb = await this.releaseRepo.save(release);
 
 		// coverArt
