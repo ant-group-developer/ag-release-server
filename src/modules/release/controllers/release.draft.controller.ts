@@ -7,14 +7,18 @@ import {
 	ParseUUIDPipe,
 	Post,
 	Put,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseError, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	ReleaseMessageCodeSuccess,
+	ReleaseMessages,
 	ReleaseMessageSuccess,
 } from '../constants/release.constant';
 
+import { Request } from 'express';
+import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
@@ -28,8 +32,15 @@ export class ReleaseDraftController {
 	constructor(private readonly releaseDraftService: ReleaseDraftService) {}
 
 	@Post()
-	async create(@Body() data: CreateReleaseDraftDto) {
-		const result = await this.releaseDraftService.create(data);
+	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
+		const tenantId = req.user!.tenantId;
+		if (checkIsSystemTenant(tenantId)) {
+			throw new ResponseError(ReleaseMessages.DECLINE_SYSTEM_TENANT);
+		}
+		const result = await this.releaseDraftService.create(
+			data,
+			req.user!.tenantId,
+		);
 
 		return new ResponseSuccess({
 			data: result,
