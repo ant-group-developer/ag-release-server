@@ -126,19 +126,6 @@ export class TrackDraftService {
 		const [tracksDb, totalItems] =
 			await this.trackQueryService.getListWithPolicy(query);
 
-		// const trackIdsMissingPolicies = tracksDb
-		// 	.filter(
-		// 		(track) =>
-		// 			!track.trackPolicies || track.trackPolicies.length === 0,
-		// 	)
-		// 	.map((track) => track.id);
-
-		// if (trackIdsMissingPolicies.length > 0) {
-		// 	await this.trackPolicyService.createTrackPoliciesForMultipleTracks(
-		// 		trackIdsMissingPolicies,
-		// 	);
-		// }
-
 		return new PageDto({
 			items: tracksDb,
 			metadata: {
@@ -147,6 +134,24 @@ export class TrackDraftService {
 				totalItems,
 			},
 		});
+	}
+
+	async createTrackPolicies() {
+		const tracksDb = await this.trackRepo.find({
+			relations: ['trackPolicies'],
+		});
+
+		const trackIdsMissingPolicies = tracksDb
+			.filter(
+				(track) =>
+					!track.trackPolicies || track.trackPolicies.length === 0,
+			)
+			.map((track) => track.id);
+		if (trackIdsMissingPolicies.length > 0) {
+			await this.trackPolicyService.createTrackPoliciesForMultipleTracks(
+				trackIdsMissingPolicies,
+			);
+		}
 	}
 
 	// update

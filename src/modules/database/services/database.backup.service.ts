@@ -15,7 +15,7 @@ import { NotificationService } from 'src/modules/notification/services/notificat
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
 import { promisify } from 'util';
-import { BackupDto, QueryGetListBackup } from '../dto/database.dto';
+import { QueryGetListBackup } from '../dto/database.dto';
 import { Backup } from '../entities/database.backup.entity';
 import { StatusBackup } from '../enums/database.enum';
 
@@ -30,17 +30,19 @@ export class DatabaseBackupService implements OnModuleInit {
 		database: string;
 	};
 
+	// private acrCloud: AppConfig['config']['backupDatabase'];
+
 	private notifyOnFailed: boolean;
 	private notifyOnSuccess: boolean;
 
 	private toDrive: boolean;
 	private toGcs: boolean;
 
-	private folderBackupDriveId: string;
-	private baseUrlDrive: string;
-
 	private bucketName: string;
 	private baseUrlGcs: string;
+
+	private baseUrlConsoleGcsBackup =
+		'https://console.cloud.google.com/storage/browser/_details/ant-music-assets-protected/backups';
 
 	private urlFolderBucket: string;
 
@@ -62,7 +64,7 @@ export class DatabaseBackupService implements OnModuleInit {
 		};
 
 		this.bucketName = this.configService.get<string>('PROTECTED_BUCKET')!;
-		this.baseUrlDrive = 'https://drive.google.com/file/d/';
+		// this.baseUrlDrive = 'https://drive.google.com/file/d/';
 		this.baseUrlGcs = 'https://storage.cloud.google.com';
 		this.urlFolderBucket =
 			'https://console.cloud.google.com/storage/browser/ant-music-assets-protected/backups';
@@ -95,13 +97,15 @@ export class DatabaseBackupService implements OnModuleInit {
 		);
 	}
 
-	private async backup(data: BackupDto) {
+	private async backup() {
 		const { toDrive, toGcs } = this;
 
 		const fileName = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
 			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
+
+		const urlFolderGcs = this.getUrlConsoleGcsBackup(fileName);
 
 		const timeStart = Date.now();
 		const result = this.backupRepo.create({
@@ -111,6 +115,7 @@ export class DatabaseBackupService implements OnModuleInit {
 			urlGcs: toGcs
 				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
 				: null,
+			urlFolderGcs,
 			status: StatusBackup.RUNNING,
 			fileName,
 		});
@@ -166,36 +171,33 @@ export class DatabaseBackupService implements OnModuleInit {
 	}
 
 	async handleCreate() {
-		const result = await this.backup({
-			toDrive: this.toDrive,
-			toGcs: this.toGcs,
-		});
+		const result = await this.backup();
 
 		const resultDb = await this.backupRepo.save(result);
 		await this.sendNotificationBackup(resultDb);
 	}
 
-	async a() {
-		const { toDrive, toGcs } = this;
+	// async a() {
+	// 	const { toDrive, toGcs } = this;
 
-		const fileName = generateFileNameWithTimestamp(
-			'backup_ant_release.sql',
-			DateFormat['YYYY-MM-DD_HH-mm-ss'],
-		);
+	// 	const fileName = generateFileNameWithTimestamp(
+	// 		'backup_ant_release.sql',
+	// 		DateFormat['YYYY-MM-DD_HH-mm-ss'],
+	// 	);
 
-		const a = await this.backupRepo.create({
-			urlDrive: toDrive
-				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
-				: null,
-			urlGcs: toGcs
-				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
-				: null,
-			status: StatusBackup.RUNNING,
-			fileName,
-		});
+	// 	const a = this.backupRepo.create({
+	// 		urlDrive: toDrive
+	// 			? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+	// 			: null,
+	// 		urlGcs: toGcs
+	// 			? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+	// 			: null,
+	// 		status: StatusBackup.RUNNING,
+	// 		fileName,
+	// 	});
 
-		await this.backupRepo.save(a);
-	}
+	// 	await this.backupRepo.save(a);
+	// }
 
 	handleCreateSafe() {
 		this.handleCreate().catch((_e) => {
@@ -203,16 +205,18 @@ export class DatabaseBackupService implements OnModuleInit {
 		});
 	}
 
+	private getUrlConsoleGcsBackup(fileName: string) {
+		return this.baseUrlConsoleGcsBackup + `/${fileName}`;
+	}
+
+	//
 	async sendNotificationBackup(result: Backup) {
 		const { status } = result;
 
 		if (status === StatusBackup.SUCCESS && this.notifyOnSuccess) {
-			await this.notificationService.notifyOnBackupSuccess({
-				...result,
-				fileOnBucket: this.urlFolderBucket,
-			});
+			await this.notificationService.notifyOnBackupSuccess(result);
 		}
-		if (status === StatusBackup.FAILED && this.notifyOnSuccess) {
+		if (status === StatusBackup.FAILED && this.notifyOnFailed) {
 			await this.notificationService.notifyOnBackupFailed(result);
 		}
 	}

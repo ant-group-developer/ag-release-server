@@ -207,6 +207,9 @@ export class ReleaseQueryService {
 
 			.leftJoinAndSelect('release.label', 'label')
 
+			.leftJoin('release.modifier', 'modifier')
+			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar'])
+
 			// virtual
 			.addSelect((subQuery) => {
 				return subQuery

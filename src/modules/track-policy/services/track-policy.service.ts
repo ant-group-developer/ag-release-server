@@ -20,23 +20,23 @@ export class TrackPolicyService {
 		private readonly actionRepo: Repository<Action>,
 	) {}
 
-	// async createTrackPoliciesForMultipleTracks(trackIds: string[]) {
-	// 	const listDspWithDefaultAction =
-	// 		await this.trackPolicyDspService.getListWithDefaultActions();
+	async createTrackPoliciesForMultipleTracks(trackIds: string[]) {
+		const listDspWithDefaultAction =
+			await this.trackPolicyDspService.getListWithDefaultActions();
 
-	// 	const trackPolicies = trackIds
-	// 		.map((trackId) =>
-	// 			listDspWithDefaultAction.map((item) =>
-	// 				this.trackPolicyRepo.create({
-	// 					...item,
-	// 					trackId,
-	// 				}),
-	// 			),
-	// 		)
-	// 		.flat();
+		const trackPolicies = trackIds
+			.map((trackId) =>
+				listDspWithDefaultAction.map((item) =>
+					this.trackPolicyRepo.create({
+						...item,
+						trackId,
+					}),
+				),
+			)
+			.flat();
 
-	// 	return this.trackPolicyRepo.save(trackPolicies);
-	// }
+		return this.trackPolicyRepo.save(trackPolicies);
+	}
 
 	async createTrackPoliciesOfTrack({ trackId }: { trackId: string }) {
 		const listEntities = await this.createListEntities({ trackId });
