@@ -36,14 +36,9 @@ export class TelegramService implements OnModuleInit {
 		chatId: number;
 		message: string;
 	}) {
-		this.bot
-			.sendMessage(chatId, message)
-			.then(() => {
-				this.logger.log('Message sent successfully!');
-			})
-			.catch((error) => {
-				this.logger.error('Error sending message:', error);
-			});
+		this.bot.sendMessage(chatId, message).catch((error) => {
+			this.logger.error('Error sending message:', error);
+		});
 	}
 
 	private stopBotSafe() {

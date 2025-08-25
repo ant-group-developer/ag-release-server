@@ -115,13 +115,7 @@ export class AudioFileDraftService {
 	}
 
 	async deleteAudioAndPeak(audioFile: AudioFile) {
-		await this.bucketService.delete(audioFile.fileId);
-		await this.bucketService.delete(audioFile.peakId);
-	}
-
-	async deleteRecordOfTrackSafe({ trackId }: { trackId: string }) {
-		await this.deleteRecordOfTrack({ trackId }).catch((e) =>
-			this.logger.warn(`Skip delete, reason: ${e.message}`),
-		);
+		await this.bucketService.deleteSafe(audioFile.fileId);
+		await this.bucketService.deleteSafe(audioFile.peakId);
 	}
 }

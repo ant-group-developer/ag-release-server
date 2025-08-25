@@ -98,4 +98,8 @@ export class TrackPolicyService {
 
 		return this.trackPolicyRepo.save(entity);
 	}
+
+	async deleteRecordOrTrack({ trackId }: { trackId: string }) {
+		await this.trackPolicyRepo.delete({ trackId });
+	}
 }

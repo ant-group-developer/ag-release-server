@@ -30,8 +30,6 @@ export class DatabaseBackupService implements OnModuleInit {
 		database: string;
 	};
 
-	// private acrCloud: AppConfig['config']['backupDatabase'];
-
 	private notifyOnFailed: boolean;
 	private notifyOnSuccess: boolean;
 
@@ -103,8 +101,6 @@ export class DatabaseBackupService implements OnModuleInit {
 		);
 
 		const urlFolderGcs = this.getUrlConsoleGcsBackup(fileName);
-
-		console.log(this.baseUrlGcs);
 
 		const timeStart = Date.now();
 		const result = this.backupRepo.create({

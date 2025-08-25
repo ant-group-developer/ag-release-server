@@ -155,44 +155,34 @@ export class ReleaseDraftService {
 	}
 
 	// delete
-	async delete(id: string) {
+	async deleteDb(id: string) {
 		await this.releaseRepo.delete(id);
 	}
 
-	async deleteSafe(id: string) {
-		await this.delete(id).catch((e) =>
-			this.logger.warn(`Skip delete, reason: ${e.message}`),
-		);
+	async handleDelete(id: string): Promise<void> {
+		await this.deleteRelatedRecords({ releaseId: id });
+		await this.deleteDb(id);
 	}
 
-	async handleDeleteSafe(id: string): Promise<void> {
-		await this.deleteRelatedRecordsSafe({ releaseId: id });
-		await this.deleteSafe(id);
-	}
-
-	private async deleteRelatedRecordsSafe({
-		releaseId,
-	}: {
-		releaseId: string;
-	}) {
+	private async deleteRelatedRecords({ releaseId }: { releaseId: string }) {
 		await Promise.all([
-			this.releaseLanguageDraftService.deleteRecordOfReleaseSafe({
+			this.releaseLanguageDraftService.deleteRecordOfRelease({
 				releaseId,
 			}),
 
-			this.releaseArtistService.deleteRecordOfReleaseSafe({
+			this.releaseArtistService.deleteRecordOfRelease({
 				releaseId,
 			}),
 
-			this.releaseCoverArtService.deleteRecordOfReleaseSafe({
+			this.releaseCoverArtService.deleteRecordOfRelease({
 				releaseId,
 			}),
 
-			this.trackDraftService.deleteRecordOfReleaseSafe({
+			this.trackDraftService.deleteRecordOfRelease({
 				releaseId,
 			}),
 
-			this.releaseTerritoryService.deleteRecordOfReleaseSafe({
+			this.releaseTerritoryService.deleteRecordOfRelease({
 				releaseId,
 			}),
 		]);
