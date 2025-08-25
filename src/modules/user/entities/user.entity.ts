@@ -39,9 +39,6 @@ export class User extends BaseUUIDEntity {
 	@Column({ name: 'last_ip', nullable: true })
 	lastIp: string;
 
-	@Column({ name: 'logins_count', default: 0 })
-	loginsCount: number;
-
 	@OneToMany(() => UserRole, (userRole) => userRole.user)
 	userRoles: UserRole[];
 

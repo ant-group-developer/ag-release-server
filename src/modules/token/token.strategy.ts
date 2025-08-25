@@ -70,7 +70,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 		}
 
 		const user = await this.userService.findOne(claims.sub, {
-			select: ['type', 'isActive', 'email', 'name', 'avatar'],
+			select: ['id', 'type', 'isActive', 'email', 'name', 'avatar'],
 		});
 		if (!user) throw new ResponseError(UserMessages.NOT_FOUND);
 
@@ -90,6 +90,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 				user.id,
 			);
 		}
+
+		this.userService.updateLastActive(user.id);
 
 		// merge claims + safe DB fields
 		return {
