@@ -31,3 +31,11 @@ export const ReleaseMessageError = {
 	ERROR_MAX_COUNT_TRACKS: 'Error max count tracks',
 	ERROR_MIN_COUNT_TRACKS: 'Error min count tracks',
 };
+
+export const ReleaseMessages = {
+	DECLINE_SYSTEM_TENANT: {
+		statusCode: 403,
+		message: 'You cannot create release in tenant system',
+		messageCode: 'release.message.error.declineSystemTenant',
+	},
+};
