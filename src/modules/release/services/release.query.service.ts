@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessageError } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
@@ -141,6 +142,19 @@ export class ReleaseQueryService {
 		return queryBuilder;
 	}
 
+	filterByPermission(
+		queryBuilder: SelectQueryBuilder<Release>,
+		tenantId: string,
+	) {
+		if (checkIsSystemTenant(tenantId)) {
+			queryBuilder
+				.leftJoin('release.tenant', 'tenant')
+				.addSelect(['tenant.id', 'tenant.name']);
+		} else {
+			queryBuilder.andWhere('release.tenantId = :tenantId', { tenantId });
+		}
+	}
+
 	// public
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
@@ -158,8 +172,9 @@ export class ReleaseQueryService {
 		return release;
 	}
 
-	async getManyAndCount(query: QueryGetListReleaseDto) {
+	async getManyAndCount(query: QueryGetListReleaseDto, tenantId: string) {
 		const queryGetList = this.createQueryGetList(query);
+		this.filterByPermission(queryGetList, tenantId);
 
 		// left join
 		queryGetList

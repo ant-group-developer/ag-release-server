@@ -7,6 +7,7 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
@@ -16,6 +17,7 @@ import {
 	ReleaseMessageSuccess,
 } from '../constants/release.constant';
 
+import { Request } from 'express';
 import {
 	QueryGetListReleaseDto,
 	SubmitCreateReleaseDto,
@@ -91,8 +93,12 @@ export class ReleaseController {
 	})
 	async getListDetail(
 		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
-		const result = await this.releaseService.getListDetail(query);
+		const result = await this.releaseService.getListDetail(
+			query,
+			req.user!.tenantId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
