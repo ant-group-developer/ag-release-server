@@ -33,6 +33,13 @@ export class TrackDraftController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	//
+	@Post('policy')
+	async createTrackPolicies() {
+		const result = await this.trackDraftService.createTrackPolicies();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Post('bulk')
 	async bulkCreate(
 		@Body() data: BulkCreateTrackDraft,

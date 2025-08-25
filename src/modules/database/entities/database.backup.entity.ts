@@ -17,6 +17,9 @@ export class Backup extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	urlGcs: string | null;
 
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	urlFolderGcs: string | null;
+
 	@Column({ type: 'varchar', length: 100 + 'YYYYMMDDHHmmss_'.length })
 	fileName: string;
 
