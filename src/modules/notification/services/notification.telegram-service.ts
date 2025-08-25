@@ -1,31 +1,97 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import TelegramBot from 'node-telegram-bot-api';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 
 @Injectable()
-export class TelegramService {
+export class TelegramService implements OnModuleInit {
+	private readonly logger = new Logger(TelegramService.name);
+
 	private bot: TelegramBot;
+	private token: string;
+	private chatIdDev: number;
 
-	constructor(private configService: ConfigService) {
-		const token = this.configService.get<string>('TELEGRAM_TOKEN')!;
+	constructor(private readonly appConfigService: AppConfigService) {}
 
-		this.bot = new TelegramBot(token, { polling: true });
+	onModuleInit() {
+		this.reloadConfig();
+	}
 
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.reloadConfig();
+	}
+
+	private reloadConfig() {
+		this.stopBotSafe();
+		this.newBot();
+	}
+
+	private sendMessageSafe({
+		chatId,
+		message,
+	}: {
+		chatId: number;
+		message: string;
+	}) {
+		this.bot
+			.sendMessage(chatId, message)
+			.then(() => {
+				this.logger.log('Message sent successfully!');
+			})
+			.catch((error) => {
+				this.logger.error('Error sending message:', error);
+			});
+	}
+
+	private stopBotSafe() {
+		if (this.bot) {
+			this.bot.stopPolling().catch((_e) => {
+				this.logger.error(_e);
+			});
+		}
+	}
+
+	private newBot() {
+		this.token = this.appConfigService.getValue(
+			AppConfigKey.TELEGRAM_TOKEN,
+		);
+
+		if (this.token) {
+			this.bot = new TelegramBot(this.token, { polling: true });
+
+			this.chatIdDev = Number(
+				this.appConfigService.getValue(AppConfigKey.CHAT_ID),
+			);
+
+			this.applyReplyPing();
+			this.sendHelloGroup();
+		}
+	}
+
+	private applyReplyPing() {
 		this.bot.onText(/\/start/, (msg) => {
 			const chatId = msg.chat.id;
 			const telegramId = msg.from?.id;
-
-			this.bot
-				.sendMessage(chatId, `Hello, your telegram Id is ${telegramId}`)
-				.then(() => {
-					console.log('Message sent successfully!');
-				})
-				.catch((error) => {
-					console.error('Error sending message:', error);
-				});
+			this.sendMessageSafe({
+				chatId,
+				message: `Hello, telegramId: ${telegramId}, chatId: ${chatId}`,
+			});
 		});
 	}
 
+	private sendHelloGroup() {
+		if (this.chatIdDev) {
+			this.sendMessageSafe({
+				chatId: this.chatIdDev,
+				message: `Hello, chatId: ${this.chatIdDev}`,
+			});
+		}
+	}
+
+	//
 	async sendMessage(telegramId: string, message: string) {
 		await this.bot.sendMessage(telegramId, message);
 	}
@@ -36,5 +102,9 @@ export class TelegramService {
 		for (const telegramId of telegramIds) {
 			await this.sendMessage(telegramId, message);
 		}
+	}
+
+	async sendToDev(message: string) {
+		await this.bot.sendMessage(this.chatIdDev, message);
 	}
 }

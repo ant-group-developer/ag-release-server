@@ -11,6 +11,10 @@ import {
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
+	ActionMessageCodeSuccess,
+	ActionMessageSuccess,
+} from './constants/action.constant';
+import {
 	CreateActionDto,
 	QueryGetListActionDto,
 	UpdateActionDto,
@@ -27,7 +31,11 @@ export class ActionController {
 		@Body() data: CreateActionDto,
 	): Promise<ResponseSuccess<Action>> {
 		const result = await this.actionService.create(data);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			data: result,
+			message: ActionMessageSuccess.CREATE,
+			messageCode: ActionMessageCodeSuccess.CREATE,
+		});
 	}
 
 	@Get(':id')
@@ -50,7 +58,11 @@ export class ActionController {
 		@Body() data: UpdateActionDto,
 	): Promise<ResponseSuccess<Action>> {
 		const result = await this.actionService.update(id, data);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			data: result,
+			message: ActionMessageSuccess.UPDATE,
+			messageCode: ActionMessageCodeSuccess.UPDATE,
+		});
 	}
 
 	@Delete(':id')
@@ -58,6 +70,9 @@ export class ActionController {
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {
 		await this.actionService.delete(id);
-		return new ResponseSuccess({ messageCode: 'Action deleted' });
+		return new ResponseSuccess({
+			messageCode: ActionMessageCodeSuccess.DELETE,
+			message: ActionMessageSuccess.DELETE,
+		});
 	}
 }

@@ -1,7 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
-	IsBoolean,
+	IsArray,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
-import { FieldOrderTrack } from '../enum/track.enum';
+import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
 
 export class CreateTrackDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
@@ -104,24 +104,64 @@ export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 }
 
 export class QueryGetListTrackDto extends BaseQueryDto {
-	@IsUUID()
 	@IsOptional()
-	releaseId?: string;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseId?: string[];
 
 	@IsOptional()
-	@IsString()
-	@Length(10, 10)
-	artistId?: string | null;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	@IsArray()
+	artistId?: string[];
 
 	@IsOptional()
-	@Length(10, 10)
-	@IsString()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	@IsArray()
 	labelId?: string;
 
-	@Transform(({ value }) => value === 'true')
-	@IsBoolean()
 	@IsOptional()
-	isScanned?: boolean;
+	@IsArray()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsEnum(ScanCopyrightStatus, { each: true })
+	scanCopyrightStatus?: ScanCopyrightStatus[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	primaryGenreId?: string[];
 
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;

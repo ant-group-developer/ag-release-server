@@ -4,6 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { exec as execCallback } from 'child_process';
 import * as fs from 'fs';
+import { stat } from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { PageDto } from 'src/common/dtos/response.dto';
@@ -35,8 +36,13 @@ export class DatabaseBackupService implements OnModuleInit {
 	private toDrive: boolean;
 	private toGcs: boolean;
 
+	private folderBackupDriveId: string;
 	private baseUrlDrive: string;
+
+	private bucketName: string;
 	private baseUrlGcs: string;
+
+	private urlFolderBucket: string;
 
 	constructor(
 		@InjectRepository(Backup)
@@ -55,8 +61,11 @@ export class DatabaseBackupService implements OnModuleInit {
 			database: this.configService.get<string>('DB_DATABASE')!,
 		};
 
+		this.bucketName = this.configService.get<string>('PROTECTED_BUCKET')!;
 		this.baseUrlDrive = 'https://drive.google.com/file/d/';
 		this.baseUrlGcs = 'https://storage.cloud.google.com';
+		this.urlFolderBucket =
+			'https://console.cloud.google.com/storage/browser/ant-music-assets-protected/backups';
 	}
 
 	onModuleInit() {
@@ -66,8 +75,6 @@ export class DatabaseBackupService implements OnModuleInit {
 	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
 	handleAppConfigUpdated() {
 		this.reloadConfig();
-
-		console.log(this.toDrive, this.toGcs);
 	}
 
 	private reloadConfig() {
@@ -78,10 +85,18 @@ export class DatabaseBackupService implements OnModuleInit {
 		this.toGcs = this.appConfigService.getValue(
 			AppConfigKey.DATABASE_TO_GCS,
 		);
+
+		this.notifyOnSuccess = this.appConfigService.getValue(
+			AppConfigKey.NOTIFY_ON_SUCCESS,
+		);
+
+		this.notifyOnSuccess = this.appConfigService.getValue(
+			AppConfigKey.NOTIFY_ON_FAILED,
+		);
 	}
 
 	private async backup(data: BackupDto) {
-		const { toDrive, toGcs } = data;
+		const { toDrive, toGcs } = this;
 
 		const fileName = generateFileNameWithTimestamp(
 			'backup_ant_release.sql',
@@ -90,8 +105,12 @@ export class DatabaseBackupService implements OnModuleInit {
 
 		const timeStart = Date.now();
 		const result = this.backupRepo.create({
-			urlDrive: '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link',
-			urlGcs: `${this.baseUrlGcs}/ant-music-assets-protected/backups/2025-07-11_14-22-21_backup_ant_release.sql`,
+			urlDrive: toDrive
+				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+				: null,
+			urlGcs: toGcs
+				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+				: null,
 			status: StatusBackup.RUNNING,
 			fileName,
 		});
@@ -116,34 +135,27 @@ export class DatabaseBackupService implements OnModuleInit {
 				shell: shellPath,
 			});
 
-			// backup
+			// // backup
 			// if (toDrive) {
 			// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
 
 			// 	await exec(driveUploadCommand, { shell: shellPath });
 			// }
 
-			// if (toGcs) {
-			// 	const bucketName =
-			// 		this.configService.get<string>('PROTECTED_BUCKET');
-			// 	const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${bucketName}/backups/ --progress`;
+			if (toGcs) {
+				const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
 
-			// 	await exec(gcsUploadCommand, {
-			// 		shell: shellPath,
-			// 	});
-			// }
+				await exec(gcsUploadCommand, {
+					shell: shellPath,
+				});
+			}
 
-			// await this.notificationService.sendNotificationBackupSuccess({
-			// 	filename,
-			// });
+			const stats = await stat(backupPath);
+			const fileSizeInBytes = stats.size;
 
 			result.status = StatusBackup.SUCCESS;
-		} catch (err) {
-			// await this.notificationService.sendNotificationBackupFail({
-			// 	filename,
-			// 	error: err instanceof Error ? err.message : String(err),
-			// });
-
+			result.fileSize = fileSizeInBytes;
+		} catch (_e) {
 			result.status = StatusBackup.FAILED;
 		} finally {
 			const timeEnd = Date.now();
@@ -159,7 +171,50 @@ export class DatabaseBackupService implements OnModuleInit {
 			toGcs: this.toGcs,
 		});
 
-		return await this.backupRepo.save(result);
+		const resultDb = await this.backupRepo.save(result);
+		await this.sendNotificationBackup(resultDb);
+	}
+
+	async a() {
+		const { toDrive, toGcs } = this;
+
+		const fileName = generateFileNameWithTimestamp(
+			'backup_ant_release.sql',
+			DateFormat['YYYY-MM-DD_HH-mm-ss'],
+		);
+
+		const a = await this.backupRepo.create({
+			urlDrive: toDrive
+				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+				: null,
+			urlGcs: toGcs
+				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+				: null,
+			status: StatusBackup.RUNNING,
+			fileName,
+		});
+
+		await this.backupRepo.save(a);
+	}
+
+	handleCreateSafe() {
+		this.handleCreate().catch((_e) => {
+			console.log(_e);
+		});
+	}
+
+	async sendNotificationBackup(result: Backup) {
+		const { status } = result;
+
+		if (status === StatusBackup.SUCCESS && this.notifyOnSuccess) {
+			await this.notificationService.notifyOnBackupSuccess({
+				...result,
+				fileOnBucket: this.urlFolderBucket,
+			});
+		}
+		if (status === StatusBackup.FAILED && this.notifyOnSuccess) {
+			await this.notificationService.notifyOnBackupFailed(result);
+		}
 	}
 
 	async getList(query: QueryGetListBackup) {
@@ -177,6 +232,8 @@ export class DatabaseBackupService implements OnModuleInit {
 
 	private createQueryGetList(query: QueryGetListBackup) {
 		const {
+			status,
+
 			startCreatedAt,
 			endCreatedAt,
 			startUpdatedAt,
@@ -188,6 +245,10 @@ export class DatabaseBackupService implements OnModuleInit {
 		} = query;
 
 		const qb = this.backupRepo.createQueryBuilder('backup');
+
+		if (status) {
+			qb.andWhere(`backup.status = :status`, { status });
+		}
 
 		if (startCreatedAt && endCreatedAt) {
 			qb.andWhere(

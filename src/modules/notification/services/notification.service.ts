@@ -18,8 +18,8 @@ export class NotificationService {
 		this.PATH_TEMPLATES = './src/modules/notification/templates';
 	}
 
-	async sendNotificationBackupSuccess(data: { filename: string }) {
-		const { filename } = data;
+	async sendNotificationBackupSuccess(data: { fileName: string }) {
+		const { fileName } = data;
 
 		const time = new Date().toLocaleString('vi-VN', {
 			timeZone: 'Asia/Ho_Chi_Minh',
@@ -29,17 +29,17 @@ export class NotificationService {
 
 		const html = renderTemplate(
 			`${this.PATH_TEMPLATES}/backup-success.hbs`,
-			{ time, filename },
+			{ time, fileName },
 		);
 
 		await this.sendToDev(subject, html);
 	}
 
 	async sendNotificationBackupFail(data: {
-		filename: string;
+		fileName: string;
 		error: string;
 	}) {
-		const { filename, error } = data;
+		const { fileName, error } = data;
 
 		const time = new Date().toLocaleString('vi-VN', {
 			timeZone: 'Asia/Ho_Chi_Minh',
@@ -49,7 +49,7 @@ export class NotificationService {
 
 		const html = renderTemplate(`${this.PATH_TEMPLATES}/backup-fail.hbs`, {
 			time,
-			filename,
+			fileName,
 			error: error ?? '',
 		});
 
@@ -81,5 +81,27 @@ export class NotificationService {
 				message: htmlToText(html),
 			});
 		}
+	}
+
+	async notifyOnBackupSuccess(result: any) {
+		const time = new Date().toISOString();
+		const subject = `[🟢 BACKUP] Success at ${time}`;
+
+		const jsonResult = JSON.stringify(result, null, 2);
+
+		const message = `${subject}\n\n${jsonResult}`;
+
+		await this.telegramService.sendToDev(message);
+	}
+
+	async notifyOnBackupFailed(result: any) {
+		const time = new Date().toISOString();
+		const subject = `[🔴 BACKUP] Failed at ${time}`;
+
+		const jsonResult = JSON.stringify(result, null, 2);
+
+		const message = `${subject}\n\n${jsonResult}`;
+
+		await this.telegramService.sendToDev(message);
 	}
 }

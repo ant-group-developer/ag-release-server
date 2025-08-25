@@ -12,10 +12,10 @@ export class Backup extends BaseUUIDEntity {
 	status: StatusBackup;
 
 	@Column({ type: 'varchar', length: 255, nullable: true })
-	urlDrive: string;
+	urlDrive: string | null;
 
 	@Column({ type: 'varchar', length: 255, nullable: true })
-	urlGcs: string;
+	urlGcs: string | null;
 
 	@Column({ type: 'varchar', length: 100 + 'YYYYMMDDHHmmss_'.length })
 	fileName: string;

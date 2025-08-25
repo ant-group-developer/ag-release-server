@@ -15,6 +15,7 @@ import {
 @Injectable()
 export class AppConfigService implements OnModuleInit {
 	private readonly logger = new Logger(AppConfigService.name);
+	private id: string;
 	private config: AppConfigShape;
 
 	constructor(
@@ -25,6 +26,7 @@ export class AppConfigService implements OnModuleInit {
 
 	async onModuleInit() {
 		const result = await this.initDataDefault();
+		this.id = result.id;
 		this.config = result.config;
 	}
 
@@ -49,11 +51,12 @@ export class AppConfigService implements OnModuleInit {
 	}
 
 	private async findOne() {
-		return await this.appConfigRepo.createQueryBuilder().getOne();
+		return this.appConfigRepo.createQueryBuilder().getOne();
 	}
 
 	private async getOneOrCreate(): Promise<AppConfig> {
 		const result = new AppConfig();
+		result.id = this.id;
 		result.config = this.config;
 
 		if (!result || !result.config) {
@@ -68,6 +71,7 @@ export class AppConfigService implements OnModuleInit {
 		const { website, telegram, acrCloud, backupDatabase } = payload;
 
 		const data = await this.getOneOrCreate();
+
 		const { config: configDb } = data;
 
 		const {
@@ -110,10 +114,17 @@ export class AppConfigService implements OnModuleInit {
 			[AppConfigKey.ACR_ACCESS_KEY]: acrCloud.acrAccessKey,
 			[AppConfigKey.ACR_ACCESS_SECRET]: acrCloud.acrAccessSecret,
 			[AppConfigKey.CHUNK_DURATION]: acrCloud.chunkDuration,
+			[AppConfigKey.SCORE_WARNING]: acrCloud.scoreWarning,
 
 			// backup
 			[AppConfigKey.DATABASE_TO_DRIVE]: backupDatabase.toDrive,
 			[AppConfigKey.DATABASE_TO_GCS]: backupDatabase.toGcs,
+			[AppConfigKey.NOTIFY_ON_SUCCESS]: backupDatabase.notifyOnSuccess,
+			[AppConfigKey.NOTIFY_ON_FAILED]: backupDatabase.notifyOnFailed,
+
+			// telegram
+			[AppConfigKey.TELEGRAM_TOKEN]: telegram.token,
+			[AppConfigKey.CHAT_ID]: telegram.chatId,
 		};
 
 		return values[key];

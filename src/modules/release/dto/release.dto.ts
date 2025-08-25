@@ -1,6 +1,8 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsArray,
+	IsBoolean,
 	IsDate,
 	IsEnum,
 	IsIn,
@@ -205,28 +207,59 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	fieldOrder: string = FieldOrderRelease.TITLE;
 
 	@IsOptional()
-	@Length(10, 10)
-	albumFormatId?: string;
-
-	@IsString()
-	@IsOptional()
-	@Length(10, 10)
-	primaryGenreId?: string | null;
-
-	@IsOptional()
-	@IsString()
-	@Length(10, 10)
-	subGenreId?: string | null;
-
-	@IsString()
-	@IsOptional()
-	@Length(10, 10)
-	labelId?: string | null;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	albumFormatId?: string[];
 
 	@IsOptional()
-	@IsString()
-	@Length(10, 10)
-	artistId?: string | null;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	primaryGenreId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	subGenreId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	labelId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	artistId?: string[];
 
 	@IsOptional()
 	// @IsDate()
@@ -236,7 +269,24 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	// @IsDate()
 	endDateRelease?: Date;
 
-	@IsEnum(ReleaseStatus)
 	@IsOptional()
-	status?: ReleaseStatus;
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsArray()
+	@IsEnum(ReleaseStatus, { each: true })
+	status?: ReleaseStatus[];
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isVariousArtist?: boolean;
 }

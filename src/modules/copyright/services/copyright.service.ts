@@ -1,6 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { ScanCopyrightStatus } from 'src/modules/track/enum/track.enum';
 import {
 	CreateTrackScanStatusDto,
 	QueryGetListResultScan,
@@ -8,15 +13,18 @@ import {
 } from '../dtos/copyright.dto';
 import { TrackScanStatus } from '../entities/track-scan-status.entity';
 import { ErrorTask, ScanStatus } from '../enums/copyright.enum';
+import { ResultScan } from '../interface/copyright.interface';
 import { CopyrightAcrService } from './sub-services/copyright.acr.service';
 import { CopyrightResultService } from './sub-services/copyright.result.service';
 import { CopyrightTaskService } from './sub-services/copyright.task.service';
 import { CopyrightTrackService } from './sub-services/copyright.track.service';
 
 @Injectable()
-export class CopyrightService {
+export class CopyrightService implements OnModuleInit {
 	private readonly logger = new Logger(CopyrightService.name);
 	private scanControllers = new Map<string, AbortController>();
+
+	private scoreWarning: number;
 
 	constructor(
 		private readonly bucketService: BucketService,
@@ -24,7 +32,23 @@ export class CopyrightService {
 		private readonly copyrightTaskService: CopyrightTaskService,
 		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightResultService: CopyrightResultService,
+		private readonly appConfigService: AppConfigService,
 	) {}
+
+	onModuleInit() {
+		this.reloadConfig();
+	}
+
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.reloadConfig();
+	}
+
+	private reloadConfig() {
+		this.scoreWarning = this.appConfigService.getValue(
+			AppConfigKey.SCORE_WARNING,
+		);
+	}
 
 	// task
 	async handleCreateTask(
@@ -211,6 +235,11 @@ export class CopyrightService {
 
 		if (!track.audioFile) {
 			this.logger.warn(`Missing audio file of track ${id}`);
+
+			await this.copyrightTrackService.updateStatusScannedTrack(
+				id,
+				ScanCopyrightStatus.REJECTED,
+			);
 			return;
 		}
 
@@ -218,18 +247,79 @@ export class CopyrightService {
 			track.audioFile.fileId,
 		);
 
-		const resultScan = await this.copyrightAcrService.scanBufferCopyright({
-			buffer: fileBuffer,
-			duration: track.audioFile.duration,
-		});
+		const resultScanAcr =
+			await this.copyrightAcrService.scanBufferCopyright({
+				buffer: fileBuffer,
+				duration: track.audioFile.duration,
+			});
+
+		const scanCopyrightStatus = this.getScanCopyrightStatus(resultScanAcr);
 
 		const trackScanHistory = this.copyrightResultService.create({
-			result: resultScan,
+			result: resultScanAcr,
 			trackId: id,
 		});
 
-		await this.copyrightTrackService.updateIsScannedTrack(id);
+		await this.copyrightTrackService.updateStatusScannedTrack(
+			id,
+			scanCopyrightStatus,
+		);
 
 		return trackScanHistory;
+	}
+
+	private getScanCopyrightStatus(
+		resultScan: ResultScan[],
+	): ScanCopyrightStatus {
+		const musicItems: { start: number; end: number; score: number }[] = [];
+		const hummingItems: {
+			start: number;
+			end: number;
+			score: number;
+		}[] = [];
+
+		for (const scan of resultScan) {
+			if (scan.content?.music) {
+				for (const m of scan.content.music) {
+					musicItems.push({
+						start: scan.key.startSecond,
+						end: scan.key.endSecond,
+						score: m.score,
+					});
+				}
+			}
+
+			if (scan.content?.humming) {
+				for (const h of scan.content.humming) {
+					hummingItems.push({
+						start: scan.key.startSecond,
+						end: scan.key.endSecond,
+						score: Math.round(h.score * 100),
+					});
+				}
+			}
+		}
+
+		if (this.checkWarning(musicItems) || this.checkWarning(hummingItems)) {
+			return ScanCopyrightStatus.WARNING;
+		}
+
+		return ScanCopyrightStatus.FINISHED;
+	}
+
+	private checkWarning(
+		items: { start: number; end: number; score: number }[],
+	) {
+		items.sort((a, b) => a.start - b.start);
+
+		for (let i = 0; i < items.length - 1; i++) {
+			if (
+				items[i].score > this.scoreWarning &&
+				items[i + 1].score > this.scoreWarning
+			) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

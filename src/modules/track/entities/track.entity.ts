@@ -20,6 +20,7 @@ import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
+import { ScanCopyrightStatus } from '../enum/track.enum';
 import { ITrack } from '../interfaces/track.interface';
 
 @Entity('tracks')
@@ -97,8 +98,12 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'text', nullable: true })
 	lyric: string;
 
-	@Column({ type: 'boolean', default: false })
-	isScanned: boolean;
+	@Column({
+		type: 'enum',
+		enum: ScanCopyrightStatus,
+		default: ScanCopyrightStatus.UN_SCANNED,
+	})
+	scanCopyrightStatus: ScanCopyrightStatus;
 
 	@Column({ type: 'boolean', default: false })
 	copyArtistsFromRelease: boolean;

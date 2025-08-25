@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { ScanCopyrightStatus } from 'src/modules/track/enum/track.enum';
 import { Repository } from 'typeorm';
 import { TrackScanFilter } from '../../interface/copyright.interface';
 
@@ -11,8 +12,11 @@ export class CopyrightTrackService {
 		private readonly trackRepo: Repository<Track>,
 	) {}
 
-	async updateIsScannedTrack(id: string) {
-		await this.trackRepo.update({ id }, { isScanned: true });
+	async updateStatusScannedTrack(
+		id: string,
+		scanCopyrightStatus: ScanCopyrightStatus,
+	) {
+		await this.trackRepo.update({ id }, { scanCopyrightStatus });
 	}
 
 	async getTrackIds(filter: TrackScanFilter) {
@@ -22,13 +26,16 @@ export class CopyrightTrackService {
 
 		const rows = await query.getRawMany<{
 			track_id: string;
-			track_is_scanned: boolean;
+			scan_copyright_status: ScanCopyrightStatus;
 		}>();
 
 		return rows
 			.filter((row) => {
 				if (ignoreTrackScanned) {
-					return row.track_is_scanned === false;
+					return (
+						row.scan_copyright_status ===
+						ScanCopyrightStatus.UN_SCANNED
+					);
 				}
 
 				return true;
@@ -54,7 +61,7 @@ export class CopyrightTrackService {
 
 		return this.trackRepo
 			.createQueryBuilder('track')
-			.select(['track.id', 'track.isScanned'])
+			.select(['track.id', 'track.scanCopyrightStatus'])
 			.leftJoin('track.release', 'release')
 			.where('track.id IN (:...ids)', { ids: trackIds });
 	}

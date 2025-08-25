@@ -1,5 +1,9 @@
 import { ReleaseStatus } from '../../release/enum/release.enum';
-import { AppConfigKey, ExecuteCycleType } from '../enums/app-config.enum';
+import {
+	AppConfigKey,
+	ExecuteCycleType,
+	ScheduleType,
+} from '../enums/app-config.enum';
 
 export interface Auth0Config {
 	clientId: string;
@@ -21,12 +25,13 @@ export interface BackupDatabase {
 	executeCycleType: ExecuteCycleType;
 
 	executeConfig: {
-		nDays?: number; // backup mỗi N ngày
-		nHours?: number; // backup mỗi N giờ
 		nMinutes?: number; // backup mỗi N phút
+		nHours?: number; // backup mỗi N giờ
+		nDays?: number; // backup mỗi N ngày
+
 		dayOfWeek?: string; // backup hàng tuần: "monday", "tuesday", ...
 		dayOfMonth?: number; // backup hàng tháng: 1–31
-		time?: string; // giờ thực hiện: "01:30"
+		time?: string; // giờ thực hiện: "1"
 	};
 
 	// Thông báo kết quả backup
@@ -53,6 +58,11 @@ export interface AcrCloud {
 	chunkDuration: number;
 	scoreWarning: number;
 	autoScan: boolean;
+	autoScanTime1?: {
+		type: ScheduleType;
+		value: string;
+	};
+
 	autoScanTime: string;
 	releaseStatusAutoScans: ReleaseStatus[];
 }
@@ -74,6 +84,15 @@ export type AppConfigValueMap = {
 	[AppConfigKey.ACR_ACCESS_KEY]: string;
 	[AppConfigKey.ACR_ACCESS_SECRET]: string;
 	[AppConfigKey.CHUNK_DURATION]: number;
+	[AppConfigKey.SCORE_WARNING]: number;
+
+	//
 	[AppConfigKey.DATABASE_TO_DRIVE]: boolean;
 	[AppConfigKey.DATABASE_TO_GCS]: boolean;
+	[AppConfigKey.NOTIFY_ON_SUCCESS]: boolean;
+	[AppConfigKey.NOTIFY_ON_FAILED]: boolean;
+
+	//
+	[AppConfigKey.TELEGRAM_TOKEN]: string;
+	[AppConfigKey.CHAT_ID]: string;
 };
