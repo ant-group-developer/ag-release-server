@@ -7,12 +7,20 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { Request } from 'express';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
+import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import {
 	LabelMessageCodeSuccess,
 	LabelMessageError,
+	LabelMessages,
 	LabelMessageSuccess,
 } from './constants/label.constant';
 import {
@@ -40,8 +48,17 @@ export class LabelController {
 	})
 	async create(
 		@Body() createLabelDto: CreateLabelDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.create(createLabelDto);
+		const tenantId = req.user!.tenantId;
+
+		if (checkIsSystemTenant(tenantId)) {
+			throw new ResponseError(LabelMessages.SYSTEM_TENANT_FORBIDDEN);
+		}
+
+		await this.labelService.checkExceedLabels(tenantId);
+
+		const result = await this.labelService.create(createLabelDto, tenantId);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: LabelMessageCodeSuccess.CREATE,

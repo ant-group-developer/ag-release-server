@@ -2,6 +2,7 @@ import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constan
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { Release } from 'src/modules/release/entities/release.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
@@ -18,6 +19,13 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];
+
+	@Column({ type: 'uuid' })
+	tenantId: string;
+
+	@ManyToOne(() => Tenant)
+	@JoinColumn({ name: 'tenant_id' })
+	tenant: Tenant;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
