@@ -15,6 +15,8 @@ export enum FieldOrderRelease {
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
 
+	RELEASE_DATE = 'releaseDate',
+
 	// virtual
 	TRACKS_COUNT = 'tracks_count',
 	TOTAL_DURATION = 'total_duration',
