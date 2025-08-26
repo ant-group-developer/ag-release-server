@@ -92,8 +92,11 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	})
 	trackOriginTypeId: string | null;
 
-	@Column({ type: Boolean, nullable: true })
+	@Column({ type: Boolean, default: false })
 	isSensitiveContent: boolean;
+
+	@Column({ type: Boolean, default: false })
+	isByAi: boolean;
 
 	@Column({ type: 'text', nullable: true })
 	lyric: string;

@@ -30,8 +30,6 @@ export class DatabaseBackupService implements OnModuleInit {
 		database: string;
 	};
 
-	// private acrCloud: AppConfig['config']['backupDatabase'];
-
 	private notifyOnFailed: boolean;
 	private notifyOnSuccess: boolean;
 
@@ -41,10 +39,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	private bucketName: string;
 	private baseUrlGcs: string;
 
-	private baseUrlConsoleGcsBackup =
-		'https://console.cloud.google.com/storage/browser/_details/ant-music-assets-protected/backups';
-
-	private urlFolderBucket: string;
+	private baseUrlConsoleGcsBackup: string;
 
 	constructor(
 		@InjectRepository(Backup)
@@ -64,10 +59,10 @@ export class DatabaseBackupService implements OnModuleInit {
 		};
 
 		this.bucketName = this.configService.get<string>('PROTECTED_BUCKET')!;
-		// this.baseUrlDrive = 'https://drive.google.com/file/d/';
-		this.baseUrlGcs = 'https://storage.cloud.google.com';
-		this.urlFolderBucket =
-			'https://console.cloud.google.com/storage/browser/ant-music-assets-protected/backups';
+		this.baseUrlGcs = this.configService.get<string>('BASE_URL_GCS')!;
+		this.baseUrlConsoleGcsBackup = this.configService.get<string>(
+			'BASE_URL_CONSOLE_GCS_BACKUP',
+		)!;
 	}
 
 	onModuleInit() {

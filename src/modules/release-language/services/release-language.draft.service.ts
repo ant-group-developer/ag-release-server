@@ -109,13 +109,11 @@ export class ReleaseLanguageDraftService {
 		await this.releaseLanguageRepo.update(id, dataUpdate);
 	}
 
-	async deleteRecordOfReleaseSafe({
+	async deleteRecordOfRelease({
 		releaseId,
 	}: {
 		releaseId: string;
 	}): Promise<void> {
-		await this.releaseLanguageRepo.delete({ releaseId }).catch((e) => {
-			this.logger.warn(`Skip delete, reason: ${e.message}`);
-		});
+		await this.releaseLanguageRepo.delete({ releaseId });
 	}
 }

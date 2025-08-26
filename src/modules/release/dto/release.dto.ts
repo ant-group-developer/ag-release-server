@@ -204,7 +204,7 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	title?: string;
 
 	@IsEnum(FieldOrderRelease)
-	fieldOrder: string = FieldOrderRelease.TITLE;
+	fieldOrder: FieldOrderRelease = FieldOrderRelease.TITLE;
 
 	@IsOptional()
 	@Transform(({ value }) =>

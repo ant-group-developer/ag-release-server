@@ -89,14 +89,4 @@ export class ReleaseTerritoryService {
 	}): Promise<void> {
 		await this.releaseTerritoryRepo.delete({ releaseId });
 	}
-
-	async deleteRecordOfReleaseSafe({
-		releaseId,
-	}: {
-		releaseId: string;
-	}): Promise<void> {
-		await this.deleteRecordOfRelease({ releaseId }).catch((e) =>
-			this.logger.warn(`Skip delete, reason: ${e.message}`),
-		);
-	}
 }

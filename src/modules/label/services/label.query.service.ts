@@ -8,6 +8,10 @@ import {
 } from '../constants/label.constant';
 import { QueryGetListLabelDto } from '../dto/label.dto';
 import { Label } from '../entities/label.entity';
+import {
+	VirtualColumnsLabel,
+	VirtualColumnsLabelArr,
+} from '../enum/label.enum';
 import { IDataFromDb } from '../interfaces/label.interface';
 
 @Injectable()
@@ -34,6 +38,21 @@ export class LabelQueryService {
 		} = query;
 
 		const queryBuilder = this.labelRepo.createQueryBuilder('label');
+		queryBuilder
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(DISTINCT(track.id))')
+					.from('tracks', 'track')
+					.leftJoin('track.release', 'release')
+					.where('release.labelId = label.id');
+			}, VirtualColumnsLabel.TRACK_COUNT)
+
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(DISTINCT(release.id))')
+					.from('releases', 'release')
+					.where('release.labelId = label.id');
+			}, VirtualColumnsLabel.RELEASE_COUNT);
 
 		if (keyword) {
 			queryBuilder.andWhere('label.name ILIKE :keyword', {
@@ -61,7 +80,12 @@ export class LabelQueryService {
 			);
 		}
 
-		queryBuilder.orderBy(`label.${fieldOrder}`, orderBy);
+		if (VirtualColumnsLabelArr.includes(fieldOrder)) {
+			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			queryBuilder.orderBy(`label.${fieldOrder}`, orderBy);
+		}
+
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
@@ -69,7 +93,12 @@ export class LabelQueryService {
 
 	async getList(query: QueryGetListLabelDto) {
 		const queryGetList = this.createQueryGetList(query);
-		return await queryGetList.getManyAndCount();
+		const dataFromDb: IDataFromDb = await queryGetList.getRawAndEntities();
+		const totalItems = await queryGetList.getCount();
+
+		const labels = this.assigneeVirtualColumn(dataFromDb);
+
+		return { labels, totalItems };
 	}
 
 	private createQueryFindOneWithCountRelation(id: string) {

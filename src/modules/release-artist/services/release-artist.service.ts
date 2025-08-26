@@ -172,7 +172,7 @@ export class ReleaseArtistService {
 			);
 	}
 
-	async deleteRecordOfReleaseSafe({
+	async deleteRecordOfRelease({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -182,17 +182,17 @@ export class ReleaseArtistService {
 		});
 
 		await Promise.all(
-			releaseArtists.map((item) => this.handleDeleteSafe(item.id)),
+			releaseArtists.map((item) => this.handleDelete(item.id)),
 		);
 	}
 
-	async handleDeleteSafe(id: string): Promise<void> {
-		await this.deleteRelatedRecordsSafe(id);
+	async handleDelete(id: string): Promise<void> {
+		await this.deleteRelatedRecords(id);
 		await this.deleteSafe(id);
 	}
 
-	async deleteRelatedRecordsSafe(releaseArtistId: string) {
-		await this.trackDraftService.deleteTrackArtistByReleaseArtistSafe(
+	async deleteRelatedRecords(releaseArtistId: string) {
+		await this.trackDraftService.deleteTrackArtistByReleaseArtist(
 			releaseArtistId,
 		);
 	}

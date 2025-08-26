@@ -18,7 +18,7 @@ import {
 	UpdateTrackDraftDto,
 	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
-import { QueryGetListTrackDto } from '../dto/track.dto';
+import { BulkDeleteTracksDto, QueryGetListTrackDto } from '../dto/track.dto';
 import { ITrackDraft } from '../interfaces/track.interface';
 import { TrackDraftService } from '../services/track.draft.service';
 
@@ -106,5 +106,11 @@ export class TrackDraftController {
 		return new ResponseSuccess({
 			messageCode: TrackMessageCodeSuccess.DELETE,
 		});
+	}
+
+	@Post('bulk-delete')
+	async bulkDelete(@Body() data: BulkDeleteTracksDto) {
+		const result = await this.trackDraftService.bulkDelete(data);
+		return new ResponseSuccess({ ...result });
 	}
 }

@@ -14,7 +14,7 @@ import {
 	ITrackDraft,
 } from '../interfaces/track.interface';
 
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
@@ -22,7 +22,7 @@ import { TrackArtistService } from 'src/modules/track-artist/services/track-arti
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 import { TrackLanguageDraftService } from 'src/modules/track-language/services/track-language.draft.service';
 import { TrackPolicyService } from 'src/modules/track-policy/services/track-policy.service';
-import { QueryGetListTrackDto } from '../dto/track.dto';
+import { BulkDeleteTracksDto, QueryGetListTrackDto } from '../dto/track.dto';
 import { TrackQueryService } from './track.query.service';
 
 @Injectable()
@@ -261,6 +261,18 @@ export class TrackDraftService {
 	}
 
 	//delete
+	async bulkDelete(data: BulkDeleteTracksDto) {
+		const { ids } = data;
+
+		const messageWarnings = await Promise.all(
+			ids.map((id) => this.handleDelete(id)),
+		);
+
+		return new ResponseSuccess({
+			messageWarning: messageWarnings.join('\n'),
+		});
+	}
+
 	async handleDelete(id: string) {
 		await this.deleteRelatedRecords({ trackId: id });
 		await this.trackRepo.delete(id);
@@ -274,11 +286,11 @@ export class TrackDraftService {
 				trackId,
 			}),
 			this.copyrightService.deleteResultOfTrack({ trackId }),
+			this.trackPolicyService.deleteRecordOrTrack({ trackId }),
 		]);
 	}
 
-	// safe
-	async deleteRecordOfReleaseSafe({
+	async deleteRecordOfRelease({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -287,29 +299,7 @@ export class TrackDraftService {
 			releaseId,
 		});
 
-		await Promise.all(
-			tracks.map((track) => this.handleDeleteSafe(track.id)),
-		);
-	}
-
-	async handleDeleteSafe(id: string) {
-		await this.deleteRelatedRecordsSafe({ trackId: id });
-		await this.trackRepo
-			.delete(id)
-			.catch((e) =>
-				this.logger.warn(`Skip delete, reason: ${e.message}`),
-			);
-	}
-
-	private async deleteRelatedRecordsSafe({ trackId }: { trackId: string }) {
-		await Promise.all([
-			this.audioFileDraftService.deleteRecordOfTrackSafe({ trackId }),
-			this.trackArtistService.deleteRecordOfTrackSafe({ trackId }),
-			this.trackLanguageDraftService.deleteRecordOfTrackSafe({
-				trackId,
-			}),
-			this.copyrightService.deleteResultOfTrackSafe({ trackId }),
-		]);
+		await Promise.all(tracks.map((track) => this.handleDelete(track.id)));
 	}
 
 	// artist
@@ -353,9 +343,7 @@ export class TrackDraftService {
 		await this.trackArtistService.updateByReleaseArtist(releaseArtist);
 	}
 
-	async deleteTrackArtistByReleaseArtistSafe(releaseArtistId: string) {
-		await this.trackArtistService.deleteByReleaseArtistSafe(
-			releaseArtistId,
-		);
+	async deleteTrackArtistByReleaseArtist(releaseArtistId: string) {
+		await this.trackArtistService.deleteByReleaseArtist(releaseArtistId);
 	}
 }

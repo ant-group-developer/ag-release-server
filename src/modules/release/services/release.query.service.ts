@@ -6,7 +6,10 @@ import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessageError } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
-import { VirtualColumnRelease } from '../enum/release.enum';
+import {
+	VirtualColumnRelease,
+	VirtualColumnReleaseArr,
+} from '../enum/release.enum';
 
 @Injectable()
 export class ReleaseQueryService {
@@ -147,11 +150,7 @@ export class ReleaseQueryService {
 			);
 		}
 
-		if (
-			(Object.values(VirtualColumnRelease) as string[]).includes(
-				fieldOrder,
-			)
-		) {
+		if (VirtualColumnReleaseArr.includes(fieldOrder)) {
 			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
 		} else {
 			queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
@@ -206,9 +205,6 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releaseArtist.artistRole', 'artistRole')
 
 			.leftJoinAndSelect('release.label', 'label')
-
-			.leftJoin('release.modifier', 'modifier')
-			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar'])
 
 			// virtual
 			.addSelect((subQuery) => {
@@ -298,7 +294,10 @@ export class ReleaseQueryService {
 
 			.leftJoinAndSelect('release.timeZone', 'timeZone')
 
-			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory');
+			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
+
+			.leftJoin('release.modifier', 'modifier')
+			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar']);
 
 		query.where('release.id = :id', {
 			id,

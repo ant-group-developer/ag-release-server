@@ -19,7 +19,6 @@ export class CopyrightAcrService implements OnModuleInit {
 	private ENDPOINT = '/v1/identify';
 	private SIGNATURE_VERSION = '1';
 	private DATA_TYPE = 'audio';
-	private chunkDuration: number;
 
 	constructor(
 		private readonly http: HttpService,
@@ -37,9 +36,6 @@ export class CopyrightAcrService implements OnModuleInit {
 		);
 		this.ACR_ACCESS_SECRET = this.appConfigService.getValue(
 			AppConfigKey.ACR_ACCESS_SECRET,
-		);
-		this.chunkDuration = this.appConfigService.getValue(
-			AppConfigKey.CHUNK_DURATION,
 		);
 	}
 
@@ -246,19 +242,21 @@ export class CopyrightAcrService implements OnModuleInit {
 	async scanBufferCopyright({
 		buffer,
 		duration,
+		chunkDuration,
 	}: {
 		buffer: Buffer;
 		duration: number;
+		chunkDuration: number;
 	}): Promise<ResultScan[]> {
 		const chunks = this.getChunks({
 			buffer,
 			duration,
-			windowSec: this.chunkDuration,
+			windowSec: chunkDuration,
 		});
 
 		const tasks = chunks.map(({ buffer, key }) =>
 			this.recognizeByBuffer({ buffer, key }).catch((e) => {
-				this.logger.log(e);
+				this.logger.error(e);
 				return null;
 			}),
 		);

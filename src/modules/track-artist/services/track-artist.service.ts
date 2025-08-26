@@ -331,11 +331,7 @@ export class TrackArtistService {
 		}
 	}
 
-	async deleteByReleaseArtistSafe(releaseArtistId: string) {
-		await this.trackArtistRepo
-			.delete({ releaseArtistId })
-			.catch((e) =>
-				this.logger.warn(`Skip delete, reason: ${e.message}`),
-			);
+	async deleteByReleaseArtist(releaseArtistId: string) {
+		await this.trackArtistRepo.delete({ releaseArtistId });
 	}
 }

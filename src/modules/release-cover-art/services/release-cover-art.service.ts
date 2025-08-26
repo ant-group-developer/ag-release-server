@@ -43,7 +43,7 @@ export class ReleaseCoverArtService {
 		if (releaseCoverArt !== undefined) {
 			// delete
 			if (releaseCoverArt === null) {
-				await this.deleteRecordOfReleaseSafe({
+				await this.deleteRecordOfRelease({
 					releaseId,
 				});
 			}
@@ -56,7 +56,7 @@ export class ReleaseCoverArtService {
 					fileId: fileCoverArtOriginalId,
 				});
 
-				await this.deleteRecordOfReleaseSafe({ releaseId });
+				await this.deleteRecordOfRelease({ releaseId });
 
 				await this.genArtOnBucketAndSaveToDb({
 					fileCoverArtOriginalId,
@@ -201,13 +201,7 @@ export class ReleaseCoverArtService {
 		await this.releaseCoverArtRepo.delete(id);
 	}
 
-	async deleteSafe(id: string) {
-		await this.delete(id).catch((e) =>
-			this.logger.warn(`Skip delete, reason: ${e.message}`),
-		);
-	}
-
-	async deleteRecordOfReleaseSafe({
+	async deleteRecordOfRelease({
 		releaseId,
 	}: {
 		releaseId: string;
@@ -216,9 +210,7 @@ export class ReleaseCoverArtService {
 			where: { releaseId },
 		});
 
-		await Promise.all(
-			releaseCoverArts.map((item) => this.deleteSafe(item.id)),
-		);
+		await Promise.all(releaseCoverArts.map((item) => this.delete(item.id)));
 
 		await Promise.all(
 			releaseCoverArts.map((item) =>

@@ -15,12 +15,18 @@ export enum FieldOrderRelease {
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
 
+	RELEASE_DATE = 'releaseDate',
+
 	// virtual
 	TRACKS_COUNT = 'tracks_count',
 	TOTAL_DURATION = 'total_duration',
 }
 
 export enum VirtualColumnRelease {
-	TRACKS_COUNT = 'tracks_count',
-	TOTAL_DURATION = 'total_duration',
+	TRACKS_COUNT = FieldOrderRelease.TRACKS_COUNT,
+	TOTAL_DURATION = FieldOrderRelease.TOTAL_DURATION,
 }
+
+export const VirtualColumnReleaseArr = Object.values(
+	VirtualColumnRelease,
+) as string[];

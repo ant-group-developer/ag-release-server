@@ -36,37 +36,37 @@ export class ScheduleService {
 		this.logger.log(`Added cron job: ${name}, cron time: ${cronTime}`);
 	}
 
-	handleScheduleArc() {
-		const acrCloud = this.acrCloud;
-		if (acrCloud.autoScan) {
-			const trackIds = this.getListTrackIdsNeedScan();
+	// handleScheduleArc() {
+	// 	const acrCloud = this.acrCloud;
+	// 	if (acrCloud.autoScan) {
+	// 		const trackIds = this.getListTrackIdsNeedScan();
 
-			if (acrCloud.autoScanTime1) {
-				if (acrCloud.autoScanTime1.type === 'interval') {
-					this.addIntervalJob('jobArc', 0, () => {
-						return trackIds.map((item) => {
-							return this.copyrightService.scanTrackCopyright(
-								item,
-							);
-						});
-					});
-				} else if (acrCloud.autoScanTime1.type === 'cron') {
-					this.addCronJob(
-						'jobArc',
-						acrCloud.autoScanTime1.value,
-						() => {
-							return trackIds.map((item) => {
-								return this.copyrightService.scanTrackCopyright(
-									item,
-								);
-							});
-						},
-					);
-					this.copyrightService.scanTrackCopyright('');
-				}
-			}
-		}
-	}
+	// 		if (acrCloud.autoScanTime1) {
+	// 			if (acrCloud.autoScanTime1.type === 'interval') {
+	// 				this.addIntervalJob('jobArc', 0, () => {
+	// 					return trackIds.map((item) => {
+	// 						return this.copyrightService.scanTrackCopyright(
+	// 							item,
+	// 						);
+	// 					});
+	// 				});
+	// 			} else if (acrCloud.autoScanTime1.type === 'cron') {
+	// 				this.addCronJob(
+	// 					'jobArc',
+	// 					acrCloud.autoScanTime1.value,
+	// 					() => {
+	// 						return trackIds.map((item) => {
+	// 							return this.copyrightService.scanTrackCopyright(
+	// 								item,
+	// 							);
+	// 						});
+	// 					},
+	// 				);
+	// 				this.copyrightService.scanTrackCopyright('');
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	getListTrackIdsNeedScan() {
 		return ['', ''];

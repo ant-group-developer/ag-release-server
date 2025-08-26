@@ -1,15 +1,15 @@
 export enum ExecuteCycleType {
 	// chạy cách đơn vị
-	N_MINUTES = 'n_minutes',
-	N_HOURS = 'n_hours',
-	N_DAYS = 'n_days',
+	N_MINUTES = 'n_minutes', // mỗi N phút
+	N_HOURS = 'n_hours', // mỗi N giờ
+	N_DAYS = 'n_days', // mỗi N ngày
 
-	// chạy theo đơn vị, vào lúc
-	HOURLY = 'hourly',
-	DAILY = 'daily',
-	WEEKLY = 'weekly',
+	// chạy theo đơn vị
+	HOURLY = 'hourly', // mỗi giờ
+	DAILY = 'daily', // mỗi ngày
+	WEEKLY = 'weekly', // mỗi tuần
 
-	MONTHLY = 'monthly',
+	MONTHLY = 'monthly', // mỗi tháng
 }
 
 export enum AppConfigKey {

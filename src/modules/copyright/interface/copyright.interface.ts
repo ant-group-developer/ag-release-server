@@ -5,6 +5,7 @@ export interface ICreateTask {
 	status: ScanStatus;
 	filter: TrackScanFilter;
 	trackNeedScanIds: string[];
+	chunkDuration: number;
 }
 
 interface AcrArtist {

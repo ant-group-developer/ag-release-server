@@ -166,3 +166,9 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;
 }
+
+export class BulkDeleteTracksDto {
+	@IsArray()
+	@Length(10, 10, { each: true })
+	ids: string[];
+}
