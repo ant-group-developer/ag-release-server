@@ -1,3 +1,4 @@
+import { DEFAULT_CHUNK_DURATION } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
@@ -8,6 +9,9 @@ import { TrackScanFilter } from '../interface/copyright.interface';
 export class TrackScanStatus extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'enum', enum: ScanStatus })
 	status: ScanStatus;
+
+	@Column({ type: 'int', default: DEFAULT_CHUNK_DURATION })
+	chunkDuration: number;
 
 	@Column({ type: 'jsonb' })
 	filter: TrackScanFilter;

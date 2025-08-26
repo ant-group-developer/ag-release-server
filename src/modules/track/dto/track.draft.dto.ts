@@ -149,9 +149,15 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 	@IsUUID()
 	trackTypeId?: string;
 
-	@IsOptional()
+	@IsNotEmpty()
 	@IsBoolean()
+	@ValidateIf((_, value) => value !== undefined)
 	isSensitiveContent?: boolean;
+
+	@IsNotEmpty()
+	@IsBoolean()
+	@ValidateIf((_, value) => value !== undefined)
+	isByAi?: boolean;
 
 	@IsOptional()
 	@IsString()

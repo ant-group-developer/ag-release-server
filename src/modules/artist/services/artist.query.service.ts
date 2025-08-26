@@ -8,6 +8,10 @@ import {
 } from '../constants/artist.constant';
 import { QueryGetListArtistDto } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
+import {
+	VirtualColumnsArtist,
+	VirtualColumnsArtistArr,
+} from '../enum/artist.enum';
 
 @Injectable()
 export class ArtistQueryService {
@@ -37,7 +41,21 @@ export class ArtistQueryService {
 
 		queryBuilder
 			.leftJoinAndSelect('artist.artistProfiles', 'artistProfile')
-			.leftJoinAndSelect('artistProfile.dsp', 'dsp');
+			.leftJoinAndSelect('artistProfile.dsp', 'dsp')
+
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(release_artist.id)')
+					.from('release_artist', 'release_artist')
+					.where('release_artist.artist_id = artist.id');
+			}, VirtualColumnsArtist.TRACK_COUNT)
+
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(track_artist.id)')
+					.from('track_artist', 'track_artist')
+					.where('track_artist.artist_id = artist.id');
+			}, VirtualColumnsArtist.RELEASE_COUNT);
 
 		if (keyword) {
 			queryBuilder.andWhere('artist.name ILIKE :keyword', {
@@ -71,7 +89,11 @@ export class ArtistQueryService {
 			);
 		}
 
-		queryBuilder.orderBy(`artist.${fieldOrder}`, orderBy);
+		if (VirtualColumnsArtistArr.includes(fieldOrder)) {
+			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			queryBuilder.orderBy(`artist.${fieldOrder}`, orderBy);
+		}
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
@@ -79,7 +101,28 @@ export class ArtistQueryService {
 
 	async getList(query: QueryGetListArtistDto) {
 		const queryGetList = this.createQueryGetList(query);
-		return await queryGetList.getManyAndCount();
+		const [dataFromDb, totalItems]: [IDataFromDb, number] =
+			await Promise.all([
+				queryGetList.getRawAndEntities(),
+				queryGetList.getCount(),
+			]);
+
+		const artists = this.assigneeVirtualColumn(dataFromDb);
+
+		return { artists, totalItems };
+	}
+
+	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {
+		return dataFromDb.entities.map((entity) => {
+			const dataRawOfLabel = dataFromDb.raw.find(
+				(item) => item.artist_id === entity.id,
+			);
+
+			entity.trackCount = Number(dataRawOfLabel?.track_count);
+			entity.releaseCount = Number(dataRawOfLabel?.release_count);
+
+			return entity;
+		});
 	}
 
 	async findOneWithCountRelation(id: string) {
@@ -178,4 +221,13 @@ export class ArtistQueryService {
 			});
 		}
 	}
+}
+
+interface IDataFromDb {
+	entities: Artist[];
+	raw: {
+		artist_id: string;
+		track_count: string;
+		release_count: string;
+	}[];
 }

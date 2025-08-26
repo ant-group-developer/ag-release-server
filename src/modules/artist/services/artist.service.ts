@@ -106,7 +106,7 @@ export class ArtistService {
 	async getList(query: QueryGetListArtistDto): Promise<PageDto<Artist>> {
 		const { page, pageSize } = query;
 
-		const [artists, totalItems] =
+		const { artists, totalItems } =
 			await this.artistQueryService.getList(query);
 
 		return new PageDto({

@@ -20,7 +20,9 @@ export class CopyrightResultService {
 	}
 
 	async getOneResult(id: string) {
-		const result = await this.trackScanHistoryRepo.find({ where: { id } });
+		const result = await this.trackScanHistoryRepo.findOne({
+			where: { id },
+		});
 
 		if (!result) {
 			throw new ResponseError({ message: 'Result not found' });
@@ -100,5 +102,66 @@ export class CopyrightResultService {
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
+	}
+
+	// compare
+	async compareResultOfTrack({
+		scanHistoryId1,
+		scanHistoryId2,
+	}: {
+		scanHistoryId1: string;
+		scanHistoryId2: string;
+	}) {
+		const scanHistory1 = await this.getOneResult(scanHistoryId1);
+		const scanHistory2 = await this.getOneResult(scanHistoryId2);
+
+		const resultCompare = this.getResultCompare(
+			scanHistory1.result,
+			scanHistory2.result,
+		);
+
+		scanHistory1.result = [];
+		scanHistory2.result = [];
+
+		return {
+			resultCompare,
+			scanHistory1,
+			scanHistory2,
+		};
+	}
+
+	private getResultCompare(
+		result1: TrackScanHistory['result'],
+		result2: TrackScanHistory['result'],
+	) {
+		const allKeys = [
+			...result1.map((r) => JSON.stringify(r.key)),
+			...result2.map((r) => JSON.stringify(r.key)),
+		];
+		const uniqueKeys = Array.from(new Set(allKeys)).map((k) =>
+			JSON.parse(k),
+		);
+
+		return uniqueKeys.map((key) => {
+			const content1 =
+				result1.find(
+					(r) =>
+						r.key.startSecond === key.startSecond &&
+						r.key.endSecond === key.endSecond,
+				)?.content ?? null;
+
+			const content2 =
+				result2.find(
+					(r) =>
+						r.key.startSecond === key.startSecond &&
+						r.key.endSecond === key.endSecond,
+				)?.content ?? null;
+
+			return {
+				key,
+				content1,
+				content2,
+			};
+		});
 	}
 }

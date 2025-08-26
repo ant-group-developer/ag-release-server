@@ -5,6 +5,7 @@ import {
 	IsDate,
 	IsEnum,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
@@ -50,6 +51,10 @@ export class CreateTrackScanStatusDto {
 	@ValidateNested()
 	@Type(() => TrackScanTaskDto)
 	filter: TrackScanTaskDto;
+
+	@IsOptional()
+	@IsNumber()
+	chunkDuration?: number;
 }
 
 export class QueryGetListTask extends BaseQueryDto {
@@ -69,4 +74,9 @@ export class ScanTrackDto {
 
 export class QueryGetListResultScan extends BaseQueryDto {
 	fieldOrder: string = 'createdAt';
+}
+
+export class CompareHistoryScanDto {
+	scanHistoryId1: string;
+	scanHistoryId2: string;
 }

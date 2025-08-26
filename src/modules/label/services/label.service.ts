@@ -59,7 +59,7 @@ export class LabelService {
 	async getList(query: QueryGetListLabelDto): Promise<PageDto<Label>> {
 		const { page, pageSize } = query;
 
-		const [labels, totalItems] =
+		const { labels, totalItems } =
 			await this.labelQueryService.getList(query);
 
 		return new PageDto({

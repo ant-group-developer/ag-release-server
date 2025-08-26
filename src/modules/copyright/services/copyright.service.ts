@@ -7,6 +7,7 @@ import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { ScanCopyrightStatus } from 'src/modules/track/enum/track.enum';
 import {
+	CompareHistoryScanDto,
 	CreateTrackScanStatusDto,
 	QueryGetListResultScan,
 	QueryGetListTask,
@@ -25,14 +26,16 @@ export class CopyrightService implements OnModuleInit {
 	private scanControllers = new Map<string, AbortController>();
 
 	private scoreWarning: number;
+	private chunkDuration: number;
 
 	constructor(
 		private readonly bucketService: BucketService,
+		private readonly appConfigService: AppConfigService,
+
 		private readonly copyrightAcrService: CopyrightAcrService,
 		private readonly copyrightTaskService: CopyrightTaskService,
 		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightResultService: CopyrightResultService,
-		private readonly appConfigService: AppConfigService,
 	) {}
 
 	onModuleInit() {
@@ -48,13 +51,17 @@ export class CopyrightService implements OnModuleInit {
 		this.scoreWarning = this.appConfigService.getValue(
 			AppConfigKey.SCORE_WARNING,
 		);
+
+		this.chunkDuration = this.appConfigService.getValue(
+			AppConfigKey.CHUNK_DURATION,
+		);
 	}
 
 	// task
 	async handleCreateTask(
 		data: CreateTrackScanStatusDto,
 	): Promise<TrackScanStatus> {
-		const { filter } = data;
+		const { filter, chunkDuration } = data;
 
 		const trackNeedScanIds =
 			await this.copyrightTrackService.getTrackIds(filter);
@@ -63,9 +70,10 @@ export class CopyrightService implements OnModuleInit {
 			filter,
 			status: ScanStatus.PENDING,
 			trackNeedScanIds,
+			chunkDuration: chunkDuration ?? this.chunkDuration,
 		});
 
-		this.startTask(taskDb).catch((e) => {
+		this.processTask(taskDb).catch((e) => {
 			this.logger.error(
 				`Failed to start scan for task ${taskDb.id}: ${e.message}`,
 			);
@@ -74,15 +82,12 @@ export class CopyrightService implements OnModuleInit {
 		return taskDb;
 	}
 
-	private async startTask(task: TrackScanStatus) {
+	private async processTask(task: TrackScanStatus) {
 		const { id: taskId } = task;
-		this.createSignal(taskId);
-
-		await this.updateTaskStatus(taskId, ScanStatus.RUNNING);
 
 		// processListTracks
 		try {
-			await this.processTask(task);
+			await this.startTask(task);
 			await this.finishTask(task);
 		} catch (e) {
 			if (e.message === ErrorTask.CANCEL_TASK) {
@@ -92,36 +97,18 @@ export class CopyrightService implements OnModuleInit {
 			}
 		} finally {
 			this.deleteSignal(taskId);
-
-			this.logger.log(this.scanControllers);
 		}
 	}
 
-	async processTask(task: TrackScanStatus) {
+	// task handlers
+	private async startTask(task: TrackScanStatus) {
+		const { id: taskId } = task;
+		this.createSignal(taskId);
+		await this.updateTaskStatus(taskId, ScanStatus.RUNNING);
+
 		for (const trackId of task.trackNeedScanIds) {
-			this.checkAbort(task.id);
-			await this.processSubTask({ taskId: task.id, trackId });
-		}
-	}
-
-	async processSubTask({
-		taskId,
-		trackId,
-	}: {
-		trackId: string;
-		taskId: string;
-	}) {
-		try {
-			await this.scanTrackCopyright(trackId);
-			await this.copyrightTaskService.addScannedTrackId({
-				taskId,
-				trackId,
-			});
-			this.logger.log(`Track scanned successfully: ${trackId}`);
-		} catch {
-			throw new ResponseError({
-				message: ErrorTask.FAIL_PROCESSING_SINGLE_TRACK,
-			});
+			this.checkAbort(taskId);
+			await this.processSubTask({ taskId, trackId });
 		}
 	}
 
@@ -138,6 +125,33 @@ export class CopyrightService implements OnModuleInit {
 	private async finishTask(task: TrackScanStatus) {
 		await this.updateTaskStatus(task.id, ScanStatus.FINISHED);
 		this.logger.log(`Task ${task.id} finished successfully`);
+	}
+
+	// sub task
+	private async processSubTask({
+		taskId,
+		trackId,
+	}: {
+		trackId: string;
+		taskId: string;
+	}) {
+		try {
+			const task = await this.copyrightTaskService.findOne(taskId);
+			await this.scanTrackCopyright({
+				trackId,
+				chunkDuration: task.chunkDuration,
+			});
+
+			await this.copyrightTaskService.addScannedTrackId({
+				taskId,
+				trackId,
+			});
+			this.logger.log(`Track scanned successfully: ${trackId}`);
+		} catch {
+			throw new ResponseError({
+				message: ErrorTask.FAIL_PROCESSING_SINGLE_TRACK,
+			});
+		}
 	}
 
 	private checkAbort(taskId: string) {
@@ -230,14 +244,20 @@ export class CopyrightService implements OnModuleInit {
 	}
 
 	// acr
-	async scanTrackCopyright(id: string) {
-		const track = await this.copyrightTrackService.getTrack(id);
+	async scanTrackCopyright({
+		trackId,
+		chunkDuration,
+	}: {
+		trackId: string;
+		chunkDuration?: number;
+	}) {
+		const track = await this.copyrightTrackService.getTrack(trackId);
 
 		if (!track.audioFile) {
-			this.logger.warn(`Missing audio file of track ${id}`);
+			this.logger.warn(`Missing audio file of track ${trackId}`);
 
 			await this.copyrightTrackService.updateStatusScannedTrack(
-				id,
+				trackId,
 				ScanCopyrightStatus.REJECTED,
 			);
 			return;
@@ -251,17 +271,18 @@ export class CopyrightService implements OnModuleInit {
 			await this.copyrightAcrService.scanBufferCopyright({
 				buffer: fileBuffer,
 				duration: track.audioFile.duration,
+				chunkDuration: chunkDuration ?? this.chunkDuration,
 			});
 
 		const scanCopyrightStatus = this.getScanCopyrightStatus(resultScanAcr);
 
 		const trackScanHistory = this.copyrightResultService.create({
 			result: resultScanAcr,
-			trackId: id,
+			trackId,
 		});
 
 		await this.copyrightTrackService.updateStatusScannedTrack(
-			id,
+			trackId,
 			scanCopyrightStatus,
 		);
 
@@ -321,5 +342,10 @@ export class CopyrightService implements OnModuleInit {
 			}
 		}
 		return false;
+	}
+
+	// compare
+	async compareResultOfTrack(payload: CompareHistoryScanDto) {
+		return await this.copyrightResultService.compareResultOfTrack(payload);
 	}
 }
