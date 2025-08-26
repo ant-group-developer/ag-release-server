@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { LabelMessageError } from '../constants/label.constant';
+import { LabelMessageError, LabelMessages } from '../constants/label.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
@@ -24,10 +24,12 @@ export class LabelService {
 	) {}
 
 	// create
-	async create(data: CreateLabelDto): Promise<Label> {
-		await this.labelQueryService.validate({ name: data.name });
+	async create(data: CreateLabelDto, tenantId: string): Promise<Label> {
+		await this.labelQueryService.validate({
+			where: { name: data.name, tenantId },
+		});
 
-		const label = this.labelRepo.create(data);
+		const label = this.labelRepo.create({ ...data, tenantId: tenantId });
 		return await this.labelRepo.save(label);
 	}
 
@@ -79,7 +81,9 @@ export class LabelService {
 		const label = await this.findOne(id);
 
 		if (name && name !== label.name) {
-			await this.labelQueryService.validate({ name: data.name });
+			await this.labelQueryService.validate({
+				where: { name: data.name, tenantId: label.tenantId },
+			});
 		}
 
 		if (
@@ -104,5 +108,23 @@ export class LabelService {
 		}
 
 		await this.labelRepo.delete(id);
+	}
+
+	async checkExceedLabels(tenantId: string) {
+		const { label_count, max_label_count } = await this.labelRepo
+			.createQueryBuilder('label')
+			.leftJoin('label.tenant', 'tenant')
+			.select([
+				'COUNT(label.id) AS label_count',
+				'tenant.maxLabels AS max_label_count',
+				'tenant.id AS tenant_id',
+			])
+			.groupBy('tenant.id')
+			.where('tenant.id = :tenantId', { tenantId })
+			.getRawOne();
+
+		if (Number(label_count) >= Number(max_label_count)) {
+			throw new ResponseError(LabelMessages.LIMIT_EXCEEDED);
+		}
 	}
 }

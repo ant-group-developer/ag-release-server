@@ -115,6 +115,7 @@ export class TenantService {
 				email: true,
 				isActive: true,
 				type: true,
+				maxLabels: true,
 				parent: {
 					id: true,
 					logo: true,
@@ -124,6 +125,7 @@ export class TenantService {
 					email: true,
 					isActive: true,
 					type: true,
+					maxLabels: true,
 				},
 				tenantUser: {
 					id: true,

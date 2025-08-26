@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { FindOneOptions, Repository } from 'typeorm';
 import {
 	LabelMessageCodeError,
 	LabelMessageError,
@@ -118,18 +118,18 @@ export class LabelQueryService {
 	}
 
 	// validate
-	async validate({ name }: { name?: string }) {
-		if (name) {
-			const artist = await this.labelRepo.findOne({ where: { name } });
+	async validate(options: FindOneOptions<Label>) {
+		// if (name) {
+		const label = await this.labelRepo.findOne(options);
 
-			if (artist) {
-				throw new ResponseError({
-					message: LabelMessageError.DUPLICATE_NAME_LABEL,
-					messageCode: LabelMessageCodeError.DUPLICATE_NAME_LABEL,
-					statusCode: 409,
-				});
-			}
+		if (label) {
+			throw new ResponseError({
+				message: LabelMessageError.DUPLICATE_NAME_LABEL,
+				messageCode: LabelMessageCodeError.DUPLICATE_NAME_LABEL,
+				statusCode: 409,
+			});
 		}
+		// }
 	}
 
 	validateDelete(label: Label) {

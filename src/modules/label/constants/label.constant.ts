@@ -23,3 +23,17 @@ export const LabelMessageError = {
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this label because it is linked to release(s).',
 };
+
+export const LabelMessages = {
+	LIMIT_EXCEEDED: {
+		statusCode: 403,
+		message:
+			'You have reached the maximum number of labels allowed for this workspace.',
+		messageCode: 'label.message.error.limitExceeded',
+	},
+	SYSTEM_TENANT_FORBIDDEN: {
+		statusCode: 403,
+		message: 'System tenant cannot create labels.',
+		messageCode: 'label.message.error.systemTenantForbidden',
+	},
+};

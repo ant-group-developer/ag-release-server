@@ -33,6 +33,9 @@ export class Tenant extends BaseUUIDEntity {
 	})
 	logo: string;
 
+	@Column({ type: 'smallint', name: 'max_labels' })
+	maxLabels: number;
+
 	@Column({
 		length: LENGTH_PICTURE,
 		nullable: true,

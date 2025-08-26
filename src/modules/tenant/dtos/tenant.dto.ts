@@ -3,11 +3,14 @@ import {
 	IsBoolean,
 	IsEmail,
 	IsEnum,
+	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
+	Max,
+	Min,
 } from 'class-validator';
 import { CsvEnumArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
@@ -90,6 +93,13 @@ export abstract class UpdateTenantDto {
 	@IsOptional()
 	@IsUUID()
 	parentId?: string;
+
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsInt()
+	@Max(20_000)
+	@Min(0)
+	maxLabels?: number;
 }
 
 export class CreateTenantDto extends UpdateTenantDto {
