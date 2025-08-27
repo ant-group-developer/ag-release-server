@@ -6,6 +6,7 @@ import {
 	IsArray,
 	IsDate,
 	IsEnum,
+	IsInt,
 	IsNumber,
 	IsOptional,
 	IsUUID,
@@ -35,6 +36,19 @@ export function CsvUuidArray(validationOpts?: ValidationOptions) {
 		IsOptional(),
 		IsArray(),
 		IsUUID(undefined, { each: true, ...validationOpts }),
+	);
+}
+
+export function CsvIntArray(validationOpts?: ValidationOptions) {
+	return applyDecorators(
+		makeSplitter<number>((v) => {
+			const n = parseInt(v);
+			if (isNaN(n)) throw new Error(`Invalid number: "${v}"`);
+			return n;
+		}),
+		IsOptional(),
+		IsArray(),
+		IsInt({ each: true, ...validationOpts }),
 	);
 }
 
