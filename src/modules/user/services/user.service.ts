@@ -110,6 +110,7 @@ export class UserService {
 			orderBy,
 			fieldOrder,
 			tenantIds,
+			status,
 		} = query;
 
 		const tenantId = req.user!.tenantId;
@@ -128,8 +129,6 @@ export class UserService {
 		}
 		queryBuilder
 			.leftJoin('tenantUser.tenant', 'tenant')
-			// .leftJoin('user.creator', 'creator')
-			// .leftJoin('user.modifier', 'modifier')
 			.select([
 				'user.id',
 				'user.name',
@@ -141,25 +140,11 @@ export class UserService {
 				'user.lastActive',
 				'user.createdAt',
 				'user.updatedAt',
-				// 'creator.id',
-				// 'creator.email',
-				// 'modifier.id',
-				// 'modifier.email',
 				'tenantUser.id',
 				'tenantUser.type',
-				// 'tenantUser.tenantId',
 				'tenant.id',
 				'tenant.name',
 			])
-			// .andWhere(
-			// 	new Brackets((qb) => {
-			// 		if (checkIsSystemAdmin(req.user!.type)) {
-			// 			qb.orWhere('user.type = :type', {
-			// 				type: UserType.ADMIN,
-			// 			});
-			// 		}
-			// 	}),
-			// )
 			.skip(skip)
 			.take(pageSize)
 			.orderBy(`user.${fieldOrder}`, orderBy);
@@ -188,6 +173,12 @@ export class UserService {
 					});
 				}),
 			);
+		}
+
+		if (status?.length) {
+			queryBuilder.andWhere('user.isActive IN (:...status)', {
+				status,
+			});
 		}
 
 		const [users, totalItems] = await queryBuilder.getManyAndCount();

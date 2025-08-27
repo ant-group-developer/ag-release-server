@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import {
 	CsvEnumArray,
+	CsvIntArray,
 	CsvUuidArray,
 } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
@@ -110,11 +111,6 @@ export class GetListUserDto extends BaseQueryDto {
 	@IsString()
 	id?: string;
 
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
-	tenantId?: string;
-
 	@ApiPropertyOptional({
 		description: 'List user types to filter (comma-separated)',
 		example: 'a,b,c',
@@ -135,6 +131,13 @@ export class GetListUserDto extends BaseQueryDto {
 	})
 	@CsvUuidArray()
 	tenantIds?: string[];
+
+	@ApiPropertyOptional({
+		description: 'User status to filter users (comma-separated)',
+		type: 'number',
+	})
+	@CsvIntArray()
+	status?: number[];
 }
 
 export class InviteUserToTenantDto {
