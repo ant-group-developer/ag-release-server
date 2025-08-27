@@ -10,12 +10,19 @@ export const ReleaseCoverArtMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const ReleaseCoverArtMessageCodeError = {
+const ReleaseCoverArtMessageCodeError = {
 	NOT_FOUND: 'releaseCoverArt.message.error.notFound',
 	RELEASE_NOT_FOUND: 'releaseCoverArt.message.error.releaseNotFound',
 };
 
-export const ReleaseCoverArtMessageError = {
+const ReleaseCoverArtMessageError = {
 	NOT_FOUND: 'Not found',
 	RELEASE_NOT_FOUND: 'Release not found',
+};
+
+export const ReleaseCoverArtMessage = {
+	RELEASE_NOT_FOUND: {
+		message: ReleaseCoverArtMessageError.RELEASE_NOT_FOUND,
+		messageCode: ReleaseCoverArtMessageCodeError.RELEASE_NOT_FOUND,
+	},
 };

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { TrackTypeMessageError } from '../constants/track-type.constant';
+import { TrackTypeMessages } from '../constants/track-type.constant';
 import {
 	CreateTrackTypeDto,
 	QueryGetListTrackTypeDto,
@@ -33,10 +33,7 @@ export class TrackTypeService {
 	async findOne(id: string): Promise<TrackType> {
 		const trackType = await this.trackTypeRepo.findOne({ where: { id } });
 		if (!trackType) {
-			throw new ResponseError({
-				message: TrackTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackTypeMessages.NOT_FOUND);
 		}
 
 		return trackType;
@@ -47,10 +44,7 @@ export class TrackTypeService {
 			await this.trackTypeQueryService.findOneWithCountRelation(id);
 
 		if (!trackType) {
-			throw new ResponseError({
-				message: TrackTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackTypeMessages.NOT_FOUND);
 		}
 
 		return trackType;

@@ -21,7 +21,7 @@ export const ReleaseMessageCodeError = {
 	ERROR_MIN_COUNT_TRACKS: 'track.message.error.minCountTrack',
 };
 
-export const ReleaseMessageError = {
+const ReleaseMessageError = {
 	NOT_FOUND: 'Not found',
 	ALBUM_FORMAT_NOT_FOUND: 'Album format not found',
 	PRIMARY_GENRE_NOT_FOUND: 'Primary genre not found',
@@ -33,6 +33,37 @@ export const ReleaseMessageError = {
 };
 
 export const ReleaseMessages = {
+	NOT_FOUND: {
+		message: ReleaseMessageError.NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.NOT_FOUND,
+		statusCode: 404,
+	},
+
+	ALBUM_FORMAT_NOT_FOUND: {
+		message: ReleaseMessageError.ALBUM_FORMAT_NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.ALBUM_FORMAT_NOT_FOUND,
+	},
+
+	PRIMARY_GENRE_NOT_FOUND: {
+		message: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.PRIMARY_GENRE_NOT_FOUND,
+	},
+
+	SUB_GENRE_NOT_FOUND: {
+		message: ReleaseMessageError.SUB_GENRE_NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.SUB_GENRE_NOT_FOUND,
+	},
+
+	LABEL_NOT_FOUND: {
+		message: ReleaseMessageError.LABEL_NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.LABEL_NOT_FOUND,
+	},
+
+	TIMEZONE_NOT_FOUND: {
+		message: ReleaseMessageError.TIMEZONE_NOT_FOUND,
+		messageCode: ReleaseMessageCodeError.TIMEZONE_NOT_FOUND,
+	},
+
 	DECLINE_SYSTEM_TENANT: {
 		statusCode: 403,
 		message: 'You cannot create release in tenant system',

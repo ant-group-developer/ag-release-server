@@ -56,3 +56,30 @@ export function renderTemplate(
 	const template = Handlebars.compile(templateSource);
 	return template(data);
 }
+
+export function stringToCode(input: string): string {
+	return input
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/ /g, '_')
+		.toUpperCase();
+}
+
+export function splitCodeIndex(code: string): {
+	preCode: string;
+	index: number;
+} {
+	const match = code.match(/^(.*)_(\d+)$/);
+
+	if (match) {
+		return {
+			preCode: match[1],
+			index: parseInt(match[2], 10),
+		};
+	}
+
+	return {
+		preCode: code,
+		index: 0,
+	};
+}

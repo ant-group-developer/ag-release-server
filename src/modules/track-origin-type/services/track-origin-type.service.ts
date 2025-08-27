@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { TrackOriginTypeMessageError } from '../constants/track-origin-type.constant';
+import { TrackOriginTypeMessages } from '../constants/track-origin-type.constant';
 import {
 	CreateTrackOriginTypeDto,
 	QueryGetListTrackOriginTypeDto,
@@ -37,10 +37,7 @@ export class TrackOriginTypeService {
 			where: { id },
 		});
 		if (!trackOriginType) {
-			throw new ResponseError({
-				message: TrackOriginTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackOriginTypeMessages.NOT_FOUND);
 		}
 
 		return trackOriginType;
@@ -51,10 +48,7 @@ export class TrackOriginTypeService {
 			await this.trackOriginTypeQueryService.findOneWithCountRelation(id);
 
 		if (!trackOriginType) {
-			throw new ResponseError({
-				message: TrackOriginTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackOriginTypeMessages.NOT_FOUND);
 		}
 
 		return trackOriginType;

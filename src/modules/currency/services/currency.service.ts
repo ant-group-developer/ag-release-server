@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
-	CurrencyMessageCodeError,
-	CurrencyMessageError,
+	CurrencyMessage,
 	defaultCurrencies,
 } from '../constants/currency.constant';
 import {
@@ -68,11 +67,7 @@ export class CurrencyService implements OnModuleInit {
 	// read
 	async findOne(id: string): Promise<Currency> {
 		const currency = await this.currencyRepo.findOne({ where: { id } });
-		if (!currency)
-			throw new ResponseError({
-				message: CurrencyMessageError.NOT_FOUND,
-				messageCode: CurrencyMessageCodeError.NOT_FOUND,
-			});
+		if (!currency) throw new ResponseError(CurrencyMessage.NOT_FOUND);
 		return currency;
 	}
 

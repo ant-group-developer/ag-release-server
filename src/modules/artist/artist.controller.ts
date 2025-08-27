@@ -8,13 +8,9 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	ArtistMessageCodeSuccess,
-	ArtistMessageError,
-	ArtistMessageSuccess,
-} from './constants/artist.constant';
+import { ArtistMessageCodeSuccess } from './constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
@@ -29,12 +25,6 @@ export class ArtistController {
 	constructor(private readonly artistService: ArtistService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new artist' })
-	@ApiResponse({ status: 200, description: ArtistMessageSuccess.CREATE })
-	@ApiResponse({
-		status: 409,
-		description: ArtistMessageError.DUPLICATE_NAME_ARTIST,
-	})
 	async create(
 		@Body() createArtistDto: CreateArtistDto,
 	): Promise<ResponseSuccess<Artist>> {
@@ -46,17 +36,12 @@ export class ArtistController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get an artist by ID' })
-	@ApiResponse({ status: 200, description: 'Successfully retrieved artist' })
-	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Artist>> {
 		const result = await this.artistService.findOneLite(id);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of artists' })
-	@ApiResponse({ status: 200, description: 'List of artists' })
 	async getList(
 		@Query() query: QueryGetListArtistDto,
 	): Promise<ResponseSuccess<PageDto<Artist>>> {
@@ -65,13 +50,6 @@ export class ArtistController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update an artist by ID' })
-	@ApiResponse({ status: 200, description: ArtistMessageSuccess.UPDATE })
-	@ApiResponse({
-		status: 409,
-		description: ArtistMessageError.DUPLICATE_NAME_ARTIST,
-	})
-	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async update(
 		@Param('id') id: string,
 		@Body() data: UpdateArtistDto,
@@ -84,9 +62,6 @@ export class ArtistController {
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete an artist by ID' })
-	@ApiResponse({ status: 200, description: ArtistMessageSuccess.DELETE })
-	@ApiResponse({ status: 404, description: ArtistMessageError.NOT_FOUND })
 	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.artistService.delete(id);
 		return new ResponseSuccess({

@@ -10,7 +10,7 @@ export const LanguageMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const LanguageMessageCodeError = {
+const LanguageMessageCodeError = {
 	DUPLICATE_NAME_LANGUAGE: 'language.message.error.duplicateNameLanguage',
 	DUPLICATE_CODE_LANGUAGE: 'language.message.error.duplicateCodeLanguage',
 	NOT_FOUND: 'language.message.error.notFound',
@@ -28,7 +28,7 @@ export const LanguageMessageCodeError = {
 		'language.message.error.cannotDeleteBecauseLinkedTrackLocalizes',
 };
 
-export const LanguageMessageError = {
+const LanguageMessageError = {
 	DUPLICATE_NAME_LANGUAGE: 'Duplicate language name',
 	DUPLICATE_CODE_LANGUAGE: 'Duplicate language code',
 	NOT_FOUND: 'Not found',
@@ -44,4 +44,70 @@ export const LanguageMessageError = {
 		'Cannot delete this language because it is linked to track metadata languages.',
 	CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES:
 		'Cannot delete this language because it is linked to track localizations.',
+};
+
+export const LanguageMessage = {
+	NOT_FOUND: {
+		message: LanguageMessageError.NOT_FOUND,
+		statusCode: 404,
+	},
+
+	DUPLICATE_NAME_LANGUAGE: {
+		message: LanguageMessageError.DUPLICATE_NAME_LANGUAGE,
+		messageCode: LanguageMessageCodeError.DUPLICATE_NAME_LANGUAGE,
+		statusCode: 409,
+	},
+
+	DUPLICATE_CODE_LANGUAGE: {
+		message: LanguageMessageError.DUPLICATE_CODE_LANGUAGE,
+		messageCode: LanguageMessageCodeError.DUPLICATE_CODE_LANGUAGE,
+		statusCode: 409,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
+		statusCode: 400,
+	},
+	CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES: {
+		message:
+			LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
+		messageCode:
+			LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
+		statusCode: 400,
+	},
 };

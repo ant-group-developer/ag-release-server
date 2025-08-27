@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	IsArray,
@@ -9,6 +9,7 @@ import {
 	IsOptional,
 	IsString,
 	IsUUID,
+	Matches,
 	MaxLength,
 	ValidateIf,
 	ValidateNested,
@@ -36,6 +37,12 @@ export class CreateDspDto {
 	})
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
+	@Matches(/^[^_]+$/, {
+		message: 'Name must not contain underscore (_)',
+	})
 	@IsNotEmpty()
 	name: string;
 

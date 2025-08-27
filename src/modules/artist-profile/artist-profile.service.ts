@@ -6,10 +6,8 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ensureUUID } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import {
-	ArtistProfileMessageCodeError,
-	ArtistProfileMessageError,
-} from './constants/artist-profile.constants';
+
+import { ArtistProfileMessage } from './constants/artist-profile.constants';
 import { ArtistProfile } from './entities/artist-profile.entity';
 import {
 	IBulkUpdateArtistProfile,
@@ -83,10 +81,7 @@ export class ArtistProfileService {
 			});
 
 			if (!dsp) {
-				throw new ResponseError({
-					message: ArtistProfileMessageError.DSP_NOT_FOUND,
-					messageCode: ArtistProfileMessageCodeError.DSP_NOT_FOUND,
-				});
+				throw new ResponseError(ArtistProfileMessage.DSP_NOT_FOUND);
 			}
 		}
 
@@ -96,10 +91,7 @@ export class ArtistProfileService {
 			});
 
 			if (!artist) {
-				throw new ResponseError({
-					message: ArtistProfileMessageError.ARTIST_NOT_FOUND,
-					messageCode: ArtistProfileMessageCodeError.ARTIST_NOT_FOUND,
-				});
+				throw new ResponseError(ArtistProfileMessage.ARTIST_NOT_FOUND);
 			}
 		}
 	}

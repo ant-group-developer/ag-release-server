@@ -10,18 +10,38 @@ export const CurrencyMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const CurrencyMessageCodeError = {
+const CurrencyMessageCodeError = {
 	NOT_FOUND: 'currency.message.error.notFound',
 	UNIQUE_CONSTRAINT: 'currency.message.error.uniqueConstraint',
 	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
 		'currency.message.error.cannotDeleteBecauseLinkedPriceTiers',
 };
 
-export const CurrencyMessageError = {
+const CurrencyMessageError = {
 	NOT_FOUND: 'Currency not found',
 	UNIQUE_CONSTRAINT: 'Currency already exists',
 	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
 		'Cannot delete this currency because it is linked to price tiers',
+};
+
+export const CurrencyMessage = {
+	NOT_FOUND: {
+		message: CurrencyMessageError.NOT_FOUND,
+		messageCode: CurrencyMessageCodeError.NOT_FOUND,
+	},
+
+	UNIQUE_CONSTRAINT: {
+		message: CurrencyMessageError.UNIQUE_CONSTRAINT,
+		messageCode: CurrencyMessageCodeError.UNIQUE_CONSTRAINT,
+		statusCode: 409,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS: {
+		message: CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+		messageCode:
+			CurrencyMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+		statusCode: 400,
+	},
 };
 
 // data init

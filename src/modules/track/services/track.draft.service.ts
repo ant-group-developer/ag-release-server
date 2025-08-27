@@ -15,7 +15,7 @@ import {
 } from '../interfaces/track.interface';
 
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import { AudioFileDraftService } from 'src/modules/audio-file/services/audio-file.draft.service';
+import { AudioFileService } from 'src/modules/audio-file/services/audio-file.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtistService } from 'src/modules/track-artist/services/track-artist.service';
@@ -34,7 +34,7 @@ export class TrackDraftService {
 		private readonly trackRepo: Repository<Track>,
 
 		private readonly trackQueryService: TrackQueryService,
-		private readonly audioFileDraftService: AudioFileDraftService,
+		private readonly audioFileService: AudioFileService,
 		private readonly trackLanguageDraftService: TrackLanguageDraftService,
 		private readonly trackArtistService: TrackArtistService,
 		private readonly copyrightService: CopyrightService,
@@ -97,7 +97,7 @@ export class TrackDraftService {
 	}) {
 		const { id: trackId } = track;
 
-		await this.audioFileDraftService.create({
+		await this.audioFileService.create({
 			...audioFile,
 			trackId,
 		});
@@ -222,7 +222,7 @@ export class TrackDraftService {
 
 		if (audioFile) {
 			if (track.audioFile) {
-				await this.audioFileDraftService.update({
+				await this.audioFileService.update({
 					audioFileId: track.audioFile.id,
 					dataUpdate: audioFile,
 				});
@@ -280,7 +280,7 @@ export class TrackDraftService {
 
 	private async deleteRelatedRecords({ trackId }: { trackId: string }) {
 		await Promise.all([
-			this.audioFileDraftService.deleteRecordOfTrack({ trackId }),
+			this.audioFileService.deleteRecordOfTrack({ trackId }),
 			this.trackArtistService.deleteRecordOfTrack({ trackId }),
 			this.trackLanguageDraftService.deleteRecordOfTrack({
 				trackId,

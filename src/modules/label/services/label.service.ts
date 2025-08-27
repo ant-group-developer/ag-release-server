@@ -4,7 +4,8 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { LabelMessageError } from '../constants/label.constant';
+import { stringToCode } from 'src/utils/util';
+import { LabelMessage } from '../constants/label.constant';
 import {
 	CreateLabelDto,
 	QueryGetListLabelDto,
@@ -27,7 +28,8 @@ export class LabelService {
 	async create(data: CreateLabelDto): Promise<Label> {
 		await this.labelQueryService.validate({ name: data.name });
 
-		const label = this.labelRepo.create(data);
+		const code = stringToCode(data.name);
+		const label = this.labelRepo.create({ ...data, code });
 		return await this.labelRepo.save(label);
 	}
 
@@ -35,10 +37,7 @@ export class LabelService {
 	private async findOne(id: string): Promise<Label> {
 		const label = await this.labelRepo.findOne({ where: { id } });
 		if (!label) {
-			throw new ResponseError({
-				message: LabelMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LabelMessage.NOT_FOUND);
 		}
 
 		return label;
@@ -47,10 +46,7 @@ export class LabelService {
 	async findOneWithCountRelation(id: string): Promise<Label> {
 		const label = await this.labelQueryService.findOneWithCountRelation(id);
 		if (!label) {
-			throw new ResponseError({
-				message: LabelMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LabelMessage.NOT_FOUND);
 		}
 
 		return label;

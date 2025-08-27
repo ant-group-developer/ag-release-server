@@ -13,14 +13,18 @@ import {
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderArtist } from '../enum/artist.enum';
 
 class CreateArtistProfileDto {
 	@IsNotEmpty()
-	@MaxLength(50)
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
+	@IsString()
 	name: string;
 
 	@IsNotEmpty()

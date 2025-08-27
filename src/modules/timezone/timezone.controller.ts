@@ -9,13 +9,9 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	TimezoneMessageCodeSuccess,
-	TimezoneMessageError,
-	TimezoneMessageSuccess,
-} from './constants/timezone.constant';
+import { TimezoneMessageCodeSuccess } from './constants/timezone.constant';
 
 import {
 	CreateTimezoneDto,
@@ -30,11 +26,6 @@ export class TimezoneController {
 	constructor(private readonly timezoneService: TimezoneService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new timezone' })
-	@ApiResponse({
-		status: 200,
-		description: TimezoneMessageSuccess.CREATE,
-	})
 	async create(
 		@Body() createTimezoneDto: CreateTimezoneDto,
 	): Promise<ResponseSuccess<Timezone>> {
@@ -46,15 +37,6 @@ export class TimezoneController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a timezone by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved timezone',
-	})
-	@ApiResponse({
-		status: 404,
-		description: TimezoneMessageError.NOT_FOUND,
-	})
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<Timezone>> {
@@ -63,11 +45,6 @@ export class TimezoneController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of timezones' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of timezones',
-	})
 	async getList(
 		@Query() query: QueryGetListTimezoneDto,
 	): Promise<ResponseSuccess<PageDto<Timezone>>> {
@@ -76,15 +53,6 @@ export class TimezoneController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a timezone by ID' })
-	@ApiResponse({
-		status: 200,
-		description: TimezoneMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 404,
-		description: TimezoneMessageError.NOT_FOUND,
-	})
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTimezoneDto: UpdateTimezoneDto,
@@ -97,11 +65,6 @@ export class TimezoneController {
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a timezone by ID' })
-	@ApiResponse({
-		status: 200,
-		description: TimezoneMessageSuccess.DELETE,
-	})
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {

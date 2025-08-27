@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
 import { Repository } from 'typeorm';
-import { ReleaseArtistMessageError } from '../constants/release-artist.constant';
+import { ReleaseArtistMessage } from '../constants/release-artist.constant';
 import {
 	CreateReleaseArtistDto,
 	QueryGetListReleaseArtistDto,
@@ -67,10 +67,7 @@ export class ReleaseArtistService {
 		});
 
 		if (!releaseArtist) {
-			throw new ResponseError({
-				message: ReleaseArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ReleaseArtistMessage.NOT_FOUND);
 		}
 
 		return releaseArtist;

@@ -9,13 +9,9 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	ReleaseMessageCodeSuccess,
-	ReleaseMessageError,
-	ReleaseMessageSuccess,
-} from '../constants/release.constant';
+import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request } from 'express';
 import {
@@ -35,26 +31,6 @@ import { ReleaseService } from '../services/release.service';
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
-	// @Post()
-	// @ApiOperation({ summary: 'Create a new release' })
-	// @ApiResponse({
-	// 	status: 200,
-	// 	description: ReleaseMessageSuccess.CREATE,
-	// })
-	// @ApiResponse({
-	// 	status: 400,
-	// 	description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-	// })
-	// async create(
-	// 	@Body() createReleaseDto: CreateReleaseDto,
-	// ): Promise<ResponseSuccess<Release>> {
-	// 	const result = await this.releaseService.create(createReleaseDto);
-	// 	return new ResponseSuccess({
-	// 		data: result,
-	// 		messageCode: ReleaseMessageCodeSuccess.CREATE,
-	// 	});
-	// }
-
 	@Post(':id/submit')
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -69,15 +45,6 @@ export class ReleaseController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a release by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved release',
-	})
-	@ApiResponse({
-		status: 404,
-		description: ReleaseMessageError.NOT_FOUND,
-	})
 	async getOneDetail(
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<IReleaseDetail>> {
@@ -86,11 +53,6 @@ export class ReleaseController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of releases' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of releases',
-	})
 	async getListDetail(
 		@Query() query: QueryGetListReleaseDto,
 		@Req() req: Request,
@@ -103,19 +65,6 @@ export class ReleaseController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a release by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 404,
-		description: ReleaseMessageError.NOT_FOUND,
-	})
-	@ApiResponse({
-		status: 400,
-		description: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-	})
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateReleaseDto: UpdateReleaseDto,

@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { ArtistMessageError } from '../constants/artist.constant';
+import { ArtistMessage } from '../constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
@@ -43,8 +43,9 @@ export class ArtistService {
 	private async create(data: ICreateArtist): Promise<Artist> {
 		const { name } = data;
 		await this.artistQueryService.validate({ name });
+		const code = await this.artistQueryService.getCodeFromName(name);
 
-		const artist = this.artistRepo.create(data);
+		const artist = this.artistRepo.create({ ...data, code });
 		return await this.artistRepo.save(artist);
 	}
 
@@ -69,10 +70,7 @@ export class ArtistService {
 	private async findOne(id: string): Promise<Artist> {
 		const artist = await this.artistRepo.findOne({ where: { id } });
 		if (!artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ArtistMessage.NOT_FOUND);
 		}
 
 		return artist;
@@ -82,10 +80,7 @@ export class ArtistService {
 		const artist =
 			await this.artistQueryService.findOneWithCountRelation(id);
 		if (!artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ArtistMessage.NOT_FOUND);
 		}
 
 		return artist;
@@ -95,10 +90,7 @@ export class ArtistService {
 		const artist = await this.artistQueryService.findOneLite(id);
 
 		if (!artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ArtistMessage.NOT_FOUND);
 		}
 		return artist;
 	}

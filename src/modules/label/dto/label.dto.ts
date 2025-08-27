@@ -1,9 +1,11 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	Matches,
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
@@ -18,9 +20,16 @@ export class CreateLabelDto {
 		maxLength: 100,
 		example: 'Warner Music',
 	})
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
+	@IsNotEmpty()
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(DEFAULT_LENGTH_NAME)
+	@Matches(/^[^_]+$/, {
+		message: 'Name must not contain underscore (_)',
+	})
 	name: string;
 
 	@ApiProperty({

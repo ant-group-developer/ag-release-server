@@ -8,13 +8,9 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	ReleaseArtistMessageCodeSuccess,
-	ReleaseArtistMessageError,
-	ReleaseArtistMessageSuccess,
-} from './constants/release-artist.constant';
+import { ReleaseArtistMessageCodeSuccess } from './constants/release-artist.constant';
 
 import {
 	CreateReleaseArtistDto,
@@ -30,11 +26,6 @@ export class ReleaseArtistController {
 	constructor(private readonly releaseArtistService: ReleaseArtistService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new release artist' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseArtistMessageSuccess.CREATE,
-	})
 	async create(
 		@Body() createReleaseArtistDto: CreateReleaseArtistDto,
 	): Promise<ResponseSuccess<ReleaseArtist>> {
@@ -48,15 +39,6 @@ export class ReleaseArtistController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a release artist by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved release artist',
-	})
-	@ApiResponse({
-		status: 404,
-		description: ReleaseArtistMessageError.NOT_FOUND,
-	})
 	async findOne(
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<ReleaseArtist>> {
@@ -65,11 +47,6 @@ export class ReleaseArtistController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of release artist' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of release artist',
-	})
 	async getList(
 		@Query() query: QueryGetListReleaseArtistDto,
 	): Promise<ResponseSuccess<PageDto<ReleaseArtist>>> {
@@ -78,15 +55,6 @@ export class ReleaseArtistController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a release artist by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseArtistMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 404,
-		description: ReleaseArtistMessageError.NOT_FOUND,
-	})
 	async update(
 		@Param('id') id: string,
 		@Body() updateReleaseArtistDto: UpdateReleaseArtistDto,
@@ -102,11 +70,6 @@ export class ReleaseArtistController {
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a release artist by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseArtistMessageSuccess.DELETE,
-	})
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.releaseArtistService.handleDelete(id);
 		return new ResponseSuccess({

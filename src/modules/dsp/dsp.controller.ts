@@ -8,13 +8,9 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	DspMessageCodeSuccess,
-	DspMessageError,
-	DspMessageSuccess,
-} from './constants/dsp.constant';
+import { DspMessageCodeSuccess } from './constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
 import { Dsp } from './entities/dsp.entity';
 import { DspService } from './services/dsp.service';
@@ -25,12 +21,6 @@ export class DspController {
 	constructor(private readonly dspService: DspService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new DSP' })
-	@ApiResponse({ status: 200, description: DspMessageSuccess.CREATE })
-	@ApiResponse({
-		status: 409,
-		description: DspMessageError.DUPLICATE_NAME_DSP,
-	})
 	async create(@Body() createDspDto: CreateDspDto) {
 		const result = await this.dspService.handleCreate(createDspDto);
 		return new ResponseSuccess({
@@ -40,8 +30,6 @@ export class DspController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of DSPs' })
-	@ApiResponse({ status: 200, description: 'List of DSPs' })
 	async getList(
 		@Query() query: QueryGetListDspDto,
 	): Promise<ResponseSuccess<PageDto<Dsp>>> {
@@ -50,8 +38,6 @@ export class DspController {
 	}
 
 	@Get('with-actions')
-	@ApiOperation({ summary: 'Get a list of DSPs' })
-	@ApiResponse({ status: 200, description: 'List of DSPs' })
 	async getListWithActions(
 		@Query() query: QueryGetListDspDto,
 	): Promise<ResponseSuccess<PageDto<Dsp>>> {
@@ -60,9 +46,6 @@ export class DspController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a DSP by ID' })
-	@ApiResponse({ status: 200, description: 'Successfully retrieved DSP' })
-	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
 		const result = await this.dspService.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -75,13 +58,6 @@ export class DspController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a DSP by ID' })
-	@ApiResponse({ status: 200, description: DspMessageSuccess.UPDATE })
-	@ApiResponse({
-		status: 409,
-		description: DspMessageError.DUPLICATE_NAME_DSP,
-	})
-	@ApiResponse({ status: 404, description: DspMessageError.NOT_FOUND })
 	async handleUpdate(@Param('id') id: string, @Body() data: UpdateDspDto) {
 		const result = await this.dspService.handleUpdate({ dspId: id, data });
 		return new ResponseSuccess({

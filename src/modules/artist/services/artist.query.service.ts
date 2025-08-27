@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { splitCodeIndex, stringToCode } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import {
-	ArtistMessageCodeError,
-	ArtistMessageError,
-} from '../constants/artist.constant';
+import { ArtistMessage } from '../constants/artist.constant';
 import { QueryGetListArtistDto } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
 import {
@@ -193,33 +191,39 @@ export class ArtistQueryService {
 		});
 
 		if (artist) {
-			throw new ResponseError({
-				message: ArtistMessageError.DUPLICATE_NAME_ARTIST,
-				messageCode: ArtistMessageCodeError.DUPLICATE_NAME_ARTIST,
-				statusCode: 409,
-			});
+			throw new ResponseError(ArtistMessage.DUPLICATE_NAME_ARTIST);
 		}
 	}
 
 	validateDelete(artist: Artist) {
 		if ((artist.releaseCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				ArtistMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+			);
 		}
 
 		if ((artist.trackCount ?? 0) > 0) {
-			throw new ResponseError({
-				message: ArtistMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					ArtistMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				ArtistMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+			);
 		}
+	}
+
+	async getCodeFromName(name: string) {
+		const code = stringToCode(name) + '_0';
+		return this.generateUniqueCode(code);
+	}
+
+	private async generateUniqueCode(code: string): Promise<string> {
+		const entities = await this.artistRepo.findOne({
+			where: { code },
+		});
+
+		if (!entities) return code;
+
+		const { preCode, index } = splitCodeIndex(code);
+
+		return this.generateUniqueCode(`${preCode}_${index + 1}`);
 	}
 }
 

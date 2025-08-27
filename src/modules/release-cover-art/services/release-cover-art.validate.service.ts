@@ -4,10 +4,7 @@ import { ResponseError } from 'src/common/dtos/response.dto';
 import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
 import { Repository } from 'typeorm';
 import { Release } from '../../release/entities/release.entity';
-import {
-	ReleaseCoverArtMessageCodeError,
-	ReleaseCoverArtMessageError,
-} from '../constants/release-cover-art.constant';
+import { ReleaseCoverArtMessage } from '../constants/release-cover-art.constant';
 import { ReleaseCoverArt } from '../entities/release-cover-art.entity';
 
 @Injectable()
@@ -36,11 +33,9 @@ export class ReleaseCoverArtValidateService {
 			});
 
 			if (!release) {
-				throw new ResponseError({
-					message: ReleaseCoverArtMessageError.RELEASE_NOT_FOUND,
-					messageCode:
-						ReleaseCoverArtMessageCodeError.RELEASE_NOT_FOUND,
-				});
+				throw new ResponseError(
+					ReleaseCoverArtMessage.RELEASE_NOT_FOUND,
+				);
 			}
 		}
 

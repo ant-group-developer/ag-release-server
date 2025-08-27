@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { GenreMessageError } from '../constants/genre.constant';
+import { GenreMessage } from '../constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -35,10 +35,7 @@ export class GenreService {
 	async findOne(id: string): Promise<Genre> {
 		const genre = await this.genreRepo.findOne({ where: { id } });
 		if (!genre) {
-			throw new ResponseError({
-				message: GenreMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(GenreMessage.NOT_FOUND);
 		}
 
 		return genre;
@@ -48,10 +45,7 @@ export class GenreService {
 		const genre = await this.genreQueryService.findOneWithCountRelation(id);
 
 		if (!genre) {
-			throw new ResponseError({
-				message: GenreMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(GenreMessage.NOT_FOUND);
 		}
 
 		return genre;

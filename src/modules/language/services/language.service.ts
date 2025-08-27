@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { LanguageMessageError } from '../constants/language.constant';
+import { LanguageMessage } from '../constants/language.constant';
 import {
 	CreateLanguageDto,
 	QueryGetListLanguageDto,
@@ -34,10 +34,7 @@ export class LanguageService {
 	async findOne(id: string): Promise<Language> {
 		const language = await this.languageRepo.findOne({ where: { id } });
 		if (!language) {
-			throw new ResponseError({
-				message: LanguageMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LanguageMessage.NOT_FOUND);
 		}
 
 		return language;
@@ -86,10 +83,7 @@ export class LanguageService {
 		const language =
 			await this.languageQueryService.findOneWithCountRelation(id);
 		if (!language) {
-			throw new ResponseError({
-				message: LanguageMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LanguageMessage.NOT_FOUND);
 		}
 
 		this.languageQueryService.validateDelete(language);

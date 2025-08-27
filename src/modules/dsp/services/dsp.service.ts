@@ -9,8 +9,8 @@ import {
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';
+import { stringToCode } from 'src/utils/util';
 import { In, Repository } from 'typeorm';
-import { DspMessageError } from '../constants/dsp.constant';
 import { DspMessages } from '../constants/dsp.message';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
@@ -46,7 +46,8 @@ export class DspService {
 
 	private async createDsp(data: Omit<CreateDspDto, 'dspActions'>) {
 		await this.dspQueryService.validate({ name: data.name });
-		const dsp = this.dspRepo.create(data);
+		const code = stringToCode(data.name);
+		const dsp = this.dspRepo.create({ ...data, code });
 		return await this.dspRepo.save(dsp);
 	}
 
@@ -98,7 +99,7 @@ export class DspService {
 	private async findOneWithCountRelation(id: string): Promise<Dsp> {
 		const dsp = await this.dspQueryService.findOneWithCountRelation(id);
 		if (!dsp) {
-			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
+			throw new ResponseError(DspMessages.NOT_FOUND);
 		}
 
 		return dsp;

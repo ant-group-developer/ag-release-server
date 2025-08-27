@@ -9,13 +9,9 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	CountryMessageCodeSuccess,
-	CountryMessageError,
-	CountryMessageSuccess,
-} from './constants/country.constant';
+import { CountryMessageCodeSuccess } from './constants/country.constant';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -30,15 +26,6 @@ export class CountryController {
 	constructor(private readonly countryService: CountryService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new country' })
-	@ApiResponse({
-		status: 200,
-		description: CountryMessageSuccess.CREATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: CountryMessageError.DUPLICATE_NAME_COUNTRY,
-	})
 	async create(
 		@Body() createCountryDto: CreateCountryDto,
 	): Promise<ResponseSuccess<Country>> {
@@ -58,12 +45,6 @@ export class CountryController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a country by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved country',
-	})
-	@ApiResponse({ status: 404, description: CountryMessageError.NOT_FOUND })
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<Country>> {
@@ -72,11 +53,6 @@ export class CountryController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of countries' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of countries',
-	})
 	async getList(
 		@Query() query: QueryGetListCountryDto,
 	): Promise<ResponseSuccess<PageDto<Country>>> {
@@ -87,15 +63,6 @@ export class CountryController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a country by ID' })
-	@ApiResponse({
-		status: 200,
-		description: CountryMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: CountryMessageError.DUPLICATE_NAME_COUNTRY,
-	})
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateCountryDto: UpdateCountryDto,
@@ -108,8 +75,6 @@ export class CountryController {
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a country by ID' })
-	@ApiResponse({ status: 200, description: CountryMessageSuccess.DELETE })
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {

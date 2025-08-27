@@ -1,4 +1,7 @@
-import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
@@ -18,6 +21,9 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		length: DEFAULT_LENGTH_NAME,
 	})
 	name: string;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	code: string;
 
 	@Column({
 		name: 'picture',

@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Currency } from 'src/modules/currency/entities/currency.entity';
 import { Repository } from 'typeorm';
-import {
-	PriceTierMessageCodeError,
-	PriceTierMessageError,
-} from '../constants/price-tiers.constant';
+import { PriceTierMessage } from '../constants/price-tiers.constant';
 import { QueryGetListPriceTier } from '../dto/price-tier.dto';
 import { PriceTier } from '../entities/price-tier.entity';
 import { FieldOrderCurrency } from '../enum/price-tier.enum';
@@ -59,10 +56,8 @@ export class PriceTierQueryService {
 			});
 			if (!currency) {
 				throw new ResponseError({
-					message: PriceTierMessageError.CURRENCY_NOT_FOUND,
-					messageCode: PriceTierMessageCodeError.CURRENCY_NOT_FOUND,
-					messageWarning: `${PriceTierMessageError.CURRENCY_NOT_FOUND}: ${currencyId}`,
-					statusCode: 404,
+					...PriceTierMessage.CURRENCY_NOT_FOUND,
+					messageWarning: `${PriceTierMessage.CURRENCY_NOT_FOUND.message}: ${currencyId}`,
 				});
 			}
 		}
@@ -119,15 +114,12 @@ export class PriceTierQueryService {
 	validateDelete(priceTier: PriceTier) {
 		if ((priceTier.trackCount ?? 0) > 0) {
 			throw new ResponseError({
-				message:
-					PriceTierMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					PriceTierMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+				...PriceTierMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
 				messageWarning:
-					PriceTierMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS +
+					PriceTierMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACKS
+						.message +
 					': ' +
 					priceTier.id,
-				statusCode: 400,
 			});
 		}
 	}

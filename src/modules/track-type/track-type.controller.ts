@@ -9,14 +9,10 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 
-import {
-	TrackTypeMessageCodeSuccess,
-	TrackTypeMessageError,
-	TrackTypeMessageSuccess,
-} from './constants/track-type.constant';
+import { TrackTypeMessageCodeSuccess } from './constants/track-type.constant';
 import {
 	CreateTrackTypeDto,
 	QueryGetListTrackTypeDto,
@@ -42,12 +38,6 @@ export class TrackTypeController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a trackType by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved trackType',
-	})
-	@ApiResponse({ status: 404, description: TrackTypeMessageError.NOT_FOUND })
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<TrackType>> {
@@ -56,8 +46,6 @@ export class TrackTypeController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of trackTypes' })
-	@ApiResponse({ status: 200, description: 'List of trackTypes' })
 	async getList(
 		@Query() query: QueryGetListTrackTypeDto,
 	): Promise<ResponseSuccess<PageDto<TrackType>>> {
@@ -66,13 +54,6 @@ export class TrackTypeController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a trackType by ID' })
-	@ApiResponse({ status: 200, description: TrackTypeMessageSuccess.UPDATE })
-	@ApiResponse({
-		status: 409,
-		description: TrackTypeMessageError.DUPLICATE_NAME_TRACK_TYPE,
-	})
-	@ApiResponse({ status: 404, description: TrackTypeMessageError.NOT_FOUND })
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackTypeDto: UpdateTrackTypeDto,
@@ -88,8 +69,6 @@ export class TrackTypeController {
 	}
 
 	@Delete(':id')
-	@ApiOperation({ summary: 'Delete a trackType by ID' })
-	@ApiResponse({ status: 200, description: TrackTypeMessageSuccess.DELETE })
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {

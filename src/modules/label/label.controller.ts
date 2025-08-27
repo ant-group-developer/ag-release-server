@@ -12,7 +12,6 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	LabelMessageCodeSuccess,
-	LabelMessageError,
 	LabelMessageSuccess,
 } from './constants/label.constant';
 import {
@@ -29,15 +28,6 @@ export class LabelController {
 	constructor(private readonly labelService: LabelService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new label' })
-	@ApiResponse({
-		status: 200,
-		description: LabelMessageSuccess.CREATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: LabelMessageError.DUPLICATE_NAME_LABEL,
-	})
 	async create(
 		@Body() createLabelDto: CreateLabelDto,
 	): Promise<ResponseSuccess<Label>> {
@@ -49,15 +39,6 @@ export class LabelController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a label by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved label',
-	})
-	@ApiResponse({
-		status: 404,
-		description: LabelMessageError.NOT_FOUND,
-	})
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Label>> {
 		const result = await this.labelService.findOneWithCountRelation(id);
 		return new ResponseSuccess({ data: result });
@@ -77,15 +58,6 @@ export class LabelController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a label by ID' })
-	@ApiResponse({
-		status: 200,
-		description: LabelMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: LabelMessageError.DUPLICATE_NAME_LABEL,
-	})
 	async update(
 		@Param('id') id: string,
 		@Body() updateLabelDto: UpdateLabelDto,

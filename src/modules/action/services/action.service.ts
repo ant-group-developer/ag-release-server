@@ -1,12 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import {
-	ActionMessageCodeError,
-	ActionMessageError,
-} from '../constants/action.constant';
+import { ActionMessage } from '../constants/action.constant';
 import {
 	CreateActionDto,
 	QueryGetListActionDto,
@@ -17,8 +14,6 @@ import { ActionQueryService } from './action.query.service';
 
 @Injectable()
 export class ActionService {
-	private readonly logger = new Logger(ActionService.name);
-
 	constructor(
 		@InjectRepository(Action)
 		private readonly actionRepo: Repository<Action>,
@@ -36,11 +31,7 @@ export class ActionService {
 	async findOne(id: string): Promise<Action> {
 		const action = await this.actionRepo.findOne({ where: { id } });
 		if (!action) {
-			throw new ResponseError({
-				message: ActionMessageError.NOT_FOUND,
-				messageCode: ActionMessageCodeError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ActionMessage.NOT_FOUND);
 		}
 		return action;
 	}
@@ -50,11 +41,7 @@ export class ActionService {
 			await this.actionQueryService.findOneWithCountRelation(id);
 
 		if (!action) {
-			throw new ResponseError({
-				message: ActionMessageError.NOT_FOUND,
-				messageCode: ActionMessageCodeError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ActionMessage.NOT_FOUND);
 		}
 
 		return action;

@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import {
-	ActionMessageCodeError,
-	ActionMessageError,
-} from '../constants/action.constant';
+import { ActionMessage } from '../constants/action.constant';
 import { QueryGetListActionDto } from '../dtos/action.dto';
 import { Action } from '../entities/action.entity';
 
@@ -70,11 +67,7 @@ export class ActionQueryService {
 				where: { name },
 			});
 			if (existingName) {
-				throw new ResponseError({
-					message: ActionMessageError.DUPLICATE_NAME_ACTION,
-					messageCode: ActionMessageCodeError.DUPLICATE_NAME_ACTION,
-					statusCode: 409,
-				});
+				throw new ResponseError(ActionMessage.DUPLICATE_NAME_ACTION);
 			}
 		}
 
@@ -83,11 +76,7 @@ export class ActionQueryService {
 				where: { code },
 			});
 			if (existingCode) {
-				throw new ResponseError({
-					message: ActionMessageError.DUPLICATE_CODE_ACTION,
-					messageCode: ActionMessageCodeError.DUPLICATE_CODE_ACTION,
-					statusCode: 409,
-				});
+				throw new ResponseError(ActionMessage.DUPLICATE_CODE_ACTION);
 			}
 		}
 	}
@@ -134,12 +123,8 @@ export class ActionQueryService {
 	validateDelete(action: Action) {
 		if ((action.dspActionCount ?? 0) > 0) {
 			throw new ResponseError({
-				message:
-					ActionMessageError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS,
-				messageCode:
-					ActionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS,
-				messageWarning: `${ActionMessageError.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS}: ${action.id}`,
-				statusCode: 400,
+				...ActionMessage.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS,
+				messageWarning: `${ActionMessage.CANNOT_DELETE_BECAUSE_LINKED_DSP_ACTIONS.message}: ${action.id}`,
 			});
 		}
 	}

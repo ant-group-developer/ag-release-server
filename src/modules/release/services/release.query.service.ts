@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
-import { ReleaseMessageError } from '../constants/release.constant';
+import { ReleaseMessages } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import {
@@ -182,10 +182,7 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError({
-				message: ReleaseMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
 		}
 
 		return release;
@@ -306,33 +303,9 @@ export class ReleaseQueryService {
 		const release = await query.getOne();
 
 		if (!release) {
-			throw new ResponseError({
-				message: ReleaseMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
 		}
 
 		return release;
-	}
-
-	async getListTotalDurationOfRelease(ids: string[]) {
-		if (!ids.length) return {};
-
-		const result = await this.releaseRepo
-			.createQueryBuilder('release')
-			.leftJoin('release.tracks', 'track')
-			.leftJoin('track.audioFile', 'audioFile')
-			.select('release.id', 'releaseId')
-			.addSelect('SUM(audioFile.duration)', 'totalDuration')
-			.where('release.id IN (:...ids)', { ids })
-			.groupBy('release.id')
-			.getRawMany<{ releaseId: string; totalDuration: string | null }>();
-
-		return result.reduce<Record<string, number>>((acc, row) => {
-			acc[row.releaseId] = row.totalDuration
-				? Number(row.totalDuration)
-				: 0;
-			return acc;
-		}, {});
 	}
 }

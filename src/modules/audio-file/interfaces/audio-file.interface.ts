@@ -56,16 +56,3 @@ export interface IAudioFileNonDraft extends IAudioFile {
 	fileId: string;
 	peakId: string;
 }
-
-// export interface IAudioFileBucket {
-// 	sampleRate: string;
-// 	bitrate: string | null;
-// 	bitDepth: number | null;
-// 	duration: number;
-// 	hook: number | null;
-// 	trackId: string;
-// 	fileId: string;
-// 	peakId: string;
-// 	file: string;
-// 	peak: string;
-// }
