@@ -70,9 +70,9 @@ export class AppConfigService implements OnModuleInit {
 	async update(payload: UpdateConfigDto) {
 		const { website, telegram, acrCloud, backupDatabase } = payload;
 
-		const data = await this.getOneOrCreate();
+		const dataDb = await this.getOneOrCreate();
 
-		const { config: configDb } = data;
+		const { config: configDb } = dataDb;
 
 		const {
 			website: websiteDb,
@@ -81,24 +81,29 @@ export class AppConfigService implements OnModuleInit {
 			backupDatabase: backupDatabaseDb,
 		} = configDb;
 
-		data.config.website = website ?? websiteDb;
-
-		if (
-			website?.logo !== undefined &&
-			websiteDb.logo &&
-			website.logo !== websiteDb.logo
-		) {
-			this.eventEmitter.emit(AppEvent.DELETE_LOGO, websiteDb.logo);
+		if (website?.logo !== undefined) {
+			if (website.logo === null) {
+				if (websiteDb.logo) {
+					this.eventEmitter.emit(
+						AppEvent.DELETE_LOGO,
+						websiteDb.logo,
+					);
+				}
+			}
+		} else if (website) {
+			website.logo = websiteDb.logo;
 		}
 
-		data.config.telegram = telegram ?? telegramDb;
-		data.config.acrCloud = acrCloud ?? acrCloudDb;
-		data.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
+		dataDb.config.website = website ?? websiteDb;
+
+		dataDb.config.telegram = telegram ?? telegramDb;
+		dataDb.config.acrCloud = acrCloud ?? acrCloudDb;
+		dataDb.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
 
 		// const
-		const dataDb = await this.appConfigRepo.save(data);
+		const result = await this.appConfigRepo.save(dataDb);
 
-		this.config = dataDb.config;
+		this.config = result.config;
 		this.emitEventUpdate();
 		return this.config;
 	}

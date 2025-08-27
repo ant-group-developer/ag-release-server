@@ -203,6 +203,7 @@ export class TrackQueryService {
 				'trackLanguage.metadataLanguageCountry',
 				'metadataLanguageCountry',
 			)
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage')
 			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
 			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
 
@@ -244,7 +245,26 @@ export class TrackQueryService {
 			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect(['artist.id', 'artist.name', 'artist.picture'])
 
-			.addSelect(['trackLanguage.id'])
+			.addSelect([
+				'trackLanguage.id',
+				'trackLanguage.metadataLanguageCountryId',
+				'trackLanguage.audioLanguageId',
+				'trackLanguage.metadataLanguageId',
+				'trackLanguage.recordingCountryId',
+			])
+
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
 			.addSelect([
 				'metadataLanguageCountry.id',
 				'metadataLanguageCountry.name',
@@ -260,6 +280,7 @@ export class TrackQueryService {
 				'metadataLanguageCountry.nationality',
 				'metadataLanguageCountry.continent',
 			])
+
 			.addSelect([
 				'recordingCountry.id',
 				'recordingCountry.name',
@@ -274,11 +295,6 @@ export class TrackQueryService {
 				'recordingCountry.regionId',
 				'recordingCountry.nationality',
 				'recordingCountry.continent',
-			])
-			.addSelect([
-				'audioLanguage.id',
-				'audioLanguage.name',
-				'audioLanguage.code',
 			])
 
 			.addSelect([

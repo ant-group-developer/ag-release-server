@@ -24,23 +24,20 @@ export class CopyrightTrackService {
 
 		const query = this.createQueryGetTrackIds(filter);
 
-		const rows = await query.getRawMany<{
-			track_id: string;
-			scan_copyright_status: ScanCopyrightStatus;
-		}>();
+		const tracks = await query.getMany();
 
-		return rows
-			.filter((row) => {
+		return tracks
+			.filter((tracks) => {
 				if (ignoreTrackScanned) {
 					return (
-						row.scan_copyright_status ===
+						tracks.scanCopyrightStatus ===
 						ScanCopyrightStatus.UN_SCANNED
 					);
 				}
 
 				return true;
 			})
-			.map((row) => row.track_id);
+			.map((track) => track.id);
 	}
 
 	async getTrack(id: string) {

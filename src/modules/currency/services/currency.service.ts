@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
 	CurrencyMessage,
-	defaultCurrencies,
+	dataInitCurrencies,
 } from '../constants/currency.constant';
 import {
 	CreateCurrencyDto,
@@ -34,19 +34,9 @@ export class CurrencyService implements OnModuleInit {
 		const count = await this.currencyRepo.count();
 
 		if (count === 0) {
-			this.logger.log(
-				'Currency table is empty, initializing default currencies',
-			);
-
-			const entities = defaultCurrencies.map((currency) =>
-				this.currencyRepo.create({
-					name: currency.name,
-					code: currency.code,
-				}),
-			);
-
+			this.logger.log('Initializing default currencies');
+			const entities = this.currencyRepo.create(dataInitCurrencies);
 			await this.currencyRepo.save(entities);
-
 			this.logger.log('Default currencies inserted successfully');
 		} else {
 			this.logger.log(
