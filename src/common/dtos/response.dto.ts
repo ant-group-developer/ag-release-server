@@ -8,7 +8,6 @@ import {
 	SUCCESS_MESSAGE_CODE_DEFAULT,
 	SUCCESS_MESSAGE_DEFAULT,
 	SUCCESS_STATUS_CODE_DEFAULT,
-	WARNING_MESSAGE_DEFAULT,
 } from '../constants/common.default.constants';
 
 /**
@@ -72,14 +71,14 @@ export class ResponseSuccess<T> {
 	statusCode: number;
 	message: string;
 	messageCode: string;
-	messageWarning: string;
+	messageWarning?: string;
 	data?: T;
 
 	constructor({
 		statusCode = SUCCESS_STATUS_CODE_DEFAULT,
 		message = SUCCESS_MESSAGE_DEFAULT,
 		messageCode = SUCCESS_MESSAGE_CODE_DEFAULT,
-		messageWarning = WARNING_MESSAGE_DEFAULT,
+		messageWarning,
 		data,
 	}: {
 		statusCode?: number;

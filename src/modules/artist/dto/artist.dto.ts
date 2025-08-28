@@ -116,5 +116,5 @@ export class QueryGetListArtistDto extends BaseQueryDto {
 	fieldOrder: FieldOrderArtist = FieldOrderArtist.NAME;
 
 	@IsOptional()
-	id: string;
+	code?: string;
 }
