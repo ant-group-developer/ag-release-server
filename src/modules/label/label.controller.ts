@@ -18,8 +18,8 @@ import {
 } from 'src/common/dtos/response.dto';
 import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import {
+	LabelMessage,
 	LabelMessageCodeSuccess,
-	LabelMessages,
 	LabelMessageSuccess,
 } from './constants/label.constant';
 import {
@@ -43,7 +43,7 @@ export class LabelController {
 		const tenantId = req.user!.tenantId;
 
 		if (checkIsSystemTenant(tenantId)) {
-			throw new ResponseError(LabelMessages.SYSTEM_TENANT_FORBIDDEN);
+			throw new ResponseError(LabelMessage.SYSTEM_TENANT_FORBIDDEN);
 		}
 
 		await this.labelService.checkExceedLabels(tenantId);
