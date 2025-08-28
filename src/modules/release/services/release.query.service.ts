@@ -194,14 +194,50 @@ export class ReleaseQueryService {
 
 		// left join
 		queryGetList
-			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
-			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoin('release.releaseArtists', 'releaseArtist')
+			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			.leftJoin('release.label', 'label')
 
-			.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
-			.leftJoinAndSelect('releaseArtist.artist', 'artist')
-			.leftJoinAndSelect('releaseArtist.artistRole', 'artistRole')
-
-			.leftJoinAndSelect('release.label', 'label')
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+				'albumFormat.minTrackCount',
+				'albumFormat.maxTrackCount',
+			])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.releaseId',
+				'releaseCoverArt.width',
+				'releaseCoverArt.height',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'releaseArtist.id',
+				'releaseArtist.artistRoleId',
+				'releaseArtist.artistId',
+				'releaseArtist.releaseId',
+				'releaseArtist.addArtistToTracks',
+			])
+			.addSelect([
+				'artist.id',
+				'artist.name',
+				'artist.code',
+				'artist.picture',
+				'artist.biography',
+			])
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.code',
+				'label.picture',
+				'label.description',
+			])
 
 			// virtual
 			.addSelect((subQuery) => {
@@ -266,34 +302,116 @@ export class ReleaseQueryService {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
 		query
-			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
-			.leftJoinAndSelect('release.label', 'label')
+			.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.label', 'label')
 
-			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
-			.leftJoinAndSelect('release.subGenre', 'subGenre')
+			.leftJoin('release.primaryGenre', 'primaryGenre')
+			.leftJoin('release.subGenre', 'subGenre')
 
-			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
 
-			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
-			.leftJoinAndSelect('releaseArtists.artist', 'artist')
-			.leftJoinAndSelect('releaseArtists.artistRole', 'artistRole')
+			.leftJoin('release.releaseArtists', 'releaseArtist')
+			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('releaseArtist.artistRole', 'artistRole')
 
-			.leftJoinAndSelect('release.releaseLanguage', 'releaseLanguage')
-			.leftJoinAndSelect(
-				'releaseLanguage.metadataLanguage',
-				'metadataLanguage',
-			)
-			.leftJoinAndSelect('releaseLanguage.audioLanguage', 'audioLanguage')
-			.leftJoinAndSelect(
+			.leftJoin('release.releaseLanguage', 'releaseLanguage')
+
+			.leftJoin('releaseLanguage.metadataLanguage', 'metadataLanguage')
+			.leftJoin('releaseLanguage.audioLanguage', 'audioLanguage')
+			.leftJoin(
 				'releaseLanguage.metadataLanguageCountry',
 				'metadataLanguageCountry',
 			)
-
-			.leftJoinAndSelect('release.timeZone', 'timeZone')
-
-			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
+			.leftJoin('release.timeZone', 'timeZone')
+			.leftJoin('release.releaseTerritory', 'releaseTerritory')
 
 			.leftJoin('release.modifier', 'modifier')
+
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+				'albumFormat.minTrackCount',
+				'albumFormat.maxTrackCount',
+			])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.code',
+				'label.picture',
+				'label.description',
+			])
+			.addSelect([
+				'primaryGenre.id',
+				'primaryGenre.name',
+				'primaryGenre.code',
+				'primaryGenre.picture',
+				'primaryGenre.description',
+			])
+			.addSelect([
+				'subGenre.id',
+				'subGenre.name',
+				'subGenre.code',
+				'subGenre.picture',
+				'subGenre.description',
+			])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.releaseId',
+				'releaseCoverArt.width',
+				'releaseCoverArt.height',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'releaseArtist.id',
+				'releaseArtist.artistRoleId',
+				'releaseArtist.artistId',
+				'releaseArtist.releaseId',
+				'releaseArtist.addArtistToTracks',
+			])
+			.addSelect([
+				'artist.id',
+				'artist.name',
+				'artist.code',
+				'artist.picture',
+				'artist.biography',
+			])
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect([
+				'releaseLanguage.id',
+				'releaseLanguage.metadataLanguageCountryId',
+				'releaseLanguage.audioLanguageId',
+				'releaseLanguage.metadataLanguageId',
+				'releaseLanguage.releaseId',
+			])
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+			.addSelect([
+				'metadataLanguageCountry.id',
+				'metadataLanguageCountry.name',
+			])
+			.addSelect([
+				'timeZone.id',
+				'timeZone.name',
+				'timeZone.utc',
+				'timeZone.zone',
+			])
+			.addSelect([
+				'releaseTerritory.id',
+				'releaseTerritory.distributeWorldwide',
+				'releaseTerritory.distributionType',
+				'releaseTerritory.selectedCountries',
+			])
+
 			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar']);
 
 		query.where('release.id = :id', {

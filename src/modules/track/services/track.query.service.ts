@@ -214,11 +214,11 @@ export class TrackQueryService {
 			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
 			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
 
-			.leftJoinAndSelect('track.primaryGenre', 'primaryGenre')
-			.leftJoinAndSelect('track.subGenre', 'subGenre')
+			.leftJoin('track.primaryGenre', 'primaryGenre')
+			.leftJoin('track.subGenre', 'subGenre')
 
-			.leftJoinAndSelect('track.trackType', 'trackType')
-			.leftJoinAndSelect('track.trackOriginType', 'trackOriginType');
+			.leftJoin('track.trackType', 'trackType')
+			.leftJoin('track.trackOriginType', 'trackOriginType');
 
 		// select
 		queryGetList
@@ -360,28 +360,23 @@ export class TrackQueryService {
 			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
 			.leftJoin('release.label', 'label')
 
-			.leftJoinAndSelect('track.audioFile', 'audioFile')
-			.leftJoinAndSelect('audioFile.file', 'file')
-			.leftJoinAndSelect('audioFile.peak', 'peak')
+			.leftJoin('track.audioFile', 'audioFile')
+			.leftJoin('audioFile.file', 'file')
+			.leftJoin('audioFile.peak', 'peak')
 
-			.leftJoinAndSelect('track.trackArtists', 'trackArtist')
-			.leftJoinAndSelect('trackArtist.artistRole', 'artistRole')
-			.leftJoinAndSelect('trackArtist.artist', 'artist')
+			.leftJoin('track.trackArtists', 'trackArtist')
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist')
 
-			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
-			.leftJoinAndSelect(
+			.leftJoin('track.trackLanguage', 'trackLanguage')
+
+			.leftJoin(
 				'trackLanguage.metadataLanguageCountry',
 				'metadataLanguageCountry',
 			)
-			.leftJoinAndSelect(
-				'trackLanguage.recordingCountry',
-				'recordingCountry',
-			)
-			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
-			.leftJoinAndSelect(
-				'trackLanguage.metadataLanguage',
-				'metadataLanguage',
-			);
+			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
+			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage');
 
 		// select
 		query
@@ -396,7 +391,77 @@ export class TrackQueryService {
 				'label.name',
 				'label.picture',
 				'label.description',
-			]);
+			])
+
+			.addSelect([
+				'audioFile.id',
+				'audioFile.sampleRate',
+				'audioFile.bitrate',
+				'audioFile.bitDepth',
+				'audioFile.duration',
+				'audioFile.hook',
+				'audioFile.preview',
+				'audioFile.fileId',
+				'audioFile.peakId',
+			])
+			.addSelect(['trackArtist.id'])
+			.addSelect(['artistRole.name'])
+			.addSelect(['artist.name', 'artist.picture'])
+
+			.addSelect([
+				'trackLanguage.id',
+				'trackLanguage.metadataLanguageCountryId',
+				'trackLanguage.audioLanguageId',
+				'trackLanguage.metadataLanguageId',
+				'trackLanguage.recordingCountryId',
+			])
+
+			.addSelect([
+				'metadataLanguageCountry.id',
+				'metadataLanguageCountry.name',
+				'metadataLanguageCountry.iso3',
+				'metadataLanguageCountry.iso2',
+				'metadataLanguageCountry.numericCode',
+				'metadataLanguageCountry.phoneCode',
+				'metadataLanguageCountry.capital',
+				'metadataLanguageCountry.currency',
+				'metadataLanguageCountry.currencyName',
+				'metadataLanguageCountry.currencySymbol',
+				'metadataLanguageCountry.regionId',
+				'metadataLanguageCountry.nationality',
+				'metadataLanguageCountry.continent',
+			])
+
+			.addSelect([
+				'recordingCountry.id',
+				'recordingCountry.name',
+				'recordingCountry.iso3',
+				'recordingCountry.iso2',
+				'recordingCountry.numericCode',
+				'recordingCountry.phoneCode',
+				'recordingCountry.capital',
+				'recordingCountry.currency',
+				'recordingCountry.currencyName',
+				'recordingCountry.currencySymbol',
+				'recordingCountry.regionId',
+				'recordingCountry.nationality',
+				'recordingCountry.continent',
+			])
+
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+
+			.addSelect(['file.id', 'file.fileName'])
+			.addSelect(['peak.id']);
 
 		const track = await query.getOne();
 

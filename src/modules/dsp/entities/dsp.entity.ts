@@ -15,7 +15,6 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 @Entity('dsps')
 export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@Column({
-		name: 'name',
 		type: 'varchar',
 		unique: true,
 		length: DEFAULT_LENGTH_NAME,
@@ -25,20 +24,11 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
-	@Column({
-		name: 'picture',
-		type: 'varchar',
-		length: LENGTH_PICTURE,
-		nullable: true,
-	})
+	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
 	picture: string | null;
 
-	@Column({
-		name: 'can_link_artist_profile',
-		type: 'boolean',
-		default: false,
-	})
-	canLinkArtistProfile: boolean;
+	@Column({ type: 'boolean', default: false })
+	isActive: boolean;
 
 	@Column('varchar', {
 		array: true,

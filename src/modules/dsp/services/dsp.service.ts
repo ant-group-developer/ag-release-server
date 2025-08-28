@@ -120,29 +120,15 @@ export class DspService {
 		});
 	}
 
-	async getListWithActions(query: QueryGetListDspDto): Promise<PageDto<Dsp>> {
-		const { page, pageSize } = query;
-
-		const [dsps, totalItems] =
-			await this.dspQueryService.getListWithActions(query);
-
-		return new PageDto({
-			items: dsps.filter((item) => item.dspActions.length > 0),
-			metadata: {
-				currentPage: page,
-				pageSize,
-				totalItems,
-			},
-		});
-	}
-
 	// update
 	async handleUpdate({ dspId, data }: { dspId: string; data: UpdateDspDto }) {
 		const { dspActions, ...rest } = data;
 
-		await this.updateDsp({ dspId, data: rest });
+		const dsp = await this.findOne(dspId);
+
+		await this.updateDsp({ dsp, data: rest });
 		const messageWarning = await this.updateDspActions({
-			dspId,
+			dsp,
 			dspActions,
 		});
 
@@ -154,14 +140,13 @@ export class DspService {
 	}
 
 	private async updateDsp({
-		dspId,
+		dsp,
 		data,
 	}: {
-		dspId: string;
+		dsp: Dsp;
 		data: Omit<UpdateDspDto, 'dspActions'>;
 	}): Promise<Dsp> {
 		const { name, picture } = data;
-		const dsp = await this.findOne(dspId);
 
 		if (name && name !== dsp.name) {
 			await this.dspQueryService.validate({ name });
@@ -171,22 +156,23 @@ export class DspService {
 			await this.bucketService.deletePublicFile(dsp.picture);
 		}
 
-		await this.dspRepo.update(dspId, data);
-		return await this.findOne(dspId);
+		await this.dspRepo.update(dsp.id, data);
+		return await this.findOne(dsp.id);
 	}
 
 	private async updateDspActions({
-		dspId,
+		dsp,
 		dspActions,
 	}: {
-		dspId: string;
+		dsp: Dsp;
 		dspActions: UpdateDspDto['dspActions'];
 	}) {
-		if (!dspActions?.length) return;
+		if (!dspActions) return;
+
+		const { id: dspId, dspActions: dspActionsDb } = dsp;
 
 		const dataCreate = [];
 		const dataUpdate = [];
-		const messageWarnings = [];
 
 		for (const item of dspActions) {
 			if (!item.id) {
@@ -196,23 +182,33 @@ export class DspService {
 			}
 		}
 
-		if (dataCreate.length) {
-			const dataCreateDspActions =
-				await this.dspActionService.bulkCreateSafe(dataCreate);
-			const messageWarning = dataCreateDspActions
-				.map((item) => item.messageWarning)
-				.join('\n');
-			messageWarnings.push(messageWarning);
+		const listUpdateIds = dataUpdate.map((item) => item.id);
+		const listDbIds = dspActionsDb.map((item) => item.id);
+
+		const listDeleteIds = listDbIds.filter(
+			(id) => !listUpdateIds.includes(id),
+		);
+
+		const [created, updated] = await Promise.all([
+			this.dspActionService.bulkCreateSafe(dataCreate),
+			this.dspActionService.bulkUpdateSafe(dataUpdate),
+			...listDeleteIds.map((id) => this.deleteDspAction(id)),
+		]);
+
+		// build warnings
+		const messageWarnings: string[] = [];
+		if (created) {
+			messageWarnings.push(
+				created.map((item) => item.messageWarning).join('\n'),
+			);
+		}
+		if (updated) {
+			messageWarnings.push(
+				Array.isArray(updated) ? updated.join('\n') : updated,
+			);
 		}
 
-		if (dataUpdate.length) {
-			const messageWarning =
-				await this.dspActionService.bulkUpdateSafe(dataUpdate);
-
-			messageWarnings.push(messageWarning);
-		}
-
-		return messageWarnings.join('\n');
+		return messageWarnings.filter(Boolean).join('\n');
 	}
 
 	// delete

@@ -52,7 +52,7 @@ export class ArtistQueryService {
 				'dsp.name',
 				'dsp.code',
 				'dsp.picture',
-				'dsp.canLinkArtistProfile',
+				'dsp.isActive',
 				'dsp.formatLinks',
 			])
 
@@ -184,7 +184,7 @@ export class ArtistQueryService {
 				'dsp.id',
 				'dsp.name',
 				'dsp.picture',
-				'dsp.canLinkArtistProfile',
+				'dsp.isActive',
 				'dsp.formatLinks',
 			]);
 

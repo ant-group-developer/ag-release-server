@@ -64,7 +64,7 @@ export class CreateDspDto {
 		example: true,
 	})
 	@IsBoolean()
-	canLinkArtistProfile: boolean;
+	isActive: boolean;
 
 	@IsNotEmpty()
 	@IsNotEmpty({ each: true })

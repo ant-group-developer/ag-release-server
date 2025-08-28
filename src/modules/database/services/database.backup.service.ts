@@ -92,33 +92,33 @@ export class DatabaseBackupService implements OnModuleInit {
 		);
 	}
 
-	// private async backup() {
-	// 	const timeStart = Date.now();
-	// 	const fileName = this.generateBackupFileName();
-	// 	const backupPath = this.prepareBackupPath(fileName);
+	private async backup() {
+		const timeStart = Date.now();
+		const fileName = this.generateBackupFileName();
+		const backupPath = this.prepareBackupPath(fileName);
 
-	// 	const result = this.backupRepo.create({
-	// 		...this.buildBackupRecord(fileName),
-	// 		status: StatusBackup.RUNNING,
-	// 		fileName,
-	// 	});
+		const result = this.backupRepo.create({
+			...this.buildBackupRecord(fileName),
+			status: StatusBackup.RUNNING,
+			fileName,
+		});
 
-	// 	try {
-	// 		await this.exportDatabase(backupPath);
-	// 		if (this.toGcs) await this.uploadToGcs(backupPath);
-	// 		if (this.toDrive) await this.uploadToDrive(backupPath);
+		try {
+			await this.exportDatabase(backupPath);
+			if (this.toGcs) await this.uploadToGcs(backupPath);
+			if (this.toDrive) await this.uploadToDrive(backupPath);
 
-	// 		const fileSize = await this.getFileSize(backupPath);
-	// 		result.status = StatusBackup.SUCCESS;
-	// 		result.fileSize = fileSize;
-	// 	} catch (e) {
-	// 		result.status = StatusBackup.FAILED;
-	// 	} finally {
-	// 		result.elapsedTime = this.calculateElapsedTime(timeStart);
-	// 	}
+			const fileSize = await this.getFileSize(backupPath);
+			result.status = StatusBackup.SUCCESS;
+			result.fileSize = fileSize;
+		} catch (_e) {
+			result.status = StatusBackup.FAILED;
+		} finally {
+			result.elapsedTime = this.calculateElapsedTime(timeStart);
+		}
 
-	// 	return result;
-	// }
+		return result;
+	}
 
 	private generateBackupFileName(): string {
 		return generateFileNameWithTimestamp(
@@ -186,78 +186,78 @@ export class DatabaseBackupService implements OnModuleInit {
 		return Math.floor((Date.now() - start) / 1000);
 	}
 
-	private async backup() {
-		const { toDrive, toGcs } = this;
+	// private async backup() {
+	// 	const { toDrive, toGcs } = this;
 
-		const fileName = generateFileNameWithTimestamp(
-			'backup_ant_release.sql',
-			DateFormat['YYYY-MM-DD_HH-mm-ss'],
-		);
+	// 	const fileName = generateFileNameWithTimestamp(
+	// 		'backup_ant_release.sql',
+	// 		DateFormat['YYYY-MM-DD_HH-mm-ss'],
+	// 	);
 
-		const urlFolderGcs = this.getUrlConsoleGcsBackup(fileName);
+	// 	const urlFolderGcs = this.getUrlConsoleGcsBackup(fileName);
 
-		const timeStart = Date.now();
-		const result = this.backupRepo.create({
-			urlDrive: toDrive
-				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
-				: null,
-			urlGcs: toGcs
-				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
-				: null,
-			urlFolderGcs,
-			status: StatusBackup.RUNNING,
-			fileName,
-		});
+	// 	const timeStart = Date.now();
+	// 	const result = this.backupRepo.create({
+	// 		urlDrive: toDrive
+	// 			? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+	// 			: null,
+	// 		urlGcs: toGcs
+	// 			? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+	// 			: null,
+	// 		urlFolderGcs,
+	// 		status: StatusBackup.RUNNING,
+	// 		fileName,
+	// 	});
 
-		const exec = promisify(execCallback);
+	// 	const exec = promisify(execCallback);
 
-		const backupDir = path.join(os.homedir(), 'backups');
-		const backupPath = path.join(backupDir, fileName);
+	// 	const backupDir = path.join(os.homedir(), 'backups');
+	// 	const backupPath = path.join(backupDir, fileName);
 
-		if (!fs.existsSync(backupDir)) {
-			fs.mkdirSync(backupDir, { recursive: true });
-		}
+	// 	if (!fs.existsSync(backupDir)) {
+	// 		fs.mkdirSync(backupDir, { recursive: true });
+	// 	}
 
-		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
-		const rcloneConfig = '--config=./database.rclone.conf';
-		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+	// 	const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
+	// 	const rcloneConfig = '--config=./database.rclone.conf';
+	// 	const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
 
-		try {
-			// Backup database
-			await exec(exportDatabaseCommand, {
-				env: { ...process.env, PGPASSWORD: this.configDB.password },
-				shell: shellPath,
-			});
+	// 	try {
+	// 		// Backup database
+	// 		await exec(exportDatabaseCommand, {
+	// 			env: { ...process.env, PGPASSWORD: this.configDB.password },
+	// 			shell: shellPath,
+	// 		});
 
-			// // backup
-			// if (toDrive) {
-			// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
+	// 		// // backup
+	// 		// if (toDrive) {
+	// 		// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
 
-			// 	await exec(driveUploadCommand, { shell: shellPath });
-			// }
+	// 		// 	await exec(driveUploadCommand, { shell: shellPath });
+	// 		// }
 
-			if (toGcs) {
-				const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
+	// 		if (toGcs) {
+	// 			const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
 
-				await exec(gcsUploadCommand, {
-					shell: shellPath,
-				});
-			}
+	// 			await exec(gcsUploadCommand, {
+	// 				shell: shellPath,
+	// 			});
+	// 		}
 
-			const stats = await stat(backupPath);
-			const fileSizeInBytes = stats.size;
+	// 		const stats = await stat(backupPath);
+	// 		const fileSizeInBytes = stats.size;
 
-			result.status = StatusBackup.SUCCESS;
-			result.fileSize = fileSizeInBytes;
-		} catch (_e) {
-			result.status = StatusBackup.FAILED;
-		} finally {
-			const timeEnd = Date.now();
-			result.elapsedTime = Math.floor((timeEnd - timeStart) / 1000);
-		}
+	// 		result.status = StatusBackup.SUCCESS;
+	// 		result.fileSize = fileSizeInBytes;
+	// 	} catch (_e) {
+	// 		result.status = StatusBackup.FAILED;
+	// 	} finally {
+	// 		const timeEnd = Date.now();
+	// 		result.elapsedTime = Math.floor((timeEnd - timeStart) / 1000);
+	// 	}
 
-		return result;
-	}
+	// 	return result;
+	// }
 
 	async handleCreate() {
 		const result = await this.backup();

@@ -33,8 +33,23 @@ export class ArtistRoleQueryService {
 			this.artistRoleRepo.createQueryBuilder('artistRole');
 
 		queryBuilder
-			.leftJoinAndSelect('artistRole.trackArtists', 'trackArtists')
-			.leftJoinAndSelect('artistRole.releaseArtists', 'releaseArtists');
+			.leftJoin('artistRole.trackArtists', 'trackArtist')
+			.leftJoin('artistRole.releaseArtists', 'releaseArtist');
+
+		queryBuilder.addSelect([
+			'trackArtist.id',
+			'trackArtist.artistId',
+			'trackArtist.artistRoleId',
+			'trackArtist.trackId',
+		]);
+
+		queryBuilder.addSelect([
+			'releaseArtist.id',
+			'releaseArtist.artistId',
+			'releaseArtist.artistRoleId',
+			'releaseArtist.releaseId',
+			'releaseArtist.addArtistToTracks',
+		]);
 
 		if (keyword) {
 			queryBuilder.andWhere('artistRole.name ILIKE :keyword', {

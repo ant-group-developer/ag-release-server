@@ -55,7 +55,7 @@ export class TelegramService implements OnModuleInit {
 		);
 
 		if (this.token) {
-			this.bot = new TelegramBot(this.token, { polling: true });
+			this.bot = new TelegramBot(this.token);
 
 			this.chatIdDev = Number(
 				this.appConfigService.getValue(AppConfigKey.CHAT_ID),

@@ -115,20 +115,20 @@ export class ArtistService {
 	async handleUpdate(id: string, data: UpdateArtistDto) {
 		const { artistProfiles, ...restOfData } = data;
 
-		await this.update(id, restOfData);
+		const artist = await this.findOne(id);
 
-		await this.updateOrCreateArtistProfile({
-			artistId: id,
+		await this.update(artist, restOfData);
+
+		await this.updateArtistProfile({
+			artist,
 			artistProfiles,
 		});
 
 		return await this.findOneLite(id);
 	}
 
-	private async update(id: string, data: UpdateArtistDto) {
+	private async update(artist: Artist, data: UpdateArtistDto) {
 		const { name, picture } = data;
-
-		const artist = await this.findOne(id);
 
 		if (name && name !== artist.name) {
 			await this.artistQueryService.validate({ name });
@@ -142,16 +142,18 @@ export class ArtistService {
 			await this.bucketService.deletePublicFile(artist.picture);
 		}
 
-		await this.artistRepo.update(id, data);
+		await this.artistRepo.update(artist.id, data);
 	}
 
-	private async updateOrCreateArtistProfile({
-		artistId,
+	private async updateArtistProfile({
+		artist,
 		artistProfiles,
 	}: {
-		artistId: string;
+		artist: Artist;
 		artistProfiles: UpdateArtistDto['artistProfiles'];
 	}) {
+		const { id: artistId, artistProfiles: artistProfilesDb } = artist;
+
 		const dataCreate = [];
 		const dataUpdate = [];
 
@@ -165,8 +167,20 @@ export class ArtistService {
 			}
 		}
 
-		await this.artistProfileService.bulkCreate(dataCreate);
-		await this.artistProfileService.bulkUpdate(dataUpdate);
+		const listUpdateIds = dataUpdate.map((item) => item.id);
+		const listDbIds = artistProfilesDb.map((item) => item.id);
+
+		const listDeleteIds = listDbIds.filter(
+			(item) => !listUpdateIds.includes(item),
+		);
+
+		await Promise.all([
+			this.artistProfileService.bulkCreate(dataCreate),
+			this.artistProfileService.bulkUpdate(dataUpdate),
+			Promise.all(
+				listDeleteIds.map((id) => this.deleteArtistProfile(id)),
+			),
+		]);
 	}
 
 	// delete
