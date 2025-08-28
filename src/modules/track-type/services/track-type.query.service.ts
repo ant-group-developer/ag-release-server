@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	TrackTypeMessageCodeError,
-	TrackTypeMessageError,
-} from '../constants/track-type.constant';
+import { TrackTypeMessages } from '../constants/track-type.constant';
 import { QueryGetListTrackTypeDto } from '../dto/track-type.dto';
 import { TrackType } from '../entities/track-type.entity';
 
@@ -84,11 +81,9 @@ export class TrackTypeQueryService {
 			});
 
 			if (trackType) {
-				throw new ResponseError({
-					messageCode:
-						TrackTypeMessageCodeError.DUPLICATE_NAME_TRACK_TYPE,
-					message: TrackTypeMessageError.DUPLICATE_NAME_TRACK_TYPE,
-				});
+				throw new ResponseError(
+					TrackTypeMessages.DUPLICATE_NAME_TRACK_TYPE,
+				);
 			}
 		}
 
@@ -97,31 +92,22 @@ export class TrackTypeQueryService {
 				where: { code },
 			});
 			if (trackType) {
-				throw new ResponseError({
-					messageCode:
-						TrackTypeMessageCodeError.DUPLICATE_CODE_TRACK_TYPE,
-					message: TrackTypeMessageError.DUPLICATE_CODE_TRACK_TYPE,
-				});
+				throw new ResponseError(
+					TrackTypeMessages.DUPLICATE_CODE_TRACK_TYPE,
+				);
 			}
 		}
 	}
 
 	validateDelete(trackType: TrackType) {
 		if (!trackType) {
-			throw new ResponseError({
-				message: TrackTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackTypeMessages.NOT_FOUND);
 		}
 
 		if ((trackType.tracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					TrackTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					TrackTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				TrackTypeMessages.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+			);
 		}
 	}
 }

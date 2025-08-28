@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';
-import { GenreMessageError } from '../constants/genre.constant';
+import { dataInitGenre, GenreMessage } from '../constants/genre.constant';
 import {
 	CreateGenreDto,
 	QueryGetListGenreDto,
@@ -13,7 +13,8 @@ import { Genre } from '../entities/genre.entity';
 import { GenreQueryService } from './genre.query.service';
 
 @Injectable()
-export class GenreService {
+export class GenreService implements OnModuleInit {
+	private readonly logger = new Logger(GenreService.name);
 	constructor(
 		@InjectRepository(Genre)
 		private readonly genreRepo: Repository<Genre>,
@@ -21,6 +22,27 @@ export class GenreService {
 		private readonly bucketService: BucketService,
 		private readonly genreQueryService: GenreQueryService,
 	) {}
+
+	async onModuleInit() {
+		await this.initGenre();
+	}
+
+	private async initGenre() {
+		const count = await this.genreRepo.count();
+
+		if (count === 0) {
+			this.logger.log('Initializing language');
+
+			const insertData = this.genreRepo.create(dataInitGenre);
+			await this.genreRepo.save(insertData);
+
+			this.logger.log('Genres inserted successfully');
+		} else {
+			this.logger.log(
+				'Genres table already has data, skipping initialization',
+			);
+		}
+	}
 
 	// create
 	async create(data: CreateGenreDto): Promise<Genre> {
@@ -35,10 +57,7 @@ export class GenreService {
 	async findOne(id: string): Promise<Genre> {
 		const genre = await this.genreRepo.findOne({ where: { id } });
 		if (!genre) {
-			throw new ResponseError({
-				message: GenreMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(GenreMessage.NOT_FOUND);
 		}
 
 		return genre;
@@ -48,10 +67,7 @@ export class GenreService {
 		const genre = await this.genreQueryService.findOneWithCountRelation(id);
 
 		if (!genre) {
-			throw new ResponseError({
-				message: GenreMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(GenreMessage.NOT_FOUND);
 		}
 
 		return genre;

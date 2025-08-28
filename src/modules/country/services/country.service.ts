@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { CountryMessageError } from '../constants/country.constant';
+import { CountryMessage } from '../constants/country.constant';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
@@ -36,10 +36,7 @@ export class CountryService {
 	async findOne(id: string): Promise<Country> {
 		const country = await this.countryRepo.findOne({ where: { id } });
 		if (!country) {
-			throw new ResponseError({
-				message: CountryMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(CountryMessage.NOT_FOUND);
 		}
 
 		return country;
@@ -49,10 +46,7 @@ export class CountryService {
 		const country =
 			await this.countryQueryService.findOneWithCountRelation(id);
 		if (!country) {
-			throw new ResponseError({
-				message: CountryMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(CountryMessage.NOT_FOUND);
 		}
 
 		return country;

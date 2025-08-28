@@ -7,10 +7,7 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Brackets, Repository } from 'typeorm';
-import {
-	TrackMessageCodeError,
-	TrackMessageError,
-} from '../constants/track.constant';
+import { TrackMessages } from '../constants/track.constant';
 import {
 	BulkCreateTrackDraft,
 	UpdateTrackDraftDto,
@@ -206,6 +203,7 @@ export class TrackQueryService {
 				'trackLanguage.metadataLanguageCountry',
 				'metadataLanguageCountry',
 			)
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage')
 			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
 			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
 
@@ -247,7 +245,26 @@ export class TrackQueryService {
 			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect(['artist.id', 'artist.name', 'artist.picture'])
 
-			.addSelect(['trackLanguage.id'])
+			.addSelect([
+				'trackLanguage.id',
+				'trackLanguage.metadataLanguageCountryId',
+				'trackLanguage.audioLanguageId',
+				'trackLanguage.metadataLanguageId',
+				'trackLanguage.recordingCountryId',
+			])
+
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
 			.addSelect([
 				'metadataLanguageCountry.id',
 				'metadataLanguageCountry.name',
@@ -263,6 +280,7 @@ export class TrackQueryService {
 				'metadataLanguageCountry.nationality',
 				'metadataLanguageCountry.continent',
 			])
+
 			.addSelect([
 				'recordingCountry.id',
 				'recordingCountry.name',
@@ -277,11 +295,6 @@ export class TrackQueryService {
 				'recordingCountry.regionId',
 				'recordingCountry.nationality',
 				'recordingCountry.continent',
-			])
-			.addSelect([
-				'audioLanguage.id',
-				'audioLanguage.name',
-				'audioLanguage.code',
 			])
 
 			.addSelect([
@@ -322,10 +335,7 @@ export class TrackQueryService {
 		});
 
 		if (!track) {
-			throw new ResponseError({
-				message: TrackMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackMessages.NOT_FOUND);
 		}
 
 		return track;
@@ -384,10 +394,7 @@ export class TrackQueryService {
 		const track = await query.getOne();
 
 		if (!track) {
-			throw new ResponseError({
-				message: TrackMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackMessages.NOT_FOUND);
 		}
 
 		return track;
@@ -462,10 +469,7 @@ export class TrackQueryService {
 		const track = await query.getOne();
 
 		if (!track) {
-			throw new ResponseError({
-				message: TrackMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackMessages.NOT_FOUND);
 		}
 
 		return track;
@@ -498,10 +502,7 @@ export class TrackQueryService {
 		const track = await query.getOne();
 
 		if (!track) {
-			throw new ResponseError({
-				message: TrackMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackMessages.NOT_FOUND);
 		}
 
 		return track;
@@ -532,10 +533,7 @@ export class TrackQueryService {
 			});
 
 			if (!release) {
-				throw new ResponseError({
-					message: TrackMessageError.RELEASE_NOT_FOUND,
-					messageCode: TrackMessageCodeError.RELEASE_NOT_FOUND,
-				});
+				throw new ResponseError(TrackMessages.RELEASE_NOT_FOUND);
 			}
 		}
 		if (primaryGenreId) {
@@ -544,10 +542,7 @@ export class TrackQueryService {
 			});
 
 			if (!genre) {
-				throw new ResponseError({
-					message: TrackMessageError.PRIMARY_GENRE_NOT_FOUND,
-					messageCode: TrackMessageCodeError.PRIMARY_GENRE_NOT_FOUND,
-				});
+				throw new ResponseError(TrackMessages.PRIMARY_GENRE_NOT_FOUND);
 			}
 		}
 
@@ -557,10 +552,7 @@ export class TrackQueryService {
 			});
 
 			if (!genre) {
-				throw new ResponseError({
-					message: TrackMessageError.SUB_GENRE_NOT_FOUND,
-					messageCode: TrackMessageCodeError.SUB_GENRE_NOT_FOUND,
-				});
+				throw new ResponseError(TrackMessages.SUB_GENRE_NOT_FOUND);
 			}
 		}
 
@@ -570,10 +562,7 @@ export class TrackQueryService {
 			});
 
 			if (!trackType) {
-				throw new ResponseError({
-					message: TrackMessageError.TRACK_TYPE_NOT_FOUND,
-					messageCode: TrackMessageCodeError.TRACK_TYPE_NOT_FOUND,
-				});
+				throw new ResponseError(TrackMessages.TRACK_TYPE_NOT_FOUND);
 			}
 		}
 
@@ -583,11 +572,9 @@ export class TrackQueryService {
 			});
 
 			if (!trackOriginType) {
-				throw new ResponseError({
-					message: TrackMessageError.TRACK_ORIGIN_TYPE_NOT_FOUND,
-					messageCode:
-						TrackMessageCodeError.TRACK_ORIGIN_TYPE_NOT_FOUND,
-				});
+				throw new ResponseError(
+					TrackMessages.TRACK_ORIGIN_TYPE_NOT_FOUND,
+				);
 			}
 		}
 
@@ -597,10 +584,7 @@ export class TrackQueryService {
 			});
 
 			if (!priceTier) {
-				throw new ResponseError({
-					message: TrackMessageError.PRICE_TIER_NOT_FOUND,
-					messageCode: TrackMessageCodeError.PRICE_TIER_NOT_FOUND,
-				});
+				throw new ResponseError(TrackMessages.PRICE_TIER_NOT_FOUND);
 			}
 		}
 	}

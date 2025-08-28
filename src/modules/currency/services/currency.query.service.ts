@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	CurrencyMessageCodeError,
-	CurrencyMessageError,
-} from '../constants/currency.constant';
+import { CurrencyMessage } from '../constants/currency.constant';
 import { QueryGetListCurrencyDto } from '../dto/currency.dto';
 import { Currency } from '../entities/currency.entity';
 
@@ -30,10 +27,8 @@ export class CurrencyQueryService {
 			});
 			if (existByName) {
 				throw new ResponseError({
-					message: CurrencyMessageError.UNIQUE_CONSTRAINT,
-					messageCode: CurrencyMessageCodeError.UNIQUE_CONSTRAINT,
-					messageWarning: `${CurrencyMessageError.UNIQUE_CONSTRAINT}: name = ${name}`,
-					statusCode: 409,
+					...CurrencyMessage.UNIQUE_CONSTRAINT,
+					messageWarning: `${CurrencyMessage.UNIQUE_CONSTRAINT.messageCode}: name = ${name}`,
 				});
 			}
 		}
@@ -44,10 +39,8 @@ export class CurrencyQueryService {
 			});
 			if (existByCode) {
 				throw new ResponseError({
-					message: CurrencyMessageError.UNIQUE_CONSTRAINT,
-					messageCode: CurrencyMessageCodeError.UNIQUE_CONSTRAINT,
-					messageWarning: `${CurrencyMessageError.UNIQUE_CONSTRAINT}: code = ${code}`,
-					statusCode: 409,
+					...CurrencyMessage.UNIQUE_CONSTRAINT,
+					messageWarning: `${CurrencyMessage.UNIQUE_CONSTRAINT.messageCode}: name = ${name}`,
 				});
 			}
 		}
@@ -141,15 +134,12 @@ export class CurrencyQueryService {
 	validateDelete(currency: Currency) {
 		if ((currency.priceTierCount ?? 0) > 0) {
 			throw new ResponseError({
-				message:
-					CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
-				messageCode:
-					CurrencyMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+				...CurrencyMessage.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
 				messageWarning:
-					CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS +
+					CurrencyMessage.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS
+						.message +
 					': ' +
 					currency.id,
-				statusCode: 400,
 			});
 		}
 	}

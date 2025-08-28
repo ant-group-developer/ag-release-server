@@ -1,108 +1,107 @@
-// import { Injectable } from '@nestjs/common';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AudioFile } from '../entities/audio-file.entity';
 
-// import { BucketService } from 'src/modules/bucket/services/bucket.service';
-// import {
-// 	SubmitCreateAudioFileDto,
-// 	UpdateAudioFileDto,
-// } from '../dto/audio-file.dto';
-// import { AudioFile } from '../entities/audio-file.entity';
-// import { IAudioFileNonDraft } from '../interfaces/audio-file.interface';
-// import { AudioFileQueryService } from './audio-file.query.service';
-// import { AudioFileValidateService } from './audio-file.validate.service';
+import { ResponseError } from 'src/common/dtos/response.dto';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import {
+	IAudioFileDraft,
+	ICreateAudioFile,
+	IUpdateAudioFile,
+} from '../interfaces/audio-file.interface';
+import { AudioFileQueryService } from './audio-file.query.service';
 
-// @Injectable()
-// export class AudioFileService {
-// 	constructor(
-// 		@InjectRepository(AudioFile)
-// 		private readonly audioFileRepo: Repository<AudioFile>,
-// 		private readonly audioFileValidateService: AudioFileValidateService,
-// 		private readonly audioFileQueryService: AudioFileQueryService,
-// 		private readonly bucketService: BucketService,
-// 	) {}
+@Injectable()
+export class AudioFileService {
+	constructor(
+		@InjectRepository(AudioFile)
+		private readonly audioFileRepo: Repository<AudioFile>,
 
-// 	async submit(
-// 		id: string,
-// 		data: SubmitCreateAudioFileDto,
-// 	): Promise<IAudioFileNonDraft> {
-// 		// validate id
-// 		await this.audioFileQueryService.findOne(id);
+		private readonly bucketService: BucketService,
+		private readonly audioFileQueryService: AudioFileQueryService,
+	) {}
 
-// 		// validate nonDraft
-// 		const audioFileNonDraft =
-// 			this.audioFileValidateService.ensureNonDraftAudioFile(data);
+	async create(data: ICreateAudioFile): Promise<IAudioFileDraft> {
+		const { trackId, fileId, peakId } = data;
 
-// 		await this.audioFileRepo.update(id, audioFileNonDraft);
-// 		const result = await this.audioFileQueryService.findOne(id);
+		await this.audioFileQueryService.validate({
+			trackId,
+			fileId,
+			peakId,
+		});
 
-// 		// convert to IAudioFileNonDraft
-// 		return this.audioFileValidateService.ensureNonDraftAudioFile(result);
-// 	}
+		const audioFile = this.audioFileRepo.create(data);
+		const result = await this.audioFileRepo.save(audioFile);
 
-// 	// async getDetail(id: string): Promise<IAudioFileDetail> {
-// 	// 	const audioFile = await this.audioFileQbService.getDetail(id);
+		return this.audioFileQueryService.ensureDraftAudioFile(result);
+	}
 
-// 	// 	const { audioFileCoverArt, ...restOfAudioFile } = audioFile;
+	async update({
+		audioFileId,
+		dataUpdate,
+	}: {
+		audioFileId: string;
+		dataUpdate: IUpdateAudioFile;
+	}): Promise<IAudioFileDraft> {
+		const { file, ...restOfDataUpdate } = dataUpdate;
+		const { fileId, peakId, preview } = restOfDataUpdate;
 
-// 	// 	const coverArtThumbnails = this.getCoverArtThumbnails(audioFileCoverArt);
+		const audioFile = await this.audioFileQueryService.findOne(audioFileId);
 
-// 	// 	return {
-// 	// 		...restOfAudioFile,
-// 	// 		coverArtThumbnails,
-// 	// 	};
-// 	// }
+		if (preview && preview > audioFile.duration) {
+			throw new ResponseError({
+				message: 'Preview cannot be greater than the original duration',
+			});
+		}
 
-// 	// async getList(query: QueryGetListAudioFileDto): Promise<PageDto<IAudioFile>> {
-// 	// 	const { page, pageSize } = query;
+		if (fileId && fileId !== audioFile.fileId) {
+			await this.audioFileQueryService.validate({
+				fileId,
+			});
 
-// 	// 	const queryGetList = this.audioFileQbService.createQueryGetList(query);
+			await this.bucketService.delete(audioFile.fileId);
+		}
 
-// 	// 	const [audioFiles, totalItems] = await queryGetList.getManyAndCount();
+		if (peakId && peakId !== audioFile.peakId) {
+			await this.audioFileQueryService.validate({
+				peakId,
+			});
 
-// 	// 	return new PageDto({
-// 	// 		items: audioFiles,
-// 	// 		metadata: {
-// 	// 			currentPage: page,
-// 	// 			pageSize,
-// 	// 			totalItems,
-// 	// 		},
-// 	// 	});
-// 	// }
+			await this.bucketService.delete(audioFile.fileId);
+		}
 
-// 	async update(
-// 		id: string,
-// 		data: UpdateAudioFileDto,
-// 	): Promise<IAudioFileNonDraft> {
-// 		const { trackId, fileId, peakId } = data;
+		await this.audioFileRepo.update(audioFileId, restOfDataUpdate);
+		const result = await this.audioFileQueryService.findOne(audioFileId);
 
-// 		const audioFile = await this.audioFileQueryService.findOne(id);
+		if (file?.fileName) {
+			await this.bucketService.update({
+				fileId: audioFile.fileId,
+				dataUpdate: { fileName: file.fileName },
+			});
+		}
 
-// 		if (trackId && trackId !== audioFile.trackId) {
-// 			await this.audioFileValidateService.validate({
-// 				trackId,
-// 			});
-// 		}
+		return this.audioFileQueryService.ensureDraftAudioFile(result);
+	}
 
-// 		if (fileId && fileId !== audioFile.fileId) {
-// 			await this.audioFileValidateService.validate({
-// 				fileId,
-// 			});
+	// delete
+	async deleteRecordOfTrack({ trackId }: { trackId: string }) {
+		const audioFileOfTrack =
+			await this.audioFileQueryService.getAudioFileOfTrack({
+				trackId,
+			});
 
-// 			await this.bucketService.remove(audioFile.fileId);
-// 		}
+		await this.handleDelete(audioFileOfTrack.id);
+	}
 
-// 		if (peakId && peakId !== audioFile.peakId) {
-// 			await this.audioFileValidateService.validate({
-// 				peakId,
-// 			});
+	async handleDelete(id: string) {
+		const audioFile = await this.audioFileQueryService.findOne(id);
+		await this.audioFileRepo.delete(id);
+		await this.deleteAudioAndPeak(audioFile);
+	}
 
-// 			await this.bucketService.remove(audioFile.fileId);
-// 		}
-
-// 		await this.audioFileRepo.update(id, data);
-// 		const result = await this.audioFileQueryService.findOne(id);
-
-// 		return this.audioFileValidateService.ensureNonDraftAudioFile(result);
-// 	}
-// }
+	async deleteAudioAndPeak(audioFile: AudioFile) {
+		await this.bucketService.deleteSafe(audioFile.fileId);
+		await this.bucketService.deleteSafe(audioFile.peakId);
+	}
+}

@@ -9,7 +9,7 @@ import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
 import {
 	ReleaseMessageCodeError,
-	ReleaseMessageError,
+	ReleaseMessages,
 } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
@@ -58,10 +58,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!albumFormat) {
-				throw new ResponseError({
-					message: ReleaseMessageError.ALBUM_FORMAT_NOT_FOUND,
-					messageCode: ReleaseMessageCodeError.ALBUM_FORMAT_NOT_FOUND,
-				});
+				throw new ResponseError(ReleaseMessages.ALBUM_FORMAT_NOT_FOUND);
 			}
 		}
 
@@ -71,11 +68,9 @@ export class ReleaseValidateService {
 			});
 
 			if (!genre) {
-				throw new ResponseError({
-					message: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-					messageCode:
-						ReleaseMessageCodeError.PRIMARY_GENRE_NOT_FOUND,
-				});
+				throw new ResponseError(
+					ReleaseMessages.PRIMARY_GENRE_NOT_FOUND,
+				);
 			}
 		}
 
@@ -84,10 +79,7 @@ export class ReleaseValidateService {
 				where: { id: subGenreId },
 			});
 			if (!genre) {
-				throw new ResponseError({
-					message: ReleaseMessageError.SUB_GENRE_NOT_FOUND,
-					messageCode: ReleaseMessageCodeError.SUB_GENRE_NOT_FOUND,
-				});
+				throw new ResponseError(ReleaseMessages.SUB_GENRE_NOT_FOUND);
 			}
 		}
 
@@ -96,10 +88,7 @@ export class ReleaseValidateService {
 				where: { id: labelId },
 			});
 			if (!label) {
-				throw new ResponseError({
-					message: ReleaseMessageError.LABEL_NOT_FOUND,
-					messageCode: ReleaseMessageCodeError.LABEL_NOT_FOUND,
-				});
+				throw new ResponseError(ReleaseMessages.LABEL_NOT_FOUND);
 			}
 		}
 
@@ -109,10 +98,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!timezone) {
-				throw new ResponseError({
-					message: ReleaseMessageError.TIMEZONE_NOT_FOUND,
-					messageCode: ReleaseMessageCodeError.TIMEZONE_NOT_FOUND,
-				});
+				throw new ResponseError(ReleaseMessages.TIMEZONE_NOT_FOUND);
 			}
 		}
 	}
@@ -256,7 +242,6 @@ export class ReleaseValidateService {
 				new FieldErrorDetails({
 					page: 'tracks',
 					field: 'maxTrackCount',
-					// message: `${release.albumFormat.name} format cannot have more than ${release.albumFormat.maxTrackCount} tracks.`,
 					message: `${release.albumFormat.maxTrackCount}`,
 					messageCode: ReleaseMessageCodeError.ERROR_MAX_COUNT_TRACKS,
 				}),
@@ -268,7 +253,6 @@ export class ReleaseValidateService {
 				new FieldErrorDetails({
 					page: 'tracks',
 					field: 'minTrackCount',
-					// message: `${release.albumFormat.name} format cannot have less than ${release.albumFormat.minTrackCount} tracks.`,
 					message: `${release.albumFormat.minTrackCount}`,
 					messageCode: ReleaseMessageCodeError.ERROR_MIN_COUNT_TRACKS,
 				}),

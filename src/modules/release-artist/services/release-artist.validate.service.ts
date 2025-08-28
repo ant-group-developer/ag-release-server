@@ -5,10 +5,7 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
-import {
-	ReleaseArtistMessageCodeError,
-	ReleaseArtistMessageError,
-} from '../constants/release-artist.constant';
+import { ReleaseArtistMessage } from '../constants/release-artist.constant';
 import { ReleaseArtist } from '../entities/release-artist.entity';
 
 @Injectable()
@@ -37,43 +34,34 @@ export class ReleaseArtistValidateService {
 		releaseId?: string;
 	}) {
 		if (artistRoleId) {
-			const genre = await this.artistRoleRepo.findOne({
+			const entity = await this.artistRoleRepo.findOne({
 				where: { id: artistRoleId },
 			});
 
-			if (!genre) {
-				throw new ResponseError({
-					message: ReleaseArtistMessageError.ARTIST_ROLE_NOT_FOUND,
-					messageCode:
-						ReleaseArtistMessageCodeError.ARTIST_ROLE_NOT_FOUND,
-				});
+			if (!entity) {
+				throw new ResponseError(
+					ReleaseArtistMessage.ARTIST_ROLE_NOT_FOUND,
+				);
 			}
 		}
 
 		if (artistId) {
-			const genre = await this.artistRepo.findOne({
+			const entity = await this.artistRepo.findOne({
 				where: { id: artistId },
 			});
 
-			if (!genre) {
-				throw new ResponseError({
-					message: ReleaseArtistMessageError.ARTIST_NOT_FOUND,
-					messageCode: ReleaseArtistMessageCodeError.ARTIST_NOT_FOUND,
-				});
+			if (!entity) {
+				throw new ResponseError(ReleaseArtistMessage.ARTIST_NOT_FOUND);
 			}
 		}
 
 		if (releaseId) {
-			const label = await this.releaseRepo.findOne({
+			const entity = await this.releaseRepo.findOne({
 				where: { id: releaseId },
 			});
 
-			if (!label) {
-				throw new ResponseError({
-					message: ReleaseArtistMessageError.RELEASE_NOT_FOUND,
-					messageCode:
-						ReleaseArtistMessageCodeError.RELEASE_NOT_FOUND,
-				});
+			if (!entity) {
+				throw new ResponseError(ReleaseArtistMessage.RELEASE_NOT_FOUND);
 			}
 		}
 	}
@@ -96,10 +84,7 @@ export class ReleaseArtistValidateService {
 		});
 
 		if (releaseArtist) {
-			throw new ResponseError({
-				message: ReleaseArtistMessageError.UNIQUE_CONSTRAINT,
-				messageCode: ReleaseArtistMessageCodeError.UNIQUE_CONSTRAINT,
-			});
+			throw new ResponseError(ReleaseArtistMessage.UNIQUE_CONSTRAINT);
 		}
 	}
 

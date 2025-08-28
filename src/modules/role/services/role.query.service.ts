@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import { Permission } from '../../permission/entities/permission.entity';
-import {
-	RoleMessageCodeError,
-	RoleMessageError,
-} from '../constants/role.constant';
+import { RoleMessages } from '../constants/role.constant';
 import { GetListRole } from '../dtos/role.dto';
 import { Role } from '../entities/role.entity';
 
@@ -127,10 +124,7 @@ export class RoleQueryService {
 			const entity = await this.roleRepo.findOne({ where: { name } });
 
 			if (entity) {
-				throw new ResponseError({
-					messageCode: RoleMessageCodeError.DUPLICATE_NAME_ROLE,
-					message: RoleMessageError.DUPLICATE_NAME_ROLE,
-				});
+				throw new ResponseError(RoleMessages.DUPLICATE_NAME_ROLE);
 			}
 		}
 
@@ -140,11 +134,9 @@ export class RoleQueryService {
 			});
 
 			if (!entity) {
-				throw new ResponseError({
-					messageCode: RoleMessageCodeError.PERMISSION_NOT_FOUND,
-					message: RoleMessageError.PERMISSION_NOT_FOUND,
-					messageWarning: `${RoleMessageError.PERMISSION_NOT_FOUND}: ${permissionId}`,
-				});
+				throw new ResponseError(
+					RoleMessages.PERMISSION_NOT_FOUND(permissionId),
+				);
 			}
 		}
 	}

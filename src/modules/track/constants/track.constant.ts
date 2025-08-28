@@ -10,7 +10,7 @@ export const TrackMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const TrackMessageCodeError = {
+const TrackMessageCodeError = {
 	NOT_FOUND: 'track.message.error.notFound',
 	PRIMARY_GENRE_NOT_FOUND: 'track.message.error.primaryGenreNotFound',
 	SUB_GENRE_NOT_FOUND: 'track.message.error.subGenreNotFound',
@@ -20,7 +20,7 @@ export const TrackMessageCodeError = {
 	PRICE_TIER_NOT_FOUND: 'track.message.error.priceTierNotFound',
 };
 
-export const TrackMessageError = {
+const TrackMessageError = {
 	NOT_FOUND: 'Not found',
 	PRIMARY_GENRE_NOT_FOUND: 'Primary genre not found',
 	SUB_GENRE_NOT_FOUND: 'Sub-genre not found',
@@ -28,4 +28,37 @@ export const TrackMessageError = {
 	TRACK_ORIGIN_TYPE_NOT_FOUND: 'Track origin type not found',
 	RELEASE_NOT_FOUND: 'Release not found',
 	PRICE_TIER_NOT_FOUND: 'Price tier not found',
+};
+
+export const TrackMessages = {
+	NOT_FOUND: {
+		message: TrackMessageError.NOT_FOUND,
+		statusCode: 404,
+	},
+
+	RELEASE_NOT_FOUND: {
+		message: TrackMessageError.RELEASE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.RELEASE_NOT_FOUND,
+	},
+	PRIMARY_GENRE_NOT_FOUND: {
+		message: TrackMessageError.PRIMARY_GENRE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.PRIMARY_GENRE_NOT_FOUND,
+	},
+	SUB_GENRE_NOT_FOUND: {
+		message: TrackMessageError.SUB_GENRE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.SUB_GENRE_NOT_FOUND,
+	},
+	TRACK_TYPE_NOT_FOUND: {
+		message: TrackMessageError.TRACK_TYPE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.TRACK_TYPE_NOT_FOUND,
+	},
+	TRACK_ORIGIN_TYPE_NOT_FOUND: {
+		message: TrackMessageError.TRACK_ORIGIN_TYPE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.TRACK_ORIGIN_TYPE_NOT_FOUND,
+	},
+
+	PRICE_TIER_NOT_FOUND: {
+		message: TrackMessageError.PRICE_TIER_NOT_FOUND,
+		messageCode: TrackMessageCodeError.PRICE_TIER_NOT_FOUND,
+	},
 };

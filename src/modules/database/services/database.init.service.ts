@@ -8,7 +8,6 @@ import { DataSource } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
 	listCountries,
-	listLanguages,
 	listTimeZones,
 } from '../constants/database.init.constant';
 
@@ -47,7 +46,6 @@ export class DatabaseInitService implements OnModuleInit {
 			await Promise.all([
 				this.initUser(),
 				this.initCountry(),
-				this.initLanguage(),
 				this.initTimeZones(),
 			]);
 		} catch (error) {
@@ -123,38 +121,6 @@ export class DatabaseInitService implements OnModuleInit {
 		} else {
 			this.logger.log(
 				'Countries table already has data, skipping initialization',
-			);
-		}
-	}
-
-	private async initLanguage() {
-		const countQuery = `SELECT COUNT(*) FROM languages`;
-		const result = await this.dataSource.query(countQuery);
-
-		if (result[0].count === '0') {
-			this.logger.log('Initializing language');
-			const query = `
-				INSERT INTO languages (
-					id, name, code
-				) VALUES (
-					$1, $2, $3
-				)
-			`;
-
-			const dataInitLanguage = listLanguages;
-
-			for (const language of dataInitLanguage) {
-				await this.dataSource.query(query, [
-					uuidv4(),
-					language[0],
-					language[1],
-				]);
-			}
-
-			this.logger.log('Languages inserted successfully');
-		} else {
-			this.logger.log(
-				'Languages table already has data, skipping initialization',
 			);
 		}
 	}

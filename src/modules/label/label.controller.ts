@@ -19,7 +19,6 @@ import {
 import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import {
 	LabelMessageCodeSuccess,
-	LabelMessageError,
 	LabelMessages,
 	LabelMessageSuccess,
 } from './constants/label.constant';
@@ -37,15 +36,6 @@ export class LabelController {
 	constructor(private readonly labelService: LabelService) {}
 
 	@Post()
-	@ApiOperation({ summary: 'Create a new label' })
-	@ApiResponse({
-		status: 200,
-		description: LabelMessageSuccess.CREATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: LabelMessageError.DUPLICATE_NAME_LABEL,
-	})
 	async create(
 		@Body() createLabelDto: CreateLabelDto,
 		@Req() req: Request,
@@ -66,15 +56,6 @@ export class LabelController {
 	}
 
 	@Get(':id')
-	@ApiOperation({ summary: 'Get a label by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved label',
-	})
-	@ApiResponse({
-		status: 404,
-		description: LabelMessageError.NOT_FOUND,
-	})
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Label>> {
 		const result = await this.labelService.findOneWithCountRelation(id);
 		return new ResponseSuccess({ data: result });
@@ -94,15 +75,6 @@ export class LabelController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a label by ID' })
-	@ApiResponse({
-		status: 200,
-		description: LabelMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: LabelMessageError.DUPLICATE_NAME_LABEL,
-	})
 	async update(
 		@Param('id') id: string,
 		@Body() updateLabelDto: UpdateLabelDto,

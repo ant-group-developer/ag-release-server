@@ -6,7 +6,7 @@ import {
 	ParseUUIDPipe,
 	Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	BulkCreateBucketDto,
@@ -24,22 +24,6 @@ export class BucketGcsController {
 
 	// create
 	@Post('private')
-	@ApiOperation({
-		summary: 'Generate signed URL to upload a private picture to GCS',
-	})
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully generated signed upload URL and public URL',
-		schema: {
-			example: new ResponseSuccess({
-				data: {
-					uploadUrl: 'https://storage.googleapis.com/...',
-					fileId: 'fileId',
-					key: 'string',
-				},
-			}),
-		},
-	})
 	async create(@Body() data: CreateBucketDto) {
 		const result = await this.bucketService.create(data);
 
@@ -104,21 +88,6 @@ export class BucketGcsController {
 
 	// public: non file
 	@Post('public/upload/presigned-url')
-	@ApiOperation({
-		summary: 'Generate signed URL to upload a public picture to GCS',
-	})
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully generated signed upload URL and public URL',
-		schema: {
-			example: new ResponseSuccess({
-				data: {
-					uploadUrl: 'https://storage.googleapis.com/...',
-					publicUrl: 'https://storage.googleapis.com/...',
-				},
-			}),
-		},
-	})
 	async generatePublicPresignedUploadUrl(
 		@Body() data: GeneratePublicUploadUrlDto,
 	) {

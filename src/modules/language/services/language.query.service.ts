@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	LanguageMessageCodeError,
-	LanguageMessageError,
-} from '../constants/language.constant';
+import { LanguageMessage } from '../constants/language.constant';
 import { QueryGetListLanguageDto } from '../dto/language.dto';
 import { Language } from '../entities/language.entity';
 
@@ -108,12 +105,9 @@ export class LanguageQueryService {
 			});
 
 			if (language) {
-				throw new ResponseError({
-					message: LanguageMessageError.DUPLICATE_NAME_LANGUAGE,
-					messageCode:
-						LanguageMessageCodeError.DUPLICATE_NAME_LANGUAGE,
-					statusCode: 409,
-				});
+				throw new ResponseError(
+					LanguageMessage.DUPLICATE_NAME_LANGUAGE,
+				);
 			}
 		}
 
@@ -123,75 +117,48 @@ export class LanguageQueryService {
 			});
 
 			if (language) {
-				throw new ResponseError({
-					message: LanguageMessageError.DUPLICATE_CODE_LANGUAGE,
-					messageCode:
-						LanguageMessageCodeError.DUPLICATE_CODE_LANGUAGE,
-					statusCode: 409,
-				});
+				throw new ResponseError(
+					LanguageMessage.DUPLICATE_CODE_LANGUAGE,
+				);
 			}
 		}
 	}
 
 	validateDelete(language: Language) {
 		if ((language.releaseLocalizesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_LOCALIZES,
+			);
 		}
 
 		if ((language.releaseAudiolanguagesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_AUDIO_LANGUAGES,
+			);
 		}
 
 		if ((language.releaseMetadataLanguagesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+			);
 		}
 
 		if ((language.trackAudioLanguagesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACK_AUDIO_LANGUAGES,
+			);
 		}
 
 		if ((language.trackMetadataLanguagesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+			);
 		}
 
 		if ((language.trackLocalizesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					LanguageMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
-				messageCode:
-					LanguageMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				LanguageMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACK_LOCALIZES,
+			);
 		}
 	}
 }

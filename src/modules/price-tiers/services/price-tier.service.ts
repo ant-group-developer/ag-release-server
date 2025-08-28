@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	PriceTierMessageCodeError,
-	PriceTierMessageError,
-} from '../constants/price-tiers.constant';
+import { PriceTierMessage } from '../constants/price-tiers.constant';
 import {
 	CreatePriceTierDto,
 	QueryGetListPriceTier,
@@ -41,10 +38,8 @@ export class PriceTierService {
 		const priceTier = await this.priceTierRepo.findOne({ where: { id } });
 		if (!priceTier) {
 			throw new ResponseError({
-				message: PriceTierMessageError.NOT_FOUND,
-				messageCode: PriceTierMessageCodeError.NOT_FOUND,
-				messageWarning: `${PriceTierMessageError.NOT_FOUND}: ${id}`,
-				statusCode: 404,
+				...PriceTierMessage.NOT_FOUND,
+				messageWarning: `${PriceTierMessage.NOT_FOUND.message}: ${id}`,
 			});
 		}
 		return priceTier;

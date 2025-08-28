@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	TimezoneMessageCodeError,
-	TimezoneMessageError,
-} from '../constants/timezone.constant';
+import { TimezoneMessages } from '../constants/timezone.constant';
 import {
 	CreateTimezoneDto,
 	QueryGetListTimezoneDto,
@@ -31,10 +28,7 @@ export class TimezoneService {
 	async findOne(id: string): Promise<Timezone> {
 		const timezone = await this.timezoneRepo.findOne({ where: { id } });
 		if (!timezone) {
-			throw new ResponseError({
-				message: TimezoneMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TimezoneMessages.NOT_FOUND);
 		}
 
 		return timezone;
@@ -73,20 +67,13 @@ export class TimezoneService {
 			await this.timezoneQueryService.findOneWithCountRelation(id);
 
 		if (!timezone) {
-			throw new ResponseError({
-				message: TimezoneMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TimezoneMessages.NOT_FOUND);
 		}
 
 		if ((timezone.releasesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					TimezoneMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					TimezoneMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				TimezoneMessages.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+			);
 		}
 
 		await this.timezoneRepo.delete(id);

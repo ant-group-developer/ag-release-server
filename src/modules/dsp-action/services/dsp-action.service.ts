@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
-import {
-	DspMessageCodeError,
-	DspMessageError,
-} from 'src/modules/dsp/constants/dsp.constant';
+import { DspMessage } from 'src/modules/dsp/constants/dsp.constant';
 import { Repository } from 'typeorm';
 import { DspAction } from '../entities/dsp-action.entities';
 import {
@@ -59,8 +56,8 @@ export class DspActionService {
 
 		if (!dspAction)
 			throw new ResponseError({
-				message: DspMessageCodeError.NOT_FOUND,
-				messageWarning: DspMessageError.NOT_FOUND + `: ${id}`,
+				...DspMessage.NOT_FOUND,
+				messageWarning: DspMessage.NOT_FOUND.message + `: ${id}`,
 			});
 
 		return dspAction;

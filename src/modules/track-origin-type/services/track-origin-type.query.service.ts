@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	TrackOriginTypeMessageCodeError,
-	TrackOriginTypeMessageError,
-} from '../constants/track-origin-type.constant';
+import { TrackOriginTypeMessages } from '../constants/track-origin-type.constant';
 import { QueryGetListTrackOriginTypeDto } from '../dto/track-origin-type.dto';
 import { TrackOriginType } from '../entities/track-origin-type.entity';
 
@@ -86,12 +83,9 @@ export class TrackOriginTypeQueryService {
 			});
 
 			if (trackOriginType) {
-				throw new ResponseError({
-					messageCode:
-						TrackOriginTypeMessageCodeError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
-					message:
-						TrackOriginTypeMessageError.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
-				});
+				throw new ResponseError(
+					TrackOriginTypeMessages.DUPLICATE_NAME_TRACK_ORIGIN_TYPE,
+				);
 			}
 		}
 
@@ -101,32 +95,22 @@ export class TrackOriginTypeQueryService {
 			});
 
 			if (trackOriginType) {
-				throw new ResponseError({
-					messageCode:
-						TrackOriginTypeMessageCodeError.DUPLICATE_CODE_TRACK_ORIGIN_TYPE,
-					message:
-						TrackOriginTypeMessageError.DUPLICATE_CODE_TRACK_ORIGIN_TYPE,
-				});
+				throw new ResponseError(
+					TrackOriginTypeMessages.DUPLICATE_CODE_TRACK_ORIGIN_TYPE,
+				);
 			}
 		}
 	}
 
 	validateDelete(trackOriginType: TrackOriginType) {
 		if (!trackOriginType) {
-			throw new ResponseError({
-				message: TrackOriginTypeMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackOriginTypeMessages.NOT_FOUND);
 		}
 
 		if ((trackOriginType.tracksCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					TrackOriginTypeMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					TrackOriginTypeMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				TrackOriginTypeMessages.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+			);
 		}
 	}
 }

@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
-import { TrackArtistMessageError } from '../constants/track-artist.constant';
+import { TrackArtistMessages } from '../constants/track-artist.constant';
 import {
 	CreateTrackArtistDto,
 	QueryGetListTrackArtistDto,
@@ -184,10 +184,7 @@ export class TrackArtistService {
 		});
 
 		if (!trackArtist) {
-			throw new ResponseError({
-				message: TrackArtistMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(TrackArtistMessages.NOT_FOUND);
 		}
 
 		return trackArtist;

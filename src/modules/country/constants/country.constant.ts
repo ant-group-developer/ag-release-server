@@ -10,7 +10,7 @@ export const CountryMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const CountryMessageCodeError = {
+const CountryMessageCodeError = {
 	DUPLICATE_NAME_COUNTRY: 'country.message.error.duplicateNameCountry',
 	NOT_FOUND: 'country.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES:
@@ -21,7 +21,7 @@ export const CountryMessageCodeError = {
 		'country.message.error.cannotDeleteBecauseLinkedTrackRecordings',
 };
 
-export const CountryMessageError = {
+const CountryMessageError = {
 	DUPLICATE_NAME_COUNTRY: 'Duplicate country name',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES:
@@ -30,4 +30,41 @@ export const CountryMessageError = {
 		'Cannot delete this country because it is linked to track metadata languages.',
 	CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS:
 		'Cannot delete this country because it is linked to track recordings.',
+};
+
+export const CountryMessage = {
+	NOT_FOUND: {
+		message: CountryMessageError.NOT_FOUND,
+		statusCode: 404,
+	},
+
+	DUPLICATE_NAME_COUNTRY: {
+		message: CountryMessageError.DUPLICATE_NAME_COUNTRY,
+		messageCode: CountryMessageCodeError.DUPLICATE_NAME_COUNTRY,
+		statusCode: 409,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES: {
+		message:
+			CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+		messageCode:
+			CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES: {
+		message:
+			CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+		messageCode:
+			CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+		statusCode: 400,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS: {
+		message:
+			CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
+		messageCode:
+			CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
+		statusCode: 400,
+	},
 };

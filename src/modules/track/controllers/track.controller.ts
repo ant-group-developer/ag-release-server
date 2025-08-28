@@ -1,11 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	TrackMessageCodeSuccess,
-	TrackMessageError,
-	TrackMessageSuccess,
-} from '../constants/track.constant';
+import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import {
 	QueryGetListTrackDto,
@@ -22,11 +18,6 @@ export class TrackController {
 	constructor(private readonly trackService: TrackService) {}
 
 	@Get()
-	@ApiOperation({ summary: 'Get a list of tracks' })
-	@ApiResponse({
-		status: 200,
-		description: 'List of tracks',
-	})
 	async getList(
 		@Query() query: QueryGetListTrackDto,
 	): Promise<ResponseSuccess<PageDto<Track>>> {
@@ -70,19 +61,6 @@ export class TrackController {
 	}
 
 	@Put(':id')
-	@ApiOperation({ summary: 'Update a track by ID' })
-	@ApiResponse({
-		status: 200,
-		description: TrackMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 404,
-		description: TrackMessageError.NOT_FOUND,
-	})
-	@ApiResponse({
-		status: 400,
-		description: TrackMessageError.PRIMARY_GENRE_NOT_FOUND,
-	})
 	async update(
 		@Param('id') id: string,
 		@Body() updateTrackDto: UpdateTrackDto,

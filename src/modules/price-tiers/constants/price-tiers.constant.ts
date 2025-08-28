@@ -10,7 +10,7 @@ export const PriceTierMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const PriceTierMessageCodeError = {
+const PriceTierMessageCodeError = {
 	NOT_FOUND: 'priceTier.message.error.notFound',
 	CURRENCY_NOT_FOUND: 'priceTier.message.error.currencyNotFound',
 
@@ -18,9 +18,30 @@ export const PriceTierMessageCodeError = {
 		'priceTier.message.error.cannotDeleteBecauseLinkedTracks',
 };
 
-export const PriceTierMessageError = {
+const PriceTierMessageError = {
 	NOT_FOUND: 'Price tier not found',
 	CURRENCY_NOT_FOUND: 'Currency not found',
 	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
 		'Cannot delete this price tier because it is linked to tracks',
+};
+
+export const PriceTierMessage = {
+	CURRENCY_NOT_FOUND: {
+		message: PriceTierMessageError.CURRENCY_NOT_FOUND,
+		messageCode: PriceTierMessageCodeError.CURRENCY_NOT_FOUND,
+		statusCode: 404,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_TRACKS: {
+		message: PriceTierMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+		messageCode:
+			PriceTierMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+		statusCode: 400,
+	},
+
+	NOT_FOUND: {
+		message: PriceTierMessageError.NOT_FOUND,
+		messageCode: PriceTierMessageCodeError.NOT_FOUND,
+		statusCode: 404,
+	},
 };

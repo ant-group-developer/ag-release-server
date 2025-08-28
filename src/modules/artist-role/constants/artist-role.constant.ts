@@ -12,7 +12,7 @@ export const ArtistRoleMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const ArtistRoleMessageCodeError = {
+const ArtistRoleMessageCodeError = {
 	DUPLICATE_NAME_ARTIST_ROLE:
 		'artistRole.message.error.duplicateNameArtistRole',
 	DUPLICATE_CODE_ARTIST_ROLE:
@@ -24,7 +24,7 @@ export const ArtistRoleMessageCodeError = {
 		'artistRole.message.error.cannotDeleteBecauseLinkedTracks',
 };
 
-export const ArtistRoleMessageError = {
+const ArtistRoleMessageError = {
 	DUPLICATE_NAME_ARTIST_ROLE: 'Duplicate artist role name',
 	DUPLICATE_CODE_ARTIST_ROLE: 'Duplicate artist role code',
 	NOT_FOUND: 'Not found',
@@ -32,4 +32,31 @@ export const ArtistRoleMessageError = {
 		'Cannot delete this artist role because it is linked to releases.',
 	CANNOT_DELETE_BECAUSE_LINKED_TRACKS:
 		'Cannot delete this artist role because it is linked to tracks.',
+};
+
+export const ArtistRoleMessage = {
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASES: {
+		message: ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+		messageCode:
+			ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+		statusCode: 400,
+	},
+	CANNOT_DELETE_BECAUSE_LINKED_TRACKS: {
+		message: ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+		messageCode:
+			ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+		statusCode: 400,
+	},
+
+	DUPLICATE_NAME_ARTIST_ROLE: {
+		message: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
+		messageCode: ArtistRoleMessageCodeError.DUPLICATE_NAME_ARTIST_ROLE,
+		statusCode: 409,
+	},
+
+	DUPLICATE_CODE_ARTIST_ROLE: {
+		message: ArtistRoleMessageError.DUPLICATE_CODE_ARTIST_ROLE,
+		messageCode: ArtistRoleMessageCodeError.DUPLICATE_CODE_ARTIST_ROLE,
+		statusCode: 409,
+	},
 };

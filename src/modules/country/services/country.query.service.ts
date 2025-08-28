@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	CountryMessageCodeError,
-	CountryMessageError,
-} from '../constants/country.constant';
+import { CountryMessage } from '../constants/country.constant';
 import { QueryGetListCountryDto } from '../dto/country.dto';
 import { Country } from '../entities/country.entity';
 import { IContinentWithCountries } from '../interfaces/country.interface';
@@ -122,44 +119,28 @@ export class CountryQueryService {
 			const artist = await this.countryRepo.findOne({ where: { name } });
 
 			if (artist) {
-				throw new ResponseError({
-					message: CountryMessageError.DUPLICATE_NAME_COUNTRY,
-					messageCode: CountryMessageCodeError.DUPLICATE_NAME_COUNTRY,
-					statusCode: 409,
-				});
+				throw new ResponseError(CountryMessage.DUPLICATE_NAME_COUNTRY);
 			}
 		}
 	}
 
 	validateDelete(country: Country) {
 		if ((country.releaseMetadataLanguageCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				CountryMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASE_METADATA_LANGUAGES,
+			);
 		}
 
 		if ((country.trackMetadataLanguageCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				CountryMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACK_METADATA_LANGUAGES,
+			);
 		}
 
 		if ((country.trackRecordingCountriesCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					CountryMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
-				messageCode:
-					CountryMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				CountryMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACK_RECORDINGS,
+			);
 		}
 	}
 }

@@ -10,22 +10,42 @@ export const CurrencyMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const CurrencyMessageCodeError = {
+const CurrencyMessageCodeError = {
 	NOT_FOUND: 'currency.message.error.notFound',
 	UNIQUE_CONSTRAINT: 'currency.message.error.uniqueConstraint',
 	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
 		'currency.message.error.cannotDeleteBecauseLinkedPriceTiers',
 };
 
-export const CurrencyMessageError = {
+const CurrencyMessageError = {
 	NOT_FOUND: 'Currency not found',
 	UNIQUE_CONSTRAINT: 'Currency already exists',
 	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS:
 		'Cannot delete this currency because it is linked to price tiers',
 };
 
+export const CurrencyMessage = {
+	NOT_FOUND: {
+		message: CurrencyMessageError.NOT_FOUND,
+		messageCode: CurrencyMessageCodeError.NOT_FOUND,
+	},
+
+	UNIQUE_CONSTRAINT: {
+		message: CurrencyMessageError.UNIQUE_CONSTRAINT,
+		messageCode: CurrencyMessageCodeError.UNIQUE_CONSTRAINT,
+		statusCode: 409,
+	},
+
+	CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS: {
+		message: CurrencyMessageError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+		messageCode:
+			CurrencyMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_PRICE_TIERS,
+		statusCode: 400,
+	},
+};
+
 // data init
-export const defaultCurrencies = [
+export const dataInitCurrencies: { name: string; code: string }[] = [
 	{ name: 'Afghani', code: 'AFN' },
 	{ name: 'Euro', code: 'EUR' },
 	{ name: 'Lek', code: 'ALL' },
@@ -71,8 +91,10 @@ export const defaultCurrencies = [
 	{ name: 'Congolese Franc', code: 'CDF' },
 	{ name: 'New Zealand Dollar', code: 'NZD' },
 	{ name: 'Costa Rican Colon', code: 'CRC' },
+	{ name: 'Kuna', code: 'HRK' },
 	{ name: 'Cuban Peso', code: 'CUP' },
-	{ name: 'Caribbean Guilder', code: 'XCG' },
+	{ name: 'Peso Convertible', code: 'CUC' },
+	{ name: 'Netherlands Antillean Guilder', code: 'ANG' },
 	{ name: 'Czech Koruna', code: 'CZK' },
 	{ name: 'Danish Krone', code: 'DKK' },
 	{ name: 'Djibouti Franc', code: 'DJF' },
@@ -154,7 +176,7 @@ export const defaultCurrencies = [
 	{ name: 'Saudi Riyal', code: 'SAR' },
 	{ name: 'Serbian Dinar', code: 'RSD' },
 	{ name: 'Seychelles Rupee', code: 'SCR' },
-	{ name: 'Leone', code: 'SLE' },
+	{ name: 'Leone', code: 'SLL' },
 	{ name: 'Singapore Dollar', code: 'SGD' },
 	{ name: 'Sucre', code: 'XSU' },
 	{ name: 'Solomon Islands Dollar', code: 'SBD' },
@@ -191,27 +213,5 @@ export const defaultCurrencies = [
 	{ name: 'CFP Franc', code: 'XPF' },
 	{ name: 'Yemeni Rial', code: 'YER' },
 	{ name: 'Zambian Kwacha', code: 'ZMW' },
-	{ name: 'Zimbabwe Gold', code: 'ZWG' },
-	{ name: 'Bond Markets Unit European Composite Unit (EURCO)', code: 'XBA' },
-	{
-		name: 'Bond Markets Unit European Monetary Unit (E.M.U.-6)',
-		code: 'XBB',
-	},
-	{
-		name: 'Bond Markets Unit European Unit of Account 9 (E.U.A.-9)',
-		code: 'XBC',
-	},
-	{
-		name: 'Bond Markets Unit European Unit of Account 17 (E.U.A.-17)',
-		code: 'XBD',
-	},
-	{ name: 'Codes specifically reserved for testing purposes', code: 'XTS' },
-	{
-		name: 'The codes assigned for transactions where no currency is involved',
-		code: 'XXX',
-	},
-	{ name: 'Gold', code: 'XAU' },
-	{ name: 'Palladium', code: 'XPD' },
-	{ name: 'Platinum', code: 'XPT' },
-	{ name: 'Silver', code: 'XAG' },
+	{ name: 'US Dollar (Next day)', code: 'USN' },
 ];

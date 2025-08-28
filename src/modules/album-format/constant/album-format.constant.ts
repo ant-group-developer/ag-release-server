@@ -1,3 +1,4 @@
+// data init
 const albumType = {
 	code: 'album',
 	name: 'Album',
@@ -21,6 +22,7 @@ const singleType = {
 
 export const AlbumFormatDefault = [albumType, epType, singleType];
 
+// messages
 export const AlbumFormatMessageCodeSuccess = {
 	CREATE: 'albumFormat.message.success.create',
 	UPDATE: 'albumFormat.message.success.update',
@@ -33,7 +35,7 @@ export const AlbumFormatMessageSuccess = {
 	DELETE: 'Delete success',
 };
 
-export const AlbumFormatMessageCodeError = {
+const AlbumFormatMessageCodeError = {
 	DUPLICATE_NAME_ALBUM_FORMAT:
 		'albumFormat.message.error.duplicateNameAlbumFormat',
 	DUPLICATE_CODE_ALBUM_FORMAT:
@@ -43,10 +45,36 @@ export const AlbumFormatMessageCodeError = {
 		'albumFormat.message.error.cannotDeleteBecauseLinkedReleases',
 };
 
-export const AlbumFormatMessageError = {
+const AlbumFormatMessageError = {
 	DUPLICATE_NAME_ALBUM_FORMAT: 'Duplicate album format name',
 	DUPLICATE_CODE_ALBUM_FORMAT: 'Duplicate album format code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this album format because it is linked to releases.',
+};
+
+export const AlbumFormatMessage = {
+	NOT_FOUND: {
+		message: AlbumFormatMessageError.NOT_FOUND,
+		messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
+		statusCode: 404,
+	},
+
+	DUPLICATE_NAME_ALBUM_FORMAT: {
+		message: AlbumFormatMessageError.DUPLICATE_NAME_ALBUM_FORMAT,
+		messageCode: AlbumFormatMessageCodeError.DUPLICATE_NAME_ALBUM_FORMAT,
+		statusCode: 409,
+	},
+	DUPLICATE_CODE_ALBUM_FORMAT: {
+		message: AlbumFormatMessageError.DUPLICATE_CODE_ALBUM_FORMAT,
+		messageCode: AlbumFormatMessageCodeError.DUPLICATE_CODE_ALBUM_FORMAT,
+		statusCode: 409,
+	},
+	CANNOT_DELETE_BECAUSE_LINKED_RELEASES: {
+		message: AlbumFormatMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+		messageCode:
+			AlbumFormatMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+
+		statusCode: 400,
+	},
 };

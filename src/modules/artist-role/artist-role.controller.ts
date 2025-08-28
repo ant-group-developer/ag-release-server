@@ -11,11 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
-import {
-	ArtistRoleMessageCodeSuccess,
-	ArtistRoleMessageError,
-	ArtistRoleMessageSuccess,
-} from './constants/artist-role.constant';
+import { ArtistRoleMessageCodeSuccess } from './constants/artist-role.constant';
 import {
 	CreateArtistRoleDto,
 	QueryGetListArtistRoleDto,
@@ -29,15 +25,6 @@ import { ArtistRoleService } from './services/artist-role.service';
 export class ArtistRoleController {
 	constructor(private readonly artistRoleService: ArtistRoleService) {}
 
-	@ApiOperation({ summary: 'Create a new artist role' })
-	@ApiResponse({
-		status: 200,
-		description: ArtistRoleMessageSuccess.CREATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
-	})
 	@Post()
 	async create(
 		@Body() createArtistRoleDto: CreateArtistRoleDto,
@@ -49,15 +36,6 @@ export class ArtistRoleController {
 		});
 	}
 
-	@ApiOperation({ summary: 'Get an artist role by ID' })
-	@ApiResponse({
-		status: 200,
-		description: 'Successfully retrieved artist role',
-	})
-	@ApiResponse({
-		status: 404,
-		description: ArtistRoleMessageError.NOT_FOUND,
-	})
 	@Get(':id')
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -79,19 +57,6 @@ export class ArtistRoleController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@ApiOperation({ summary: 'Update an artist role by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ArtistRoleMessageSuccess.UPDATE,
-	})
-	@ApiResponse({
-		status: 409,
-		description: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
-	})
-	@ApiResponse({
-		status: 404,
-		description: ArtistRoleMessageError.NOT_FOUND,
-	})
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -107,11 +72,6 @@ export class ArtistRoleController {
 		});
 	}
 
-	@ApiOperation({ summary: 'Delete an artist role by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ArtistRoleMessageSuccess.DELETE,
-	})
 	@Delete(':id')
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,

@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { LanguageMessageError } from '../constants/language.constant';
+import {
+	dataInitLanguage,
+	LanguageMessage,
+} from '../constants/language.constant';
 import {
 	CreateLanguageDto,
 	QueryGetListLanguageDto,
@@ -12,13 +15,36 @@ import { Language } from '../entities/language.entity';
 import { LanguageQueryService } from './language.query.service';
 
 @Injectable()
-export class LanguageService {
+export class LanguageService implements OnModuleInit {
+	private readonly logger = new Logger(LanguageService.name);
+
 	constructor(
 		@InjectRepository(Language)
 		private readonly languageRepo: Repository<Language>,
 
 		private readonly languageQueryService: LanguageQueryService,
 	) {}
+
+	async onModuleInit() {
+		await this.initLanguage();
+	}
+
+	private async initLanguage() {
+		const count = await this.languageRepo.count();
+
+		if (count === 0) {
+			this.logger.log('Initializing language');
+
+			const insertData = this.languageRepo.create(dataInitLanguage);
+			await this.languageRepo.save(insertData);
+
+			this.logger.log('Languages inserted successfully');
+		} else {
+			this.logger.log(
+				'Languages table already has data, skipping initialization',
+			);
+		}
+	}
 
 	// create
 	async create(createLanguageDto: CreateLanguageDto): Promise<Language> {
@@ -34,10 +60,7 @@ export class LanguageService {
 	async findOne(id: string): Promise<Language> {
 		const language = await this.languageRepo.findOne({ where: { id } });
 		if (!language) {
-			throw new ResponseError({
-				message: LanguageMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LanguageMessage.NOT_FOUND);
 		}
 
 		return language;
@@ -86,10 +109,7 @@ export class LanguageService {
 		const language =
 			await this.languageQueryService.findOneWithCountRelation(id);
 		if (!language) {
-			throw new ResponseError({
-				message: LanguageMessageError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(LanguageMessage.NOT_FOUND);
 		}
 
 		this.languageQueryService.validateDelete(language);

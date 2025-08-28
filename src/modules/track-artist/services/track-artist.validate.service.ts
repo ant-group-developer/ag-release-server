@@ -5,10 +5,7 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
-import {
-	TrackArtistMessageCodeError,
-	TrackArtistMessageError,
-} from '../constants/track-artist.constant';
+import { TrackArtistMessages } from '../constants/track-artist.constant';
 import { TrackArtist } from '../entities/track-artist.entity';
 
 @Injectable()
@@ -130,10 +127,7 @@ export class TrackArtistValidateService {
 		});
 
 		if (releaseArtist) {
-			throw new ResponseError({
-				message: TrackArtistMessageError.UNIQUE_CONSTRAINT,
-				messageCode: TrackArtistMessageCodeError.UNIQUE_CONSTRAINT,
-			});
+			throw new ResponseError(TrackArtistMessages.UNIQUE_CONSTRAINT);
 		}
 	}
 }

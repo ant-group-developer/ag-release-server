@@ -4,8 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 import {
 	AlbumFormatDefault,
-	AlbumFormatMessageCodeError,
-	AlbumFormatMessageError,
+	AlbumFormatMessage,
 } from '../constant/album-format.constant';
 import {
 	CreateAlbumFormatDto,
@@ -65,11 +64,7 @@ export class AlbumFormatService implements OnModuleInit {
 		});
 
 		if (!albumFormat) {
-			throw new ResponseError({
-				message: AlbumFormatMessageError.NOT_FOUND,
-				messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(AlbumFormatMessage.NOT_FOUND);
 		}
 		return albumFormat;
 	}
@@ -79,11 +74,7 @@ export class AlbumFormatService implements OnModuleInit {
 			await this.albumFormatQueryService.findOneWithCountRelation(id);
 
 		if (!albumFormat) {
-			throw new ResponseError({
-				message: AlbumFormatMessageError.NOT_FOUND,
-				messageCode: AlbumFormatMessageCodeError.NOT_FOUND,
-				statusCode: 404,
-			});
+			throw new ResponseError(AlbumFormatMessage.NOT_FOUND);
 		}
 		return albumFormat;
 	}

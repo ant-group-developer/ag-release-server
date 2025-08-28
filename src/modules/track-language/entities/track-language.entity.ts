@@ -26,7 +26,7 @@ export class TrackLanguage extends BaseUUIDEntity {
 		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
-	metadataLanguageId: string | null;
+	metadataLanguageId: string | null; // ngon ngu metadata
 
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
@@ -36,7 +36,7 @@ export class TrackLanguage extends BaseUUIDEntity {
 		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
-	recordingCountryId: string | null;
+	recordingCountryId: string | null; // quoc gia thu am
 
 	// relation
 	@ManyToOne(() => Country)

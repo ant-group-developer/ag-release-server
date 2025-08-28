@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	ArtistRoleMessageCodeError,
-	ArtistRoleMessageError,
-} from '../constants/artist-role.constant';
+import { ArtistRoleMessage } from '../constants/artist-role.constant';
 import { QueryGetListArtistRoleDto } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
 
@@ -91,23 +88,15 @@ export class ArtistRoleQueryService {
 	// validate
 	validateDelete(artistRole: ArtistRole) {
 		if ((artistRole.releaseCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				ArtistRoleMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+			);
 		}
 
 		if ((artistRole.trackCount ?? 0) > 0) {
-			throw new ResponseError({
-				message:
-					ArtistRoleMessageError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				messageCode:
-					ArtistRoleMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				ArtistRoleMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
+			);
 		}
 	}
 
@@ -118,12 +107,9 @@ export class ArtistRoleQueryService {
 			});
 
 			if (artistRole) {
-				throw new ResponseError({
-					message: ArtistRoleMessageError.DUPLICATE_NAME_ARTIST_ROLE,
-					messageCode:
-						ArtistRoleMessageCodeError.DUPLICATE_NAME_ARTIST_ROLE,
-					statusCode: 409,
-				});
+				throw new ResponseError(
+					ArtistRoleMessage.DUPLICATE_NAME_ARTIST_ROLE,
+				);
 			}
 		}
 
@@ -133,12 +119,9 @@ export class ArtistRoleQueryService {
 			});
 
 			if (artistRole) {
-				throw new ResponseError({
-					message: ArtistRoleMessageError.DUPLICATE_CODE_ARTIST_ROLE,
-					messageCode:
-						ArtistRoleMessageCodeError.DUPLICATE_CODE_ARTIST_ROLE,
-					statusCode: 409,
-				});
+				throw new ResponseError(
+					ArtistRoleMessage.DUPLICATE_CODE_ARTIST_ROLE,
+				);
 			}
 		}
 	}

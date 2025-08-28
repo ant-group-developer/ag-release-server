@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	DspMessageCodeError,
-	DspMessageError,
-} from '../constants/dsp.constant';
+import { DspMessage } from '../constants/dsp.constant';
 import { QueryGetListDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
 
@@ -22,7 +19,7 @@ export class DspQueryService {
 		const dsp = await query.getOne();
 
 		if (!dsp) {
-			throw new ResponseError({ message: DspMessageError.NOT_FOUND });
+			throw new ResponseError(DspMessage.NOT_FOUND);
 		}
 
 		return dsp;
@@ -167,23 +164,16 @@ export class DspQueryService {
 			});
 
 			if (dsp) {
-				throw new ResponseError({
-					message: DspMessageError.DUPLICATE_NAME_DSP,
-					messageCode: DspMessageCodeError.DUPLICATE_NAME_DSP,
-					statusCode: 409,
-				});
+				throw new ResponseError(DspMessage.DUPLICATE_NAME_DSP);
 			}
 		}
 	}
 
 	validateDelete(dsp: Dsp) {
 		if ((dsp.releaseDspsCount ?? 0) > 0) {
-			throw new ResponseError({
-				message: DspMessageError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				messageCode:
-					DspMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-				statusCode: 400,
-			});
+			throw new ResponseError(
+				DspMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
+			);
 		}
 	}
 }

@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import {
-	PermissionMessageCodeError,
-	PermissionMessageError,
-} from '../constants/permission.constant';
+import { PermissionMessage } from '../constants/permission.constant';
 import { QueryGetListPermissionDto } from '../dto/permission.dto';
 import { Permission } from '../entities/permission.entity';
 
@@ -99,11 +96,9 @@ export class PermissionQueryService {
 
 			if (entity) {
 				throw new ResponseError({
-					messageCode:
-						PermissionMessageCodeError.DUPLICATE_NAME_PERMISSION,
-					message: PermissionMessageError.DUPLICATE_NAME_PERMISSION,
+					...PermissionMessage.DUPLICATE_NAME_PERMISSION,
 					messageWarning:
-						PermissionMessageError.DUPLICATE_NAME_PERMISSION +
+						PermissionMessage.DUPLICATE_NAME_PERMISSION.message +
 						': ' +
 						name,
 				});
@@ -117,11 +112,9 @@ export class PermissionQueryService {
 
 			if (entity) {
 				throw new ResponseError({
-					messageCode:
-						PermissionMessageCodeError.DUPLICATE_CODE_PERMISSION,
-					message: PermissionMessageError.DUPLICATE_CODE_PERMISSION,
+					...PermissionMessage.DUPLICATE_CODE_PERMISSION,
 					messageWarning:
-						PermissionMessageError.DUPLICATE_CODE_PERMISSION +
+						PermissionMessage.DUPLICATE_CODE_PERMISSION.message +
 						': ' +
 						code,
 				});
@@ -132,29 +125,23 @@ export class PermissionQueryService {
 	validateDelete(permission: Permission) {
 		if ((permission.userCount ?? 0) > 0) {
 			throw new ResponseError({
-				message:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
-				messageCode:
-					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_USERS,
+				...PermissionMessage.CANNOT_DELETE_BECAUSE_LINKED_USERS,
 				messageWarning:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_USERS +
+					PermissionMessage.CANNOT_DELETE_BECAUSE_LINKED_USERS
+						.message +
 					': ' +
 					permission.id,
-				statusCode: 400,
 			});
 		}
 
 		if ((permission.rolePermissionCount ?? 0) > 0) {
 			throw new ResponseError({
-				message:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
-				messageCode:
-					PermissionMessageCodeError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
+				...PermissionMessage.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS,
 				messageWarning:
-					PermissionMessageError.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS +
+					PermissionMessage
+						.CANNOT_DELETE_BECAUSE_LINKED_ROLE_PERMISSIONS.message +
 					': ' +
 					permission.id,
-				statusCode: 400,
 			});
 		}
 	}
