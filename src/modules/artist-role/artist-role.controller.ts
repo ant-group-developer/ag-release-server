@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { ArtistRoleMessageCodeSuccess } from './constants/artist-role.constant';
 import {
 	CreateArtistRoleDto,
@@ -25,6 +26,7 @@ import { ArtistRoleService } from './services/artist-role.service';
 export class ArtistRoleController {
 	constructor(private readonly artistRoleService: ArtistRoleService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(
 		@Body() createArtistRoleDto: CreateArtistRoleDto,
@@ -57,6 +59,7 @@ export class ArtistRoleController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -72,6 +75,7 @@ export class ArtistRoleController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,

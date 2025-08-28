@@ -18,7 +18,10 @@ import {
 } from 'src/common/dtos/response.dto';
 import { DeleteResult } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';
-import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
+import {
+	SystemAdminOnly,
+	TenantOwnerOrAdminOnly,
+} from '../auth/decorators/auth.decorator';
 import { UserMessages } from './constants/messages';
 import {
 	BulkUpdateTenantUserDto,
@@ -33,6 +36,7 @@ import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
 import { checkIsSystemTenant } from './utils/user-type.util';
 
+@TenantOwnerOrAdminOnly()
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
@@ -120,7 +124,7 @@ export class UserController {
 
 	@ApiOperation({
 		summary:
-			'Bulk update tenant user (accept tenant type member or admin only',
+			'Bulk update tenant user (accept tenant type member or admin only)',
 	})
 	@SystemAdminOnly()
 	@Post('bulk-update-tenant-user')

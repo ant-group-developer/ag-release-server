@@ -13,6 +13,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { TimezoneMessageCodeSuccess } from './constants/timezone.constant';
 
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
 	CreateTimezoneDto,
 	QueryGetListTimezoneDto,
@@ -25,6 +26,7 @@ import { TimezoneService } from './services/timezone.service';
 export class TimezoneController {
 	constructor(private readonly timezoneService: TimezoneService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(
 		@Body() createTimezoneDto: CreateTimezoneDto,
@@ -52,6 +54,7 @@ export class TimezoneController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -64,6 +67,7 @@ export class TimezoneController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,

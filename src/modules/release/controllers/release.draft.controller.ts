@@ -18,6 +18,11 @@ import {
 } from '../constants/release.constant';
 
 import { Request } from 'express';
+import {
+	RequirePermissions,
+	SystemAdminOnly,
+} from 'src/modules/auth/decorators/auth.decorator';
+import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	CreateReleaseDraftDto,
@@ -31,6 +36,7 @@ import { ReleaseDraftService } from '../services/release.draft.service';
 export class ReleaseDraftController {
 	constructor(private readonly releaseDraftService: ReleaseDraftService) {}
 
+	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
 		const tenantId = req.user!.tenantId;
@@ -48,6 +54,7 @@ export class ReleaseDraftController {
 		});
 	}
 
+	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -60,12 +67,14 @@ export class ReleaseDraftController {
 		});
 	}
 
+	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	@Get(':id/validate')
 	async validateSchemaRelease(@Param('id') id: string) {
 		const result = await this.releaseDraftService.validateSchemaRelease(id);
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
 	@ApiResponse({

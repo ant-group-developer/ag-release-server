@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
 	PriceTierMessageCodeSuccess,
 	PriceTierMessageSuccess,
@@ -38,6 +39,7 @@ export class PriceTierController {
 		return new ResponseSuccess({ data });
 	}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(@Body() dto: CreatePriceTierDto) {
 		const data = await this.priceTierService.create(dto);
@@ -48,6 +50,7 @@ export class PriceTierController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -61,6 +64,7 @@ export class PriceTierController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(@Param('id', ParseUUIDPipe) id: string) {
 		await this.priceTierService.delete(id);

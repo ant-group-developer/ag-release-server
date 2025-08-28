@@ -16,6 +16,11 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/response.dto';
+import {
+	RequirePermissions,
+	SystemAdminOnly,
+} from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import {
 	LabelMessage,
@@ -35,6 +40,7 @@ import { LabelService } from './services/label.service';
 export class LabelController {
 	constructor(private readonly labelService: LabelService) {}
 
+	@RequirePermissions(Permission.LABEL.CREATE)
 	@Post()
 	async create(
 		@Body() createLabelDto: CreateLabelDto,
@@ -74,6 +80,7 @@ export class LabelController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.LABEL.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -86,6 +93,7 @@ export class LabelController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a label by ID' })
 	@ApiResponse({

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { CountryMessageCodeSuccess } from './constants/country.constant';
 import {
 	CreateCountryDto,
@@ -25,6 +26,7 @@ import { CountryService } from './services/country.service';
 export class CountryController {
 	constructor(private readonly countryService: CountryService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(
 		@Body() createCountryDto: CreateCountryDto,
@@ -62,6 +64,7 @@ export class CountryController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -74,6 +77,7 @@ export class CountryController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,

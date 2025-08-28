@@ -11,6 +11,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { GenreMessageCodeSuccess } from './constants/genre.constant';
 import {
 	CreateGenreDto,
@@ -25,6 +26,7 @@ import { GenreService } from './services/genre.service';
 export class GenreController {
 	constructor(private readonly genreService: GenreService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(
 		@Body() createGenreDto: CreateGenreDto,
@@ -50,6 +52,7 @@ export class GenreController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -62,6 +65,7 @@ export class GenreController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.genreService.delete(id);

@@ -11,6 +11,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import { checkIsSystemAdmin } from '../user/utils/user-type.util';
 import {
@@ -52,6 +53,7 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@TenantOwnerOrAdminOnly()
 	@Post()
 	async create(
 		@Body() payload: CreateTenantDto,
@@ -60,6 +62,7 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@TenantOwnerOrAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id') id: string,

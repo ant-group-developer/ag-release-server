@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
 	CreateAlbumFormatDto,
 	QueryGetListAlbumFormatDto,
@@ -23,6 +24,7 @@ import { AlbumFormatService } from './services/album-format.service';
 export class AlbumFormatController {
 	constructor(private readonly albumFormatService: AlbumFormatService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	@ApiOperation({ summary: 'Create a new album format' })
 	@ApiResponse({
@@ -58,6 +60,7 @@ export class AlbumFormatController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	@ApiOperation({ summary: 'Update album format by ID' })
 	@ApiResponse({
@@ -75,6 +78,7 @@ export class AlbumFormatController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete album format by ID' })
 	@ApiResponse({

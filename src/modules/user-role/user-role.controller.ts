@@ -2,9 +2,11 @@ import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { UpdateUserRoleDto } from './user-role.dto';
 import { UserRoleService } from './user-role.service';
 
+@TenantOwnerOrAdminOnly()
 @ApiTags('User Role')
 @Controller('user-role')
 export class UserRoleController {

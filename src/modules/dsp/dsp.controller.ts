@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { DspMessageCodeSuccess } from './constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
 import { Dsp } from './entities/dsp.entity';
@@ -20,6 +21,7 @@ import { DspService } from './services/dsp.service';
 export class DspController {
 	constructor(private readonly dspService: DspService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(@Body() createDspDto: CreateDspDto) {
 		const result = await this.dspService.handleCreate(createDspDto);
@@ -57,6 +59,7 @@ export class DspController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async handleUpdate(@Param('id') id: string, @Body() data: UpdateDspDto) {
 		const result = await this.dspService.handleUpdate({ dspId: id, data });
@@ -66,6 +69,7 @@ export class DspController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.dspService.handleDelete(id);
@@ -74,6 +78,7 @@ export class DspController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id/dsp-actions/:dspActionId')
 	async deleteDspAction(
 		@Param('dspActionId') dspActionId: string,

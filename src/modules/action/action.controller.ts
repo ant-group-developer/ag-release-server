@@ -10,6 +10,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
 	ActionMessageCodeSuccess,
 	ActionMessageSuccess,
@@ -26,6 +27,7 @@ import { ActionService } from './services/action.service';
 export class ActionController {
 	constructor(private readonly actionService: ActionService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(
 		@Body() data: CreateActionDto,
@@ -52,6 +54,7 @@ export class ActionController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -65,6 +68,7 @@ export class ActionController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,
