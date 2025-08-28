@@ -111,7 +111,7 @@ export class LabelService {
 	}
 
 	async checkExceedLabels(tenantId: string) {
-		const { label_count, max_label_count } = await this.labelRepo
+		const data = await this.labelRepo
 			.createQueryBuilder('label')
 			.leftJoin('label.tenant', 'tenant')
 			.select([
@@ -123,6 +123,9 @@ export class LabelService {
 			.where('tenant.id = :tenantId', { tenantId })
 			.getRawOne();
 
+		if (!data) return;
+
+		const { label_count, max_label_count } = data;
 		if (Number(label_count) >= Number(max_label_count)) {
 			throw new ResponseError(LabelMessage.LIMIT_EXCEEDED);
 		}
