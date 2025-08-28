@@ -30,3 +30,6 @@ export const checkCanAccessTenantAll = (
 
 export const checkIsSystemTenant = (tenantId: string) =>
 	tenantId === SYSTEM_TENANT_ID;
+
+export const checkIsNotSystemTenant = (tenantId: string) =>
+	tenantId !== SYSTEM_TENANT_ID;
