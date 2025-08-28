@@ -1,4 +1,16 @@
-export const mainArtistRole = { name: 'Main Artist', code: 'main_artist' };
+export const mainArtistRole = { name: 'Main Artist', code: 'MAIN_ARTIST' };
+export const dataInitArtistRole: { name: string; code: string }[] = [
+	{ name: 'Main Artist', code: 'MAIN_ARTIST' },
+	{ name: 'Singer', code: 'SINGER' },
+	{ name: 'Composer', code: 'COMPOSER' },
+	{ name: 'Lyricist', code: 'LYRICIST' },
+	{ name: 'Producer', code: 'PRODUCER' },
+	{ name: 'Arranger', code: 'ARRANGER' },
+	{ name: 'Featured Artist', code: 'FEATURED_ARTIST' },
+	{ name: 'Conductor', code: 'CONDUCTOR' },
+	{ name: 'Instrumentalist', code: 'INSTRUMENTALIST' },
+	{ name: 'Background Vocalist', code: 'BACKGROUND_VOCALIST' },
+];
 
 export const ArtistRoleMessageCodeSuccess = {
 	CREATE: 'artistRole.message.success.create',

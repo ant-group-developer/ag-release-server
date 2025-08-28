@@ -2,7 +2,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { mainArtistRole } from '../constants/artist-role.constant';
+import {
+	dataInitArtistRole,
+	mainArtistRole,
+} from '../constants/artist-role.constant';
 import {
 	CreateArtistRoleDto,
 	QueryGetListArtistRoleDto,
@@ -28,19 +31,12 @@ export class ArtistRoleService implements OnModuleInit {
 	}
 
 	private async initMainArtistRole() {
-		const mainArtistRoleDb = await this.artistRoleRepo.findOne({
-			where: { name: mainArtistRole.name },
-		});
+		const count = await this.artistRoleRepo.count();
+		if (count === 0) {
+			this.logger.log('Initializing artist role');
 
-		if (!mainArtistRoleDb) {
-			this.logger.log('Initializing main artist role');
-
-			const entity = this.artistRoleRepo.create({
-				name: mainArtistRole.name,
-				code: mainArtistRole.code,
-			});
-
-			await this.artistRoleRepo.save(entity);
+			const entities = this.artistRoleRepo.create(dataInitArtistRole);
+			await this.artistRoleRepo.save(entities);
 
 			this.logger.log('Main artist role inserted successfully');
 		} else {
@@ -48,11 +44,20 @@ export class ArtistRoleService implements OnModuleInit {
 				'Artist role table already has data, skipping initialization',
 			);
 		}
+
+		const mainIsExist = await this.artistRoleRepo.findOne({
+			where: { code: mainArtistRole.code },
+		});
+
+		if (!mainIsExist) {
+			throw new ResponseError({ message: 'Main artist is required' });
+		}
 	}
 
 	// create
 	async create(data: CreateArtistRoleDto): Promise<ArtistRole> {
 		const { name, code } = data;
+
 		await this.artistRoleQueryService.validate({ name, code });
 
 		const artist = this.artistRoleRepo.create(data);

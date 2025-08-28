@@ -122,6 +122,7 @@ export class AppConfigService implements OnModuleInit {
 			[AppConfigKey.SCORE_WARNING]: acrCloud.scoreWarning,
 
 			// backup
+			[AppConfigKey.CRON_VALUE]: backupDatabase.cronValue,
 			[AppConfigKey.DATABASE_TO_DRIVE]: backupDatabase.toDrive,
 			[AppConfigKey.DATABASE_TO_GCS]: backupDatabase.toGcs,
 			[AppConfigKey.NOTIFY_ON_SUCCESS]: backupDatabase.notifyOnSuccess,

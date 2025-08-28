@@ -21,7 +21,7 @@ export class ArtistQueryService {
 	private createQueryGetList(query: QueryGetListArtistDto) {
 		const {
 			keyword,
-			id,
+			code,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -38,8 +38,23 @@ export class ArtistQueryService {
 		const queryBuilder = this.artistRepo.createQueryBuilder('artist');
 
 		queryBuilder
-			.leftJoinAndSelect('artist.artistProfiles', 'artistProfile')
-			.leftJoinAndSelect('artistProfile.dsp', 'dsp')
+			.leftJoin('artist.artistProfiles', 'artistProfile')
+			.leftJoin('artistProfile.dsp', 'dsp')
+
+			.addSelect([
+				'artistProfile.id',
+				'artistProfile.name',
+				'artistProfile.url',
+			])
+
+			.addSelect([
+				'dsp.id',
+				'dsp.name',
+				'dsp.code',
+				'dsp.picture',
+				'dsp.canLinkArtistProfile',
+				'dsp.formatLinks',
+			])
 
 			.addSelect((subQuery) => {
 				return subQuery
@@ -61,9 +76,9 @@ export class ArtistQueryService {
 			});
 		}
 
-		if (id) {
-			queryBuilder.andWhere('artist.id ILIKE :id', {
-				id: `%${id}%`,
+		if (code) {
+			queryBuilder.andWhere('artist.code ILIKE :code', {
+				code: `%${code}%`,
 			});
 		}
 
@@ -92,6 +107,8 @@ export class ArtistQueryService {
 		} else {
 			queryBuilder.orderBy(`artist.${fieldOrder}`, orderBy);
 		}
+
+		queryBuilder.addOrderBy('dsp.name', 'ASC');
 		queryBuilder.skip(skip).take(pageSize);
 
 		return queryBuilder;
