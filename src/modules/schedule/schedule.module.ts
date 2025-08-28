@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule as ScheduleModuleNestJS } from '@nestjs/schedule';
-import { CopyrightModule } from '../copyright/copyright.module';
+import { AppConfigModule } from '../app-config/app-config.module';
 import { DatabaseModule } from '../database/database.module';
 import { ScheduleService } from './schedule.service';
 
 @Module({
-	imports: [ScheduleModuleNestJS.forRoot(), DatabaseModule, CopyrightModule],
+	imports: [ScheduleModuleNestJS.forRoot(), DatabaseModule, AppConfigModule],
 	providers: [ScheduleService],
 })
 export class ScheduleModule {}

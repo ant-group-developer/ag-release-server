@@ -92,6 +92,100 @@ export class DatabaseBackupService implements OnModuleInit {
 		);
 	}
 
+	// private async backup() {
+	// 	const timeStart = Date.now();
+	// 	const fileName = this.generateBackupFileName();
+	// 	const backupPath = this.prepareBackupPath(fileName);
+
+	// 	const result = this.backupRepo.create({
+	// 		...this.buildBackupRecord(fileName),
+	// 		status: StatusBackup.RUNNING,
+	// 		fileName,
+	// 	});
+
+	// 	try {
+	// 		await this.exportDatabase(backupPath);
+	// 		if (this.toGcs) await this.uploadToGcs(backupPath);
+	// 		if (this.toDrive) await this.uploadToDrive(backupPath);
+
+	// 		const fileSize = await this.getFileSize(backupPath);
+	// 		result.status = StatusBackup.SUCCESS;
+	// 		result.fileSize = fileSize;
+	// 	} catch (e) {
+	// 		result.status = StatusBackup.FAILED;
+	// 	} finally {
+	// 		result.elapsedTime = this.calculateElapsedTime(timeStart);
+	// 	}
+
+	// 	return result;
+	// }
+
+	private generateBackupFileName(): string {
+		return generateFileNameWithTimestamp(
+			'backup_ant_release.sql',
+			DateFormat['YYYY-MM-DD_HH-mm-ss'],
+		);
+	}
+
+	private prepareBackupPath(fileName: string): string {
+		const backupDir = path.join(os.homedir(), 'backups');
+		if (!fs.existsSync(backupDir)) {
+			fs.mkdirSync(backupDir, { recursive: true });
+		}
+		return path.join(backupDir, fileName);
+	}
+
+	private buildBackupRecord(fileName: string) {
+		return {
+			urlDrive: this.toDrive
+				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
+				: null,
+			urlGcs: this.toGcs
+				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+				: null,
+			urlFolderGcs: this.getUrlConsoleGcsBackup(fileName),
+		};
+	}
+
+	private async exportDatabase(backupPath: string): Promise<void> {
+		const exec = promisify(execCallback);
+		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+
+		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
+
+		await exec(exportDatabaseCommand, {
+			env: { ...process.env, PGPASSWORD: this.configDB.password },
+			shell: shellPath,
+		});
+	}
+
+	private async uploadToGcs(backupPath: string): Promise<void> {
+		const exec = promisify(execCallback);
+		const rcloneConfig = '--config=./database.rclone.conf';
+		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+
+		const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
+		await exec(gcsUploadCommand, { shell: shellPath });
+	}
+
+	private async uploadToDrive(backupPath: string): Promise<void> {
+		const exec = promisify(execCallback);
+		const rcloneConfig = '--config=./database.rclone.conf';
+		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+
+		const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
+		await exec(driveUploadCommand, { shell: shellPath });
+	}
+
+	private async getFileSize(filePath: string): Promise<number> {
+		const stats = await stat(filePath);
+		return stats.size;
+	}
+
+	private calculateElapsedTime(start: number): number {
+		return Math.floor((Date.now() - start) / 1000);
+	}
+
 	private async backup() {
 		const { toDrive, toGcs } = this;
 
@@ -171,28 +265,6 @@ export class DatabaseBackupService implements OnModuleInit {
 		const resultDb = await this.backupRepo.save(result);
 		await this.sendNotificationBackup(resultDb);
 	}
-
-	// async a() {
-	// 	const { toDrive, toGcs } = this;
-
-	// 	const fileName = generateFileNameWithTimestamp(
-	// 		'backup_ant_release.sql',
-	// 		DateFormat['YYYY-MM-DD_HH-mm-ss'],
-	// 	);
-
-	// 	const a = this.backupRepo.create({
-	// 		urlDrive: toDrive
-	// 			? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
-	// 			: null,
-	// 		urlGcs: toGcs
-	// 			? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
-	// 			: null,
-	// 		status: StatusBackup.RUNNING,
-	// 		fileName,
-	// 	});
-
-	// 	await this.backupRepo.save(a);
-	// }
 
 	handleCreateSafe() {
 		this.handleCreate().catch((_e) => {

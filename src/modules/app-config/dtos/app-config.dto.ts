@@ -12,7 +12,6 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { ReleaseStatus } from '../../release/enum/release.enum';
-import { ExecuteCycleType } from '../enums/app-config.enum';
 
 export class UpdateAuth0ConfigDto {
 	@IsString() clientId: string;
@@ -66,39 +65,10 @@ export class UpdateAcrCloudDto {
 	releaseStatusAutoScans: ReleaseStatus[];
 }
 
-export class ExecuteConfigDto {
-	@IsOptional()
-	@IsNumber()
-	nDays?: number;
-
-	@IsOptional()
-	@IsNumber()
-	nHours?: number;
-
-	@IsOptional()
-	@IsNumber()
-	nMinutes?: number;
-
-	@IsOptional()
-	@IsString()
-	dayOfWeek?: string;
-
-	@IsOptional()
-	@IsNumber()
-	dayOfMonth?: number;
-
-	@IsOptional()
-	@IsString()
-	time?: string;
-}
-
 export class UpdateBackupDatabaseDto {
-	@IsEnum(ExecuteCycleType)
-	executeCycleType: ExecuteCycleType;
-
-	@ValidateNested()
-	@Type(() => ExecuteConfigDto)
-	executeConfig: ExecuteConfigDto;
+	@IsOptional()
+	@IsString()
+	cronValue: string;
 
 	@IsBoolean()
 	notifyOnFailed: boolean;

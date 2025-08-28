@@ -1,74 +1,65 @@
 // schedule.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { AppConfig } from '../app-config/entities/app-config.entity';
-import { CopyrightService } from '../copyright/services/copyright.service';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from '../app-config/app-config.service';
+import { AppConfigKey } from '../app-config/enums/app-config.enum';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 
 @Injectable()
-export class ScheduleService {
+export class ScheduleService implements OnModuleInit {
 	private readonly logger = new Logger(ScheduleService.name);
-	private acrCloud: AppConfig['config']['acrCloud'];
+	private cronValue: string;
 
 	constructor(
 		private readonly databaseBackupService: DatabaseBackupService,
 		private readonly schedulerRegistry: SchedulerRegistry,
-		private readonly copyrightService: CopyrightService,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
-	private addIntervalJob(
-		name: string,
-		milliseconds: number,
-		callback: () => void,
-	) {
-		const interval = setInterval(callback, milliseconds);
-		this.schedulerRegistry.addInterval(name, interval);
-		this.logger.log(
-			`Added interval job: ${name}, every ${milliseconds} ms`,
+	onModuleInit() {
+		this.reloadConfig();
+	}
+
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.reloadConfig();
+	}
+
+	private reloadConfig() {
+		this.cronValue = this.appConfigService.getValue(
+			AppConfigKey.CRON_VALUE,
 		);
+		this.addJobBackup();
 	}
 
-	private addCronJob(name: string, cronTime: string, callback: () => void) {
-		const job = new CronJob(cronTime, callback);
-		this.schedulerRegistry.addCronJob(name, job);
-		job.start();
-		this.logger.log(`Added cron job: ${name}, cron time: ${cronTime}`);
+	private addJobBackup() {
+		const jobName = 'backup-job';
+		this.deleteIfExists({ jobName });
+
+		try {
+			const jobBackup = new CronJob(this.cronValue, () => {
+				this.logger.log('Start backup');
+				this.databaseBackupService.handleCreateSafe();
+			});
+
+			this.schedulerRegistry.addCronJob(jobName, jobBackup);
+			jobBackup.start();
+			this.logger.log(`Added cron job: ${jobName}`);
+		} catch (err) {
+			this.logger.error(
+				` Failed to create cron job [${jobName}]: ${(err as Error).message}`,
+			);
+		}
 	}
 
-	// handleScheduleArc() {
-	// 	const acrCloud = this.acrCloud;
-	// 	if (acrCloud.autoScan) {
-	// 		const trackIds = this.getListTrackIdsNeedScan();
-
-	// 		if (acrCloud.autoScanTime1) {
-	// 			if (acrCloud.autoScanTime1.type === 'interval') {
-	// 				this.addIntervalJob('jobArc', 0, () => {
-	// 					return trackIds.map((item) => {
-	// 						return this.copyrightService.scanTrackCopyright(
-	// 							item,
-	// 						);
-	// 					});
-	// 				});
-	// 			} else if (acrCloud.autoScanTime1.type === 'cron') {
-	// 				this.addCronJob(
-	// 					'jobArc',
-	// 					acrCloud.autoScanTime1.value,
-	// 					() => {
-	// 						return trackIds.map((item) => {
-	// 							return this.copyrightService.scanTrackCopyright(
-	// 								item,
-	// 							);
-	// 						});
-	// 					},
-	// 				);
-	// 				this.copyrightService.scanTrackCopyright('');
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	getListTrackIdsNeedScan() {
-		return ['', ''];
+	private deleteIfExists({ jobName }: { jobName: string }) {
+		const jobs = this.schedulerRegistry.getCronJobs();
+		if (jobs.has(jobName)) {
+			this.schedulerRegistry.deleteCronJob(jobName);
+			this.logger.log(`Deleted existing cron job: ${jobName}`);
+		}
 	}
 }

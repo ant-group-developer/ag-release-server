@@ -1,7 +1,7 @@
 import { ReleaseStatus } from '../../release/enum/release.enum';
 import {
 	AppConfigKey,
-	ExecuteCycleType,
+	// ExecuteCycleType,
 	ScheduleType,
 } from '../enums/app-config.enum';
 
@@ -22,17 +22,7 @@ export interface WebsiteConfig {
 }
 
 export interface BackupDatabase {
-	executeCycleType: ExecuteCycleType;
-
-	executeConfig: {
-		nMinutes?: number; // backup mỗi N phút
-		nHours?: number; // backup mỗi N giờ
-		nDays?: number; // backup mỗi N ngày
-
-		dayOfWeek?: string; // backup hàng tuần: "monday", "tuesday", ...
-		dayOfMonth?: number; // backup hàng tháng: 1–31
-		time?: string; // giờ thực hiện: "1"
-	};
+	cronValue: string;
 
 	// Thông báo kết quả backup
 	notifyOnFailed: boolean;
@@ -87,6 +77,7 @@ export type AppConfigValueMap = {
 	[AppConfigKey.SCORE_WARNING]: number;
 
 	//
+	[AppConfigKey.CRON_VALUE]: string;
 	[AppConfigKey.DATABASE_TO_DRIVE]: boolean;
 	[AppConfigKey.DATABASE_TO_GCS]: boolean;
 	[AppConfigKey.NOTIFY_ON_SUCCESS]: boolean;
