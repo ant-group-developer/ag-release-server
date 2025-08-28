@@ -43,7 +43,6 @@ export class TrackService {
 	// read
 	async getDetail(id: string): Promise<Track> {
 		const trackDb = await this.trackQueryService.getDetailOne(id);
-
 		return this.enhanceDetailsOne(trackDb);
 	}
 

@@ -36,20 +36,28 @@ export class TenantController {
 		@Query() query: FindTenantsDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const result = await this.tenantService.findAll(query, req);
+		const tenantId = req.user!.tenantId;
+		const result = await this.tenantService.findAll(query, tenantId);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get('active')
 	@ApiOperation({ summary: 'Get all tenants flatten which is actived' })
-	async findAllFlattenActive(): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const result = await this.tenantService.findAllFlattenActive();
+	async findAllFlattenActive(
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Tenant>>> {
+		const result = await this.tenantService.findAllFlattenActive(
+			req.user!.tenantId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Tenant>> {
-		const result = await this.tenantService.findOne(id);
+	async findOne(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Tenant>> {
+		const result = await this.tenantService.findOne(id, req.user!.tenantId);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -57,8 +65,12 @@ export class TenantController {
 	@Post()
 	async create(
 		@Body() payload: CreateTenantDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Tenant>> {
-		const result = await this.tenantService.create(payload);
+		const result = await this.tenantService.create(
+			payload,
+			req.user!.tenantId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -69,7 +81,11 @@ export class TenantController {
 		@Body() { ownerId, ...payload }: UpdateTenantDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Tenant>> {
-		const result = await this.tenantService.update(id, payload);
+		const result = await this.tenantService.update(
+			id,
+			payload,
+			req.user!.tenantId,
+		);
 		if (ownerId && checkIsSystemAdmin(req.user!.type)) {
 			await this.TenantUserService.updateOwner(result.id, ownerId);
 		}

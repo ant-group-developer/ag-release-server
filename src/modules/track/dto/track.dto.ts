@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	IsArray,
@@ -11,6 +11,7 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
@@ -165,6 +166,14 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 
 	@IsEnum(FieldOrderTrack)
 	fieldOrder: string = FieldOrderTrack.CREATED_AT;
+
+	@ApiPropertyOptional({
+		description: 'Tenant IDs to filter tracks (comma-separated)',
+		type: 'string',
+		format: 'uuid',
+	})
+	@CsvUuidArray()
+	tenantIds?: string[];
 }
 
 export class BulkDeleteTracksDto {

@@ -21,6 +21,7 @@ export interface IRelease {
 	releaseDate: Date | null;
 	releaseTime: string | null;
 	totalDuration?: number;
+	tenantId?: string;
 }
 
 export interface IReleaseDraft {
@@ -55,6 +56,7 @@ export interface IReleaseNonDraft {
 	catalogId: string | null;
 	releaseDate: Date;
 	releaseTime: string | null;
+	tenantId?: string;
 }
 
 export interface ICoverArtThumbnails {
