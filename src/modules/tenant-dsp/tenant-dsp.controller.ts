@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { UpdateTenantDspDto } from './tenant-dsp.dto';
 import { TenantDspService } from './tenant-dsp.service';
 
@@ -9,6 +10,7 @@ import { TenantDspService } from './tenant-dsp.service';
 export class TenantDspController {
 	constructor(private readonly tenantDspService: TenantDspService) {}
 
+	@TenantOwnerOrAdminOnly()
 	@ApiOperation({ summary: 'Update list dsp that tenant can access' })
 	@Post()
 	async update(@Body() payload: UpdateTenantDspDto) {

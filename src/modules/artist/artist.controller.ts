@@ -10,6 +10,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	RequirePermissions,
+	SystemAdminOnly,
+} from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import { ArtistMessageCodeSuccess } from './constants/artist.constant';
 import {
 	CreateArtistDto,
@@ -24,6 +29,7 @@ import { ArtistService } from './services/artist.service';
 export class ArtistController {
 	constructor(private readonly artistService: ArtistService) {}
 
+	@RequirePermissions(Permission.ARTIST.CREATE)
 	@Post()
 	async create(
 		@Body() createArtistDto: CreateArtistDto,
@@ -49,6 +55,7 @@ export class ArtistController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.ARTIST.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -61,6 +68,7 @@ export class ArtistController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.artistService.delete(id);
@@ -69,6 +77,7 @@ export class ArtistController {
 		});
 	}
 
+	@RequirePermissions(Permission.ARTIST.UPDATE)
 	@Delete(':id/artist-profiles/:artistProfileId')
 	async deleteArtistProfile(
 		@Param('artistProfileId') artistProfileId: string,

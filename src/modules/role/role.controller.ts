@@ -11,6 +11,10 @@ import {
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
+	SystemAdminOnly,
+	TenantOwnerOrAdminOnly,
+} from '../auth/decorators/auth.decorator';
+import {
 	RoleMessageCodeSuccess,
 	RoleMessageSuccess,
 } from './constants/role.constant';
@@ -26,7 +30,7 @@ import { RoleService } from './services/role.service';
 export class RoleController {
 	constructor(private readonly roleService: RoleService) {}
 
-	// create
+	@SystemAdminOnly()
 	@Post()
 	async handleCreateRole(@Body() data: CreateRoleDto) {
 		const result = await this.roleService.handleCreateRole(data);
@@ -37,7 +41,7 @@ export class RoleController {
 		});
 	}
 
-	// read
+	@TenantOwnerOrAdminOnly()
 	@Get(':id')
 	async getOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.roleService.getOne(id);
@@ -47,6 +51,7 @@ export class RoleController {
 		});
 	}
 
+	@TenantOwnerOrAdminOnly()
 	@Get()
 	async getList(@Query() data: GetListRole) {
 		const result = await this.roleService.getList(data);
@@ -57,7 +62,7 @@ export class RoleController {
 		});
 	}
 
-	// update
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -72,19 +77,21 @@ export class RoleController {
 		});
 	}
 
-	// delete
+	@SystemAdminOnly()
 	@Post('bulk-delete')
 	async bulkDelete(@Body() data: BulkDeleteRoleDto) {
 		const result = await this.roleService.bulkDelete(data);
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(@Param('id', ParseUUIDPipe) id: string) {
 		await this.roleService.handleDelete(id);
 		return new ResponseSuccess();
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id/role-permissions/:rolePermissionId')
 	async deleteRolePermission(
 		@Param('rolePermissionId', ParseUUIDPipe) rolePermissionId: string,

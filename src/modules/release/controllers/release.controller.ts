@@ -14,6 +14,8 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request } from 'express';
+import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
+import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import {
 	QueryGetListReleaseDto,
 	SubmitCreateReleaseDto,
@@ -31,6 +33,7 @@ import { ReleaseService } from '../services/release.service';
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
+	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/submit')
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -64,6 +67,7 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,

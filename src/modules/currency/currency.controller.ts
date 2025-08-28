@@ -10,6 +10,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { CurrencyMessageCodeSuccess } from './constants/currency.constant';
 import {
 	CreateCurrencyDto,
@@ -34,6 +35,7 @@ export class CurrencyController {
 		return new ResponseSuccess({ data });
 	}
 
+	@SystemAdminOnly()
 	@Post()
 	async create(@Body() dto: CreateCurrencyDto) {
 		const data = await this.currencyService.create(dto);
@@ -43,6 +45,7 @@ export class CurrencyController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -55,6 +58,7 @@ export class CurrencyController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async delete(@Param('id', ParseUUIDPipe) id: string) {
 		await this.currencyService.delete(id);

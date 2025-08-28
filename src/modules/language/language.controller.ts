@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { LanguageMessageCodeSuccess } from './constants/language.constant';
 import {
 	CreateLanguageDto,
@@ -25,6 +26,7 @@ import { LanguageService } from './services/language.service';
 export class LanguageController {
 	constructor(private readonly languageService: LanguageService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	@ApiOperation({ summary: 'Create a new language' })
 	async create(
@@ -53,6 +55,7 @@ export class LanguageController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -65,6 +68,7 @@ export class LanguageController {
 		});
 	}
 
+	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(
 		@Param('id', ParseUUIDPipe) id: string,
