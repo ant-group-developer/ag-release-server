@@ -39,14 +39,6 @@ export class DspController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Get('with-actions')
-	async getListWithActions(
-		@Query() query: QueryGetListDspDto,
-	): Promise<ResponseSuccess<PageDto<Dsp>>> {
-		const result = await this.dspService.getListWithActions(query);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get(':id')
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
 		const result = await this.dspService.findOne(id);

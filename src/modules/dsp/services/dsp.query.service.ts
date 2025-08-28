@@ -30,12 +30,6 @@ export class DspQueryService {
 		return await queryGetList.getManyAndCount();
 	}
 
-	async getListWithActions(query: QueryGetListDspDto) {
-		const queryGetListWithActions =
-			this.createQueryGetListWithActions(query);
-		return await queryGetListWithActions.getManyAndCount();
-	}
-
 	private createQueryFindOne(id: string) {
 		const qb = this.dspRepo
 			.createQueryBuilder('dsp')
@@ -57,28 +51,6 @@ export class DspQueryService {
 		]);
 
 		return qb;
-	}
-
-	private createQueryGetListWithActions(query: QueryGetListDspDto) {
-		const queryGetList = this.createQueryGetList(query);
-
-		const queryGetListWithActions = queryGetList.clone();
-
-		queryGetListWithActions
-			.leftJoin('dsp.dspActions', 'dspAction')
-			.leftJoin('dspAction.action', 'action');
-
-		queryGetListWithActions
-			.select(['dsp.id', 'dsp.name'])
-			.addSelect(['dspAction.id', 'dspAction.isDefault'])
-			.addSelect([
-				'action.id',
-				'action.code',
-				'action.name',
-				'action.note',
-			]);
-
-		return queryGetListWithActions;
 	}
 
 	private createQueryGetList(query: QueryGetListDspDto) {
