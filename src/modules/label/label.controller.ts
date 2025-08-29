@@ -16,12 +16,16 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/response.dto';
+import { AuthMessages } from '../auth/constants/messages';
 import {
 	RequirePermissions,
 	SystemAdminOnly,
 } from '../auth/decorators/auth.decorator';
 import { Permission } from '../permission/constants/permission.data.constant';
-import { checkIsSystemTenant } from '../user/utils/user-type.util';
+import {
+	checkIsNotSystemTenant,
+	checkIsSystemTenant,
+} from '../user/utils/user-type.util';
 import {
 	LabelMessage,
 	LabelMessageCodeSuccess,
@@ -62,8 +66,17 @@ export class LabelController {
 	}
 
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Label>> {
+	async findOne(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Label>> {
 		const result = await this.labelService.findOneWithCountRelation(id);
+
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -75,7 +88,13 @@ export class LabelController {
 	})
 	async getList(
 		@Query() query: QueryGetListLabelDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Label>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
 		const result = await this.labelService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
