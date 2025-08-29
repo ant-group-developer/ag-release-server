@@ -1,10 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { exec as execCallback } from 'child_process';
+import { execFile } from 'child_process';
 import * as fs from 'fs';
-import { stat } from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { PageDto } from 'src/common/dtos/response.dto';
@@ -18,9 +17,12 @@ import { promisify } from 'util';
 import { QueryGetListBackup } from '../dto/database.dto';
 import { Backup } from '../entities/database.backup.entity';
 import { StatusBackup } from '../enums/database.enum';
+const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class DatabaseBackupService implements OnModuleInit {
+	private logger = new Logger(DatabaseBackupService.name);
+
 	private configDB: {
 		type: string;
 		host: string;
@@ -40,6 +42,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	private baseUrlGcs: string;
 
 	private baseUrlConsoleGcsBackup: string;
+	private fileName: string = 'backup_ant_release.sql';
 
 	constructor(
 		@InjectRepository(Backup)
@@ -92,37 +95,56 @@ export class DatabaseBackupService implements OnModuleInit {
 		);
 	}
 
-	private async backup() {
+	async eventBackup() {
+		const data = await this.newJobBackup();
+		this.processTaskBackup(data).catch((_e) => {
+			this.logger.error(_e);
+		});
+		return data.entityBackup;
+	}
+
+	private async newJobBackup() {
 		const timeStart = Date.now();
 		const fileName = this.generateBackupFileName();
 		const backupPath = this.prepareBackupPath(fileName);
 
-		const result = this.backupRepo.create({
+		const entity = this.backupRepo.create({
 			...this.buildBackupRecord(fileName),
 			status: StatusBackup.RUNNING,
 			fileName,
 		});
 
-		try {
-			await this.exportDatabase(backupPath);
-			if (this.toGcs) await this.uploadToGcs(backupPath);
-			if (this.toDrive) await this.uploadToDrive(backupPath);
+		const entityBackup = await this.backupRepo.save(entity);
 
-			const fileSize = await this.getFileSize(backupPath);
-			result.status = StatusBackup.SUCCESS;
-			result.fileSize = fileSize;
-		} catch (_e) {
-			result.status = StatusBackup.FAILED;
-		} finally {
-			result.elapsedTime = this.calculateElapsedTime(timeStart);
-		}
+		return { timeStart, backupPath, entityBackup };
+	}
 
-		return result;
+	private async processTaskBackup({
+		timeStart,
+		backupPath,
+		entityBackup,
+	}: {
+		timeStart: number;
+		backupPath: string;
+		entityBackup: Backup;
+	}) {
+		const { fileSize, errorMessages } =
+			await this.runScriptBackup(backupPath);
+
+		entityBackup.status = StatusBackup.SUCCESS;
+		entityBackup.fileSize = fileSize;
+
+		entityBackup.status = StatusBackup.FAILED;
+		entityBackup.error = errorMessages.join('\n');
+
+		entityBackup.elapsedTime = this.calculateElapsedTime(timeStart);
+		const result = await this.backupRepo.save(entityBackup);
+		await this.sendNotificationBackup(result);
 	}
 
 	private generateBackupFileName(): string {
 		return generateFileNameWithTimestamp(
-			'backup_ant_release.sql',
+			this.fileName,
 			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
 	}
@@ -147,129 +169,63 @@ export class DatabaseBackupService implements OnModuleInit {
 		};
 	}
 
-	private async exportDatabase(backupPath: string): Promise<void> {
-		const exec = promisify(execCallback);
-		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+	private async runScriptBackup(backupPath: string) {
+		const { username, host, port, database, password } = this.configDB;
+		const scriptBackupPath =
+			this.configService.get<string>('SCRIPT_BACKUP_PATH')!;
 
-		const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
+		const { stdout } = await execFileAsync(scriptBackupPath, {
+			env: {
+				DB_USER: username,
+				DB_HOST: host,
+				DB_PORT: String(port),
+				DB_NAME: database,
+				DB_PASSWORD: password,
 
-		await exec(exportDatabaseCommand, {
-			env: { ...process.env, PGPASSWORD: this.configDB.password },
-			shell: shellPath,
+				RCLONE_CONFIG: './database.rclone.conf',
+				BUCKET_NAME: this.bucketName,
+				BACKUP_PATH: backupPath,
+			},
+			shell:
+				process.platform === 'win32'
+					? 'C:\\Program Files\\Git\\bin\\bash.exe'
+					: '/bin/bash',
 		});
+
+		return this.parseResultBackup(stdout.trim());
 	}
 
-	private async uploadToGcs(backupPath: string): Promise<void> {
-		const exec = promisify(execCallback);
-		const rcloneConfig = '--config=./database.rclone.conf';
-		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
+	private parseResultBackup(stdout: string): {
+		fileSize: number;
+		successMessages: string[];
+		errorMessages: string[];
+	} {
+		const successMessages: string[] = [];
+		const errorMessages: string[] = [];
+		let fileSize = 0;
 
-		const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
-		await exec(gcsUploadCommand, { shell: shellPath });
-	}
+		stdout
+			.split('\n')
+			.map((line) => line.trim())
+			.filter(Boolean)
+			.forEach((line) => {
+				if (line.startsWith('SUCCESS:')) {
+					successMessages.push(line.slice(8).trim());
+				} else if (line.startsWith('ERROR:')) {
+					errorMessages.push(line.slice(6).trim());
+				} else if (line.startsWith('FILE_SIZE:')) {
+					const match = line.match(/FILE_SIZE:\s*(\d+)/);
+					if (match) {
+						fileSize = parseInt(match[1], 10);
+					}
+				}
+			});
 
-	private async uploadToDrive(backupPath: string): Promise<void> {
-		const exec = promisify(execCallback);
-		const rcloneConfig = '--config=./database.rclone.conf';
-		const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
-
-		const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
-		await exec(driveUploadCommand, { shell: shellPath });
-	}
-
-	private async getFileSize(filePath: string): Promise<number> {
-		const stats = await stat(filePath);
-		return stats.size;
+		return { fileSize, successMessages, errorMessages };
 	}
 
 	private calculateElapsedTime(start: number): number {
 		return Math.floor((Date.now() - start) / 1000);
-	}
-
-	// private async backup() {
-	// 	const { toDrive, toGcs } = this;
-
-	// 	const fileName = generateFileNameWithTimestamp(
-	// 		'backup_ant_release.sql',
-	// 		DateFormat['YYYY-MM-DD_HH-mm-ss'],
-	// 	);
-
-	// 	const urlFolderGcs = this.getUrlConsoleGcsBackup(fileName);
-
-	// 	const timeStart = Date.now();
-	// 	const result = this.backupRepo.create({
-	// 		urlDrive: toDrive
-	// 			? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
-	// 			: null,
-	// 		urlGcs: toGcs
-	// 			? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
-	// 			: null,
-	// 		urlFolderGcs,
-	// 		status: StatusBackup.RUNNING,
-	// 		fileName,
-	// 	});
-
-	// 	const exec = promisify(execCallback);
-
-	// 	const backupDir = path.join(os.homedir(), 'backups');
-	// 	const backupPath = path.join(backupDir, fileName);
-
-	// 	if (!fs.existsSync(backupDir)) {
-	// 		fs.mkdirSync(backupDir, { recursive: true });
-	// 	}
-
-	// 	const exportDatabaseCommand = `"pg_dump" -U ${this.configDB.username} -h ${this.configDB.host} -p ${this.configDB.port} ${this.configDB.database} > "${backupPath}"`;
-	// 	const rcloneConfig = '--config=./database.rclone.conf';
-	// 	const shellPath = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
-
-	// 	try {
-	// 		// Backup database
-	// 		await exec(exportDatabaseCommand, {
-	// 			env: { ...process.env, PGPASSWORD: this.configDB.password },
-	// 			shell: shellPath,
-	// 		});
-
-	// 		// // backup
-	// 		// if (toDrive) {
-	// 		// 	const driveUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} drive:/backups/ --progress`;
-
-	// 		// 	await exec(driveUploadCommand, { shell: shellPath });
-	// 		// }
-
-	// 		if (toGcs) {
-	// 			const gcsUploadCommand = `rclone copy "${backupPath}" ${rcloneConfig} gcs:/${this.bucketName}/backups/ --progress`;
-
-	// 			await exec(gcsUploadCommand, {
-	// 				shell: shellPath,
-	// 			});
-	// 		}
-
-	// 		const stats = await stat(backupPath);
-	// 		const fileSizeInBytes = stats.size;
-
-	// 		result.status = StatusBackup.SUCCESS;
-	// 		result.fileSize = fileSizeInBytes;
-	// 	} catch (_e) {
-	// 		result.status = StatusBackup.FAILED;
-	// 	} finally {
-	// 		const timeEnd = Date.now();
-	// 		result.elapsedTime = Math.floor((timeEnd - timeStart) / 1000);
-	// 	}
-
-	// 	return result;
-	// }
-
-	async handleCreate() {
-		const result = await this.backup();
-
-		const resultDb = await this.backupRepo.save(result);
-		await this.sendNotificationBackup(resultDb);
-	}
-
-	handleCreateSafe() {
-		this.handleCreate().catch((_e) => {
-			console.log(_e);
-		});
 	}
 
 	private getUrlConsoleGcsBackup(fileName: string) {

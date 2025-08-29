@@ -42,7 +42,9 @@ export class ScheduleService implements OnModuleInit {
 		try {
 			const jobBackup = new CronJob(this.cronValue, () => {
 				this.logger.log('Start backup');
-				this.databaseBackupService.handleCreateSafe();
+				this.databaseBackupService.eventBackup().catch((_e) => {
+					this.logger.log(_e.message);
+				});
 			});
 
 			this.schedulerRegistry.addCronJob(jobName, jobBackup);
