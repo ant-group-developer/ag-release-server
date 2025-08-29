@@ -21,6 +21,7 @@ export class LabelQueryService {
 	private createQueryGetList(query: QueryGetListLabelDto) {
 		const {
 			keyword,
+			tenantIds,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -34,22 +35,40 @@ export class LabelQueryService {
 			pageSize,
 		} = query;
 
-		const queryBuilder = this.labelRepo.createQueryBuilder('label');
-		queryBuilder
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(DISTINCT(track.id))')
-					.from('tracks', 'track')
-					.leftJoin('track.release', 'release')
-					.where('release.labelId = label.id');
-			}, VirtualColumnsLabel.TRACK_COUNT)
+		const queryBuilder = this.labelRepo
+			.createQueryBuilder('label')
+			// tenant for display
+			.leftJoin('label.tenant', 'tenant')
+			.addSelect(['tenant.id', 'tenant.name'])
 
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(DISTINCT(release.id))')
-					.from('releases', 'release')
-					.where('release.labelId = label.id');
-			}, VirtualColumnsLabel.RELEASE_COUNT);
+			// join releases under this label (optionally filter by tenant)
+			.leftJoin('label.releases', 'release')
+
+			// join tracks under each release
+			.leftJoin('release.tracks', 'track')
+
+			// counts
+			.addSelect(
+				'COUNT(DISTINCT release.id)',
+				VirtualColumnsLabel.RELEASE_COUNT,
+			)
+			.addSelect(
+				'COUNT(DISTINCT track.id)',
+				VirtualColumnsLabel.TRACK_COUNT,
+			);
+
+		// optional label-level tenant filter
+		if (tenantIds?.length) {
+			queryBuilder.andWhere('label.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
+		}
+
+		// group for aggregates
+		queryBuilder
+			.groupBy('label.id')
+			.addGroupBy('tenant.id')
+			.addGroupBy('tenant.name');
 
 		if (keyword) {
 			queryBuilder.andWhere('label.name ILIKE :keyword', {

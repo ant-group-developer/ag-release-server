@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Request } from 'express';
 import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
@@ -13,7 +14,10 @@ import { Brackets, In, TreeRepository } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
-import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
+import {
+	checkIsNotSystemAdmin,
+	checkIsNotSystemTenant,
+} from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -199,7 +203,7 @@ export class TenantService {
 		});
 	}
 
-	async findAllFlattenActive(tenantId: string): Promise<PageDto<Tenant>> {
+	async findAllFlattenActive(req: Request): Promise<PageDto<Tenant>> {
 		const queryBuilder = this.tenantTreeRepo
 			.createQueryBuilder('tenant')
 			.select([
@@ -229,7 +233,9 @@ export class TenantService {
 			})
 			.orderBy('tenant.name', 'ASC');
 
-		if (checkIsNotSystemTenant(tenantId)) {
+		const tenantId = req.user!.tenantId;
+		const userType = req.user!.type;
+		if (checkIsNotSystemAdmin(userType)) {
 			queryBuilder.andWhere(
 				new Brackets((qb) => {
 					qb.andWhere('tenant.id = :tenantId', { tenantId }).orWhere(

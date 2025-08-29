@@ -68,7 +68,10 @@ export class TrackController {
 		const result = await this.trackService.getDetail(id);
 
 		const tenantId = req.user!.tenantId;
-		if (tenantId !== result.release.tenantId) {
+		if (
+			checkIsNotSystemTenant(tenantId) &&
+			tenantId !== result.release.tenantId
+		) {
 			throw new ResponseError(AuthMessages.FORBIDDEN);
 		}
 

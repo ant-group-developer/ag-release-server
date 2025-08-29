@@ -21,6 +21,7 @@ import { Request } from 'express';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
+import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	QueryGetListReleaseDto,
 	SubmitCreateReleaseDto,
@@ -60,7 +61,7 @@ export class ReleaseController {
 		const result = await this.releaseService.getOneDetail(id);
 
 		const tenantId = req.user!.tenantId;
-		if (tenantId !== result.tenantId) {
+		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
 			throw new ResponseError(AuthMessages.FORBIDDEN);
 		}
 

@@ -46,9 +46,7 @@ export class TenantController {
 	async findAllFlattenActive(
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const result = await this.tenantService.findAllFlattenActive(
-			req.user!.tenantId,
-		);
+		const result = await this.tenantService.findAllFlattenActive(req);
 		return new ResponseSuccess({ data: result });
 	}
 
