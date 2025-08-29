@@ -1,4 +1,5 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { QueryGetListResultScan } from '../dtos/copyright.dto';
 import { CopyrightService } from '../services/copyright.service';
 
@@ -7,12 +8,24 @@ export class CopyrightResultController {
 	constructor(private readonly copyrightService: CopyrightService) {}
 
 	@Get(':id')
-	async getOneResult(@Param('id', ParseUUIDPipe) id: string) {
-		return await this.copyrightService.getOneResult(id);
+	getOneResult(@Param('id', ParseUUIDPipe) id: string) {
+		return new ResponseSuccess({
+			data: this.copyrightService.getOneResult(id),
+		});
 	}
 
 	@Get()
-	async getListResult(@Query() data: QueryGetListResultScan) {
-		return await this.copyrightService.getListResult(data);
+	getListResult(@Query() data: QueryGetListResultScan) {
+		return new ResponseSuccess({
+			data: this.copyrightService.getListResult(data),
+		});
+	}
+
+	// function test
+	@Get(':id/scan-by-business')
+	testScanByBusiness(@Param('id', ParseUUIDPipe) id: string) {
+		return new ResponseSuccess({
+			data: this.copyrightService.testScanByBusiness(id),
+		});
 	}
 }

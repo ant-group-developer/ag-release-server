@@ -108,6 +108,18 @@ export class AppConfigService implements OnModuleInit {
 		return this.config;
 	}
 
+	getPublic() {
+		const website = this.getValue(AppConfigKey.WEBSITE);
+		const chunkDuration = this.getValue(AppConfigKey.CHUNK_DURATION);
+
+		return {
+			website,
+			acrCloud: {
+				chunkDuration,
+			},
+		};
+	}
+
 	getValue<K extends AppConfigKey>(key: K): AppConfigValueMap[K] {
 		const { acrCloud, telegram, website, backupDatabase } = this.config;
 

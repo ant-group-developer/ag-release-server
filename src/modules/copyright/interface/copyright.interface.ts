@@ -127,3 +127,10 @@ export interface ICreateResultScan {
 	trackId: string;
 	result: ResultScan[];
 }
+
+export interface ICopyrightBasic {
+	start: number;
+	end: number;
+	score: number;
+	acrid: string;
+}

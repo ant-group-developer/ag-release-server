@@ -22,6 +22,7 @@ export class ArtistQueryService {
 		const {
 			keyword,
 			code,
+			tenantIds,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -57,17 +58,48 @@ export class ArtistQueryService {
 			])
 
 			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(release_artist.id)')
+				subQuery
+					.select('COUNT(DISTINCT(release_artist.id))')
 					.from('release_artist', 'release_artist')
+					.leftJoin(
+						'releases',
+						'release',
+						'release.id = release_artist.release_id',
+					)
 					.where('release_artist.artist_id = artist.id');
+
+				if (tenantIds?.length) {
+					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
+						tenantIds,
+					});
+				}
+
+				return subQuery;
 			}, VirtualColumnsArtist.TRACK_COUNT)
 
 			.addSelect((subQuery) => {
-				return subQuery
+				subQuery
 					.select('COUNT(track_artist.id)')
 					.from('track_artist', 'track_artist')
+					.leftJoin(
+						'tracks',
+						'track',
+						'track_artist.track_id = track.id',
+					)
+					.leftJoin(
+						'releases',
+						'release',
+						'track.release_id = release.id',
+					)
 					.where('track_artist.artist_id = artist.id');
+
+				if (tenantIds?.length) {
+					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
+						tenantIds,
+					});
+				}
+
+				return subQuery;
 			}, VirtualColumnsArtist.RELEASE_COUNT);
 
 		if (keyword) {

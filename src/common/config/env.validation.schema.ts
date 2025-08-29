@@ -41,7 +41,7 @@ export const envValidationSchema = Joi.object({
 	JWT_KID: Joi.string().default('v1'),
 
 	// BACK UP
-	SCRIPT_BACKUP_PATH: Joi.string().required(),
+	FILE_NAME: Joi.string().required(),
 	BASE_URL_GCS: Joi.string().required(),
 	BASE_URL_CONSOLE_GCS_BACKUP: Joi.string().required(),
 });

@@ -8,11 +8,13 @@ export enum FieldOrderLabel {
 	// virtual
 	TRACK_COUNT = 'track_count',
 	RELEASE_COUNT = 'release_count',
+	NAME_TENANT = 'tenant.name',
 }
 
 export enum VirtualColumnsLabel {
 	TRACK_COUNT = FieldOrderLabel.TRACK_COUNT,
 	RELEASE_COUNT = FieldOrderLabel.RELEASE_COUNT,
+	NAME_TENANT = FieldOrderLabel.NAME_TENANT,
 }
 
 export const VirtualColumnsLabelArr = Object.values(

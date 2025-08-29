@@ -42,7 +42,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	private baseUrlGcs: string;
 
 	private baseUrlConsoleGcsBackup: string;
-	private fileName: string = 'backup_ant_release.sql';
+	private fileName: string;
 
 	constructor(
 		@InjectRepository(Backup)
@@ -66,6 +66,8 @@ export class DatabaseBackupService implements OnModuleInit {
 		this.baseUrlConsoleGcsBackup = this.configService.get<string>(
 			'BASE_URL_CONSOLE_GCS_BACKUP',
 		)!;
+
+		this.fileName = this.configService.get<string>('FILE_NAME')!;
 	}
 
 	onModuleInit() {
@@ -171,8 +173,7 @@ export class DatabaseBackupService implements OnModuleInit {
 
 	private async runScriptBackup(backupPath: string) {
 		const { username, host, port, database, password } = this.configDB;
-		const scriptBackupPath =
-			this.configService.get<string>('SCRIPT_BACKUP_PATH')!;
+		const scriptBackupPath = './scripts/script.backup.sh';
 
 		const { stdout } = await execFileAsync(scriptBackupPath, {
 			env: {

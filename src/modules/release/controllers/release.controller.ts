@@ -73,10 +73,12 @@ export class ReleaseController {
 		@Query() query: QueryGetListReleaseDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
-		const result = await this.releaseService.getListDetail(
-			query,
-			req.user!.tenantId,
-		);
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.releaseService.getListDetail(query);
 		return new ResponseSuccess({ data: result });
 	}
 

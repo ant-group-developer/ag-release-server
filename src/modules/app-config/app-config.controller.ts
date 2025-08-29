@@ -20,9 +20,9 @@ export class AppConfigController {
 	}
 
 	@PublicRoute()
-	@Get('/website')
-	getWebsite() {
-		const data = this.appConfigService.getValue(AppConfigKey.WEBSITE);
+	@Get('/public')
+	getPublic() {
+		const data = this.appConfigService.getPublic();
 		return new ResponseSuccess({ data });
 	}
 

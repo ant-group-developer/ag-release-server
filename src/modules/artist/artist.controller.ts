@@ -7,14 +7,17 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	RequirePermissions,
 	SystemAdminOnly,
 } from '../auth/decorators/auth.decorator';
 import { Permission } from '../permission/constants/permission.data.constant';
+import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
 import { ArtistMessageCodeSuccess } from './constants/artist.constant';
 import {
 	CreateArtistDto,
@@ -50,7 +53,13 @@ export class ArtistController {
 	@Get()
 	async getList(
 		@Query() query: QueryGetListArtistDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Artist>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
 		const result = await this.artistService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
