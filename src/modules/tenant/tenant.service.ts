@@ -1,5 +1,4 @@
 import {
-	BadRequestException,
 	ConflictException,
 	forwardRef,
 	Inject,
@@ -12,9 +11,13 @@ import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { Brackets, In, TreeRepository } from 'typeorm';
+import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
-import { checkIsSystemTenant } from '../user/utils/user-type.util';
+import {
+	checkIsNotSystemAdmin,
+	checkIsNotSystemTenant,
+} from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -34,13 +37,18 @@ export class TenantService {
 		private readonly tenantUserService: TenantUserService,
 	) {}
 
+	checkCanAccess(tenantUserId: string, tenantId: string, parentId?: string) {
+		if (checkIsNotSystemTenant(tenantUserId)) {
+			if (tenantId !== tenantUserId && parentId !== tenantUserId) {
+				throw new ResponseError(AuthMessages.FORBIDDEN);
+			}
+		}
+	}
+
 	async findAll(
 		query: FindTenantsDto,
-		req: Request,
+		tenantId: string,
 	): Promise<PageDto<TreeNode<Tenant, 'children'>>> {
-		const tenantId = req.user?.tenantId;
-		if (!tenantId) throw new BadRequestException('Missing tenantId');
-
 		// Whitelist sortable fields
 		const orderable: Record<string, string> = {
 			id: 't.id',
@@ -79,7 +87,7 @@ export class TenantService {
 				'p.id',
 			]);
 
-		if (!checkIsSystemTenant(tenantId)) {
+		if (checkIsNotSystemTenant(tenantId)) {
 			queryBuilder.andWhere(
 				new Brackets((w) =>
 					w
@@ -195,8 +203,8 @@ export class TenantService {
 		});
 	}
 
-	async findAllFlattenActive(): Promise<PageDto<Tenant>> {
-		const data = await this.tenantTreeRepo
+	async findAllFlattenActive(req: Request): Promise<PageDto<Tenant>> {
+		const queryBuilder = this.tenantTreeRepo
 			.createQueryBuilder('tenant')
 			.select([
 				'tenant.id',
@@ -223,9 +231,22 @@ export class TenantService {
 			.andWhere('tenantUser.type = :type', {
 				type: TenantUserType.OWNER,
 			})
-			.orderBy('tenant.name', 'ASC')
-			.getMany();
+			.orderBy('tenant.name', 'ASC');
 
+		const tenantId = req.user!.tenantId;
+		const userType = req.user!.type;
+		if (checkIsNotSystemAdmin(userType)) {
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.andWhere('tenant.id = :tenantId', { tenantId }).orWhere(
+						'parent.id = :tenantId',
+						{ tenantId },
+					);
+				}),
+			);
+		}
+
+		const data = await queryBuilder.getMany();
 		const sorted = parentFirstSort(data);
 
 		return new PageDto({
@@ -239,7 +260,7 @@ export class TenantService {
 	}
 
 	/** Lấy một node cùng toàn bộ descendants */
-	async findOne(id: string): Promise<Tenant> {
+	async findOne(id: string, tenantId: string): Promise<Tenant> {
 		const node = await this.tenantTreeRepo.findOne({
 			where: { id },
 			relations: {
@@ -260,9 +281,16 @@ export class TenantService {
 				},
 			},
 		});
+
 		if (!node) {
-			throw new NotFoundException(`Tenant with ID ${id} not found`);
+			throw new ResponseError({
+				...TenantMessages.NOT_FOUND,
+				data: id,
+			});
 		}
+
+		this.checkCanAccess(tenantId, node.id, node.parent?.id);
+
 		const tree = await this.tenantTreeRepo.findDescendantsTree(node, {
 			relations: ['parent', 'tenantUser'],
 		});
@@ -270,7 +298,10 @@ export class TenantService {
 	}
 
 	/** Tạo mới, gán parent nếu có và tự động lưu closure-table */
-	async create({ ownerId, ...dto }: CreateTenantDto): Promise<Tenant> {
+	async create(
+		{ ownerId, ...dto }: CreateTenantDto,
+		tenantId: string,
+	): Promise<Tenant> {
 		// Check duplicate name
 		const dup = await this.tenantTreeRepo.findOne({
 			where: { name: dto.name },
@@ -286,9 +317,10 @@ export class TenantService {
 				where: { id: dto.parentId },
 			});
 			if (!foundParent) {
-				throw new NotFoundException(
-					`Parent tenant ${dto.parentId} not found`,
-				);
+				throw new ResponseError({
+					...TenantMessages.NOT_FOUND,
+					data: dto.parentId,
+				});
 			}
 			// if (foundParent.type !== dto.type) {
 			// 	throw new BadRequestException(
@@ -313,17 +345,29 @@ export class TenantService {
 			TenantUserType.OWNER,
 		);
 
-		return this.findOne(saved.id);
+		return this.findOne(saved.id, tenantId);
 	}
 
 	/** Cập nhật thông tin và parent */
-	async update(id: string, dto: UpdateTenantDto): Promise<Tenant> {
+	async update(
+		id: string,
+		dto: UpdateTenantDto,
+		tenantId: string,
+	): Promise<Tenant> {
 		const tenant = await this.tenantTreeRepo.findOne({
 			where: { id },
+			relations: {
+				parent: true,
+			},
 		});
 		if (!tenant) {
-			throw new NotFoundException(`Tenant with ID ${id} not found`);
+			throw new ResponseError({
+				...TenantMessages.NOT_FOUND,
+				data: id,
+			});
 		}
+
+		this.checkCanAccess(tenantId, tenant.id, tenant.parent?.id);
 
 		// Đổi tên nếu cần và check duplicate
 		if (dto.name && dto.name !== tenant.name) {
@@ -366,7 +410,7 @@ export class TenantService {
 		});
 
 		await this.tenantTreeRepo.save(tenant);
-		return this.findOne(id);
+		return this.findOne(id, tenantId);
 	}
 
 	async validateExisted(id: string | string[]) {

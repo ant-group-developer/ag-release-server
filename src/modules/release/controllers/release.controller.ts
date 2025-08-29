@@ -10,12 +10,18 @@ import {
 	Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request } from 'express';
+import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
+import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	QueryGetListReleaseDto,
 	SubmitCreateReleaseDto,
@@ -50,8 +56,15 @@ export class ReleaseController {
 	@Get(':id')
 	async getOneDetail(
 		@Param('id') id: string,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<IReleaseDetail>> {
 		const result = await this.releaseService.getOneDetail(id);
+
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 

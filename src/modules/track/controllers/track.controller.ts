@@ -1,8 +1,24 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Get,
+	Param,
+	Post,
+	Put,
+	Query,
+	Req,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	PageDto,
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
+import { Request } from 'express';
+import { AuthMessages } from 'src/modules/auth/constants/messages';
+import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	QueryGetListTrackDto,
 	SubmitCreateTrackDto,
@@ -20,7 +36,13 @@ export class TrackController {
 	@Get()
 	async getList(
 		@Query() query: QueryGetListTrackDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Track>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
 		const result = await this.trackService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
@@ -39,8 +61,20 @@ export class TrackController {
 	}
 
 	@Get(':id')
-	async getDetail(@Param('id') id: string): Promise<ResponseSuccess<Track>> {
+	async getDetail(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Track>> {
 		const result = await this.trackService.getDetail(id);
+
+		const tenantId = req.user!.tenantId;
+		if (
+			checkIsNotSystemTenant(tenantId) &&
+			tenantId !== result.release.tenantId
+		) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 

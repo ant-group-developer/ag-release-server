@@ -12,8 +12,8 @@ export class AuthController {
 	constructor(private readonly auth: AuthService) {}
 
 	@Get('me')
-	async me(@Req() req: Request) {
-		const data = await this.auth.me(req);
+	me(@Req() req: Request) {
+		const data = this.auth.me(req);
 		return new ResponseSuccess({ data });
 	}
 

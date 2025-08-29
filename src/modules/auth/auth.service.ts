@@ -29,6 +29,7 @@ export class AuthService {
 	me(req: Request) {
 		// return this.userService.findOne(req.user?.sub as string);
 		const user = req.user;
+		// console.log('user:', user);
 		return {
 			id: user!.sub,
 			name: user!.name,
@@ -43,7 +44,10 @@ export class AuthService {
 	}
 
 	tenant(req: Request) {
-		return this.tenantService.findOne(req.user!.tenantId);
+		return this.tenantService.findOne(
+			req.user!.tenantId,
+			req.user!.tenantId,
+		);
 	}
 
 	// Call after validating user credentials
@@ -73,7 +77,7 @@ export class AuthService {
 				user.id,
 			);
 			if (tenantUser) {
-				tenantId = tenantUser.id;
+				tenantId = tenantUser.tenantId;
 			} else {
 				throw new ResponseError(UserMessages.TENANT.NOT_FOUND);
 			}

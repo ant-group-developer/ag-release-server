@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	IsEnum,
@@ -10,6 +10,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderLabel } from '../enum/label.enum';
@@ -69,4 +70,12 @@ export class QueryGetListLabelDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderLabel)
 	fieldOrder: FieldOrderLabel = FieldOrderLabel.NAME;
+
+	@ApiPropertyOptional({
+		description: 'Tenant IDs to filter labels (comma-separated)',
+		type: 'string',
+		format: 'uuid',
+	})
+	@CsvUuidArray()
+	tenantIds?: string[];
 }

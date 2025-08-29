@@ -49,6 +49,7 @@ export class TrackQueryService {
 			keyword,
 
 			releaseId,
+			tenantIds,
 
 			artistId,
 			labelId,
@@ -88,6 +89,12 @@ export class TrackQueryService {
 		if (releaseId?.length) {
 			queryBuilder.andWhere('track.releaseId IN (:...releaseId)', {
 				releaseId,
+			});
+		}
+
+		if (tenantIds?.length) {
+			queryBuilder.andWhere('release.tenantId IN (:...tenantIds)', {
+				tenantIds,
 			});
 		}
 
@@ -373,7 +380,7 @@ export class TrackQueryService {
 
 		// select
 		query
-			.addSelect(['release.id', 'release.title'])
+			.addSelect(['release.id', 'release.title', 'release.tenantId'])
 			.addSelect([
 				'releaseCoverArt.id',
 				'releaseCoverArt.fileId',

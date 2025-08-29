@@ -19,6 +19,10 @@ export const checkIsSystemAdmin = (type: UserType): boolean => {
 	return type === UserType.ADMIN;
 };
 
+export const checkIsNotSystemAdmin = (type: UserType): boolean => {
+	return type !== UserType.ADMIN;
+};
+
 export const checkCanAccessTenantAll = (
 	systemType: UserType,
 	tenantType: TenantUserType,
@@ -30,3 +34,6 @@ export const checkCanAccessTenantAll = (
 
 export const checkIsSystemTenant = (tenantId: string) =>
 	tenantId === SYSTEM_TENANT_ID;
+
+export const checkIsNotSystemTenant = (tenantId: string) =>
+	tenantId !== SYSTEM_TENANT_ID;
