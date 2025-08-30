@@ -74,8 +74,8 @@ export class UserService {
 		return user;
 	}
 
-	checkUserActive(isActive: boolean) {
-		if (!isActive) throw new ResponseError(UserMessages.NOT_FOUND);
+	checkActive(isActive: boolean) {
+		if (!isActive) throw new ResponseError(UserMessages.BLOCKED);
 	}
 
 	async findOneByEmail(

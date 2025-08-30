@@ -44,6 +44,11 @@ export const AuthMessages = {
 	},
 
 	// Tenant constraints
+	TENANT_WHITE_LABEL_ONLY: {
+		statusCode: 403,
+		message: 'Only tenant type white label can access this resource.',
+		messageCode: 'auth.message.error.tenantWhiteLabelOnly',
+	},
 	TENANT_OWNER_ONLY: {
 		statusCode: 403,
 		message: 'Only tenant owners can access this resource.',

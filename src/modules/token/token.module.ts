@@ -2,6 +2,7 @@ import { Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { readFileSync } from 'fs';
+import { TenantModule } from '../tenant/tenant.module';
 import { UserRoleModule } from '../user-role/user-role.module';
 import { UserModule } from '../user/user.module';
 import { TokenService } from './token.service';
@@ -58,6 +59,7 @@ const PublicKeysProvider: Provider = {
 		}),
 		UserModule,
 		UserRoleModule,
+		TenantModule,
 	],
 	providers: [TokenService, JwtStrategy, PublicKeysProvider],
 	exports: [TokenService, JwtModule],

@@ -6,13 +6,15 @@ import {
 	checkIsSystemAdmin,
 	checkIsTenantOwner,
 	checkIsTenantOwnerOrAdmin,
+	checkTenantType,
 } from 'src/modules/user/utils/user-type.util';
 import {
 	AUTH_PERMISSIONS_KEY,
 	AUTH_PUBLIC_KEY,
-	AUTH_SYSTEM_ADMIN_ONLY,
+	AUTH_SYSTEM_ADMIN_ONLY_KEY,
 	AUTH_TENANT_OWNER_ONLY_KEY,
 	AUTH_TENANT_OWNER_OR_ADMIN_ONLY_KEY,
+	AUTH_TENANT_WHITE_LABEL_ONLY_KEY,
 	Permission,
 } from '../constants/key';
 import {
@@ -44,10 +46,10 @@ export class PolicyGuard implements CanActivate {
 
 		/** 3) SystemAdminOnly — explicitly enforce first */
 		const systemAdminOnly =
-			this.reflector.getAllAndOverride<boolean>(AUTH_SYSTEM_ADMIN_ONLY, [
-				handler,
-				clazz,
-			]) ?? false;
+			this.reflector.getAllAndOverride<boolean>(
+				AUTH_SYSTEM_ADMIN_ONLY_KEY,
+				[handler, clazz],
+			) ?? false;
 
 		if (systemAdminOnly && !isSysAdmin) {
 			throw new ResponseError(AuthMessages.SYSTEM_ADMIN_ONLY);
@@ -75,11 +77,18 @@ export class PolicyGuard implements CanActivate {
 				[handler, clazz],
 			) ?? false;
 
+		const tenantWhiteLabel =
+			this.reflector.getAllAndOverride<boolean>(
+				AUTH_TENANT_WHITE_LABEL_ONLY_KEY,
+				[handler, clazz],
+			) ?? false;
+
 		/** 6) Require tenantId only when tenant context is needed */
 		const needsTenantContext =
 			requiredPerms.length > 0 ||
 			tenantOwnerOnly ||
-			tenantOwnerOrAdminOnly;
+			tenantOwnerOrAdminOnly ||
+			tenantWhiteLabel;
 		if (needsTenantContext && !user.tenantId) {
 			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
 		}
@@ -98,11 +107,17 @@ export class PolicyGuard implements CanActivate {
 		}
 
 		/** 8) Tenant gates (mutually exclusive; owner is stricter) */
+		if (tenantWhiteLabel) {
+			const { isTypeWhiteLabel } = checkTenantType(user.tenantType);
+			if (!isTypeWhiteLabel)
+				throw new ResponseError(AuthMessages.TENANT_WHITE_LABEL_ONLY);
+		}
+
 		if (tenantOwnerOnly) {
-			const ok = checkIsTenantOwner(user.tenantType);
+			const ok = checkIsTenantOwner(user.tenantUserType);
 			if (!ok) throw new ResponseError(AuthMessages.TENANT_OWNER_ONLY);
 		} else if (tenantOwnerOrAdminOnly) {
-			const ok = checkIsTenantOwnerOrAdmin(user.tenantType);
+			const ok = checkIsTenantOwnerOrAdmin(user.tenantUserType);
 			if (!ok)
 				throw new ResponseError(
 					AuthMessages.TENANT_OWNER_OR_ADMIN_ONLY,
