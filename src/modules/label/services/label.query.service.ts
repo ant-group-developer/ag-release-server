@@ -180,4 +180,17 @@ export class LabelQueryService {
 			);
 		}
 	}
+
+	async getListSimple(tenantIds?: string[]) {
+		const qb = this.labelRepo.createQueryBuilder('label');
+		if (tenantIds?.length) {
+			qb.andWhere('label.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
+		}
+
+		qb.select(['label.id', 'label.name', 'label.code']);
+
+		return await qb.getMany();
+	}
 }

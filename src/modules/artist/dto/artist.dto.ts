@@ -77,6 +77,10 @@ export class CreateArtistDto {
 	@Type(() => CreateArtistProfileDto)
 	@IsArray()
 	artistProfiles?: CreateArtistProfileDto[];
+
+	creatorId: string;
+
+	modifierId: string;
 }
 
 class UpdateArtistProfileDto {

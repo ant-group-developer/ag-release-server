@@ -93,6 +93,13 @@ export class CountryQueryService {
 		return result;
 	}
 
+	async getListSimple() {
+		return this.countryRepo
+			.createQueryBuilder('c')
+			.select(['c.id', 'c.name'])
+			.getMany();
+	}
+
 	async findOneWithCountRelation(id: string) {
 		const queryBuilder = this.countryRepo
 			.createQueryBuilder('country')

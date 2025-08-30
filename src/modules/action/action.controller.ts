@@ -8,7 +8,9 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
@@ -31,8 +33,9 @@ export class ActionController {
 	@Post()
 	async create(
 		@Body() data: CreateActionDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Action>> {
-		const result = await this.actionService.create(data);
+		const result = await this.actionService.create(data, req);
 		return new ResponseSuccess({
 			data: result,
 			message: ActionMessageSuccess.CREATE,
@@ -59,8 +62,9 @@ export class ActionController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateActionDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Action>> {
-		const result = await this.actionService.update(id, data);
+		const result = await this.actionService.update(id, data, req);
 		return new ResponseSuccess({
 			data: result,
 			message: ActionMessageSuccess.UPDATE,

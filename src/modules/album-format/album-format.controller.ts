@@ -39,6 +39,22 @@ export class AlbumFormatController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get()
+	@ApiOperation({ summary: 'Get a list of album formats' })
+	@ApiResponse({ status: 200, description: 'List of album formats' })
+	async getList(@Query() query: QueryGetListAlbumFormatDto) {
+		const result = await this.albumFormatService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	@ApiOperation({ summary: 'Get a list of album formats' })
+	@ApiResponse({ status: 200, description: 'List of album formats' })
+	async getListSimple() {
+		const result = await this.albumFormatService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get album format by ID' })
 	@ApiResponse({
@@ -49,14 +65,6 @@ export class AlbumFormatController {
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<AlbumFormat>> {
 		const result = await this.albumFormatService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	@ApiOperation({ summary: 'Get a list of album formats' })
-	@ApiResponse({ status: 200, description: 'List of album formats' })
-	async getList(@Query() query: QueryGetListAlbumFormatDto) {
-		const result = await this.albumFormatService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 

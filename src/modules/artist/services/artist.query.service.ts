@@ -154,6 +154,7 @@ export class ArtistQueryService {
 
 	async getList(query: QueryGetListArtistDto) {
 		const queryGetList = this.createQueryGetList(query);
+
 		const [dataFromDb, totalItems]: [IDataFromDb, number] =
 			await Promise.all([
 				queryGetList.getRawAndEntities(),
@@ -279,6 +280,22 @@ export class ArtistQueryService {
 		const { preCode, index } = splitCodeIndex(code);
 
 		return this.generateUniqueCode(`${preCode}_${index + 1}`);
+	}
+
+	async getListSimple(query: QueryGetListArtistDto) {
+		const queryGetList = this.createQueryGetList(query);
+		queryGetList
+			.select(['artist.id', 'artist.name', 'artist.code'])
+			.addSelect([
+				'artistProfile.id',
+				'artistProfile.name',
+				'artistProfile.url',
+			])
+			.addSelect(['dsp.id', 'dsp.name', 'dsp.code', 'dsp.picture']);
+
+		const [artists, totalItems] = await queryGetList.getManyAndCount();
+
+		return { artists, totalItems };
 	}
 }
 

@@ -111,6 +111,24 @@ export class ArtistService {
 		});
 	}
 
+	async getListSimple(
+		query: QueryGetListArtistDto,
+	): Promise<PageDto<Artist>> {
+		const { page, pageSize } = query;
+
+		const { artists, totalItems } =
+			await this.artistQueryService.getListSimple(query);
+
+		return new PageDto({
+			items: artists,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
 	// update
 	async handleUpdate(id: string, data: UpdateArtistDto) {
 		const { artistProfiles, ...restOfData } = data;

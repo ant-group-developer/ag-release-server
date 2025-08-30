@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
+import { Request } from 'express';
 import { ActionMessage } from '../constants/action.constant';
 import {
 	CreateActionDto,
@@ -20,11 +21,16 @@ export class ActionService {
 		private readonly actionQueryService: ActionQueryService,
 	) {}
 
-	async create(data: CreateActionDto): Promise<Action> {
+	async create(data: CreateActionDto, req: Request): Promise<Action> {
 		const { name, code } = data;
+		const userId = req.user!.sub;
 
 		await this.actionQueryService.validate({ name, code });
-		const action = this.actionRepo.create(data);
+		const action = this.actionRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.actionRepo.save(action);
 	}
 
@@ -58,7 +64,11 @@ export class ActionService {
 		});
 	}
 
-	async update(id: string, data: UpdateActionDto): Promise<Action> {
+	async update(
+		id: string,
+		data: UpdateActionDto,
+		req: Request,
+	): Promise<Action> {
 		const { name, code } = data;
 		const action = await this.findOne(id);
 
@@ -68,8 +78,8 @@ export class ActionService {
 		if (code && code !== action.code) {
 			await this.actionQueryService.validate({ code });
 		}
-
-		await this.actionRepo.update(id, data);
+		const userId = req.user!.sub;
+		await this.actionRepo.update(id, { ...data, modifierId: userId });
 		return this.findOne(id);
 	}
 

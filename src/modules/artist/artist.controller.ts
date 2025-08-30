@@ -36,18 +36,18 @@ export class ArtistController {
 	@Post()
 	async create(
 		@Body() createArtistDto: CreateArtistDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Artist>> {
+		const userId = req.user!.sub;
+		createArtistDto.creatorId = userId;
+		createArtistDto.modifierId = userId;
+
 		const result = await this.artistService.handleCreate(createArtistDto);
+
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ArtistMessageCodeSuccess.CREATE,
 		});
-	}
-
-	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Artist>> {
-		const result = await this.artistService.findOneLite(id);
-		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
@@ -61,6 +61,26 @@ export class ArtistController {
 		}
 
 		const result = await this.artistService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple(
+		@Query() query: QueryGetListArtistDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Artist>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.artistService.getListSimple(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Artist>> {
+		const result = await this.artistService.findOneLite(id);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -38,17 +38,23 @@ export class GenreController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Genre>> {
-		const result = await this.genreService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	async getList(
 		@Query() query: QueryGetListGenreDto,
 	): Promise<ResponseSuccess<PageDto<Genre>>> {
 		const result = await this.genreService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.genreService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Genre>> {
+		const result = await this.genreService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 

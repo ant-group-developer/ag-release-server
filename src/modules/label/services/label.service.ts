@@ -74,6 +74,10 @@ export class LabelService {
 		});
 	}
 
+	async getListSimple(tenantIds?: string[]) {
+		return await this.labelQueryService.getListSimple(tenantIds);
+	}
+
 	// update
 	async update(id: string, data: UpdateLabelDto): Promise<Label> {
 		const { name, picture } = data;

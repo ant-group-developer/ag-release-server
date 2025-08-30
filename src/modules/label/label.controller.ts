@@ -65,21 +65,6 @@ export class LabelController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(
-		@Param('id') id: string,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.findOneWithCountRelation(id);
-
-		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
-			throw new ResponseError(AuthMessages.FORBIDDEN);
-		}
-
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	@ApiOperation({ summary: 'Get a list of labels' })
 	@ApiResponse({
@@ -96,6 +81,38 @@ export class LabelController {
 		}
 
 		const result = await this.labelService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	@ApiOperation({ summary: 'Get a list of labels' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of labels',
+	})
+	async getListSimple(@Req() req: Request) {
+		const tenantId = req.user!.tenantId;
+		let tenantIds;
+		if (checkIsNotSystemTenant(tenantId)) {
+			tenantIds = [tenantId];
+		}
+
+		const result = await this.labelService.getListSimple(tenantIds);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Label>> {
+		const result = await this.labelService.findOneWithCountRelation(id);
+
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 

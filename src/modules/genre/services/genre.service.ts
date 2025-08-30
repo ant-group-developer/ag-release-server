@@ -90,6 +90,10 @@ export class GenreService implements OnModuleInit {
 		});
 	}
 
+	async getListSimple() {
+		return this.genreQueryService.getListSimple();
+	}
+
 	// update
 	async update(id: string, updateGenreDto: UpdateGenreDto): Promise<Genre> {
 		const { name, code, picture } = updateGenreDto;

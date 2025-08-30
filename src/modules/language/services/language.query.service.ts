@@ -161,4 +161,11 @@ export class LanguageQueryService {
 			);
 		}
 	}
+
+	async getListSimple() {
+		return this.languageRepo
+			.createQueryBuilder('l')
+			.select(['l.id', 'l.name', 'l.code'])
+			.getMany();
+	}
 }
