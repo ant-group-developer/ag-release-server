@@ -81,12 +81,11 @@ export class ReleaseService {
 
 	async getListDetail(
 		query: QueryGetListReleaseDto,
-		tenantId: string,
 	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 
 		const { releases, totalItems } =
-			await this.releaseQueryService.getManyAndCount(query, tenantId);
+			await this.releaseQueryService.getManyAndCount(query);
 
 		const enhancedRelease = this.enhanceReleasesDetails(releases);
 

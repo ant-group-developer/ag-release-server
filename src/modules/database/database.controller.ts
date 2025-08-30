@@ -12,9 +12,9 @@ export class DatabaseController {
 	constructor(private readonly databaseService: DatabaseBackupService) {}
 
 	@Post()
-	create() {
-		this.databaseService.handleCreateSafe();
+	async create() {
 		return new ResponseSuccess({
+			data: await this.databaseService.eventBackup(),
 			messageCode: BackupMessageCodeSuccess.STARTED,
 			message: BackupMessageSuccess.STARTED,
 		});

@@ -289,4 +289,6 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 		return value;
 	})
 	isVariousArtist?: boolean;
+
+	tenantIds?: string[];
 }

@@ -239,7 +239,7 @@ export class CopyrightAcrService implements OnModuleInit {
 	}
 
 	// public
-	async scanBufferCopyright({
+	async scanBuffer({
 		buffer,
 		duration,
 		chunkDuration,
@@ -262,6 +262,7 @@ export class CopyrightAcrService implements OnModuleInit {
 		);
 
 		const results = await Promise.all(tasks);
+
 		return results.filter((r): r is ResultScan => r !== null);
 	}
 }

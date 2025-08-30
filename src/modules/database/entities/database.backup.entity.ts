@@ -20,6 +20,9 @@ export class Backup extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	urlFolderGcs: string | null;
 
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	urlFolderDrive: string | null;
+
 	@Column({ type: 'varchar', length: 100 + 'YYYYMMDDHHmmss_'.length })
 	fileName: string;
 
@@ -28,4 +31,7 @@ export class Backup extends BaseUUIDEntity {
 
 	@Column({ type: 'bigint', default: 0 })
 	fileSize: number;
+
+	@Column({ type: 'text', nullable: true })
+	error: string | null;
 }

@@ -115,7 +115,7 @@ export class ArtistService {
 	async handleUpdate(id: string, data: UpdateArtistDto) {
 		const { artistProfiles, ...restOfData } = data;
 
-		const artist = await this.findOne(id);
+		const artist = await this.findOneLite(id);
 
 		await this.update(artist, restOfData);
 

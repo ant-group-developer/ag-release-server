@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
@@ -10,6 +9,15 @@ import {
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
+
+interface IDataFromDb {
+	entities: Release[];
+	raw: {
+		release_id: string;
+		tracks_count: string;
+		total_duration: string;
+	}[];
+}
 
 @Injectable()
 export class ReleaseQueryService {
@@ -26,154 +34,6 @@ export class ReleaseQueryService {
 		return this.mainAlias;
 	}
 
-	private createQueryGetList(query: QueryGetListReleaseDto) {
-		const {
-			keyword,
-
-			startCreatedAt,
-			endCreatedAt,
-			startUpdatedAt,
-			endUpdatedAt,
-
-			startDateRelease,
-			endDateRelease,
-
-			albumFormatId,
-			status,
-			primaryGenreId,
-			subGenreId,
-			labelId,
-			artistId,
-			isVariousArtist,
-
-			fieldOrder,
-			orderBy,
-
-			skip,
-			pageSize,
-		} = query;
-
-		const queryBuilder = this.releaseRepo.createQueryBuilder(
-			this.mainAlias,
-		);
-
-		if (keyword) {
-			queryBuilder.andWhere(
-				new Brackets((qb) => {
-					qb.where('release.title ILIKE :keyword')
-						.orWhere('albumFormat.name ILIKE :keyword')
-						.orWhere('artist.name ILIKE :keyword')
-						.orWhere('label.name ILIKE :keyword');
-				}),
-				{ keyword: `%${keyword}%` },
-			);
-		}
-
-		if (startCreatedAt && endCreatedAt) {
-			queryBuilder.andWhere(
-				`release.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
-				{
-					startCreatedAt,
-					endCreatedAt,
-				},
-			);
-		}
-
-		if (startUpdatedAt && endUpdatedAt) {
-			queryBuilder.andWhere(
-				`release.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
-				{
-					startUpdatedAt,
-					endUpdatedAt,
-				},
-			);
-		}
-
-		if (startDateRelease && endDateRelease) {
-			queryBuilder.andWhere(
-				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
-				{
-					startDateRelease,
-					endDateRelease,
-				},
-			);
-		}
-
-		if (albumFormatId?.length) {
-			queryBuilder.andWhere(
-				'release.albumFormatId IN (:...albumFormatId)',
-				{
-					albumFormatId,
-				},
-			);
-		}
-
-		if (primaryGenreId?.length) {
-			queryBuilder.andWhere(
-				'release.primaryGenreId IN (:...primaryGenreId)',
-				{
-					primaryGenreId,
-				},
-			);
-		}
-
-		if (subGenreId?.length) {
-			queryBuilder.andWhere('release.subGenreId IN (:...subGenreId)', {
-				subGenreId,
-			});
-		}
-
-		if (labelId?.length) {
-			queryBuilder.andWhere('release.labelId IN (:...labelId)', {
-				labelId,
-			});
-		}
-
-		if (artistId?.length) {
-			queryBuilder.andWhere('releaseArtist.artistId IN (:...artistId)', {
-				artistId,
-			});
-		}
-
-		if (status?.length) {
-			queryBuilder.andWhere('release.status IN (:...status)', {
-				status,
-			});
-		}
-
-		if (isVariousArtist !== undefined) {
-			queryBuilder.andWhere(
-				'release.isVariousArtist = :isVariousArtist',
-				{
-					isVariousArtist,
-				},
-			);
-		}
-
-		if (VirtualColumnReleaseArr.includes(fieldOrder)) {
-			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
-		} else {
-			queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
-		}
-
-		queryBuilder.skip(skip).take(pageSize);
-
-		return queryBuilder;
-	}
-
-	filterByPermission(
-		queryBuilder: SelectQueryBuilder<Release>,
-		tenantId: string,
-	) {
-		if (checkIsSystemTenant(tenantId)) {
-			queryBuilder
-				.leftJoin('release.tenant', 'tenant')
-				.addSelect(['tenant.id', 'tenant.name']);
-		} else {
-			queryBuilder.andWhere('release.tenantId = :tenantId', { tenantId });
-		}
-	}
-
 	// public
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
@@ -188,87 +48,15 @@ export class ReleaseQueryService {
 		return release;
 	}
 
-	async getManyAndCount(query: QueryGetListReleaseDto, tenantId: string) {
-		const queryGetList = this.createQueryGetList(query);
-		this.filterByPermission(queryGetList, tenantId);
+	async getManyAndCount(query: QueryGetListReleaseDto) {
+		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
-		// left join
-		queryGetList
-			.leftJoin('release.albumFormat', 'albumFormat')
-			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
-			.leftJoin('release.releaseArtists', 'releaseArtist')
-			.leftJoin('releaseArtist.artist', 'artist')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
-			.leftJoin('release.label', 'label')
+		this.filterByQuery(qb, query);
+		this.leftJoin(qb);
+		this.select(qb, query);
 
-			.addSelect([
-				'albumFormat.id',
-				'albumFormat.name',
-				'albumFormat.code',
-				'albumFormat.minTrackCount',
-				'albumFormat.maxTrackCount',
-			])
-			.addSelect([
-				'releaseCoverArt.id',
-				'releaseCoverArt.fileId',
-				'releaseCoverArt.releaseId',
-				'releaseCoverArt.width',
-				'releaseCoverArt.height',
-				'releaseCoverArt.type',
-			])
-			.addSelect([
-				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
-				'releaseArtist.artistId',
-				'releaseArtist.releaseId',
-				'releaseArtist.addArtistToTracks',
-			])
-			.addSelect([
-				'artist.id',
-				'artist.name',
-				'artist.code',
-				'artist.picture',
-				'artist.biography',
-			])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
-			.addSelect([
-				'label.id',
-				'label.name',
-				'label.code',
-				'label.picture',
-				'label.description',
-			])
-
-			// virtual
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(track.id)')
-					.from('tracks', 'track')
-					.where('track.releaseId = release.id');
-			}, VirtualColumnRelease.TRACKS_COUNT)
-
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('SUM(audioFile.duration)')
-					.from('tracks', 'track')
-					.leftJoin('track.audioFile', 'audioFile')
-					.where('track.releaseId = release.id');
-			}, VirtualColumnRelease.TOTAL_DURATION);
-
-		const [dataFromDb, totalItems]: [
-			{
-				entities: Release[];
-				raw: {
-					release_id: string;
-					tracks_count: string;
-					total_duration: string;
-				}[];
-			},
-			number,
-		] = await Promise.all([
-			queryGetList.getRawAndEntities(),
-			queryGetList.getCount(),
-		]);
+		const [dataFromDb, totalItems]: [IDataFromDb, number] =
+			await Promise.all([qb.getRawAndEntities(), qb.getCount()]);
 
 		const releases = this.assigneeVirtualColumn(dataFromDb);
 
@@ -278,14 +66,7 @@ export class ReleaseQueryService {
 		};
 	}
 
-	private assigneeVirtualColumn(dataFromDb: {
-		entities: Release[];
-		raw: {
-			release_id: string;
-			tracks_count: string;
-			total_duration: string;
-		}[];
-	}) {
+	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {
 		return dataFromDb.entities.map((entity) => {
 			const dataRawOfRelease = dataFromDb.raw.find(
 				(item) => item.release_id === entity.id,
@@ -425,5 +206,243 @@ export class ReleaseQueryService {
 		}
 
 		return release;
+	}
+
+	// private
+	private filterByQuery(
+		queryBuilder: SelectQueryBuilder<Release>,
+		query: QueryGetListReleaseDto,
+	) {
+		const {
+			keyword,
+
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+
+			startDateRelease,
+			endDateRelease,
+
+			albumFormatId,
+			status,
+			primaryGenreId,
+			subGenreId,
+			labelId,
+			artistId,
+			isVariousArtist,
+			tenantIds,
+
+			fieldOrder,
+			orderBy,
+
+			skip,
+			pageSize,
+		} = query;
+
+		if (keyword) {
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.where('release.title ILIKE :keyword')
+						.orWhere('albumFormat.name ILIKE :keyword')
+						.orWhere('artist.name ILIKE :keyword')
+						.orWhere('label.name ILIKE :keyword');
+				}),
+				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			queryBuilder.andWhere(
+				`release.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			queryBuilder.andWhere(
+				`release.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{
+					startUpdatedAt,
+					endUpdatedAt,
+				},
+			);
+		}
+
+		if (startDateRelease && endDateRelease) {
+			queryBuilder.andWhere(
+				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
+				{
+					startDateRelease,
+					endDateRelease,
+				},
+			);
+		}
+
+		if (albumFormatId?.length) {
+			queryBuilder.andWhere(
+				'release.albumFormatId IN (:...albumFormatId)',
+				{
+					albumFormatId,
+				},
+			);
+		}
+
+		if (primaryGenreId?.length) {
+			queryBuilder.andWhere(
+				'release.primaryGenreId IN (:...primaryGenreId)',
+				{
+					primaryGenreId,
+				},
+			);
+		}
+
+		if (subGenreId?.length) {
+			queryBuilder.andWhere('release.subGenreId IN (:...subGenreId)', {
+				subGenreId,
+			});
+		}
+
+		if (labelId?.length) {
+			queryBuilder.andWhere('release.labelId IN (:...labelId)', {
+				labelId,
+			});
+		}
+
+		if (artistId?.length) {
+			queryBuilder.andWhere('releaseArtist.artistId IN (:...artistId)', {
+				artistId,
+			});
+		}
+
+		if (status?.length) {
+			queryBuilder.andWhere('release.status IN (:...status)', {
+				status,
+			});
+		}
+
+		if (isVariousArtist !== undefined) {
+			queryBuilder.andWhere(
+				'release.isVariousArtist = :isVariousArtist',
+				{
+					isVariousArtist,
+				},
+			);
+		}
+
+		if (tenantIds?.length) {
+			queryBuilder.andWhere('release.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
+		} else {
+			queryBuilder
+				.leftJoin('release.tenant', 'tenant')
+				.addSelect(['tenant.id', 'tenant.name']);
+		}
+
+		if (VirtualColumnReleaseArr.includes(fieldOrder)) {
+			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
+		}
+
+		queryBuilder.skip(skip).take(pageSize);
+
+		return queryBuilder;
+	}
+
+	private leftJoin(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder
+			.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoin('release.releaseArtists', 'releaseArtist')
+			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			.leftJoin('release.label', 'label');
+	}
+
+	private select(
+		queryBuilder: SelectQueryBuilder<Release>,
+		query: QueryGetListReleaseDto,
+	) {
+		const { tenantIds } = query;
+
+		queryBuilder
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+				'albumFormat.minTrackCount',
+				'albumFormat.maxTrackCount',
+			])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.releaseId',
+				'releaseCoverArt.width',
+				'releaseCoverArt.height',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'releaseArtist.id',
+				'releaseArtist.artistRoleId',
+				'releaseArtist.artistId',
+				'releaseArtist.releaseId',
+				'releaseArtist.addArtistToTracks',
+			])
+			.addSelect([
+				'artist.id',
+				'artist.name',
+				'artist.code',
+				'artist.picture',
+				'artist.biography',
+			])
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.code',
+				'label.picture',
+				'label.description',
+			])
+
+			// virtual
+			.addSelect((subQuery) => {
+				subQuery
+					.select('COUNT(DISTINCT(track_sub1.id))')
+					.from('tracks', 'track_sub1')
+					.where('track_sub1.release_id = release.id');
+
+				if (tenantIds?.length) {
+					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
+						tenantIds,
+					});
+				}
+
+				return subQuery;
+			}, VirtualColumnRelease.TRACKS_COUNT)
+
+			.addSelect((subQuery) => {
+				subQuery
+					.select('SUM(DISTINCT(audio_files_sub2.duration))')
+					.from('tracks', 'track_sub2')
+					.leftJoin(
+						'audio_files',
+						'audio_files_sub2',
+						'audio_files_sub2.track_id = track_sub2.id',
+					)
+					.where('track_sub2.release_id = release.id');
+
+				if (tenantIds?.length) {
+					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
+						tenantIds,
+					});
+				}
+
+				return subQuery;
+			}, VirtualColumnRelease.TOTAL_DURATION);
 	}
 }

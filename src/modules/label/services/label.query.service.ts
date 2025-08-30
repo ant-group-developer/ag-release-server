@@ -109,6 +109,7 @@ export class LabelQueryService {
 
 	async getList(query: QueryGetListLabelDto) {
 		const queryGetList = this.createQueryGetList(query);
+
 		const dataFromDb: IDataFromDb = await queryGetList.getRawAndEntities();
 		const totalItems = await queryGetList.getCount();
 

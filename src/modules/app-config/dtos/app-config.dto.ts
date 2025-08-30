@@ -4,6 +4,7 @@ import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
+	IsNotEmpty,
 	IsNumber,
 	IsOptional,
 	IsString,
@@ -66,9 +67,17 @@ export class UpdateAcrCloudDto {
 }
 
 export class UpdateBackupDatabaseDto {
-	@IsOptional()
+	@IsNotEmpty()
 	@IsString()
 	cronValue: string;
+
+	@IsString()
+	@IsNotEmpty()
+	fileName: string;
+
+	@IsString()
+	@IsNotEmpty()
+	shell: string;
 
 	@IsBoolean()
 	notifyOnFailed: boolean;

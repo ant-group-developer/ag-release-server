@@ -14,7 +14,7 @@ import {
 } from '../dtos/copyright.dto';
 import { TrackScanStatus } from '../entities/track-scan-status.entity';
 import { ErrorTask, ScanStatus } from '../enums/copyright.enum';
-import { ResultScan } from '../interface/copyright.interface';
+import { ICopyrightBasic, ResultScan } from '../interface/copyright.interface';
 import { CopyrightAcrService } from './sub-services/copyright.acr.service';
 import { CopyrightResultService } from './sub-services/copyright.result.service';
 import { CopyrightTaskService } from './sub-services/copyright.task.service';
@@ -267,59 +267,38 @@ export class CopyrightService implements OnModuleInit {
 			track.audioFile.fileId,
 		);
 
-		const resultScanAcr =
-			await this.copyrightAcrService.scanBufferCopyright({
-				buffer: fileBuffer,
-				duration: track.audioFile.duration,
-				chunkDuration: chunkDuration ?? this.chunkDuration,
-			});
+		const resultScanAcr = await this.copyrightAcrService.scanBuffer({
+			buffer: fileBuffer,
+			duration: track.audioFile.duration,
+			chunkDuration: chunkDuration ?? this.chunkDuration,
+		});
 
-		const scanCopyrightStatus = this.getScanCopyrightStatus(resultScanAcr);
-
-		const trackScanHistory = this.copyrightResultService.create({
+		const trackScanHistory = await this.copyrightResultService.create({
 			result: resultScanAcr,
 			trackId,
 		});
 
+		const statusTrack = this.scanByBusiness(resultScanAcr);
+
 		await this.copyrightTrackService.updateStatusScannedTrack(
 			trackId,
-			scanCopyrightStatus,
+			statusTrack,
 		);
 
 		return trackScanHistory;
 	}
 
-	private getScanCopyrightStatus(
-		resultScan: ResultScan[],
-	): ScanCopyrightStatus {
-		const musicItems: { start: number; end: number; score: number }[] = [];
-		const hummingItems: {
-			start: number;
-			end: number;
-			score: number;
-		}[] = [];
+	// function test
+	async testScanByBusiness(historyId: string) {
+		const history =
+			await this.copyrightResultService.getOneResult(historyId);
 
-		for (const scan of resultScan) {
-			if (scan.content?.music) {
-				for (const m of scan.content.music) {
-					musicItems.push({
-						start: scan.key.startSecond,
-						end: scan.key.endSecond,
-						score: m.score,
-					});
-				}
-			}
+		return this.scanByBusiness(history.result);
+	}
 
-			if (scan.content?.humming) {
-				for (const h of scan.content.humming) {
-					hummingItems.push({
-						start: scan.key.startSecond,
-						end: scan.key.endSecond,
-						score: Math.round(h.score * 100),
-					});
-				}
-			}
-		}
+	private scanByBusiness(resultScan: ResultScan[]): ScanCopyrightStatus {
+		const { hummingItems, musicItems } =
+			this.parseMusicAndHumming(resultScan);
 
 		if (this.checkWarning(musicItems) || this.checkWarning(hummingItems)) {
 			return ScanCopyrightStatus.WARNING;
@@ -328,19 +307,61 @@ export class CopyrightService implements OnModuleInit {
 		return ScanCopyrightStatus.FINISHED;
 	}
 
-	private checkWarning(
-		items: { start: number; end: number; score: number }[],
-	) {
-		items.sort((a, b) => a.start - b.start);
+	private parseMusicAndHumming(resultScan: ResultScan[]) {
+		const musicItems = resultScan.flatMap(
+			(scan) =>
+				scan.content?.music?.map((m) => ({
+					start: scan.key.startSecond,
+					end: scan.key.endSecond,
+					score: m.score,
+					acrid: m.acrid,
+				})) ?? [],
+		);
 
-		for (let i = 0; i < items.length - 1; i++) {
-			if (
-				items[i].score > this.scoreWarning &&
-				items[i + 1].score > this.scoreWarning
-			) {
-				return true;
+		const hummingItems = resultScan.flatMap(
+			(scan) =>
+				scan.content?.humming?.map((h) => ({
+					start: scan.key.startSecond,
+					end: scan.key.endSecond,
+					score: Math.round(h.score * 100),
+					acrid: h.acrid,
+				})) ?? [],
+		);
+
+		return { musicItems, hummingItems };
+	}
+
+	private checkWarning(items: ICopyrightBasic[]): boolean {
+		if (!items.length) return false;
+
+		// group theo acrId
+		const grouped: Map<string, ICopyrightBasic[]> = new Map();
+
+		for (const item of items) {
+			if (!grouped.has(item.acrid)) {
+				grouped.set(item.acrid, []);
+			}
+			grouped.get(item.acrid)!.push(item);
+		}
+
+		for (const group of grouped.values()) {
+			group.sort((a, b) => a.start - b.start);
+
+			for (let i = 0; i < group.length - 1; i++) {
+				const curr = group[i];
+				const next = group[i + 1];
+
+				if (
+					curr.end === next.start && // 2 đoạn liên tiếp
+					curr.score > this.scoreWarning && // check theo điểm
+					next.score > this.scoreWarning
+				) {
+					// this.logger.log(curr, next);
+					return true;
+				}
 			}
 		}
+
 		return false;
 	}
 

@@ -1,7 +1,10 @@
 import {
 	DEFAULT_AUTO_SCAN_TIME,
 	DEFAULT_CHUNK_DURATION,
+	DEFAULT_CRON_VALUE,
+	DEFAULT_FILE_NAME_BACKUP,
 	DEFAULT_SCORE_WARNING,
+	DEFAULT_SHELL,
 } from 'src/common/constants/common.default.constants';
 import { ReleaseStatus } from '../../release/enum/release.enum';
 import { AppConfigShape } from '../interfaces/app-config.type';
@@ -24,7 +27,10 @@ export const appConfigDefault: AppConfigShape = {
 	},
 
 	backupDatabase: {
-		cronValue: '0 1 * * *',
+		cronValue: DEFAULT_CRON_VALUE,
+
+		fileName: DEFAULT_FILE_NAME_BACKUP,
+		shell: DEFAULT_SHELL,
 
 		notifyOnFailed: true,
 		notifyOnSuccess: true,
