@@ -7,8 +7,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
@@ -33,6 +35,7 @@ export class AlbumFormatController {
 	})
 	async create(
 		@Body() createAlbumFormatDto: CreateAlbumFormatDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<AlbumFormat>> {
 		const result =
 			await this.albumFormatService.create(createAlbumFormatDto);

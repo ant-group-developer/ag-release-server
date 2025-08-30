@@ -6,7 +6,9 @@ import {
 	ParseUUIDPipe,
 	Post,
 	Query,
+	Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateTrackScanStatusDto,
@@ -19,8 +21,16 @@ export class CopyrightTaskController {
 	constructor(private readonly copyrightService: CopyrightService) {}
 
 	@Post()
-	async handleCreateTask(@Body() data: CreateTrackScanStatusDto) {
-		const result = await this.copyrightService.handleCreateTask(data);
+	async handleCreateTask(
+		@Body() data: CreateTrackScanStatusDto,
+		@Req() req: Request,
+	) {
+		const userId = req.user!.sub;
+
+		const result = await this.copyrightService.handleCreateTask(
+			data,
+			userId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -38,8 +48,9 @@ export class CopyrightTaskController {
 	}
 
 	@Post(':id/re-scan')
-	async reScan(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.copyrightService.reScan(id);
+	async reScan(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const result = await this.copyrightService.reScan(id, userId);
 		return new ResponseSuccess({
 			data: result,
 			message: 'Re-scan successfully',

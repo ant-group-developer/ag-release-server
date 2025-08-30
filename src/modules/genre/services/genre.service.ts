@@ -45,11 +45,15 @@ export class GenreService implements OnModuleInit {
 	}
 
 	// create
-	async create(data: CreateGenreDto): Promise<Genre> {
+	async create(data: CreateGenreDto, userId: string): Promise<Genre> {
 		const { name, code } = data;
 		await this.genreQueryService.validate({ name, code });
 
-		const genre = this.genreRepo.create(data);
+		const genre = this.genreRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.genreRepo.save(genre);
 	}
 
@@ -95,7 +99,11 @@ export class GenreService implements OnModuleInit {
 	}
 
 	// update
-	async update(id: string, updateGenreDto: UpdateGenreDto): Promise<Genre> {
+	async update(
+		id: string,
+		updateGenreDto: UpdateGenreDto,
+		userId: string,
+	): Promise<Genre> {
 		const { name, code, picture } = updateGenreDto;
 		const genre = await this.findOne(id);
 
@@ -115,7 +123,10 @@ export class GenreService implements OnModuleInit {
 			await this.bucketService.deletePublicFile(genre.picture);
 		}
 
-		await this.genreRepo.update(id, updateGenreDto);
+		await this.genreRepo.update(id, {
+			...updateGenreDto,
+			modifierId: userId,
+		});
 		return await this.findOne(id);
 	}
 

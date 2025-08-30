@@ -46,11 +46,15 @@ export class CurrencyService implements OnModuleInit {
 	}
 
 	// create
-	async create(data: CreateCurrencyDto): Promise<Currency> {
+	async create(data: CreateCurrencyDto, userId: string): Promise<Currency> {
 		const { name, code } = data;
 		await this.currencyQueryService.validateCreate({ name, code });
 
-		const currency = this.currencyRepo.create(data);
+		const currency = this.currencyRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.currencyRepo.save(currency);
 	}
 
@@ -88,8 +92,16 @@ export class CurrencyService implements OnModuleInit {
 		});
 	}
 
+	async getListSimple() {
+		return await this.currencyRepo.find({ select: ['id', 'code', 'name'] });
+	}
+
 	// update
-	async update(id: string, data: UpdateCurrencyDto): Promise<Currency> {
+	async update(
+		id: string,
+		data: UpdateCurrencyDto,
+		userId: string,
+	): Promise<Currency> {
 		const { name, code } = data;
 
 		const currency = await this.findOne(id);
@@ -104,7 +116,10 @@ export class CurrencyService implements OnModuleInit {
 			currency.code = code;
 		}
 
-		return await this.currencyRepo.save(currency);
+		return await this.currencyRepo.save({
+			...currency,
+			modifierId: userId,
+		});
 	}
 
 	// delete

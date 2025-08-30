@@ -27,14 +27,19 @@ export class ArtistService {
 	) {}
 
 	//create
-	async handleCreate(data: CreateArtistDto) {
+	async handleCreate(data: CreateArtistDto, userId: string) {
 		const { artistProfiles, ...restOfData } = data;
 
-		const artist = await this.create(restOfData);
+		const artist = await this.create({
+			...restOfData,
+			creatorId: userId,
+			modifierId: userId,
+		});
 
 		artist.artistProfiles = await this.createArtistProfile({
 			artistId: artist.id,
 			artistProfiles,
+			userId,
 		});
 
 		return artist;
@@ -52,14 +57,18 @@ export class ArtistService {
 	private async createArtistProfile({
 		artistId,
 		artistProfiles,
+		userId,
 	}: {
 		artistId: string;
 		artistProfiles: CreateArtistDto['artistProfiles'];
+		userId: string;
 	}) {
 		return artistProfiles && artistProfiles.length > 0
 			? await this.artistProfileService.bulkCreate(
 					artistProfiles.map((item) => ({
 						...item,
+						creatorId: userId,
+						modifierId: userId,
 						artistId,
 					})),
 				)
@@ -130,22 +139,27 @@ export class ArtistService {
 	}
 
 	// update
-	async handleUpdate(id: string, data: UpdateArtistDto) {
+	async handleUpdate(id: string, data: UpdateArtistDto, userId: string) {
 		const { artistProfiles, ...restOfData } = data;
 
 		const artist = await this.findOneLite(id);
 
-		await this.update(artist, restOfData);
+		await this.update(artist, restOfData, userId);
 
 		await this.updateArtistProfile({
 			artist,
 			artistProfiles,
+			userId,
 		});
 
 		return await this.findOneLite(id);
 	}
 
-	private async update(artist: Artist, data: UpdateArtistDto) {
+	private async update(
+		artist: Artist,
+		data: UpdateArtistDto,
+		userId: string,
+	) {
 		const { name, picture } = data;
 
 		if (name && name !== artist.name) {
@@ -160,15 +174,20 @@ export class ArtistService {
 			await this.bucketService.deletePublicFile(artist.picture);
 		}
 
-		await this.artistRepo.update(artist.id, data);
+		await this.artistRepo.update(artist.id, {
+			...data,
+			modifierId: userId,
+		});
 	}
 
 	private async updateArtistProfile({
 		artist,
 		artistProfiles,
+		userId,
 	}: {
 		artist: Artist;
 		artistProfiles: UpdateArtistDto['artistProfiles'];
+		userId: string;
 	}) {
 		const { id: artistId, artistProfiles: artistProfilesDb } = artist;
 
@@ -178,9 +197,18 @@ export class ArtistService {
 		if (artistProfiles && artistProfiles.length > 0) {
 			for (const item of artistProfiles) {
 				if (!item.id) {
-					dataCreate.push({ ...item, artistId });
+					dataCreate.push({
+						...item,
+						artistId,
+						creatorId: userId,
+						modifierId: userId,
+					});
 				} else {
-					dataUpdate.push({ id: item.id, ...item, artistId });
+					dataUpdate.push({
+						id: item.id,
+						...item,
+						artistId,
+					});
 				}
 			}
 		}
@@ -194,7 +222,7 @@ export class ArtistService {
 
 		await Promise.all([
 			this.artistProfileService.bulkCreate(dataCreate),
-			this.artistProfileService.bulkUpdate(dataUpdate),
+			this.artistProfileService.bulkUpdate(dataUpdate, userId),
 			Promise.all(
 				listDeleteIds.map((id) => this.deleteArtistProfile(id)),
 			),

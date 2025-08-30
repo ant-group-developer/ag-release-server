@@ -37,19 +37,25 @@ export class TrackTypeController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<ResponseSuccess<TrackType>> {
-		const result = await this.trackTypeService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	async getList(
 		@Query() query: QueryGetListTrackTypeDto,
 	): Promise<ResponseSuccess<PageDto<TrackType>>> {
 		const result = await this.trackTypeService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.trackTypeService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<TrackType>> {
+		const result = await this.trackTypeService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -39,10 +39,11 @@ export class ArtistController {
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Artist>> {
 		const userId = req.user!.sub;
-		createArtistDto.creatorId = userId;
-		createArtistDto.modifierId = userId;
 
-		const result = await this.artistService.handleCreate(createArtistDto);
+		const result = await this.artistService.handleCreate(
+			createArtistDto,
+			userId,
+		);
 
 		return new ResponseSuccess({
 			data: result,
@@ -89,8 +90,11 @@ export class ArtistController {
 	async update(
 		@Param('id') id: string,
 		@Body() data: UpdateArtistDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Artist>> {
-		const result = await this.artistService.handleUpdate(id, data);
+		const userId = req.user!.sub;
+
+		const result = await this.artistService.handleUpdate(id, data, userId);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ArtistMessageCodeSuccess.UPDATE,

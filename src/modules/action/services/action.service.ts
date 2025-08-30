@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { Request } from 'express';
 import { ActionMessage } from '../constants/action.constant';
 import {
 	CreateActionDto,
@@ -21,9 +20,8 @@ export class ActionService {
 		private readonly actionQueryService: ActionQueryService,
 	) {}
 
-	async create(data: CreateActionDto, req: Request): Promise<Action> {
+	async create(data: CreateActionDto, userId: string): Promise<Action> {
 		const { name, code } = data;
-		const userId = req.user!.sub;
 
 		await this.actionQueryService.validate({ name, code });
 		const action = this.actionRepo.create({
@@ -64,10 +62,16 @@ export class ActionService {
 		});
 	}
 
+	async getListSimple() {
+		return this.actionRepo.find({
+			select: ['id', 'code', 'name', 'note'],
+		});
+	}
+
 	async update(
 		id: string,
 		data: UpdateActionDto,
-		req: Request,
+		userId: string,
 	): Promise<Action> {
 		const { name, code } = data;
 		const action = await this.findOne(id);
@@ -78,7 +82,7 @@ export class ActionService {
 		if (code && code !== action.code) {
 			await this.actionQueryService.validate({ code });
 		}
-		const userId = req.user!.sub;
+
 		await this.actionRepo.update(id, { ...data, modifierId: userId });
 		return this.findOne(id);
 	}

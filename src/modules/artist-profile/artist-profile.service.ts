@@ -46,19 +46,26 @@ export class ArtistProfileService {
 	}
 
 	// update
-	async bulkUpdate(data: IBulkUpdateArtistProfile[]) {
+	async bulkUpdate(data: IBulkUpdateArtistProfile[], userId: string) {
 		await Promise.all(
 			data.map(({ id, ...rest }) =>
-				this.update(id, rest).catch((_e) => {}),
+				this.update(id, rest, userId).catch((_e) => {}),
 			),
 		);
 	}
 
-	private async update(id: string, data: IUpdateArtistProfile) {
+	private async update(
+		id: string,
+		data: IUpdateArtistProfile,
+		userId: string,
+	) {
 		const { artistId, dspId } = data;
 
 		await this.validate({ artistId, dspId });
-		await this.artistProfileRepo.update(id, data);
+		await this.artistProfileRepo.update(id, {
+			...data,
+			modifierId: userId,
+		});
 	}
 
 	// delete

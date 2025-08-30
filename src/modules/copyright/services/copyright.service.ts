@@ -60,18 +60,22 @@ export class CopyrightService implements OnModuleInit {
 	// task
 	async handleCreateTask(
 		data: CreateTrackScanStatusDto,
+		userId: string,
 	): Promise<TrackScanStatus> {
 		const { filter, chunkDuration } = data;
 
 		const trackNeedScanIds =
 			await this.copyrightTrackService.getTrackIds(filter);
 
-		const taskDb = await this.copyrightTaskService.create({
-			filter,
-			status: ScanStatus.PENDING,
-			trackNeedScanIds,
-			chunkDuration: chunkDuration ?? this.chunkDuration,
-		});
+		const taskDb = await this.copyrightTaskService.create(
+			{
+				filter,
+				status: ScanStatus.PENDING,
+				trackNeedScanIds,
+				chunkDuration: chunkDuration ?? this.chunkDuration,
+			},
+			userId,
+		);
 
 		this.processTask(taskDb).catch((e) => {
 			this.logger.error(
@@ -182,15 +186,18 @@ export class CopyrightService implements OnModuleInit {
 		});
 	}
 
-	async reScan(taskId: string) {
+	async reScan(taskId: string, userId: string) {
 		const task = await this.copyrightTaskService.findOne(taskId);
 
-		const newTask = await this.handleCreateTask({
-			filter: {
-				...task.filter,
-				ignoreTrackScanned: false,
+		const newTask = await this.handleCreateTask(
+			{
+				filter: {
+					...task.filter,
+					ignoreTrackScanned: false,
+				},
 			},
-		});
+			userId,
+		);
 
 		return newTask;
 	}

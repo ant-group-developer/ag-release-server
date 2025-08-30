@@ -39,20 +39,6 @@ import { ReleaseService } from '../services/release.service';
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/submit')
-	async submit(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Body() data: SubmitCreateReleaseDto,
-	): Promise<ResponseSuccess<IReleaseNonDraft>> {
-		const result = await this.releaseService.submit(id, data);
-
-		return new ResponseSuccess({
-			data: result,
-			messageCode: ReleaseMessageCodeSuccess.CREATE,
-		});
-	}
-
 	@Get(':id')
 	async getOneDetail(
 		@Param('id') id: string,
@@ -87,11 +73,33 @@ export class ReleaseController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateReleaseDto: UpdateReleaseDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<IRelease>> {
-		const result = await this.releaseService.update(id, updateReleaseDto);
+		const userId = req.user!.sub;
+		const result = await this.releaseService.update(
+			id,
+			updateReleaseDto,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,
+		});
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/submit')
+	async submit(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() data: SubmitCreateReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<IReleaseNonDraft>> {
+		const userId = req.user!.sub;
+		const result = await this.releaseService.submit(id, data, userId);
+
+		return new ResponseSuccess({
+			data: result,
+			messageCode: ReleaseMessageCodeSuccess.CREATE,
 		});
 	}
 }

@@ -8,8 +8,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { ArtistRoleMessageCodeSuccess } from './constants/artist-role.constant';
@@ -30,20 +32,17 @@ export class ArtistRoleController {
 	@Post()
 	async create(
 		@Body() createArtistRoleDto: CreateArtistRoleDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<ArtistRole>> {
-		const result = await this.artistRoleService.create(createArtistRoleDto);
+		const userId = req.user!.sub;
+		const result = await this.artistRoleService.create(
+			createArtistRoleDto,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ArtistRoleMessageCodeSuccess.CREATE,
 		});
-	}
-
-	@Get(':id')
-	async findOne(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<ResponseSuccess<ArtistRole>> {
-		const result = await this.artistRoleService.findOne(id);
-		return new ResponseSuccess({ data: result });
 	}
 
 	@ApiOperation({ summary: 'Get a list of artist roles' })
@@ -59,15 +58,38 @@ export class ArtistRoleController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get a list of artist roles' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of artist roles',
+	})
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.artistRoleService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<ArtistRole>> {
+		const result = await this.artistRoleService.findOne(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateArtistRoleDto: UpdateArtistRoleDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<ArtistRole>> {
+		const userId = req.user!.sub;
+
 		const result = await this.artistRoleService.update(
 			id,
 			updateArtistRoleDto,
+			userId,
 		);
 		return new ResponseSuccess({
 			data: result,

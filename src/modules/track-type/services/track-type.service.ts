@@ -70,6 +70,12 @@ export class TrackTypeService {
 		});
 	}
 
+	async getListSimple() {
+		return await this.trackTypeRepo.find({
+			select: ['id', 'name', 'code'],
+		});
+	}
+
 	// update
 	async update(id: string, data: UpdateTrackTypeDto): Promise<TrackType> {
 		const { name, code } = data;

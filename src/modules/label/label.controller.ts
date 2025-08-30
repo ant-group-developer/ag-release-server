@@ -52,13 +52,18 @@ export class LabelController {
 	): Promise<ResponseSuccess<Label>> {
 		const tenantId = req.user!.tenantId;
 
+		const userId = req.user!.sub;
 		if (checkIsSystemTenant(tenantId)) {
 			throw new ResponseError(LabelMessage.SYSTEM_TENANT_FORBIDDEN);
 		}
 
 		await this.labelService.checkExceedLabels(tenantId);
 
-		const result = await this.labelService.create(createLabelDto, tenantId);
+		const result = await this.labelService.create(
+			createLabelDto,
+			tenantId,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: LabelMessageCodeSuccess.CREATE,
@@ -121,8 +126,15 @@ export class LabelController {
 	async update(
 		@Param('id') id: string,
 		@Body() updateLabelDto: UpdateLabelDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.update(id, updateLabelDto);
+		const userId = req.user!.sub;
+
+		const result = await this.labelService.update(
+			id,
+			updateLabelDto,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: LabelMessageCodeSuccess.UPDATE,

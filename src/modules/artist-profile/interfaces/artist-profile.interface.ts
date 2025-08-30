@@ -1,4 +1,6 @@
-export interface ICreateArtistProfile {
+import { IAuditDto } from 'src/common/interface/common.interface';
+
+export interface ICreateArtistProfile extends IAuditDto {
 	name: string;
 	url: string;
 	dspId: string;

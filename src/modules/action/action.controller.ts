@@ -35,7 +35,9 @@ export class ActionController {
 		@Body() data: CreateActionDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Action>> {
-		const result = await this.actionService.create(data, req);
+		const userId = req.user!.sub;
+
+		const result = await this.actionService.create(data, userId);
 		return new ResponseSuccess({
 			data: result,
 			message: ActionMessageSuccess.CREATE,
@@ -64,7 +66,9 @@ export class ActionController {
 		@Body() data: UpdateActionDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Action>> {
-		const result = await this.actionService.update(id, data, req);
+		const userId = req.user!.sub;
+
+		const result = await this.actionService.update(id, data, userId);
 		return new ResponseSuccess({
 			data: result,
 			message: ActionMessageSuccess.UPDATE,

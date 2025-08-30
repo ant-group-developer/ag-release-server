@@ -48,6 +48,7 @@ export class ReleaseService {
 	async submit(
 		id: string,
 		data: SubmitCreateReleaseDto,
+		userId: string,
 	): Promise<IReleaseNonDraft> {
 		// validate id
 		await this.releaseQueryService.findOne(id);
@@ -59,7 +60,7 @@ export class ReleaseService {
 				status: ReleaseStatus.PROCESSING,
 			});
 
-		await this.releaseRepo.save(releaseNonDraft);
+		await this.releaseRepo.save({ ...releaseNonDraft, creatorId: userId });
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
@@ -112,7 +113,11 @@ export class ReleaseService {
 		});
 	}
 
-	async update(id: string, data: UpdateReleaseDto): Promise<IRelease> {
+	async update(
+		id: string,
+		data: UpdateReleaseDto,
+		userId: string,
+	): Promise<IRelease> {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
 		const release = await this.releaseQueryService.findOne(id);
@@ -150,7 +155,7 @@ export class ReleaseService {
 			});
 		}
 
-		await this.releaseRepo.update(id, data);
+		await this.releaseRepo.update(id, { ...data, modifierId: userId });
 		return await this.releaseQueryService.findOne(id);
 	}
 }

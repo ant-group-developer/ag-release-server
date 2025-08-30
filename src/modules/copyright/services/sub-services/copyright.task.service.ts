@@ -14,8 +14,12 @@ export class CopyrightTaskService {
 	) {}
 
 	// create
-	async create(data: ICreateTask): Promise<TrackScanStatus> {
-		const task = this.trackScanStatusRepo.create(data);
+	async create(data: ICreateTask, userId: string): Promise<TrackScanStatus> {
+		const task = this.trackScanStatusRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.trackScanStatusRepo.save(task);
 	}
 

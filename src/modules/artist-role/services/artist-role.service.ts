@@ -55,12 +55,19 @@ export class ArtistRoleService implements OnModuleInit {
 	}
 
 	// create
-	async create(data: CreateArtistRoleDto): Promise<ArtistRole> {
+	async create(
+		data: CreateArtistRoleDto,
+		userId: string,
+	): Promise<ArtistRole> {
 		const { name, code } = data;
 
 		await this.artistRoleQueryService.validate({ name, code });
 
-		const artist = this.artistRoleRepo.create(data);
+		const artist = this.artistRoleRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.artistRoleRepo.save(artist);
 	}
 
@@ -110,8 +117,19 @@ export class ArtistRoleService implements OnModuleInit {
 		});
 	}
 
+	async getListSimple() {
+		return this.artistRoleRepo
+			.createQueryBuilder('ar')
+			.select(['ar.id', 'ar.code', 'ar.name'])
+			.getMany();
+	}
+
 	// update
-	async update(id: string, data: UpdateArtistRoleDto): Promise<ArtistRole> {
+	async update(
+		id: string,
+		data: UpdateArtistRoleDto,
+		userId: string,
+	): Promise<ArtistRole> {
 		const { name, code } = data;
 		const artistRole = await this.findOne(id);
 		if (name && name !== artistRole.name) {
@@ -122,7 +140,7 @@ export class ArtistRoleService implements OnModuleInit {
 			await this.artistRoleQueryService.validate({ code });
 		}
 
-		await this.artistRoleRepo.update(id, data);
+		await this.artistRoleRepo.update(id, { ...data, modifierId: userId });
 		return await this.findOne(id);
 	}
 
