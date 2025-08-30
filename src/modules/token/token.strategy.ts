@@ -12,6 +12,7 @@ import { TenantUserType } from '../user/enum/user.enum';
 import { UserTypeService } from '../user/services/user-type.service';
 import { UserService } from '../user/services/user.service';
 import {
+	checkIsNotSystemTenant,
 	checkIsSystemAdmin,
 	checkIsSystemTenant,
 } from '../user/utils/user-type.util';
@@ -74,36 +75,37 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 			throw new ResponseError(AuthMessages.INVALID_TOKEN_TYPE);
 		}
 
-		const tenant = await this.tenantService.getOneTenantData(
-			claims.tenantId,
-			{ select: ['isActive'] },
-		);
-		this.tenantService.checkActive(tenant.isActive);
+		const { tenantId, sub: userId } = claims;
 
-		const user = await this.userService.findOne(claims.sub, {
+		if (checkIsNotSystemTenant(tenantId)) {
+			const tenant = await this.tenantService.getOneTenantData(tenantId, {
+				select: ['isActive'],
+			});
+			this.tenantService.checkActive(tenant.isActive);
+		}
+
+		const user = await this.userService.findOne(userId, {
 			select: ['id', 'type', 'isActive', 'email', 'name', 'avatar'],
 		});
 		this.userService.checkActive(user.isActive);
 
 		const permission = await this.userRoleService.getPermission(
-			claims.tenantId,
+			tenantId,
 			user.id,
 		);
 
 		let tenantUserType = TenantUserType.OWNER;
 		let tenantType;
 		if (checkIsSystemAdmin(user.type)) {
-			if (checkIsSystemTenant(claims.tenantId)) {
+			if (checkIsSystemTenant(tenantId)) {
 				tenantType = TenantType.WHITE_LABEL;
 			} else {
-				tenantType = await this.tenantService.getTenantType(
-					claims.tenantId,
-				);
+				tenantType = await this.tenantService.getTenantType(tenantId);
 			}
 		} else {
 			const data =
 				await this.userTypeService.getTenantTypeAndTenantUserType(
-					claims.tenantId,
+					tenantId,
 					user.id,
 				);
 			tenantUserType = data.tenantUserType;
