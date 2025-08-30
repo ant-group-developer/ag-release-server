@@ -42,7 +42,6 @@ export const envValidationSchema = Joi.object({
 
 	// BACK UP
 	RCLONE_CONFIG_PATH: Joi.string().required(),
-	FILE_NAME: Joi.string().required(),
 	BASE_URL_GCS: Joi.string().required(),
 	BASE_URL_CONSOLE_GCS_BACKUP: Joi.string().required(),
 });

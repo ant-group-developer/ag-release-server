@@ -59,19 +59,22 @@ export class ArtistQueryService {
 
 			.addSelect((subQuery) => {
 				subQuery
-					.select('COUNT(DISTINCT(release_artist.id))')
-					.from('release_artist', 'release_artist')
+					.select('COUNT(DISTINCT(release_artist_sub1.id))')
+					.from('release_artist', 'release_artist_sub1')
 					.leftJoin(
 						'releases',
-						'release',
-						'release.id = release_artist.release_id',
+						'release_sub1',
+						'release_sub1.id = release_artist_sub1.release_id',
 					)
-					.where('release_artist.artist_id = artist.id');
+					.where('release_artist_sub1.artist_id = artist.id');
 
 				if (tenantIds?.length) {
-					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
-						tenantIds,
-					});
+					subQuery.andWhere(
+						'release_sub1.tenant_id IN (:...tenantIds)',
+						{
+							tenantIds,
+						},
+					);
 				}
 
 				return subQuery;
@@ -79,24 +82,27 @@ export class ArtistQueryService {
 
 			.addSelect((subQuery) => {
 				subQuery
-					.select('COUNT(track_artist.id)')
-					.from('track_artist', 'track_artist')
+					.select('COUNT(DISTINCT(track_artist_sub2.id))')
+					.from('track_artist', 'track_artist_sub2')
 					.leftJoin(
 						'tracks',
-						'track',
-						'track_artist.track_id = track.id',
+						'track_sub2',
+						'track_sub2.id = track_artist_sub2.track_id',
 					)
 					.leftJoin(
 						'releases',
-						'release',
-						'track.release_id = release.id',
+						'release_sub2',
+						'track_sub2.release_id = release_sub2.id',
 					)
-					.where('track_artist.artist_id = artist.id');
+					.where('track_artist_sub2.artist_id = artist.id');
 
 				if (tenantIds?.length) {
-					subQuery.andWhere('release.tenant_id IN (:...tenantIds)', {
-						tenantIds,
-					});
+					subQuery.andWhere(
+						'release_sub2.tenant_id IN (:...tenantIds)',
+						{
+							tenantIds,
+						},
+					);
 				}
 
 				return subQuery;
