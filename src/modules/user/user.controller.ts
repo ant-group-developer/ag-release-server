@@ -61,7 +61,7 @@ export class UserController {
 		await this.tenantUserService.addUserToTenant(
 			tenantId,
 			result.id,
-			payload.tenantType ?? TenantUserType.MEMBER,
+			payload.tenantUserType ?? TenantUserType.MEMBER,
 		);
 		return new ResponseSuccess({ data: result });
 	}
