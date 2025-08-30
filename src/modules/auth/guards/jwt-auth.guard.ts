@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
+import { ResponseError } from 'src/common/dtos/response.dto';
 import { AUTH_PUBLIC_KEY } from '../constants/key';
 
 @Injectable()
@@ -26,8 +27,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
 	handleRequest(err: any, user: any, info: any) {
 		if (err || !user) {
-			// Return structured JSON with a clear reason code
-			throw new UnauthorizedException(info);
+			if (err?.response?.statusCode) {
+				throw new ResponseError(err.response);
+			} else {
+				throw new UnauthorizedException(info);
+			}
 		}
 		return user;
 	}

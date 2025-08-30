@@ -10,7 +10,7 @@ import { Request } from 'express';
 import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
-import { Brackets, In, TreeRepository } from 'typeorm';
+import { Brackets, FindOneOptions, In, TreeRepository } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
@@ -410,6 +410,15 @@ export class TenantService {
 		});
 
 		await this.tenantTreeRepo.save(tenant);
+
+		// Nếu khoá tenant cha thì sẽ khoá tất cả tenant con
+		if (dto.isActive === false) {
+			await this.tenantTreeRepo.update(
+				{ parent: { id } },
+				{ isActive: dto.isActive },
+			);
+		}
+
 		return this.findOne(id, tenantId);
 	}
 
@@ -442,5 +451,41 @@ export class TenantService {
 				throw new ResponseError(TenantMessages.NOT_FOUND);
 			}
 		}
+	}
+
+	async getTenantType(id: string) {
+		const data = await this.tenantTreeRepo.findOne({
+			where: { id },
+			select: { type: true },
+		});
+
+		if (!data) {
+			throw new ResponseError({
+				...TenantMessages.NOT_FOUND,
+				data: id,
+			});
+		}
+
+		return data.type;
+	}
+
+	async getOneTenantData(id: string, options?: FindOneOptions<Tenant>) {
+		const data = await this.tenantTreeRepo.findOne({
+			...options,
+			where: { ...options?.where, id },
+		});
+
+		if (!data) {
+			throw new ResponseError({
+				...TenantMessages.NOT_FOUND,
+				data: id,
+			});
+		}
+
+		return data;
+	}
+
+	checkActive(isActive: boolean) {
+		if (!isActive) throw new ResponseError(TenantMessages.BLOCKED);
 	}
 }

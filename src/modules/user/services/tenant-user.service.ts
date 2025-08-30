@@ -28,6 +28,12 @@ export class TenantUserService {
 		const data = await this.tenantUserRepository.find({
 			where: {
 				userId,
+				tenant: {
+					isActive: true,
+				},
+			},
+			relations: {
+				tenant: true,
 			},
 			select: {
 				tenantId: true,
@@ -55,6 +61,16 @@ export class TenantUserService {
 			where: {
 				tenantId,
 				userId,
+			},
+			relations: {
+				tenant: true,
+			},
+			select: {
+				tenant: {
+					id: true,
+					name: true,
+					type: true,
+				},
 			},
 		});
 	}
@@ -130,7 +146,7 @@ export class TenantUserService {
 
 		if (
 			(!checkIsSystemAdmin(req.user!.type) ||
-				!checkIsTenantOwner(req.user!.tenantType)) &&
+				!checkIsTenantOwner(req.user!.tenantUserType)) &&
 			checkIsTenantAdmin(tenantUser.type)
 		) {
 			throw new ResponseError(
@@ -186,5 +202,19 @@ export class TenantUserService {
 				TenantUserType.OWNER,
 			);
 		}
+	}
+
+	async checkIsOwnerParentTenant(userId: string, parentTenantId?: string) {
+		if (!parentTenantId) {
+			return false;
+		}
+		const data = await this.tenantUserRepository.findOne({
+			where: {
+				tenantId: parentTenantId,
+				type: TenantUserType.OWNER,
+				userId,
+			},
+		});
+		return Boolean(data);
 	}
 }

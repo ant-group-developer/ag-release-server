@@ -40,6 +40,7 @@ export class AuthService {
 			permission: user!.permission,
 			tenantId: user!.tenantId,
 			tenantType: user!.tenantType,
+			tenantUserType: user!.tenantUserType,
 		};
 	}
 
@@ -63,8 +64,7 @@ export class AuthService {
 				password: true,
 			},
 		});
-
-		this.userService.checkUserActive(user.isActive);
+		this.userService.checkActive(user.isActive);
 
 		const valid = await verify(user.password, body.password);
 		if (!valid) throw new ResponseError(AuthMessages.INVALID_CREDENTIAL);
@@ -170,7 +170,7 @@ export class AuthService {
 			},
 		});
 
-		this.userService.checkUserActive(user.isActive);
+		this.userService.checkActive(user.isActive);
 		if (!checkIsSystemAdmin(user.type)) {
 			await this.tenantUserService.checkMembership(tenantId, userId);
 		}

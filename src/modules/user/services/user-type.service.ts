@@ -55,14 +55,14 @@ export class UserTypeService {
 		return this.checkIsTenantOwnerOrAdmin(tenantId, userId);
 	}
 
-	async getTenantType(
-		tenantId: string,
-		userId: string,
-	): Promise<TenantUserType> {
+	async getTenantTypeAndTenantUserType(tenantId: string, userId: string) {
 		const data = await this.tenantUserService.checkMembership(
 			tenantId,
 			userId,
 		);
-		return data.type;
+		return {
+			tenantType: data.tenant.type,
+			tenantUserType: data.type,
+		};
 	}
 }

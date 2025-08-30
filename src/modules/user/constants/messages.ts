@@ -6,7 +6,7 @@ export const UserMessages = {
 	},
 	BLOCKED: {
 		statusCode: 403,
-		message: 'User blocked',
+		message: 'User has been blocked',
 		messageCode: 'user.message.error.blocked',
 	},
 	EMAIL: {

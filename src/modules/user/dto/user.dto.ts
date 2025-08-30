@@ -102,7 +102,7 @@ export class CreateUserDto extends UpdateUserDto {
 		message: (option) =>
 			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
 	})
-	tenantType?: TenantUserType.ADMIN | TenantUserType.MEMBER;
+	tenantUserType?: TenantUserType.ADMIN | TenantUserType.MEMBER;
 }
 
 export class GetListUserDto extends BaseQueryDto {
