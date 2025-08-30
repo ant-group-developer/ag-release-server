@@ -10,38 +10,48 @@ RCLONE_CONFIG=$RCLONE_CONFIG
 BUCKET_NAME=$BUCKET_NAME
 BACKUP_PATH=$BACKUP_PATH
 
-# validate
+# validate env
 if [ -z "$DB_USER" ] || [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_PASSWORD" ]; then
-  echo "ERROR: Missing database environment variables"
+  echo "Missing database environment variables" >&2
+  exit 1
 fi
 
 if [ -z "$RCLONE_CONFIG" ] || [ -z "$BUCKET_NAME" ] || [ -z "$BACKUP_PATH" ]; then
-  echo "ERROR: Missing storage environment variables"
+  echo "Missing storage environment variables" >&2
+  exit 1
+fi
+
+# validate command
+if ! command -v pg_dump &> /dev/null; then
+  echo "pg_dump is not installed or not in PATH" >&2
+  exit 1
+fi
+
+if ! command -v rclone &> /dev/null; then
+  echo "rclone is not installed or not in PATH" >&2
+  exit 1
 fi
 
 # export db
 mkdir -p "$(dirname "$BACKUP_PATH")"
-PGPASSWORD=$DB_PASSWORD pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" > "$BACKUP_PATH"
-if [ $? -eq 0 ]; then
+if PGPASSWORD=$DB_PASSWORD pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" > "$BACKUP_PATH"; then
   FILE_SIZE=$(stat -c%s "$BACKUP_PATH")
   echo "FILE_SIZE: $FILE_SIZE"
-  echo "SUCCESS: Backup created at $BACKUP_PATH"
+  echo "Backup created at $BACKUP_PATH"
 else
-  echo "ERROR: Backup failed!"
+  echo "Backup failed!" >&2
+  exit 1
 fi
 
 # to gcs
-rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress
-if [ $? -eq 0 ]; then
-  echo "SUCCESS: Uploaded $BACKUP_PATH to GCS bucket: $BUCKET_NAME"
+if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress 1>/dev/null; then
+  echo "Uploaded $BACKUP_PATH to GCS bucket: $BUCKET_NAME"
 else
-  echo "ERROR: Failed when push to GCS"
+  echo "Failed when push to GCS" >&2
+  exit 1
 fi
 
 # delete
-rm -f "$BACKUP_PATH"
-if [ $? -eq 0 ]; then
-  echo "SUCCESS: Local backup file deleted: $BACKUP_PATH"
-else
-  echo "ERROR: Failed to delete local backup file: $BACKUP_PATH"
+if rm -f "$BACKUP_PATH"; then
+  echo "Local backup file deleted: $BACKUP_PATH"
 fi

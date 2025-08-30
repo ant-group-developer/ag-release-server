@@ -3,8 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { PageDto } from 'src/common/dtos/response.dto';
 import { AppEvent, DateFormat } from 'src/common/enums/common';
@@ -43,6 +41,7 @@ export class DatabaseBackupService implements OnModuleInit {
 
 	private baseUrlConsoleGcsBackup: string;
 	private fileName: string;
+	private shell: string;
 
 	constructor(
 		@InjectRepository(Backup)
@@ -66,8 +65,6 @@ export class DatabaseBackupService implements OnModuleInit {
 		this.baseUrlConsoleGcsBackup = this.configService.get<string>(
 			'BASE_URL_CONSOLE_GCS_BACKUP',
 		)!;
-
-		this.fileName = this.configService.get<string>('FILE_NAME')!;
 	}
 
 	onModuleInit() {
@@ -92,9 +89,12 @@ export class DatabaseBackupService implements OnModuleInit {
 			AppConfigKey.NOTIFY_ON_SUCCESS,
 		);
 
-		this.notifyOnSuccess = this.appConfigService.getValue(
+		this.notifyOnFailed = this.appConfigService.getValue(
 			AppConfigKey.NOTIFY_ON_FAILED,
 		);
+
+		this.fileName = this.appConfigService.getValue(AppConfigKey.FILE_NAME);
+		this.shell = this.appConfigService.getValue(AppConfigKey.SHELL);
 	}
 
 	async eventBackup() {
@@ -130,16 +130,14 @@ export class DatabaseBackupService implements OnModuleInit {
 		backupPath: string;
 		entityBackup: Backup;
 	}) {
-		const { fileSize, errorMessages } =
+		const { fileSize, status, error } =
 			await this.runScriptBackup(backupPath);
 
-		entityBackup.status = StatusBackup.SUCCESS;
+		entityBackup.status = status;
 		entityBackup.fileSize = fileSize;
-
-		entityBackup.status = StatusBackup.FAILED;
-		entityBackup.error = errorMessages.join('\n');
-
+		entityBackup.error = error;
 		entityBackup.elapsedTime = this.calculateElapsedTime(timeStart);
+
 		const result = await this.backupRepo.save(entityBackup);
 		await this.sendNotificationBackup(result);
 	}
@@ -152,10 +150,7 @@ export class DatabaseBackupService implements OnModuleInit {
 	}
 
 	private prepareBackupPath(fileName: string): string {
-		const backupDir = path.join(os.homedir(), 'backups');
-		if (!fs.existsSync(backupDir)) {
-			fs.mkdirSync(backupDir, { recursive: true });
-		}
+		const backupDir = path.join(process.cwd(), 'backups');
 		return path.join(backupDir, fileName);
 	}
 
@@ -175,34 +170,38 @@ export class DatabaseBackupService implements OnModuleInit {
 		const { username, host, port, database, password } = this.configDB;
 		const scriptBackupPath = './scripts/script.backup.sh';
 
-		const { stdout } = await execFileAsync(scriptBackupPath, {
-			env: {
-				DB_USER: username,
-				DB_HOST: host,
-				DB_PORT: String(port),
-				DB_NAME: database,
-				DB_PASSWORD: password,
+		try {
+			const { stdout } = await execFileAsync(scriptBackupPath, {
+				env: {
+					DB_USER: username,
+					DB_HOST: host,
+					DB_PORT: String(port),
+					DB_NAME: database,
+					DB_PASSWORD: password,
 
-				RCLONE_CONFIG: './database.rclone.conf',
-				BUCKET_NAME: this.bucketName,
-				BACKUP_PATH: backupPath,
-			},
-			shell:
-				process.platform === 'win32'
-					? 'C:\\Program Files\\Git\\bin\\bash.exe'
-					: '/bin/bash',
-		});
+					RCLONE_CONFIG:
+						this.configService.get<string>('RCLONE_CONFIG_PATH')!,
+					BUCKET_NAME: this.bucketName,
+					BACKUP_PATH: backupPath,
+				},
+				shell: this.shell,
+			});
 
-		return this.parseResultBackup(stdout.trim());
+			return {
+				status: StatusBackup.SUCCESS,
+				fileSize: this.parseFileSize(stdout),
+				error: null,
+			};
+		} catch (error) {
+			return {
+				status: StatusBackup.FAILED,
+				fileSize: 0,
+				error: JSON.stringify(error),
+			};
+		}
 	}
 
-	private parseResultBackup(stdout: string): {
-		fileSize: number;
-		successMessages: string[];
-		errorMessages: string[];
-	} {
-		const successMessages: string[] = [];
-		const errorMessages: string[] = [];
+	private parseFileSize(stdout: string): number {
 		let fileSize = 0;
 
 		stdout
@@ -210,11 +209,7 @@ export class DatabaseBackupService implements OnModuleInit {
 			.map((line) => line.trim())
 			.filter(Boolean)
 			.forEach((line) => {
-				if (line.startsWith('SUCCESS:')) {
-					successMessages.push(line.slice(8).trim());
-				} else if (line.startsWith('ERROR:')) {
-					errorMessages.push(line.slice(6).trim());
-				} else if (line.startsWith('FILE_SIZE:')) {
+				if (line.startsWith('FILE_SIZE:')) {
 					const match = line.match(/FILE_SIZE:\s*(\d+)/);
 					if (match) {
 						fileSize = parseInt(match[1], 10);
@@ -222,7 +217,7 @@ export class DatabaseBackupService implements OnModuleInit {
 				}
 			});
 
-		return { fileSize, successMessages, errorMessages };
+		return fileSize;
 	}
 
 	private calculateElapsedTime(start: number): number {

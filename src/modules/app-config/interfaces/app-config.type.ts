@@ -24,6 +24,10 @@ export interface WebsiteConfig {
 export interface BackupDatabase {
 	cronValue: string;
 
+	// config
+	fileName: string;
+	shell: string;
+
 	// Thông báo kết quả backup
 	notifyOnFailed: boolean;
 	notifyOnSuccess: boolean;
@@ -78,6 +82,8 @@ export type AppConfigValueMap = {
 
 	//
 	[AppConfigKey.CRON_VALUE]: string;
+	[AppConfigKey.FILE_NAME]: string;
+	[AppConfigKey.SHELL]: string;
 	[AppConfigKey.DATABASE_TO_DRIVE]: boolean;
 	[AppConfigKey.DATABASE_TO_GCS]: boolean;
 	[AppConfigKey.NOTIFY_ON_SUCCESS]: boolean;
