@@ -8,10 +8,12 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 
+import { Request } from 'express';
 import { TrackOriginTypeMessageCodeSuccess } from './constants/track-origin-type.constant';
 import {
 	CreateTrackOriginTypeDto,
@@ -31,9 +33,12 @@ export class TrackOriginTypeController {
 	@Post()
 	async create(
 		@Body() createTrackOriginTypeDto: CreateTrackOriginTypeDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<TrackOriginType>> {
+		const userId = req.user!.sub;
 		const result = await this.trackOriginTypeService.create(
 			createTrackOriginTypeDto,
+			userId,
 		);
 		return new ResponseSuccess({
 			data: result,
@@ -67,10 +72,13 @@ export class TrackOriginTypeController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackOriginTypeDto: UpdateTrackOriginTypeDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<TrackOriginType>> {
+		const userId = req.user!.sub;
 		const result = await this.trackOriginTypeService.update(
 			id,
 			updateTrackOriginTypeDto,
+			userId,
 		);
 		return new ResponseSuccess({
 			data: result,

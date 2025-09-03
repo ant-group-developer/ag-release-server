@@ -31,7 +31,7 @@ export class UserService {
 		return result;
 	}
 
-	async create(payload: CreateUserDto): Promise<User> {
+	async create(payload: CreateUserDto, userReqId: string): Promise<User> {
 		const {
 			email,
 			password,
@@ -57,6 +57,8 @@ export class UserService {
 			password: hashedPassword,
 			emailVerified: emailVerified ?? true,
 			avatar: avatar || getAvatarUrl(formattedEmail),
+			creatorId: userReqId,
+			modifierId: userReqId,
 		});
 		const savedData = await this.userRepository.save(user);
 
@@ -193,7 +195,11 @@ export class UserService {
 		});
 	}
 
-	async update(id: string, payload: UpdateUserDto): Promise<User> {
+	async update(
+		id: string,
+		payload: UpdateUserDto,
+		userReqId: string,
+	): Promise<User> {
 		const { email, password } = payload;
 
 		const user = await this.findOne(id);
@@ -215,6 +221,7 @@ export class UserService {
 			email: formattedEmail ?? user.email,
 			password: hashedPassword || user.password,
 			avatar,
+			modifierId: userReqId,
 		});
 
 		return this.findOne(savedData.id);

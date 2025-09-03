@@ -21,12 +21,19 @@ export class TrackOriginTypeService {
 	) {}
 
 	// create
-	async create(data: CreateTrackOriginTypeDto): Promise<TrackOriginType> {
+	async create(
+		data: CreateTrackOriginTypeDto,
+		userId: string,
+	): Promise<TrackOriginType> {
 		const { name, code } = data;
 
 		await this.trackOriginTypeQueryService.validate({ name, code });
 
-		const trackOriginType = this.trackOriginTypeRepo.create(data);
+		const trackOriginType = this.trackOriginTypeRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 
 		return await this.trackOriginTypeRepo.save(trackOriginType);
 	}
@@ -85,6 +92,7 @@ export class TrackOriginTypeService {
 	async update(
 		id: string,
 		data: UpdateTrackOriginTypeDto,
+		userId: string,
 	): Promise<TrackOriginType> {
 		const { name, code } = data;
 		const trackOriginType = await this.findOne(id);
@@ -97,7 +105,10 @@ export class TrackOriginTypeService {
 			await this.trackOriginTypeQueryService.validate({ code });
 		}
 
-		await this.trackOriginTypeRepo.update(id, data);
+		await this.trackOriginTypeRepo.update(id, {
+			...data,
+			modifierId: userId,
+		});
 		return await this.findOne(id);
 	}
 

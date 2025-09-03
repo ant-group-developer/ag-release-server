@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import {
 	Column,
 	Entity,
@@ -18,12 +18,12 @@ import { TenantType } from './tenant.enum';
 
 @Entity({ name: 'tenants' })
 @Tree('closure-table')
-export class Tenant extends BaseUUIDEntity {
-	@Column({ type: 'uuid', nullable: true })
-	creatorId: string;
+export class Tenant extends BaseUserTrackedUUIDEntity {
+	// @Column({ type: 'uuid', nullable: true })
+	// creatorId: string;
 
-	@Column({ type: 'uuid', nullable: true })
-	modifierId: string;
+	// @Column({ type: 'uuid', nullable: true })
+	// modifierId: string;
 
 	@Column({
 		length: LENGTH_PICTURE,

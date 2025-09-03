@@ -8,7 +8,9 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	SystemAdminOnly,
@@ -32,8 +34,9 @@ export class RoleController {
 
 	@SystemAdminOnly()
 	@Post()
-	async handleCreateRole(@Body() data: CreateRoleDto) {
-		const result = await this.roleService.handleCreateRole(data);
+	async handleCreateRole(@Body() data: CreateRoleDto, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const result = await this.roleService.handleCreateRole(data, userId);
 		return new ResponseSuccess({
 			...result,
 			message: RoleMessageSuccess.CREATE,
@@ -67,8 +70,10 @@ export class RoleController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateRoleDto,
+		@Req() req: Request,
 	) {
-		const result = await this.roleService.handleUpdate(id, data);
+		const userId = req.user!.sub;
+		const result = await this.roleService.handleUpdate(id, data, userId);
 
 		return new ResponseSuccess({
 			...result,

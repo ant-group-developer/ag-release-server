@@ -98,11 +98,14 @@ export class TenantUserService {
 		tenantId: string,
 		userId: string,
 		type: TenantUserType,
+		userReqId: string,
 	): Promise<TenantUser> {
 		const tenantUser = this.tenantUserRepository.create({
 			tenantId,
 			userId,
 			type,
+			creatorId: userReqId,
+			modifierId: userReqId,
 		});
 		return this.tenantUserRepository.save(tenantUser);
 	}
@@ -121,10 +124,11 @@ export class TenantUserService {
 		tenantId: string,
 		email: string,
 		type: TenantUserType,
+		userReqId: string,
 	): Promise<TenantUser> {
 		const user = await this.userService.findOneByEmail(email);
 		await this.checkExisted(tenantId, user.id);
-		return this.addUserToTenant(tenantId, user.id, type);
+		return this.addUserToTenant(tenantId, user.id, type, userReqId);
 	}
 
 	async remove(req: Request, userId: string) {
@@ -157,7 +161,10 @@ export class TenantUserService {
 		return this.tenantUserRepository.delete({ tenantId, userId });
 	}
 
-	async bulkUpdateTenantUser({ userId, data }: BulkUpdateTenantUserDto) {
+	async bulkUpdateTenantUser(
+		{ userId, data }: BulkUpdateTenantUserDto,
+		userReqId: string,
+	) {
 		await this.userService.findOne(userId);
 		await this.tenantService.validateExisted(
 			data.map((item) => item.tenantId),
@@ -171,6 +178,8 @@ export class TenantUserService {
 				tenantId: item.tenantId,
 				type: item.type,
 				userId,
+				creatorId: userReqId,
+				modifierId: userReqId,
 			}),
 		);
 		return this.tenantUserRepository.save(newData);
@@ -183,7 +192,7 @@ export class TenantUserService {
 		});
 	}
 
-	async updateOwner(tenantId: string, ownerId: string) {
+	async updateOwner(tenantId: string, ownerId: string, userReqId: string) {
 		await this.userService.findOne(ownerId);
 		const tenantUser = await this.findOne(tenantId, ownerId);
 		if (tenantUser) {
@@ -200,6 +209,7 @@ export class TenantUserService {
 				tenantId,
 				ownerId,
 				TenantUserType.OWNER,
+				userReqId,
 			);
 		}
 	}

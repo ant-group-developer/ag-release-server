@@ -301,6 +301,7 @@ export class TenantService {
 	async create(
 		{ ownerId, ...dto }: CreateTenantDto,
 		tenantId: string,
+		userReqId: string,
 	): Promise<Tenant> {
 		// Check duplicate name
 		const dup = await this.tenantTreeRepo.findOne({
@@ -330,7 +331,11 @@ export class TenantService {
 			parent = foundParent;
 		}
 
-		const tenant = this.tenantTreeRepo.create(dto);
+		const tenant = this.tenantTreeRepo.create({
+			...dto,
+			creatorId: userReqId,
+			modifierId: userReqId,
+		});
 
 		if (parent) {
 			tenant.parent = parent;
@@ -343,6 +348,7 @@ export class TenantService {
 			saved.id,
 			ownerId,
 			TenantUserType.OWNER,
+			userReqId,
 		);
 
 		return this.findOne(saved.id, tenantId);
@@ -353,6 +359,7 @@ export class TenantService {
 		id: string,
 		dto: UpdateTenantDto,
 		tenantId: string,
+		userReqId: string,
 	): Promise<Tenant> {
 		const tenant = await this.tenantTreeRepo.findOne({
 			where: { id },
@@ -409,13 +416,13 @@ export class TenantService {
 			}
 		});
 
-		await this.tenantTreeRepo.save(tenant);
+		await this.tenantTreeRepo.save({ ...tenant, modifierId: userReqId });
 
 		// Nếu khoá tenant cha thì sẽ khoá tất cả tenant con
 		if (dto.isActive === false) {
 			await this.tenantTreeRepo.update(
 				{ parent: { id } },
-				{ isActive: dto.isActive },
+				{ isActive: dto.isActive, modifierId: userReqId },
 			);
 		}
 
