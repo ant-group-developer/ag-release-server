@@ -52,32 +52,22 @@ export class LabelController {
 	): Promise<ResponseSuccess<Label>> {
 		const tenantId = req.user!.tenantId;
 
+		const userId = req.user!.sub;
 		if (checkIsSystemTenant(tenantId)) {
 			throw new ResponseError(LabelMessage.SYSTEM_TENANT_FORBIDDEN);
 		}
 
 		await this.labelService.checkExceedLabels(tenantId);
 
-		const result = await this.labelService.create(createLabelDto, tenantId);
+		const result = await this.labelService.create(
+			createLabelDto,
+			tenantId,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: LabelMessageCodeSuccess.CREATE,
 		});
-	}
-
-	@Get(':id')
-	async findOne(
-		@Param('id') id: string,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.findOneWithCountRelation(id);
-
-		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
-			throw new ResponseError(AuthMessages.FORBIDDEN);
-		}
-
-		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
@@ -99,13 +89,52 @@ export class LabelController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('simple')
+	@ApiOperation({ summary: 'Get a list of labels' })
+	@ApiResponse({
+		status: 200,
+		description: 'List of labels',
+	})
+	async getListSimple(@Req() req: Request) {
+		const tenantId = req.user!.tenantId;
+		let tenantIds;
+		if (checkIsNotSystemTenant(tenantId)) {
+			tenantIds = [tenantId];
+		}
+
+		const result = await this.labelService.getListSimple(tenantIds);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<Label>> {
+		const result = await this.labelService.findOneWithCountRelation(id);
+
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@RequirePermissions(Permission.LABEL.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
 		@Body() updateLabelDto: UpdateLabelDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<Label>> {
-		const result = await this.labelService.update(id, updateLabelDto);
+		const userId = req.user!.sub;
+
+		const result = await this.labelService.update(
+			id,
+			updateLabelDto,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: LabelMessageCodeSuccess.UPDATE,

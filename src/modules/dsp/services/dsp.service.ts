@@ -29,10 +29,10 @@ export class DspService {
 	) {}
 
 	// create
-	async handleCreate(data: CreateDspDto) {
+	async handleCreate(data: CreateDspDto, userId: string) {
 		const { dspActions, ...rest } = data;
 
-		const dsp = await this.createDsp(rest);
+		const dsp = await this.createDsp(rest, userId);
 		const { messageWarning } = await this.createDspActionsSafe({
 			dspId: dsp.id,
 			dspActions,
@@ -44,10 +44,18 @@ export class DspService {
 		});
 	}
 
-	private async createDsp(data: Omit<CreateDspDto, 'dspActions'>) {
+	private async createDsp(
+		data: Omit<CreateDspDto, 'dspActions'>,
+		userId: string,
+	) {
 		await this.dspQueryService.validate({ name: data.name });
 		const code = stringToCode(data.name);
-		const dsp = this.dspRepo.create({ ...data, code });
+		const dsp = this.dspRepo.create({
+			...data,
+			code,
+			modifierId: userId,
+			creatorId: userId,
+		});
 		return await this.dspRepo.save(dsp);
 	}
 
@@ -121,12 +129,20 @@ export class DspService {
 	}
 
 	// update
-	async handleUpdate({ dspId, data }: { dspId: string; data: UpdateDspDto }) {
+	async handleUpdate({
+		dspId,
+		data,
+		userId,
+	}: {
+		dspId: string;
+		data: UpdateDspDto;
+		userId: string;
+	}) {
 		const { dspActions, ...rest } = data;
 
 		const dsp = await this.findOne(dspId);
 
-		await this.updateDsp({ dsp, data: rest });
+		await this.updateDsp({ dsp, data: rest, userId });
 		const messageWarning = await this.updateDspActions({
 			dsp,
 			dspActions,
@@ -142,9 +158,11 @@ export class DspService {
 	private async updateDsp({
 		dsp,
 		data,
+		userId,
 	}: {
 		dsp: Dsp;
 		data: Omit<UpdateDspDto, 'dspActions'>;
+		userId: string;
 	}): Promise<Dsp> {
 		const { name, picture } = data;
 
@@ -156,7 +174,7 @@ export class DspService {
 			await this.bucketService.deletePublicFile(dsp.picture);
 		}
 
-		await this.dspRepo.update(dsp.id, data);
+		await this.dspRepo.update(dsp.id, { ...data, modifierId: userId });
 		return await this.findOne(dsp.id);
 	}
 

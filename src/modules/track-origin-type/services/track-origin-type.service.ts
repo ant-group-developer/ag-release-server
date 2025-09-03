@@ -54,6 +54,12 @@ export class TrackOriginTypeService {
 		return trackOriginType;
 	}
 
+	async getListSimple() {
+		return await this.trackOriginTypeRepo.find({
+			select: ['id', 'code', 'name'],
+		});
+	}
+
 	async getList(
 		query: QueryGetListTrackOriginTypeDto,
 	): Promise<PageDto<TrackOriginType>> {

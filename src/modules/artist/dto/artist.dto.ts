@@ -16,6 +16,7 @@ import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { Transform, Type } from 'class-transformer';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
+
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderArtist } from '../enum/artist.enum';
 

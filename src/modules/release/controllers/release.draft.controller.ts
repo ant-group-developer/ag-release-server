@@ -40,12 +40,16 @@ export class ReleaseDraftController {
 	@Post()
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
 		const tenantId = req.user!.tenantId;
+
+		const userId = req.user!.sub;
+
 		if (checkIsSystemTenant(tenantId)) {
 			throw new ResponseError(ReleaseMessages.DECLINE_SYSTEM_TENANT);
 		}
 		const result = await this.releaseDraftService.create(
 			data,
 			req.user!.tenantId,
+			userId,
 		);
 
 		return new ResponseSuccess({
@@ -59,8 +63,11 @@ export class ReleaseDraftController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<IReleaseDetail>> {
-		const result = await this.releaseDraftService.update(id, data);
+		const userId = req.user!.sub;
+		const result = await this.releaseDraftService.update(id, data, userId);
+
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseMessageCodeSuccess.UPDATE,

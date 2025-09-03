@@ -43,6 +43,7 @@ export class ReleaseDraftService {
 	async create(
 		data: CreateReleaseDraftDto,
 		tenantId: string,
+		userId: string,
 	): Promise<Release> {
 		const {
 			albumFormatId,
@@ -60,7 +61,12 @@ export class ReleaseDraftService {
 			releaseTimezoneId,
 		});
 
-		const release = this.releaseRepo.create({ ...data, tenantId });
+		const release = this.releaseRepo.create({
+			...data,
+			tenantId,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		const releaseDb = await this.releaseRepo.save(release);
 
 		// coverArt
@@ -83,6 +89,7 @@ export class ReleaseDraftService {
 	async update(
 		id: string,
 		data: UpdateReleaseDraftDto,
+		userId: string,
 	): Promise<IReleaseDetail> {
 		const {
 			releaseCoverArt,
@@ -112,7 +119,10 @@ export class ReleaseDraftService {
 			releaseTerritory,
 		});
 
-		await this.releaseRepo.update(id, restOfData);
+		await this.releaseRepo.update(id, {
+			...restOfData,
+			modifierId: userId,
+		});
 		const releaseDb = await this.releaseQueryService.getOneDetail(id);
 
 		const { releaseCoverArts, ...restOfRelease } = releaseDb;

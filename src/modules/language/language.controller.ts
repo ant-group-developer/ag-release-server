@@ -39,19 +39,25 @@ export class LanguageController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<ResponseSuccess<Language>> {
-		const result = await this.languageService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	async getList(
 		@Query() query: QueryGetListLanguageDto,
 	): Promise<ResponseSuccess<PageDto<Language>>> {
 		const result = await this.languageService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('/simple')
+	async getListSimple() {
+		const result = await this.languageService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Language>> {
+		const result = await this.languageService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 

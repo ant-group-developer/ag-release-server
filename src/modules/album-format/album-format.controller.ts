@@ -7,8 +7,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
@@ -33,9 +35,26 @@ export class AlbumFormatController {
 	})
 	async create(
 		@Body() createAlbumFormatDto: CreateAlbumFormatDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<AlbumFormat>> {
 		const result =
 			await this.albumFormatService.create(createAlbumFormatDto);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get()
+	@ApiOperation({ summary: 'Get a list of album formats' })
+	@ApiResponse({ status: 200, description: 'List of album formats' })
+	async getList(@Query() query: QueryGetListAlbumFormatDto) {
+		const result = await this.albumFormatService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	@ApiOperation({ summary: 'Get a list of album formats' })
+	@ApiResponse({ status: 200, description: 'List of album formats' })
+	async getListSimple() {
+		const result = await this.albumFormatService.getListSimple();
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -49,14 +68,6 @@ export class AlbumFormatController {
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<AlbumFormat>> {
 		const result = await this.albumFormatService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	@ApiOperation({ summary: 'Get a list of album formats' })
-	@ApiResponse({ status: 200, description: 'List of album formats' })
-	async getList(@Query() query: QueryGetListAlbumFormatDto) {
-		const result = await this.albumFormatService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 

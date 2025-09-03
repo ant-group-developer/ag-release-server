@@ -97,6 +97,10 @@ export class AlbumFormatService implements OnModuleInit {
 		});
 	}
 
+	async getListSimple() {
+		return this.albumFormatQueryService.getListSimple();
+	}
+
 	async update(id: string, data: UpdateAlbumFormatDto): Promise<AlbumFormat> {
 		const { code, name } = data;
 

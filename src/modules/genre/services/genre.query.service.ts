@@ -131,4 +131,11 @@ export class GenreQueryService {
 			);
 		}
 	}
+
+	async getListSimple() {
+		return this.genreRepo
+			.createQueryBuilder('g')
+			.select(['g.id', 'g.name', 'g.code'])
+			.getMany();
+	}
 }

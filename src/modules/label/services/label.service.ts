@@ -25,7 +25,11 @@ export class LabelService {
 	) {}
 
 	// create
-	async create(data: CreateLabelDto, tenantId: string): Promise<Label> {
+	async create(
+		data: CreateLabelDto,
+		tenantId: string,
+		userId: string,
+	): Promise<Label> {
 		await this.labelQueryService.validate({
 			where: { name: data.name, tenantId },
 		});
@@ -35,6 +39,8 @@ export class LabelService {
 			...data,
 			code,
 			tenantId: tenantId,
+			creatorId: userId,
+			modifierId: userId,
 		});
 		return await this.labelRepo.save(label);
 	}
@@ -74,8 +80,16 @@ export class LabelService {
 		});
 	}
 
+	async getListSimple(tenantIds?: string[]) {
+		return await this.labelQueryService.getListSimple(tenantIds);
+	}
+
 	// update
-	async update(id: string, data: UpdateLabelDto): Promise<Label> {
+	async update(
+		id: string,
+		data: UpdateLabelDto,
+		userId: string,
+	): Promise<Label> {
 		const { name, picture } = data;
 
 		const label = await this.findOne(id);
@@ -94,7 +108,7 @@ export class LabelService {
 			await this.bucketService.deletePublicFile(label.picture);
 		}
 
-		await this.labelRepo.update(id, data);
+		await this.labelRepo.update(id, { ...data, modifierId: userId });
 		return await this.findOne(id);
 	}
 

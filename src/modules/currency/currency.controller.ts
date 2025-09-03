@@ -8,7 +8,9 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { CurrencyMessageCodeSuccess } from './constants/currency.constant';
@@ -29,6 +31,12 @@ export class CurrencyController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Get('simple')
+	async getListSimple() {
+		const data = await this.currencyService.getListSimple();
+		return new ResponseSuccess({ data });
+	}
+
 	@Get(':id')
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const data = await this.currencyService.findOne(id);
@@ -37,8 +45,9 @@ export class CurrencyController {
 
 	@SystemAdminOnly()
 	@Post()
-	async create(@Body() dto: CreateCurrencyDto) {
-		const data = await this.currencyService.create(dto);
+	async create(@Body() dto: CreateCurrencyDto, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const data = await this.currencyService.create(dto, userId);
 		return new ResponseSuccess({
 			data,
 			messageCode: CurrencyMessageCodeSuccess.CREATE,
@@ -50,8 +59,10 @@ export class CurrencyController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() dto: UpdateCurrencyDto,
+		@Req() req: Request,
 	) {
-		const data = await this.currencyService.update(id, dto);
+		const userId = req.user!.sub;
+		const data = await this.currencyService.update(id, dto, userId);
 		return new ResponseSuccess({
 			data,
 			messageCode: CurrencyMessageCodeSuccess.UPDATE,

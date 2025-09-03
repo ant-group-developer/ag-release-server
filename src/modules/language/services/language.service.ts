@@ -84,6 +84,10 @@ export class LanguageService implements OnModuleInit {
 		});
 	}
 
+	async getListSimple() {
+		return this.languageQueryService.getListSimple();
+	}
+
 	// update
 	async update(
 		id: string,

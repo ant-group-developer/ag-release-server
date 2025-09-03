@@ -28,16 +28,23 @@ export class PermissionService {
 	) {}
 
 	// create
-	async create(data: CreatePermissionDto): Promise<Permission> {
+	async create(
+		data: CreatePermissionDto,
+		userId: string,
+	): Promise<Permission> {
 		await this.permissionQueryService.validate(data);
 
-		const permission = this.permissionRepo.create(data);
+		const permission = this.permissionRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.permissionRepo.save(permission);
 	}
 
-	async createSafe(data: CreatePermissionDto) {
+	async createSafe(data: CreatePermissionDto, userId: string) {
 		try {
-			const entity = await this.create(data);
+			const entity = await this.create(data, userId);
 			return { entity, messageWarning: null };
 		} catch (error) {
 			const messageWarning =
@@ -47,11 +54,11 @@ export class PermissionService {
 		}
 	}
 
-	async bulkCreate(data: BulkCreatePermissionDto) {
+	async bulkCreate(data: BulkCreatePermissionDto, userId: string) {
 		const { permissions } = data;
 
 		const result = await Promise.all(
-			permissions.map((item) => this.createSafe(item)),
+			permissions.map((item) => this.createSafe(item, userId)),
 		);
 
 		return new ResponseSuccess({
@@ -100,7 +107,11 @@ export class PermissionService {
 	}
 
 	// update
-	async update(id: string, data: UpdatePermissionDto): Promise<Permission> {
+	async update(
+		id: string,
+		data: UpdatePermissionDto,
+		userId: string,
+	): Promise<Permission> {
 		const { name, code } = data;
 
 		const permission = await this.findOne(id);
@@ -113,7 +124,7 @@ export class PermissionService {
 			await this.permissionQueryService.validate({ code });
 		}
 
-		await this.permissionRepo.update(id, data);
+		await this.permissionRepo.update(id, { ...data, modifierId: userId });
 		return await this.findOne(id);
 	}
 

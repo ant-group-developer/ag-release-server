@@ -8,7 +8,9 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	SystemAdminOnly,
@@ -33,24 +35,22 @@ export class PermissionController {
 
 	@SystemAdminOnly()
 	@Post()
-	async create(@Body() data: CreatePermissionDto) {
-		const result = await this.permissionService.create(data);
+	async create(@Body() data: CreatePermissionDto, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const result = await this.permissionService.create(data, userId);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@SystemAdminOnly()
 	@Post('bulk')
-	async bulkCreate(@Body() data: BulkCreatePermissionDto) {
-		const result = await this.permissionService.bulkCreate(data);
+	async bulkCreate(
+		@Body() data: BulkCreatePermissionDto,
+		@Req() req: Request,
+	) {
+		const userId = req.user!.sub;
+		const result = await this.permissionService.bulkCreate(data, userId);
 
 		return new ResponseSuccess({ ...result });
-	}
-
-	@TenantOwnerOrAdminOnly()
-	@Get(':id')
-	async findOne(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.permissionService.findOne(id);
-		return new ResponseSuccess({ data: result });
 	}
 
 	@TenantOwnerOrAdminOnly()
@@ -60,13 +60,29 @@ export class PermissionController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@TenantOwnerOrAdminOnly()
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.permissionService.getAll();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@TenantOwnerOrAdminOnly()
+	@Get(':id')
+	async findOne(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.permissionService.findOne(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdatePermissionDto,
+		@Req() req: Request,
 	) {
-		const result = await this.permissionService.update(id, data);
+		const userId = req.user!.sub;
+		const result = await this.permissionService.update(id, data, userId);
 		return new ResponseSuccess({ data: result });
 	}
 

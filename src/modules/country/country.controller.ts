@@ -38,9 +38,27 @@ export class CountryController {
 		});
 	}
 
+	@Get()
+	async getList(
+		@Query() query: QueryGetListCountryDto,
+	): Promise<ResponseSuccess<PageDto<Country>>> {
+		const result = await this.countryService.getList(query);
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
 	@Get('continents')
 	async getListContinent() {
 		const result = await this.countryService.getListContinent();
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.countryService.getListSimple();
 		return new ResponseSuccess({
 			data: result,
 		});
@@ -52,16 +70,6 @@ export class CountryController {
 	): Promise<ResponseSuccess<Country>> {
 		const result = await this.countryService.findOne(id);
 		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	async getList(
-		@Query() query: QueryGetListCountryDto,
-	): Promise<ResponseSuccess<PageDto<Country>>> {
-		const result = await this.countryService.getList(query);
-		return new ResponseSuccess({
-			data: result,
-		});
 	}
 
 	@SystemAdminOnly()

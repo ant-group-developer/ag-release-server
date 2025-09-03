@@ -7,8 +7,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { DspMessageCodeSuccess } from './constants/dsp.constant';
@@ -23,8 +25,9 @@ export class DspController {
 
 	@SystemAdminOnly()
 	@Post()
-	async create(@Body() createDspDto: CreateDspDto) {
-		const result = await this.dspService.handleCreate(createDspDto);
+	async create(@Body() createDspDto: CreateDspDto, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const result = await this.dspService.handleCreate(createDspDto, userId);
 		return new ResponseSuccess({
 			...result,
 			messageCode: DspMessageCodeSuccess.CREATE,
@@ -53,8 +56,17 @@ export class DspController {
 
 	@SystemAdminOnly()
 	@Put(':id')
-	async handleUpdate(@Param('id') id: string, @Body() data: UpdateDspDto) {
-		const result = await this.dspService.handleUpdate({ dspId: id, data });
+	async handleUpdate(
+		@Param('id') id: string,
+		@Body() data: UpdateDspDto,
+		@Req() req: Request,
+	) {
+		const userId = req.user!.sub;
+		const result = await this.dspService.handleUpdate({
+			dspId: id,
+			data,
+			userId,
+		});
 		return new ResponseSuccess({
 			...result,
 			messageCode: DspMessageCodeSuccess.UPDATE,

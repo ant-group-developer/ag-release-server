@@ -20,11 +20,15 @@ export class ActionService {
 		private readonly actionQueryService: ActionQueryService,
 	) {}
 
-	async create(data: CreateActionDto): Promise<Action> {
+	async create(data: CreateActionDto, userId: string): Promise<Action> {
 		const { name, code } = data;
 
 		await this.actionQueryService.validate({ name, code });
-		const action = this.actionRepo.create(data);
+		const action = this.actionRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.actionRepo.save(action);
 	}
 
@@ -58,7 +62,17 @@ export class ActionService {
 		});
 	}
 
-	async update(id: string, data: UpdateActionDto): Promise<Action> {
+	async getListSimple() {
+		return this.actionRepo.find({
+			select: ['id', 'code', 'name', 'note'],
+		});
+	}
+
+	async update(
+		id: string,
+		data: UpdateActionDto,
+		userId: string,
+	): Promise<Action> {
 		const { name, code } = data;
 		const action = await this.findOne(id);
 
@@ -69,7 +83,7 @@ export class ActionService {
 			await this.actionQueryService.validate({ code });
 		}
 
-		await this.actionRepo.update(id, data);
+		await this.actionRepo.update(id, { ...data, modifierId: userId });
 		return this.findOne(id);
 	}
 

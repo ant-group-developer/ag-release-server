@@ -73,6 +73,10 @@ export class CountryService {
 		return await this.countryQueryService.getListContinent();
 	}
 
+	async getListSimple() {
+		return this.countryQueryService.getListSimple();
+	}
+
 	// update
 	async update(
 		id: string,

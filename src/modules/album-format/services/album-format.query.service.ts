@@ -126,4 +126,17 @@ export class AlbumFormatQueryService {
 			);
 		}
 	}
+
+	async getListSimple() {
+		return this.albumFormatRepo
+			.createQueryBuilder('albumFormat')
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+				'albumFormat.minTrackCount',
+				'albumFormat.maxTrackCount',
+			])
+			.getMany();
+	}
 }

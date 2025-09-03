@@ -41,19 +41,25 @@ export class TrackOriginTypeController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<ResponseSuccess<TrackOriginType>> {
-		const result = await this.trackOriginTypeService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	async getList(
 		@Query() query: QueryGetListTrackOriginTypeDto,
 	): Promise<ResponseSuccess<PageDto<TrackOriginType>>> {
 		const result = await this.trackOriginTypeService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.trackOriginTypeService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<TrackOriginType>> {
+		const result = await this.trackOriginTypeService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 
