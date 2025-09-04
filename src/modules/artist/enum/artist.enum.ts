@@ -19,3 +19,9 @@ export enum VirtualColumnsArtist {
 export const VirtualColumnsArtistArr = Object.values(
 	VirtualColumnsArtist,
 ) as string[];
+
+export enum ArtistSource {
+	MUSIC_BRAINZ = 'music_brainz',
+	ANT_MUSIC = 'ant_music',
+	ADA = 'ada',
+}

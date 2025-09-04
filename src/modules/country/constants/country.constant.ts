@@ -68,3 +68,33 @@ export const CountryMessage = {
 		statusCode: 400,
 	},
 };
+export const listCountriesInit = [
+	{
+		name: 'Afghanistan',
+		iso3: 'AFG',
+		iso2: 'AF',
+		numericCode: '4',
+		phoneCode: '93',
+		capital: 'Kabul',
+		currency: 'AFN',
+		currencyName: 'Afghan Afghani',
+		currencySymbol: '؋',
+		regionId: 1,
+		nationality: 'Afghan',
+		continent: 'Asia',
+	},
+	{
+		name: 'Albania',
+		iso3: 'ALB',
+		iso2: 'AL',
+		numericCode: '8',
+		phoneCode: '355',
+		capital: 'Tirana',
+		currency: 'ALL',
+		currencyName: 'Albanian Lek',
+		currencySymbol: 'Lek',
+		regionId: 1,
+		nationality: 'Albanian',
+		continent: 'Europe',
+	},
+];

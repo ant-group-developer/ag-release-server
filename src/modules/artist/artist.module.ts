@@ -1,3 +1,4 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtistProfileModule } from '../artist-profile/artist-profile.module';
@@ -12,6 +13,7 @@ import { ArtistService } from './services/artist.service';
 		TypeOrmModule.forFeature([Artist]),
 		BucketModule,
 		ArtistProfileModule,
+		HttpModule,
 	],
 	controllers: [ArtistController],
 	providers: [ArtistService, ArtistQueryService],
