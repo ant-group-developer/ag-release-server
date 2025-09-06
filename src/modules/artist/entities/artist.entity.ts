@@ -9,10 +9,11 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { ArtistSource } from '../enum/artist.enum';
 
 @Entity('artists')
 export class Artist extends BaseUserTrackedCustomIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
 	name: string;
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
@@ -23,6 +24,16 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 
 	@Column({ type: 'varchar', length: 250, nullable: true })
 	biography: string | null;
+
+	@Column({
+		type: 'enum',
+		enum: ArtistSource,
+		default: ArtistSource.ANT_MUSIC,
+	})
+	artistSource: ArtistSource;
+
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	idSource: string;
 
 	// relations
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)

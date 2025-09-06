@@ -20,7 +20,7 @@ export class PriceTierService {
 		private readonly priceTierQueryService: PriceTierQueryService,
 	) {}
 
-	async create(dto: CreatePriceTierDto): Promise<PriceTier> {
+	async create(dto: CreatePriceTierDto, userId: string): Promise<PriceTier> {
 		await this.priceTierQueryService.validateForeignKey({
 			currencyId: dto.currencyId,
 		});
@@ -29,7 +29,11 @@ export class PriceTierService {
 			await this.priceTierQueryService.resetDefaultPriceTier();
 		}
 
-		const entity = this.priceTierRepo.create(dto);
+		const entity = this.priceTierRepo.create({
+			...dto,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return this.priceTierRepo.save(entity);
 	}
 
@@ -68,7 +72,11 @@ export class PriceTierService {
 		});
 	}
 
-	async update(id: string, dto: UpdatePriceTierDto): Promise<PriceTier> {
+	async update(
+		id: string,
+		dto: UpdatePriceTierDto,
+		userId: string,
+	): Promise<PriceTier> {
 		const entity = await this.findOne(id);
 		await this.priceTierQueryService.validateForeignKey({
 			currencyId: dto.currencyId,
@@ -78,7 +86,7 @@ export class PriceTierService {
 			await this.priceTierQueryService.resetDefaultPriceTier();
 		}
 
-		Object.assign(entity, dto);
+		Object.assign(entity, { ...dto, modifierId: userId });
 		return this.priceTierRepo.save(entity);
 	}
 

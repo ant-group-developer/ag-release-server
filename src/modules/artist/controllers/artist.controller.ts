@@ -15,17 +15,17 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	RequirePermissions,
 	SystemAdminOnly,
-} from '../auth/decorators/auth.decorator';
-import { Permission } from '../permission/constants/permission.data.constant';
-import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
-import { ArtistMessageCodeSuccess } from './constants/artist.constant';
+} from '../../auth/decorators/auth.decorator';
+import { Permission } from '../../permission/constants/permission.data.constant';
+import { checkIsNotSystemTenant } from '../../user/utils/user-type.util';
+import { ArtistMessageCodeSuccess } from '../constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
 	UpdateArtistDto,
-} from './dto/artist.dto';
-import { Artist } from './entities/artist.entity';
-import { ArtistService } from './services/artist.service';
+} from '../dto/artist.dto';
+import { Artist } from '../entities/artist.entity';
+import { ArtistService } from '../services/artist.service';
 
 @ApiTags('Artists')
 @Controller('artists')

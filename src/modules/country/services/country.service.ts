@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
@@ -14,13 +14,26 @@ import { IContinentWithCountries } from '../interfaces/country.interface';
 import { CountryQueryService } from './country.query.service';
 
 @Injectable()
-export class CountryService {
+export class CountryService implements OnModuleInit {
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 
 		private readonly countryQueryService: CountryQueryService,
 	) {}
+
+	async onModuleInit() {
+		await this.initData();
+	}
+
+	async initData() {
+		// const dataInit = listCountriesInit;
+		// const count = await this.countryRepo.count();
+		// if (count === 0) {
+		// 	const listEntities = this.countryRepo.create(dataInit);
+		// 	await this.countryRepo.save(listEntities);
+		// }
+	}
 
 	// create
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {

@@ -37,10 +37,14 @@ export class RoleService {
 	) {}
 
 	// create
-	async handleCreateRole(data: CreateRoleDto) {
+	async handleCreateRole(data: CreateRoleDto, userId: string) {
 		const { permissionIds, ...restOfData } = data;
 
-		const role = await this.createRole(restOfData);
+		const role = await this.createRole({
+			...restOfData,
+			creatorId: userId,
+			modifierId: userId,
+		});
 
 		// skip if error
 		const messageWarnings = await Promise.all(
@@ -119,12 +123,12 @@ export class RoleService {
 	}
 
 	// update
-	async handleUpdate(id: string, data: UpdateRoleDto) {
+	async handleUpdate(id: string, data: UpdateRoleDto, userId: string) {
 		const { permissionIds, ...rest } = data;
 
 		const roleDb = await this.getOne(id);
 
-		await this.updateRole(roleDb, rest);
+		await this.updateRole(roleDb, rest, userId);
 
 		// skip if error
 		const messageWarnings = await this.updateRolePermissionSafe(
@@ -143,6 +147,7 @@ export class RoleService {
 	private async updateRole(
 		roleDb: Role,
 		data: Omit<UpdateRoleDto, 'permissionIds'>,
+		userId: string,
 	) {
 		const { name } = data;
 
@@ -150,7 +155,7 @@ export class RoleService {
 			await this.roleQueryService.validate({ name });
 		}
 
-		await this.roleRepo.update(roleDb.id, data);
+		await this.roleRepo.update(roleDb.id, { ...data, modifierId: userId });
 	}
 
 	private async updateRolePermissionSafe(

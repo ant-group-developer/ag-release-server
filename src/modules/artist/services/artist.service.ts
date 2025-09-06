@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
@@ -16,6 +17,8 @@ import { ArtistQueryService } from './artist.query.service';
 
 @Injectable()
 export class ArtistService {
+	private logger = new Logger(ArtistService.name);
+
 	constructor(
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
@@ -24,9 +27,9 @@ export class ArtistService {
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,
+		private readonly httpService: HttpService,
 	) {}
 
-	//create
 	async handleCreate(data: CreateArtistDto, userId: string) {
 		const { artistProfiles, ...restOfData } = data;
 
@@ -45,9 +48,17 @@ export class ArtistService {
 		return artist;
 	}
 
+	private async createSafe(data: ICreateArtist) {
+		try {
+			return await this.create(data);
+		} catch (error) {
+			this.logger.error(error?.message);
+		}
+	}
+
 	private async create(data: ICreateArtist): Promise<Artist> {
 		const { name } = data;
-		await this.artistQueryService.validate({ name });
+		// await this.artistQueryService.validate({ name });
 		const code = await this.artistQueryService.getCodeFromName(name);
 
 		const artist = this.artistRepo.create({ ...data, code });
@@ -160,11 +171,11 @@ export class ArtistService {
 		data: UpdateArtistDto,
 		userId: string,
 	) {
-		const { name, picture } = data;
+		const { picture } = data;
 
-		if (name && name !== artist.name) {
-			await this.artistQueryService.validate({ name });
-		}
+		// if (name && name !== artist.name) {
+		// 	await this.artistQueryService.validate({ name });
+		// }
 
 		if (
 			picture !== undefined &&

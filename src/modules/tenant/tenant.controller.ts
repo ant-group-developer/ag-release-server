@@ -77,6 +77,7 @@ export class TenantController {
 	): Promise<ResponseSuccess<Tenant>> {
 		const tenantId = req.user!.tenantId;
 		const userType = req.user!.type;
+		const userReqId = req.user!.sub;
 
 		if (checkIsNotSystemAdmin(userType)) {
 			payload.type = TenantType.LABEL;
@@ -86,6 +87,7 @@ export class TenantController {
 		const result = await this.tenantService.create(
 			payload,
 			req.user!.tenantId,
+			userReqId,
 		);
 		return new ResponseSuccess({ data: result });
 	}
@@ -98,6 +100,7 @@ export class TenantController {
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Tenant>> {
 		const userType = req.user!.type;
+		const userReqId = req.user!.sub;
 
 		if (checkIsNotSystemAdmin(userType)) {
 			delete payload.type;
@@ -108,6 +111,7 @@ export class TenantController {
 			id,
 			payload,
 			req.user!.tenantId,
+			userReqId,
 		);
 
 		const isOwnerParentTenant =
@@ -116,7 +120,11 @@ export class TenantController {
 				result.parent?.id,
 			);
 		if (ownerId && (isOwnerParentTenant || checkIsSystemAdmin(userType))) {
-			await this.tenantUserService.updateOwner(result.id, ownerId);
+			await this.tenantUserService.updateOwner(
+				result.id,
+				ownerId,
+				userReqId,
+			);
 		}
 
 		return new ResponseSuccess({ data: result });

@@ -8,8 +8,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
@@ -41,8 +43,9 @@ export class PriceTierController {
 
 	@SystemAdminOnly()
 	@Post()
-	async create(@Body() dto: CreatePriceTierDto) {
-		const data = await this.priceTierService.create(dto);
+	async create(@Body() dto: CreatePriceTierDto, @Req() req: Request) {
+		const userId = req.user!.sub;
+		const data = await this.priceTierService.create(dto, userId);
 		return new ResponseSuccess({
 			data,
 			message: PriceTierMessageSuccess.CREATE,
@@ -55,8 +58,10 @@ export class PriceTierController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() dto: UpdatePriceTierDto,
+		@Req() req: Request,
 	) {
-		const data = await this.priceTierService.update(id, dto);
+		const userId = req.user!.sub;
+		const data = await this.priceTierService.update(id, dto, userId);
 		return new ResponseSuccess({
 			data,
 			message: PriceTierMessageSuccess.UPDATE,

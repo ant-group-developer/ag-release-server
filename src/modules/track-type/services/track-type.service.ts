@@ -21,11 +21,15 @@ export class TrackTypeService {
 	) {}
 
 	// create
-	async create(data: CreateTrackTypeDto): Promise<TrackType> {
+	async create(data: CreateTrackTypeDto, userId: string): Promise<TrackType> {
 		const { name, code } = data;
 		await this.trackTypeQueryService.validate({ name, code });
 
-		const trackType = this.trackTypeRepo.create(data);
+		const trackType = this.trackTypeRepo.create({
+			...data,
+			creatorId: userId,
+			modifierId: userId,
+		});
 		return await this.trackTypeRepo.save(trackType);
 	}
 
@@ -77,7 +81,11 @@ export class TrackTypeService {
 	}
 
 	// update
-	async update(id: string, data: UpdateTrackTypeDto): Promise<TrackType> {
+	async update(
+		id: string,
+		data: UpdateTrackTypeDto,
+		userId: string,
+	): Promise<TrackType> {
 		const { name, code } = data;
 		const trackType = await this.findOne(id);
 
@@ -89,7 +97,7 @@ export class TrackTypeService {
 			await this.trackTypeQueryService.validate({ code });
 		}
 
-		await this.trackTypeRepo.update(id, data);
+		await this.trackTypeRepo.update(id, { ...data, modifierId: userId });
 		return await this.findOne(id);
 	}
 

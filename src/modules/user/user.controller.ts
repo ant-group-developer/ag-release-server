@@ -57,11 +57,14 @@ export class UserController {
 			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
 		}
 
-		const result = await this.userService.create(payload);
+		const userReqId = req.user!.sub;
+
+		const result = await this.userService.create(payload, userReqId);
 		await this.tenantUserService.addUserToTenant(
 			tenantId,
 			result.id,
 			payload.tenantUserType ?? TenantUserType.MEMBER,
+			userReqId,
 		);
 		return new ResponseSuccess({ data: result });
 	}
@@ -71,10 +74,13 @@ export class UserController {
 		@Body() payload: InviteUserToTenantDto,
 		@Req() req: Request,
 	) {
+		const userReqId = req.user!.sub;
+
 		const result = await this.tenantUserService.inviteUserToTenant(
 			req.user!.tenantId,
 			payload.email,
 			payload.type ?? TenantUserType.MEMBER,
+			userReqId,
 		);
 		return new ResponseSuccess({
 			...UserMessages.INVITE.SUCCESS,
@@ -128,8 +134,15 @@ export class UserController {
 	})
 	@SystemAdminOnly()
 	@Post('bulk-update-tenant-user')
-	async bulkUpdateTenantUser(@Body() payload: BulkUpdateTenantUserDto) {
-		const data = await this.tenantUserService.bulkUpdateTenantUser(payload);
+	async bulkUpdateTenantUser(
+		@Body() payload: BulkUpdateTenantUserDto,
+		@Req() req: Request,
+	) {
+		const userReqId = req.user!.sub;
+		const data = await this.tenantUserService.bulkUpdateTenantUser(
+			payload,
+			userReqId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -137,8 +150,10 @@ export class UserController {
 	async update(
 		@Param('id') id: string,
 		@Body() payload: UpdateUserDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<User>> {
-		const result = await this.userService.update(id, payload);
+		const userReqId = req.user!.sub;
+		const result = await this.userService.update(id, payload, userReqId);
 		return new ResponseSuccess({ data: result });
 	}
 

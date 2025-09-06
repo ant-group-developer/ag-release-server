@@ -8,10 +8,12 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 
+import { Request } from 'express';
 import { TrackTypeMessageCodeSuccess } from './constants/track-type.constant';
 import {
 	CreateTrackTypeDto,
@@ -29,8 +31,13 @@ export class TrackTypeController {
 	@Post()
 	async create(
 		@Body() createTrackTypeDto: CreateTrackTypeDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<TrackType>> {
-		const result = await this.trackTypeService.create(createTrackTypeDto);
+		const userId = req.user!.sub;
+		const result = await this.trackTypeService.create(
+			createTrackTypeDto,
+			userId,
+		);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: TrackTypeMessageCodeSuccess.CREATE,
@@ -63,10 +70,13 @@ export class TrackTypeController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() updateTrackTypeDto: UpdateTrackTypeDto,
+		@Req() req: Request,
 	): Promise<ResponseSuccess<TrackType>> {
+		const userId = req.user!.sub;
 		const result = await this.trackTypeService.update(
 			id,
 			updateTrackTypeDto,
+			userId,
 		);
 		return new ResponseSuccess({
 			data: result,
