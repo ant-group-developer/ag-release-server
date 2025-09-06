@@ -11,82 +11,26 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import * as fs from 'fs';
-import { Parser } from 'json2csv';
-import path from 'path';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	RequirePermissions,
 	SystemAdminOnly,
-} from '../auth/decorators/auth.decorator';
-import { Permission } from '../permission/constants/permission.data.constant';
-import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
-import { ArtistMessageCodeSuccess } from './constants/artist.constant';
+} from '../../auth/decorators/auth.decorator';
+import { Permission } from '../../permission/constants/permission.data.constant';
+import { checkIsNotSystemTenant } from '../../user/utils/user-type.util';
+import { ArtistMessageCodeSuccess } from '../constants/artist.constant';
 import {
 	CreateArtistDto,
 	QueryGetListArtistDto,
 	UpdateArtistDto,
-} from './dto/artist.dto';
-import { Artist } from './entities/artist.entity';
-import { ArtistService } from './services/artist.service';
+} from '../dto/artist.dto';
+import { Artist } from '../entities/artist.entity';
+import { ArtistService } from '../services/artist.service';
 
 @ApiTags('Artists')
 @Controller('artists')
 export class ArtistController {
 	constructor(private readonly artistService: ArtistService) {}
-
-	@Post('data/ada')
-	async artistFromAda(
-		@Body() body: { cookie: string; authorization: string },
-	) {
-		const result = await this.artistService.artistFromAda(
-			body.cookie,
-			body.authorization,
-		);
-
-		const fields = [
-			'id',
-			'labelId',
-			'name',
-			'displayName',
-			'legalName',
-			'gcdmId',
-			'nameId',
-			'partyId',
-			'artistType',
-			'artistNameFormat',
-			'artistNameFormatGcdmId',
-			'originCountry',
-			'originCountryGcdmId',
-			'locale',
-			'primaryGenre',
-			'primaryGenreGcdmId',
-			'isni',
-			'isActive',
-			'isDeleted',
-			'createdBy',
-			'updatedBy',
-			'createdAt',
-			'updatedAt',
-		];
-
-		const parser = new Parser({ fields });
-		const csv = parser.parse(result);
-
-		const dir = path.join(process.cwd(), 'exports');
-		if (!fs.existsSync(dir)) {
-			fs.mkdirSync(dir, { recursive: true });
-		}
-
-		const filePath = path.join(dir, `ada_artists_${Date.now()}.csv`);
-
-		fs.writeFileSync(filePath, csv, 'utf8');
-
-		return new ResponseSuccess({
-			message: 'CSV exported successfully',
-			data: filePath,
-		});
-	}
 
 	@RequirePermissions(Permission.ARTIST.CREATE)
 	@Post()
