@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # const
 DB_USER=$DB_USER
 DB_HOST=$DB_HOST
@@ -22,12 +22,12 @@ if [ -z "$RCLONE_CONFIG" ] || [ -z "$BUCKET_NAME" ] || [ -z "$BACKUP_PATH" ]; th
 fi
 
 # validate command
-if ! command -v pg_dump &> /dev/null; then
+if ! command -v pg_dump >/dev/null 2>&1; then
   echo "pg_dump is not installed or not in PATH" >&2
   exit 1
 fi
 
-if ! command -v rclone &> /dev/null; then
+if ! command -v rclone >/dev/null 2>&1; then
   echo "rclone is not installed or not in PATH" >&2
   exit 1
 fi
@@ -35,7 +35,8 @@ fi
 # export db
 mkdir -p "$(dirname "$BACKUP_PATH")"
 if PGPASSWORD=$DB_PASSWORD pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" > "$BACKUP_PATH"; then
-  FILE_SIZE=$(stat -c%s "$BACKUP_PATH")
+  # Sử dụng wc -c để lấy kích thước tệp trên Alpine
+  FILE_SIZE=$(wc -c < "$BACKUP_PATH")
   echo "FILE_SIZE: $FILE_SIZE"
   echo "Backup created at $BACKUP_PATH"
 else
@@ -44,7 +45,7 @@ else
 fi
 
 # to gcs
-if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress 1>/dev/null; then
+if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress >/dev/null; then
   echo "Uploaded $BACKUP_PATH to GCS bucket: $BUCKET_NAME"
 else
   echo "Failed when push to GCS" >&2

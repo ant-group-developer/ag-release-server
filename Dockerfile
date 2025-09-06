@@ -2,6 +2,7 @@
     FROM node:20-alpine AS builder
     WORKDIR /app
     
+    RUN apk add --no-cache postgresql-client rclone
     # 1. Copy manifest và cài toàn bộ (bao gồm devDeps)
     COPY package.json yarn.lock ./
     RUN yarn install --frozen-lockfile
