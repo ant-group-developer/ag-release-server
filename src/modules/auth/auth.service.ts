@@ -10,7 +10,10 @@ import { TokenService } from '../token/token.service';
 import { UserMessages } from '../user/constants/messages';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import { UserService } from '../user/services/user.service';
-import { checkIsSystemAdmin } from '../user/utils/user-type.util';
+import {
+	checkIsSystemAdmin,
+	checkIsSystemTenant,
+} from '../user/utils/user-type.util';
 import { SiginDto } from './auth.dto';
 import { AuthMessages } from './constants/messages';
 import { RefreshTokensService } from './refresh-tokens.service';
@@ -45,10 +48,11 @@ export class AuthService {
 	}
 
 	tenant(req: Request) {
-		return this.tenantService.findOne(
-			req.user!.tenantId,
-			req.user!.tenantId,
-		);
+		const tenantId = req.user!.tenantId;
+		if (checkIsSystemTenant(tenantId)) {
+			return null;
+		}
+		return this.tenantService.findOne(tenantId, tenantId);
 	}
 
 	// Call after validating user credentials
