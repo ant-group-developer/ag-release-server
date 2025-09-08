@@ -1,6 +1,6 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Track } from '../track/entities/track.entity';
+import { Track } from '../../track/entities/track.entity';
 
 @Entity('track_revenue')
 export class TrackRevenue extends BaseEntity {
@@ -9,8 +9,8 @@ export class TrackRevenue extends BaseEntity {
 	reportDate: Date;
 
 	// Source
-	@Column({ type: 'varchar', length: 10 })
-	dspId: string;
+	@Column({ type: 'varchar', length: 50 })
+	dspName: string;
 
 	// Territory
 	@Column({ type: 'varchar', length: 2 })
