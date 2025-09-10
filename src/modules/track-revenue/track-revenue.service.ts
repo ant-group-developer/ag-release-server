@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { stringToCode } from 'src/utils/util';
 import { ILike, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
+import { Dsp } from '../dsp/entities/dsp.entity';
 import { Release } from '../release/entities/release.entity';
 import { Track } from '../track/entities/track.entity';
 import { TrackRevenue } from './entities/track-revenue.entity';
@@ -15,7 +17,12 @@ interface TrackRow {
 	configuration: string;
 	trackTitle: string;
 	releaseTitle: string;
+	dspName: string;
 	type: string;
+
+	isrc: string;
+	trackArtist: string | null;
+	releaseLabel: string | null;
 }
 
 @Injectable()
@@ -25,6 +32,9 @@ export class TrackRevenueService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
 
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
@@ -55,57 +65,53 @@ export class TrackRevenueService {
 			configuration: row['Configuration'],
 			trackTitle: row['Track Title'],
 			releaseTitle: row['Release Title'],
+			dspName: row['Source'],
 			type: row['Type'],
+
+			isrc: row['ISRC'],
+			trackArtist: row['Track Artist'],
+			releaseLabel: row['Release Label'],
 		}));
 
 		return mapped.filter((r) => r.type === 'Track');
 	}
 
 	private async bulkCreateTrackRevenue(data: TrackRow[]) {
-		const batchSize = 50;
+		for (let i = 0; i < data.length; i++) {
+			const item = data[i];
 
-		const batches: TrackRow[][] = [];
-		for (let i = 0; i < data.length; i += batchSize) {
-			batches.push(data.slice(i, i + batchSize));
+			this.logger.debug(
+				`Processing record ${i + 1}/${data.length}: ${item.trackTitle}`,
+			);
+
+			const dsp = await this.createDspIfNotExists(item.dspName);
+
+			const track = await this.createTrackIfNotExists(
+				item.isrc,
+				item.trackTitle,
+				item.releaseTitle,
+			);
+
+			this.logger.log(
+				`Processed track "${item.trackTitle}" (id=${track.id}) for release "${item.releaseTitle}"`,
+			);
+
+			const entity = this.trackRevenueRepo.create({
+				reportDate: item.transactionDate,
+				dspId: dsp.id,
+				countryCode: item.territory,
+				currencyCode: item.currency,
+				amount: item.netAmount,
+				configuration: item.configuration,
+				trackId: track.id,
+			});
+
+			await this.trackRevenueRepo.save(entity);
+
+			this.logger.log(
+				`Saved track revenue record for trackId=${track.id}`,
+			);
 		}
-
-		await Promise.all(
-			batches.map(async (batch, batchIndex) => {
-				this.logger.debug(
-					`Processing batch ${batchIndex + 1}/${batches.length}, rows ${
-						batchIndex * batchSize + 1
-					}–${batchIndex * batchSize + batch.length}/${data.length}`,
-				);
-
-				const entities = await Promise.all(
-					batch.map(async (item) => {
-						const track = await this.createTrackIfNotExists(
-							item.trackTitle,
-							item.releaseTitle,
-						);
-
-						this.logger.log(
-							`Processed track "${item.trackTitle}" (id=${track.id}) for release "${item.releaseTitle}"`,
-						);
-
-						return this.trackRevenueRepo.create({
-							reportDate: item.transactionDate,
-							dspName: item.source,
-							countryCode: item.territory,
-							currencyCode: item.currency,
-							amount: item.netAmount,
-							configuration: item.configuration,
-							trackId: track.id,
-						});
-					}),
-				);
-
-				await this.trackRevenueRepo.save(entities);
-				this.logger.log(
-					`Saved ${entities.length} track revenue records`,
-				);
-			}),
-		);
 
 		this.logger.log(
 			`Finished inserting ${data.length} track revenue records`,
@@ -135,12 +141,32 @@ export class TrackRevenueService {
 		return release;
 	}
 
+	private async createDspIfNotExists(name: string) {
+		const dsp = await this.dspRepo.findOne({
+			where: { name: ILike(name) },
+		});
+
+		if (!dsp) {
+			const newEntity = this.dspRepo.create({
+				name,
+				code: stringToCode(name),
+			});
+			const savedEntity = await this.dspRepo.save(newEntity);
+			this.logger.log(`Created new dsp: "${dsp}" (id=${savedEntity.id})`);
+			return savedEntity;
+		}
+
+		this.logger.log(`Found existing release: "${name}" (id=${dsp.id})`);
+		return dsp;
+	}
+
 	private async createTrackIfNotExists(
+		isrc: string,
 		titleTrack: string,
 		titleRelease: string,
 	) {
 		const track = await this.trackRepo.findOne({
-			where: { title: ILike(titleTrack) },
+			where: { isrc },
 		});
 
 		if (!track) {
@@ -149,6 +175,7 @@ export class TrackRevenueService {
 			const newTrack = this.trackRepo.create({
 				title: titleTrack,
 				releaseId: release.id,
+				isrc,
 			});
 
 			const savedTrack = await this.trackRepo.save(newTrack);

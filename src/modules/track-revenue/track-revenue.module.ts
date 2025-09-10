@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Dsp } from '../dsp/entities/dsp.entity';
 import { Release } from '../release/entities/release.entity';
 import { Track } from '../track/entities/track.entity';
 import { TrackRevenue } from './entities/track-revenue.entity';
@@ -7,7 +8,7 @@ import { TrackRevenueController } from './track-revenue.controller';
 import { TrackRevenueService } from './track-revenue.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([TrackRevenue, Track, Release])],
+	imports: [TypeOrmModule.forFeature([TrackRevenue, Track, Release, Dsp])],
 	controllers: [TrackRevenueController],
 	providers: [TrackRevenueService],
 })

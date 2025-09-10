@@ -88,6 +88,12 @@ class CreateTrackDraftDto {
 	@IsOptional()
 	@IsUUID()
 	priceTierId?: string | null;
+
+	@IsOptional()
+	@Min(0)
+	@Max(1000)
+	@IsNumber()
+	order?: number;
 }
 
 export class BulkCreateTrackDraft {

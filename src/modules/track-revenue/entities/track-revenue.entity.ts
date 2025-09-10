@@ -1,4 +1,5 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Track } from '../../track/entities/track.entity';
 
@@ -9,8 +10,8 @@ export class TrackRevenue extends BaseEntity {
 	reportDate: Date;
 
 	// Source
-	@Column({ type: 'varchar', length: 50 })
-	dspName: string;
+	@Column({ type: 'varchar', length: 10 })
+	dspId: string;
 
 	// Territory
 	@Column({ type: 'varchar', length: 2 })
@@ -34,4 +35,8 @@ export class TrackRevenue extends BaseEntity {
 	@ManyToOne(() => Track)
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
+
+	@ManyToOne(() => Dsp)
+	@JoinColumn({ name: 'dsp_id' })
+	dsp: Dsp;
 }

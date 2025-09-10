@@ -45,17 +45,23 @@ export class ActionController {
 		});
 	}
 
+	@Get()
+	async getList(@Query() query: QueryGetListActionDto) {
+		const result = await this.actionService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.actionService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<Action>> {
 		const result = await this.actionService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
-	@Get()
-	async getList(@Query() query: QueryGetListActionDto) {
-		const result = await this.actionService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 

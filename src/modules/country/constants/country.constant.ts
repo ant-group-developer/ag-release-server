@@ -68,6 +68,7 @@ export const CountryMessage = {
 		statusCode: 400,
 	},
 };
+
 export const listCountriesInit = [
 	{
 		name: 'Afghanistan',
