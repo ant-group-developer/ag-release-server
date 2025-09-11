@@ -17,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
+import { CacheModule } from './modules/cache/cache.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
@@ -58,6 +59,8 @@ import { UserModule } from './modules/user/user.module';
 		// 	imports: [ConfigModule],
 		// 	useClass: DatabaseConfigService,
 		// }),
+
+		CacheModule,
 
 		EventEmitterModule.forRoot(),
 
