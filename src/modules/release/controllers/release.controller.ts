@@ -22,11 +22,7 @@ import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
-import {
-	QueryGetListReleaseDto,
-	SubmitCreateReleaseDto,
-	UpdateReleaseDto,
-} from '../dto/release.dto';
+import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import {
 	IRelease,
 	IReleaseDetail,
@@ -91,11 +87,10 @@ export class ReleaseController {
 	@Post(':id/submit')
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
-		@Body() data: SubmitCreateReleaseDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<IReleaseNonDraft>> {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, data, userId);
+		const result = await this.releaseService.submit(id, userId);
 
 		return new ResponseSuccess({
 			data: result,

@@ -3,7 +3,7 @@ export interface ICreateAudioFile {
 	bitrate?: string | null;
 	bitDepth?: number | null;
 	duration: number;
-	hook?: number | null;
+	sampleLength?: number | null;
 	preview?: number | null;
 	trackId: string;
 	fileId: string;
@@ -11,7 +11,7 @@ export interface ICreateAudioFile {
 }
 
 export interface IUpdateAudioFile {
-	hook?: number | null;
+	sampleLength?: number | null;
 	preview?: number | null;
 
 	sampleRate?: string;
@@ -29,7 +29,7 @@ export interface IAudioFile {
 	bitrate: string | null;
 	bitDepth: number | null;
 	duration: number;
-	hook: number | null;
+	sampleLength: number | null;
 	trackId: string;
 	fileId: string;
 	peakId: string;
@@ -40,7 +40,7 @@ export interface IAudioFileDraft {
 	bitrate: string | null;
 	bitDepth: number | null;
 	duration: number;
-	hook: number | null;
+	sampleLength: number | null;
 	trackId: string;
 	fileId: string;
 	peakId: string;
@@ -51,7 +51,7 @@ export interface IAudioFileNonDraft extends IAudioFile {
 	bitrate: string;
 	bitDepth: number;
 	duration: number;
-	hook: number;
+	sampleLength: number;
 	trackId: string;
 	fileId: string;
 	peakId: string;

@@ -1,5 +1,6 @@
 import { PartialType } from '@nestjs/swagger';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -24,6 +25,10 @@ export class CreateTrackOriginTypeDto {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsBoolean()
+	isDefault?: boolean;
 }
 
 export class UpdateTrackOriginTypeDto extends PartialType(
@@ -40,6 +45,10 @@ export class UpdateTrackOriginTypeDto extends PartialType(
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsBoolean()
+	isDefault?: boolean;
 }
 
 export class QueryGetListTrackOriginTypeDto extends BaseQueryDto {

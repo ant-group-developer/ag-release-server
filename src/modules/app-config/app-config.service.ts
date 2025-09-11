@@ -68,7 +68,8 @@ export class AppConfigService implements OnModuleInit {
 
 	// public
 	async update(payload: UpdateConfigDto) {
-		const { website, telegram, acrCloud, backupDatabase } = payload;
+		const { website, telegram, acrCloud, backupDatabase, general } =
+			payload;
 
 		const dataDb = await this.getOneOrCreate();
 
@@ -79,6 +80,7 @@ export class AppConfigService implements OnModuleInit {
 			telegram: telegramDb,
 			acrCloud: acrCloudDb,
 			backupDatabase: backupDatabaseDb,
+			general: generalDb,
 		} = configDb;
 
 		if (website?.logo !== undefined) {
@@ -99,6 +101,7 @@ export class AppConfigService implements OnModuleInit {
 		dataDb.config.telegram = telegram ?? telegramDb;
 		dataDb.config.acrCloud = acrCloud ?? acrCloudDb;
 		dataDb.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
+		dataDb.config.general = general ?? generalDb;
 
 		// const
 		const result = await this.appConfigRepo.save(dataDb);
@@ -111,17 +114,21 @@ export class AppConfigService implements OnModuleInit {
 	getPublic() {
 		const website = this.getValue(AppConfigKey.WEBSITE);
 		const chunkDuration = this.getValue(AppConfigKey.CHUNK_DURATION);
+		const general = this.getValue(AppConfigKey.GENERAL);
 
 		return {
 			website,
 			acrCloud: {
 				chunkDuration,
 			},
+
+			general,
 		};
 	}
 
 	getValue<K extends AppConfigKey>(key: K): AppConfigValueMap[K] {
-		const { acrCloud, telegram, website, backupDatabase } = this.config;
+		const { acrCloud, telegram, website, backupDatabase, general } =
+			this.config;
 
 		const values: AppConfigValueMap = {
 			[AppConfigKey.ALL]: this.config,
@@ -146,6 +153,9 @@ export class AppConfigService implements OnModuleInit {
 			// telegram
 			[AppConfigKey.TELEGRAM_TOKEN]: telegram.token,
 			[AppConfigKey.CHAT_ID]: telegram.chatId,
+
+			// track
+			[AppConfigKey.GENERAL]: general,
 		};
 
 		return values[key];

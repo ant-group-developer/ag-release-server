@@ -25,6 +25,9 @@ export enum AppConfigKey {
 	// telegram
 	TELEGRAM_TOKEN = 'telegram_token',
 	CHAT_ID = 'chat_id',
+
+	// track
+	GENERAL = 'general',
 }
 
 export enum ScheduleType {

@@ -2,6 +2,7 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsDate,
+	IsEnum,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -17,6 +18,7 @@ import {
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
+import { ReleaseTimeMode } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
@@ -97,6 +99,10 @@ export class CreateReleaseDraftDto {
 	@IsString()
 	@MaxLength(100)
 	catalogId?: string | null;
+
+	@IsOptional()
+	@IsEnum(ReleaseTimeMode)
+	releaseTimeMode?: ReleaseTimeMode;
 
 	@ApiProperty({ example: '2025-07-01' })
 	@IsOptional()

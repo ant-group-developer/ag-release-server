@@ -14,6 +14,9 @@ export class TrackType extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
+	@Column({ type: 'boolean', default: false })
+	isDefault: boolean;
+
 	// relation
 	@OneToMany(() => Track, (track) => track.trackType)
 	tracks: Track[];

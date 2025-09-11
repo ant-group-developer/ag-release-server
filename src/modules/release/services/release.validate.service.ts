@@ -13,7 +13,7 @@ import {
 } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
-import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import {
 	IRelease,
 	IReleaseDraft,
@@ -23,9 +23,6 @@ import {
 @Injectable()
 export class ReleaseValidateService {
 	constructor(
-		@InjectRepository(Release)
-		private readonly releaseRepo: Repository<Release>,
-
 		@InjectRepository(AlbumFormat)
 		private readonly albumFormatRepo: Repository<AlbumFormat>,
 
@@ -201,27 +198,7 @@ export class ReleaseValidateService {
 	}
 
 	// validate schema release
-	async validateSchemaRelease(id: string) {
-		const release = await this.releaseRepo.findOne({
-			where: { id },
-			relations: {
-				albumFormat: true,
-				releaseCoverArts: true,
-				releaseArtists: {
-					artistRole: true,
-				},
-				releaseLanguage: true,
-				tracks: {
-					trackLanguage: true,
-					audioFile: true,
-					trackArtists: {
-						artistRole: true,
-					},
-				},
-				releaseTerritory: true,
-			},
-		});
-
+	getErrorsSchemaRelease(release: Release) {
 		const result: FieldErrorDetails[] = [];
 
 		if (release) {
@@ -337,13 +314,25 @@ export class ReleaseValidateService {
 		}
 
 		// time release validation
-		if (!release.releaseTime) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'schedule',
-					field: 'releaseTime',
-				}),
-			);
+
+		if (release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE) {
+			if (!release.releaseTime) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'schedule',
+						field: 'releaseTime',
+					}),
+				);
+			}
+
+			if (!release.releaseTimezoneId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'schedule',
+						field: 'releaseTimezoneId',
+					}),
+				);
+			}
 		}
 
 		if (!release.releaseDate) {
@@ -351,15 +340,6 @@ export class ReleaseValidateService {
 				new FieldErrorDetails({
 					page: 'schedule',
 					field: 'releaseDate',
-				}),
-			);
-		}
-
-		if (!release.releaseTimezoneId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'schedule',
-					field: 'releaseTimezoneId',
 				}),
 			);
 		}

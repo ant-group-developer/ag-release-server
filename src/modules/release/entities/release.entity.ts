@@ -22,7 +22,7 @@ import {
 	OneToMany,
 	OneToOne,
 } from 'typeorm';
-import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
 
 @Entity('releases')
@@ -109,6 +109,17 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	})
 	catalogId: string | null;
 
+	@Column({ type: Boolean, default: false })
+	isVariousArtist: boolean;
+
+	// release time
+	@Column({
+		type: 'enum',
+		enum: ReleaseTimeMode,
+		default: ReleaseTimeMode.GLOBAL_MIDNIGHT,
+	})
+	releaseTimeMode: ReleaseTimeMode;
+
 	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
 	releaseTimezoneId: string | null;
 
@@ -126,9 +137,6 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		comment: 'Format: HH:ss. Example: 18:00',
 	})
 	releaseTime: string | null;
-
-	@Column({ type: Boolean, default: false })
-	isVariousArtist: boolean;
 
 	// relation
 	@ManyToOne(() => AlbumFormat)

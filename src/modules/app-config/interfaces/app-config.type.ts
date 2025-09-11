@@ -61,12 +61,18 @@ export interface AcrCloud {
 	releaseStatusAutoScans: ReleaseStatus[];
 }
 
+export interface GeneralConfig {
+	sampleLength: number;
+	preview: number;
+}
+
 export interface AppConfigShape {
 	auth0: Auth0Config;
 	website: WebsiteConfig;
 	backupDatabase: BackupDatabase;
 	telegram: Telegram;
 	acrCloud: AcrCloud;
+	general: GeneralConfig;
 }
 
 export type AppConfigValueMap = {
@@ -92,4 +98,5 @@ export type AppConfigValueMap = {
 	//
 	[AppConfigKey.TELEGRAM_TOKEN]: string;
 	[AppConfigKey.CHAT_ID]: string;
+	[AppConfigKey.GENERAL]: GeneralConfig;
 };

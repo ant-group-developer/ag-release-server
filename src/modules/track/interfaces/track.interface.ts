@@ -52,6 +52,8 @@ export interface ICreateTrackDraft {
 	primaryGenreId?: string | null;
 	subGenreId?: string | null;
 	priceTierId?: string | null;
+	trackTypeId?: string | null;
+	trackOriginTypeId?: string | null;
 }
 
 interface ITrackLanguage {
@@ -66,7 +68,7 @@ interface IAudioFileDraft {
 	bitrate?: string | null;
 	bitDepth?: number | null;
 	duration: number;
-	hook?: number | null;
+	sampleLength?: number | null;
 	preview?: number | null;
 	fileId: string;
 	peakId: string;

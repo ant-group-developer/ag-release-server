@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -24,6 +26,8 @@ import {
 @Injectable()
 export class TrackQueryService {
 	constructor(
+		private readonly appConfigService: AppConfigService,
+
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
 
@@ -234,7 +238,7 @@ export class TrackQueryService {
 				'audioFile.bitrate',
 				'audioFile.bitDepth',
 				'audioFile.duration',
-				'audioFile.hook',
+				'audioFile.sampleLength',
 				'audioFile.preview',
 				'audioFile.fileId',
 				'audioFile.peakId',
@@ -399,7 +403,7 @@ export class TrackQueryService {
 				'audioFile.bitrate',
 				'audioFile.bitDepth',
 				'audioFile.duration',
-				'audioFile.hook',
+				'audioFile.sampleLength',
 				'audioFile.preview',
 				'audioFile.fileId',
 				'audioFile.peakId',
@@ -757,50 +761,62 @@ export class TrackQueryService {
 	}
 
 	//
-	async fillDataToTracks({
+	async enrichTrackDraftWithReleaseData({
 		trackDrafts,
 		releaseId,
 	}: {
 		trackDrafts: BulkCreateTrackDraft['trackDrafts'];
 		releaseId: string;
 	}) {
-		const [release, priceTierDefault] = await Promise.all([
+		const [
+			release,
+			priceTierDefault,
+			trackTypeDefault,
+			trackOriginTypeDefault,
+		] = await Promise.all([
 			this.getRelease({
 				releaseId,
 			}),
+
 			this.priceTierRepo.findOne({
 				where: { isDefault: true, isActive: true },
 			}),
+
+			this.trackTypeRepo.findOne({
+				where: { isDefault: true },
+			}),
+
+			this.trackOriginTypeRepo.findOne({
+				where: { isDefault: true },
+			}),
 		]);
 
-		return trackDrafts.map((track) =>
-			this.fillDataToTrack({
+		const result = trackDrafts.map((track) =>
+			this.enrichSingleTrackDraft({
 				track,
 				release,
 				priceTierId: priceTierDefault?.id ?? null,
+				trackTypeId: trackTypeDefault?.id ?? null,
+				trackOriginTypeId: trackOriginTypeDefault?.id ?? null,
 			}),
 		);
+
+		return result;
 	}
 
-	private fillDataToTrack({
+	private enrichSingleTrackDraft({
 		track,
 		release,
 		priceTierId,
+		trackTypeId,
+		trackOriginTypeId,
 	}: {
 		track: BulkCreateTrackDraft['trackDrafts'][number];
 		release: Release | null;
 		priceTierId: string | null;
+		trackTypeId: string | null;
+		trackOriginTypeId: string | null;
 	}): IHandleCreateTrackOne {
-		const trackLanguage = release?.releaseLanguage
-			? (({ id: _id, ...restOfReleaseLanguage }) => {
-					return {
-						...restOfReleaseLanguage,
-						recordingCountryId:
-							restOfReleaseLanguage.metadataLanguageCountryId,
-					};
-				})(release.releaseLanguage)
-			: undefined;
-
 		return {
 			...track,
 
@@ -812,8 +828,49 @@ export class TrackQueryService {
 			version: release?.version,
 
 			priceTierId,
+			trackTypeId,
+			trackOriginTypeId,
 
-			trackLanguage,
+			trackLanguage: this.populateTrackLanguage(release),
+			audioFileDraft: this.setAudioPreviewAndSampleLength(
+				track.audioFileDraft,
+			),
+		};
+	}
+
+	private setAudioPreviewAndSampleLength(
+		audioFileDraft: BulkCreateTrackDraft['trackDrafts'][number]['audioFileDraft'],
+	) {
+		const { duration } = audioFileDraft;
+		const { sampleLength, preview } =
+			this.calculatePreviewAndSampleLength(duration);
+
+		return {
+			...audioFileDraft,
+			sampleLength,
+			preview,
+		};
+	}
+
+	private calculatePreviewAndSampleLength(duration: number) {
+		const { sampleLength: sampleConfig, preview: previewConfig } =
+			this.appConfigService.getValue(AppConfigKey.GENERAL);
+		const preview =
+			duration > previewConfig ? previewConfig : Math.round(duration / 2);
+		const sampleLength =
+			preview + sampleConfig < duration
+				? sampleConfig
+				: duration - preview;
+		return { preview, sampleLength };
+	}
+
+	private populateTrackLanguage(release: Release | null) {
+		if (!release?.releaseLanguage) return undefined;
+		const { id: _id, ...rest } = release.releaseLanguage;
+
+		return {
+			...rest,
+			recordingCountryId: rest.metadataLanguageCountryId,
 		};
 	}
 }
