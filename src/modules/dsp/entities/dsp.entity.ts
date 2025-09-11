@@ -38,6 +38,9 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	formatLinks: string[];
 
+	@Column({ type: 'boolean', default: false })
+	enablePolicy: boolean;
+
 	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

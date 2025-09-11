@@ -66,6 +66,9 @@ export class CreateDspDto {
 	@IsBoolean()
 	isActive: boolean;
 
+	@IsBoolean()
+	enablePolicy: boolean;
+
 	@IsNotEmpty()
 	@IsNotEmpty({ each: true })
 	@IsArray()
