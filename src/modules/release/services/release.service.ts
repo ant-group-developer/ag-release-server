@@ -150,7 +150,7 @@ export class ReleaseService {
 	async getFileCsvMetadata(releaseId: string) {
 		const dataRaw =
 			await this.releaseQueryService.getMetadataRaw(releaseId);
-		return getFileExcelFromRaw({
+		return getFileCsvFromRaw({
 			records: [dataRaw],
 			fileName: dataRaw.release_title,
 		});
@@ -159,7 +159,7 @@ export class ReleaseService {
 	async getFileXlsxMetadata(releaseId: string) {
 		const dataRaw =
 			await this.releaseQueryService.getMetadataRaw(releaseId);
-		return getFileCsvFromRaw({
+		return getFileExcelFromRaw({
 			records: [dataRaw],
 			fileName: dataRaw.release_title,
 		});
