@@ -132,6 +132,11 @@ class AudioFile {
 	@IsOptional()
 	@IsInt()
 	@Max(MAX_INTEGER)
+	sampleLength?: number;
+
+	@IsOptional()
+	@IsInt()
+	@Max(MAX_INTEGER)
 	preview?: number;
 
 	@IsOptional()

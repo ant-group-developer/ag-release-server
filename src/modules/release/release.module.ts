@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
+import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
+import { ReleaseCoverArt } from '../release-cover-art/entities/release-cover-art.entity';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
@@ -25,6 +27,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Genre,
 			Label,
 			Timezone,
+			ReleaseCoverArt,
 		]),
 
 		ReleaseLanguageModule,
@@ -33,7 +36,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseTerritoryModule,
 
 		TrackModule,
-		// BucketModule,
+		BucketModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

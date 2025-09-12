@@ -4,6 +4,7 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 import { nanoid } from 'nanoid';
 import { ResponseError } from 'src/common/dtos/response.dto';
 
+import { Response } from 'express';
 import * as fs from 'fs';
 import * as Handlebars from 'handlebars';
 
@@ -93,4 +94,21 @@ export function normalizeName(name: string): string {
 		.toUpperCase()
 		.trim()
 		.replace(/\s+/g, '_'); // khoảng trắng thành _
+}
+
+export function streamDownload(
+	res: Response,
+	options: {
+		stream: NodeJS.ReadableStream;
+		contentType: string;
+		fileName: string;
+	},
+) {
+	res.setHeader('Content-Type', options.contentType);
+	res.setHeader(
+		'Content-Disposition',
+		`attachment; filename="${options.fileName}"`,
+	);
+
+	options.stream.pipe(res);
 }
