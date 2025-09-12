@@ -76,8 +76,9 @@ export class ReleaseDraftController {
 
 	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	@Get(':id/validate')
-	async validateSchemaRelease(@Param('id') id: string) {
-		const result = await this.releaseDraftService.validateSchemaRelease(id);
+	async getErrorsSchemaRelease(@Param('id') id: string) {
+		const result =
+			await this.releaseDraftService.getErrorsSchemaRelease(id);
 		return new ResponseSuccess({ data: result });
 	}
 

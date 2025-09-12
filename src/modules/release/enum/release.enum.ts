@@ -7,6 +7,11 @@ export enum ReleaseStatus {
 	TAKEN_DOWN = 'taken_down',
 }
 
+export enum ReleaseTimeMode {
+	GLOBAL_MIDNIGHT = 'global_midnight',
+	SPECIFIC_TIMEZONE = 'specific_timezone',
+}
+
 export type ReleaseStatusNonDraft = Exclude<ReleaseStatus, ReleaseStatus.DRAFT>;
 
 export enum FieldOrderRelease {

@@ -38,19 +38,25 @@ export class TimezoneController {
 		});
 	}
 
-	@Get(':id')
-	async findOne(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<ResponseSuccess<Timezone>> {
-		const result = await this.timezoneService.findOne(id);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@Get()
 	async getList(
 		@Query() query: QueryGetListTimezoneDto,
 	): Promise<ResponseSuccess<PageDto<Timezone>>> {
 		const result = await this.timezoneService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple() {
+		const result = await this.timezoneService.getListSimple();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id')
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<Timezone>> {
+		const result = await this.timezoneService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 

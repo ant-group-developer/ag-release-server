@@ -32,13 +32,10 @@ export class AudioFile extends BaseUUIDEntity {
 
 	@Column({
 		type: 'int',
-		comment:
-			'This is where the track will begin playing when listeners are previewing the sample' +
-			' & ' +
-			COMMENT_FOR_NULLABLE_DRAFT,
+		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
 	})
-	hook: number | null;
+	sampleLength: number | null;
 
 	@Column({
 		type: 'int',

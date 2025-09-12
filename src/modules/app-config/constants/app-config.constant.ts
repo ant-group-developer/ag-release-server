@@ -55,4 +55,9 @@ export const appConfigDefault: AppConfigShape = {
 		autoScanTime: DEFAULT_AUTO_SCAN_TIME,
 		releaseStatusAutoScans: [ReleaseStatus.DRAFT],
 	},
+
+	general: {
+		sampleLength: 60,
+		preview: 60 + 42,
+	},
 };

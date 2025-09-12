@@ -30,6 +30,42 @@ export class DspQueryService {
 		return await queryGetList.getManyAndCount();
 	}
 
+	async getListDspEnablePolicy() {
+		const qb = this.dspRepo.createQueryBuilder('dsp');
+		qb.leftJoin('dsp.dspActions', 'dspAction').leftJoin(
+			'dspAction.action',
+			'action',
+		);
+
+		qb.where(
+			'dsp.isActive = :isActive and dsp.enablePolicy = :enablePolicy',
+			{
+				isActive: true,
+				enablePolicy: true,
+			},
+		);
+
+		qb.select([
+			'dsp.id',
+			'dsp.name',
+			'dsp.code',
+			'dsp.picture',
+			'dsp.enablePolicy',
+		]).addSelect([
+			'dspAction.id',
+			'dspAction.dspId',
+			'dspAction.actionId',
+			'dspAction.isDefault',
+
+			'action.id',
+			'action.name',
+			'action.code',
+			'action.note',
+		]);
+
+		return qb.getMany();
+	}
+
 	private createQueryFindOne(id: string) {
 		const qb = this.dspRepo
 			.createQueryBuilder('dsp')

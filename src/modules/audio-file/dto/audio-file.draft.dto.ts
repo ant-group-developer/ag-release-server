@@ -32,7 +32,7 @@ export class CreateAudioFileDraftDto {
 	@IsOptional()
 	@IsInt()
 	@Min(0)
-	hook?: number | null;
+	sampleLength?: number | null;
 
 	@IsOptional()
 	@IsInt()

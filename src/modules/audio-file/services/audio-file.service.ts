@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AudioFile } from '../entities/audio-file.entity';
@@ -14,6 +14,8 @@ import { AudioFileQueryService } from './audio-file.query.service';
 
 @Injectable()
 export class AudioFileService {
+	private readonly logger = new Logger(AudioFileService.name);
+
 	constructor(
 		@InjectRepository(AudioFile)
 		private readonly audioFileRepo: Repository<AudioFile>,
@@ -85,6 +87,12 @@ export class AudioFileService {
 	}
 
 	// delete
+	async deleteRecordOfTrackSafe({ trackId }: { trackId: string }) {
+		await this.deleteRecordOfTrack({ trackId }).catch((_e) => {
+			this.logger.log(_e.message);
+		});
+	}
+
 	async deleteRecordOfTrack({ trackId }: { trackId: string }) {
 		const audioFileOfTrack =
 			await this.audioFileQueryService.getAudioFileOfTrack({

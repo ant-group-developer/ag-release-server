@@ -45,25 +45,26 @@ export class TrackDraftService {
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
 
-		const filledTrackDrafts = await this.trackQueryService.fillDataToTracks(
-			{
+		const enrichedTrackDrafts =
+			await this.trackQueryService.enrichTrackDraftWithReleaseData({
 				trackDrafts,
 				releaseId: trackDrafts[0].releaseId,
-			},
-		);
+			});
 
 		return Promise.all(
-			filledTrackDrafts.map((item) => this.handleCreateOne(item)),
+			enrichedTrackDrafts.map((item) =>
+				this.createSingleTrackDraft(item),
+			),
 		);
 	}
 
-	private async handleCreateOne(
+	private async createSingleTrackDraft(
 		data: IHandleCreateTrackOne,
 	): Promise<ITrackDraft> {
 		const { audioFileDraft, trackLanguage, ...trackData } = data;
 		const trackDb = await this.createTrackDraft(trackData);
 
-		await this.createSubEntities({
+		await this.createRelatedTrackEntities({
 			track: trackDb,
 			trackLanguage,
 			audioFile: audioFileDraft,
@@ -86,7 +87,7 @@ export class TrackDraftService {
 		return await this.trackRepo.save(track);
 	}
 
-	private async createSubEntities({
+	private async createRelatedTrackEntities({
 		track,
 		trackLanguage,
 		audioFile,
@@ -280,7 +281,7 @@ export class TrackDraftService {
 
 	private async deleteRelatedRecords({ trackId }: { trackId: string }) {
 		await Promise.all([
-			this.audioFileService.deleteRecordOfTrack({ trackId }),
+			this.audioFileService.deleteRecordOfTrackSafe({ trackId }),
 			this.trackArtistService.deleteRecordOfTrack({ trackId }),
 			this.trackLanguageDraftService.deleteRecordOfTrack({
 				trackId,

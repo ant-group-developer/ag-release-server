@@ -17,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BucketModule } from './modules/bucket/bucket.module';
+import { CacheModule } from './modules/cache/cache.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
@@ -42,6 +43,7 @@ import { TrackArtistModule } from './modules/track-artist/track-artist.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
 import { TrackOriginTypeModule } from './modules/track-origin-type/track-origin-type.module';
+import { TrackRevenueModule } from './modules/track-revenue/track-revenue.module';
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserRoleModule } from './modules/user-role/user-role.module';
@@ -57,6 +59,8 @@ import { UserModule } from './modules/user/user.module';
 		// 	imports: [ConfigModule],
 		// 	useClass: DatabaseConfigService,
 		// }),
+
+		CacheModule,
 
 		EventEmitterModule.forRoot(),
 
@@ -115,6 +119,7 @@ import { UserModule } from './modules/user/user.module';
 		PriceTierModule,
 
 		ScheduleModule,
+		TrackRevenueModule,
 	],
 	controllers: [AppController],
 	providers: [

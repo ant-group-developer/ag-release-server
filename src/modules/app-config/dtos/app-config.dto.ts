@@ -92,6 +92,14 @@ export class UpdateBackupDatabaseDto {
 	toGcs: boolean;
 }
 
+export class UpdateTrackConfigDto {
+	@IsNumber()
+	sampleLength: number;
+
+	@IsNumber()
+	preview: number;
+}
+
 export class UpdateConfigDto {
 	@IsOptional()
 	@ValidateNested()
@@ -117,4 +125,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateBackupDatabaseDto)
 	backupDatabase?: UpdateBackupDatabaseDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateTrackConfigDto)
+	general?: UpdateTrackConfigDto;
 }

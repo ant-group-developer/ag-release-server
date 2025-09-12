@@ -22,6 +22,7 @@
 	"dependencies": {
 		"@google-cloud/storage": "^7.16.0",
 		"@nestjs/axios": "^4.0.1",
+		"@nestjs/cache-manager": "^3.0.1",
 		"@nestjs/common": "^11.0.1",
 		"@nestjs/config": "^4.0.2",
 		"@nestjs/core": "^11.0.1",
@@ -35,6 +36,8 @@
 		"argon2": "^0.43.1",
 		"auth0": "^4.28.0",
 		"axios": "^1.11.0",
+		"cache-manager": "^7.2.0",
+		"cache-manager-redis-store": "^3.0.1",
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.14.2",
 		"csv-parse": "^6.1.0",
@@ -42,6 +45,7 @@
 		"express-basic-auth": "^1.2.1",
 		"handlebars": "^4.7.8",
 		"html-to-text": "^9.0.5",
+		"ioredis": "^5.7.0",
 		"joi": "^17.13.3",
 		"json2csv": "^6.0.0-alpha.2",
 		"jwks-rsa": "^3.2.0",
@@ -60,7 +64,8 @@
 		"sharp": "^0.34.3",
 		"swagger-ui-express": "^5.0.1",
 		"typeorm": "^0.3.25",
-		"typeorm-naming-strategies": "^4.1.0"
+		"typeorm-naming-strategies": "^4.1.0",
+		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.2.0",
@@ -70,6 +75,7 @@
 		"@nestjs/testing": "^11.0.1",
 		"@swc/cli": "^0.6.0",
 		"@swc/core": "^1.10.7",
+		"@types/cache-manager": "^5.0.0",
 		"@types/csv-parse": "^1.2.5",
 		"@types/express": "^5.0.0",
 		"@types/html-to-text": "^9.0.4",

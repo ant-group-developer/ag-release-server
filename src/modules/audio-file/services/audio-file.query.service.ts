@@ -111,7 +111,11 @@ export class AudioFileQueryService {
 		// 	throw new ResponseError({ message: 'Invalid audioFile.status' });
 		// }
 
-		if (!audioFile.bitrate || !audioFile.bitDepth || !audioFile.hook) {
+		if (
+			!audioFile.bitrate ||
+			!audioFile.bitDepth ||
+			!audioFile.sampleLength
+		) {
 			throw new ResponseError({
 				message: 'Audio file is draft',
 			});

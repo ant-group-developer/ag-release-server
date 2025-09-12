@@ -90,7 +90,7 @@ export function normalizeName(name: string): string {
 		.replace(/[\u0300-\u036f]/g, '') // xóa dấu
 		.replace(/đ/g, 'd')
 		.replace(/Đ/g, 'D')
-		.toLowerCase()
+		.toUpperCase()
 		.trim()
 		.replace(/\s+/g, '_'); // khoảng trắng thành _
 }

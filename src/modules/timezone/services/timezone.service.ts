@@ -52,6 +52,12 @@ export class TimezoneService {
 		});
 	}
 
+	async getListSimple() {
+		return this.timezoneRepo.find({
+			select: ['id', 'name', 'zone'],
+		});
+	}
+
 	async update(
 		id: string,
 		updateTimezoneDto: UpdateTimezoneDto,

@@ -445,4 +445,32 @@ export class ReleaseQueryService {
 				return subQuery;
 			}, VirtualColumnRelease.TOTAL_DURATION);
 	}
+
+	async findOneWithRelation(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				albumFormat: true,
+				releaseCoverArts: true,
+				releaseArtists: {
+					artistRole: true,
+				},
+				releaseLanguage: true,
+				tracks: {
+					trackLanguage: true,
+					audioFile: true,
+					trackArtists: {
+						artistRole: true,
+					},
+				},
+				releaseTerritory: true,
+			},
+		});
+
+		if (!release) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		return release;
+	}
 }

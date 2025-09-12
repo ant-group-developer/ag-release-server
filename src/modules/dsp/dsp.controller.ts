@@ -42,6 +42,13 @@ export class DspController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('enable-policy')
+	async getListDspEnablePolicy() {
+		return new ResponseSuccess({
+			data: await this.dspService.getListDspEnablePolicy(),
+		});
+	}
+
 	@Get(':id')
 	async findOne(@Param('id') id: string): Promise<ResponseSuccess<Dsp>> {
 		const result = await this.dspService.findOne(id);

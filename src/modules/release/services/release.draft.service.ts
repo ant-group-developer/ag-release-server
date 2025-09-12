@@ -199,7 +199,8 @@ export class ReleaseDraftService {
 	}
 
 	// other
-	async validateSchemaRelease(id: string) {
-		return await this.releaseValidateService.validateSchemaRelease(id);
+	async getErrorsSchemaRelease(id: string) {
+		const release = await this.releaseQueryService.findOneWithRelation(id);
+		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
 }

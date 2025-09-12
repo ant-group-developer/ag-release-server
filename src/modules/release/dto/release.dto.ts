@@ -5,7 +5,6 @@ import {
 	IsBoolean,
 	IsDate,
 	IsEnum,
-	IsIn,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -140,13 +139,6 @@ export class CreateReleaseDto {
 		value === undefined ? null : value,
 	)
 	releaseTimezoneId: string | null;
-}
-
-export class SubmitCreateReleaseDto extends CreateReleaseDto {
-	@IsOptional()
-	@ValidateIf((_, value) => value !== undefined)
-	@IsIn([ReleaseStatus.DRAFT])
-	status: ReleaseStatus.DRAFT;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {

@@ -4,11 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import {
-	QueryGetListReleaseDto,
-	SubmitCreateReleaseDto,
-	UpdateReleaseDto,
-} from '../dto/release.dto';
+import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
@@ -45,22 +41,22 @@ export class ReleaseService {
 	// 	return await this.releaseRepo.save(release);
 	// }
 
-	async submit(
-		id: string,
-		data: SubmitCreateReleaseDto,
-		userId: string,
-	): Promise<IReleaseNonDraft> {
-		// validate id
-		await this.releaseQueryService.findOne(id);
+	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
+		const release = await this.releaseQueryService.findOneWithRelation(id);
+		release.status = ReleaseStatus.PROCESSING;
 
 		// validate nonDraft
-		const releaseNonDraft =
-			this.releaseValidateService.ensureNonDraftRelease({
-				...data,
-				status: ReleaseStatus.PROCESSING,
-			});
+		const errors =
+			this.releaseValidateService.getErrorsSchemaRelease(release);
 
-		await this.releaseRepo.save({ ...releaseNonDraft, creatorId: userId });
+		if (errors.length > 0) {
+			throw new ResponseError({
+				message:
+					'Release validation failed. Please check the input data.',
+			});
+		}
+
+		await this.releaseRepo.save({ ...release, creatorId: userId });
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft

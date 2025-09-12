@@ -128,6 +128,10 @@ export class DspService {
 		});
 	}
 
+	async getListDspEnablePolicy() {
+		return this.dspQueryService.getListDspEnablePolicy();
+	}
+
 	// update
 	async handleUpdate({
 		dspId,

@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/entities/base.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Track } from '../track/entities/track.entity';
+import { Track } from '../../track/entities/track.entity';
 
 @Entity('track_revenue')
 export class TrackRevenue extends BaseEntity {
@@ -34,4 +35,8 @@ export class TrackRevenue extends BaseEntity {
 	@ManyToOne(() => Track)
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
+
+	@ManyToOne(() => Dsp)
+	@JoinColumn({ name: 'dsp_id' })
+	dsp: Dsp;
 }
