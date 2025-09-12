@@ -1,4 +1,7 @@
 import ExcelJS from 'exceljs';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { PassThrough } from 'stream';
 
 export async function getFileExcelFromRaw(input: {
@@ -67,13 +70,13 @@ export async function getFileExcelFromRaw(input: {
 }
 
 export function getFileCsvFromRaw(options: {
-	rows: Record<string, any>[];
+	records: Record<string, any>[];
 	fileName: string;
 	header?: string[];
 }) {
-	const { rows, fileName, header } = options;
-	const keys = header ?? Object.keys(rows[0]);
-	const data = rows.map((row) => keys.map((key) => row[key]));
+	const { records, fileName, header } = options;
+	const keys = header ?? Object.keys(records[0]);
+	const data = records.map((record) => keys.map((key) => record[key]));
 	return buildCsvStream({ header: keys, data, fileName });
 }
 
@@ -106,5 +109,84 @@ function buildCsvStream(input: {
 		stream,
 		fileName: `${fileName}.csv`,
 		contentType: 'text/csv; charset=utf-8',
+	};
+}
+
+export function getFileTxtFromRelease(options: {
+	release: Release;
+	fileName: string;
+}) {
+	const { release, fileName } = options;
+
+	const lines: string[] = [];
+
+	// RELEASE INFO
+	lines.push(release.title || '-');
+	lines.push(
+		`Performed by: ${
+			release.releaseArtists?.map((ra) => ra.artist?.name).join(', ') ||
+			'-'
+		}`,
+	);
+	lines.push('Produced by: -');
+	lines.push(`℗ ${release.pLineYear || '-'} ${release.pLineOwner || '-'}`);
+	lines.push(`Catalog Id: ${release.catalogId || '-'}`);
+	lines.push(`UPC: ${release.upc || '-'}`);
+	lines.push('');
+
+	// PRODUCTION CREDITS
+	lines.push('PRODUCTION CREDITS:\n');
+	lines.push('Produced by: -');
+	lines.push('Mixed by: -');
+	lines.push('Mastered by: -');
+	lines.push('Mix Engineers: -');
+	lines.push('Additional Production by: -');
+	lines.push('');
+
+	// ART CREDITS
+	lines.push('ART CREDITS:\n');
+	lines.push('Art Direction/Graphic Design: -');
+	lines.push('Photography: -');
+	lines.push('Artwork: -');
+	lines.push('');
+
+	// MUSICIAN CREDITS
+	lines.push('MUSICIAN CREDITS:\n');
+	lines.push(
+		`Composer & Lyricist: ${
+			release.releaseArtists?.map((ra) => ra.artist?.name).join(', ') ||
+			'-'
+		}`,
+	);
+	lines.push('');
+
+	// LINER NOTES
+	lines.push('LINER NOTES:');
+	lines.push('-\n');
+
+	// TRACKS
+	lines.push('TRACKS CREDITS:\n');
+	release.tracks?.forEach((track: Track, index: number) => {
+		lines.push(String(index + 1));
+		lines.push(track.title || '-');
+
+		const writers =
+			track.trackArtists
+				?.map((ta: TrackArtist) => ta.artist?.name)
+				.filter(Boolean)
+				.join(', ') || '-';
+
+		lines.push(`Written by: ${writers}`);
+		lines.push(`Published by: ${release.label?.name || '-'}`);
+		lines.push('Produced by: -\n');
+	});
+
+	const stream = new PassThrough();
+	stream.end(lines.join('\n'), 'utf-8');
+
+	return {
+		stream,
+		fileName: `${fileName}.txt`,
+		contentType: 'text/plain; charset=utf-8',
 	};
 }

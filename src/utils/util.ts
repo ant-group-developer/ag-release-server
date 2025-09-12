@@ -7,6 +7,7 @@ import { ResponseError } from 'src/common/dtos/response.dto';
 import { Response } from 'express';
 import * as fs from 'fs';
 import * as Handlebars from 'handlebars';
+import { mapKeys, snakeCase } from 'lodash';
 
 export function getCoverArtThumbnails(
 	coverArts: ReleaseCoverArt[] | undefined,
@@ -111,4 +112,8 @@ export function streamDownload(
 	);
 
 	options.stream.pipe(res);
+}
+
+export function toSnakeCaseKeys<T extends object>(obj: T): Record<string, any> {
+	return mapKeys(obj, (_value, key) => snakeCase(key));
 }

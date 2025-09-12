@@ -5,7 +5,11 @@ import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
-import { getFileExcelFromRaw } from 'src/utils/util.excel';
+import {
+	getFileCsvFromRaw,
+	getFileExcelFromRaw,
+	getFileTxtFromRelease,
+} from 'src/utils/util.file';
 import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
@@ -143,6 +147,29 @@ export class ReleaseService {
 		return await this.releaseQueryService.findOne(id);
 	}
 
+	async getFileCsvMetadata(releaseId: string) {
+		const dataRaw =
+			await this.releaseQueryService.getMetadataRaw(releaseId);
+		return getFileExcelFromRaw({
+			records: [dataRaw],
+			fileName: dataRaw.release_title,
+		});
+	}
+
+	async getFileXlsxMetadata(releaseId: string) {
+		const dataRaw =
+			await this.releaseQueryService.getMetadataRaw(releaseId);
+		return getFileCsvFromRaw({
+			records: [dataRaw],
+			fileName: dataRaw.release_title,
+		});
+	}
+
+	async getFileTxtMetadata(releaseId: string) {
+		const release = await this.releaseQueryService.getMetadata(releaseId);
+		return getFileTxtFromRelease({ release, fileName: release.title });
+	}
+
 	async getAssets(releaseId: string) {
 		const zipStream = new PassThrough();
 		const archive = archiver('zip', { zlib: { level: 9 } });
@@ -170,7 +197,7 @@ export class ReleaseService {
 			}
 		}
 
-		archive.finalize();
+		archive.finalize().catch((_e) => {});
 
 		return {
 			contentType: 'application/zip',
@@ -212,11 +239,5 @@ export class ReleaseService {
 			stream: response.data,
 			contentType: response.headers['content-type'],
 		};
-	}
-
-	async getFileXlsxMetadata(releaseId: string) {
-		const dataRaw =
-			await this.releaseQueryService.getMetadataRaw(releaseId);
-		return getFileExcelFromRaw({ records: [dataRaw], fileName: 'test' });
 	}
 }

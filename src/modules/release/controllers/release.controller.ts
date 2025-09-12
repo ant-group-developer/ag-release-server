@@ -67,15 +67,9 @@ export class ReleaseController {
 	}
 
 	@Get(':id/download/csv-metadata')
-	async downloadCsvMetadata() {
-		// const { contentType, stream, fileName } =
-		// 	await this.releaseService.getAssets(id);
-		// res.setHeader('Content-Type', contentType);
-		// res.setHeader(
-		// 	'Content-Disposition',
-		// 	`attachment; filename="${fileName}"`,
-		// );
-		// stream.pipe(res);
+	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getFileCsvMetadata(id);
+		streamDownload(res, data);
 	}
 
 	@Get(':id/download/xlsx-metadata')
@@ -85,7 +79,10 @@ export class ReleaseController {
 	}
 
 	@Get(':id/download/txt-metadata')
-	async downloadTxtMetadata() {}
+	async downloadTxtMetadata(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getFileXlsxMetadata(id);
+		streamDownload(res, data);
+	}
 
 	@Get(':id/download/assets')
 	async downloadAssets(@Param('id') id: string, @Res() res: Response) {

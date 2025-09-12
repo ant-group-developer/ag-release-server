@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { toSnakeCaseKeys } from 'src/utils/util';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
@@ -10,7 +10,6 @@ import {
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
-
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -27,9 +26,6 @@ export class ReleaseQueryService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
-
-		@InjectRepository(ReleaseCoverArt)
-		private readonly releaseCvaRepo: Repository<ReleaseCoverArt>,
 	) {
 		this.mainAlias = 'release';
 	}
@@ -479,38 +475,25 @@ export class ReleaseQueryService {
 	}
 
 	async getFileIdAssetsRelease(id: string) {
-		const release = await this.releaseRepo
-			.createQueryBuilder('release')
-			.leftJoinAndSelect('release.tracks', 'tracks')
-			.leftJoinAndSelect('tracks.audioFile', 'audioFile')
-			.innerJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
-			.leftJoinAndSelect('releaseCoverArts.file', 'coverFile')
-			.where('release.id = :id', { id })
-			// .andWhere('releaseCoverArts.width = :width', { width: 160 })
-			.getOne();
-
-		// const release1 = await this.releaseRepo
-		// 	.createQueryBuilder('release')
-		// 	.innerJoinAndSelect(
-		// 		'release.releaseCoverArts',
-		// 		'rca',
-		// 		// 'rca.width = :w AND rca.height = :h',
-		// 		// { w: 160, h: 160 },
-		// 	)
-		// 	.where('release.id = :id', { id })
-		// 	.getOne();
-
-		// console.log(release1);
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				tracks: {
+					audioFile: true,
+				},
+				releaseCoverArts: {
+					file: true,
+				},
+			},
+		});
 
 		if (!release) {
 			throw new ResponseError(ReleaseMessages.NOT_FOUND);
 		}
 
 		const coverArtOriginal = release.releaseCoverArts?.find(
-			(i) => (i.type = 'original'),
+			(i) => i.type === 'original',
 		);
-
-		console.log(release.releaseCoverArts);
 
 		return {
 			releaseName: release.title,
@@ -526,7 +509,7 @@ export class ReleaseQueryService {
 		};
 	}
 
-	getMetadataRaw(id: string) {
+	private createQbMetadata(id: string) {
 		const qb = this.releaseRepo
 			.createQueryBuilder('release')
 			.leftJoin('release.albumFormat', 'albumFormat')
@@ -552,7 +535,6 @@ export class ReleaseQueryService {
 
 			.leftJoin('release.modifier', 'modifier')
 
-			.select(['release.id as id'])
 			.addSelect(['albumFormat.name'])
 			.addSelect(['label.name'])
 			.addSelect(['primaryGenre.name'])
@@ -587,6 +569,32 @@ export class ReleaseQueryService {
 			id,
 		});
 
-		return qb.getRawOne();
+		return qb;
+	}
+
+	async getMetadata(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				label: true,
+				releaseArtists: { artist: true, artistRole: true },
+				tracks: { trackArtists: { artist: true, artistRole: true } },
+			},
+		});
+		if (!release) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		return release;
+	}
+
+	async getMetadataRaw(id: string) {
+		const qb = this.createQbMetadata(id);
+		const raw = await qb.getRawOne();
+		if (!raw) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		return toSnakeCaseKeys(raw);
 	}
 }
