@@ -180,6 +180,26 @@ export class ArtistDataInit {
 		return dir;
 	}
 
+	async getAdaArtistByName(
+		cookie: string,
+		authorization: string,
+		query: string,
+	) {
+		const url = `https://partners.ada-music.com/api/coop/releases/parties/find-by-name?showRelated=false&query=${encodeURIComponent(query)}`;
+
+		const res = await firstValueFrom(
+			this.httpService.get(url, {
+				headers: {
+					Authorization: authorization,
+					Cookie: cookie,
+					'x-no-gzip-response': 'true',
+				},
+			}),
+		);
+
+		return res.data;
+	}
+
 	private async fetchAdaArtistsBatch(
 		cookie: string,
 		authorization: string,

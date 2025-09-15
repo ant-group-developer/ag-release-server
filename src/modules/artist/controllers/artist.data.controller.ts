@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { ArtistDataInit } from '../services/artist.data.service';
@@ -7,6 +7,23 @@ import { ArtistDataInit } from '../services/artist.data.service';
 @Controller('artists')
 export class ArtistDataController {
 	constructor(private readonly artistDataInit: ArtistDataInit) {}
+
+	@Post('find-artist/ada')
+	async findAdaArtist(
+		@Query('query') query: string,
+		@Body() body: { cookie: string; authorization: string },
+	) {
+		const data = await this.artistDataInit.getAdaArtistByName(
+			body.cookie,
+			body.authorization,
+			query,
+		);
+
+		return new ResponseSuccess({
+			message: 'Found artist(s) from ADA',
+			data: data.data,
+		});
+	}
 
 	@Post('export-data/ada')
 	async exportFromAda(
