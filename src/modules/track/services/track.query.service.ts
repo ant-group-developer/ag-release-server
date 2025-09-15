@@ -7,6 +7,7 @@ import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Brackets, Repository } from 'typeorm';
 import { TrackMessages } from '../constants/track.constant';
@@ -45,6 +46,9 @@ export class TrackQueryService {
 
 		@InjectRepository(PriceTier)
 		private readonly priceTierRepo: Repository<PriceTier>,
+
+		@InjectRepository(TrackSensitive)
+		private readonly trackSensitiveRepo: Repository<TrackSensitive>,
 	) {}
 
 	// private
@@ -222,7 +226,8 @@ export class TrackQueryService {
 			.leftJoin('track.subGenre', 'subGenre')
 
 			.leftJoin('track.trackType', 'trackType')
-			.leftJoin('track.trackOriginType', 'trackOriginType');
+			.leftJoin('track.trackOriginType', 'trackOriginType')
+			.leftJoin('track.trackSensitive', 'trackSensitive');
 
 		// select
 		queryGetList
@@ -328,6 +333,12 @@ export class TrackQueryService {
 				'trackOriginType.id',
 				'trackOriginType.name',
 				'trackOriginType.code',
+			])
+			.addSelect([
+				'trackSensitive.id',
+				'trackSensitive.name',
+				'trackSensitive.code',
+				'trackSensitive.icon',
 			]);
 
 		return await queryGetList.getManyAndCount();
@@ -595,6 +606,7 @@ export class TrackQueryService {
 		trackOriginTypeId,
 		trackTypeId,
 		priceTierId,
+		trackSensitiveId,
 	}: {
 		primaryGenreId?: string | null;
 		subGenreId?: string | null;
@@ -602,6 +614,7 @@ export class TrackQueryService {
 		trackTypeId?: string | null;
 		trackOriginTypeId?: string | null;
 		priceTierId?: string | null;
+		trackSensitiveId?: string;
 	}) {
 		if (releaseId) {
 			const release = await this.releaseRepo.findOne({
@@ -663,6 +676,18 @@ export class TrackQueryService {
 				throw new ResponseError(TrackMessages.PRICE_TIER_NOT_FOUND);
 			}
 		}
+
+		if (trackSensitiveId) {
+			const entity = await this.trackSensitiveRepo.findOne({
+				where: { id: trackSensitiveId },
+			});
+
+			if (!entity) {
+				throw new ResponseError(
+					TrackMessages.TRACK_SENSITIVE_NOT_FOUND,
+				);
+			}
+		}
 	}
 
 	ensureNonDraftTrack(track: ITrack): ITrackNonDraft {
@@ -708,6 +733,7 @@ export class TrackQueryService {
 			trackOriginTypeId,
 			trackTypeId,
 			priceTierId,
+			trackSensitiveId,
 		} = dataUpdate;
 
 		if (primaryGenreId && primaryGenreId !== trackDb.primaryGenreId) {
@@ -740,6 +766,12 @@ export class TrackQueryService {
 		if (priceTierId && priceTierId !== trackDb.priceTierId) {
 			await this.validateForeignKey({
 				priceTierId,
+			});
+		}
+
+		if (trackSensitiveId && trackSensitiveId !== trackDb.trackSensitiveId) {
+			await this.validateForeignKey({
+				trackSensitiveId,
 			});
 		}
 	}

@@ -10,8 +10,8 @@ export class TrackPolicyDspService {
 		private readonly dspRepo: Repository<Dsp>,
 	) {}
 
-	async getListWithDefaultActions(): Promise<
-		{ dspId: string; actionId: string }[]
+	async getListDspEnablePolicy(): Promise<
+		{ dspId: string; actionId: string | null }[]
 	> {
 		const data = await this.dspRepo
 			.createQueryBuilder('dsp')
@@ -21,14 +21,15 @@ export class TrackPolicyDspService {
 				'dspAction.isDefault = :isDefault',
 				{ isDefault: true },
 			)
-			.where('dspAction.isDefault = :isDefault', { isDefault: true })
+			.where('dsp.isActive = :isActive', { isActive: true })
+			.andWhere('dsp.enablePolicy = :enablePolicy', {
+				enablePolicy: true,
+			})
 			.getMany();
 
-		return data.flatMap((dsp) => {
-			const defaultAction = dsp.dspActions[0];
-			return defaultAction
-				? [{ dspId: dsp.id, actionId: defaultAction.actionId }]
-				: [];
-		});
+		return data.map((dsp) => ({
+			dspId: dsp.id,
+			actionId: dsp.dspActions[0]?.actionId ?? null,
+		}));
 	}
 }

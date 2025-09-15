@@ -80,7 +80,7 @@ export class ReleaseController {
 
 	@Get(':id/download/txt-metadata')
 	async downloadTxtMetadata(@Param('id') id: string, @Res() res: Response) {
-		const data = await this.releaseService.getFileXlsxMetadata(id);
+		const data = await this.releaseService.getFileTxtMetadata(id);
 		streamDownload(res, data);
 	}
 

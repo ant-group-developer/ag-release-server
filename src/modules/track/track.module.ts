@@ -10,6 +10,7 @@ import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackOriginType } from '../track-origin-type/entities/track-origin-type.entity';
 import { TrackPolicyModule } from '../track-policy/track-policy.module';
+import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from '../track-type/entities/track-type.entity';
 import { TrackController } from './controllers/track.controller';
 import { TrackDraftController } from './controllers/track.draft.controller';
@@ -27,6 +28,7 @@ import { TrackService } from './services/track.service';
 			TrackType,
 			TrackOriginType,
 			PriceTier,
+			TrackSensitive,
 		]),
 
 		AudioFileModule,

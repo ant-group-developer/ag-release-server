@@ -19,6 +19,7 @@ import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-hist
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
+import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ScanCopyrightStatus } from '../enum/track.enum';
 import { ITrack } from '../interfaces/track.interface';
@@ -92,8 +93,8 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	})
 	trackOriginTypeId: string | null;
 
-	@Column({ type: Boolean, default: false })
-	isSensitiveContent: boolean;
+	@Column({ type: 'uuid', nullable: true })
+	trackSensitiveId: string | null;
 
 	@Column({ type: Boolean, default: false })
 	isByAi: boolean;
@@ -163,4 +164,8 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.track)
 	trackPolicies?: TrackPolicy[];
+
+	@ManyToOne(() => TrackSensitive, (trackSensitive) => trackSensitive.tracks)
+	@JoinColumn({ name: 'track_sensitive_id' })
+	trackSensitive: TrackSensitive | null;
 }

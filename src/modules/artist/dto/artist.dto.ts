@@ -73,6 +73,14 @@ export class CreateArtistDto {
 	@MaxLength(250)
 	biography: string | null;
 
+	@Length(10, 10)
+	@IsOptional()
+	genreId?: string;
+
+	@IsUUID()
+	@IsOptional()
+	countryId?: string;
+
 	@IsOptional()
 	@ValidateNested({ each: true })
 	@Type(() => CreateArtistProfileDto)

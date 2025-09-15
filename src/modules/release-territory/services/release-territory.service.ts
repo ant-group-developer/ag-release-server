@@ -4,7 +4,7 @@ import { ResponseError } from 'src/common/dtos/response.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
 import { UpdateReleaseTerritoryDto } from '../dto/release-territory.dto';
-import { ReleaseTerritory } from '../entities/release-territoty.entity';
+import { ReleaseTerritory } from '../entities/release-territory.entity';
 import {
 	ICreateReleaseTerritory,
 	IUpdateReleaseTerritory,

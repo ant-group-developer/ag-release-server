@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
@@ -86,7 +87,7 @@ export class TrackDraftController {
 
 	@Put(':id/trackPolicies/:trackPolicyId')
 	async updateTrackPolicy(
-		@Param('trackPolicyId') trackPolicyId: string,
+		@Param('trackPolicyId', ParseUUIDPipe) trackPolicyId: string,
 		@Body() data: UpdateTrackPolicyDto,
 	) {
 		const result = await this.trackDraftService.updateTrackPolicy({

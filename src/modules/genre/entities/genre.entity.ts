@@ -3,6 +3,7 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
+import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -36,6 +37,9 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 
 	@OneToMany(() => Track, (track) => track.subGenre)
 	subGenreTracks: Track[];
+
+	@OneToMany(() => Artist, (artist) => artist.genre)
+	artists: Artist[];
 
 	//user
 	@ManyToOne(() => User)

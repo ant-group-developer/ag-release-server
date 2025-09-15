@@ -78,7 +78,13 @@ export class TrackSensitiveService {
 	}
 
 	async delete(id: string) {
-		await this.findOne(id);
+		const entity =
+			await this.trackSensitiveQueryService.findOneWithTrackCount(id);
+		if ((entity?.trackCount ?? 0) > 0) {
+			throw new ResponseError(
+				TrackSensitiveMessage.CANNOT_DELETE_RELATION_WITH_TRACK,
+			);
+		}
 		await this.trackSensitiveRepository.delete(id);
 	}
 }
