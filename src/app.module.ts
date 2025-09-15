@@ -44,6 +44,7 @@ import { TrackLanguageModule } from './modules/track-language/track-language.mod
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
 import { TrackOriginTypeModule } from './modules/track-origin-type/track-origin-type.module';
 import { TrackRevenueModule } from './modules/track-revenue/track-revenue.module';
+import { TrackSensitiveModule } from './modules/track-sensitive/track-sensitive.module';
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserRoleModule } from './modules/user-role/user-role.module';
@@ -120,6 +121,7 @@ import { UserModule } from './modules/user/user.module';
 
 		ScheduleModule,
 		TrackRevenueModule,
+		TrackSensitiveModule,
 	],
 	controllers: [AppController],
 	providers: [

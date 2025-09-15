@@ -8,6 +8,7 @@ import {
 	Put,
 	Query,
 	Req,
+	Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
@@ -17,11 +18,12 @@ import {
 } from 'src/common/dtos/response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { streamDownload } from 'src/utils/util';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import {
 	IRelease,
@@ -34,6 +36,20 @@ import { ReleaseService } from '../services/release.service';
 @Controller('releases')
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
+
+	@Get()
+	async getListDetail(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.releaseService.getListDetail(query);
+		return new ResponseSuccess({ data: result });
+	}
 
 	@Get(':id')
 	async getOneDetail(
@@ -50,18 +66,34 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Get()
-	async getListDetail(
-		@Query() query: QueryGetListReleaseDto,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
-		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId)) {
-			query.tenantIds = [tenantId];
-		}
+	@Get(':id/download/csv-metadata')
+	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getFileCsvMetadata(id);
+		streamDownload(res, data);
+	}
 
-		const result = await this.releaseService.getListDetail(query);
-		return new ResponseSuccess({ data: result });
+	@Get(':id/download/xlsx-metadata')
+	async downloadXlsxMetadata(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getFileXlsxMetadata(id);
+		streamDownload(res, data);
+	}
+
+	@Get(':id/download/txt-metadata')
+	async downloadTxtMetadata(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getFileXlsxMetadata(id);
+		streamDownload(res, data);
+	}
+
+	@Get(':id/download/assets')
+	async downloadAssets(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getAssets(id);
+		streamDownload(res, data);
+	}
+
+	@Get(':id/download/cover-art')
+	async downloadCoverArt(@Param('id') id: string, @Res() res: Response) {
+		const data = await this.releaseService.getCoverArtStream(id);
+		streamDownload(res, data);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

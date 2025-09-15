@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import archiver from 'archiver';
+import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
-import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
+import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
+import {
+	getFileCsvFromRaw,
+	getFileExcelFromRaw,
+	getFileTxtFromRelease,
+} from 'src/utils/util.file';
+import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
@@ -22,24 +30,8 @@ export class ReleaseService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
-		// private readonly bucketService: BucketService,
-
-		private readonly releaseCoverArtService: ReleaseCoverArtService,
+		private readonly bucketService: BucketService,
 	) {}
-
-	// async create(data: CreateReleaseDto): Promise<Release> {
-	// 	const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
-
-	// 	await this.releaseValidateService.validate({
-	// 		labelId,
-	// 		primaryGenreId,
-	// 		subGenreId,
-	// 		releaseTimezoneId,
-	// 	});
-
-	// 	const release = this.releaseRepo.create(data);
-	// 	return await this.releaseRepo.save(release);
-	// }
 
 	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
@@ -153,5 +145,99 @@ export class ReleaseService {
 
 		await this.releaseRepo.update(id, { ...data, modifierId: userId });
 		return await this.releaseQueryService.findOne(id);
+	}
+
+	async getFileCsvMetadata(releaseId: string) {
+		const dataRaw =
+			await this.releaseQueryService.getMetadataRaw(releaseId);
+		return getFileCsvFromRaw({
+			records: [dataRaw],
+			fileName: dataRaw.release_title,
+		});
+	}
+
+	async getFileXlsxMetadata(releaseId: string) {
+		const dataRaw =
+			await this.releaseQueryService.getMetadataRaw(releaseId);
+		return getFileExcelFromRaw({
+			records: [dataRaw],
+			fileName: dataRaw.release_title,
+		});
+	}
+
+	async getFileTxtMetadata(releaseId: string) {
+		const release = await this.releaseQueryService.getMetadata(releaseId);
+		return getFileTxtFromRelease({ release, fileName: release.title });
+	}
+
+	async getAssets(releaseId: string) {
+		const zipStream = new PassThrough();
+		const archive = archiver('zip', { zlib: { level: 9 } });
+		archive.pipe(zipStream);
+
+		const { releaseName, coverArt, listAudios } =
+			await this.releaseQueryService.getFileIdAssetsRelease(releaseId);
+
+		if (coverArt.fileId) {
+			const streamCoverArt = await this.streamFileOnBucket(
+				coverArt.fileId,
+			);
+			archive.append(streamCoverArt.stream, {
+				name: coverArt.name || 'cover.jpg',
+			});
+		}
+
+		for (const item of listAudios) {
+			if (item.fileId) {
+				const streamAudio = await this.streamFileOnBucket(item.fileId);
+
+				archive.append(streamAudio.stream, {
+					name: item.name || 'item.wav',
+				});
+			}
+		}
+
+		archive.finalize().catch((_e) => {});
+
+		return {
+			contentType: 'application/zip',
+			stream: zipStream,
+			fileName: `${releaseName}assets.zip`,
+		};
+	}
+
+	async getCoverArtStream(releaseId: string) {
+		const { coverArt } =
+			await this.releaseQueryService.getFileIdAssetsRelease(releaseId);
+
+		const { stream, contentType } = await this.streamFileOnBucket(
+			coverArt.fileId,
+		);
+
+		return {
+			stream,
+			contentType,
+			fileName: coverArt.name,
+		};
+	}
+
+	private async streamFileOnBucket(fileId?: string | null) {
+		if (!fileId) {
+			throw new ResponseError({ message: 'Resource not found' });
+		}
+
+		const url = await this.bucketService.getUrlDown(fileId);
+		return this.getStream(url);
+	}
+
+	private async getStream(url: string) {
+		const response = await axios.get(url, {
+			responseType: 'stream',
+		});
+
+		return {
+			stream: response.data,
+			contentType: response.headers['content-type'],
+		};
 	}
 }

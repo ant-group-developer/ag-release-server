@@ -11,6 +11,7 @@ export enum EntityTypePicture {
 	TRACK = 'tracks',
 	TENANT = 'tenants',
 	LOGO = 'logo',
+	TRACK_SENSITIVE = 'track_sensitive',
 }
 
 export enum UploadPurpose {

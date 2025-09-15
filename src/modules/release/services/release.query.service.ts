@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
+import { toSnakeCaseKeys } from 'src/utils/util';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
@@ -9,7 +10,6 @@ import {
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
-
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -472,5 +472,129 @@ export class ReleaseQueryService {
 		}
 
 		return release;
+	}
+
+	async getFileIdAssetsRelease(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				tracks: {
+					audioFile: true,
+				},
+				releaseCoverArts: {
+					file: true,
+				},
+			},
+		});
+
+		if (!release) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		const coverArtOriginal = release.releaseCoverArts?.find(
+			(i) => i.type === 'original',
+		);
+
+		return {
+			releaseName: release.title,
+
+			coverArt: {
+				fileId: coverArtOriginal?.fileId,
+				name: `${release.title}.${coverArtOriginal?.file.extension}`,
+			},
+			listAudios: release.tracks.map((item) => ({
+				fileId: item.audioFile?.fileId,
+				name: `${item.title}.wav`,
+			})),
+		};
+	}
+
+	private createQbMetadata(id: string) {
+		const qb = this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.label', 'label')
+
+			.leftJoin('release.primaryGenre', 'primaryGenre')
+			.leftJoin('release.subGenre', 'subGenre')
+
+			.leftJoin('release.releaseArtists', 'releaseArtist')
+			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('releaseArtist.artistRole', 'artistRole')
+
+			.leftJoin('release.releaseLanguage', 'releaseLanguage')
+
+			.leftJoin('releaseLanguage.metadataLanguage', 'metadataLanguage')
+			.leftJoin('releaseLanguage.audioLanguage', 'audioLanguage')
+			.leftJoin(
+				'releaseLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoin('release.timeZone', 'timeZone')
+			.leftJoin('release.releaseTerritory', 'releaseTerritory')
+
+			.leftJoin('release.modifier', 'modifier')
+
+			.addSelect(['albumFormat.name'])
+			.addSelect(['label.name'])
+			.addSelect(['primaryGenre.name'])
+			.addSelect(['subGenre.name'])
+
+			.addSelect([
+				'releaseArtist.id',
+				'releaseArtist.artistRoleId',
+				'releaseArtist.artistId',
+				'releaseArtist.releaseId',
+				'releaseArtist.addArtistToTracks',
+			])
+			.addSelect(['artist.name'])
+			.addSelect(['artistRole.name'])
+			.addSelect([
+				'releaseLanguage.metadataLanguageCountryId',
+				'releaseLanguage.audioLanguageId',
+				'releaseLanguage.metadataLanguageId',
+				'releaseLanguage.releaseId',
+			])
+			.addSelect(['metadataLanguage.name'])
+			.addSelect(['audioLanguage.name'])
+			.addSelect(['metadataLanguageCountry.name'])
+			.addSelect(['timeZone.name'])
+			.addSelect([
+				'releaseTerritory.distributeWorldwide',
+				'releaseTerritory.distributionType',
+				'releaseTerritory.selectedCountries',
+			]);
+
+		qb.where('release.id = :id', {
+			id,
+		});
+
+		return qb;
+	}
+
+	async getMetadata(id: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id },
+			relations: {
+				label: true,
+				releaseArtists: { artist: true, artistRole: true },
+				tracks: { trackArtists: { artist: true, artistRole: true } },
+			},
+		});
+		if (!release) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		return release;
+	}
+
+	async getMetadataRaw(id: string) {
+		const qb = this.createQbMetadata(id);
+		const raw = await qb.getRawOne();
+		if (!raw) {
+			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+		}
+
+		return toSnakeCaseKeys(raw);
 	}
 }
