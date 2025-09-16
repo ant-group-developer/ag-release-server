@@ -35,7 +35,13 @@ export class TrackOriginTypeService {
 			modifierId: userId,
 		});
 
-		return await this.trackOriginTypeRepo.save(trackOriginType);
+		const result = await this.trackOriginTypeRepo.save(trackOriginType);
+
+		if (result.isDefault) {
+			await this.setDefault(result.id);
+		}
+
+		return result;
 	}
 
 	// read
@@ -94,7 +100,7 @@ export class TrackOriginTypeService {
 		data: UpdateTrackOriginTypeDto,
 		userId: string,
 	): Promise<TrackOriginType> {
-		const { name, code } = data;
+		const { name, code, isDefault } = data;
 		const trackOriginType = await this.findOne(id);
 
 		if (name && name !== trackOriginType.name) {
@@ -103,6 +109,10 @@ export class TrackOriginTypeService {
 
 		if (code && code !== trackOriginType.code) {
 			await this.trackOriginTypeQueryService.validate({ code });
+		}
+
+		if (isDefault && isDefault !== trackOriginType.isDefault) {
+			await this.setDefault(trackOriginType.id);
 		}
 
 		await this.trackOriginTypeRepo.update(id, {
@@ -117,5 +127,10 @@ export class TrackOriginTypeService {
 		const trackOriginType = await this.findOneWithCountRelation(id);
 		this.trackOriginTypeQueryService.validateDelete(trackOriginType);
 		await this.trackOriginTypeRepo.delete(id);
+	}
+
+	async setDefault(id: string) {
+		await this.trackOriginTypeRepo.update({}, { isDefault: false });
+		await this.trackOriginTypeRepo.update({ id }, { isDefault: true });
 	}
 }

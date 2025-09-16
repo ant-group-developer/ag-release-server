@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { parse } from 'csv-parse/sync';
 import * as fs from 'fs';
 import { Parser } from 'json2csv';
+import pLimit from 'p-limit';
 import path from 'path';
 import * as readline from 'readline';
 import { firstValueFrom } from 'rxjs';
@@ -12,16 +13,17 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { normalizeName } from 'src/utils/util';
-import { Repository } from 'typeorm';
+import { ILike, IsNull, Not, Repository } from 'typeorm';
 import { Artist } from '../entities/artist.entity';
 import { ArtistSource } from '../enum/artist.enum';
+import { ArtistService } from './artist.service';
 export class ArtistDataInit {
 	private logger = new Logger(ArtistDataInit.name);
 
 	constructor(
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
-
+		private readonly artistService: ArtistService,
 		private readonly httpService: HttpService,
 	) {}
 
@@ -183,21 +185,143 @@ export class ArtistDataInit {
 	async getAdaArtistByName(
 		cookie: string,
 		authorization: string,
-		query: string,
+		name: string,
 	) {
-		const url = `https://partners.ada-music.com/api/coop/releases/parties/find-by-name?showRelated=false&query=${encodeURIComponent(query)}`;
+		const url = `https://partners.ada-music.com/api/coop/releases/parties/find-by-name?showRelated=false&query=${encodeURIComponent(
+			name,
+		)}`;
 
-		const res = await firstValueFrom(
-			this.httpService.get(url, {
-				headers: {
-					Authorization: authorization,
-					Cookie: cookie,
-					'x-no-gzip-response': 'true',
+		try {
+			const res = await firstValueFrom(
+				this.httpService.get(url, {
+					headers: {
+						Authorization: authorization,
+						Cookie: cookie,
+						'x-no-gzip-response': 'true',
+					},
+				}),
+			);
+
+			return res.data?.data ?? res.data ?? [];
+		} catch (err) {
+			this.logger.error(
+				`Error fetching ADA artist: ${name}`,
+				err.message,
+			);
+			return [];
+		}
+	}
+
+	async exportArtistsWithProfiles(
+		cookie: string,
+		authorization: string,
+		query?: string,
+		batchSize = 5000,
+		concurrency = 25,
+	) {
+		let offset = 0;
+		let totalUpdated = 0;
+		const limit = pLimit(concurrency);
+
+		while (true) {
+			const artists = await this.artistRepo.find({
+				where: {
+					idSource: Not(IsNull()),
+					artistSource: ArtistSource.ADA,
+					isScanned: false,
+					...(query ? { name: ILike(`%${query}%`) } : {}),
 				},
-			}),
-		);
+				order: { name: 'ASC' },
+				skip: offset,
+				take: batchSize,
+			});
 
-		return res.data;
+			if (artists.length === 0) break;
+			this.logger.log(`Retrieved ${artists.length} artists from DB`);
+
+			const processed = new Set<string>();
+
+			const tasks = artists.map((artist) =>
+				limit(async () => {
+					if (processed.has(artist.idSource)) return null;
+
+					const adaArtists = await this.getAdaArtistByName(
+						cookie,
+						authorization,
+						artist.name,
+					);
+
+					this.logger.debug(
+						`Found ${adaArtists.length} ADA artists for: ${artist.name}`,
+					);
+
+					const updates: Partial<Artist>[] = [];
+
+					for (const ada of adaArtists) {
+						const source = ada.artist ?? ada.participant;
+						const idSource = String(
+							ada.artist?.id || ada.participant?.id,
+						);
+
+						const match = artists.find(
+							(a) => String(a.idSource) === idSource,
+						);
+						if (match && !processed.has(idSource)) {
+							updates.push({
+								id: match.id,
+								spotifyId: source?.spotifyId?.value || null,
+								appleMusicId: source?.appleId?.value || null,
+								primaryGenre: source?.primaryGenre || null,
+								originCountry: source?.originCountry || null,
+								isScanned: true,
+							});
+							processed.add(idSource);
+						}
+					}
+
+					return updates;
+				}),
+			);
+
+			const settled = await Promise.allSettled(tasks);
+
+			const updates: Partial<Artist>[] = [];
+			for (const s of settled) {
+				if (s.status === 'fulfilled' && s.value) {
+					updates.push(...s.value);
+				}
+			}
+
+			if (updates.length > 0) {
+				this.logger.log(`Updating ${updates.length} artists in DB...`);
+				await this.artistRepo.save(updates, { chunk: 1000 });
+				totalUpdated += updates.length;
+			}
+
+			offset += batchSize;
+		}
+
+		this.logger.log(`Export completed. Total updated: ${totalUpdated}`);
+		return { message: `Export completed. Total updated: ${totalUpdated}` };
+	}
+
+	private writeCsvFile(records: any[], index: number): string {
+		const fields = [
+			'id',
+			'name',
+			'idSource',
+			'spotify_id',
+			'apple_music_id',
+		];
+		const parser = new Parser({ fields });
+		const csv = parser.parse(records);
+
+		const filePath = `artists_with_profiles_part${index}_${Date.now()}.csv`;
+		fs.writeFileSync(filePath, csv);
+
+		console.log(`   ➤ Wrote file: ${filePath} (${records.length} records)`);
+
+		return filePath;
 	}
 
 	private async fetchAdaArtistsBatch(
@@ -342,12 +466,12 @@ export class ArtistDataInit {
 					});
 
 					if (!exists) {
-						// const result = await this.create({
-						// 	name: item.name,
-						// 	artistSource: ArtistSource.MUSIC_BRAINZ,
-						// 	idSource: item.id,
-						// });
-						// this.logger.log(result);
+						const result = await this.artistService.create({
+							name: item.name,
+							artistSource: ArtistSource.MUSIC_BRAINZ,
+							idSource: item.id,
+						});
+						this.logger.log(result);
 					}
 				}),
 			);
@@ -429,19 +553,21 @@ export class ArtistDataInit {
 			for (let i = 0; i < records.length; i += chunkSize) {
 				const chunk = records.slice(i, i + chunkSize);
 
-				// await Promise.all(
-				// 	chunk.map((item: any) =>
-				// 		this.createSafe({
-				// 			name: item.name,
-				// 			idSource: item.id,
-				// 			artistSource: ArtistSource.ADA,
-				// 		}).then(() => {
-				// 			this.logger.log(
-				// 				`Imported artist from ADA → id=${item.id}, name="${item.name}"`,
-				// 			);
-				// 		}),
-				// 	),
-				// );
+				await Promise.all(
+					chunk.map((item: any) =>
+						this.artistService
+							.createSafe({
+								name: item.name,
+								idSource: item.id,
+								artistSource: ArtistSource.ADA,
+							})
+							.then(() => {
+								this.logger.log(
+									`Imported artist from ADA → id=${item.id}, name="${item.name}"`,
+								);
+							}),
+					),
+				);
 
 				this.logger.log(`Imported chunk ${i / chunkSize + 1}`);
 			}

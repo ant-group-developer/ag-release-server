@@ -30,7 +30,13 @@ export class TrackTypeService {
 			creatorId: userId,
 			modifierId: userId,
 		});
-		return await this.trackTypeRepo.save(trackType);
+
+		const result = await this.trackTypeRepo.save(trackType);
+		if (result.isDefault) {
+			await this.setDefault(result.id);
+		}
+
+		return result;
 	}
 
 	// read
@@ -86,7 +92,7 @@ export class TrackTypeService {
 		data: UpdateTrackTypeDto,
 		userId: string,
 	): Promise<TrackType> {
-		const { name, code } = data;
+		const { name, code, isDefault } = data;
 		const trackType = await this.findOne(id);
 
 		if (name && name !== trackType.name) {
@@ -95,6 +101,10 @@ export class TrackTypeService {
 
 		if (code && code !== trackType.code) {
 			await this.trackTypeQueryService.validate({ code });
+		}
+
+		if (isDefault && isDefault !== trackType.isDefault) {
+			await this.setDefault(trackType.id);
 		}
 
 		await this.trackTypeRepo.update(id, { ...data, modifierId: userId });
@@ -106,5 +116,10 @@ export class TrackTypeService {
 		const trackType = await this.findOneWithCountRelation(id);
 		this.trackTypeQueryService.validateDelete(trackType);
 		await this.trackTypeRepo.delete(id);
+	}
+
+	async setDefault(id: string) {
+		await this.trackTypeRepo.update({}, { isDefault: false });
+		await this.trackTypeRepo.update({ id }, { isDefault: true });
 	}
 }

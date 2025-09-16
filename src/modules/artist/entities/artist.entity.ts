@@ -13,7 +13,7 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { ArtistSource } from '../enum/artist.enum';
 
-@Entity('artists')
+@Entity('artist_2')
 export class Artist extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
 	name: string;
@@ -42,6 +42,21 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 
 	@Column({ type: 'uuid', nullable: true })
 	countryId: string | null;
+
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	spotifyId: string | null;
+
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	appleMusicId: string | null;
+
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	primaryGenre: string | null;
+
+	@Column({ type: 'varchar', length: 255, nullable: true })
+	originCountry: string | null;
+
+	@Column({ type: 'boolean', default: false })
+	isScanned: boolean;
 
 	// relations
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)

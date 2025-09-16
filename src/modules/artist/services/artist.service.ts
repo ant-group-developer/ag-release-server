@@ -46,7 +46,7 @@ export class ArtistService {
 		return artist;
 	}
 
-	private async createSafe(data: ICreateArtist) {
+	async createSafe(data: ICreateArtist) {
 		try {
 			return await this.create(data);
 		} catch (error) {
@@ -54,7 +54,7 @@ export class ArtistService {
 		}
 	}
 
-	private async create(data: ICreateArtist): Promise<Artist> {
+	async create(data: ICreateArtist): Promise<Artist> {
 		const { name } = data;
 		// await this.artistQueryService.validate({ name });
 		const code = await this.artistQueryService.getCodeFromName(name);
