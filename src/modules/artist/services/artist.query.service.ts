@@ -41,12 +41,23 @@ export class ArtistQueryService {
 		queryBuilder
 			.leftJoin('artist.artistProfiles', 'artistProfile')
 			.leftJoin('artistProfile.dsp', 'dsp')
+			.leftJoin('artist.genre', 'genre')
+			.leftJoin('artist.country', 'country')
 
 			.addSelect([
 				'artistProfile.id',
 				'artistProfile.name',
 				'artistProfile.url',
 			])
+
+			.addSelect([
+				'genre.id',
+				'genre.name',
+				'genre.code',
+				'genre.picture',
+			])
+
+			.addSelect(['country.id', 'country.name'])
 
 			.addSelect([
 				'dsp.id',
@@ -204,7 +215,9 @@ export class ArtistQueryService {
 
 		query
 			.leftJoin('artist.artistProfiles', 'artistProfile')
-			.leftJoin('artistProfile.dsp', 'dsp');
+			.leftJoin('artistProfile.dsp', 'dsp')
+			.leftJoin('artist.genre', 'genre')
+			.leftJoin('artist.country', 'country');
 
 		query
 			.select([
@@ -212,7 +225,16 @@ export class ArtistQueryService {
 				'artist.name',
 				'artist.picture',
 				'artist.biography',
+				'artist.genreId',
+				'artist.countryId',
 			])
+			.addSelect([
+				'genre.id',
+				'genre.name',
+				'genre.code',
+				'genre.picture',
+			])
+			.addSelect(['country.id', 'country.name'])
 			.addSelect([
 				'artistProfile.id',
 				'artistProfile.name',
@@ -284,8 +306,16 @@ export class ArtistQueryService {
 
 	async getListSimple(query: QueryGetListArtistDto) {
 		const queryGetList = this.createQueryGetList(query);
+
 		queryGetList
 			.select(['artist.id', 'artist.name', 'artist.code'])
+			.addSelect([
+				'genre.id',
+				'genre.name',
+				'genre.code',
+				'genre.picture',
+			])
+			.addSelect(['country.id', 'country.name'])
 			.addSelect([
 				'artistProfile.id',
 				'artistProfile.name',

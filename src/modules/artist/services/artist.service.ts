@@ -1,4 +1,3 @@
-import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
@@ -27,7 +26,6 @@ export class ArtistService {
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,
-		private readonly httpService: HttpService,
 	) {}
 
 	async handleCreate(data: CreateArtistDto, userId: string) {

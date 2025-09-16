@@ -18,6 +18,7 @@ const TrackMessageCodeError = {
 	TRACK_ORIGIN_TYPE_NOT_FOUND: 'track.message.error.trackOriginTypeNotFound',
 	RELEASE_NOT_FOUND: 'track.message.error.releaseNotFound',
 	PRICE_TIER_NOT_FOUND: 'track.message.error.priceTierNotFound',
+	TRACK_SENSITIVE_NOT_FOUND: 'track.message.error.trackSensitiveNotFound',
 };
 
 const TrackMessageError = {
@@ -28,6 +29,7 @@ const TrackMessageError = {
 	TRACK_ORIGIN_TYPE_NOT_FOUND: 'Track origin type not found',
 	RELEASE_NOT_FOUND: 'Release not found',
 	PRICE_TIER_NOT_FOUND: 'Price tier not found',
+	TRACK_SENSITIVE_NOT_FOUND: 'Track sensitive not found',
 };
 
 export const TrackMessages = {
@@ -60,5 +62,10 @@ export const TrackMessages = {
 	PRICE_TIER_NOT_FOUND: {
 		message: TrackMessageError.PRICE_TIER_NOT_FOUND,
 		messageCode: TrackMessageCodeError.PRICE_TIER_NOT_FOUND,
+	},
+
+	TRACK_SENSITIVE_NOT_FOUND: {
+		message: TrackMessageError.TRACK_SENSITIVE_NOT_FOUND,
+		messageCode: TrackMessageCodeError.TRACK_SENSITIVE_NOT_FOUND,
 	},
 };

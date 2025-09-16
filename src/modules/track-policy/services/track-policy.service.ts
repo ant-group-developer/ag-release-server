@@ -22,7 +22,7 @@ export class TrackPolicyService {
 
 	async createTrackPoliciesForMultipleTracks(trackIds: string[]) {
 		const listDspWithDefaultAction =
-			await this.trackPolicyDspService.getListWithDefaultActions();
+			await this.trackPolicyDspService.getListDspEnablePolicy();
 
 		const trackPolicies = trackIds
 			.map((trackId) =>
@@ -45,7 +45,7 @@ export class TrackPolicyService {
 
 	private async createListEntities({ trackId }: { trackId: string }) {
 		const listDspWithDefaultAction =
-			await this.trackPolicyDspService.getListWithDefaultActions();
+			await this.trackPolicyDspService.getListDspEnablePolicy();
 
 		return listDspWithDefaultAction.map((item) => {
 			return this.trackPolicyRepo.create({

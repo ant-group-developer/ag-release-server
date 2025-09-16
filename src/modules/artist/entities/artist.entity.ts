@@ -4,7 +4,9 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
+import { Country } from 'src/modules/country/entities/country.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
@@ -35,6 +37,12 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	idSource: string;
 
+	@Column({ type: 'varchar', length: 10, nullable: true })
+	genreId: string | null;
+
+	@Column({ type: 'uuid', nullable: true })
+	countryId: string | null;
+
 	// relations
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
 	releaseArtists: ReleaseArtist[];
@@ -52,6 +60,14 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 
 	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.artist)
 	artistProfiles: ArtistProfile[] | [];
+
+	@ManyToOne(() => Genre, (genre) => genre.artists)
+	@JoinColumn({ name: 'genre_id' })
+	genre: Genre | null;
+
+	@ManyToOne(() => Country)
+	@JoinColumn({ name: 'country_id' })
+	country: Country | null;
 
 	// count relation
 	releaseCount?: number;

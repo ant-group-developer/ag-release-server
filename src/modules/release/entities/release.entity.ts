@@ -9,7 +9,7 @@ import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
-import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territoty.entity';
+import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';

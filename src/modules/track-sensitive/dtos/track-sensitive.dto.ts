@@ -1,10 +1,17 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+	IsEnum,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	MaxLength,
+} from 'class-validator';
 import {
 	DEFAULT_LENGTH_CODE,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { FieldOrderTrackSensitive } from '../enum/track-sensitive.enum';
 
 export class CreateTrackSensitiveDto {
 	@IsString()
@@ -43,4 +50,8 @@ export class QueryGetListTrackSensitiveDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	keyword?: string;
+
+	@IsOptional()
+	@IsEnum(FieldOrderTrackSensitive)
+	order?: FieldOrderTrackSensitive;
 }

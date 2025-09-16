@@ -79,7 +79,7 @@ export class ReleaseQueryService {
 		});
 	}
 
-	async getOneDetail(id: string): Promise<Release> {
+	private createQbGetOneDetail(id: string) {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
 		query
@@ -199,7 +199,12 @@ export class ReleaseQueryService {
 			id,
 		});
 
-		const release = await query.getOne();
+		return query;
+	}
+
+	async getOneDetail(id: string): Promise<Release> {
+		const qb = this.createQbGetOneDetail(id);
+		const release = await qb.getOne();
 
 		if (!release) {
 			throw new ResponseError(ReleaseMessages.NOT_FOUND);
@@ -511,76 +516,47 @@ export class ReleaseQueryService {
 
 	private createQbMetadata(id: string) {
 		const qb = this.releaseRepo
-			.createQueryBuilder('release')
-			.leftJoin('release.albumFormat', 'albumFormat')
-			.leftJoin('release.label', 'label')
-
-			.leftJoin('release.primaryGenre', 'primaryGenre')
-			.leftJoin('release.subGenre', 'subGenre')
-
-			.leftJoin('release.releaseArtists', 'releaseArtist')
-			.leftJoin('releaseArtist.artist', 'artist')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
-
-			.leftJoin('release.releaseLanguage', 'releaseLanguage')
-
-			.leftJoin('releaseLanguage.metadataLanguage', 'metadataLanguage')
-			.leftJoin('releaseLanguage.audioLanguage', 'audioLanguage')
-			.leftJoin(
-				'releaseLanguage.metadataLanguageCountry',
-				'metadataLanguageCountry',
-			)
-			.leftJoin('release.timeZone', 'timeZone')
-			.leftJoin('release.releaseTerritory', 'releaseTerritory')
-
-			.leftJoin('release.modifier', 'modifier')
-
-			.addSelect(['albumFormat.name'])
-			.addSelect(['label.name'])
-			.addSelect(['primaryGenre.name'])
-			.addSelect(['subGenre.name'])
-
-			.addSelect([
-				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
-				'releaseArtist.artistId',
-				'releaseArtist.releaseId',
-				'releaseArtist.addArtistToTracks',
-			])
-			.addSelect(['artist.name'])
-			.addSelect(['artistRole.name'])
-			.addSelect([
-				'releaseLanguage.metadataLanguageCountryId',
-				'releaseLanguage.audioLanguageId',
-				'releaseLanguage.metadataLanguageId',
-				'releaseLanguage.releaseId',
-			])
-			.addSelect(['metadataLanguage.name'])
-			.addSelect(['audioLanguage.name'])
-			.addSelect(['metadataLanguageCountry.name'])
-			.addSelect(['timeZone.name'])
-			.addSelect([
-				'releaseTerritory.distributeWorldwide',
-				'releaseTerritory.distributionType',
-				'releaseTerritory.selectedCountries',
+			.createQueryBuilder('r')
+			.leftJoin('r.label', 'l')
+			.leftJoin('r.albumFormat', 'af')
+			.leftJoin('r.releaseArtists', 'ra')
+			.leftJoin('ra.artist', 'a')
+			.leftJoin('ra.artistRole', 'r2')
+			.leftJoin('r.primaryGenre', 'g')
+			.leftJoin('r.subGenre', 'g2')
+			.leftJoin('r.tracks', 't')
+			.leftJoin('t.trackOriginType', 'tot')
+			.leftJoin('t.trackType', 'tt')
+			.leftJoin('t.primaryGenre', 'g3')
+			.leftJoin('t.subGenre', 'g4')
+			.where('r.id = :id', { id })
+			.select([
+				'r.title AS release_name',
+				'af.name AS release_type_name',
+				'g.name AS release_primary_genre_name',
+				'g2.name AS release_sub_genre_name',
+				'l.name AS label_name',
+				'a.name AS artist_name',
+				'r2.name AS role_name',
+				't.title AS track_name',
+				'tot.name AS track_origin_type_name',
+				'tt.name AS track_type_name',
+				'g3.name AS track_primary_genre_name',
+				'g4.name AS track_sub_genre_name',
 			]);
-
-		qb.where('release.id = :id', {
-			id,
-		});
 
 		return qb;
 	}
 
 	async getMetadata(id: string) {
-		const release = await this.releaseRepo.findOne({
-			where: { id },
-			relations: {
-				label: true,
-				releaseArtists: { artist: true, artistRole: true },
-				tracks: { trackArtists: { artist: true, artistRole: true } },
-			},
-		});
+		const qb = this.createQbGetOneDetail(id);
+		qb.leftJoinAndSelect('release.tracks', 'track')
+			.leftJoinAndSelect('track.trackArtists', 'trackArtist')
+			.leftJoinAndSelect('trackArtist.artistRole', 'trackArtistRole')
+			.leftJoinAndSelect('trackArtist.artist', 'trackArtistArtist')
+			.addSelect(['track.id', 'track.title', 'track.isrc']);
+		const release = await qb.getOne();
+
 		if (!release) {
 			throw new ResponseError(ReleaseMessages.NOT_FOUND);
 		}
@@ -591,6 +567,7 @@ export class ReleaseQueryService {
 	async getMetadataRaw(id: string) {
 		const qb = this.createQbMetadata(id);
 		const raw = await qb.getRawOne();
+
 		if (!raw) {
 			throw new ResponseError(ReleaseMessages.NOT_FOUND);
 		}

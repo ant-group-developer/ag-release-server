@@ -121,54 +121,25 @@ export function getFileTxtFromRelease(options: {
 	const lines: string[] = [];
 
 	// RELEASE INFO
-	lines.push(release.title || '-');
+	lines.push(release.title);
 	lines.push(
 		`Performed by: ${
 			release.releaseArtists?.map((ra) => ra.artist?.name).join(', ') ||
 			'-'
 		}`,
 	);
-	lines.push('Produced by: -');
-	lines.push(`℗ ${release.pLineYear || '-'} ${release.pLineOwner || '-'}`);
+	lines.push(
+		`Produced by: ℗ ${release.pLineYear || '-'} ${release.pLineOwner || '-'}`,
+	);
 	lines.push(`Catalog Id: ${release.catalogId || '-'}`);
 	lines.push(`UPC: ${release.upc || '-'}`);
 	lines.push('');
 
-	// PRODUCTION CREDITS
-	lines.push('PRODUCTION CREDITS:\n');
-	lines.push('Produced by: -');
-	lines.push('Mixed by: -');
-	lines.push('Mastered by: -');
-	lines.push('Mix Engineers: -');
-	lines.push('Additional Production by: -');
-	lines.push('');
-
-	// ART CREDITS
-	lines.push('ART CREDITS:\n');
-	lines.push('Art Direction/Graphic Design: -');
-	lines.push('Photography: -');
-	lines.push('Artwork: -');
-	lines.push('');
-
-	// MUSICIAN CREDITS
-	lines.push('MUSICIAN CREDITS:\n');
-	lines.push(
-		`Composer & Lyricist: ${
-			release.releaseArtists?.map((ra) => ra.artist?.name).join(', ') ||
-			'-'
-		}`,
-	);
-	lines.push('');
-
-	// LINER NOTES
-	lines.push('LINER NOTES:');
-	lines.push('-\n');
-
 	// TRACKS
-	lines.push('TRACKS CREDITS:\n');
+	lines.push('Tracks:');
 	release.tracks?.forEach((track: Track, index: number) => {
-		lines.push(String(index + 1));
-		lines.push(track.title || '-');
+		const trackTitle = `${String(index + 1)}: ${track.title || '-'}`;
+		lines.push(trackTitle);
 
 		const writers =
 			track.trackArtists
@@ -178,7 +149,7 @@ export function getFileTxtFromRelease(options: {
 
 		lines.push(`Written by: ${writers}`);
 		lines.push(`Published by: ${release.label?.name || '-'}`);
-		lines.push('Produced by: -\n');
+		lines.push('\n');
 	});
 
 	const stream = new PassThrough();

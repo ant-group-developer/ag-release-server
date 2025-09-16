@@ -10,8 +10,8 @@ export class TrackPolicy extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 10 })
 	trackId: string;
 
-	@Column({ type: 'uuid' })
-	actionId: string;
+	@Column({ type: 'uuid', nullable: true })
+	actionId: string | null;
 
 	@Column({ type: 'uuid' })
 	dspId: string;
@@ -23,7 +23,7 @@ export class TrackPolicy extends BaseUUIDEntity {
 
 	@ManyToOne(() => Action, (action) => action.trackPolicies)
 	@JoinColumn({ name: 'action_id' })
-	action: Action;
+	action: Action | null;
 
 	@ManyToOne(() => Dsp, (dsp) => dsp.trackPolicies)
 	@JoinColumn({ name: 'dsp_id' })

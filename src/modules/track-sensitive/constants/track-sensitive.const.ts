@@ -30,4 +30,10 @@ export const TrackSensitiveMessage = {
 		messageCode: 'trackSensitive.message.error.duplicateCode',
 		statusCode: 409,
 	},
+	CANNOT_DELETE_RELATION_WITH_TRACK: {
+		message: 'Cannot delete TrackSensitive because it is related to tracks',
+		messageCode:
+			'trackSensitive.message.error.cannotDeleteRelationWithTrack',
+		statusCode: 400,
+	},
 };
