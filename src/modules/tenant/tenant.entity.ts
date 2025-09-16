@@ -12,6 +12,8 @@ import {
 } from 'typeorm';
 import { LENGTH_PICTURE } from '../database/constants/database.constants';
 import { TenantDsp } from '../tenant-dsp/tenant-dsp.entity';
+import { TenantIssue } from '../tenant-issue/entities/tenant-issue.entity';
+import { TenantTier } from '../tenant-tiers/entities/tenant-tiers.entity';
 import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
 import { TenantType } from './tenant.enum';
@@ -19,12 +21,6 @@ import { TenantType } from './tenant.enum';
 @Entity({ name: 'tenants' })
 @Tree('closure-table')
 export class Tenant extends BaseUserTrackedUUIDEntity {
-	// @Column({ type: 'uuid', nullable: true })
-	// creatorId: string;
-
-	// @Column({ type: 'uuid', nullable: true })
-	// modifierId: string;
-
 	@Column({
 		length: LENGTH_PICTURE,
 		nullable: true,
@@ -85,6 +81,9 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'enum', enum: TenantType, default: TenantType.LABEL })
 	type: TenantType;
 
+	@Column({ type: 'uuid', nullable: true })
+	tenantTierId: string | null;
+
 	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
@@ -114,4 +113,11 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => TenantDsp, (tenantDsp) => tenantDsp.tenant)
 	tenantDsp: TenantDsp[];
+
+	@ManyToOne(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
+	tenantIssues: TenantIssue[];
+
+	@OneToMany(() => TenantTier, (tenantTier) => tenantTier.tenants)
+	@JoinColumn({ name: 'tenant_tier_id' })
+	tenantTier: TenantTier[];
 }
