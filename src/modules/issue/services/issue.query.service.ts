@@ -6,7 +6,6 @@ import { Repository } from 'typeorm';
 import { IssueMessage } from '../constants/issue.constant';
 import { QueryGetListIssueDto } from '../dto/issue.dto';
 import { Issue } from '../entities/issue.entity';
-import { FieldOrderIssue } from '../enum/issue.enum';
 
 @Injectable()
 export class IssueQueryService {
@@ -62,11 +61,7 @@ export class IssueQueryService {
 			);
 		}
 
-		if (fieldOrder === FieldOrderIssue.ISSUE_LEVEL) {
-			qb.orderBy('issueLevel.severityRank', orderBy);
-		} else {
-			qb.orderBy(`issue.${fieldOrder}`, orderBy);
-		}
+		qb.orderBy(fieldOrder, orderBy);
 
 		qb.skip(skip).take(pageSize);
 
