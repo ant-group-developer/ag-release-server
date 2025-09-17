@@ -7,8 +7,10 @@ import {
 	Post,
 	Query,
 	Req,
+	Sse,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { interval, map, Observable, take } from 'rxjs';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import {
 	CreateTrackScanStatusDto,
@@ -39,6 +41,24 @@ export class CopyrightTaskController {
 		const data = await this.copyrightService.getDetailTask(id);
 
 		return new ResponseSuccess({ data });
+	}
+
+	@Get(':id/stream')
+	@Sse()
+	streamTask(@Param('id') id: string): Observable<MessageEvent> {
+		return interval(1000).pipe(
+			map((count) => {
+				const progress = count * 10;
+				return <MessageEvent>{
+					data: {
+						taskId: id,
+						progress,
+						status: progress < 100 ? 'RUNNING' : 'FINISHED',
+					},
+				};
+			}),
+			take(11),
+		);
 	}
 
 	@Post(':id/cancel')
