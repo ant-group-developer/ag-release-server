@@ -114,7 +114,7 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 	@OneToMany(() => TenantDsp, (tenantDsp) => tenantDsp.tenant)
 	tenantDsp: TenantDsp[];
 
-	@ManyToOne(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
+	@OneToMany(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
 	tenantIssues: TenantIssue[];
 
 	@OneToMany(() => TenantTier, (tenantTier) => tenantTier.tenants)

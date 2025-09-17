@@ -29,6 +29,12 @@ export class TenantIssue extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
 	note: string | null;
 
+	@Column({ type: 'uuid' })
+	tenantId: string;
+
+	@Column({ type: 'uuid' })
+	issueId: string;
+
 	// user
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
