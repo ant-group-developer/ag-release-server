@@ -6,4 +6,5 @@ export enum FieldOrderIssue {
 	NUMBER_OF_DAYS_AFFECT = 'numberOfDaysAffect',
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
+	ISSUE_LEVEL = 'issueLevel.severityRank',
 }

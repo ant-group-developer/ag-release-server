@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { IssueMessage } from '../constants/issue.constant';
 import { QueryGetListIssueDto } from '../dto/issue.dto';
 import { Issue } from '../entities/issue.entity';
+import { FieldOrderIssue } from '../enum/issue.enum';
 
 @Injectable()
 export class IssueQueryService {
@@ -31,6 +32,8 @@ export class IssueQueryService {
 		} = query;
 
 		const qb = this.issueRepo.createQueryBuilder('issue');
+
+		qb.leftJoin('issue.issueLevel', 'issueLevel');
 
 		if (keyword) {
 			qb.andWhere(
@@ -59,7 +62,12 @@ export class IssueQueryService {
 			);
 		}
 
-		qb.orderBy(`issue.${fieldOrder}`, orderBy);
+		if (fieldOrder === FieldOrderIssue.ISSUE_LEVEL) {
+			qb.orderBy('issueLevel.severityRank', orderBy);
+		} else {
+			qb.orderBy(`issue.${fieldOrder}`, orderBy);
+		}
+
 		qb.skip(skip).take(pageSize);
 
 		return qb;
@@ -67,6 +75,14 @@ export class IssueQueryService {
 
 	async getList(query: QueryGetListIssueDto) {
 		const qb = this.createQueryGetList(query);
+		qb.addSelect([
+			'issueLevel.id',
+			'issueLevel.nameEn',
+			'issueLevel.nameVi',
+			'issueLevel.code',
+			'issueLevel.color',
+			'issueLevel.severityRank',
+		]);
 		return qb.getManyAndCount();
 	}
 
@@ -102,5 +118,25 @@ export class IssueQueryService {
 			if (!exist)
 				throw new ResponseError(IssueMessage.ISSUE_LEVEL_NOT_FOUND);
 		}
+	}
+
+	async getListSimple() {
+		return this.issueRepo
+			.createQueryBuilder('issue')
+			.leftJoin('issue.issueLevel', 'issueLevel')
+			.select([
+				'issue.id',
+				'issue.code',
+				'issue.nameVi',
+				'issue.nameEn',
+				'issueLevel.id',
+				'issueLevel.nameEn',
+				'issueLevel.nameVi',
+				'issueLevel.code',
+				'issueLevel.color',
+				'issueLevel.severityRank',
+			])
+			.orderBy('issueLevel.severityRank', 'ASC')
+			.getMany();
 	}
 }

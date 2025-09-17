@@ -13,10 +13,7 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
-import {
-	IssueLevelMessageCodeSuccess,
-	IssueLevelMessageSuccess,
-} from './constant/issue-level.constant';
+import { IssueLevelMessage } from './constant/issue-level.constant';
 import {
 	BulkUpdateIssueLevel,
 	CreateIssueLevelDto,
@@ -37,13 +34,8 @@ export class IssueLevelController {
 		@Req() req: Request,
 	): Promise<ResponseSuccess<IssueLevel>> {
 		const userId = req.user!.sub;
-
 		const result = await this.issueLevelService.create(data, userId);
-		return new ResponseSuccess({
-			data: result,
-			message: IssueLevelMessageSuccess.CREATE,
-			messageCode: IssueLevelMessageCodeSuccess.CREATE,
-		});
+		return new ResponseSuccess(IssueLevelMessage.CREATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -73,11 +65,9 @@ export class IssueLevelController {
 		@Body() data: BulkUpdateIssueLevel,
 	): Promise<ResponseSuccess<IssueLevel[]>> {
 		const result = await this.issueLevelService.bulkUpdate(data);
-
-		return new ResponseSuccess({
-			data: result,
-			messageCode: IssueLevelMessageCodeSuccess.UPDATE_ORDER,
-		});
+		return new ResponseSuccess(
+			IssueLevelMessage.UPDATE_ORDER_SUCCESS(result),
+		);
 	}
 
 	@SystemAdminOnly()
@@ -88,13 +78,8 @@ export class IssueLevelController {
 		@Req() req: Request,
 	): Promise<ResponseSuccess<IssueLevel>> {
 		const userId = req.user!.sub;
-
 		const result = await this.issueLevelService.update(id, data, userId);
-		return new ResponseSuccess({
-			data: result,
-			message: IssueLevelMessageSuccess.UPDATE,
-			messageCode: IssueLevelMessageCodeSuccess.UPDATE,
-		});
+		return new ResponseSuccess(IssueLevelMessage.UPDATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -103,9 +88,6 @@ export class IssueLevelController {
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {
 		await this.issueLevelService.delete(id);
-		return new ResponseSuccess({
-			messageCode: IssueLevelMessageCodeSuccess.DELETE,
-			message: IssueLevelMessageSuccess.DELETE,
-		});
+		return new ResponseSuccess(IssueLevelMessage.DELETE_SUCCESS);
 	}
 }

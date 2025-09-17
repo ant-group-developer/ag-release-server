@@ -67,12 +67,14 @@ export class TenantTierService {
 	): Promise<TenantTier> {
 		const entity = await this.findOne(id);
 
-		if (data.nameVi && data.nameVi !== entity.nameVi)
-			await this.tenantTierQueryService.validate({ nameVi: data.nameVi });
-		if (data.nameEn && data.nameEn !== entity.nameEn)
-			await this.tenantTierQueryService.validate({ nameEn: data.nameEn });
-		if (data.code && data.code !== entity.code)
-			await this.tenantTierQueryService.validate({ code: data.code });
+		const { nameEn, nameVi, code } = data;
+
+		if (nameVi && nameVi !== entity.nameVi)
+			await this.tenantTierQueryService.validate({ nameVi });
+		if (nameEn && nameEn !== entity.nameEn)
+			await this.tenantTierQueryService.validate({ nameEn });
+		if (code && code !== entity.code)
+			await this.tenantTierQueryService.validate({ code });
 
 		await this.tenantTierRepo.update(id, { ...data, modifierId: userId });
 		return this.findOne(id);

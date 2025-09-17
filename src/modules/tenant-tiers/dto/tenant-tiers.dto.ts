@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_COLOR,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
@@ -45,6 +46,11 @@ export class CreateTenantTierDto {
 	@IsString()
 	@IsOptional()
 	note?: string;
+
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_COLOR)
+	@IsNotEmpty()
+	color: string;
 }
 
 export class UpdateTenantTierDto extends PartialType(CreateTenantTierDto) {}

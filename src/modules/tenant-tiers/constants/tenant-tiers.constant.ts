@@ -1,48 +1,42 @@
-export const TenantTierMessageCodeSuccess = {
-	CREATE: 'tenantTier.message.success.create',
-	UPDATE: 'tenantTier.message.success.update',
-	DELETE: 'tenantTier.message.success.delete',
-};
-
-export const TenantTierMessageSuccess = {
-	CREATE: 'Create success',
-	UPDATE: 'Update success',
-	DELETE: 'Delete success',
-};
-
-const TenantTierMessageCodeError = {
-	NOT_FOUND: 'tenantTier.message.error.notFound',
-	DUPLICATE_NAME_VI: 'tenantTier.message.error.duplicateNameVi',
-	DUPLICATE_NAME_EN: 'tenantTier.message.error.duplicateNameEn',
-	DUPLICATE_CODE: 'tenantTier.message.error.duplicateCode',
-};
-
-const TenantTierMessageError = {
-	NOT_FOUND: 'Not found',
-	DUPLICATE_NAME_VI: 'Duplicate Vietnamese name',
-	DUPLICATE_NAME_EN: 'Duplicate English name',
-	DUPLICATE_CODE: 'Duplicate code',
-};
-
 export const TenantTierMessage = {
+	CREATE_SUCCESS: (data: any) => ({
+		data,
+		message: 'Create success',
+		messageCode: 'tenantTier.message.success.create',
+	}),
+
+	UPDATE_SUCCESS: (data: any) => ({
+		data,
+		message: 'Update success',
+		messageCode: 'tenantTier.message.success.update',
+	}),
+
+	DELETE_SUCCESS: {
+		message: 'Delete success',
+		messageCode: 'tenantTier.message.success.delete',
+	},
+
 	NOT_FOUND: {
-		message: TenantTierMessageError.NOT_FOUND,
-		messageCode: TenantTierMessageCodeError.NOT_FOUND,
+		message: 'Not found',
+		messageCode: 'tenantTier.message.error.notFound',
 		statusCode: 404,
 	},
+
 	DUPLICATE_NAME_VI: {
-		message: TenantTierMessageError.DUPLICATE_NAME_VI,
-		messageCode: TenantTierMessageCodeError.DUPLICATE_NAME_VI,
+		message: 'Duplicate Vietnamese name',
+		messageCode: 'tenantTier.message.error.duplicateNameVi',
 		statusCode: 409,
 	},
+
 	DUPLICATE_NAME_EN: {
-		message: TenantTierMessageError.DUPLICATE_NAME_EN,
-		messageCode: TenantTierMessageCodeError.DUPLICATE_NAME_EN,
+		message: 'Duplicate English name',
+		messageCode: 'tenantTier.message.error.duplicateNameEn',
 		statusCode: 409,
 	},
+
 	DUPLICATE_CODE: {
-		message: TenantTierMessageError.DUPLICATE_CODE,
-		messageCode: TenantTierMessageCodeError.DUPLICATE_CODE,
+		message: 'Duplicate code',
+		messageCode: 'tenantTier.message.error.duplicateCode',
 		statusCode: 409,
 	},
 };

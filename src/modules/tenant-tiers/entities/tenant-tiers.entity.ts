@@ -1,5 +1,6 @@
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_COLOR,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
@@ -9,13 +10,13 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('tenant_tiers')
 export class TenantTier extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameVi: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameEn: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
 	@Column({ type: 'int', default: 0 })
@@ -29,6 +30,9 @@ export class TenantTier extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'varchar', length: 200, nullable: true })
 	note: string | null;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_COLOR })
+	color: string;
 
 	// user
 	@ManyToOne(() => User)

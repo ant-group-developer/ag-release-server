@@ -53,12 +53,7 @@ export class IssueService {
 	}
 
 	async getListSimple() {
-		return this.issueRepo.find({
-			select: ['id', 'code', 'nameVi', 'nameEn'],
-			order: {
-				nameEn: 'ASC',
-			},
-		});
+		return this.issueQueryService.getListSimple();
 	}
 
 	async update(id: string, data: UpdateIssueDto, userId: string) {

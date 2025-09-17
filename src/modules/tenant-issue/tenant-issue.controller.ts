@@ -13,11 +13,7 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
-
-import {
-	TenantIssueMessageCodeSuccess,
-	TenantIssueMessageSuccess,
-} from './constants/tenant-issue.constant';
+import { TenantIssueMessage } from './constants/tenant-issue.constant';
 import {
 	CreateTenantIssueDto,
 	QueryGetListTenantIssueDto,
@@ -34,11 +30,7 @@ export class TenantIssueController {
 	async create(@Body() data: CreateTenantIssueDto, @Req() req: Request) {
 		const userId = req.user!.sub;
 		const result = await this.tenantIssueService.create(data, userId);
-		return new ResponseSuccess({
-			data: result,
-			message: TenantIssueMessageSuccess.CREATE,
-			messageCode: TenantIssueMessageCodeSuccess.CREATE,
-		});
+		return new ResponseSuccess(TenantIssueMessage.CREATE_SUCCESS(result));
 	}
 
 	@Get()
@@ -62,20 +54,13 @@ export class TenantIssueController {
 	) {
 		const userId = req.user!.sub;
 		const result = await this.tenantIssueService.update(id, data, userId);
-		return new ResponseSuccess({
-			data: result,
-			message: TenantIssueMessageSuccess.UPDATE,
-			messageCode: TenantIssueMessageCodeSuccess.UPDATE,
-		});
+		return new ResponseSuccess(TenantIssueMessage.UPDATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.tenantIssueService.delete(id);
-		return new ResponseSuccess({
-			message: TenantIssueMessageSuccess.DELETE,
-			messageCode: TenantIssueMessageCodeSuccess.DELETE,
-		});
+		return new ResponseSuccess(TenantIssueMessage.DELETE_SUCCESS);
 	}
 }

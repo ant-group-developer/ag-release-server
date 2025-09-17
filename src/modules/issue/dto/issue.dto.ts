@@ -61,7 +61,7 @@ export class CreateIssueDto {
 export class UpdateIssueDto extends PartialType(CreateIssueDto) {}
 
 export class QueryGetListIssueDto extends BaseQueryDto {
-	@IsEnum(FieldOrderIssue)
 	@IsOptional()
-	fieldOrder: FieldOrderIssue = FieldOrderIssue.CREATED_AT;
+	@IsEnum(FieldOrderIssue)
+	fieldOrder: FieldOrderIssue = FieldOrderIssue.ISSUE_LEVEL;
 }
