@@ -119,7 +119,12 @@ export class TrackTypeService {
 	}
 
 	async setDefault(id: string) {
-		await this.trackTypeRepo.update({}, { isDefault: false });
+		await this.trackTypeRepo
+			.createQueryBuilder()
+			.update()
+			.set({ isDefault: false })
+			.where('isDefault = :isDefault', { isDefault: true })
+			.execute();
 		await this.trackTypeRepo.update({ id }, { isDefault: true });
 	}
 }

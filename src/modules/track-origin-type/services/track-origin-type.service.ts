@@ -130,7 +130,12 @@ export class TrackOriginTypeService {
 	}
 
 	async setDefault(id: string) {
-		await this.trackOriginTypeRepo.update({}, { isDefault: false });
+		await this.trackOriginTypeRepo
+			.createQueryBuilder()
+			.update()
+			.set({ isDefault: false })
+			.where('isDefault = :isDefault', { isDefault: true })
+			.execute();
 		await this.trackOriginTypeRepo.update({ id }, { isDefault: true });
 	}
 }

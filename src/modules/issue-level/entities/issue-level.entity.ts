@@ -1,5 +1,6 @@
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_COLOR,
 	DEFAULT_LENGTH_NAME,
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
@@ -10,16 +11,16 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('issue_level')
 export class IssueLevel extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameVi: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameEn: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
-	@Column({ type: 'varchar', length: 10 })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_COLOR })
 	color: string;
 
 	@Column({ type: 'int', default: 1, comment: '1 = lowest severity' })

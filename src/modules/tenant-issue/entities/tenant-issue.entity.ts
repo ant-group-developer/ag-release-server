@@ -45,11 +45,15 @@ export class TenantIssue extends BaseUserTrackedUUIDEntity {
 	modifier: User;
 
 	// relation
-	@ManyToOne(() => Tenant, (tenant) => tenant.tenantIssues)
+	@ManyToOne(() => Tenant, (tenant) => tenant.tenantIssues, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant;
 
-	@ManyToOne(() => Issue, (issue) => issue.tenantIssues)
+	@ManyToOne(() => Issue, (issue) => issue.tenantIssues, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'issue_id' })
 	issue: Issue;
 }
