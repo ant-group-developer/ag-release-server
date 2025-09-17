@@ -21,7 +21,24 @@ export class ArtistDataController {
 
 		return new ResponseSuccess({
 			message: 'Found artist(s) from ADA',
-			data: data.data,
+			data,
+		});
+	}
+
+	@Post('export-data-with-profile/ada')
+	async exportFromAdaWithProfile(
+		@Query('query') query: string,
+		@Body() body: { cookie: string; authorization: string },
+	) {
+		const result = await this.artistDataInit.exportArtistsWithProfiles(
+			body.cookie,
+			body.authorization,
+			query,
+		);
+
+		return new ResponseSuccess({
+			message: 'Artists updated and saved to DB',
+			data: result,
 		});
 	}
 

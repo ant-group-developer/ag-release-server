@@ -200,7 +200,8 @@ export class TrackDraftService {
 		track: Track;
 		trackLanguage?: UpdateTrackLanguageDraftDto;
 		audioFile?: {
-			preview?: number;
+			preview?: number | null;
+			sampleLength?: number | null;
 			// file?: {
 			// 	fileName: string;
 			// };

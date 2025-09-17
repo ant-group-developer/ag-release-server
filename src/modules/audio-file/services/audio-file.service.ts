@@ -47,13 +47,24 @@ export class AudioFileService {
 		dataUpdate: IUpdateAudioFile;
 	}): Promise<IAudioFileDraft> {
 		const { file, ...restOfDataUpdate } = dataUpdate;
-		const { fileId, peakId, preview } = restOfDataUpdate;
+		const { fileId, peakId, preview, sampleLength } = restOfDataUpdate;
 
 		const audioFile = await this.audioFileQueryService.findOne(audioFileId);
 
 		if (preview && preview > audioFile.duration) {
 			throw new ResponseError({
 				message: 'Preview cannot be greater than the original duration',
+			});
+		}
+
+		if (
+			sampleLength &&
+			sampleLength + (preview ?? audioFile.preview ?? 0) >
+				audioFile.duration
+		) {
+			throw new ResponseError({
+				message:
+					'Preview + Sample length cannot be greater than the original duration',
 			});
 		}
 

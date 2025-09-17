@@ -25,6 +25,8 @@ import { DatabaseModule } from './modules/database/database.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
+import { IssueLevelModule } from './modules/issue-level/issue-level.module';
+import { IssueModule } from './modules/issue/issue.module';
 import { LabelModule } from './modules/label/label.module';
 import { LanguageModule } from './modules/language/language.module';
 import { PermissionModule } from './modules/permission/permission.module';
@@ -36,6 +38,8 @@ import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
+import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
+import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
@@ -122,6 +126,11 @@ import { UserModule } from './modules/user/user.module';
 		ScheduleModule,
 		TrackRevenueModule,
 		TrackSensitiveModule,
+
+		IssueModule,
+		IssueLevelModule,
+		TenantIssueModule,
+		TenantTierModule,
 	],
 	controllers: [AppController],
 	providers: [

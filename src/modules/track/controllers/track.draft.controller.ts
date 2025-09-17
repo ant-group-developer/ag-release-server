@@ -65,7 +65,7 @@ export class TrackDraftController {
 		});
 	}
 
-	@Get(':id/trackPolicies')
+	@Get(':id/track-policies')
 	async getTrackPolicies(@Param('id') id: string) {
 		const result = await this.trackDraftService.getTrackPolicies({
 			trackId: id,
@@ -85,7 +85,7 @@ export class TrackDraftController {
 		});
 	}
 
-	@Put(':id/trackPolicies/:trackPolicyId')
+	@Put(':id/track-policies/:trackPolicyId')
 	async updateTrackPolicy(
 		@Param('trackPolicyId', ParseUUIDPipe) trackPolicyId: string,
 		@Body() data: UpdateTrackPolicyDto,
