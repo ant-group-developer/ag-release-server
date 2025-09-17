@@ -5,7 +5,7 @@ import {
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('tenant_tiers')
 export class TenantTier extends BaseUserTrackedUUIDEntity {
@@ -39,6 +39,6 @@ export class TenantTier extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	@ManyToOne(() => Tenant, (tenant) => tenant.tenantTier)
+	@OneToMany(() => Tenant, (tenant) => tenant.tenantTier)
 	tenants: Tenant[];
 }

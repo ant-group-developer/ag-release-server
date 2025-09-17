@@ -11,13 +11,13 @@ import { IssueLevel } from '../../issue-level/entities/issue-level.entity';
 
 @Entity('issues')
 export class Issue extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameVi: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
 	nameEn: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE })
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
 	@Column({
@@ -39,6 +39,9 @@ export class Issue extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
 	note: string | null;
+
+	@Column({ type: 'uuid' })
+	issueLevelId: string;
 
 	// user
 	@ManyToOne(() => User)

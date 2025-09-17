@@ -100,6 +100,10 @@ export abstract class UpdateTenantDto {
 	@Max(20_000)
 	@Min(0)
 	maxLabels?: number;
+
+	@IsOptional()
+	@IsUUID()
+	tenantTierId?: string | null;
 }
 
 export class CreateTenantDto extends UpdateTenantDto {

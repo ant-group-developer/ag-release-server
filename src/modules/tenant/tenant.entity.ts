@@ -114,10 +114,12 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 	@OneToMany(() => TenantDsp, (tenantDsp) => tenantDsp.tenant)
 	tenantDsp: TenantDsp[];
 
-	@ManyToOne(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
+	@OneToMany(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
 	tenantIssues: TenantIssue[];
 
-	@OneToMany(() => TenantTier, (tenantTier) => tenantTier.tenants)
+	@ManyToOne(() => TenantTier, (tenantTier) => tenantTier.tenants, {
+		onDelete: 'SET NULL',
+	})
 	@JoinColumn({ name: 'tenant_tier_id' })
-	tenantTier: TenantTier[];
+	tenantTier: TenantTier | null;
 }
