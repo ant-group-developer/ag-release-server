@@ -49,6 +49,12 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('simple')
+	async getListSimple() {
+		const data = await this.tenantService.getListSimple();
+		return new ResponseSuccess({ data });
+	}
+
 	@Get('active')
 	@ApiOperation({ summary: 'Get all tenants flatten which is actived' })
 	async findAllFlattenActive(

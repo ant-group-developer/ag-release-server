@@ -43,6 +43,15 @@ export class IssueService {
 		return entity;
 	}
 
+	async findOneSimple(id: string): Promise<Issue> {
+		const entity = await this.issueRepo.findOne({
+			where: { id },
+			select: ['id', 'score', 'numberOfDaysAffect'],
+		});
+		if (!entity) throw new ResponseError(IssueMessage.NOT_FOUND);
+		return entity;
+	}
+
 	async getList(query: QueryGetListIssueDto): Promise<PageDto<Issue>> {
 		const { page, pageSize } = query;
 		const [items, totalItems] = await this.issueQueryService.getList(query);

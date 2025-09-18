@@ -54,6 +54,13 @@ export class IssueController {
 	}
 
 	@SystemAdminOnly()
+	@Get(':id/simple')
+	async findOneSimple(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.issueService.findOneSimple(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@SystemAdminOnly()
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
