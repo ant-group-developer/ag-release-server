@@ -1,4 +1,4 @@
-export const IssueMessage = {
+export const IssueResponse = {
 	CREATE_SUCCESS: (data: any) => ({
 		data,
 		message: 'Create success',

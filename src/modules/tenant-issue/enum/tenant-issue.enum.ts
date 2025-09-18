@@ -1,8 +1,8 @@
 export enum FieldOrderTenantIssue {
-	SCORE = 'score',
-	START_DATE_AFFECT = 'startDateAffect',
-	END_DATE_AFFECT = 'endDateAffect',
-	IS_ACTIVE = 'isActive',
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
+	SCORE = 'tenantIssue.score',
+	START_DATE_AFFECT = 'tenantIssue.startDateAffect',
+	END_DATE_AFFECT = 'tenantIssue.endDateAffect',
+	IS_ACTIVE = 'tenantIssue.isActive',
+	CREATED_AT = 'tenantIssue.createdAt',
+	// UPDATED_AT = 'tenantIssue.updatedAt',
 }

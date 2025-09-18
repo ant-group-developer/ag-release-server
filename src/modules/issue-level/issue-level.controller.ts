@@ -13,7 +13,7 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
-import { IssueLevelMessage } from './constant/issue-level.constant';
+import { IssueLevelResponse } from './constant/issue-level.constant';
 import {
 	BulkUpdateIssueLevel,
 	CreateIssueLevelDto,
@@ -35,7 +35,7 @@ export class IssueLevelController {
 	): Promise<ResponseSuccess<IssueLevel>> {
 		const userId = req.user!.sub;
 		const result = await this.issueLevelService.create(data, userId);
-		return new ResponseSuccess(IssueLevelMessage.CREATE_SUCCESS(result));
+		return new ResponseSuccess(IssueLevelResponse.CREATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -66,7 +66,7 @@ export class IssueLevelController {
 	): Promise<ResponseSuccess<IssueLevel[]>> {
 		const result = await this.issueLevelService.bulkUpdate(data);
 		return new ResponseSuccess(
-			IssueLevelMessage.UPDATE_ORDER_SUCCESS(result),
+			IssueLevelResponse.UPDATE_ORDER_SUCCESS(result),
 		);
 	}
 
@@ -79,7 +79,7 @@ export class IssueLevelController {
 	): Promise<ResponseSuccess<IssueLevel>> {
 		const userId = req.user!.sub;
 		const result = await this.issueLevelService.update(id, data, userId);
-		return new ResponseSuccess(IssueLevelMessage.UPDATE_SUCCESS(result));
+		return new ResponseSuccess(IssueLevelResponse.UPDATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -88,6 +88,6 @@ export class IssueLevelController {
 		@Param('id', ParseUUIDPipe) id: string,
 	): Promise<ResponseSuccess<void>> {
 		await this.issueLevelService.delete(id);
-		return new ResponseSuccess(IssueLevelMessage.DELETE_SUCCESS);
+		return new ResponseSuccess(IssueLevelResponse.DELETE_SUCCESS);
 	}
 }

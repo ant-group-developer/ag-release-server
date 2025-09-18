@@ -1,4 +1,4 @@
-export const TenantIssueMessage = {
+export const TenantIssueResponse = {
 	CREATE_SUCCESS: (data: any) => ({
 		data,
 		message: 'Create success',

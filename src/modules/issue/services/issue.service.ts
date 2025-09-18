@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { IssueMessage } from '../constants/issue.constant';
+import { IssueResponse } from '../constants/issue.constant';
 import {
 	CreateIssueDto,
 	QueryGetListIssueDto,
@@ -39,7 +39,7 @@ export class IssueService {
 
 	async findOne(id: string): Promise<Issue> {
 		const entity = await this.issueRepo.findOne({ where: { id } });
-		if (!entity) throw new ResponseError(IssueMessage.NOT_FOUND);
+		if (!entity) throw new ResponseError(IssueResponse.NOT_FOUND);
 		return entity;
 	}
 
@@ -48,7 +48,7 @@ export class IssueService {
 			where: { id },
 			select: ['id', 'score', 'numberOfDaysAffect'],
 		});
-		if (!entity) throw new ResponseError(IssueMessage.NOT_FOUND);
+		if (!entity) throw new ResponseError(IssueResponse.NOT_FOUND);
 		return entity;
 	}
 

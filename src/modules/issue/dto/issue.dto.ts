@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
 	IsEnum,
 	IsInt,
@@ -64,4 +65,15 @@ export class QueryGetListIssueDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderIssue)
 	fieldOrder: FieldOrderIssue = FieldOrderIssue.ISSUE_LEVEL;
+
+	@IsUUID('4', { each: true })
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	issueLevelId?: string[];
 }
