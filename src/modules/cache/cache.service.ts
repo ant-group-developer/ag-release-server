@@ -1,20 +1,34 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
+import { SetCacheDto } from './dto/cache.dto';
+import { EntityCache } from './enum/cache.enum';
 
 @Injectable()
 export class CacheService {
 	constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
-	async get<T>(key: string): Promise<T | undefined> {
-		return await this.cacheManager.get<T>(key);
+	async get<T>(input: {
+		entity: EntityCache;
+		key: string;
+	}): Promise<T | undefined> {
+		return await this.cacheManager.get<T>(this.getFullKey(input));
 	}
 
-	async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-		await this.cacheManager.set(key, value, ttl);
+	async bulkSet(input: SetCacheDto[]): Promise<void> {
+		await Promise.all(input.map((i) => this.set(i)));
 	}
 
-	async del(key: string): Promise<void> {
-		await this.cacheManager.del(key);
+	async set(input: SetCacheDto): Promise<void> {
+		const { value, ttl } = input;
+		await this.cacheManager.set(this.getFullKey(input), value, ttl);
+	}
+
+	async del(input: { entity: EntityCache; key: string }): Promise<void> {
+		await this.cacheManager.del(this.getFullKey(input));
+	}
+
+	private getFullKey({ entity, key }: { entity: EntityCache; key: string }) {
+		return entity + '_' + key;
 	}
 }

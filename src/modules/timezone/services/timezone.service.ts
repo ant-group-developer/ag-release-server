@@ -54,7 +54,7 @@ export class TimezoneService {
 
 	async getListSimple() {
 		return this.timezoneRepo.find({
-			select: ['id', 'name', 'zone'],
+			select: ['id', 'name', 'zone', 'utc'],
 		});
 	}
 
