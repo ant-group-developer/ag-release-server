@@ -1,16 +1,8 @@
-import {
-	Body,
-	Controller,
-	Delete,
-	Get,
-	HttpException,
-	HttpStatus,
-	Param,
-	Post,
-	Put,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { CacheService } from './cache.service';
-import { SetCacheDto, UpdateCacheDto } from './dto/cache.dto';
+import { SetCacheDto } from './dto/cache.dto';
+import { EntityCache } from './enum/cache.enum';
 
 @Controller('cache')
 export class CacheController {
@@ -18,60 +10,26 @@ export class CacheController {
 
 	@Post()
 	async setCache(@Body() setCacheDto: SetCacheDto) {
-		const { key, value, ttl } = setCacheDto;
-		await this.cacheService.set(key, value, ttl);
-		return {
-			message: `Successfully set key ${key} in cache`,
-			key,
-			value,
-			ttl,
-		};
+		const { entity, key, value, ttl } = setCacheDto;
+		await this.cacheService.set({ entity, key, value, ttl });
+		return new ResponseSuccess();
 	}
 
-	@Get(':key')
-	async getCache(@Param('key') key: string) {
-		const value = await this.cacheService.get<string>(key);
-		if (!value) {
-			throw new HttpException(
-				`Key ${key} not found in cache`,
-				HttpStatus.NOT_FOUND,
-			);
-		}
-		return { key, value };
-	}
-
-	@Put(':key')
-	async updateCache(
+	@Get(':entity/:key')
+	async getCache(
+		@Param('entity') entity: EntityCache,
 		@Param('key') key: string,
-		@Body() updateCacheDto: UpdateCacheDto,
 	) {
-		const { value, ttl } = updateCacheDto;
-		const existingValue = await this.cacheService.get<string>(key);
-		if (!existingValue) {
-			throw new HttpException(
-				`Key ${key} not found in cache`,
-				HttpStatus.NOT_FOUND,
-			);
-		}
-		await this.cacheService.set(key, value, ttl);
-		return {
-			message: `Successfully updated key ${key} in cache`,
-			key,
-			value,
-			ttl,
-		};
+		const data = await this.cacheService.get<any>({ entity, key });
+		return new ResponseSuccess({ data });
 	}
 
-	@Delete(':key')
-	async deleteCache(@Param('key') key: string) {
-		const existingValue = await this.cacheService.get<string>(key);
-		if (!existingValue) {
-			throw new HttpException(
-				`Key ${key} not found in cache`,
-				HttpStatus.NOT_FOUND,
-			);
-		}
-		// await this.cacheService.delete(key);
-		return { message: `Successfully deleted key ${key} from cache` };
+	@Delete(':entity/:key')
+	async deleteCache(
+		@Param('entity') entity: EntityCache,
+		@Param('key') key: string,
+	) {
+		await this.cacheService.del({ entity, key });
+		return new ResponseSuccess();
 	}
 }

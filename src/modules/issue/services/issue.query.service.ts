@@ -124,6 +124,9 @@ export class IssueQueryService {
 				'issue.code',
 				'issue.nameVi',
 				'issue.nameEn',
+				'issue.score',
+				'issue.numberOfDaysAffect',
+
 				'issueLevel.id',
 				'issueLevel.nameEn',
 				'issueLevel.nameVi',

@@ -203,6 +203,17 @@ export class TenantService {
 		});
 	}
 
+	async getListSimple() {
+		return this.tenantTreeRepo.find({
+			select: ['id', 'logo', 'icon', 'title', 'name', 'primaryColor'],
+			where: {
+				isActive: true,
+			},
+
+			order: { name: 'ASC' },
+		});
+	}
+
 	async findAllFlattenActive(req: Request): Promise<PageDto<Tenant>> {
 		const queryBuilder = this.tenantTreeRepo
 			.createQueryBuilder('tenant')

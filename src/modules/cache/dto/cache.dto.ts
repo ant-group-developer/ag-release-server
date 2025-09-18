@@ -1,10 +1,8 @@
-export interface SetCacheDto {
-	key: string;
-	value: any;
-	ttl?: number;
-}
+import { EntityCache } from '../enum/cache.enum';
 
-export interface UpdateCacheDto {
+export class SetCacheDto {
+	entity: EntityCache;
+	key: string;
 	value: any;
 	ttl?: number;
 }
