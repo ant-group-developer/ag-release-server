@@ -16,7 +16,7 @@ import { TrackController } from './controllers/track.controller';
 import { TrackDraftController } from './controllers/track.draft.controller';
 import { Track } from './entities/track.entity';
 import { TrackDraftService } from './services/track.draft.service';
-import { TrackQueryService } from './services/track.query.service copy';
+import { TrackQueryService } from './services/track.query.service';
 import { TrackService } from './services/track.service';
 
 @Module({

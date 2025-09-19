@@ -9,7 +9,7 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
-import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { TrackMessages } from '../constants/track.constant';
 import {
 	BulkCreateTrackDraft,
@@ -51,14 +51,303 @@ export class TrackQueryService {
 		private readonly trackSensitiveRepo: Repository<TrackSensitive>,
 	) {}
 
+	// private
+	private baseQueryGetList(query: QueryGetListTrackDto) {
+		const {
+			keyword,
+
+			releaseId,
+			tenantIds,
+
+			artistId,
+			labelId,
+			scanCopyrightStatus,
+			primaryGenreId,
+
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+
+			fieldOrder,
+			orderBy,
+
+			skip,
+			pageSize,
+		} = query;
+
+		const queryBuilder = this.trackRepo.createQueryBuilder('track');
+
+		// join for filter
+		queryBuilder
+			.leftJoin('track.release', 'release')
+			.leftJoin('track.trackArtists', 'trackArtist');
+
+		if (keyword) {
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.where('track.title ILIKE :keyword')
+						.orWhere('track.lyric ILIKE :keyword')
+						.orWhere('track.version ILIKE :keyword');
+				}),
+				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		if (releaseId?.length) {
+			queryBuilder.andWhere('track.releaseId IN (:...releaseId)', {
+				releaseId,
+			});
+		}
+
+		if (tenantIds?.length) {
+			queryBuilder.andWhere('release.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
+		}
+
+		if (labelId?.length) {
+			queryBuilder.andWhere('release.labelId IN (:...labelId)', {
+				labelId,
+			});
+		}
+
+		if (artistId?.length) {
+			queryBuilder.andWhere('trackArtist.artistId IN (:...artistId)', {
+				artistId,
+			});
+		}
+
+		if (scanCopyrightStatus?.length) {
+			queryBuilder.andWhere(
+				'track.scanCopyrightStatus IN (:...scanCopyrightStatus)',
+				{
+					scanCopyrightStatus,
+				},
+			);
+		}
+
+		if (primaryGenreId?.length) {
+			queryBuilder.andWhere(
+				'track.primaryGenreId IN (:...primaryGenreId)',
+				{
+					primaryGenreId,
+				},
+			);
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			queryBuilder.andWhere(
+				`track.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			queryBuilder.andWhere(
+				`track.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{
+					startUpdatedAt,
+					endUpdatedAt,
+				},
+			);
+		}
+
+		queryBuilder.orderBy(`track.${fieldOrder}`, orderBy);
+		queryBuilder.skip(skip).take(pageSize);
+
+		return queryBuilder;
+	}
+
+	private createQueryGetListWithPolicy(query: QueryGetListTrackDto) {
+		const queryGetList = this.baseQueryGetList(query);
+
+		const qb = queryGetList.clone();
+		qb.leftJoin('track.priceTier', 'priceTier')
+			.leftJoin('priceTier.currency', 'currency')
+
+			.leftJoin('track.trackPolicies', 'trackPolicy')
+			.leftJoin('trackPolicy.dsp', 'dsp')
+			.leftJoin('trackPolicy.action', 'action')
+
+			.select([
+				'track.id',
+				'track.title',
+				'track.releaseId',
+				'track.createdAt',
+				'track.order',
+			])
+			.addSelect(['priceTier.id', 'priceTier.amount'])
+			.addSelect(['currency.id', 'currency.name', 'currency.code'])
+
+			.addSelect([
+				'trackPolicy.id',
+				'trackPolicy.actionId',
+				'trackPolicy.dspId',
+			])
+			.addSelect(['dsp.id', 'dsp.name', 'dsp.picture'])
+			.addSelect([
+				'action.id',
+				'action.code',
+				'action.name',
+				'action.note',
+			]);
+
+		return qb;
+	}
+
 	// public
 	async getList(query: QueryGetListTrackDto) {
-		const qb = this.createQueryGetList(query);
-		return await qb.getManyAndCount();
+		const queryGetList = this.baseQueryGetList(query);
+
+		queryGetList
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+
+			.leftJoin('track.audioFile', 'audioFile')
+			.leftJoin('audioFile.file', 'file')
+			.leftJoin('audioFile.peak', 'peak')
+
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist')
+
+			.leftJoin('track.trackLanguage', 'trackLanguage')
+			.leftJoin(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage')
+			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
+			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
+
+			.leftJoin('track.primaryGenre', 'primaryGenre')
+			.leftJoin('track.subGenre', 'subGenre')
+
+			.leftJoin('track.trackType', 'trackType')
+			.leftJoin('track.trackOriginType', 'trackOriginType')
+			.leftJoin('track.trackSensitive', 'trackSensitive');
+
+		// select
+		queryGetList
+			.addSelect(['release.id', 'release.title', 'release.labelId'])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'audioFile.id',
+				'audioFile.sampleRate',
+				'audioFile.bitrate',
+				'audioFile.bitDepth',
+				'audioFile.duration',
+				'audioFile.sampleLength',
+				'audioFile.preview',
+				'audioFile.fileId',
+				'audioFile.peakId',
+			])
+
+			.addSelect(['file.id', 'file.fileName'])
+			.addSelect(['peak.id'])
+
+			.addSelect([
+				'trackArtist.id',
+				'trackArtist.artistId',
+				'trackArtist.artistRoleId',
+			])
+
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect(['artist.id', 'artist.name', 'artist.picture'])
+
+			.addSelect([
+				'trackLanguage.id',
+				'trackLanguage.metadataLanguageCountryId',
+				'trackLanguage.audioLanguageId',
+				'trackLanguage.metadataLanguageId',
+				'trackLanguage.recordingCountryId',
+			])
+
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
+			.addSelect([
+				'metadataLanguageCountry.id',
+				'metadataLanguageCountry.name',
+				'metadataLanguageCountry.iso3',
+				'metadataLanguageCountry.iso2',
+				'metadataLanguageCountry.numericCode',
+				'metadataLanguageCountry.phoneCode',
+				'metadataLanguageCountry.capital',
+				'metadataLanguageCountry.currency',
+				'metadataLanguageCountry.currencyName',
+				'metadataLanguageCountry.currencySymbol',
+				'metadataLanguageCountry.regionId',
+				'metadataLanguageCountry.nationality',
+				'metadataLanguageCountry.continent',
+			])
+
+			.addSelect([
+				'recordingCountry.id',
+				'recordingCountry.name',
+				'recordingCountry.iso3',
+				'recordingCountry.iso2',
+				'recordingCountry.numericCode',
+				'recordingCountry.phoneCode',
+				'recordingCountry.capital',
+				'recordingCountry.currency',
+				'recordingCountry.currencyName',
+				'recordingCountry.currencySymbol',
+				'recordingCountry.regionId',
+				'recordingCountry.nationality',
+				'recordingCountry.continent',
+			])
+
+			.addSelect([
+				'primaryGenre.id',
+				'primaryGenre.name',
+				'primaryGenre.code',
+				'primaryGenre.picture',
+				'primaryGenre.description',
+			])
+			.addSelect([
+				'subGenre.id',
+				'subGenre.name',
+				'subGenre.code',
+				'subGenre.picture',
+				'subGenre.description',
+			])
+
+			.addSelect(['trackType.id', 'trackType.name', 'trackType.code'])
+			.addSelect([
+				'trackOriginType.id',
+				'trackOriginType.name',
+				'trackOriginType.code',
+			])
+			.addSelect([
+				'trackSensitive.id',
+				'trackSensitive.name',
+				'trackSensitive.code',
+				'trackSensitive.icon',
+			]);
+
+		return await queryGetList.getManyAndCount();
 	}
 
 	async getListWithPolicy(query: QueryGetListTrackDto) {
 		const queryGetListWithPolicy = this.createQueryGetListWithPolicy(query);
+		queryGetListWithPolicy.addOrderBy('dsp.name', 'ASC');
+
 		return await queryGetListWithPolicy.getManyAndCount();
 	}
 
@@ -75,28 +364,121 @@ export class TrackQueryService {
 	}
 
 	async getDetailOne(id: string): Promise<Track> {
-		const qb = this.createBaseQb();
+		const query = this.trackRepo.createQueryBuilder('track');
 
-		qb.where('track.id = :id', {
+		query.where('track.id = :id', {
 			id,
 		});
 
-		this.leftJoinRelation(qb);
+		query
+			.leftJoin('track.release', 'release')
+			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoin('release.label', 'label')
+
+			.leftJoin('track.audioFile', 'audioFile')
+			.leftJoin('audioFile.file', 'file')
+			.leftJoin('audioFile.peak', 'peak')
+
+			.leftJoin('track.trackArtists', 'trackArtist')
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist')
+
+			.leftJoin('track.trackLanguage', 'trackLanguage')
+
+			.leftJoin(
+				'trackLanguage.metadataLanguageCountry',
+				'metadataLanguageCountry',
+			)
+			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
+			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage');
 
 		// select
-		this.addSelectReleaseSimple(qb);
-		this.addSelectReleaseCoverArtSimple(qb);
-		this.addSelectLabel(qb);
-		this.addSelectAudioFile(qb);
-		this.addSelectFileAndPeak(qb);
-		this.addSelectTrackArtist(qb);
-		this.addSelectTrackLanguage(qb);
-		this.addSelectMetadataLanguage(qb);
-		this.addSelectMetadataLanguageCountry(qb);
-		this.addSelectRecordingCountry(qb);
-		this.addSelectAudioLanguage(qb);
+		query
+			.addSelect(['release.id', 'release.title', 'release.tenantId'])
+			.addSelect([
+				'releaseCoverArt.id',
+				'releaseCoverArt.fileId',
+				'releaseCoverArt.type',
+			])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.picture',
+				'label.description',
+			])
 
-		const track = await qb.getOne();
+			.addSelect([
+				'audioFile.id',
+				'audioFile.sampleRate',
+				'audioFile.bitrate',
+				'audioFile.bitDepth',
+				'audioFile.duration',
+				'audioFile.sampleLength',
+				'audioFile.preview',
+				'audioFile.fileId',
+				'audioFile.peakId',
+			])
+			.addSelect(['trackArtist.id'])
+			.addSelect(['artistRole.name'])
+			.addSelect(['artist.name', 'artist.picture'])
+
+			.addSelect([
+				'trackLanguage.id',
+				'trackLanguage.metadataLanguageCountryId',
+				'trackLanguage.audioLanguageId',
+				'trackLanguage.metadataLanguageId',
+				'trackLanguage.recordingCountryId',
+			])
+
+			.addSelect([
+				'metadataLanguageCountry.id',
+				'metadataLanguageCountry.name',
+				'metadataLanguageCountry.iso3',
+				'metadataLanguageCountry.iso2',
+				'metadataLanguageCountry.numericCode',
+				'metadataLanguageCountry.phoneCode',
+				'metadataLanguageCountry.capital',
+				'metadataLanguageCountry.currency',
+				'metadataLanguageCountry.currencyName',
+				'metadataLanguageCountry.currencySymbol',
+				'metadataLanguageCountry.regionId',
+				'metadataLanguageCountry.nationality',
+				'metadataLanguageCountry.continent',
+			])
+
+			.addSelect([
+				'recordingCountry.id',
+				'recordingCountry.name',
+				'recordingCountry.iso3',
+				'recordingCountry.iso2',
+				'recordingCountry.numericCode',
+				'recordingCountry.phoneCode',
+				'recordingCountry.capital',
+				'recordingCountry.currency',
+				'recordingCountry.currencyName',
+				'recordingCountry.currencySymbol',
+				'recordingCountry.regionId',
+				'recordingCountry.nationality',
+				'recordingCountry.continent',
+			])
+
+			.addSelect([
+				'audioLanguage.id',
+				'audioLanguage.name',
+				'audioLanguage.code',
+			])
+
+			.addSelect([
+				'metadataLanguage.id',
+				'metadataLanguage.name',
+				'metadataLanguage.code',
+			])
+
+			.addSelect(['file.id', 'file.fileName'])
+			.addSelect(['peak.id']);
+
+		const track = await query.getOne();
 
 		if (!track) {
 			throw new ResponseError(TrackMessages.NOT_FOUND);
@@ -452,376 +834,6 @@ export class TrackQueryService {
 		);
 
 		return result;
-	}
-
-	// private
-	private createQueryGetList(filter: QueryGetListTrackDto) {
-		const qb = this.createBaseQb();
-
-		this.leftJoinRelation(qb);
-		this.applyFilter({ qb, filter });
-
-		this.addSelectReleaseSimple(qb);
-		this.addSelectReleaseCoverArtSimple(qb);
-		this.addSelectLabel(qb);
-		this.addSelectAudioFile(qb);
-		this.addSelectFileAndPeak(qb);
-		this.addSelectTrackArtist(qb);
-		this.addSelectTrackLanguage(qb);
-		this.addSelectMetadataLanguage(qb);
-		this.addSelectAudioLanguage(qb);
-		this.addSelectMetadataLanguageCountry(qb);
-		this.addSelectRecordingCountry(qb);
-		this.addSelectPrimaryGenre(qb);
-		this.addSelectSubGenre(qb);
-		this.addSelectTrackType(qb);
-		this.addSelectTrackOriginType(qb);
-		this.addSelectTrackSensitive(qb);
-
-		return qb;
-	}
-
-	private createBaseQb() {
-		return this.trackRepo.createQueryBuilder('track');
-	}
-
-	private leftJoinRelation(qb: SelectQueryBuilder<Track>) {
-		qb.leftJoin('track.release', 'release')
-			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
-
-			.leftJoin('release.label', 'label')
-
-			.leftJoin('track.audioFile', 'audioFile')
-			.leftJoin('audioFile.file', 'file')
-			.leftJoin('audioFile.peak', 'peak')
-
-			.leftJoin('track.trackArtists', 'trackArtist')
-			.leftJoin('trackArtist.artistRole', 'artistRole')
-			.leftJoin('trackArtist.artist', 'artist')
-
-			.leftJoin('track.trackLanguage', 'trackLanguage')
-			.leftJoin(
-				'trackLanguage.metadataLanguageCountry',
-				'metadataLanguageCountry',
-			)
-			.leftJoin('trackLanguage.metadataLanguage', 'metadataLanguage')
-			.leftJoin('trackLanguage.recordingCountry', 'recordingCountry')
-			.leftJoin('trackLanguage.audioLanguage', 'audioLanguage')
-
-			.leftJoin('track.primaryGenre', 'primaryGenre')
-			.leftJoin('track.subGenre', 'subGenre')
-
-			.leftJoin('track.trackType', 'trackType')
-			.leftJoin('track.trackOriginType', 'trackOriginType')
-			.leftJoin('track.trackSensitive', 'trackSensitive');
-	}
-
-	private applyFilter({
-		qb,
-		filter,
-	}: {
-		qb: SelectQueryBuilder<Track>;
-		filter: QueryGetListTrackDto;
-	}) {
-		const {
-			keyword,
-
-			releaseId,
-			tenantIds,
-
-			artistId,
-			labelId,
-			scanCopyrightStatus,
-			primaryGenreId,
-
-			startCreatedAt,
-			endCreatedAt,
-			startUpdatedAt,
-			endUpdatedAt,
-
-			fieldOrder,
-			orderBy,
-
-			skip,
-			pageSize,
-		} = filter;
-
-		if (keyword) {
-			qb.andWhere(
-				new Brackets((qb) => {
-					qb.where('track.title ILIKE :keyword')
-						.orWhere('track.lyric ILIKE :keyword')
-						.orWhere('track.version ILIKE :keyword');
-				}),
-				{ keyword: `%${keyword}%` },
-			);
-		}
-
-		if (releaseId?.length) {
-			qb.andWhere('track.releaseId IN (:...releaseId)', {
-				releaseId,
-			});
-		}
-
-		if (tenantIds?.length) {
-			qb.andWhere('release.tenantId IN (:...tenantIds)', {
-				tenantIds,
-			});
-		}
-
-		if (labelId?.length) {
-			qb.andWhere('release.labelId IN (:...labelId)', {
-				labelId,
-			});
-		}
-
-		if (artistId?.length) {
-			qb.andWhere('trackArtist.artistId IN (:...artistId)', {
-				artistId,
-			});
-		}
-
-		if (scanCopyrightStatus?.length) {
-			qb.andWhere(
-				'track.scanCopyrightStatus IN (:...scanCopyrightStatus)',
-				{
-					scanCopyrightStatus,
-				},
-			);
-		}
-
-		if (primaryGenreId?.length) {
-			qb.andWhere('track.primaryGenreId IN (:...primaryGenreId)', {
-				primaryGenreId,
-			});
-		}
-
-		if (startCreatedAt && endCreatedAt) {
-			qb.andWhere(
-				`track.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
-				{
-					startCreatedAt,
-					endCreatedAt,
-				},
-			);
-		}
-
-		if (startUpdatedAt && endUpdatedAt) {
-			qb.andWhere(
-				`track.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
-				{
-					startUpdatedAt,
-					endUpdatedAt,
-				},
-			);
-		}
-
-		qb.orderBy(`track.${fieldOrder}`, orderBy);
-		qb.skip(skip).take(pageSize);
-
-		return qb;
-	}
-
-	private leftJoinTrackPolicy(qb: SelectQueryBuilder<Track>) {
-		qb.leftJoin('track.priceTier', 'priceTier')
-			.leftJoin('priceTier.currency', 'currency')
-
-			.leftJoin('track.trackPolicies', 'trackPolicy')
-			.leftJoin('trackPolicy.dsp', 'dsp')
-			.leftJoin('trackPolicy.action', 'action');
-	}
-
-	private addSelectTrackPolicy(qb: SelectQueryBuilder<Track>) {
-		qb.select([
-			'track.id',
-			'track.title',
-			'track.releaseId',
-			'track.createdAt',
-			'track.order',
-		])
-			.addSelect(['priceTier.id', 'priceTier.amount'])
-			.addSelect(['currency.id', 'currency.name', 'currency.code'])
-
-			.addSelect([
-				'trackPolicy.id',
-				'trackPolicy.actionId',
-				'trackPolicy.dspId',
-			])
-			.addSelect(['dsp.id', 'dsp.name', 'dsp.picture'])
-			.addSelect([
-				'action.id',
-				'action.code',
-				'action.name',
-				'action.note',
-			]);
-	}
-
-	private createQueryGetListWithPolicy(filter: QueryGetListTrackDto) {
-		const qb = this.createBaseQb();
-		this.addSelectTrackPolicy(qb);
-		this.leftJoinTrackPolicy(qb);
-		this.applyFilter({ qb, filter });
-
-		return qb;
-	}
-
-	private addSelectReleaseSimple(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect(['release.id', 'release.title', 'release.labelId']);
-	}
-
-	private addSelectReleaseCoverArtSimple(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'releaseCoverArt.id',
-			'releaseCoverArt.fileId',
-			'releaseCoverArt.type',
-		]);
-	}
-
-	private addSelectLabel(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'label.id',
-			'label.name',
-			'label.picture',
-			'label.description',
-		]);
-	}
-
-	private addSelectAudioFile(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'audioFile.id',
-			'audioFile.sampleRate',
-			'audioFile.bitrate',
-			'audioFile.bitDepth',
-			'audioFile.duration',
-			'audioFile.sampleLength',
-			'audioFile.preview',
-			'audioFile.fileId',
-			'audioFile.peakId',
-		]);
-	}
-
-	private addSelectFileAndPeak(qb: SelectQueryBuilder<Track>) {
-		return qb
-			.addSelect(['file.id', 'file.fileName'])
-			.addSelect(['peak.id']);
-	}
-
-	private addSelectTrackArtist(qb: SelectQueryBuilder<Track>) {
-		return qb
-			.addSelect([
-				'trackArtist.id',
-				'trackArtist.artistId',
-				'trackArtist.artistRoleId',
-			])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
-			.addSelect(['artist.id', 'artist.name', 'artist.picture']);
-	}
-
-	private addSelectTrackLanguage(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'trackLanguage.id',
-			'trackLanguage.metadataLanguageCountryId',
-			'trackLanguage.audioLanguageId',
-			'trackLanguage.metadataLanguageId',
-			'trackLanguage.recordingCountryId',
-		]);
-	}
-
-	private addSelectMetadataLanguage(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'metadataLanguage.id',
-			'metadataLanguage.name',
-			'metadataLanguage.code',
-		]);
-	}
-
-	private addSelectAudioLanguage(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'audioLanguage.id',
-			'audioLanguage.name',
-			'audioLanguage.code',
-		]);
-	}
-
-	private addSelectMetadataLanguageCountry(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'metadataLanguageCountry.id',
-			'metadataLanguageCountry.name',
-			'metadataLanguageCountry.iso3',
-			'metadataLanguageCountry.iso2',
-			'metadataLanguageCountry.numericCode',
-			'metadataLanguageCountry.phoneCode',
-			'metadataLanguageCountry.capital',
-			'metadataLanguageCountry.currency',
-			'metadataLanguageCountry.currencyName',
-			'metadataLanguageCountry.currencySymbol',
-			'metadataLanguageCountry.regionId',
-			'metadataLanguageCountry.nationality',
-			'metadataLanguageCountry.continent',
-		]);
-	}
-
-	private addSelectRecordingCountry(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'recordingCountry.id',
-			'recordingCountry.name',
-			'recordingCountry.iso3',
-			'recordingCountry.iso2',
-			'recordingCountry.numericCode',
-			'recordingCountry.phoneCode',
-			'recordingCountry.capital',
-			'recordingCountry.currency',
-			'recordingCountry.currencyName',
-			'recordingCountry.currencySymbol',
-			'recordingCountry.regionId',
-			'recordingCountry.nationality',
-			'recordingCountry.continent',
-		]);
-	}
-
-	private addSelectPrimaryGenre(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'primaryGenre.id',
-			'primaryGenre.name',
-			'primaryGenre.code',
-			'primaryGenre.picture',
-			'primaryGenre.description',
-		]);
-	}
-
-	private addSelectSubGenre(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'subGenre.id',
-			'subGenre.name',
-			'subGenre.code',
-			'subGenre.picture',
-			'subGenre.description',
-		]);
-	}
-
-	private addSelectTrackType(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'trackType.id',
-			'trackType.name',
-			'trackType.code',
-		]);
-	}
-
-	private addSelectTrackOriginType(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'trackOriginType.id',
-			'trackOriginType.name',
-			'trackOriginType.code',
-		]);
-	}
-
-	private addSelectTrackSensitive(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect([
-			'trackSensitive.id',
-			'trackSensitive.name',
-			'trackSensitive.code',
-			'trackSensitive.icon',
-		]);
 	}
 
 	private enrichSingleTrackDraft({

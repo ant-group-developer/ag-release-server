@@ -10,7 +10,7 @@ import {
 } from '../dto/track.dto';
 import { Track } from '../entities/track.entity';
 import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
-import { TrackQueryService } from './track.query.service copy';
+import { TrackQueryService } from './track.query.service';
 
 @Injectable()
 export class TrackService {
@@ -78,12 +78,12 @@ export class TrackService {
 		const { page, pageSize } = query;
 
 		const [tracksDb, totalItems] =
-			await this.trackQueryService.getList(query);
+			await this.trackQueryService.getListWithRevenue(query);
 
-		const enhancedTracks = this.enhanceDetailsList(tracksDb);
+		// const enhancedTracks = this.enhanceDetailsList(tracksDb);
 
 		return new PageDto({
-			items: enhancedTracks,
+			items: tracksDb,
 			metadata: {
 				currentPage: page,
 				pageSize,
