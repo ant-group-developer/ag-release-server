@@ -65,7 +65,7 @@ interface ITrackLanguage {
 
 interface IAudioFileDraft {
 	sampleRate: string;
-	bitrate?: string | null;
+	bitrate?: number | null;
 	bitDepth?: number | null;
 	duration: number;
 	sampleLength?: number | null;

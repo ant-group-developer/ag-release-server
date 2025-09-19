@@ -3,10 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { stringToCode } from 'src/utils/util';
 import { ILike, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
-import { Dsp } from '../dsp/entities/dsp.entity';
-import { Release } from '../release/entities/release.entity';
-import { Track } from '../track/entities/track.entity';
-import { TrackRevenue } from './entities/track-revenue.entity';
+import { Dsp } from '../../dsp/entities/dsp.entity';
+import { Release } from '../../release/entities/release.entity';
+import { Track } from '../../track/entities/track.entity';
+import { TrackRevenue } from '../entities/track-revenue.entity';
 
 interface TrackRow {
 	transactionDate: string;
@@ -26,8 +26,8 @@ interface TrackRow {
 }
 
 @Injectable()
-export class TrackRevenueService {
-	private readonly logger = new Logger(TrackRevenueService.name);
+export class TrackRevenueDataService {
+	private readonly logger = new Logger(TrackRevenueDataService.name);
 
 	constructor(
 		@InjectRepository(Release)
