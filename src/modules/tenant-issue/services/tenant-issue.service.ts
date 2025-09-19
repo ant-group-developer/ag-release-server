@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
-import { TenantIssueMessage } from '../constants/tenant-issue.constant';
+import { TenantIssueResponse } from '../constants/tenant-issue.constant';
 import {
 	CreateTenantIssueDto,
 	QueryGetListTenantIssueDto,
@@ -59,7 +59,7 @@ export class TenantIssueService {
 			where: { id },
 			relations: ['tenant', 'issue'],
 		});
-		if (!entity) throw new ResponseError(TenantIssueMessage.NOT_FOUND);
+		if (!entity) throw new ResponseError(TenantIssueResponse.NOT_FOUND);
 		return entity;
 	}
 
@@ -67,7 +67,7 @@ export class TenantIssueService {
 		query: QueryGetListTenantIssueDto,
 	): Promise<PageDto<TenantIssue>> {
 		const { page, pageSize } = query;
-		const [items, totalItems] =
+		const { items, totalItems } =
 			await this.tenantIssueQueryService.getList(query);
 		return new PageDto({
 			items,

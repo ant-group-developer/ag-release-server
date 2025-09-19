@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { IssueLevelMessage } from '../constant/issue-level.constant';
+import { IssueLevelResponse } from '../constant/issue-level.constant';
 import {
 	BulkUpdateIssueLevel,
 	CreateIssueLevelDto,
@@ -39,7 +39,7 @@ export class IssueLevelService {
 	async findOne(id: string): Promise<IssueLevel> {
 		const issueLevel = await this.issueLevelRepo.findOne({ where: { id } });
 		if (!issueLevel) {
-			throw new ResponseError(IssueLevelMessage.NOT_FOUND);
+			throw new ResponseError(IssueLevelResponse.NOT_FOUND);
 		}
 		return issueLevel;
 	}
@@ -49,7 +49,7 @@ export class IssueLevelService {
 			await this.issueLevelQueryService.findOneWithCountRelation(id);
 
 		if (!issueLevel) {
-			throw new ResponseError(IssueLevelMessage.NOT_FOUND);
+			throw new ResponseError(IssueLevelResponse.NOT_FOUND);
 		}
 
 		return issueLevel;

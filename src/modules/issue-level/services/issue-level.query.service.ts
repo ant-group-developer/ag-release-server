@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 
-import { IssueLevelMessage } from '../constant/issue-level.constant';
+import { IssueLevelResponse } from '../constant/issue-level.constant';
 import { QueryGetListIssueLevelDto } from '../dto/issue-level.dto';
 import { IssueLevel } from '../entities/issue-level.entity';
 
@@ -13,49 +13,6 @@ export class IssueLevelQueryService {
 		@InjectRepository(IssueLevel)
 		private readonly issueLevelRepo: Repository<IssueLevel>,
 	) {}
-
-	private createQueryGetList(query: QueryGetListIssueLevelDto) {
-		const {
-			keyword,
-			startCreatedAt,
-			endCreatedAt,
-			startUpdatedAt,
-			endUpdatedAt,
-			fieldOrder,
-			orderBy,
-			skip,
-			pageSize,
-		} = query;
-
-		const queryBuilder =
-			this.issueLevelRepo.createQueryBuilder('issueLevel');
-
-		if (keyword) {
-			queryBuilder.andWhere(
-				'(issueLevel.nameVi ILIKE :keyword OR issueLevel.nameEn ILIKE :keyword)',
-				{ keyword: `%${keyword}%` },
-			);
-		}
-
-		if (startCreatedAt && endCreatedAt) {
-			queryBuilder.andWhere(
-				`issueLevel.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
-				{ startCreatedAt, endCreatedAt },
-			);
-		}
-
-		if (startUpdatedAt && endUpdatedAt) {
-			queryBuilder.andWhere(
-				`issueLevel.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
-				{ startUpdatedAt, endUpdatedAt },
-			);
-		}
-
-		queryBuilder.orderBy(`issueLevel.${fieldOrder}`, orderBy);
-		queryBuilder.skip(skip).take(pageSize);
-
-		return queryBuilder;
-	}
 
 	async getList(query: QueryGetListIssueLevelDto) {
 		const queryGetList = this.createQueryGetList(query);
@@ -77,7 +34,7 @@ export class IssueLevelQueryService {
 				where: { nameVi },
 			});
 			if (existingNameVi) {
-				throw new ResponseError(IssueLevelMessage.DUPLICATE_NAME_VI);
+				throw new ResponseError(IssueLevelResponse.DUPLICATE_NAME_VI);
 			}
 		}
 
@@ -86,7 +43,7 @@ export class IssueLevelQueryService {
 				where: { nameEn },
 			});
 			if (existingNameEn) {
-				throw new ResponseError(IssueLevelMessage.DUPLICATE_NAME_EN);
+				throw new ResponseError(IssueLevelResponse.DUPLICATE_NAME_EN);
 			}
 		}
 
@@ -95,13 +52,13 @@ export class IssueLevelQueryService {
 				where: { code },
 			});
 			if (existingCode) {
-				throw new ResponseError(IssueLevelMessage.DUPLICATE_CODE);
+				throw new ResponseError(IssueLevelResponse.DUPLICATE_CODE);
 			}
 		}
 	}
 
 	async findOneWithCountRelation(id: string) {
-		const query = this.issueLevelRepo.createQueryBuilder('issueLevel');
+		const query = this.createBaseQuery();
 
 		// virtual count issues
 		query.addSelect((subQuery) => {
@@ -122,6 +79,74 @@ export class IssueLevelQueryService {
 		return items[0];
 	}
 
+	validateDelete(issueLevel: IssueLevel) {
+		if ((issueLevel.issuesCount ?? 0) > 0) {
+			throw new ResponseError(
+				IssueLevelResponse.CANNOT_DELETE_BECAUSE_LINKED_ISSUES(
+					issueLevel.id,
+				),
+			);
+		}
+	}
+
+	// private
+	private createBaseQuery() {
+		return this.issueLevelRepo.createQueryBuilder('issueLevel');
+	}
+
+	private createQueryGetList(filter: QueryGetListIssueLevelDto) {
+		const qb = this.createBaseQuery();
+		this.applyFilter({ qb, filter });
+
+		return qb;
+	}
+
+	private applyFilter({
+		filter,
+		qb,
+	}: {
+		filter: QueryGetListIssueLevelDto;
+		qb: SelectQueryBuilder<IssueLevel>;
+	}) {
+		const {
+			keyword,
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+			fieldOrder,
+			orderBy,
+			skip,
+			pageSize,
+		} = filter;
+
+		if (keyword) {
+			qb.andWhere(
+				'(issueLevel.nameVi ILIKE :keyword OR issueLevel.nameEn ILIKE :keyword)',
+				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`issueLevel.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{ startCreatedAt, endCreatedAt },
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			qb.andWhere(
+				`issueLevel.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{ startUpdatedAt, endUpdatedAt },
+			);
+		}
+
+		qb.orderBy(fieldOrder, orderBy);
+		qb.skip(skip).take(pageSize);
+
+		return qb;
+	}
+
 	private assigneeVirtualColumn(dataFromDb: {
 		raw: { issuelevel_id: string; issues_count: string }[];
 		entities: IssueLevel[];
@@ -134,14 +159,5 @@ export class IssueLevelQueryService {
 			entity.issuesCount = Number(dataRaw?.issues_count ?? 0);
 			return entity;
 		});
-	}
-
-	validateDelete(issueLevel: IssueLevel) {
-		if ((issueLevel.issuesCount ?? 0) > 0) {
-			throw new ResponseError({
-				...IssueLevelMessage.CANNOT_DELETE_BECAUSE_LINKED_ISSUES,
-				messageWarning: `${IssueLevelMessage.CANNOT_DELETE_BECAUSE_LINKED_ISSUES.message}: ${issueLevel.id}`,
-			});
-		}
 	}
 }

@@ -1,4 +1,4 @@
-export const TenantTierMessage = {
+export const TenantTierResponse = {
 	CREATE_SUCCESS: (data: any) => ({
 		data,
 		message: 'Create success',

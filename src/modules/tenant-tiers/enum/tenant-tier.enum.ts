@@ -1,9 +1,9 @@
 export enum FieldOrderTenantTier {
-	NAME_VI = 'nameVi',
-	NAME_EN = 'nameEn',
-	CODE = 'code',
-	MIN_SCORE = 'minScore',
-	MAX_SCORE = 'maxScore',
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
+	NAME_VI = 'tenantTier.nameVi',
+	NAME_EN = 'tenantTier.nameEn',
+	CODE = 'tenantTier.code',
+	MIN_SCORE = 'tenantTier.minScore',
+	MAX_SCORE = 'tenantTier.maxScore',
+	CREATED_AT = 'tenantTier.createdAt',
+	UPDATED_AT = 'tenantTier.updatedAt',
 }

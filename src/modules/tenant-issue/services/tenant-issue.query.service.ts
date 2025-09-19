@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Issue } from 'src/modules/issue/entities/issue.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
-import { Repository } from 'typeorm';
-import { TenantIssueMessage } from '../constants/tenant-issue.constant';
+import { Repository, SelectQueryBuilder } from 'typeorm';
+import { TenantIssueResponse } from '../constants/tenant-issue.constant';
 import { QueryGetListTenantIssueDto } from '../dto/tenant-issue.dto';
 import { TenantIssue } from '../entities/tenant-issue.entity';
 
@@ -19,7 +19,121 @@ export class TenantIssueQueryService {
 		private readonly issueRepo: Repository<Issue>,
 	) {}
 
-	private createQueryGetList(query: QueryGetListTenantIssueDto) {
+	async getList(query: QueryGetListTenantIssueDto) {
+		const qb = this.createQueryGetList(query);
+		const [items, totalItems] = await qb.getManyAndCount();
+		return { items, totalItems };
+	}
+
+	async validate({
+		tenantId,
+		issueId,
+	}: {
+		tenantId?: string;
+		issueId?: string;
+	}) {
+		if (tenantId) {
+			const exist = await this.tenantRepo.findOne({
+				where: { id: tenantId },
+			});
+
+			if (!exist)
+				throw new ResponseError(TenantIssueResponse.TENANT_NOT_FOUND);
+		}
+
+		if (issueId) {
+			const exist = await this.issueRepo.findOne({
+				where: { id: issueId },
+			});
+
+			if (!exist)
+				throw new ResponseError(TenantIssueResponse.ISSUE_NOT_FOUND);
+		}
+	}
+
+	// private
+	private createBaseQuery() {
+		return this.tenantIssueRepo
+			.createQueryBuilder('tenantIssue')
+			.leftJoinAndSelect('tenantIssue.tenant', 'tenant')
+			.leftJoinAndSelect('tenantIssue.issue', 'issue')
+			.leftJoinAndSelect('issue.issueLevel', 'issueLevel');
+	}
+
+	private createQueryGetList(filter: QueryGetListTenantIssueDto) {
+		const qb = this.createBaseQuery();
+		this.applyFilter({ qb, filter });
+		this.selectTenantIssue(qb);
+		this.addSelectTenant(qb);
+		this.addSelectIssue(qb);
+		this.addSelectIssueLevelColor(qb);
+
+		return qb;
+	}
+
+	private selectTenantIssue(qb: SelectQueryBuilder<TenantIssue>) {
+		return qb.select([
+			'tenantIssue.id',
+			'tenantIssue.score',
+			'tenantIssue.startDateAffect',
+			'tenantIssue.endDateAffect',
+			'tenantIssue.isActive',
+			'tenantIssue.description',
+			'tenantIssue.note',
+			'tenantIssue.createdAt',
+		]);
+	}
+
+	private addSelectTenant(qb: SelectQueryBuilder<TenantIssue>) {
+		return qb.addSelect([
+			'tenant.id',
+			'tenant.name',
+			'tenant.title',
+			'tenant.logo',
+			'tenant.icon',
+			'tenant.isActive',
+		]);
+	}
+
+	private addSelectIssue(qb: SelectQueryBuilder<TenantIssue>) {
+		return qb.addSelect([
+			'issue.id',
+			'issue.nameVi',
+			'issue.nameEn',
+			'issue.code',
+			'issue.score',
+			'issue.numberOfDaysAffect',
+			'issue.description',
+			'issue.note',
+		]);
+	}
+
+	private addSelectIssueLevel(qb: SelectQueryBuilder<TenantIssue>) {
+		qb.addSelect([
+			'issueLevel.id',
+			'issueLevel.nameEn',
+			'issueLevel.nameVi',
+			'issueLevel.code',
+			'issueLevel.color',
+			'issueLevel.severityRank',
+		]);
+
+		return qb;
+	}
+
+	private addSelectIssueLevelColor(qb: SelectQueryBuilder<TenantIssue>) {
+		qb.addSelect(['issueLevel.id', 'issueLevel.color']);
+
+		return qb;
+	}
+
+	private applyFilter({
+		filter,
+		qb,
+	}: {
+		filter: QueryGetListTenantIssueDto;
+		qb: SelectQueryBuilder<TenantIssue>;
+	}) {
 		const {
 			keyword,
 			startCreatedAt,
@@ -30,12 +144,9 @@ export class TenantIssueQueryService {
 			orderBy,
 			skip,
 			pageSize,
-		} = query;
 
-		const qb = this.tenantIssueRepo
-			.createQueryBuilder('tenantIssue')
-			.leftJoinAndSelect('tenantIssue.tenant', 'tenant')
-			.leftJoinAndSelect('tenantIssue.issue', 'issue');
+			issueLevelId,
+		} = filter;
 
 		if (keyword) {
 			qb.andWhere(
@@ -64,40 +175,15 @@ export class TenantIssueQueryService {
 			);
 		}
 
-		qb.orderBy(`tenantIssue.${fieldOrder}`, orderBy);
+		if (issueLevelId?.length) {
+			qb.andWhere('issue.issueLevelId IN (:...issueLevelId)', {
+				issueLevelId,
+			});
+		}
+
+		qb.orderBy(fieldOrder, orderBy);
 		qb.skip(skip).take(pageSize);
 
 		return qb;
-	}
-
-	async getList(query: QueryGetListTenantIssueDto) {
-		const qb = this.createQueryGetList(query);
-		return qb.getManyAndCount();
-	}
-
-	async validate({
-		tenantId,
-		issueId,
-	}: {
-		tenantId?: string;
-		issueId?: string;
-	}) {
-		if (tenantId) {
-			const exist = await this.tenantRepo.findOne({
-				where: { id: tenantId },
-			});
-
-			if (!exist)
-				throw new ResponseError(TenantIssueMessage.TENANT_NOT_FOUND);
-		}
-
-		if (issueId) {
-			const exist = await this.issueRepo.findOne({
-				where: { id: issueId },
-			});
-
-			if (!exist)
-				throw new ResponseError(TenantIssueMessage.ISSUE_NOT_FOUND);
-		}
 	}
 }

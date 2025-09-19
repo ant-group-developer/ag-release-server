@@ -1,4 +1,4 @@
-export const IssueLevelMessage = {
+export const IssueLevelResponse = {
 	CREATE_SUCCESS: (data: any) => ({
 		data,
 		message: 'Create success',
@@ -46,10 +46,11 @@ export const IssueLevelMessage = {
 		statusCode: 409,
 	},
 
-	CANNOT_DELETE_BECAUSE_LINKED_ISSUES: {
+	CANNOT_DELETE_BECAUSE_LINKED_ISSUES: (data: any) => ({
 		message:
 			'Cannot delete this issue level because it is linked to issues',
 		messageCode: 'issueLevel.message.error.cannotDeleteBecauseLinkedIssues',
+		messageWarning: `Cannot delete this issue level because it is linked to issues: ${data.id}`,
 		statusCode: 400,
-	},
+	}),
 };

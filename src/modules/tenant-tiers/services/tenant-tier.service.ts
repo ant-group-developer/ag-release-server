@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
 import { Repository } from 'typeorm';
 
-import { TenantTierMessage } from '../constants/tenant-tiers.constant';
+import { TenantTierResponse } from '../constants/tenant-tiers.constant';
 import {
 	CreateTenantTierDto,
 	QueryGetListTenantTierDto,
@@ -35,7 +35,7 @@ export class TenantTierService {
 
 	async findOne(id: string): Promise<TenantTier> {
 		const entity = await this.tenantTierRepo.findOne({ where: { id } });
-		if (!entity) throw new ResponseError(TenantTierMessage.NOT_FOUND);
+		if (!entity) throw new ResponseError(TenantTierResponse.NOT_FOUND);
 		return entity;
 	}
 

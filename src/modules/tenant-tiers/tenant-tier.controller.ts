@@ -14,7 +14,7 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 
-import { TenantTierMessage } from './constants/tenant-tiers.constant';
+import { TenantTierResponse } from './constants/tenant-tiers.constant';
 import {
 	CreateTenantTierDto,
 	QueryGetListTenantTierDto,
@@ -31,7 +31,7 @@ export class TenantTierController {
 	async create(@Body() data: CreateTenantTierDto, @Req() req: Request) {
 		const userId = req.user!.sub;
 		const result = await this.tenantTierService.create(data, userId);
-		return new ResponseSuccess(TenantTierMessage.CREATE_SUCCESS(result));
+		return new ResponseSuccess(TenantTierResponse.CREATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -62,13 +62,13 @@ export class TenantTierController {
 	) {
 		const userId = req.user!.sub;
 		const result = await this.tenantTierService.update(id, data, userId);
-		return new ResponseSuccess(TenantTierMessage.UPDATE_SUCCESS(result));
+		return new ResponseSuccess(TenantTierResponse.UPDATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.tenantTierService.delete(id);
-		return new ResponseSuccess(TenantTierMessage.DELETE_SUCCESS);
+		return new ResponseSuccess(TenantTierResponse.DELETE_SUCCESS);
 	}
 }

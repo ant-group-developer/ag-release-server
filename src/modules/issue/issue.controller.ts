@@ -13,7 +13,7 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
-import { IssueMessage } from './constants/issue.constant';
+import { IssueResponse } from './constants/issue.constant';
 import {
 	CreateIssueDto,
 	QueryGetListIssueDto,
@@ -30,7 +30,7 @@ export class IssueController {
 	async create(@Body() data: CreateIssueDto, @Req() req: Request) {
 		const userId = req.user!.sub;
 		const result = await this.issueService.create(data, userId);
-		return new ResponseSuccess(IssueMessage.CREATE_SUCCESS(result));
+		return new ResponseSuccess(IssueResponse.CREATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
@@ -69,13 +69,13 @@ export class IssueController {
 	) {
 		const userId = req.user!.sub;
 		const result = await this.issueService.update(id, data, userId);
-		return new ResponseSuccess(IssueMessage.UPDATE_SUCCESS(result));
+		return new ResponseSuccess(IssueResponse.UPDATE_SUCCESS(result));
 	}
 
 	@SystemAdminOnly()
 	@Delete(':id')
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.issueService.delete(id);
-		return new ResponseSuccess(IssueMessage.DELETE_SUCCESS);
+		return new ResponseSuccess(IssueResponse.DELETE_SUCCESS);
 	}
 }
