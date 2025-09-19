@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { IssueLevel } from 'src/modules/issue-level/entities/issue-level.entity';
+import { IssueLevelJoinCoreFields } from 'src/modules/orm/filed-mappings/orm.issue-level.constant';
+import { IssueSimpleFields } from 'src/modules/orm/filed-mappings/orm.issue.constant';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { IssueResponse } from '../constants/issue.constant';
 import { QueryGetListIssueDto } from '../dto/issue.dto';
@@ -29,7 +31,7 @@ export class IssueQueryService {
 		this.selectIssueSimple(qb);
 		this.addSelectIssueLevel(qb);
 
-		qb.orderBy('issueLevel.severityRank', 'ASC');
+		qb.orderBy(IssueLevelJoinCoreFields.SEVERITY_RANK, 'ASC');
 
 		return qb.getMany();
 	}
@@ -139,32 +141,17 @@ export class IssueQueryService {
 		}
 
 		qb.orderBy(fieldOrder, orderBy);
-
 		qb.skip(skip).take(pageSize);
 
 		return qb;
 	}
 
 	private selectIssueSimple(qb: SelectQueryBuilder<Issue>) {
-		return qb.select([
-			'issue.id',
-			'issue.code',
-			'issue.nameVi',
-			'issue.nameEn',
-			'issue.score',
-			'issue.numberOfDaysAffect',
-		]);
+		return qb.select(Object.values(IssueSimpleFields));
 	}
 
 	private addSelectIssueLevel(qb: SelectQueryBuilder<Issue>) {
-		qb.addSelect([
-			'issueLevel.id',
-			'issueLevel.nameEn',
-			'issueLevel.nameVi',
-			'issueLevel.code',
-			'issueLevel.color',
-			'issueLevel.severityRank',
-		]);
+		qb.addSelect(Object.values(IssueLevelJoinCoreFields));
 
 		return qb;
 	}

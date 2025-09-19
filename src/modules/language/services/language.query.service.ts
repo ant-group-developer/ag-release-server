@@ -166,6 +166,7 @@ export class LanguageQueryService {
 		return this.languageRepo
 			.createQueryBuilder('l')
 			.select(['l.id', 'l.name', 'l.code'])
+			.cache('languages_all', 1000 * 60 * 10)
 			.getMany();
 	}
 }

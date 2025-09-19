@@ -2,8 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/response.dto';
 import { Issue } from 'src/modules/issue/entities/issue.entity';
+import { IssueLevelJoinCoreFields } from 'src/modules/orm/filed-mappings/orm.issue-level.constant';
+import { IssueJoinCoreFields } from 'src/modules/orm/filed-mappings/orm.issue.constant';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import {
+	TenantIssueCoreFields,
+	TenantJoinCoreFields,
+} from '../../orm/filed-mappings/orm.tenant-issue.constant';
 import { TenantIssueResponse } from '../constants/tenant-issue.constant';
 import { QueryGetListTenantIssueDto } from '../dto/tenant-issue.dto';
 import { TenantIssue } from '../entities/tenant-issue.entity';
@@ -72,57 +78,28 @@ export class TenantIssueQueryService {
 	}
 
 	private selectTenantIssue(qb: SelectQueryBuilder<TenantIssue>) {
-		return qb.select([
-			'tenantIssue.id',
-			'tenantIssue.score',
-			'tenantIssue.startDateAffect',
-			'tenantIssue.endDateAffect',
-			'tenantIssue.isActive',
-			'tenantIssue.description',
-			'tenantIssue.note',
-			'tenantIssue.createdAt',
-		]);
+		qb.select(Object.values(TenantIssueCoreFields));
 	}
 
 	private addSelectTenant(qb: SelectQueryBuilder<TenantIssue>) {
-		return qb.addSelect([
-			'tenant.id',
-			'tenant.name',
-			'tenant.title',
-			'tenant.logo',
-			'tenant.icon',
-			'tenant.isActive',
-		]);
+		return qb.addSelect(Object.values(TenantJoinCoreFields));
 	}
 
 	private addSelectIssue(qb: SelectQueryBuilder<TenantIssue>) {
-		return qb.addSelect([
-			'issue.id',
-			'issue.nameVi',
-			'issue.nameEn',
-			'issue.code',
-			'issue.score',
-			'issue.numberOfDaysAffect',
-			'issue.description',
-			'issue.note',
-		]);
+		return qb.addSelect(Object.values(IssueJoinCoreFields));
 	}
 
 	private addSelectIssueLevel(qb: SelectQueryBuilder<TenantIssue>) {
-		qb.addSelect([
-			'issueLevel.id',
-			'issueLevel.nameEn',
-			'issueLevel.nameVi',
-			'issueLevel.code',
-			'issueLevel.color',
-			'issueLevel.severityRank',
-		]);
+		qb.addSelect(Object.values(IssueLevelJoinCoreFields));
 
 		return qb;
 	}
 
 	private addSelectIssueLevelColor(qb: SelectQueryBuilder<TenantIssue>) {
-		qb.addSelect(['issueLevel.id', 'issueLevel.color']);
+		qb.addSelect([
+			IssueLevelJoinCoreFields.ID,
+			IssueLevelJoinCoreFields.COLOR,
+		]);
 
 		return qb;
 	}

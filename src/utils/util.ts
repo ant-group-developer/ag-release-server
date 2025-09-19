@@ -117,3 +117,14 @@ export function streamDownload(
 export function toSnakeCaseKeys<T extends object>(obj: T): Record<string, any> {
 	return mapKeys(obj, (_value, key) => snakeCase(key));
 }
+
+export function pickFields<T extends Record<string, string>, K extends keyof T>(
+	fields: T,
+	keys: readonly K[],
+): Pick<T, K> {
+	const result = {} as Pick<T, K>;
+	keys.forEach((k) => {
+		result[k] = fields[k];
+	});
+	return result;
+}

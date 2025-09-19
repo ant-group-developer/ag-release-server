@@ -103,6 +103,10 @@ export class PermissionService {
 	async getAll() {
 		return this.permissionRepo.find({
 			select: ['id', 'name', 'code', 'note'],
+			cache: {
+				id: 'permissions',
+				milliseconds: 1000 * 60 * 10,
+			},
 		});
 	}
 
