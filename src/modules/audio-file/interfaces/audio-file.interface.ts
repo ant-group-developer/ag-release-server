@@ -1,6 +1,6 @@
 export interface ICreateAudioFile {
 	sampleRate: string;
-	bitrate?: string | null;
+	bitrate?: number | null;
 	bitDepth?: number | null;
 	duration: number;
 	sampleLength?: number | null;
@@ -26,7 +26,7 @@ export interface IUpdateAudioFile {
 
 export interface IAudioFile {
 	sampleRate: string;
-	bitrate: string | null;
+	bitrate: number | null;
 	bitDepth: number | null;
 	duration: number;
 	sampleLength: number | null;
@@ -37,7 +37,7 @@ export interface IAudioFile {
 
 export interface IAudioFileDraft {
 	sampleRate: string;
-	bitrate: string | null;
+	bitrate: number | null;
 	bitDepth: number | null;
 	duration: number;
 	sampleLength: number | null;
@@ -48,7 +48,7 @@ export interface IAudioFileDraft {
 
 export interface IAudioFileNonDraft extends IAudioFile {
 	sampleRate: string;
-	bitrate: string;
+	bitrate: number;
 	bitDepth: number;
 	duration: number;
 	sampleLength: number;

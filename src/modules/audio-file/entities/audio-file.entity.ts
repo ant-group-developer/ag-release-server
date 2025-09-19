@@ -13,12 +13,11 @@ export class AudioFile extends BaseUUIDEntity {
 	sampleRate: string;
 
 	@Column({
-		type: 'varchar',
+		type: 'int',
 		comment: 'Mbps' + ' & ' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
-		length: 10,
 	})
-	bitrate: string | null;
+	bitrate: number | null;
 
 	@Column({
 		type: 'smallint',
