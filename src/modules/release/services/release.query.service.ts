@@ -76,18 +76,14 @@ export class ReleaseQueryService {
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
 		const { idInclude, page, pageSize, keyword } = query;
 
-		const releaseInclude = idInclude
-			? await Promise.all(
-					idInclude.map((id) =>
-						this.releaseRepo.findOne({
-							select: {
-								id: true,
-								title: true,
-							},
-							where: { id },
-						}),
-					),
-				)
+		const releaseInclude = idInclude?.length
+			? await this.releaseRepo.find({
+					select: {
+						id: true,
+						title: true,
+					},
+					where: { id: In(idInclude) },
+				})
 			: [];
 
 		const [items, totalItems] = await this.releaseRepo.findAndCount({

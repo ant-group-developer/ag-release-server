@@ -191,6 +191,8 @@ export class LabelQueryService {
 
 		qb.select(['label.id', 'label.name', 'label.code']);
 
+		// qb.cache('list_label_simple', 1000 * 60 * 60);
+
 		return await qb.getMany();
 	}
 }
