@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { PageDto } from 'src/common/dtos/response.dto';
+import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { QueryGetListTrackRevenueDto } from '../dto/track-revenue.dto';
 import { TrackRevenue } from '../entities/track-revenue.entity';
 
@@ -12,23 +13,122 @@ export class TrackRevenueService {
 	) {}
 
 	async getList(query: QueryGetListTrackRevenueDto) {
+		const { page, pageSize } = query;
 		const qb = this.createQueryGetList(query);
 		const [items, totalItems] = await qb.getManyAndCount();
-		return { items, totalItems };
+		return new PageDto({
+			items,
+			metadata: { pageSize, totalItems, currentPage: page },
+		});
 	}
 
 	private createBaseQuery() {
-		return this.trackRevenueRepo
-			.createQueryBuilder('trackRevenue')
-			.leftJoinAndSelect('trackRevenue.track', 'track')
-			.leftJoinAndSelect('track.release', 'release')
-			.leftJoinAndSelect('trackRevenue.dsp', 'dsp');
+		return this.trackRevenueRepo.createQueryBuilder('trackRevenue');
 	}
 
 	private createQueryGetList(filter: QueryGetListTrackRevenueDto) {
 		const qb = this.createBaseQuery();
+
 		this.applyFilter({ qb, filter });
+
+		this.selectTrackRevenue(qb);
+		this.addSelectTrack(qb);
+		this.addSelectRelease(qb);
+		this.addSelectLabel(qb);
+		this.addSelectTenant(qb);
+		this.addSelectTrackArtist(qb);
+
+		this.leftJoinRelations(qb);
+
 		return qb;
+	}
+
+	private leftJoinRelations(qb: SelectQueryBuilder<TrackRevenue>) {
+		this.leftJoinTrack(qb);
+		this.leftJoinTrackArtist(qb);
+		this.leftJoinRelease(qb);
+		this.leftJoinLabel(qb);
+		this.leftJoinTenant(qb);
+		this.leftJoinDsp(qb);
+
+		return qb;
+	}
+
+	private leftJoinTrack(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('trackRevenue.track', 'track');
+	}
+
+	private leftJoinRelease(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('track.release', 'release');
+	}
+
+	private leftJoinLabel(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('release.label', 'label');
+	}
+
+	private leftJoinTenant(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('release.tenant', 'tenant');
+	}
+
+	private leftJoinDsp(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('trackRevenue.dsp', 'dsp');
+	}
+
+	private leftJoinTrackArtist(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb
+			.leftJoin('track.trackArtists', 'trackArtist')
+			.leftJoin('trackArtist.artistRole', 'artistRole')
+			.leftJoin('trackArtist.artist', 'artist');
+	}
+
+	private selectTrackRevenue(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.select([
+			'trackRevenue.id',
+			'trackRevenue.reportDate',
+			'trackRevenue.dspId',
+			'trackRevenue.countryCode',
+			'trackRevenue.currencyCode',
+			'trackRevenue.amount',
+			'trackRevenue.configuration',
+			'trackRevenue.trackId',
+		]);
+	}
+
+	private addSelectTrack(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect([
+			'track.id',
+			'track.title',
+			'track.isrc',
+			'track.releaseId',
+		]);
+	}
+
+	private addSelectRelease(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect(['release.id', 'release.title', 'release.labelId']);
+	}
+
+	private addSelectLabel(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect([
+			'label.id',
+			'label.name',
+			'label.picture',
+			'label.tenantId',
+		]);
+	}
+
+	private addSelectTenant(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect(['tenant.id', 'tenant.name']);
+	}
+
+	private addSelectTrackArtist(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb
+			.addSelect([
+				'trackArtist.id',
+				'trackArtist.artistId',
+				'trackArtist.artistRoleId',
+			])
+			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			.addSelect(['artist.id', 'artist.name', 'artist.picture']);
 	}
 
 	private applyFilter({
@@ -53,7 +153,11 @@ export class TrackRevenueService {
 
 		if (keyword) {
 			qb.andWhere(
-				'(track.title ILIKE :keyword OR release.title ILIKE :keyword)',
+				new Brackets((qb) => {
+					qb.where('track.title ILIKE :keyword')
+						.orWhere('release.title ILIKE :keyword')
+						.orWhere('label.name ILIKE :keyword');
+				}),
 				{ keyword: `%${keyword}%` },
 			);
 		}
@@ -65,19 +169,25 @@ export class TrackRevenueService {
 			});
 		}
 
-		if (dspId) {
-			qb.andWhere('dsp.id = :dspId', { dspId });
+		if (dspId?.length) {
+			qb.andWhere('trackRevenue.dspId IN (:...dspId)', {
+				dspId,
+			});
 		}
 
-		if (releaseId) {
-			qb.andWhere('release.id = :releaseId', { releaseId });
+		if (releaseId?.length) {
+			qb.andWhere('track.releaseId IN (:...releaseId)', {
+				releaseId,
+			});
 		}
 
-		if (trackId) {
-			qb.andWhere('track.id = :trackId', { trackId });
+		if (trackId?.length) {
+			qb.andWhere('trackRevenue.trackId IN (:...trackId)', {
+				trackId,
+			});
 		}
 
-		qb.orderBy(fieldOrder ?? 'trackRevenue.date', orderBy ?? 'DESC');
+		qb.orderBy(fieldOrder, orderBy);
 		qb.skip(skip).take(pageSize);
 
 		return qb;
