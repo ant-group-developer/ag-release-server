@@ -9,7 +9,7 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
-import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, ILike, Repository, SelectQueryBuilder } from 'typeorm';
 import { TrackMessages } from '../constants/track.constant';
 import {
 	BulkCreateTrackDraft,
@@ -55,6 +55,25 @@ export class TrackQueryService {
 	async getList(query: QueryGetListTrackDto) {
 		const qb = this.createQueryGetList(query);
 		return await qb.getManyAndCount();
+	}
+
+	async getListSimple(query: QueryGetListTrackDto) {
+		const { page, pageSize, keyword } = query;
+
+		const [items, totalItems] = await this.trackRepo.findAndCount({
+			select: {
+				id: true,
+				title: true,
+			},
+			where: {
+				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+			},
+			order: { title: 'ASC' },
+			skip: (page - 1) * pageSize,
+			take: pageSize,
+		});
+
+		return { items, totalItems };
 	}
 
 	async getListWithPolicy(query: QueryGetListTrackDto) {

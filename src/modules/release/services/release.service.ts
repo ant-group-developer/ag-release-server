@@ -88,6 +88,24 @@ export class ReleaseService {
 		});
 	}
 
+	async getListSimple(
+		query: QueryGetListReleaseDto,
+	): Promise<PageDto<Release>> {
+		const { page, pageSize } = query;
+
+		const { items, totalItems } =
+			await this.releaseQueryService.getListSimple(query);
+
+		return new PageDto({
+			items: items,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
 	private enhanceReleasesDetails(releases: Release[]) {
 		return releases.map((release) => {
 			const { releaseCoverArts, ...restOfRelease } = release;

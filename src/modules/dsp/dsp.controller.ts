@@ -42,6 +42,14 @@ export class DspController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('simple')
+	async getListSimple(
+		@Query() query: QueryGetListDspDto,
+	): Promise<ResponseSuccess<Dsp[]>> {
+		const result = await this.dspService.getListSimple(query);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get('enable-policy')
 	async getListDspEnablePolicy() {
 		return new ResponseSuccess({

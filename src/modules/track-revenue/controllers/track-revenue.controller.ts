@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { QueryGetListTrackRevenueDto } from '../dto/track-revenue.dto';
 import { TrackRevenueDataService } from '../services/track-revenue.data.service';
 import { TrackRevenueService } from '../services/track-revenue.service';
@@ -16,7 +17,9 @@ export class TrackRevenueController {
 	}
 
 	@Get()
-	private getList(@Query() query: QueryGetListTrackRevenueDto) {
-		return this.trackRevenueService.getList(query);
+	private async getList(@Query() query: QueryGetListTrackRevenueDto) {
+		return new ResponseSuccess({
+			data: await this.trackRevenueService.getList(query),
+		});
 	}
 }

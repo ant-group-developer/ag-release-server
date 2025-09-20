@@ -72,6 +72,22 @@ export class TrackService {
 		});
 	}
 
+	async getListSimple(query: QueryGetListTrackDto): Promise<PageDto<Track>> {
+		const { page, pageSize } = query;
+
+		const { items, totalItems } =
+			await this.trackQueryService.getListSimple(query);
+
+		return new PageDto({
+			items,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
 	async getListWithRevenue(
 		query: QueryGetListTrackDto,
 	): Promise<PageDto<Track>> {
@@ -79,8 +95,6 @@ export class TrackService {
 
 		const [tracksDb, totalItems] =
 			await this.trackQueryService.getListWithRevenue(query);
-
-		// const enhancedTracks = this.enhanceDetailsList(tracksDb);
 
 		return new PageDto({
 			items: tracksDb,

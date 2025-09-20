@@ -29,17 +29,18 @@ export class TrackRevenueService {
 
 	private createQueryGetList(filter: QueryGetListTrackRevenueDto) {
 		const qb = this.createBaseQuery();
+		this.leftJoinRelations(qb);
 
 		this.applyFilter({ qb, filter });
 
 		this.selectTrackRevenue(qb);
+		this.addSelectDsp(qb);
 		this.addSelectTrack(qb);
 		this.addSelectRelease(qb);
 		this.addSelectLabel(qb);
 		this.addSelectTenant(qb);
 		this.addSelectTrackArtist(qb);
-
-		this.leftJoinRelations(qb);
+		this.addSelectPrimaryGenre(qb);
 
 		return qb;
 	}
@@ -51,6 +52,7 @@ export class TrackRevenueService {
 		this.leftJoinLabel(qb);
 		this.leftJoinTenant(qb);
 		this.leftJoinDsp(qb);
+		this.leftJoinTrackPrimaryGenre(qb);
 
 		return qb;
 	}
@@ -82,6 +84,10 @@ export class TrackRevenueService {
 			.leftJoin('trackArtist.artist', 'artist');
 	}
 
+	private leftJoinTrackPrimaryGenre(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.leftJoin('track.primaryGenre', 'primaryGenre');
+	}
+
 	private selectTrackRevenue(qb: SelectQueryBuilder<TrackRevenue>) {
 		return qb.select([
 			'trackRevenue.id',
@@ -95,12 +101,17 @@ export class TrackRevenueService {
 		]);
 	}
 
+	private addSelectDsp(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect(['dsp.id', 'dsp.name', 'dsp.picture']);
+	}
+
 	private addSelectTrack(qb: SelectQueryBuilder<TrackRevenue>) {
 		return qb.addSelect([
 			'track.id',
 			'track.title',
 			'track.isrc',
 			'track.releaseId',
+			'track.primaryGenreId',
 		]);
 	}
 
@@ -130,6 +141,14 @@ export class TrackRevenueService {
 			])
 			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect(['artist.id', 'artist.name', 'artist.picture']);
+	}
+
+	private addSelectPrimaryGenre(qb: SelectQueryBuilder<TrackRevenue>) {
+		return qb.addSelect([
+			'primaryGenre.id',
+			'primaryGenre.name',
+			'primaryGenre.picture',
+		]);
 	}
 
 	private applyFilter({

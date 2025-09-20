@@ -47,6 +47,20 @@ export class TrackController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('simple')
+	async getListSimple(
+		@Query() query: QueryGetListTrackDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Track>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.trackService.getListSimple(query);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get('with-revenue')
 	async getListWithRevenue(
 		@Query() query: QueryGetListTrackDto,
