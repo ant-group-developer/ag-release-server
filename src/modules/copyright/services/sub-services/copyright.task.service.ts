@@ -1,5 +1,5 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { QueryGetListTask } from '../../dtos/copyright.dto';

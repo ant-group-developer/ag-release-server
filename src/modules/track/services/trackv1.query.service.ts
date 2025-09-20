@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { Genre } from 'src/modules/genre/entities/genre.entity';

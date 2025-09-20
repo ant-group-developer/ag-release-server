@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Raw, Repository } from 'typeorm';
 import { QueryGetListResultScan } from '../../dtos/copyright.dto';
 import { TrackScanHistory } from '../../entities/track-scan-history.entity';

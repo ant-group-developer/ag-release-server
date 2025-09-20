@@ -5,7 +5,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';

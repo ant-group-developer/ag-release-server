@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';

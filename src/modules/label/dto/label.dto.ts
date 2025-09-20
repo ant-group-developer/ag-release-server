@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderLabel } from '../enum/label.enum';
 

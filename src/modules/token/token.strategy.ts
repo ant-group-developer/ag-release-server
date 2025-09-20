@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, SecretOrKeyProvider, Strategy } from 'passport-jwt';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantType } from '../tenant/tenant.enum';
 import { TenantService } from '../tenant/tenant.service';

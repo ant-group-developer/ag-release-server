@@ -10,7 +10,10 @@ import {
 	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResponseError, ResponseSuccess } from 'src/common/dtos/response.dto';
+import {
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/common.response.dto';
 import {
 	ReleaseMessageCodeSuccess,
 	ReleaseMessages,

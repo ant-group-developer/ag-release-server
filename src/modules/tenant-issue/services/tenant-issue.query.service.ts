@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Issue } from 'src/modules/issue/entities/issue.entity';
 import { IssueLevelJoinCoreFields } from 'src/modules/orm/filed-mappings/orm.issue-level.constant';
 import { IssueJoinCoreFields } from 'src/modules/orm/filed-mappings/orm.issue.constant';

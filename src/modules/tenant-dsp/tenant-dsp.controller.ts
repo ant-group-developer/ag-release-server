@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { UpdateTenantDspDto } from './tenant-dsp.dto';
 import { TenantDspService } from './tenant-dsp.service';

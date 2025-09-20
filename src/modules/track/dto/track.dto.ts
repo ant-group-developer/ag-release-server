@@ -12,7 +12,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
 

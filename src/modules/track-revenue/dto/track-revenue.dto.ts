@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsUUID, Length } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { IsDate, IsEnum, IsOptional, IsUUID, Length } from 'class-validator';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderTrackRevenue } from '../enum/track-revenue.enum';
 
 export class QueryGetListTrackRevenueDto extends BaseQueryDto {
@@ -36,6 +36,20 @@ export class QueryGetListTrackRevenueDto extends BaseQueryDto {
 	)
 	@Length(10, 10, { each: true })
 	trackId?: string[];
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	startReportDate?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	endReportDate?: Date;
 
 	@IsOptional()
 	@IsEnum(FieldOrderTrackRevenue)

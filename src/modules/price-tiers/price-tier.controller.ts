@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { Request } from 'express';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import {
 	PriceTierMessageCodeSuccess,

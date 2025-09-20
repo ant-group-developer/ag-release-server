@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { In, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';

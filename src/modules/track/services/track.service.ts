@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {

@@ -5,7 +5,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { In, Repository } from 'typeorm';
 import { RoleMessages } from '../constants/role.constant';
 import {

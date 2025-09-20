@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderDspAction } from '../enums/dsp-action.enum';
 
 export interface ICreateDspAction {

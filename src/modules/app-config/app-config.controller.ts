@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	PublicRoute,
 	SystemAdminOnly,

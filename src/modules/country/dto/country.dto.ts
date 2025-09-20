@@ -5,7 +5,7 @@ import {
 	IsString,
 	ValidateIf,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, MaxLength } from 'class-validator';

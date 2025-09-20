@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import dayjs from 'dayjs';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { folderMap } from '../constants/bucket.constant';

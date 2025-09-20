@@ -1,7 +1,7 @@
 import { File, Storage } from '@google-cloud/storage';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 
 import { BucketGcsAction } from '../enum/bucket.enum';
 import {

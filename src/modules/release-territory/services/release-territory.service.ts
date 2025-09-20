@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
 import { UpdateReleaseTerritoryDto } from '../dto/release-territory.dto';

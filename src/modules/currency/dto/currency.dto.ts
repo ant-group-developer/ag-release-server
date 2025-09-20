@@ -6,7 +6,7 @@ import {
 	Length,
 	ValidateIf,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderCurrency } from '../enums/currency.enum';
 
 export class CreateCurrencyDto {

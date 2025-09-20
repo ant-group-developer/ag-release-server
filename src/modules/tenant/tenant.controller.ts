@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	TenantOwnerOrAdminOnly,
 	TenantWhiteLabelOnly,

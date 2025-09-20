@@ -17,7 +17,7 @@ import {
 	CsvIntArray,
 	CsvUuidArray,
 } from 'src/common/decorators/csv.decorators';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { TenantUserType, UserOrderBy, UserType } from '../enum/user.enum';
 
 export abstract class UpdateUserDto {

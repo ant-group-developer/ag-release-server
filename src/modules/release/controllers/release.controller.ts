@@ -15,7 +15,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request, Response } from 'express';

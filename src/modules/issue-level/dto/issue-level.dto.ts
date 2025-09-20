@@ -18,7 +18,7 @@ import {
 	DEFAULT_LENGTH_NAME,
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderIssueLevel } from '../enum/issue-level.enum';
 
 export class CreateIssueLevelDto {

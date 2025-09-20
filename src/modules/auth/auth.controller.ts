@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { RefreshDto, SiginDto, SwitchTenantDto } from './auth.dto';
 import { AuthService } from './auth.service';
 import { PublicRoute } from './decorators/auth.decorator';

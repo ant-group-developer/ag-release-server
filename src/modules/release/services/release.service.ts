@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {

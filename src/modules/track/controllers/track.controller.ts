@@ -13,7 +13,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import { Request } from 'express';

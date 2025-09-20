@@ -2,7 +2,7 @@ import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
 import { nanoid } from 'nanoid';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 
 import { Response } from 'express';
 import * as fs from 'fs';

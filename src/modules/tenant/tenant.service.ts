@@ -8,7 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import differenceBy from 'lodash/differenceBy';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { Brackets, FindOneOptions, In, TreeRepository } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';

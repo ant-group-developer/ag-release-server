@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';

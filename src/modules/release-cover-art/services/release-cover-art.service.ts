@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import sharp from 'sharp';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Repository } from 'typeorm';

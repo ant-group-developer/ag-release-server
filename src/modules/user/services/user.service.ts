@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
 import { Request } from 'express';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Brackets, FindOneOptions, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';

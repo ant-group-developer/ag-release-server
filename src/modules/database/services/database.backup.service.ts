@@ -4,7 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
 import * as path from 'path';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { AppEvent, DateFormat } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';

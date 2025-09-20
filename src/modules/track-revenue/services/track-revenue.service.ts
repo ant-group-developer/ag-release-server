@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { QueryGetListTrackRevenueDto } from '../dto/track-revenue.dto';
 import { TrackRevenue } from '../entities/track-revenue.entity';
@@ -22,6 +22,7 @@ export class TrackRevenueService {
 		});
 	}
 
+	// query service
 	private createBaseQuery() {
 		return this.trackRevenueRepo.createQueryBuilder('trackRevenue');
 	}
@@ -139,6 +140,9 @@ export class TrackRevenueService {
 		qb: SelectQueryBuilder<TrackRevenue>;
 	}) {
 		const {
+			startReportDate,
+			endReportDate,
+
 			keyword,
 			startCreatedAt,
 			endCreatedAt,
@@ -162,11 +166,24 @@ export class TrackRevenueService {
 			);
 		}
 
+		if (startReportDate && endReportDate) {
+			qb.andWhere(
+				`trackRevenue.reportDate BETWEEN :startReportDate AND :endReportDate`,
+				{
+					startReportDate,
+					endReportDate,
+				},
+			);
+		}
+
 		if (startCreatedAt && endCreatedAt) {
-			qb.andWhere(`trackRevenue.date BETWEEN :startDate AND :endDate`, {
-				startCreatedAt,
-				endCreatedAt,
-			});
+			qb.andWhere(
+				`trackRevenue.createAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
 		}
 
 		if (dspId?.length) {

@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { DspMessageCodeSuccess } from './constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';

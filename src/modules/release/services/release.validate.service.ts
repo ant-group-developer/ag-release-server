@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FieldErrorDetails, ResponseError } from 'src/common/dtos/response.dto';
+import {
+	FieldErrorDetails,
+	ResponseError,
+} from 'src/common/dtos/common.response.dto';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { mainArtistRole } from 'src/modules/artist-role/constants/artist-role.constant';
 import { Genre } from 'src/modules/genre/entities/genre.entity';

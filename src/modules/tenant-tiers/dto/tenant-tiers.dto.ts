@@ -12,7 +12,7 @@ import {
 	DEFAULT_LENGTH_COLOR,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderTenantTier } from '../enum/tenant-tier.enum';
 
 export class CreateTenantTierDto {

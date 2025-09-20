@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { splitCodeIndex, stringToCode } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';

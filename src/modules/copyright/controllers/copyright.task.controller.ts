@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { interval, map, Observable, take } from 'rxjs';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	CreateTrackScanStatusDto,
 	QueryGetListTask,

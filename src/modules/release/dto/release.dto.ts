@@ -16,7 +16,7 @@ import {
 	Min,
 	ValidateIf,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 
 export class CreateReleaseDto {
