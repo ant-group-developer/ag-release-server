@@ -15,16 +15,20 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request, Response } from 'express';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
-import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
+import {
+	RequirePermissions,
+	SystemAdminOnly,
+} from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import { Release } from '../entities/release.entity';
 import {
 	IRelease,
 	IReleaseDetail,
@@ -48,6 +52,21 @@ export class ReleaseController {
 		}
 
 		const result = await this.releaseService.getListDetail(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@SystemAdminOnly()
+	@Get('simple')
+	async getListSimple(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Release>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.releaseService.getListSimple(query);
 		return new ResponseSuccess({ data: result });
 	}
 

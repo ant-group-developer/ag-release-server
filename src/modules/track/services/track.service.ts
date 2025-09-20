@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/response.dto';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
@@ -64,6 +64,40 @@ export class TrackService {
 
 		return new PageDto({
 			items: enhancedTracks,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getListSimple(query: QueryGetListTrackDto): Promise<PageDto<Track>> {
+		const { page, pageSize } = query;
+
+		const { items, totalItems } =
+			await this.trackQueryService.getListSimple(query);
+
+		return new PageDto({
+			items,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getListWithRevenue(
+		query: QueryGetListTrackDto,
+	): Promise<PageDto<Track>> {
+		const { page, pageSize } = query;
+
+		const [tracksDb, totalItems] =
+			await this.trackQueryService.getListWithRevenue(query);
+
+		return new PageDto({
+			items: tracksDb,
 			metadata: {
 				currentPage: page,
 				pageSize,

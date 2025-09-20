@@ -15,7 +15,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from '../auth/constants/messages';
 import {
 	RequirePermissions,

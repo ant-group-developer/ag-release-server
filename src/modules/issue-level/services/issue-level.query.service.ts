@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 
 import { IssueLevelResponse } from '../constant/issue-level.constant';

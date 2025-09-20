@@ -16,7 +16,7 @@ import {
 	Min,
 	ValidateIf,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 
 export class CreateReleaseDto {
@@ -191,6 +191,18 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 }
 
 export class QueryGetListReleaseDto extends BaseQueryDto {
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	idInclude?: string[];
+
 	@IsOptional()
 	@IsString()
 	title?: string;

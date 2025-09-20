@@ -9,7 +9,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { ReleaseArtistMessageCodeSuccess } from './constants/release-artist.constant';
 
 import {

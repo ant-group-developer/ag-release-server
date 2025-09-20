@@ -1,5 +1,5 @@
 import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import { FieldOrderBackup, StatusBackup } from '../enums/database.enum';
 

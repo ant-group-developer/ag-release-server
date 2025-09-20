@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ensureUUID } from 'src/utils/util';

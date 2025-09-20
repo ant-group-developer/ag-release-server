@@ -13,7 +13,7 @@ import {
 	Min,
 } from 'class-validator';
 import { DEFAULT_LENGTH_NOTE } from 'src/common/constants/common.default.constants';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderTenantIssue } from '../enum/tenant-issue.enum';
 
 export class CreateTenantIssueDto {

@@ -4,7 +4,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import {
 	BulkCreatePermissionDto,
@@ -103,6 +103,10 @@ export class PermissionService {
 	async getAll() {
 		return this.permissionRepo.find({
 			select: ['id', 'name', 'code', 'note'],
+			cache: {
+				id: 'permissions',
+				milliseconds: 1000 * 60 * 10,
+			},
 		});
 	}
 

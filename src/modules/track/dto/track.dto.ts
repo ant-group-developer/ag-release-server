@@ -12,7 +12,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
 
@@ -105,6 +105,18 @@ export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 }
 
 export class QueryGetListTrackDto extends BaseQueryDto {
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	@IsArray()
+	idInclude?: string[];
+
 	@IsOptional()
 	@Transform(({ value }) =>
 		value

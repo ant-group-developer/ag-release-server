@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';

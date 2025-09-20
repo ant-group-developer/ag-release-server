@@ -37,6 +37,7 @@ import { ReleaseLocalizeModule } from './modules/release-localize/release-locali
 import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
 import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
@@ -131,6 +132,7 @@ import { UserModule } from './modules/user/user.module';
 		IssueLevelModule,
 		TenantIssueModule,
 		TenantTierModule,
+		StatisticsModule,
 	],
 	controllers: [AppController],
 	providers: [

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto, ResponseError } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';

@@ -14,7 +14,7 @@ import {
 	ITrackDraft,
 } from '../interfaces/track.interface';
 
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { AudioFileService } from 'src/modules/audio-file/services/audio-file.service';
 import { CopyrightService } from 'src/modules/copyright/services/copyright.service';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';

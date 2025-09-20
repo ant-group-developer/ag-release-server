@@ -1,8 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { toSnakeCaseKeys } from 'src/utils/util';
-import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+	Brackets,
+	ILike,
+	In,
+	Not,
+	Repository,
+	SelectQueryBuilder,
+} from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
@@ -64,6 +71,44 @@ export class ReleaseQueryService {
 			totalItems,
 			releases,
 		};
+	}
+
+	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
+		const { idInclude, page, pageSize, keyword } = query;
+
+		const releaseInclude = idInclude?.length
+			? await this.releaseRepo.find({
+					select: {
+						id: true,
+						title: true,
+					},
+					where: { id: In(idInclude) },
+				})
+			: [];
+
+		const [items, totalItems] = await this.releaseRepo.findAndCount({
+			select: {
+				id: true,
+				title: true,
+			},
+			where: {
+				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
+			},
+			order: { title: 'ASC' },
+			skip: (page - 1) * pageSize,
+			take: pageSize,
+		});
+
+		return { items: [...releaseInclude, ...items], totalItems };
+	}
+
+	private newReleaseQb() {
+		return this.releaseRepo.createQueryBuilder('release');
+	}
+
+	private selectReleaseSimple(qb: SelectQueryBuilder<Release>) {
+		return qb.select(['release.id', 'release.title']);
 	}
 
 	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {

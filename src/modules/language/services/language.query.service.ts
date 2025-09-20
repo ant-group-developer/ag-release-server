@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import { LanguageMessage } from '../constants/language.constant';
 import { QueryGetListLanguageDto } from '../dto/language.dto';
@@ -166,6 +166,7 @@ export class LanguageQueryService {
 		return this.languageRepo
 			.createQueryBuilder('l')
 			.select(['l.id', 'l.name', 'l.code'])
+			.cache('languages_all', 1000 * 60 * 10)
 			.getMany();
 	}
 }

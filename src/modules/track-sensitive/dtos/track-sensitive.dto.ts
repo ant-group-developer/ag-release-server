@@ -9,7 +9,7 @@ import {
 	DEFAULT_LENGTH_CODE,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderTrackSensitive } from '../enum/track-sensitive.enum';
 

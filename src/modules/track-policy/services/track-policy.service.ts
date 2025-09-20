@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Action } from 'src/modules/action/entities/action.entity';
 import { UpdateTrackPolicyDto } from 'src/modules/track/dto/track.draft.dto';
 import { TrackPolicy } from '../entities/track-policy.entity';

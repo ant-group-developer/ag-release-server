@@ -1,6 +1,7 @@
 import {
 	IsInt,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
@@ -15,9 +16,8 @@ export class CreateAudioFileDraftDto {
 	sampleRate: string;
 
 	@IsOptional()
-	@IsString()
-	@MaxLength(10)
-	bitrate?: string | null;
+	@IsNumber()
+	bitrate?: number | null;
 
 	@IsOptional()
 	@IsInt()

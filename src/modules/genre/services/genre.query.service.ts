@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import { GenreMessage } from '../constants/genre.constant';
 import { QueryGetListGenreDto } from '../dto/genre.dto';

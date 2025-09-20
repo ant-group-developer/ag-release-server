@@ -13,7 +13,7 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
 import { Request } from 'express';
@@ -44,6 +44,34 @@ export class TrackController {
 		}
 
 		const result = await this.trackService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('simple')
+	async getListSimple(
+		@Query() query: QueryGetListTrackDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Track>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.trackService.getListSimple(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('with-revenue')
+	async getListWithRevenue(
+		@Query() query: QueryGetListTrackDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Track>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.trackService.getListWithRevenue(query);
 		return new ResponseSuccess({ data: result });
 	}
 

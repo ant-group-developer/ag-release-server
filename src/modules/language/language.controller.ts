@@ -10,7 +10,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PageDto, ResponseSuccess } from 'src/common/dtos/response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { LanguageMessageCodeSuccess } from './constants/language.constant';
 import {

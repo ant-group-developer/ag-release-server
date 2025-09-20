@@ -8,7 +8,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldTimezoneArtist } from '../enum/timezone.enum';
 
 export class CreateTimezoneDto {

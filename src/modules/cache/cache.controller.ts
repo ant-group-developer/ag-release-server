@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CacheService } from './cache.service';
 import { SetCacheDto } from './dto/cache.dto';
 import { EntityCache } from './enum/cache.enum';

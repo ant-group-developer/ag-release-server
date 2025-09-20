@@ -5,12 +5,12 @@ import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
-} from 'src/common/dtos/response.dto';
+} from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';
 import { stringToCode } from 'src/utils/util';
-import { In, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { DspMessages } from '../constants/dsp.message';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
@@ -126,6 +126,24 @@ export class DspService {
 				totalItems,
 			},
 		});
+	}
+
+	async getListSimple(query: QueryGetListDspDto) {
+		const { keyword } = query;
+
+		const items = await this.dspRepo.find({
+			select: {
+				id: true,
+				name: true,
+				picture: true,
+			},
+			where: {
+				...(keyword ? { name: ILike(`%${keyword}%`) } : {}),
+			},
+			order: { name: 'ASC' },
+		});
+
+		return items;
 	}
 
 	async getListDspEnablePolicy() {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/response.dto';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Action } from 'src/modules/action/entities/action.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Repository } from 'typeorm';

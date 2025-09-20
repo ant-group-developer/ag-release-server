@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { ResponseSuccess } from 'src/common/dtos/response.dto';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CompareHistoryScanDto } from '../dtos/copyright.dto';
 import { CopyrightService } from '../services/copyright.service';
 
