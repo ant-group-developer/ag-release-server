@@ -9,7 +9,14 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
-import { Brackets, ILike, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+	Brackets,
+	ILike,
+	In,
+	Not,
+	Repository,
+	SelectQueryBuilder,
+} from 'typeorm';
 import { TrackMessages } from '../constants/track.constant';
 import {
 	BulkCreateTrackDraft,
@@ -58,22 +65,27 @@ export class TrackQueryService {
 	}
 
 	async getListSimple(query: QueryGetListTrackDto) {
-		const { page, pageSize, keyword } = query;
+		const { idInclude, page, pageSize, keyword } = query;
+
+		const trackInclude = idInclude?.length
+			? await this.trackRepo.find({
+					select: { id: true, title: true },
+					where: { id: In(idInclude) },
+				})
+			: [];
 
 		const [items, totalItems] = await this.trackRepo.findAndCount({
-			select: {
-				id: true,
-				title: true,
-			},
+			select: { id: true, title: true },
 			where: {
 				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
 			skip: (page - 1) * pageSize,
 			take: pageSize,
 		});
 
-		return { items, totalItems };
+		return { items: [...trackInclude, ...items], totalItems };
 	}
 
 	async getListWithPolicy(query: QueryGetListTrackDto) {

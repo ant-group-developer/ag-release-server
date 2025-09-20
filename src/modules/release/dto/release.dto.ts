@@ -192,6 +192,18 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 
 export class QueryGetListReleaseDto extends BaseQueryDto {
 	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	idInclude?: string[];
+
+	@IsOptional()
 	@IsString()
 	title?: string;
 

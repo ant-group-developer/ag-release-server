@@ -113,6 +113,18 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 					.map((v) => v.trim())
 			: [],
 	)
+	@Length(10, 10, { each: true })
+	@IsArray()
+	idInclude?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
 	@IsUUID('4', { each: true })
 	@IsArray()
 	releaseId?: string[];
