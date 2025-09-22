@@ -31,10 +31,14 @@ export class NewsPostService {
 		return this.newsPostRepo.save(entity);
 	}
 
+	async getKeywords() {
+		return this.newsPostQueryService.getKeywords();
+	}
+
 	async findOne(id: string): Promise<NewsPost> {
 		const entity = await this.newsPostRepo.findOne({
 			where: { id },
-			relations: ['newsCategory', 'thumbnail'],
+			relations: ['newsCategory'],
 		});
 		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
 		return entity;

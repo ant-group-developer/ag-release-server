@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
 	IsArray,
 	IsEnum,
@@ -13,6 +14,7 @@ import {
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderNewsPost, NewsPostStatus } from '../enum/news-post.enum';
 
 export class CreateNewsPostDto {
@@ -44,9 +46,9 @@ export class CreateNewsPostDto {
 	@IsNotEmpty()
 	contentEn: string;
 
-	@IsUUID()
+	@MaxLength(LENGTH_PICTURE)
 	@IsOptional()
-	thumbnailId?: string;
+	thumbnail?: string;
 
 	@IsEnum(NewsPostStatus)
 	@IsOptional()
@@ -70,6 +72,16 @@ export class CreateNewsPostDto {
 export class UpdateNewsPostDto extends PartialType(CreateNewsPostDto) {}
 
 export class QueryGetListNewsPostDto extends BaseQueryDto {
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			.split(',')
+			.map((v: string) => v.trim())
+			.filter(Boolean),
+	)
+	@IsArray()
+	keywords?: string[];
+
 	@IsOptional()
 	@IsEnum(NewsPostStatus)
 	status?: NewsPostStatus;

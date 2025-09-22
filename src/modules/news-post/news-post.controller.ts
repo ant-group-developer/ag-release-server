@@ -39,6 +39,12 @@ export class NewsPostController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('keywords')
+	async sidebarKeywords() {
+		const data = await this.newsPostService.getKeywords();
+		return new ResponseSuccess({ data });
+	}
+
 	@Get('public')
 	async getListPublic(@Query() query: QueryGetListNewsPostDto) {
 		const result = await this.newsPostService.getListPublic(query);

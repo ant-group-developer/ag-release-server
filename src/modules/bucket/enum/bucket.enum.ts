@@ -12,6 +12,8 @@ export enum EntityTypePicture {
 	TENANT = 'tenants',
 	LOGO = 'logo',
 	TRACK_SENSITIVE = 'track_sensitive',
+	NEWS_POST_THUMBNAIL = 'news_post_thumbnail',
+	NEWS_POST_CONTENT = 'news_post_content',
 }
 
 export enum UploadPurpose {

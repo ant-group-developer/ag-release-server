@@ -3,9 +3,9 @@ import {
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
 
 @Entity('news_posts')
@@ -28,8 +28,8 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'text' })
 	contentEn: string;
 
-	@Column({ type: 'uuid', nullable: true })
-	thumbnailId: string | null;
+	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
+	thumbnail: string | null;
 
 	@Column({
 		type: 'enum',
@@ -51,8 +51,4 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => NewsCategory, (category) => category.id)
 	@JoinColumn({ name: 'news_category_id' })
 	newsCategory: NewsCategory;
-
-	@OneToOne(() => FileEntity)
-	@JoinColumn({ name: 'thumbnail_id' })
-	thumbnail: FileEntity | null;
 }

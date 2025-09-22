@@ -50,6 +50,21 @@ export class NewsPostQueryService {
 		}
 	}
 
+	async getKeywords() {
+		const qb = this.newsPostRepo.manager
+			.createQueryBuilder()
+			.select('unnest(newsPost.keywords)', 'keyword')
+			.from(NewsPost, 'newsPost')
+			.groupBy('keyword');
+
+		const dataRaw = await qb.getRawMany<{ keyword: string }>();
+
+		return dataRaw
+			.map((i) => i.keyword)
+			.filter(Boolean)
+			.sort((a, b) => a.localeCompare(b));
+	}
+
 	// private
 	private createBaseQb() {
 		return this.newsPostRepo.createQueryBuilder('newsPost');
@@ -59,7 +74,6 @@ export class NewsPostQueryService {
 		const qb = this.createBaseQb();
 
 		this.leftJoinNewsCategory(qb);
-		this.leftJoinThumbnail(qb);
 
 		this.applyFilter({ qb, filter });
 
@@ -82,13 +96,6 @@ export class NewsPostQueryService {
 		this.leftJoinSafe({ qb, property, alias });
 	}
 
-	private leftJoinThumbnail(qb: SelectQueryBuilder<NewsPost>) {
-		const property = 'newsPost.thumbnail';
-		const alias = 'thumbnail';
-
-		return this.leftJoinSafe({ qb, property, alias });
-	}
-
 	private applyFilter({
 		filter,
 		qb,
@@ -98,6 +105,7 @@ export class NewsPostQueryService {
 	}) {
 		const {
 			keyword,
+			keywords,
 			skip,
 			pageSize,
 			fieldOrder,
@@ -107,6 +115,7 @@ export class NewsPostQueryService {
 		} = filter;
 
 		this.andWhereKeyword({ qb, keyword });
+		this.andWhereKeywords({ qb, keywords });
 		this.andWhereStatus({ qb, status });
 		this.andWhereNewsCategoryId({ qb, newsCategoryId });
 
@@ -131,6 +140,33 @@ export class NewsPostQueryService {
 						.orWhere('newsPost.slug ILIKE :keyword');
 				}),
 				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		return qb;
+	}
+
+	private andWhereKeywords({
+		keywords,
+		qb,
+	}: {
+		keywords: QueryGetListNewsPostDto['keywords'];
+		qb: SelectQueryBuilder<NewsPost>;
+	}) {
+		if (keywords && keywords.length > 0) {
+			qb.andWhere(
+				new Brackets((qb1) => {
+					keywords.forEach((kw, idx) => {
+						const param = `keyword${idx}`;
+						const clause = `:${param} = ANY(newsPost.keywords)`;
+
+						if (idx === 0) {
+							qb1.where(clause, { [param]: kw });
+						} else {
+							qb1.orWhere(clause, { [param]: kw });
+						}
+					});
+				}),
 			);
 		}
 
@@ -181,7 +217,7 @@ export class NewsPostQueryService {
 			'newsPost.descriptionEn',
 			'newsPost.contentVi',
 			'newsPost.contentEn',
-			'newsPost.thumbnailId',
+			'newsPost.thumbnail',
 			'newsPost.status',
 			'newsPost.newsCategoryId',
 			'newsPost.slug',
@@ -202,6 +238,7 @@ export class NewsPostQueryService {
 			'newsCategory.descriptionVi',
 			'newsCategory.descriptionEn',
 			'newsCategory.createdAt',
+			'newsCategory.updatedAt',
 		]);
 
 		return qb;
