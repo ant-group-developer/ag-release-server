@@ -48,8 +48,8 @@ export class CreateNewsCategoryDto {
 
 export class UpdateNewsCategoryDto extends PartialType(CreateNewsCategoryDto) {
 	@IsUUID()
-	@IsNotEmpty()
-	id: string;
+	@IsOptional()
+	id?: string;
 
 	@IsInt()
 	@IsNotEmpty()

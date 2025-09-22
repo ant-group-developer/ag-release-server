@@ -72,7 +72,11 @@ export class NewsCategoryService {
 
 	async bulkUpdate(data: BulkUpdateNewsCategory): Promise<NewsCategory[]> {
 		const { newsCategories } = data;
-		await Promise.all(newsCategories.map((item) => this.findOne(item.id)));
+		await Promise.all(
+			newsCategories
+				.filter((item) => item.id)
+				.map((item) => this.findOne(item.id as string)),
+		);
 		return await this.newsCategoryRepo.save(newsCategories);
 	}
 
