@@ -787,7 +787,7 @@ export class TrackQueryService {
 
 	private addSelectFileAndPeak(qb: SelectQueryBuilder<Track>) {
 		return qb
-			.addSelect(['file.id', 'file.fileName'])
+			.addSelect(['file.id', 'file.fileName', 'file.fileSize'])
 			.addSelect(['peak.id']);
 	}
 

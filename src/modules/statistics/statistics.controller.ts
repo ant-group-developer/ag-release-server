@@ -23,6 +23,7 @@ export class StatisticsController {
 		return new ResponseSuccess({ data });
 	}
 
+	// stream
 	@Get('stream/count/by-country')
 	async getStreamCountsByCountry(
 		@Query() query: QueryGetStreamCountByCountryDto,
