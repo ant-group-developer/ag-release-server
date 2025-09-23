@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
+import {
+	PublicRoute,
+	SystemAdminOnly,
+} from '../auth/decorators/auth.decorator';
 import { NewsPostResponse } from './constants/news-post.constant';
 import {
 	CreateNewsPostDto,
@@ -33,6 +36,7 @@ export class NewsPostController {
 		return new ResponseSuccess(NewsPostResponse.CREATE_SUCCESS(result));
 	}
 
+	@SystemAdminOnly()
 	@Get()
 	async getList(@Query() query: QueryGetListNewsPostDto) {
 		const result = await this.newsPostService.getList(query);
@@ -45,9 +49,17 @@ export class NewsPostController {
 		return new ResponseSuccess({ data });
 	}
 
+	@PublicRoute()
 	@Get('public')
 	async getListPublic(@Query() query: QueryGetListNewsPostDto) {
 		const result = await this.newsPostService.getListPublic(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@PublicRoute()
+	@Get('public/:slug')
+	async findOnePublic(@Param('slug') slug: string) {
+		const result = await this.newsPostService.findOnePublic(slug);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import slugify from 'slugify';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { getTimeStamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
 import { NewsPostResponse } from '../constants/news-post.constant';
 import {
@@ -20,11 +22,13 @@ export class NewsPostService {
 	) {}
 
 	async create(data: CreateNewsPostDto, userId: string) {
-		const { slug, newsCategoryId } = data;
-		await this.newsPostQueryService.validate({ slug, newsCategoryId });
+		const { titleEn, newsCategoryId } = data;
+		await this.newsPostQueryService.validate({ newsCategoryId });
+		const slug = this.generateSlug(titleEn);
 
 		const entity = this.newsPostRepo.create({
 			...data,
+			slug,
 			creatorId: userId,
 			modifierId: userId,
 		});
@@ -38,6 +42,18 @@ export class NewsPostService {
 	async findOne(id: string): Promise<NewsPost> {
 		const entity = await this.newsPostRepo.findOne({
 			where: { id },
+			relations: ['newsCategory'],
+		});
+		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
+		return entity;
+	}
+
+	async findOnePublic(slug: string): Promise<NewsPost> {
+		const entity = await this.newsPostRepo.findOne({
+			where: {
+				slug,
+				// status: NewsPostStatus.PUBLIC,
+			},
 			relations: ['newsCategory'],
 		});
 		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
@@ -70,8 +86,8 @@ export class NewsPostService {
 	async update(id: string, data: UpdateNewsPostDto, userId: string) {
 		const entity = await this.findOne(id);
 
-		if (data.slug && data.slug !== entity.slug)
-			await this.newsPostQueryService.validate({ slug: data.slug });
+		// if (data.slug && data.slug !== entity.slug)
+		// 	await this.newsPostQueryService.validate({ slug: data.slug });
 
 		if (
 			data.newsCategoryId &&
@@ -88,5 +104,17 @@ export class NewsPostService {
 	async delete(id: string): Promise<void> {
 		const entity = await this.findOne(id);
 		await this.newsPostRepo.delete(entity.id);
+	}
+
+	private generateSlug(text: string): string {
+		const slug = slugify(text, {
+			lower: true,
+			strict: true,
+		});
+		const timestamp = getTimeStamp();
+
+		const result = `${slug}-${timestamp}`;
+
+		return result;
 	}
 }
