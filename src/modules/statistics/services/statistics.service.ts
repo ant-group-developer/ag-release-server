@@ -6,8 +6,9 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { Repository } from 'typeorm';
+import { Between, Repository, SelectQueryBuilder } from 'typeorm';
 import {
+	BaseQueryStatisticsDto,
 	QueryGetIssueCountDto,
 	QueryGetOverviewCountDto,
 	QueryGetStreamCountByCountryDto,
@@ -35,14 +36,17 @@ export class StatisticsService {
 
 		const qb = this.issueRepo
 			.createQueryBuilder('issue')
-			.leftJoin('issue.tenantIssues', 'tenantIssue')
+			.leftJoin(
+				'issue.tenantIssues',
+				'tenantIssue',
+				startDate && endDate
+					? 'tenantIssue.createdAt BETWEEN :startDate AND :endDate'
+					: undefined,
+				startDate && endDate ? { startDate, endDate } : {},
+			)
 			.select(['issue.id', 'issue.nameEn'])
 			.addSelect('COUNT(tenantIssue.id)', 'total')
 			.groupBy('issue.id');
-
-		// if (startDate && endDate) {
-		// 	qb.andWhere('')
-		// }
 
 		const raw = await qb.getRawMany<{
 			issue_id: string;
@@ -60,10 +64,10 @@ export class StatisticsService {
 	async getOverviewCounts(filter: QueryGetOverviewCountDto) {
 		const [releasesCount, tracksCount, labelsCount, artistsCount] =
 			await Promise.all([
-				this.getReleasesCount(),
-				this.getTracksCount(),
-				this.getLabelsCount(),
-				this.getArtistsCount(),
+				this.getReleasesCount(filter),
+				this.getTracksCount(filter),
+				this.getLabelsCount(filter),
+				this.getArtistsCount(filter),
 			]);
 
 		return {
@@ -83,19 +87,68 @@ export class StatisticsService {
 			.getRawMany();
 	}
 
-	async getReleasesCount() {
-		return await this.releaseRepo.count();
+	async getReleasesCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+
+		return await this.releaseRepo.count({
+			where: this.buildDateFilter({ startDate, endDate }),
+		});
 	}
 
-	async getTracksCount() {
-		return await this.trackRepo.count();
+	async getTracksCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+		return await this.trackRepo.count({
+			where: this.buildDateFilter({ startDate, endDate }),
+		});
 	}
 
-	async getLabelsCount() {
-		return await this.labelRepo.count();
+	async getLabelsCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+		return await this.labelRepo.count({
+			where: this.buildDateFilter({ startDate, endDate }),
+		});
 	}
 
-	async getArtistsCount() {
-		return await this.artistsRepo.count();
+	async getArtistsCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+		return await this.artistsRepo.count({
+			where: this.buildDateFilter({ startDate, endDate }),
+		});
+	}
+
+	// private
+	private applyFilterStream({
+		qb,
+		filter,
+	}: {
+		qb: SelectQueryBuilder<Release | Issue | Label | Artist | TrackRevenue>;
+		filter:
+			| QueryGetIssueCountDto
+			| QueryGetOverviewCountDto
+			| QueryGetStreamCountByCountryDto;
+	}) {
+		const { startDate, endDate } = filter;
+		const alias = qb.alias;
+
+		if (startDate && endDate) {
+			qb.andWhere(`${alias}.createdAt BETWEEN :startDate AND :endDate`, {
+				startDate,
+				endDate,
+			});
+		}
+
+		return qb;
+	}
+
+	private buildDateFilter({
+		startDate,
+		endDate,
+	}: {
+		startDate: Date;
+		endDate: Date;
+	}) {
+		return startDate && endDate
+			? { createdAt: Between(startDate, endDate) }
+			: {};
 	}
 }

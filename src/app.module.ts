@@ -29,6 +29,8 @@ import { IssueLevelModule } from './modules/issue-level/issue-level.module';
 import { IssueModule } from './modules/issue/issue.module';
 import { LabelModule } from './modules/label/label.module';
 import { LanguageModule } from './modules/language/language.module';
+import { NewsCategoryModule } from './modules/news-category/news-category.module';
+import { NewsPostModule } from './modules/news-post/news-post.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
@@ -133,6 +135,9 @@ import { UserModule } from './modules/user/user.module';
 		TenantIssueModule,
 		TenantTierModule,
 		StatisticsModule,
+
+		NewsCategoryModule,
+		NewsPostModule,
 	],
 	controllers: [AppController],
 	providers: [

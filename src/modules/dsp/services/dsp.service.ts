@@ -141,6 +141,10 @@ export class DspService {
 				...(keyword ? { name: ILike(`%${keyword}%`) } : {}),
 			},
 			order: { name: 'ASC' },
+			// cache: {
+			// 	id: 'list_dsp_simple',
+			// 	milliseconds: 1000 * 60 * 60,
+			// },
 		});
 
 		return items;

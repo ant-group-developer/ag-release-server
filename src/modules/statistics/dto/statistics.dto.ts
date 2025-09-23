@@ -1,10 +1,13 @@
-import { IsDate, IsNotEmpty, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsDate, IsOptional } from 'class-validator';
 
-class BaseQueryStatisticsDto {
+export class BaseQueryStatisticsDto {
+	@Type(() => Date)
 	@IsOptional()
 	@IsDate()
 	startDate: Date;
 
+	@Type(() => Date)
 	@IsOptional()
 	@IsDate()
 	endDate: Date;
@@ -15,11 +18,13 @@ export class QueryGetIssueCountDto extends BaseQueryStatisticsDto {}
 export class QueryGetOverviewCountDto extends BaseQueryStatisticsDto {}
 
 export class QueryGetStreamCountByCountryDto extends BaseQueryStatisticsDto {
-	@IsNotEmpty()
+	@Type(() => Date)
+	@IsOptional()
 	@IsDate()
 	startDate: Date;
 
-	@IsNotEmpty()
+	@Type(() => Date)
+	@IsOptional()
 	@IsDate()
 	endDate: Date;
 
