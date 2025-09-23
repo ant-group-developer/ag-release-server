@@ -32,7 +32,7 @@ export class TrackRevenue extends BaseEntity {
 	@Column({ type: 'varchar' })
 	trackId: string;
 
-	@ManyToOne(() => Track)
+	@ManyToOne(() => Track, { onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
 
