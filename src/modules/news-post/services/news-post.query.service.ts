@@ -74,11 +74,13 @@ export class NewsPostQueryService {
 		const qb = this.createBaseQb();
 
 		this.leftJoinNewsCategory(qb);
+		this.leftJoinUserTracked(qb);
 
 		this.applyFilter({ qb, filter });
 
 		this.selectNewsPost(qb);
 		this.addSelectNewsCategory(qb);
+		this.addSelectUserTracked(qb);
 
 		return qb;
 	}
@@ -94,6 +96,42 @@ export class NewsPostQueryService {
 		const alias = 'newsCategory';
 
 		this.leftJoinSafe({ qb, property, alias });
+	}
+
+	private leftJoinUserTracked(qb: SelectQueryBuilder<NewsPost>) {
+		this.leftJoinCreator(qb);
+		this.leftJoinModifier(qb);
+	}
+
+	private leftJoinCreator(qb: SelectQueryBuilder<NewsPost>) {
+		const property = 'newsPost.creator';
+		const alias = 'creator';
+
+		this.leftJoinSafe({ qb, property, alias });
+	}
+
+	private leftJoinModifier(qb: SelectQueryBuilder<NewsPost>) {
+		const property = 'newsPost.modifier';
+		const alias = 'modifier';
+
+		this.leftJoinSafe({ qb, property, alias });
+	}
+
+	private addSelectUserTracked(qb: SelectQueryBuilder<NewsPost>) {
+		this.leftJoinUserTracked(qb);
+
+		this.addSelectCreator(qb);
+		this.addSelectModifier(qb);
+	}
+
+	private addSelectCreator(qb: SelectQueryBuilder<NewsPost>) {
+		this.leftJoinCreator(qb);
+		qb.addSelect(['creator.id', 'creator.name', 'creator.email']);
+	}
+
+	private addSelectModifier(qb: SelectQueryBuilder<NewsPost>) {
+		this.leftJoinModifier(qb);
+		qb.addSelect(['modifier.id', 'modifier.name', 'modifier.email']);
 	}
 
 	private applyFilter({
@@ -121,8 +159,6 @@ export class NewsPostQueryService {
 
 		qb.orderBy(fieldOrder, orderBy);
 		qb.skip(skip).take(pageSize);
-
-		return qb;
 	}
 
 	private andWhereKeyword({
@@ -142,8 +178,6 @@ export class NewsPostQueryService {
 				{ keyword: `%${keyword}%` },
 			);
 		}
-
-		return qb;
 	}
 
 	private andWhereKeywords({
@@ -169,8 +203,6 @@ export class NewsPostQueryService {
 				}),
 			);
 		}
-
-		return qb;
 	}
 
 	private andWhereStatus({
@@ -183,8 +215,6 @@ export class NewsPostQueryService {
 		if (status) {
 			qb.andWhere('newsPost.status = :status', { status });
 		}
-
-		return qb;
 	}
 
 	private andWhereNewsCategoryId({
@@ -199,13 +229,10 @@ export class NewsPostQueryService {
 				newsCategoryId,
 			});
 		}
-
-		return qb;
 	}
 
 	private andWhereStatusPublic(qb: SelectQueryBuilder<NewsPost>) {
 		this.andWhereStatus({ qb, status: NewsPostStatus.PUBLIC });
-		return qb;
 	}
 
 	private selectNewsPost(qb: SelectQueryBuilder<NewsPost>) {
@@ -223,9 +250,8 @@ export class NewsPostQueryService {
 			'newsPost.slug',
 			'newsPost.keywords',
 			'newsPost.createdAt',
+			'newsPost.updatedAt',
 		]);
-
-		return qb;
 	}
 
 	private addSelectNewsCategory(qb: SelectQueryBuilder<NewsPost>) {
@@ -240,8 +266,6 @@ export class NewsPostQueryService {
 			'newsCategory.createdAt',
 			'newsCategory.updatedAt',
 		]);
-
-		return qb;
 	}
 
 	private leftJoinSafe({
@@ -260,7 +284,5 @@ export class NewsPostQueryService {
 		if (!isJoined) {
 			qb.leftJoin(property, alias);
 		}
-
-		return qb;
 	}
 }

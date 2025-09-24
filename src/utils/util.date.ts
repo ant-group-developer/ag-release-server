@@ -14,6 +14,11 @@ export function generateFileNameWithTimestamp(
 	originalFileName: string,
 	format: DateFormat = DateFormat.YYYYMMDDHHmmss,
 ): string {
-	const timestamp = dayjs().format(format);
+	const timestamp = getTimeStamp(format);
 	return `${timestamp}_${originalFileName}`;
+}
+
+export function getTimeStamp(format: DateFormat = DateFormat.YYYYMMDDHHmmss) {
+	const timestamp = dayjs().format(format);
+	return timestamp;
 }

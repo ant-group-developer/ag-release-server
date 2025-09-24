@@ -5,6 +5,7 @@ import {
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
 
@@ -51,4 +52,12 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => NewsCategory, (category) => category.id)
 	@JoinColumn({ name: 'news_category_id' })
 	newsCategory: NewsCategory;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'creator_id' })
+	creator: User | null;
+
+	@ManyToOne(() => User)
+	@JoinColumn({ name: 'modifier_id' })
+	modifier: User | null;
 }

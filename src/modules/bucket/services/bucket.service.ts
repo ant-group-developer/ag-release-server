@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
-import { folderMap } from '../constants/bucket.constant';
+import { FolderBucketMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
@@ -75,7 +75,7 @@ export class BucketService {
 		trackFileName,
 	}: CreateBucketDto['folderBucket']) {
 		const datePrefix = dayjs().format('YYYY_MM');
-		const subFolder = folderMap[uploadPurpose];
+		const subFolder = FolderBucketMap[uploadPurpose];
 		const trackSegment = trackFileName ? `/${trackFileName}` : '';
 		return `releases/${datePrefix}/${releaseId}/${subFolder}${trackSegment}`;
 	}
@@ -220,7 +220,7 @@ export class BucketService {
 		const { entityType, fileName, contentType } = data;
 
 		const key = this.getFullKey({
-			previousKey: entityType,
+			previousKey: FolderBucketMap[entityType],
 			fileName,
 		});
 

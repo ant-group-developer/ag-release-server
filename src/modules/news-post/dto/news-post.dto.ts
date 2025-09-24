@@ -58,10 +58,10 @@ export class CreateNewsPostDto {
 	@IsNotEmpty()
 	newsCategoryId: string;
 
-	@IsString()
-	@MaxLength(DEFAULT_LENGTH_NAME)
-	@IsNotEmpty()
-	slug: string;
+	// @IsString()
+	// @MaxLength(DEFAULT_LENGTH_NAME)
+	// @IsNotEmpty()
+	// slug: string;
 
 	@IsArray()
 	@IsString({ each: true })

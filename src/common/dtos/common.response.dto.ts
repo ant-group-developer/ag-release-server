@@ -1,7 +1,9 @@
 // src/common/dtos/response.dto.ts
 
 import { HttpException } from '@nestjs/common';
+import { omit } from 'lodash';
 import {
+	DEFAULT_SENSITIVE_KEYS,
 	ERROR_MESSAGE_CODE_DEFAULT,
 	ERROR_MESSAGE_DEFAULT,
 	ERROR_STATUS_CODE_DEFAULT,
@@ -9,63 +11,6 @@ import {
 	SUCCESS_MESSAGE_DEFAULT,
 	SUCCESS_STATUS_CODE_DEFAULT,
 } from '../constants/common.default.constants';
-
-/**
- * Standard wrapper for single-item responses.
- */
-// export class ResponseDto<T> {
-// 	/** The actual response payload. */
-// 	data: T;
-
-// 	constructor(data: T) {
-// 		this.data = data;
-// 	}
-// }
-
-/**
- * metadata for paginated responses.
- */
-// export class PaginationMeta {
-// 	/** Total number of items across all pages. */
-// 	total: number;
-// 	/** Current page number (1-based). */
-// 	page: number;
-// 	/** Items per page. */
-// 	pageSize: number;
-// 	/** Total number of pages. */
-// 	totalPages: number;
-
-// 	constructor({
-// 		total,
-// 		page,
-// 		pageSize,
-// 	}: {
-// 		total: number;
-// 		page: number;
-// 		pageSize: number;
-// 	}) {
-// 		this.total = total;
-// 		this.page = page;
-// 		this.pageSize = pageSize;
-// 		this.totalPages = Math.ceil(total / pageSize);
-// 	}
-// }
-
-/**
- * Standard wrapper for paginated list responses.
- */
-// export class PaginatedResponseDto<T> {
-// 	/** The list of items for the current page. */
-// 	data: T[];
-
-// 	/** Pagination metadata. */
-// 	meta: PaginationMeta;
-
-// 	constructor(data: T[], meta: PaginationMeta) {
-// 		this.data = data;
-// 		this.meta = meta;
-// 	}
-// }
 
 export class ResponseSuccess<T> {
 	statusCode: number;
@@ -79,19 +24,49 @@ export class ResponseSuccess<T> {
 		message = SUCCESS_MESSAGE_DEFAULT,
 		messageCode = SUCCESS_MESSAGE_CODE_DEFAULT,
 		messageWarning,
+		sensitiveKeys = [],
+		isRemoveSensitiveFields = true,
 		data,
 	}: {
 		statusCode?: number;
 		message?: string;
 		messageCode?: string;
 		messageWarning?: string;
+
+		// remove sensitive field
+		sensitiveKeys?: string[];
+		isRemoveSensitiveFields?: boolean;
 		data?: T;
 	} = {}) {
 		this.statusCode = statusCode;
 		this.message = message;
 		this.messageCode = messageCode;
 		this.messageWarning = messageWarning;
-		this.data = data;
+
+		if (isRemoveSensitiveFields && data) {
+			sensitiveKeys.push(...DEFAULT_SENSITIVE_KEYS);
+			this.data = this.removeSensitiveFields(data, sensitiveKeys);
+		}
+	}
+
+	private removeSensitiveFields<T>(data: T, sensitiveKeys: string[]): T {
+		if (Array.isArray(data)) {
+			return data.map((item) =>
+				this.removeSensitiveFields(item, sensitiveKeys),
+			) as T;
+		}
+
+		if (data && typeof data === 'object' && !(data instanceof Date)) {
+			const shallow = omit(data, sensitiveKeys);
+			return Object.fromEntries(
+				Object.entries(shallow).map(([k, v]) => [
+					k,
+					this.removeSensitiveFields(v, sensitiveKeys),
+				]),
+			) as T;
+		}
+
+		return data;
 	}
 }
 
