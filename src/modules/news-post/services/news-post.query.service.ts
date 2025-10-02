@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
+import { ALL_NEWS_CATEGORY_FIELDS_SIMPLE } from 'src/modules/orm/filed-mappings/orm.news-category';
+import {
+	ALL_NEWS_POST_TRANSLATION_FILEDS_SIMPLE,
+	NewsPostTransLationFieldsSimple,
+} from 'src/modules/orm/filed-mappings/orm.news-post-translation';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { NewsPostResponseError } from '../constants/news-post.constant';
 import { QueryGetListNewsPostDto } from '../dto/news-post.dto';
@@ -94,8 +99,18 @@ export class NewsPostQueryService {
 		this.applyFilter({ qb, filter });
 
 		this.selectNewsPost(qb);
-		this.addSelectNewsCategory(qb);
-		this.addSelectNewsPostTranslation(qb);
+		this.addSelectNewsCategory({ qb });
+		this.addSelectNewsPostTranslation({
+			qb,
+			select: [
+				NewsPostTransLationFieldsSimple.ID,
+				NewsPostTransLationFieldsSimple.NEWS_POST_ID,
+				NewsPostTransLationFieldsSimple.LANGUAGE_CODE,
+				NewsPostTransLationFieldsSimple.TITLE,
+				NewsPostTransLationFieldsSimple.DESCRIPTION,
+				NewsPostTransLationFieldsSimple.IS_DEFAULT,
+			],
+		});
 		this.addSelectLanguage(qb);
 		this.addSelectUserTracked(qb);
 
@@ -113,8 +128,8 @@ export class NewsPostQueryService {
 		this.andWhereId({ qb, id });
 
 		this.selectNewsPost(qb);
-		this.addSelectNewsCategory(qb);
-		this.addSelectNewsPostTranslation(qb);
+		this.addSelectNewsCategory({ qb });
+		this.addSelectNewsPostTranslation({ qb });
 		this.addSelectLanguage(qb);
 
 		return qb;
@@ -131,8 +146,8 @@ export class NewsPostQueryService {
 		this.andWhereSlug({ qb, slug });
 
 		this.selectNewsPost(qb);
-		this.addSelectNewsCategory(qb);
-		this.addSelectNewsPostTranslation(qb);
+		this.addSelectNewsCategory({ qb });
+		this.addSelectNewsPostTranslation({ qb });
 		this.addSelectLanguage(qb);
 
 		return qb;
@@ -290,14 +305,26 @@ export class NewsPostQueryService {
 		title: QueryGetListNewsPostDto['title'];
 		qb: SelectQueryBuilder<NewsPost>;
 	}) {
-		if (title) {
+		if (title && title.length > 0) {
 			this.leftJoinNewsPostTranslation(qb);
 
-			qb.andWhere('newsPostTranslation.title ILIKE :title', {
-				title: `%${title}%`,
-			});
+			qb.andWhere(
+				new Brackets((qb1) => {
+					title.forEach((t, idx) => {
+						const param = `title${idx}`;
+						const clause = `newsPostTranslation.title ILIKE :${param}`;
+
+						if (idx === 0) {
+							qb1.where(clause, { [param]: `%${t}%` });
+						} else {
+							qb1.orWhere(clause, { [param]: `%${t}%` });
+						}
+					});
+				}),
+			);
 		}
 	}
+
 	private andWhereCreatedAt({
 		startCreatedAt,
 		endCreatedAt,
@@ -350,8 +377,8 @@ export class NewsPostQueryService {
 		status: QueryGetListNewsPostDto['status'];
 		qb: SelectQueryBuilder<NewsPost>;
 	}) {
-		if (status) {
-			qb.andWhere('newsPost.status = :status', { status });
+		if (status && status.length > 0) {
+			qb.andWhere('newsPost.status IN (:...status)', { status });
 		}
 	}
 
@@ -362,15 +389,15 @@ export class NewsPostQueryService {
 		newsCategoryId: QueryGetListNewsPostDto['newsCategoryId'];
 		qb: SelectQueryBuilder<NewsPost>;
 	}) {
-		if (newsCategoryId) {
-			qb.andWhere('newsPost.newsCategoryId = :newsCategoryId', {
+		if (newsCategoryId && newsCategoryId.length > 0) {
+			qb.andWhere('newsPost.newsCategoryId IN (:...newsCategoryId)', {
 				newsCategoryId,
 			});
 		}
 	}
 
 	private andWhereStatusPublic(qb: SelectQueryBuilder<NewsPost>) {
-		this.andWhereStatus({ qb, status: NewsPostStatus.PUBLIC });
+		this.andWhereStatus({ qb, status: [NewsPostStatus.PUBLIC] });
 	}
 
 	private selectNewsPost(qb: SelectQueryBuilder<NewsPost>) {
@@ -386,32 +413,36 @@ export class NewsPostQueryService {
 		]);
 	}
 
-	private addSelectNewsCategory(qb: SelectQueryBuilder<NewsPost>) {
+	private addSelectNewsCategory({
+		qb,
+		select,
+	}: {
+		qb: SelectQueryBuilder<NewsPost>;
+		select?: string[];
+	}) {
 		this.leftJoinNewsCategory(qb);
 
-		qb.addSelect([
-			'newsCategory.id',
-			'newsCategory.nameVi',
-			'newsCategory.nameEn',
-			'newsCategory.descriptionVi',
-			'newsCategory.descriptionEn',
-			'newsCategory.createdAt',
-			'newsCategory.updatedAt',
-		]);
+		if (select && select.length > 0) {
+			qb.addSelect(select.map((i) => i));
+		} else {
+			qb.addSelect(ALL_NEWS_CATEGORY_FIELDS_SIMPLE);
+		}
 	}
 
-	private addSelectNewsPostTranslation(qb: SelectQueryBuilder<NewsPost>) {
+	private addSelectNewsPostTranslation({
+		qb,
+		select,
+	}: {
+		qb: SelectQueryBuilder<NewsPost>;
+		select?: string[];
+	}) {
 		this.leftJoinNewsPostTranslation(qb);
 
-		qb.addSelect([
-			'newsPostTranslation.id',
-			'newsPostTranslation.newsPostId',
-			'newsPostTranslation.languageCode',
-			'newsPostTranslation.title',
-			'newsPostTranslation.description',
-			'newsPostTranslation.content',
-			'newsPostTranslation.isDefault',
-		]);
+		if (select && select.length > 0) {
+			qb.addSelect(select.map((i) => i));
+		} else {
+			qb.addSelect(ALL_NEWS_POST_TRANSLATION_FILEDS_SIMPLE);
+		}
 	}
 
 	private leftJoinSafe({

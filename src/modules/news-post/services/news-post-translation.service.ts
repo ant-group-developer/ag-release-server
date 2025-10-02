@@ -126,6 +126,26 @@ export class NewsPostTranslationService {
 		return await this.findOne(id);
 	}
 
+	async updateTranslationOfNewsPost({
+		newsPostId,
+		languageCode,
+		dataUpdate,
+	}: {
+		newsPostId: string;
+		languageCode: string;
+		dataUpdate: UpdateNewsPostTranslationDto;
+	}) {
+		const entity = await this.newsPostTranslationRepo.findOne({
+			where: { newsPostId, languageCode },
+		});
+
+		if (!entity) {
+			throw new ResponseError(this.responseError.NOT_FOUND);
+		}
+
+		await this.update(entity.id, dataUpdate);
+	}
+
 	async delete(id: string) {
 		const entity = await this.findOne(id);
 

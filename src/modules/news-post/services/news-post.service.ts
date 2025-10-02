@@ -143,19 +143,40 @@ export class NewsPostService {
 		});
 	}
 
-	async update(id: string, data: UpdateNewsPostDto, userId: string) {
+	async handleUpdate(id: string, data: UpdateNewsPostDto, userId: string) {
+		const { languageCode, title, description, content } = data;
+
 		const entity = await this.findOne(id);
 
 		if (
 			data.newsCategoryId &&
 			data.newsCategoryId !== entity.newsCategoryId
-		)
+		) {
 			await this.newsPostQueryService.validate({
 				newsCategoryId: data.newsCategoryId,
 			});
+		}
 
-		await this.newsPostRepo.update(id, { ...data, modifierId: userId });
-		return this.findOne(id);
+		if (languageCode) {
+			await this.newsPostTranslationService.updateTranslationOfNewsPost({
+				newsPostId: id,
+				languageCode,
+				dataUpdate: {
+					languageCode,
+					title,
+					description,
+					content,
+					userId,
+				},
+			});
+		}
+
+		const entityUpdate = this.newsPostRepo.create(data);
+		await this.newsPostRepo.update(id, {
+			...entityUpdate,
+			modifierId: userId,
+		});
+		return await this.findOne(id);
 	}
 
 	async addTranslationNewsPost(
