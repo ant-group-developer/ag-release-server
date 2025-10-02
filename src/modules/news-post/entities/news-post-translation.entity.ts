@@ -6,10 +6,11 @@ import {
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { NewsPost } from './news-post.entity';
 
 @Entity('news_posts_translation')
+@Unique(['newsPostId', 'languageCode'])
 export class NewsPostTranslation extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid' })
 	newsPostId: string;

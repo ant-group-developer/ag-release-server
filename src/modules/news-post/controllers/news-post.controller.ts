@@ -3,6 +3,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	Headers,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -13,31 +14,27 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { PublicRoute } from '../../auth/decorators/auth.decorator';
-import { NewsPostResponse } from '../constants/news-post.constant';
+import { NewsPostResponseSuccess } from '../constants/news-post.constant';
+import { GetListNewsPostTranslations } from '../dto/news-post-translation.dto';
 import {
 	AddTranslationNewsPostDto,
 	CreateNewsPostDto,
 	QueryGetListNewsPostDto,
 	UpdateNewsPostDto,
-	UpdateTranslation,
 } from '../dto/news-post.dto';
 import { NewsPostService } from '../services/news-post.service';
 
 @Controller('news-posts')
 export class NewsPostController {
+	private readonly responseSuccess = NewsPostResponseSuccess;
+
 	constructor(private readonly newsPostService: NewsPostService) {}
 
 	@Post()
 	async create(@Body() data: CreateNewsPostDto, @Req() req: Request) {
 		const userId = req.user!.sub;
 		const result = await this.newsPostService.handleCreate(data, userId);
-		return new ResponseSuccess(NewsPostResponse.CREATE_SUCCESS(result));
-	}
-
-	@Get()
-	async getList(@Query() query: QueryGetListNewsPostDto) {
-		const result = await this.newsPostService.getList(query);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess(this.responseSuccess.CREATE_SUCCESS(result));
 	}
 
 	@Get('keywords')
@@ -46,29 +43,54 @@ export class NewsPostController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Get()
+	async getList(
+		@Query() query: QueryGetListNewsPostDto,
+		@Headers('locale') locale?: string,
+	) {
+		const result = await this.newsPostService.getList(query, locale);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@PublicRoute()
 	@Get('public')
-	async getListPublic(@Query() query: QueryGetListNewsPostDto) {
-		const result = await this.newsPostService.getListPublic(query);
+	async getListPublic(
+		@Query() query: QueryGetListNewsPostDto,
+		@Headers('locale') locale?: string,
+	) {
+		const result = await this.newsPostService.getListPublic(query, locale);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@PublicRoute()
 	@Get('public/:slug')
-	async findOnePublic(@Param('slug') slug: string) {
-		const result = await this.newsPostService.findOnePublic(slug);
+	async findOnePublic(
+		@Param('slug') slug: string,
+		@Headers('locale') locale?: string,
+	) {
+		const result = await this.newsPostService.findOnePublic(slug, locale);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.newsPostService.findOne(id);
+	async findOneNewsPostAssigneedId(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Headers('locale') locale?: string,
+	) {
+		const result = await this.newsPostService.findOneNewsPostAssigneedId(
+			id,
+			locale,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id/translations')
-	async listNewsPostLanguage(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.newsPostService.listNewsPostLanguage(id);
+	async listNewsPostLanguage(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Query() query: GetListNewsPostTranslations,
+	) {
+		query.newsPostId = id;
+		const result = await this.newsPostService.listNewsPostLanguage(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -95,7 +117,7 @@ export class NewsPostController {
 	) {
 		const userId = req.user!.sub;
 		const result = await this.newsPostService.update(id, data, userId);
-		return new ResponseSuccess(NewsPostResponse.UPDATE_SUCCESS(result));
+		return new ResponseSuccess(this.responseSuccess.UPDATE_SUCCESS(result));
 	}
 
 	@Put(':id/add-translation')
@@ -110,24 +132,26 @@ export class NewsPostController {
 			id,
 			data,
 		);
-		return new ResponseSuccess(NewsPostResponse.UPDATE_SUCCESS(result));
+		return new ResponseSuccess(this.responseSuccess.UPDATE_SUCCESS(result));
 	}
 
-	@Put(':id/update-translation')
-	async updateTranslation(
-		@Body() data: UpdateTranslation,
-		@Req() req: Request,
-	) {
-		data.userId = req.user!.sub;
+	// @Put(':id/update-translation')
+	// async updateTranslation(
+	// 	@Body() data: UpdateTranslation,
+	// 	@Req() req: Request,
+	// ) {
+	// 	data.userId = req.user!.sub;
 
-		const result = await this.newsPostService.updateTranslation(data);
-		return new ResponseSuccess(NewsPostResponse.UPDATE_SUCCESS(result));
-	}
+	// 	const result = await this.newsPostService.updateTranslation(data);
+	// 	return new ResponseSuccess(
+	// 		this.responseSuccess.TRANSLATION_SUCCESS.UPDATE_SUCCESS(result),
+	// 	);
+	// }
 
 	@Delete(':id')
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.newsPostService.delete(id);
-		return new ResponseSuccess(NewsPostResponse.DELETE_SUCCESS);
+		return new ResponseSuccess(this.responseSuccess.DELETE_SUCCESS);
 	}
 
 	@Delete(':id/delete-translation/:translationId')
@@ -135,6 +159,8 @@ export class NewsPostController {
 		@Param('translationId', ParseUUIDPipe) translationId: string,
 	) {
 		await this.newsPostService.deleteTranslation(translationId);
-		return new ResponseSuccess(NewsPostResponse.DELETE_SUCCESS);
+		return new ResponseSuccess(
+			this.responseSuccess.TRANSLATION_SUCCESS.DELETE_SUCCESS,
+		);
 	}
 }

@@ -52,5 +52,5 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 		() => NewsPostTranslation,
 		(newsPostTranslation) => newsPostTranslation.newsPost,
 	)
-	newsPostTranslations: NewsPostTranslation[];
+	newsPostTranslations?: NewsPostTranslation[];
 }

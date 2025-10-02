@@ -51,8 +51,11 @@ export class CreateNewsPostDto {
 
 	@IsArray()
 	@IsString({ each: true })
+	@Transform(({ value }) =>
+		value === null || value === undefined ? [] : value,
+	)
 	@IsOptional()
-	keywords?: string[];
+	keywords?: string[] = [];
 }
 
 export class UpdateNewsPostDto extends PartialType(CreateNewsPostDto) {}
@@ -88,6 +91,10 @@ export class UpdateTranslation extends PartialType(AddTranslationNewsPostDto) {
 
 export class QueryGetListNewsPostDto extends BaseQueryDto {
 	@IsOptional()
+	@IsString()
+	title?: string;
+
+	@IsOptional()
 	@Transform(({ value }) =>
 		value
 			.split(',')
@@ -112,4 +119,6 @@ export class QueryGetListNewsPostDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	languageCode?: string;
+
+	// locale: string;
 }

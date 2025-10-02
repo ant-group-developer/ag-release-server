@@ -3,13 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
-import { NewsPostResponse } from '../constants/news-post.constant';
+import { NewsPostResponseError } from '../constants/news-post.constant';
 import { QueryGetListNewsPostDto } from '../dto/news-post.dto';
 import { NewsPost } from '../entities/news-post.entity';
 import { NewsPostStatus } from '../enum/news-post.enum';
 
 @Injectable()
 export class NewsPostQueryService {
+	private readonly responseError = NewsPostResponseError;
+
 	constructor(
 		@InjectRepository(NewsPost)
 		private readonly newsPostRepo: Repository<NewsPost>,
@@ -34,6 +36,11 @@ export class NewsPostQueryService {
 		return await qb.getOne();
 	}
 
+	async findOnePublic(slug: string) {
+		const qb = this.createQueryFindOnePublic(slug);
+		return await qb.getOne();
+	}
+
 	async validate({
 		slug,
 		newsCategoryId,
@@ -43,7 +50,8 @@ export class NewsPostQueryService {
 	}) {
 		if (slug) {
 			const exist = await this.newsPostRepo.findOne({ where: { slug } });
-			if (exist) throw new ResponseError(NewsPostResponse.DUPLICATE_SLUG);
+			if (exist)
+				throw new ResponseError(this.responseError.DUPLICATE_SLUG);
 		}
 
 		if (newsCategoryId) {
@@ -51,7 +59,7 @@ export class NewsPostQueryService {
 				where: { id: newsCategoryId },
 			});
 			if (!exist)
-				throw new ResponseError(NewsPostResponse.CATEGORY_NOT_FOUND);
+				throw new ResponseError(this.responseError.CATEGORY_NOT_FOUND);
 		}
 	}
 
@@ -99,12 +107,33 @@ export class NewsPostQueryService {
 
 		this.leftJoinNewsCategory(qb);
 		this.leftJoinNewsPostTranslation(qb);
+		this.leftJoinLanguage(qb);
 		this.leftJoinUserTracked(qb);
+
+		this.andWhereId({ qb, id });
+
 		this.selectNewsPost(qb);
 		this.addSelectNewsCategory(qb);
 		this.addSelectNewsPostTranslation(qb);
+		this.addSelectLanguage(qb);
 
-		qb.where('newsPost.id = :id', { id });
+		return qb;
+	}
+
+	private createQueryFindOnePublic(slug: string) {
+		const qb = this.createBaseQb();
+
+		this.leftJoinNewsCategory(qb);
+		this.leftJoinNewsPostTranslation(qb);
+		this.leftJoinLanguage(qb);
+		this.leftJoinUserTracked(qb);
+
+		this.andWhereSlug({ qb, slug });
+
+		this.selectNewsPost(qb);
+		this.addSelectNewsCategory(qb);
+		this.addSelectNewsPostTranslation(qb);
+		this.addSelectLanguage(qb);
 
 		return qb;
 	}
@@ -192,15 +221,45 @@ export class NewsPostQueryService {
 			orderBy,
 			status,
 			newsCategoryId,
+			title,
+
+			startCreatedAt,
+			endCreatedAt,
 		} = filter;
 
 		this.andWhereKeyword({ qb, keyword });
 		this.andWhereKeywords({ qb, keywords });
+		this.andWhereTitle({ qb, title });
+		this.andWhereCreatedAt({ qb, startCreatedAt, endCreatedAt });
 		this.andWhereStatus({ qb, status });
 		this.andWhereNewsCategoryId({ qb, newsCategoryId });
 
 		qb.orderBy(fieldOrder, orderBy);
 		qb.skip(skip).take(pageSize);
+	}
+
+	private andWhereId({
+		id,
+		qb,
+	}: {
+		id?: string;
+		qb: SelectQueryBuilder<NewsPost>;
+	}) {
+		if (id) {
+			qb.where('newsPost.id = :id', { id });
+		}
+	}
+
+	private andWhereSlug({
+		slug,
+		qb,
+	}: {
+		slug?: string;
+		qb: SelectQueryBuilder<NewsPost>;
+	}) {
+		if (slug) {
+			qb.where('newsPost.slug = :slug', { slug });
+		}
 	}
 
 	private andWhereKeyword({
@@ -220,6 +279,41 @@ export class NewsPostQueryService {
 					).orWhere('newsPost.slug ILIKE :keyword');
 				}),
 				{ keyword: `%${keyword}%` },
+			);
+		}
+	}
+
+	private andWhereTitle({
+		title,
+		qb,
+	}: {
+		title: QueryGetListNewsPostDto['title'];
+		qb: SelectQueryBuilder<NewsPost>;
+	}) {
+		if (title) {
+			this.leftJoinNewsPostTranslation(qb);
+
+			qb.andWhere('newsPostTranslation.title ILIKE :title', {
+				title: `%${title}%`,
+			});
+		}
+	}
+	private andWhereCreatedAt({
+		startCreatedAt,
+		endCreatedAt,
+		qb,
+	}: {
+		startCreatedAt: QueryGetListNewsPostDto['startCreatedAt'];
+		endCreatedAt: QueryGetListNewsPostDto['endCreatedAt'];
+		qb: SelectQueryBuilder<NewsPost>;
+	}) {
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`newsPost.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
 			);
 		}
 	}

@@ -4,13 +4,13 @@ import slugify from 'slugify';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { getTimeStamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
-import { NewsPostResponse } from '../constants/news-post.constant';
+import { NewsPostResponseError } from '../constants/news-post.constant';
+import { GetListNewsPostTranslations } from '../dto/news-post-translation.dto';
 import {
 	AddTranslationNewsPostDto,
 	CreateNewsPostDto,
 	QueryGetListNewsPostDto,
 	UpdateNewsPostDto,
-	UpdateTranslation,
 } from '../dto/news-post.dto';
 import { NewsPost } from '../entities/news-post.entity';
 import { NewsPostTranslationService } from './news-post-translation.service';
@@ -18,6 +18,8 @@ import { NewsPostQueryService } from './news-post.query.service';
 
 @Injectable()
 export class NewsPostService {
+	private readonly responseError = NewsPostResponseError;
+
 	constructor(
 		@InjectRepository(NewsPost)
 		private readonly newsPostRepo: Repository<NewsPost>,
@@ -40,7 +42,7 @@ export class NewsPostService {
 			userId,
 		});
 
-		return this.assigneNewsPostTranslationId(newsPost.id, languageCode);
+		return this.findOneNewsPostAssigneedId(newsPost.id, languageCode);
 	}
 
 	private async create(data: CreateNewsPostDto, userId: string) {
@@ -61,28 +63,32 @@ export class NewsPostService {
 		return this.newsPostQueryService.getKeywords();
 	}
 
-	async findOneWithRelations(id: string): Promise<NewsPost> {
-		const entity = await this.newsPostQueryService.findOneWithRelations(id);
-
-		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
-		return entity;
-	}
-
 	async findOne(id: string): Promise<NewsPost> {
 		const entity = await this.newsPostRepo.findOne({ where: { id } });
 
-		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
+		if (!entity) throw new ResponseError(this.responseError.NOT_FOUND);
 		return entity;
 	}
 
-	async listNewsPostLanguage(id: string) {
-		return await this.newsPostTranslationService.listOfNewsPost(id);
+	async listNewsPostLanguage(query: GetListNewsPostTranslations) {
+		return await this.newsPostTranslationService.listOfNewsPost(query);
+	}
+
+	async findOneNewsPostAssigneedId(id: string, locale?: string) {
+		return await this.assigneNewsPostTranslationId(id, locale);
+	}
+
+	async findOneWithRelations(id: string): Promise<NewsPost> {
+		const entity = await this.newsPostQueryService.findOneWithRelations(id);
+
+		if (!entity) throw new ResponseError(this.responseError.NOT_FOUND);
+		return entity;
 	}
 
 	async detailTranslationDefault(id: string) {
 		const entity = await this.findOneWithRelations(id);
 
-		const translationDefault = entity.newsPostTranslations.find(
+		const translationDefault = entity.newsPostTranslations?.find(
 			(item) => item.isDefault === true,
 		);
 
@@ -93,26 +99,23 @@ export class NewsPostService {
 		return await this.newsPostTranslationService.findOne(translationId);
 	}
 
-	async findOnePublic(slug: string): Promise<NewsPost> {
-		const entity = await this.newsPostRepo.findOne({
-			where: {
-				slug,
-				// status: NewsPostStatus.PUBLIC,
-			},
-			relations: ['newsCategory'],
-		});
-		if (!entity) throw new ResponseError(NewsPostResponse.NOT_FOUND);
-		return entity;
+	async findOnePublic(slug: string, locale?: string): Promise<NewsPost> {
+		const newsPost = await this.newsPostQueryService.findOnePublic(slug);
+		if (!newsPost) throw new ResponseError(this.responseError.NOT_FOUND);
+		return this.assigneTranslationOne({ newsPost, languageCode: locale });
 	}
 
-	async getList(query: QueryGetListNewsPostDto): Promise<PageDto<NewsPost>> {
-		const { page, pageSize, languageCode } = query;
+	async getList(
+		query: QueryGetListNewsPostDto,
+		locale?: string,
+	): Promise<PageDto<NewsPost>> {
+		const { page, pageSize } = query;
 		const { items, totalItems } =
 			await this.newsPostQueryService.getList(query);
 
 		const listAssigneed = this.assigneTranslationList({
 			listNewsPost: items,
-			languageCode,
+			languageCode: locale,
 		});
 
 		return new PageDto({
@@ -123,21 +126,25 @@ export class NewsPostService {
 
 	async getListPublic(
 		query: QueryGetListNewsPostDto,
+		locale?: string,
 	): Promise<PageDto<NewsPost>> {
 		const { page, pageSize } = query;
 		const { items, totalItems } =
 			await this.newsPostQueryService.getListPublic(query);
+
+		const listAssigneed = this.assigneTranslationList({
+			listNewsPost: items,
+			languageCode: locale,
+		});
+
 		return new PageDto({
-			items,
+			items: listAssigneed,
 			metadata: { currentPage: page, pageSize, totalItems },
 		});
 	}
 
 	async update(id: string, data: UpdateNewsPostDto, userId: string) {
 		const entity = await this.findOne(id);
-
-		// if (data.slug && data.slug !== entity.slug)
-		// 	await this.newsPostQueryService.validate({ slug: data.slug });
 
 		if (
 			data.newsCategoryId &&
@@ -167,10 +174,6 @@ export class NewsPostService {
 			userId,
 			isDefault: false,
 		});
-	}
-
-	async updateTranslation(data: UpdateTranslation) {
-		await this.newsPostTranslationService.update(data);
 	}
 
 	async delete(id: string): Promise<void> {
@@ -224,8 +227,9 @@ export class NewsPostService {
 		const { newsPostTranslations } = newsPost;
 
 		const newsPostTranslation =
-			newsPostTranslations.find((i) => i.languageCode === languageCode) ??
-			newsPostTranslations.find((i) => i.isDefault);
+			newsPostTranslations?.find(
+				(i) => i.languageCode === languageCode,
+			) ?? newsPostTranslations?.find((i) => i.isDefault);
 
 		newsPost.title = newsPostTranslation?.title ?? null;
 		newsPost.description = newsPostTranslation?.description ?? null;
