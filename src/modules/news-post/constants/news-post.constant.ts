@@ -1,4 +1,6 @@
-export const NewsPostResponse = {
+import { NewsPostTranslationResponseSuccess } from './news-post-translation.constant';
+
+export const NewsPostResponseSuccess = {
 	CREATE_SUCCESS: (data: any) => ({
 		data,
 		message: 'Create success',
@@ -16,6 +18,10 @@ export const NewsPostResponse = {
 		messageCode: 'newsPost.message.success.delete',
 	},
 
+	TRANSLATION_SUCCESS: NewsPostTranslationResponseSuccess,
+};
+
+export const NewsPostResponseError = {
 	NOT_FOUND: {
 		message: 'Not found',
 		messageCode: 'newsPost.message.error.notFound',

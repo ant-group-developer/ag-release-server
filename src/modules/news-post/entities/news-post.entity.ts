@@ -1,33 +1,20 @@
-import {
-	DEFAULT_LENGTH_NAME,
-	DEFAULT_LENGTH_NOTE,
-} from 'src/common/constants/common.default.constants';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
+import { NewsPostTranslation } from './news-post-translation.entity';
 
 @Entity('news_posts')
 export class NewsPost extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
-	titleVi: string;
-
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
-	titleEn: string;
-
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
-	descriptionVi: string | null;
-
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
-	descriptionEn: string | null;
-
-	@Column({ type: 'text' })
-	contentVi: string;
-
-	@Column({ type: 'text' })
-	contentEn: string;
+	// vitual column
+	title?: string | null;
+	description?: string | null;
+	content?: string | null;
+	languageCode?: string | null;
+	languageName?: string | null;
 
 	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
 	thumbnail: string | null;
@@ -60,4 +47,10 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User | null;
+
+	@OneToMany(
+		() => NewsPostTranslation,
+		(newsPostTranslation) => newsPostTranslation.newsPost,
+	)
+	newsPostTranslations?: NewsPostTranslation[];
 }

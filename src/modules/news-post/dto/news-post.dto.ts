@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -21,30 +22,16 @@ export class CreateNewsPostDto {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
-	titleVi: string;
-
-	@IsString()
-	@MaxLength(DEFAULT_LENGTH_NAME)
-	@IsNotEmpty()
-	titleEn: string;
+	title: string;
 
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NOTE)
 	@IsOptional()
-	descriptionVi?: string;
-
-	@IsString()
-	@MaxLength(DEFAULT_LENGTH_NOTE)
-	@IsOptional()
-	descriptionEn?: string;
+	description?: string;
 
 	@IsString()
 	@IsNotEmpty()
-	contentVi: string;
-
-	@IsString()
-	@IsNotEmpty()
-	contentEn: string;
+	content: string;
 
 	@MaxLength(LENGTH_PICTURE)
 	@IsOptional()
@@ -58,20 +45,55 @@ export class CreateNewsPostDto {
 	@IsNotEmpty()
 	newsCategoryId: string;
 
-	// @IsString()
-	// @MaxLength(DEFAULT_LENGTH_NAME)
-	// @IsNotEmpty()
-	// slug: string;
+	@IsString()
+	@IsNotEmpty()
+	languageCode: string;
 
 	@IsArray()
 	@IsString({ each: true })
+	@Transform(({ value }) =>
+		value === null || value === undefined ? [] : value,
+	)
 	@IsOptional()
-	keywords?: string[];
+	keywords?: string[] = [];
 }
 
 export class UpdateNewsPostDto extends PartialType(CreateNewsPostDto) {}
 
+export class AddTranslationNewsPostDto {
+	@IsNotEmpty()
+	@IsString()
+	languageCode: string;
+
+	@IsNotEmpty()
+	@IsString()
+	title: string;
+
+	@IsOptional()
+	@IsString()
+	description?: string;
+
+	@IsNotEmpty()
+	@IsString()
+	content: string;
+
+	@IsOptional()
+	@IsBoolean()
+	isDefault: boolean = false;
+
+	userId: string;
+}
+
+export class UpdateTranslation extends PartialType(AddTranslationNewsPostDto) {
+	@IsNotEmpty()
+	id: string;
+}
+
 export class QueryGetListNewsPostDto extends BaseQueryDto {
+	@IsOptional()
+	@IsString()
+	title?: string;
+
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -93,4 +115,10 @@ export class QueryGetListNewsPostDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderNewsPost)
 	fieldOrder: FieldOrderNewsPost = FieldOrderNewsPost.CREATED_AT;
+
+	@IsOptional()
+	@IsString()
+	languageCode?: string;
+
+	// locale: string;
 }

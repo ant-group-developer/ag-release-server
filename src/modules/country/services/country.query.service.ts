@@ -96,7 +96,7 @@ export class CountryQueryService {
 	async getListSimple() {
 		return this.countryRepo
 			.createQueryBuilder('c')
-			.select(['c.id', 'c.name'])
+			.select(['c.id', 'c.name', 'c.iso2'])
 			.getMany();
 	}
 
