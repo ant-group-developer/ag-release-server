@@ -116,7 +116,11 @@ export class NewsPostController {
 		@Req() req: Request,
 	) {
 		const userId = req.user!.sub;
-		const result = await this.newsPostService.update(id, data, userId);
+		const result = await this.newsPostService.handleUpdate(
+			id,
+			data,
+			userId,
+		);
 		return new ResponseSuccess(this.responseSuccess.UPDATE_SUCCESS(result));
 	}
 

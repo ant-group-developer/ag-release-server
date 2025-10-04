@@ -91,8 +91,16 @@ export class UpdateTranslation extends PartialType(AddTranslationNewsPostDto) {
 
 export class QueryGetListNewsPostDto extends BaseQueryDto {
 	@IsOptional()
-	@IsString()
-	title?: string;
+	@IsArray()
+	@IsString({ each: true })
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	title?: string[];
 
 	@IsOptional()
 	@Transform(({ value }) =>
@@ -105,20 +113,42 @@ export class QueryGetListNewsPostDto extends BaseQueryDto {
 	keywords?: string[];
 
 	@IsOptional()
-	@IsEnum(NewsPostStatus)
-	status?: NewsPostStatus;
+	@IsArray()
+	@IsEnum(NewsPostStatus, { each: true })
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	status?: NewsPostStatus[];
 
-	@IsUUID()
 	@IsOptional()
-	newsCategoryId?: string;
+	@IsArray()
+	@IsUUID('all', { each: true })
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	newsCategoryId?: string[];
+
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	languageCode?: string[];
 
 	@IsOptional()
 	@IsEnum(FieldOrderNewsPost)
 	fieldOrder: FieldOrderNewsPost = FieldOrderNewsPost.CREATED_AT;
-
-	@IsOptional()
-	@IsString()
-	languageCode?: string;
-
-	// locale: string;
 }
