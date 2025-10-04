@@ -138,6 +138,8 @@ export class ReleaseQueryService {
 
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('artist.genre', 'genre')
+			.leftJoin('artist.country', 'country')
 			.leftJoin('releaseArtist.artistRole', 'artistRole')
 
 			.leftJoin('release.releaseLanguage', 'releaseLanguage')
@@ -202,7 +204,16 @@ export class ReleaseQueryService {
 				'artist.code',
 				'artist.picture',
 				'artist.biography',
+				'artist.genreId',
+				'artist.countryId',
 			])
+			.addSelect([
+				'genre.id',
+				'genre.name',
+				'genre.code',
+				'genre.picture',
+			])
+			.addSelect(['country.id', 'country.name', 'country.iso2'])
 			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect([
 				'releaseLanguage.id',

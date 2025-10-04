@@ -3,6 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Issue } from 'src/modules/issue/entities/issue.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
+import { AllOrSimple } from 'src/modules/orm/enum/orm.enum';
+import {
+	IssueFields,
+	IssueSimpleFields,
+} from 'src/modules/orm/filed-mappings/orm.issue.constant';
+import { TenantIssueFields } from 'src/modules/orm/filed-mappings/orm.tenant-issue.constant';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -16,6 +22,14 @@ import {
 
 @Injectable()
 export class StatisticsService {
+	private readonly releaseAlias = 'release';
+	private readonly trackAlias = 'track';
+	private readonly labelAlias = 'label';
+	private readonly artistAlias = 'artist';
+	private readonly issueAlias = 'issue';
+	private readonly tenantIssueAlias = 'tenantIssue';
+	private readonly trackRevenueAlias = 'trackRevenue';
+
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
@@ -32,21 +46,16 @@ export class StatisticsService {
 	) {}
 
 	async getIssueCounts(filter: QueryGetIssueCountDto) {
-		const { endDate, startDate } = filter;
+		const qb = this.createBaseQbIssue();
+		this.leftJoinIssueWithTenantIssue(qb);
+		this.selectIssue({
+			qb,
+			select: [IssueFields.ID, IssueFields.NAME_EN],
+		});
+		qb.addSelect(`COUNT(${TenantIssueFields.ID})`, 'total');
+		qb.groupBy(IssueFields.ID);
 
-		const qb = this.issueRepo
-			.createQueryBuilder('issue')
-			.leftJoin(
-				'issue.tenantIssues',
-				'tenantIssue',
-				startDate && endDate
-					? 'tenantIssue.createdAt BETWEEN :startDate AND :endDate'
-					: undefined,
-				startDate && endDate ? { startDate, endDate } : {},
-			)
-			.select(['issue.id', 'issue.nameEn'])
-			.addSelect('COUNT(tenantIssue.id)', 'total')
-			.groupBy('issue.id');
+		this.andWhereTenantIssueCreatedAt({ qb, ...filter });
 
 		const raw = await qb.getRawMany<{
 			issue_id: string;
@@ -150,5 +159,79 @@ export class StatisticsService {
 		return startDate && endDate
 			? { createdAt: Between(startDate, endDate) }
 			: {};
+	}
+
+	// private method --version 2
+	// createBaseQb_Entity
+	// leftJoin_EntityA_With_EntityB
+	// addSelect_Entity
+	// andWhereEntity_FieldOfEntity
+
+	// createBaseQb_Entity
+	private createBaseQbIssue() {
+		return this.issueRepo.createQueryBuilder(this.issueAlias);
+	}
+
+	// leftJoin_EntityA_With_EntityB
+	private leftJoinIssueWithTenantIssue(qb: SelectQueryBuilder<Issue>) {
+		qb.leftJoin(`${this.issueAlias}.tenantIssues`, this.tenantIssueAlias);
+	}
+
+	// andWhereEntity_FieldOfEntity
+	private andWhereTenantIssueCreatedAt({
+		qb,
+		startDate,
+		endDate,
+	}: {
+		qb: SelectQueryBuilder<Issue>;
+		startDate: QueryGetIssueCountDto['startDate'];
+		endDate: QueryGetIssueCountDto['endDate'];
+	}) {
+		if (startDate && endDate) {
+			qb.andWhere(
+				`${this.tenantIssueAlias}.createdAt BETWEEN :startDate AND :endDate`,
+				{
+					startDate,
+					endDate,
+				},
+			);
+		}
+	}
+
+	andWhereReleaseCreatedAt({
+		qb,
+		startDate,
+		endDate,
+	}: {
+		qb: SelectQueryBuilder<Issue>;
+		startDate: QueryGetIssueCountDto['startDate'];
+		endDate: QueryGetIssueCountDto['endDate'];
+	}) {
+		if (startDate && endDate) {
+			qb.andWhere(
+				`${this.releaseAlias}.createdAt BETWEEN :startDate AND :endDate`,
+				{
+					startDate,
+					endDate,
+				},
+			);
+		}
+	}
+
+	// addSelect_Entity
+	private selectIssue({
+		qb,
+		select,
+	}: {
+		qb: SelectQueryBuilder<Issue>;
+		select: AllOrSimple.ALL | AllOrSimple.SIMPLE | string[];
+	}) {
+		if (select === AllOrSimple.ALL) {
+			qb.select(Object.values(IssueFields));
+		} else if (select === AllOrSimple.SIMPLE) {
+			qb.select(Object.values(IssueSimpleFields));
+		} else if (select?.length) {
+			qb.select(select);
+		}
 	}
 }
