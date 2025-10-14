@@ -4,6 +4,7 @@ import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { BucketModule } from '../bucket/bucket.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
+import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
@@ -35,6 +36,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 		TrackModule,
 		BucketModule,
+		OrmModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

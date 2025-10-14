@@ -296,3 +296,124 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 
 	tenantIds?: string[];
 }
+
+export class QueryGetListReleaseDto2 extends BaseQueryDto {
+	// or
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseIdsInclude?: string[];
+
+	// and
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseIds?: string[];
+
+	@IsOptional()
+	@IsString()
+	title?: string;
+
+	@IsEnum(FieldOrderRelease)
+	fieldOrder: FieldOrderRelease = FieldOrderRelease.TITLE;
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	albumFormatId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	primaryGenreId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	subGenreId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	labelId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@Length(10, 10, { each: true })
+	artistId?: string[];
+
+	@IsOptional()
+	// @IsDate()
+	startDateRelease?: Date;
+
+	@IsOptional()
+	// @IsDate()
+	endDateRelease?: Date;
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsArray()
+	@IsEnum(ReleaseStatus, { each: true })
+	status?: ReleaseStatus[];
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isVariousArtist?: boolean;
+
+	tenantIds?: string[];
+}

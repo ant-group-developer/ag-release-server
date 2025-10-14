@@ -42,7 +42,7 @@ export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
 	@Get()
-	async getListDetail(
+	async getList(
 		@Query() query: QueryGetListReleaseDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
@@ -51,7 +51,22 @@ export class ReleaseController {
 			query.tenantIds = [tenantId];
 		}
 
-		const result = await this.releaseService.getListDetail(query);
+		const result = await this.releaseService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
+	// test module orm
+	@Get('v2')
+	async getList2(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.releaseService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -71,11 +86,11 @@ export class ReleaseController {
 	}
 
 	@Get(':id')
-	async getOneDetail(
+	async getOne(
 		@Param('id') id: string,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<IReleaseDetail>> {
-		const result = await this.releaseService.getOneDetail(id);
+		const result = await this.releaseService.getOne(id);
 
 		const tenantId = req.user!.tenantId;
 		if (checkIsNotSystemTenant(tenantId) && tenantId !== result.tenantId) {

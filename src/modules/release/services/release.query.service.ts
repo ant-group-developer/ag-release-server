@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { OrmService } from 'src/modules/orm/orm.service';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
 	Brackets,
@@ -11,7 +12,10 @@ import {
 	SelectQueryBuilder,
 } from 'typeorm';
 import { ReleaseMessages } from '../constants/release.constant';
-import { QueryGetListReleaseDto } from '../dto/release.dto';
+import {
+	QueryGetListReleaseDto,
+	QueryGetListReleaseDto2,
+} from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import {
 	VirtualColumnRelease,
@@ -33,6 +37,8 @@ export class ReleaseQueryService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		private readonly ormService: OrmService,
 	) {
 		this.mainAlias = 'release';
 	}
@@ -57,6 +63,24 @@ export class ReleaseQueryService {
 
 	async getManyAndCount(query: QueryGetListReleaseDto) {
 		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
+		this.filterByQuery(qb, query);
+		this.leftJoin(qb);
+		this.select(qb, query);
+
+		const [dataFromDb, totalItems]: [IDataFromDb, number] =
+			await Promise.all([qb.getRawAndEntities(), qb.getCount()]);
+
+		const releases = this.assigneeVirtualColumn(dataFromDb);
+
+		return {
+			totalItems,
+			releases,
+		};
+	}
+
+	async getManyAndCount2(query: QueryGetListReleaseDto2) {
+		const qb = this.ormService.createReleaseQb();
 
 		this.filterByQuery(qb, query);
 		this.leftJoin(qb);
