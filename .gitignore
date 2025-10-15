@@ -4,6 +4,7 @@
 /build
 /exports
 /backups
+/ddex_batches
 
 # Logs
 logs

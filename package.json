@@ -85,7 +85,7 @@
 		"@types/csv-parse": "^1.2.5",
 		"@types/express": "^5.0.0",
 		"@types/html-to-text": "^9.0.4",
-		"@types/jest": "^29.5.14",
+		"@types/jest": "^30.0.0",
 		"@types/joi": "^17.2.3",
 		"@types/json2csv": "^5.0.7",
 		"@types/lodash": "^4.17.20",
@@ -111,22 +111,5 @@
 		"tsconfig-paths": "^4.2.0",
 		"typescript": "^5.7.3",
 		"typescript-eslint": "^8.20.0"
-	},
-	"jest": {
-		"moduleFileExtensions": [
-			"js",
-			"json",
-			"ts"
-		],
-		"rootDir": "src",
-		"testRegex": ".*\\.spec\\.ts$",
-		"transform": {
-			"^.+\\.(t|j)s$": "ts-jest"
-		},
-		"collectCoverageFrom": [
-			"**/*.(t|j)s"
-		],
-		"coverageDirectory": "../coverage",
-		"testEnvironment": "node"
 	}
 }
