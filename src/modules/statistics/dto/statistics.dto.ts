@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsOptional } from 'class-validator';
+import { IsDate, IsEnum, IsOptional } from 'class-validator';
+import { TypeDateTimeline } from '../statistics.enum';
 
 export class BaseQueryStatisticsDto {
 	@Type(() => Date)
@@ -28,5 +29,7 @@ export class QueryGetStreamCountByCountryDto extends BaseQueryStatisticsDto {
 	@IsDate()
 	endDate: Date;
 
-	typeGroup: 'day' | 'month' | 'year';
+	@IsEnum(TypeDateTimeline)
+	@IsOptional()
+	typeGroup: TypeDateTimeline;
 }

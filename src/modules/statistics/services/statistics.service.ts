@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import dayjs from 'dayjs';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Issue } from 'src/modules/issue/entities/issue.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
@@ -12,13 +14,18 @@ import { TenantIssueFields } from 'src/modules/orm/filed-mappings/orm.tenant-iss
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { Between, Repository, SelectQueryBuilder } from 'typeorm';
+import { Between, DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import {
 	BaseQueryStatisticsDto,
 	QueryGetIssueCountDto,
 	QueryGetOverviewCountDto,
 	QueryGetStreamCountByCountryDto,
 } from '../dto/statistics.dto';
+import {
+	IRevenueDspDetail,
+	IRevenueDspTimeline,
+} from '../statistics.interface';
+import { getGroupByFormatAndDateList } from '../statistics.util';
 
 @Injectable()
 export class StatisticsService {
@@ -43,6 +50,8 @@ export class StatisticsService {
 		private readonly issueRepo: Repository<Issue>,
 		@InjectRepository(TrackRevenue)
 		private readonly trackRevenueRepo: Repository<TrackRevenue>,
+
+		@InjectDataSource() private dataSource: DataSource,
 	) {}
 
 	async getIssueCounts(filter: QueryGetIssueCountDto) {
@@ -122,6 +131,83 @@ export class StatisticsService {
 		const { startDate, endDate } = filter;
 		return await this.artistsRepo.count({
 			where: this.buildDateFilter({ startDate, endDate }),
+		});
+	}
+
+	async getRevenueDspTimeline(
+		filter: QueryGetStreamCountByCountryDto,
+	): Promise<IRevenueDspTimeline[]> {
+		const { startDate, endDate, typeGroup } = filter;
+		if (!startDate || !endDate)
+			throw new ResponseError({
+				message: 'startDate and endDate is required.',
+			});
+
+		const { dateList, dayjsFormat } = getGroupByFormatAndDateList({
+			startDate,
+			endDate,
+			typeDateTimeline: typeGroup,
+		});
+
+		const formatMap = { day: 'YYYY-MM-DD', month: 'YYYY-MM', year: 'YYYY' };
+		const dateFormat = formatMap[typeGroup] || 'YYYY-MM';
+
+		const detailData = await this.trackRevenueRepo
+			.createQueryBuilder('tr')
+			.leftJoin('tr.dsp', 'dsp')
+			.select(`TO_CHAR(tr.reportDate, '${dateFormat}')`, 'date')
+			.addSelect('tr.dspId', 'dsp_id')
+			.addSelect('dsp.name', 'dsp_name')
+			.addSelect('SUM(tr.amount)', 'total_revenue')
+			.addSelect('COUNT(DISTINCT tr.id)', 'total_records')
+			.where('tr.reportDate BETWEEN :startDate AND :endDate', {
+				startDate,
+				endDate,
+			})
+			.groupBy('date')
+			.addGroupBy('tr.dspId')
+			.addGroupBy('dsp.name')
+			.orderBy('date', 'ASC')
+			.getRawMany<{
+				date: string;
+				dsp_id: string;
+				dsp_name: string;
+				total_revenue: string;
+				total_records: string;
+			}>();
+
+		const resultMap = new Map<
+			string,
+			{ total_revenue: number; total_records: number }
+		>();
+		const detailMap = new Map<string, IRevenueDspDetail[]>();
+
+		for (const d of detailData) {
+			const key = d.date;
+			if (!detailMap.has(key)) detailMap.set(key, []);
+			detailMap.get(key)!.push({
+				dspId: d.dsp_id,
+				dspName: d.dsp_name || '',
+				totalRevenue: parseFloat(d.total_revenue) || 0,
+				totalRecords: parseInt(d.total_records) || 0,
+			});
+			const total = resultMap.get(key) || {
+				total_revenue: 0,
+				total_records: 0,
+			};
+			total.total_revenue += parseFloat(d.total_revenue) || 0;
+			total.total_records += parseInt(d.total_records) || 0;
+			resultMap.set(key, total);
+		}
+
+		return dateList.map((d) => {
+			const key = dayjs(d, dayjsFormat).format(dateFormat);
+			return {
+				date: dayjs(d, dayjsFormat).toISOString(),
+				totalRevenue: resultMap.get(key)?.total_revenue || 0,
+				totalRecords: resultMap.get(key)?.total_records || 0,
+				detail: detailMap.get(key) || [],
+			};
 		});
 	}
 

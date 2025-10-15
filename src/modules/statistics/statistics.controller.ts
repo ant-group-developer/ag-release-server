@@ -50,4 +50,12 @@ export class StatisticsController {
 			await this.statisticsService.getStreamCountsByCountry(query);
 		return new ResponseSuccess({ data });
 	}
+
+	@Get('revenue/dsp/timeline')
+	async getRevenueDspTimeline(
+		@Query() query: QueryGetStreamCountByCountryDto,
+	) {
+		const data = await this.statisticsService.getRevenueDspTimeline(query);
+		return new ResponseSuccess({ data });
+	}
 }
