@@ -317,7 +317,6 @@ export class ReleaseValidateService {
 		}
 
 		// time release validation
-
 		if (release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE) {
 			if (!release.releaseTime) {
 				result.push(
@@ -431,11 +430,13 @@ export class ReleaseValidateService {
 		const result: FieldErrorDetails[] = [];
 
 		tracks.forEach((track, index) => {
+			const { trackLanguage } = track;
 			if (!track.trackOriginTypeId) {
 				result.push(
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackOriginTypeId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -445,6 +446,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.primaryGenreId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -454,6 +456,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.pLineOwner`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -463,6 +466,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.pLineYear`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -472,6 +476,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackTypeId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -486,6 +491,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackArtists`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -496,60 +502,61 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.audioFile.preview`,
+						trackId: track.id,
 					}),
 				);
 			}
 
-			// language validation
-			result.push(
-				...this.validateTrackLanguage(track.trackLanguage, index),
-			);
+			if (!trackLanguage?.audioLanguageId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.audioLanguageId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.metadataLanguageId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.metadataLanguageId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.metadataLanguageCountryId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.recordingCountryId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.recordingCountryId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!track.trackSensitiveId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackSensitiveId`,
+						trackId: track.id,
+					}),
+				);
+			}
 		});
-
-		return result;
-	}
-
-	private validateTrackLanguage(
-		trackLanguage: Release['tracks'][number]['trackLanguage'],
-		index: number,
-	) {
-		const result: FieldErrorDetails[] = [];
-
-		if (!trackLanguage?.audioLanguageId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.audioLanguageId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.metadataLanguageId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.metadataLanguageId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.metadataLanguageCountryId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.recordingCountryId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.recordingCountryId`,
-				}),
-			);
-		}
 
 		return result;
 	}

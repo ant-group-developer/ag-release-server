@@ -41,6 +41,10 @@ export class ReleaseService {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
+		if (!release.upc) {
+			release.upc = 'new_upc';
+		}
+
 		// validate nonDraft
 		const errors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);

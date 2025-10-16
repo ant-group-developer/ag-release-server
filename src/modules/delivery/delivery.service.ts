@@ -91,11 +91,11 @@ export class DeliveryService {
 	}
 
 	async buildMetadataXml(releaseId: string): Promise<string> {
-		const metadata = await this.buildMetadata(releaseId);
-		return this.getDdexMessage(metadata);
+		const ddexObj = await this.getDdexObj(releaseId);
+		return this.ddexObjToXLM(ddexObj);
 	}
 
-	async buildMetadata(releaseId: string): Promise<DdexMessage> {
+	async getDdexObj(releaseId: string): Promise<DdexMessage> {
 		const release = await this.releaseRepo.findOne({
 			where: { id: releaseId },
 			relations: ['tracks', 'label', 'releaseArtists'],
@@ -171,7 +171,7 @@ export class DeliveryService {
 		return { header, partyList, resourceList, releaseList, dealList };
 	}
 
-	private getDdexMessage(input: DdexMessage): string {
+	private ddexObjToXLM(input: DdexMessage): string {
 		return `
             <?xml version="1.0" encoding="UTF-8"?>
             <ern:NewReleaseMessage xmlns:ern="http://ddex.net/xml/ern/38">
