@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { splitCodeIndex, stringToCode } from 'src/utils/util';
-import { Brackets, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';
 import { QueryGetListArtistDto } from '../dto/artist.dto';
 import { Artist } from '../entities/artist.entity';
@@ -20,7 +20,6 @@ export class ArtistQueryService {
 
 	private createQueryGetList(query: QueryGetListArtistDto) {
 		const {
-			idInclude,
 			keyword,
 			code,
 			tenantIds,
@@ -120,41 +119,42 @@ export class ArtistQueryService {
 				return subQuery;
 			}, VirtualColumnsArtist.RELEASE_COUNT);
 
-		queryBuilder.where(
-			new Brackets((qb) => {
-				qb.where(
-					new Brackets((qb2) => {
-						if (keyword)
-							qb2.andWhere('artist.name ILIKE :keyword', {
-								keyword: `%${keyword}%`,
-							});
-						if (code)
-							qb2.andWhere('artist.code ILIKE :code', {
-								code: `%${code}%`,
-							});
-						if (startCreatedAt && endCreatedAt)
-							qb2.andWhere(
-								'artist.createdAt BETWEEN :startCreatedAt AND :endCreatedAt',
-								{ startCreatedAt, endCreatedAt },
-							);
-						if (startUpdatedAt && endUpdatedAt)
-							qb2.andWhere(
-								'artist.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt',
-								{ startUpdatedAt, endUpdatedAt },
-							);
-					}),
-				);
+		if (keyword) {
+			queryBuilder.andWhere('artist.name ILIKE :keyword', {
+				keyword: `%${keyword}%`,
+			});
+		}
 
-				if (idInclude?.length) {
-					qb.orWhere('artist.id IN (:...idInclude)', { idInclude });
-				}
-			}),
-		);
+		if (code) {
+			queryBuilder.andWhere('artist.code ILIKE :code', {
+				code: `%${code}%`,
+			});
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			queryBuilder.andWhere(
+				`artist.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			queryBuilder.andWhere(
+				`artist.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{
+					startUpdatedAt,
+					endUpdatedAt,
+				},
+			);
+		}
 
 		if (VirtualColumnsArtistArr.includes(fieldOrder)) {
-			queryBuilder.addOrderBy(`${fieldOrder}`, orderBy);
+			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
 		} else {
-			queryBuilder.addOrderBy(`artist.${fieldOrder}`, orderBy);
+			queryBuilder.orderBy(`artist.${fieldOrder}`, orderBy);
 		}
 
 		queryBuilder.addOrderBy('dsp.name', 'ASC');
