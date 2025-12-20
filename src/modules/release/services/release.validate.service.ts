@@ -10,10 +10,8 @@ import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
-import {
-	ReleaseMessageCodeError,
-	ReleaseMessages,
-} from '../constants/release.constant';
+
+import { ReleaseException } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
@@ -58,7 +56,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!albumFormat) {
-				throw new ResponseError(ReleaseMessages.ALBUM_FORMAT_NOT_FOUND);
+				throw ReleaseException.ALBUM_FORMAT_NOT_FOUND();
 			}
 		}
 
@@ -68,9 +66,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!genre) {
-				throw new ResponseError(
-					ReleaseMessages.PRIMARY_GENRE_NOT_FOUND,
-				);
+				throw ReleaseException.PRIMARY_GENRE_NOT_FOUND();
 			}
 		}
 
@@ -79,7 +75,7 @@ export class ReleaseValidateService {
 				where: { id: subGenreId },
 			});
 			if (!genre) {
-				throw new ResponseError(ReleaseMessages.SUB_GENRE_NOT_FOUND);
+				throw ReleaseException.SUB_GENRE_NOT_FOUND();
 			}
 		}
 
@@ -88,7 +84,7 @@ export class ReleaseValidateService {
 				where: { id: labelId },
 			});
 			if (!label) {
-				throw new ResponseError(ReleaseMessages.LABEL_NOT_FOUND);
+				throw ReleaseException.LABEL_NOT_FOUND();
 			}
 		}
 
@@ -98,7 +94,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!timezone) {
-				throw new ResponseError(ReleaseMessages.TIMEZONE_NOT_FOUND);
+				throw ReleaseException.TIMEZONE_NOT_FOUND();
 			}
 		}
 	}
@@ -223,7 +219,7 @@ export class ReleaseValidateService {
 					page: 'tracks',
 					field: 'maxTrackCount',
 					message: `${release.albumFormat.maxTrackCount}`,
-					messageCode: ReleaseMessageCodeError.ERROR_MAX_COUNT_TRACKS,
+					messageCode: 'track.message.error.maxCountTrack',
 				}),
 			);
 		}
@@ -234,7 +230,7 @@ export class ReleaseValidateService {
 					page: 'tracks',
 					field: 'minTrackCount',
 					message: `${release.albumFormat.minTrackCount}`,
-					messageCode: ReleaseMessageCodeError.ERROR_MIN_COUNT_TRACKS,
+					messageCode: 'track.message.error.minCountTrack',
 				}),
 			);
 		}

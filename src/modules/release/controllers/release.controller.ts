@@ -16,7 +16,6 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
-import { ReleaseMessageCodeSuccess } from '../constants/release.constant';
 
 import { Request, Response } from 'express';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
@@ -27,6 +26,7 @@ import {
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
+import { ReleaseSuccess } from '../constants/release.constant';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import {
@@ -143,10 +143,7 @@ export class ReleaseController {
 			updateReleaseDto,
 			userId,
 		);
-		return new ResponseSuccess({
-			data: result,
-			messageCode: ReleaseMessageCodeSuccess.UPDATE,
-		});
+		return ReleaseSuccess.UPDATE(result);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
@@ -158,9 +155,6 @@ export class ReleaseController {
 		const userId = req.user!.sub;
 		const result = await this.releaseService.submit(id, userId);
 
-		return new ResponseSuccess({
-			data: result,
-			messageCode: ReleaseMessageCodeSuccess.CREATE,
-		});
+		return ReleaseSuccess.CREATE(result);
 	}
 }

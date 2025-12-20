@@ -32,7 +32,8 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 			synchronize:
 				this.configService.get<string>('SYNCHRONIZE') === 'true',
 
-			// logging: true,
+			logging: true,
+			retryAttempts: 3,
 
 			// cache: {
 			// 	type: 'ioredis',

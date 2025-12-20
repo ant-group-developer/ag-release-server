@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { OrmService } from 'src/modules/orm/orm.service';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
@@ -11,7 +10,7 @@ import {
 	Repository,
 	SelectQueryBuilder,
 } from 'typeorm';
-import { ReleaseMessages } from '../constants/release.constant';
+import { ReleaseException } from '../constants/release.constant';
 import {
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
@@ -55,7 +54,7 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -287,7 +286,7 @@ export class ReleaseQueryService {
 		const release = await qb.getOne();
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -553,8 +552,10 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
+
+		release.tracks.sort((a, b) => a.order - b.order);
 
 		return release;
 	}
@@ -573,7 +574,7 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		const coverArtOriginal = release.releaseCoverArts?.find(
@@ -638,7 +639,7 @@ export class ReleaseQueryService {
 		const release = await qb.getOne();
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -649,7 +650,7 @@ export class ReleaseQueryService {
 		const raw = await qb.getRawOne();
 
 		if (!raw) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return toSnakeCaseKeys(raw);

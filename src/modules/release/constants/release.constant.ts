@@ -1,72 +1,106 @@
-export const ReleaseMessageCodeSuccess = {
-	CREATE: 'release.message.success.create',
-	UPDATE: 'release.message.success.update',
-	DELETE: 'release.message.success.delete',
-};
+import {
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/common.response.dto';
 
-export const ReleaseMessageSuccess = {
-	CREATE: 'Create success',
-	UPDATE: 'Update success',
-	DELETE: 'Delete success',
-};
+export class ReleaseSuccess {
+	static CREATE<T>(data?: T) {
+		return new ResponseSuccess<T>({
+			message: 'Create success',
+			messageCode: 'release.message.success.create',
+			data,
+		});
+	}
 
-export const ReleaseMessageCodeError = {
-	NOT_FOUND: 'release.message.error.notFound',
-	ALBUM_FORMAT_NOT_FOUND: 'release.message.error.albumFormatNotFound',
-	PRIMARY_GENRE_NOT_FOUND: 'release.message.error.primaryGenreNotFound',
-	SUB_GENRE_NOT_FOUND: 'release.message.error.subGenreNotFound',
-	LABEL_NOT_FOUND: 'release.message.error.labelNotFound',
-	TIMEZONE_NOT_FOUND: 'release.message.error.timezoneNotFound',
-	ERROR_MAX_COUNT_TRACKS: 'track.message.error.maxCountTrack',
-	ERROR_MIN_COUNT_TRACKS: 'track.message.error.minCountTrack',
-};
+	static UPDATE<T>(data?: T) {
+		return new ResponseSuccess<T>({
+			message: 'Update success',
+			messageCode: 'release.message.success.update',
+			data,
+		});
+	}
 
-const ReleaseMessageError = {
-	NOT_FOUND: 'Not found',
-	ALBUM_FORMAT_NOT_FOUND: 'Album format not found',
-	PRIMARY_GENRE_NOT_FOUND: 'Primary genre not found',
-	SUB_GENRE_NOT_FOUND: 'Sub-genre not found',
-	LABEL_NOT_FOUND: 'Label not found',
-	TIMEZONE_NOT_FOUND: 'Timezone not found',
-	ERROR_MAX_COUNT_TRACKS: 'Error max count tracks',
-	ERROR_MIN_COUNT_TRACKS: 'Error min count tracks',
-};
+	static DELETE<T>(data?: T) {
+		return new ResponseSuccess<T>({
+			message: 'Delete success',
+			messageCode: 'release.message.success.delete',
+			data,
+		});
+	}
+}
 
-export const ReleaseMessages = {
-	NOT_FOUND: {
-		message: ReleaseMessageError.NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.NOT_FOUND,
-		statusCode: 404,
-	},
+export class ReleaseException {
+	static NOT_FOUND(data?: any) {
+		return new ResponseError({
+			statusCode: 404,
+			message: 'Not found',
+			messageCode: 'release.message.error.notFound',
+			data,
+		});
+	}
 
-	ALBUM_FORMAT_NOT_FOUND: {
-		message: ReleaseMessageError.ALBUM_FORMAT_NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.ALBUM_FORMAT_NOT_FOUND,
-	},
+	static ALBUM_FORMAT_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Album format not found',
+			messageCode: 'release.message.error.albumFormatNotFound',
+			data,
+		});
+	}
 
-	PRIMARY_GENRE_NOT_FOUND: {
-		message: ReleaseMessageError.PRIMARY_GENRE_NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.PRIMARY_GENRE_NOT_FOUND,
-	},
+	static PRIMARY_GENRE_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Primary genre not found',
+			messageCode: 'release.message.error.primaryGenreNotFound',
+			data,
+		});
+	}
 
-	SUB_GENRE_NOT_FOUND: {
-		message: ReleaseMessageError.SUB_GENRE_NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.SUB_GENRE_NOT_FOUND,
-	},
+	static SUB_GENRE_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Sub-genre not found',
+			messageCode: 'release.message.error.subGenreNotFound',
+			data,
+		});
+	}
 
-	LABEL_NOT_FOUND: {
-		message: ReleaseMessageError.LABEL_NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.LABEL_NOT_FOUND,
-	},
+	static LABEL_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Label not found',
+			messageCode: 'release.message.error.labelNotFound',
+			data,
+		});
+	}
 
-	TIMEZONE_NOT_FOUND: {
-		message: ReleaseMessageError.TIMEZONE_NOT_FOUND,
-		messageCode: ReleaseMessageCodeError.TIMEZONE_NOT_FOUND,
-	},
+	static TIMEZONE_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Timezone not found',
+			messageCode: 'release.message.error.timezoneNotFound',
+			data,
+		});
+	}
 
-	DECLINE_SYSTEM_TENANT: {
-		statusCode: 403,
-		message: 'You cannot create release in tenant system',
-		messageCode: 'release.message.error.declineSystemTenant',
-	},
-};
+	static ERROR_MAX_COUNT_TRACKS(data?: any) {
+		return new ResponseError({
+			message: 'Error max count tracks',
+			messageCode: 'track.message.error.maxCountTrack',
+			data,
+		});
+	}
+
+	static ERROR_MIN_COUNT_TRACKS(data?: any) {
+		return new ResponseError({
+			message: 'Error min count tracks',
+			messageCode: 'track.message.error.minCountTrack',
+			data,
+		});
+	}
+
+	static DECLINE_SYSTEM_TENANT(data?: any) {
+		return new ResponseError({
+			statusCode: 403,
+			message: 'You cannot create release in tenant system',
+			messageCode: 'release.message.error.declineSystemTenant',
+			data,
+		});
+	}
+}
