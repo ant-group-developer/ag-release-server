@@ -103,11 +103,14 @@ export class Release {
 	@PrimaryColumn({ name: 'id', type: 'bigint' })
 	id: number;
 
-	// @Column({ name: 'release_type' })
-	// releaseType: string;
+	@Column({ name: 'album_title' })
+	albumTitle: string;
 
-	// @Column({ name: 'release_id' })
-	// releaseId: number;
+	@Column({ name: 'album_title_version', nullable: true })
+	albumTitleVersion: string;
+
+	@Column({ name: 'album_artist' })
+	albumArtist: string;
 
 	@Column({ name: 'album_upc', nullable: true })
 	albumUPC: string;
@@ -115,23 +118,20 @@ export class Release {
 	@Column({ name: 'album_id', nullable: true })
 	albumId: string;
 
-	@Column({ name: 'album_artist' })
-	albumArtist: string;
+	@Column({ name: 'category' })
+	category: string;
 
-	@Column({ name: 'album_title' })
-	albumTitle: string;
+	@Column({ name: 'album_price_code', nullable: true })
+	albumPriceCode: string;
 
-	@Column({ name: 'album_title_version', nullable: true })
-	albumTitleVersion: string;
+	@Column({ name: 'territories', type: 'text', nullable: true })
+	territories: string;
 
-	@Column({ name: 'label', nullable: true })
-	label: string;
+	@Column({ name: 'excluded_territories', type: 'text', nullable: true })
+	excludedTerritories: string;
 
 	@Column({ name: 'original_release_date', type: 'date' })
 	originalReleaseDate: Date;
-
-	@Column({ name: 'category' })
-	category: string;
 
 	@Column({ name: 'p_line_year', nullable: true })
 	pLineYear: number;
@@ -145,14 +145,14 @@ export class Release {
 	@Column({ name: 'c_line_text', nullable: true })
 	cLineText: string;
 
-	@Column({ name: 'album_price_code', nullable: true })
-	albumPriceCode: string;
+	@Column({ name: 'label', nullable: true })
+	label: string;
 
-	@Column({ name: 'territories', type: 'text', nullable: true })
-	territories: string;
+	@Column({ type: 'varchar', name: 'primary_genre', nullable: true })
+	primary_genre: string | null;
 
-	@Column({ name: 'excluded_territories', type: 'text', nullable: true })
-	excludedTerritories: string;
+	@Column({})
+	artist: string;
 
 	@OneToMany(() => Track, (track) => track.release)
 	tracks: Track[];
@@ -162,6 +162,7 @@ export class Release {
 export class Track {
 	// @PrimaryGeneratedColumn('uuid', { name: 'id' })
 	// id: string;
+
 	@PrimaryColumn({ name: 'id', type: 'bigint' })
 	id: number;
 

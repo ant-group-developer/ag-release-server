@@ -1,7 +1,7 @@
 // src/access-bomb/access-bomb.controller.ts
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { PublicRoute } from '../auth/decorators/auth.decorator';
-import { AccessBombService } from './access-bomb.service';
+import { PublicRoute } from '../../auth/decorators/auth.decorator';
+import { AccessBombService } from '../services/access-bomb.service';
 
 @Controller('access-bomb')
 export class AccessBombController {

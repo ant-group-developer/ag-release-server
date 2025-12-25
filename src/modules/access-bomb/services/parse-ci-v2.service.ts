@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 import * as unzipper from 'unzipper';
-import { Release } from './entities/metadata.entity';
+import { Release } from '../entities/metadata.entity';
 
 @Injectable()
 export class ParseDataCiService {

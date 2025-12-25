@@ -18,7 +18,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as unzipper from 'unzipper';
 import * as XLSX from 'xlsx';
-import { ReleaseMetadata } from './entities/metadata.entity';
+import { ReleaseMetadata } from '../entities/metadata.entity';
 const XlsxPopulate = require('xlsx-populate');
 
 type BombRow = {

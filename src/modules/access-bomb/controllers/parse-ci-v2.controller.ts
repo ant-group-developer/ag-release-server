@@ -1,7 +1,7 @@
 // controller
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { PublicRoute } from '../auth/decorators/auth.decorator';
-import { ParseDataCiService } from './parse-ci-v2.service';
+import { PublicRoute } from '../../auth/decorators/auth.decorator';
+import { ParseDataCiService } from '../services/parse-ci-v2.service';
 
 @Controller('ci')
 export class ParseDataCiController {
