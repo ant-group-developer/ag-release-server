@@ -6,6 +6,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './common/config/env.validation.schema';
+import { AccessBombModule } from './modules/access-bomb/access-bomb.module';
 import { ActionModule } from './modules/action/action.module';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
@@ -141,6 +142,7 @@ import { UserModule } from './modules/user/user.module';
 		NewsPostModule,
 
 		DeliveryModule,
+		AccessBombModule,
 	],
 	controllers: [AppController],
 	providers: [

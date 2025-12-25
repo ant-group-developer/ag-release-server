@@ -5,6 +5,11 @@
 /exports
 /backups
 /ddex_batches
+/downloads
+/import
+/tmp
+/download_unzip
+/src/modules/access-bomb/file
 
 # Logs
 logs
