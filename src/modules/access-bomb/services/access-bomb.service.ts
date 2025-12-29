@@ -18,8 +18,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as unzipper from 'unzipper';
 import * as XLSX from 'xlsx';
+import XlsxPopulate from 'xlsx-populate';
 import { ReleaseMetadata } from '../entities/metadata.entity';
-const XlsxPopulate = require('xlsx-populate');
+import { CI_COLUMN_MAP, CiRawRow } from '../interface/interface';
 
 type BombRow = {
 	releaseId: string;
@@ -874,5 +875,36 @@ export class AccessBombService {
 			trackFileName: r['TrackFileName'],
 			duration: r['Duration'],
 		}));
+	}
+
+	//
+	async buildCiExcel(input: {
+		templatePath: string;
+		outputPath: string;
+		rows: CiRawRow[];
+	}) {
+		const { templatePath, outputPath, rows } = input;
+
+		fs.copyFileSync(templatePath, outputPath);
+
+		const workbook = await XlsxPopulate.fromFileAsync(outputPath);
+		const sheet = workbook.sheet('METADATA TEMPLATE');
+		if (!sheet) throw new Error('SHEET_NOT_FOUND');
+
+		const START_ROW = 15;
+
+		rows.forEach((r, i) => {
+			const row = START_ROW + i;
+			(Object.keys(CI_COLUMN_MAP) as (keyof CiRawRow)[]).forEach(
+				(key) => {
+					const col = CI_COLUMN_MAP[key];
+					const val = r[key];
+					if (val === undefined) return;
+					sheet.cell(`${col}${row}`).value(val === null ? '' : val);
+				},
+			);
+		});
+
+		await workbook.toFileAsync(outputPath);
 	}
 }

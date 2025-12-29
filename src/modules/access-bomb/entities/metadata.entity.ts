@@ -175,9 +175,6 @@ export class Track {
 	@Column({ name: 'track_number' })
 	trackNumber: number;
 
-	// @Column({ name: 'track_id' })
-	// trackId: number;
-
 	@Column({ name: 'track_title' })
 	trackTitle: string;
 

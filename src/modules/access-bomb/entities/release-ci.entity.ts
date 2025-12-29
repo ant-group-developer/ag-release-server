@@ -1,8 +1,16 @@
-import { Column, Entity, PrimaryColumn, PrimaryGeneratedColumn } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	PrimaryColumn,
+	PrimaryGeneratedColumn,
+} from 'typeorm';
 @Entity('release_ci')
 export class ReleaseCi {
-	@PrimaryColumn({ name: 'grouping_id', type: 'bigint', default: null })
-	groupingId: null;
+	@PrimaryColumn({ name: 'id', type: 'bigint' })
+	id: number;
 
 	//album_title
 	@Column({ name: 'release_title' })
@@ -112,12 +120,18 @@ export class ReleaseCi {
 
 	@Column({ name: 'services', type: 'text', nullable: true })
 	services: string;
+
+	@OneToMany(() => TrackCi, (ci) => ci.releaseCi)
+	trackCis: TrackCi[];
 }
 
 @Entity('track_ci')
 export class TrackCi {
 	@PrimaryGeneratedColumn()
 	id: number;
+
+	@Column({ name: 'release_ci_id', type: 'int' })
+	releaseCiId: number;
 
 	// TRACK NO.
 	@Column({ name: 'track_no', type: 'int' })
@@ -146,11 +160,11 @@ export class TrackCi {
 
 	// ISRC
 	@Column({ name: 'isrc', type: 'varchar', length: 32, nullable: true })
-	isrc: string;
+	isrc: string | null;
 
 	// GRid
 	@Column({ name: 'grid', type: 'varchar', length: 64, nullable: true })
-	grid: string;
+	grid: string | null;
 
 	// AVAILABLE SEPARATELY
 	@Column({ name: 'available_separately', type: 'char', length: 1 })
@@ -179,7 +193,7 @@ export class TrackCi {
 		length: 100,
 		nullable: true,
 	})
-	mainGenre: string;
+	mainGenre: string | null;
 
 	// Main SubGenre
 	@Column({
@@ -188,7 +202,7 @@ export class TrackCi {
 		length: 100,
 		nullable: true,
 	})
-	mainSubGenre: string;
+	mainSubGenre: string | null;
 
 	// Alternate Genre
 	@Column({
@@ -210,7 +224,7 @@ export class TrackCi {
 
 	// EXPLICIT CONTENT
 	@Column({ name: 'explicit_content', type: 'char', length: 1 })
-	explicitContent: string; // Y / N
+	explicitContent: string; // Y
 
 	// PRODUCER(S)
 	@Column({ name: 'producers', type: 'text', nullable: true })
@@ -247,4 +261,8 @@ export class TrackCi {
 	// ORIGINAL RELEASE DATE
 	@Column({ name: 'original_release_date', type: 'date', nullable: true })
 	originalReleaseDate: Date;
+
+	@ManyToOne(() => ReleaseCi, (rc) => rc.trackCis)
+	@JoinColumn({ name: 'release_ci_id' })
+	releaseCi: ReleaseCi;
 }
