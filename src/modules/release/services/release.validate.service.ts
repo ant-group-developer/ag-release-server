@@ -10,10 +10,8 @@ import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
-import {
-	ReleaseMessageCodeError,
-	ReleaseMessages,
-} from '../constants/release.constant';
+
+import { ReleaseException } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
@@ -58,7 +56,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!albumFormat) {
-				throw new ResponseError(ReleaseMessages.ALBUM_FORMAT_NOT_FOUND);
+				throw ReleaseException.ALBUM_FORMAT_NOT_FOUND();
 			}
 		}
 
@@ -68,9 +66,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!genre) {
-				throw new ResponseError(
-					ReleaseMessages.PRIMARY_GENRE_NOT_FOUND,
-				);
+				throw ReleaseException.PRIMARY_GENRE_NOT_FOUND();
 			}
 		}
 
@@ -79,7 +75,7 @@ export class ReleaseValidateService {
 				where: { id: subGenreId },
 			});
 			if (!genre) {
-				throw new ResponseError(ReleaseMessages.SUB_GENRE_NOT_FOUND);
+				throw ReleaseException.SUB_GENRE_NOT_FOUND();
 			}
 		}
 
@@ -88,7 +84,7 @@ export class ReleaseValidateService {
 				where: { id: labelId },
 			});
 			if (!label) {
-				throw new ResponseError(ReleaseMessages.LABEL_NOT_FOUND);
+				throw ReleaseException.LABEL_NOT_FOUND();
 			}
 		}
 
@@ -98,7 +94,7 @@ export class ReleaseValidateService {
 			});
 
 			if (!timezone) {
-				throw new ResponseError(ReleaseMessages.TIMEZONE_NOT_FOUND);
+				throw ReleaseException.TIMEZONE_NOT_FOUND();
 			}
 		}
 	}
@@ -223,7 +219,7 @@ export class ReleaseValidateService {
 					page: 'tracks',
 					field: 'maxTrackCount',
 					message: `${release.albumFormat.maxTrackCount}`,
-					messageCode: ReleaseMessageCodeError.ERROR_MAX_COUNT_TRACKS,
+					messageCode: 'track.message.error.maxCountTrack',
 				}),
 			);
 		}
@@ -234,7 +230,7 @@ export class ReleaseValidateService {
 					page: 'tracks',
 					field: 'minTrackCount',
 					message: `${release.albumFormat.minTrackCount}`,
-					messageCode: ReleaseMessageCodeError.ERROR_MIN_COUNT_TRACKS,
+					messageCode: 'track.message.error.minCountTrack',
 				}),
 			);
 		}
@@ -317,7 +313,6 @@ export class ReleaseValidateService {
 		}
 
 		// time release validation
-
 		if (release.releaseTimeMode === ReleaseTimeMode.SPECIFIC_TIMEZONE) {
 			if (!release.releaseTime) {
 				result.push(
@@ -431,11 +426,13 @@ export class ReleaseValidateService {
 		const result: FieldErrorDetails[] = [];
 
 		tracks.forEach((track, index) => {
+			const { trackLanguage } = track;
 			if (!track.trackOriginTypeId) {
 				result.push(
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackOriginTypeId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -445,6 +442,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.primaryGenreId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -454,6 +452,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.pLineOwner`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -463,6 +462,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.pLineYear`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -472,6 +472,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackTypeId`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -486,6 +487,7 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackArtists`,
+						trackId: track.id,
 					}),
 				);
 			}
@@ -496,60 +498,61 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.audioFile.preview`,
+						trackId: track.id,
 					}),
 				);
 			}
 
-			// language validation
-			result.push(
-				...this.validateTrackLanguage(track.trackLanguage, index),
-			);
+			if (!trackLanguage?.audioLanguageId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.audioLanguageId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.metadataLanguageId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.metadataLanguageId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.metadataLanguageCountryId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!trackLanguage?.recordingCountryId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.recordingCountryId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			if (!track.trackSensitiveId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackSensitiveId`,
+						trackId: track.id,
+					}),
+				);
+			}
 		});
-
-		return result;
-	}
-
-	private validateTrackLanguage(
-		trackLanguage: Release['tracks'][number]['trackLanguage'],
-		index: number,
-	) {
-		const result: FieldErrorDetails[] = [];
-
-		if (!trackLanguage?.audioLanguageId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.audioLanguageId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.metadataLanguageId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.metadataLanguageId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.metadataLanguageCountryId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
-				}),
-			);
-		}
-
-		if (!trackLanguage?.recordingCountryId) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: `tracks.${index}.trackLanguage.recordingCountryId`,
-				}),
-			);
-		}
 
 		return result;
 	}

@@ -751,7 +751,12 @@ export class TrackQueryService {
 	}
 
 	private addSelectReleaseSimple(qb: SelectQueryBuilder<Track>) {
-		return qb.addSelect(['release.id', 'release.title', 'release.labelId']);
+		return qb.addSelect([
+			'release.id',
+			'release.title',
+			'release.labelId',
+			'release.tenantId',
+		]);
 	}
 
 	private addSelectReleaseCoverArtSimple(qb: SelectQueryBuilder<Track>) {

@@ -122,6 +122,17 @@ export class UpdateArtistDto extends PartialType(CreateArtistDto) {
 
 export class QueryGetListArtistDto extends BaseQueryDto {
 	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsArray()
+	idInclude?: string[];
+
+	@IsOptional()
 	@IsEnum(FieldOrderArtist)
 	fieldOrder: FieldOrderArtist = FieldOrderArtist.NAME;
 

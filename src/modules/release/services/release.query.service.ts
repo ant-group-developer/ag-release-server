@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { OrmService } from 'src/modules/orm/orm.service';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
 	Brackets,
@@ -10,8 +10,11 @@ import {
 	Repository,
 	SelectQueryBuilder,
 } from 'typeorm';
-import { ReleaseMessages } from '../constants/release.constant';
-import { QueryGetListReleaseDto } from '../dto/release.dto';
+import { ReleaseException } from '../constants/release.constant';
+import {
+	QueryGetListReleaseDto,
+	QueryGetListReleaseDto2,
+} from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import {
 	VirtualColumnRelease,
@@ -33,6 +36,8 @@ export class ReleaseQueryService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		private readonly ormService: OrmService,
 	) {
 		this.mainAlias = 'release';
 	}
@@ -49,7 +54,7 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -57,6 +62,24 @@ export class ReleaseQueryService {
 
 	async getManyAndCount(query: QueryGetListReleaseDto) {
 		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
+		this.filterByQuery(qb, query);
+		this.leftJoin(qb);
+		this.select(qb, query);
+
+		const [dataFromDb, totalItems]: [IDataFromDb, number] =
+			await Promise.all([qb.getRawAndEntities(), qb.getCount()]);
+
+		const releases = this.assigneeVirtualColumn(dataFromDb);
+
+		return {
+			totalItems,
+			releases,
+		};
+	}
+
+	async getManyAndCount2(query: QueryGetListReleaseDto2) {
+		const qb = this.ormService.createReleaseQb();
 
 		this.filterByQuery(qb, query);
 		this.leftJoin(qb);
@@ -138,6 +161,8 @@ export class ReleaseQueryService {
 
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoin('artist.genre', 'genre')
+			.leftJoin('artist.country', 'country')
 			.leftJoin('releaseArtist.artistRole', 'artistRole')
 
 			.leftJoin('release.releaseLanguage', 'releaseLanguage')
@@ -202,7 +227,16 @@ export class ReleaseQueryService {
 				'artist.code',
 				'artist.picture',
 				'artist.biography',
+				'artist.genreId',
+				'artist.countryId',
 			])
+			.addSelect([
+				'genre.id',
+				'genre.name',
+				'genre.code',
+				'genre.picture',
+			])
+			.addSelect(['country.id', 'country.name', 'country.iso2'])
 			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect([
 				'releaseLanguage.id',
@@ -252,7 +286,7 @@ export class ReleaseQueryService {
 		const release = await qb.getOne();
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -518,8 +552,10 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
+
+		release.tracks.sort((a, b) => a.order - b.order);
 
 		return release;
 	}
@@ -538,7 +574,7 @@ export class ReleaseQueryService {
 		});
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		const coverArtOriginal = release.releaseCoverArts?.find(
@@ -603,7 +639,7 @@ export class ReleaseQueryService {
 		const release = await qb.getOne();
 
 		if (!release) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return release;
@@ -614,7 +650,7 @@ export class ReleaseQueryService {
 		const raw = await qb.getRawOne();
 
 		if (!raw) {
-			throw new ResponseError(ReleaseMessages.NOT_FOUND);
+			throw ReleaseException.NOT_FOUND();
 		}
 
 		return toSnakeCaseKeys(raw);

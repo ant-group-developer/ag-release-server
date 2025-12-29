@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';
 import {
 	CreateArtistDto,
@@ -132,13 +132,31 @@ export class ArtistService {
 	async getListSimple(
 		query: QueryGetListArtistDto,
 	): Promise<PageDto<Artist>> {
-		const { page, pageSize } = query;
+		const { page, pageSize, idInclude } = query;
+
+		const artistsInclude = await this.artistRepo.find({
+			where: { id: In(idInclude ?? []) },
+		});
 
 		const { artists, totalItems } =
 			await this.artistQueryService.getListSimple(query);
 
+		let finalArtists = artists;
+
+		if (artistsInclude.length > 0) {
+			const includeIds = new Set(artistsInclude.map((a) => a.id));
+
+			const artistsFiltered = artists.filter(
+				(a) => !includeIds.has(a.id),
+			);
+
+			const mergedArtists = [...artistsInclude, ...artistsFiltered];
+
+			finalArtists = mergedArtists.slice(0, pageSize);
+		}
+
 		return new PageDto({
-			items: artists,
+			items: finalArtists,
 			metadata: {
 				currentPage: page,
 				pageSize,

@@ -4,7 +4,13 @@
 /build
 /exports
 /backups
+/ddex_batches
 
+
+/downloads
+/download_unzip
+/import
+/src/modules/access-bomb/file
 # Logs
 logs
 *.log

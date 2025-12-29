@@ -12,7 +12,11 @@ import {
 } from 'src/utils/util.file';
 import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
-import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import {
+	QueryGetListReleaseDto,
+	QueryGetListReleaseDto2,
+	UpdateReleaseDto,
+} from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
@@ -37,6 +41,10 @@ export class ReleaseService {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
+		if (!release.upc) {
+			release.upc = 'new_upc';
+		}
+
 		// validate nonDraft
 		const errors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);
@@ -55,7 +63,7 @@ export class ReleaseService {
 		return this.releaseValidateService.ensureNonDraftRelease(result);
 	}
 
-	async getOneDetail(id: string): Promise<IReleaseDetail> {
+	async getOne(id: string): Promise<IReleaseDetail> {
 		const release = await this.releaseQueryService.getOneDetail(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
@@ -68,8 +76,28 @@ export class ReleaseService {
 		};
 	}
 
-	async getListDetail(
+	async getList(
 		query: QueryGetListReleaseDto,
+	): Promise<PageDto<IReleaseDetail>> {
+		const { page, pageSize } = query;
+
+		const { releases, totalItems } =
+			await this.releaseQueryService.getManyAndCount(query);
+
+		const enhancedRelease = this.enhanceReleasesDetails(releases);
+
+		return new PageDto({
+			items: enhancedRelease,
+			metadata: {
+				currentPage: page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getList2(
+		query: QueryGetListReleaseDto2,
 	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 

@@ -150,21 +150,25 @@ export class FieldErrorDetails {
 	message: string;
 	page: string;
 	field: string;
+	trackId?: string;
 
 	constructor({
 		messageCode = 'validation.input',
 		message = 'Please enter information!',
 		page = 'unknown',
 		field = 'unknown',
+		trackId,
 	}: {
 		messageCode?: string;
 		message?: string;
 		page?: string;
 		field?: string;
+		trackId?: string;
 	}) {
 		this.messageCode = messageCode;
 		this.message = message;
 		this.page = page;
 		this.field = field;
+		this.trackId = trackId;
 	}
 }

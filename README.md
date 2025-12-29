@@ -93,3 +93,5 @@ openssl genrsa -out "secrets/jwtRS256.key" 2048
 ```
 openssl rsa -in "secrets/jwtRS256.key" -pubout -out "secrets/jwtRS256.key.pub"
 ```
+
+sudo -u postgres /usr/local/pgsql/src/bin/psql/psql -d agrelease -c "GRANT USAGE, CREATE ON SCHEMA public TO agrelease;"

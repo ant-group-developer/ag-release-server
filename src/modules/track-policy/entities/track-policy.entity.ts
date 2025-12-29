@@ -21,7 +21,9 @@ export class TrackPolicy extends BaseUUIDEntity {
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
 
-	@ManyToOne(() => Action, (action) => action.trackPolicies)
+	@ManyToOne(() => Action, (action) => action.trackPolicies, {
+		onDelete: 'SET NULL',
+	})
 	@JoinColumn({ name: 'action_id' })
 	action: Action | null;
 

@@ -2,6 +2,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+	IsArray,
 	IsDate,
 	IsEnum,
 	IsInt,
@@ -23,6 +24,93 @@ export abstract class BaseQueryDto {
 	@IsString()
 	@Transform(({ value }: { value: string | undefined }) => value?.trim())
 	keyword?: string;
+
+	/** 1‑based page number */
+	@ApiProperty({
+		description: 'Page number',
+		required: false,
+		default: 1,
+		minimum: 1,
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	page: number = 1;
+
+	/** Items per page */
+	@ApiProperty({
+		description: 'Number of items per page',
+		required: false,
+		default: 20,
+		minimum: 1,
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	pageSize: number = 20;
+
+	/** Number of records to skip */
+	get skip(): number {
+		return (this.page - 1) * this.pageSize;
+	}
+
+	/** Number of records to take */
+	get limit(): number {
+		return this.pageSize;
+	}
+
+	@IsOptional()
+	@IsString()
+	fieldOrder: string = FILED_ORDER_DEFAULT;
+
+	@IsOptional()
+	@IsString()
+	@IsEnum(OrderDirection)
+	orderBy: OrderDirection = OrderDirection.ASC;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	startCreatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	endCreatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	startUpdatedAt?: Date;
+
+	@IsOptional()
+	@IsDate()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	endUpdatedAt?: Date;
+}
+
+export abstract class BaseQueryDto2 {
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	@Transform(({ value }) =>
+		Array.isArray(value)
+			? value.map((v) => v?.trim())
+			: typeof value === 'string'
+				? [value.trim()]
+				: [],
+	)
+	keyword?: string[];
 
 	/** 1‑based page number */
 	@ApiProperty({

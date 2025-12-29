@@ -9,16 +9,8 @@ import {
 	Put,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import {
-	ResponseError,
-	ResponseSuccess,
-} from 'src/common/dtos/common.response.dto';
-import {
-	ReleaseMessageCodeSuccess,
-	ReleaseMessages,
-	ReleaseMessageSuccess,
-} from '../constants/release.constant';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
 import {
@@ -27,6 +19,10 @@ import {
 } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import {
+	ReleaseException,
+	ReleaseSuccess,
+} from '../constants/release.constant';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
@@ -47,7 +43,7 @@ export class ReleaseDraftController {
 		const userId = req.user!.sub;
 
 		if (checkIsSystemTenant(tenantId)) {
-			throw new ResponseError(ReleaseMessages.DECLINE_SYSTEM_TENANT);
+			throw ReleaseException.DECLINE_SYSTEM_TENANT();
 		}
 		const result = await this.releaseDraftService.create(
 			data,
@@ -55,10 +51,7 @@ export class ReleaseDraftController {
 			userId,
 		);
 
-		return new ResponseSuccess({
-			data: result,
-			messageCode: ReleaseMessageCodeSuccess.CREATE,
-		});
+		return ReleaseSuccess.CREATE(result);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
@@ -71,10 +64,7 @@ export class ReleaseDraftController {
 		const userId = req.user!.sub;
 		const result = await this.releaseDraftService.update(id, data, userId);
 
-		return new ResponseSuccess({
-			data: result,
-			messageCode: ReleaseMessageCodeSuccess.UPDATE,
-		});
+		return ReleaseSuccess.UPDATE(result);
 	}
 
 	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
@@ -88,14 +78,8 @@ export class ReleaseDraftController {
 	@SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
-	@ApiResponse({
-		status: 200,
-		description: ReleaseMessageSuccess.DELETE,
-	})
 	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
 		await this.releaseDraftService.handleDelete(id);
-		return new ResponseSuccess({
-			messageCode: ReleaseMessageCodeSuccess.DELETE,
-		});
+		return ReleaseSuccess.DELETE();
 	}
 }

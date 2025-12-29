@@ -42,7 +42,7 @@ export interface IReleaseDraft {
 }
 
 export interface IReleaseNonDraft {
-	upc: string | null;
+	upc: string;
 	primaryGenreId: string;
 	subGenreId: string | null;
 	labelId: string;
