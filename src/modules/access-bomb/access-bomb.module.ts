@@ -6,7 +6,12 @@ import { AccessBombController } from './controllers/access-bomb.controller';
 import { BombCrawController } from './controllers/bomb-craw.controller';
 import { ParseDataCiController } from './controllers/parse-ci-v2.controller';
 import { Release, ReleaseMetadata, Track } from './entities/metadata.entity';
-import { Release_29_12 } from './entities/metadata.entity.29-12';
+import {
+	Release_29_12,
+	ReleaseBombAll,
+	Track_29_12,
+	TrackBombAll,
+} from './entities/metadata.entity.29-12';
 import { ReleaseCi, TrackCi } from './entities/release-ci.entity';
 import { TrackBomb } from './entities/track-bomb.entity';
 import { AccessBombService } from './services/access-bomb.service';
@@ -25,6 +30,9 @@ import { ParseDataCiService } from './services/parse-ci-v2.service';
 			ReleaseCi,
 			TrackCi,
 			Release_29_12,
+			Track_29_12,
+			TrackBombAll,
+			ReleaseBombAll,
 		]),
 	],
 	controllers: [

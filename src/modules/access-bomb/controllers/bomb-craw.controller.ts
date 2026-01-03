@@ -13,7 +13,7 @@ export class BombCrawController {
 	@PublicRoute()
 	@Get('crawl-track-metadata')
 	async crawlTrackMetadata(@Query('token') token: string) {
-		return this.service.crawlMissingMetadata(token);
+		return this.service.crawlTrackMetadataAllV2();
 	}
 
 	@PublicRoute()
@@ -25,6 +25,6 @@ export class BombCrawController {
 	@PublicRoute()
 	@Get('29-12/crawl-release-metadata')
 	async crawlReleaseMetadata_29_12(@Query('token') token: string) {
-		return this.crawlService_29_12.crawlAllReleaseMetadata(token);
+		return this.service.crawlReleaseMetadataAll(token);
 	}
 }

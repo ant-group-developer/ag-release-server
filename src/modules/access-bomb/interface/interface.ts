@@ -14,14 +14,14 @@ export interface CiRawRow {
 
 	licensedTerritoriesInclude: string;
 	licensedTerritoriesExclude?: null;
-	releaseStartDate: string | Date;
+	releaseStartDate: string;
 	releaseEndDate?: null;
 	grid?: null;
 
-	pYear: number;
-	pHolder: string;
-	cYear: number;
-	cHolder: string;
+	pYear: number | null;
+	pHolder: string | null;
+	cYear: number | null;
+	cHolder: string | null;
 
 	status?: null;
 	label: string;
@@ -30,10 +30,11 @@ export interface CiRawRow {
 	mainSubGenre?: null;
 	alternateGenre?: string | null;
 	alternateSubGenre?: null;
-	explicitContent: 'N';
+	explicitContent: 'Y' | 'N';
 
 	volumeNo: 1; // 1
 	volumeTotal: 1; // 1
+	services: null;
 
 	// track
 	trackNo: number;
@@ -96,6 +97,9 @@ export const CI_COLUMN_MAP: Record<keyof CiRawRow, string> = {
 	explicitContent: 'AA',
 	volumeNo: 'AB',
 	volumeTotal: 'AC',
+	services: 'AD',
+
+	// ===== TRACK BASIC =====
 	trackNo: 'AE',
 	trackTitle: 'AF',
 	trackVersion: 'AG',
@@ -104,20 +108,299 @@ export const CI_COLUMN_MAP: Record<keyof CiRawRow, string> = {
 	isrc: 'AJ',
 	trackGrid: 'AK',
 	availableSeparately: 'AL',
-	trackPYear: 'AM',
-	trackPHolder: 'AN',
-	trackMainGenre: 'AO',
-	trackMainSubGenre: 'AP',
-	trackAlternateGenre: 'AQ',
-	trackAlternateSubGenre: 'AR',
-	trackExplicitContent: 'AS',
-	producers: 'AT',
-	mixers: 'AU',
-	composers: 'AV',
-	lyricists: 'AW',
-	publishers: 'AX',
-	hasInstruments: 'AY',
-	hasVocalsOrLanguage: 'AZ',
-	previewStartTime: 'BA',
-	originalReleaseDate: 'BB',
+
+	// ===== (P) & (C) =====
+	trackPYear: 'AM', // (P) YEAR
+	trackPHolder: 'AN', // (P) HOLDER
+	// (C) YEAR & (C) HOLDER: KHÔNG REQUIRED Ở TRACK → BỎ
+
+	// ===== GENRES =====
+	trackMainGenre: 'AQ', // Main Genre (drop-down)
+	trackMainSubGenre: 'AR', // Main SubGenre (free text)
+	trackAlternateGenre: 'AS', // Alternate Genre (drop-down)
+	trackAlternateSubGenre: 'AT', // Alternate SubGenre (free text)
+
+	// ===== EXPLICIT CONTENT =====
+	trackExplicitContent: 'AU', // Explicit Content (select)
+
+	// ===== SOUND RECORDING CONTRIBUTORS =====
+	producers: 'AV', // Producer(s)
+	mixers: 'AW', // Mixer(s)
+
+	// ===== MUSICAL WORK CONTRIBUTORS =====
+	composers: 'AX', // Composer(s)
+	lyricists: 'AY', // Lyricist(s)
+	publishers: 'AZ', // Publisher(s)
+
+	// ===== PERFORMANCE =====
+	hasInstruments: 'BA', // Has Instruments? (drop-down)
+	hasVocalsOrLanguage: 'BB', // Has Vocals/Language? (drop-down)
+	previewStartTime: 'BC', // Preview Start Time (seconds)
+	originalReleaseDate: 'BD', // Original Release Date (DD/MM/YYYY or YYYY/MM/DD)
 };
+
+// all
+export interface TrackDetailAll {
+	wav: {
+		fileId: string;
+		isTemp: boolean;
+		filename: string;
+		externalUrl: string | null;
+		lastUpdateDate: string | null;
+	} | null;
+
+	flac: {
+		fileId: string;
+		isTemp: boolean;
+		filename: string;
+		externalUrl: string | null;
+		lastUpdateDate: string | null;
+	} | null;
+
+	isrc: string;
+	name: string;
+	image: any;
+	lyrics: any;
+	rdioId: string | null;
+	appleId: number | null;
+	assetId: number;
+	bitrate: number;
+	catalog: any;
+	labelId: number;
+	trackId: number;
+	version: string | null;
+	acrCloud: any;
+	artistId: number;
+	bitDepth: number;
+	channels: number;
+	explicit: boolean;
+	releases: TrackReleaseAll[];
+	labelName: string;
+	spotifyId: string | null;
+	trackType: number;
+	archivedAt: string | null;
+	artistName: string;
+	copyrightC: string | null;
+	copyrightP: string | null;
+	discNumber: number | null;
+	isIngested: boolean;
+	languageId: number;
+	releaseIds: number[];
+	sampleRate: number;
+	totalSales: number;
+	copyTrackId: number | null;
+	description: string | null;
+	priceTierId: number | null;
+	trackLength: number;
+	artistLocals: any[];
+	compositions: any[];
+	contributors: any[];
+	enterpriseId: number;
+	isAudioValid: boolean | null;
+	playingCount: number;
+	royaltyToken: string | null;
+	tracksLocals: any[];
+	artistAppleId: string | null;
+	fileExtension: string;
+	isFullyLocked: boolean;
+	isLicensePaid: boolean | null;
+	monetizations: TrackMonetizationAll[];
+	releaseTracks: TrackReleasePlatformAll[];
+	releasesCount: number;
+	trackVendorId: number | null;
+	clearedForSale: boolean;
+	enterpriseName: string;
+	artistSpotifyId: string | null;
+	trackProperties: number[];
+	artistExternalIds: ArtistExternalIdAll[];
+	previouslyReleased: boolean;
+	composerContentsDTO: ComposerContentAll[];
+	previewStartSeconds: number | null;
+	primaryMusicStyleId: number | null;
+	secondaryMusicStyleId: number | null;
+	trackRecordingVersions: TrackRecordingVersionAll[];
+	isDolbyAtmosReadOnly: boolean;
+	licenseRequestStatus: any;
+	distributorStoreGenreIds: number[];
+}
+
+export interface TrackReleaseAll {
+	upc: number;
+	name: string;
+	image: {
+		fileId: string;
+		isTemp: boolean;
+		filename: string;
+		externalUrl: string | null;
+		lastUpdateDate: string | null;
+	} | null;
+	artist: {
+		isni: string | null;
+		name: string;
+		image: any;
+		artistId: number;
+		lastName: string | null;
+		firstName: string | null;
+		archivedAt: string | null;
+		middleName: string | null;
+		tracksCount: number;
+		releasesCount: number;
+	};
+	assetId: number;
+	version: string | null;
+	releaseId: number;
+	archivedAt: string | null;
+	isIngested: boolean;
+	releaseDate: string;
+	tracksCount: number;
+	contributors: any[];
+	enterpriseId: number;
+	isCompilation: boolean;
+	releaseTypeId: number;
+	enterpriseName: string;
+	isDolbyAtmosReadOnly: boolean;
+	isLockedForDistribution: boolean;
+}
+
+export interface TrackMonetizationAll {
+	optIn: boolean | null;
+	isLive: boolean | null;
+	isPaid: boolean | null;
+	trackId: number;
+	policyId: number;
+	isEligible: boolean | null;
+	transactionId: string | null;
+	transactionDate: string | null;
+	distributorStoreId: number;
+}
+
+export interface TrackReleasePlatformAll {
+	rdioId: string | null;
+	appleId: number | null;
+	deezerId: string | null;
+	releaseId: number;
+	spotifyId: string | null;
+}
+
+export interface ArtistExternalIdAll {
+	profileId: string;
+	distributorStoreId: number;
+}
+
+export interface ComposerContentAll {
+	proId: string | null;
+	share: number | null;
+	roleId: number;
+	rightsId: number;
+	composerId: number;
+	publisherId: number;
+	composerName: string;
+	contributorId: number;
+	publisherName: string;
+	composerImageId: string | null;
+	composersLocals: any[];
+	publisherAdminId: number | null;
+	proRegistrationId: string | null;
+	publisherAdminName: string | null;
+}
+
+export interface TrackRecordingVersionAll {
+	isrc: string;
+	audioFiles: TrackAudioFileAll[];
+	recordingVersionType: number;
+}
+
+export interface TrackAudioFileAll {
+	audioId: string;
+	audioSize: number;
+	fileFormat: number;
+	audioBitrate: number;
+	audioSeconds: number;
+	audioBitDepth: number;
+	audioChannels: number;
+	audioFilename: string;
+	audioSampleRate: number;
+}
+
+// release
+export interface ReleaseDetailAll {
+	upc: number;
+	isrc: string | null;
+	name: string;
+	tags: any;
+	image: {
+		fileId: string;
+		isTemp: boolean;
+		filename: string;
+		externalUrl: string | null;
+		lastUpdateDate: string | null;
+	} | null;
+	artist: any;
+	tracks: TrackDetailAll[]; // ← ĐÂY MỚI ĐÚNG! Không phải trackCis
+	assetId: number;
+	catalog: string | null;
+	labelId: number;
+	mixedBy: any;
+	version: string | null;
+	artistId: number;
+	createdBy: string;
+	labelName: string;
+	releaseId: number;
+	trackISRC: string | null;
+	archivedAt: string | null;
+	artistName: string;
+	copyrightC: string | null;
+	copyrightP: string | null;
+	isIngested: boolean;
+	languageId: number;
+	masteredBy: any;
+	notesCount: number;
+	payeeOwner: number;
+	producedBy: any;
+	totalSales: number;
+	description: string | null;
+	releaseDate: string;
+	tracksCount: number;
+	approvedDate: string | null;
+	artistLocals: any[];
+	contributors: any[];
+	creationDate: string;
+	enterpriseId: number;
+	masteredDate: any;
+	artistAppleId: string | null;
+	artistImageId: string;
+	isCompilation: boolean;
+	isFullyLocked: boolean;
+	kountStatusId: any;
+	recordingDate: any;
+	releaseTypeId: number;
+	createdByEmail: string;
+	enterpriseName: string;
+	hasRecordLabel: boolean;
+	releasesLocals: any[];
+	artistSpotifyId: string | null;
+	createdByUserId: string;
+	enterpriseEmail: string;
+	isEnterpriseVip: boolean;
+	kountStatusName: any;
+	payeeNotesCount: number;
+	descriptionTitle: string | null;
+	parentalAdvisory: boolean;
+	artistExternalIds: ArtistExternalIdAll[];
+	enterpriseImageId: string;
+	enterpriseOwnerId: string;
+	payeeReferrerName: any;
+	productionCredits: any;
+	recordingLocation: any;
+	featureFmSmartLink: any;
+	previouslyReleased: boolean;
+	primaryMusicStyleId: number | null;
+	isDolbyAtmosReadOnly: boolean;
+	lastPayeePaymentDate: string | null;
+	secondaryMusicStyleId: number | null;
+	lastPayeePaymentAmount: number | null;
+	trackRecordingVersions: TrackRecordingVersionAll[];
+	isEnterpriseWhiteListed: boolean;
+	isLockedForDistribution: boolean;
+	distributorStoreGenreIds: number[];
+}

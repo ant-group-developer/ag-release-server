@@ -28,6 +28,8 @@ export class CrawlService_29_12 {
 			select: ['id'],
 		});
 
+		const total = releases.length;
+
 		const concurrency = 10; // số request song song
 		const saveBatchSize = 50; // số record save 1 lần
 
@@ -58,6 +60,9 @@ export class CrawlService_29_12 {
 
 				const r = item.data;
 
+				const isExplicit: boolean =
+					r.tracks?.some((t: any) => t.explicit === true) ?? false;
+
 				toSave.push({
 					id: item.id,
 
@@ -83,8 +88,10 @@ export class CrawlService_29_12 {
 					// mainGenre: String(r.primaryMusicStyleId),
 					// alternateGenre: undefined,
 
-					primaryMusicStyleId: r.primaryMusicStyleId ?? null,
-					secondaryMusicStyleId: r.secondaryMusicStyleId ?? null,
+					// primaryMusicStyleId: r.primaryMusicStyleId ?? null,
+					// secondaryMusicStyleId: r.secondaryMusicStyleId ?? null,
+
+					isExplicit,
 				});
 
 				if (toSave.length >= saveBatchSize) {
@@ -98,6 +105,11 @@ export class CrawlService_29_12 {
 					toSave = [];
 				}
 			}
+
+			// 👉 LOG tiến trình sau mỗi batch
+			console.log(
+				`[CRAWL RELEASE] ${processed}/${total} | Updated ${updated} | Fail ${fail}`,
+			);
 		}
 
 		// flush còn lại
@@ -107,6 +119,11 @@ export class CrawlService_29_12 {
 			}
 			updated += toSave.length;
 		}
+
+		// 👉 LOG cuối
+		console.log(
+			`[CRAWL RELEASE DONE] ${processed}/${total} | Updated ${updated} | Fail ${fail}`,
+		);
 
 		return { processed, updated, fail };
 	}

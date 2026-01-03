@@ -16,15 +16,53 @@ export class ParseDataCiController {
 		return this.service.getRelease({ releaseId, label });
 	}
 
+	// @PublicRoute()
+	// @Get('release/:id')
+	// findOne(@Param('id') id: number) {
+	// 	return this.service.findOne(id);
+	// }
+
 	@PublicRoute()
-	@Get('release/:id')
-	findOne(@Param('id') id: number) {
-		return this.service.findOne(id);
+	@Post('release-by-upc/:upc')
+	parseReleaseByUpc(
+		@Param('upc') upc: string,
+		@Query('ciOrderId') ciOrderId: string,
+	) {
+		return this.service.parseReleaseByUpc(upc, ciOrderId);
 	}
 
 	@PublicRoute()
 	@Post('release/:id')
-	parseRelease(@Param('id') id: number) {
-		return this.service.parseRelease(id);
+	parseRelease(
+		@Param('id') id: number,
+		@Query('ciOrderId') ciOrderId: string,
+	) {
+		return this.service.parseRelease(id, ciOrderId);
+	}
+
+	@PublicRoute()
+	@Post('release')
+	bulkParseRelease(@Query('ciOrderId') ciOrderId: string) {
+		return this.service.parseAllReleases(ciOrderId);
+	}
+
+	// test all
+
+	@PublicRoute()
+	@Get('track/:id')
+	getTrackDetail(@Param('id') id: number) {
+		return this.service.getTrackDetail(id);
+	}
+
+	@PublicRoute()
+	@Get('release/:id')
+	getReleaseDetail(@Param('id') id: number) {
+		return this.service.getReleaseDetail(id);
+	}
+
+	@PublicRoute()
+	@Get('select-values')
+	async getSelectValues(@Query('column') column: string) {
+		return this.service.getSelectOptionsFromMetadataTemplate(column);
 	}
 }
