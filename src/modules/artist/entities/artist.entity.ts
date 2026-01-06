@@ -13,7 +13,7 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { ArtistSource } from '../enum/artist.enum';
 
-@Entity('artist_2')
+@Entity('artists')
 export class Artist extends BaseUserTrackedCustomIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
 	name: string;
