@@ -253,7 +253,7 @@ export class TrackBombCrawlService {
 		};
 	}
 
-	async crawlTrackMetadataAllV2() {
+	async crawlTrackMissingMetadata() {
 		const tracks = await this.track_29_12_Repo.find({
 			select: ['id'],
 		});
@@ -275,26 +275,38 @@ export class TrackBombCrawlService {
 			const results = await Promise.all(
 				batch.map(async (t) => {
 					try {
-						const d = await this.parseDataCiService.getTrackDetail(
-							t.id,
+						const trackLocal =
+							await this.parseDataCiService.getTrackDetailLocal(
+								t.id,
+							);
+
+						const primaryArtist = trackLocal.contributors.find(
+							(c) => c.roleId === 49,
 						);
 
-						const composers = d.composerContentsDTO?.length
-							? d.composerContentsDTO
-									.map((c) => c.composerName)
-									.filter(Boolean)
-									.join('|')
-							: null;
+						const artist = primaryArtist
+							? trackLocal.artistName +
+								'|' +
+								primaryArtist.artist.name
+							: trackLocal.artistName;
 
-						const languageId = d.languageId;
+						// const composers = trackLocal.composerContentsDTO?.length
+						// 	? trackLocal.composerContentsDTO
+						// 			.map((c) => c.composerName)
+						// 			.filter(Boolean)
+						// 			.join('|')
+						// 	: null;
 
-						const hasInstruments = true;
+						// const languageId = trackLocal.languageId;
+
+						// const hasInstruments = true;
 
 						return this.track_29_12_Repo.create({
 							id: t.id,
-							composers: composers ?? '',
-							hasInstruments: hasInstruments,
-							languageId,
+							// composers: composers ?? '',
+							// hasInstruments: hasInstruments,
+							// languageId,
+							artist,
 						});
 					} catch {
 						fail++;
@@ -528,29 +540,39 @@ export class TrackBombCrawlService {
 				processed++;
 				if (!item) continue;
 
-				const parseCopyright = (v?: string | null) => {
-					if (!v) return { year: null, text: null };
-					const m = v.trim().match(/^(\d{4})\s*(.*)$/);
-					return {
-						year: m ? Number(m[1]) : null,
-						text: m ? m[2] || null : v,
-					};
-				};
+				const primaryArtist = item.data.contributors.find(
+					(c) => c.roleId === 49,
+				);
 
-				const { year: pLineYear, text: pLineText } = parseCopyright(
-					item.data.copyrightP,
-				);
-				const { year: cLineYear, text: cLineText } = parseCopyright(
-					item.data.copyrightC,
-				);
+				const artist = primaryArtist
+					? item.data.artistName + '|' + primaryArtist.artist.name
+					: item.data.artistName;
+
+				// const parseCopyright = (v?: string | null) => {
+				// 	if (!v) return { year: null, text: null };
+				// 	const m = v.trim().match(/^(\d{4})\s*(.*)$/);
+				// 	return {
+				// 		year: m ? Number(m[1]) : null,
+				// 		text: m ? m[2] || null : v,
+				// 	};
+				// };
+
+				// const { year: pLineYear, text: pLineText } = parseCopyright(
+				// 	item.data.copyrightP,
+				// );
+				// const { year: cLineYear, text: cLineText } = parseCopyright(
+				// 	item.data.copyrightC,
+				// );
 
 				toSave.push(
 					this.release_29_12_Repo.create({
 						id: item.id,
-						pYear: pLineYear,
-						pHolder: pLineText,
-						cYear: cLineYear,
-						cHolder: cLineText,
+						// pYear: pLineYear,
+						// pHolder: pLineText,
+						// cYear: cLineYear,
+						// cHolder: cLineText,
+
+						artist,
 					}),
 				);
 
@@ -576,7 +598,6 @@ export class TrackBombCrawlService {
 		const releases = await this.releaseRepo.find({
 			select: ['id'],
 		});
-		console.log(releases);
 
 		const concurrency = 20;
 		const saveBatchSize = 100;
@@ -680,7 +701,8 @@ export class TrackBombCrawlService {
 	// }
 
 	private async getReleaseDetail2(token: string, releaseId: number) {
-		const data = await this.parseDataCiService.getReleaseDetail(releaseId);
+		const data =
+			await this.parseDataCiService.getReleaseDetailLocal(releaseId);
 		return data;
 	}
 }

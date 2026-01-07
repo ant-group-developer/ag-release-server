@@ -13,7 +13,7 @@ export class BombCrawController {
 	@PublicRoute()
 	@Get('crawl-track-metadata')
 	async crawlTrackMetadata(@Query('token') token: string) {
-		return this.service.crawlTrackMetadataAllV2();
+		return this.service.crawlTrackMissingMetadata();
 	}
 
 	@PublicRoute()

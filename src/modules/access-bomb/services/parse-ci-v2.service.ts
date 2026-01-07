@@ -44,13 +44,13 @@ export class ParseDataCiService {
 		private readonly releaseBombAllRepo: Repository<ReleaseBombAll>,
 	) {}
 
-	async getTrackDetail(id: number): Promise<TrackDetailAll> {
+	async getTrackDetailLocal(id: number): Promise<TrackDetailAll> {
 		const data = await this.trackBombAllRepo.findOne({ where: { id } });
 		if (!data) throw new NotFoundException('TRACK_NOT_FOUND');
 		return data.response;
 	}
 
-	async getReleaseDetail(id: number): Promise<ReleaseDetailAll> {
+	async getReleaseDetailLocal(id: number): Promise<ReleaseDetailAll> {
 		const data = await this.releaseBombAllRepo.findOne({ where: { id } });
 		if (!data) throw new NotFoundException('RELEASE_NOT_FOUND');
 		return data.response;
@@ -517,7 +517,9 @@ export class ParseDataCiService {
 				releaseTitle: release.releaseTitle,
 				versionDescription: release.versionDescription ?? null,
 				artist: release.artist,
-				displayArtist: null,
+				displayArtist: release.artist.includes('|')
+					? release.artist.replace(/\|/g, ' and ')
+					: null,
 				gtin: release.gtin ?? '',
 				// catalogueNo:
 				// 	release.catalogueNo ?? `auto_catalog_ag_${release.gtin}`,
@@ -567,8 +569,10 @@ export class ParseDataCiService {
 				trackTitle: t.trackTitle,
 				trackVersion: t.trackTitleVersion ?? null,
 
-				trackArtist: t.trackArtist,
-				trackDisplayArtist: null,
+				trackArtist: t.artist,
+				trackDisplayArtist: release.artist.includes('|')
+					? release.artist.replace(/\|/g, ' and ')
+					: null,
 				isrc: t.trackISRC,
 				trackGrid: null,
 				availableSeparately: 'Y',
@@ -589,17 +593,17 @@ export class ParseDataCiService {
 
 				trackExplicitContent: t.isExplicit === true ? 'Y' : 'N',
 
-				producers: release.artist,
-				mixers: release.artist,
+				producers: release.artist, // 34: Producer, 37: Vocal Producer, 66: Assistant Producer, 72: Co-Producer, 80: Executive Producer
+				mixers: release.artist, // 48: Mixer, 6: Remixer
 				composers:
 					t.composers && t.composers.trim() !== ''
 						? t.composers
-						: release.artist,
+						: release.artist, //2: Composer, 39: Composer & Lyricist,
 
 				lyricists:
 					hasVocalsOrLanguage === 'No linguistic content - zxx'
 						? null
-						: release.artist,
+						: release.artist, // 4: Lyricist, 39: Composer & Lyricist
 
 				publishers: null,
 

@@ -161,6 +161,9 @@ export class Track_29_12 {
 	})
 	language: string | null;
 
+	@Column()
+	artist: string;
+
 	@ManyToOne(() => Release_29_12, (release) => release.trackCis, {
 		onDelete: 'CASCADE',
 	})

@@ -5,7 +5,7 @@ export interface CiRawRow {
 	releaseTitle: string;
 	versionDescription?: string | null;
 	artist: string;
-	displayArtist?: null;
+	displayArtist?: string | null;
 	gtin: string;
 	catalogueNo?: string | null;
 	releaseFormatType: string;

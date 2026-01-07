@@ -51,13 +51,13 @@ export class ParseDataCiController {
 	@PublicRoute()
 	@Get('track/:id')
 	getTrackDetail(@Param('id') id: number) {
-		return this.service.getTrackDetail(id);
+		return this.service.getTrackDetailLocal(id);
 	}
 
 	@PublicRoute()
 	@Get('release/:id')
 	getReleaseDetail(@Param('id') id: number) {
-		return this.service.getReleaseDetail(id);
+		return this.service.getReleaseDetailLocal(id);
 	}
 
 	@PublicRoute()
