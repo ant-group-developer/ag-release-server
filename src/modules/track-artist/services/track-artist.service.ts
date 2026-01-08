@@ -60,7 +60,7 @@ export class TrackArtistService {
 		}
 	}
 
-	async addArtistToTracksSource1(
+	async syncTrackContributorsFromReleaseArtist(
 		releaseArtist: ReleaseArtist,
 		tracksTurnOnCopy: Track[],
 	) {

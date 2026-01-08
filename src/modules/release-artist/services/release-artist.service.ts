@@ -156,7 +156,7 @@ export class ReleaseArtistService {
 		createDto: CreateReleaseArtistDto;
 	}) {
 		// kéo artist sang những track đang bật lấy artist từ release
-		await this.pushArtistToTracksSource1(releaseArtist);
+		await this.syncTrackContributorsFromReleaseArtist(releaseArtist);
 
 		// đẩy artist sang track nếu user chọn add artist to track
 		if (createDto.addArtistToTracks) {
@@ -164,8 +164,12 @@ export class ReleaseArtistService {
 		}
 	}
 
-	private async pushArtistToTracksSource1(releaseArtist: ReleaseArtist) {
-		await this.trackDraftService.addArtistToTracksSource1(releaseArtist);
+	private async syncTrackContributorsFromReleaseArtist(
+		releaseArtist: ReleaseArtist,
+	) {
+		await this.trackDraftService.syncTrackContributorsFromReleaseArtist(
+			releaseArtist,
+		);
 	}
 
 	private async updateRelatedRecords(releaseArtist: ReleaseArtist) {

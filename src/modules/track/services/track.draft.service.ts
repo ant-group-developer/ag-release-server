@@ -177,7 +177,7 @@ export class TrackDraftService {
 	}
 
 	// artist
-	async addArtistToTracksSource1(releaseArtist: ReleaseArtist) {
+	async syncTrackContributorsFromReleaseArtist(releaseArtist: ReleaseArtist) {
 		const { releaseId } = releaseArtist;
 
 		const tracksTurnOnCopy = await this.trackRepo.find({
@@ -187,7 +187,7 @@ export class TrackDraftService {
 			},
 		});
 
-		await this.trackArtistService.addArtistToTracksSource1(
+		await this.trackArtistService.syncTrackContributorsFromReleaseArtist(
 			releaseArtist,
 			tracksTurnOnCopy,
 		);
