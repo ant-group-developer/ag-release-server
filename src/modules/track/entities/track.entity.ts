@@ -113,6 +113,9 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	@Column({ type: 'boolean', default: false })
 	copyArtistsFromRelease: boolean;
 
+	@Column({ type: 'boolean', default: false })
+	copyContributorsFromRelease: boolean;
+
 	@Column({
 		type: 'uuid',
 		nullable: true,

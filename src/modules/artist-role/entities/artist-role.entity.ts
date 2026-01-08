@@ -3,10 +3,8 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
-import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('artist_roles')
 export class ArtistRole extends BaseUserTrackedUUIDEntity {
@@ -16,11 +14,11 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
 	code: string;
 
-	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
-	releaseArtists: ReleaseArtist[];
+	// @OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
+	// releaseArtists: ReleaseArtist[];
 
-	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.artistRole)
-	trackArtists: TrackArtist[];
+	// @OneToMany(() => TrackArtist, (trackArtist) => trackArtist.artistRole)
+	// trackArtists: TrackArtist[];
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

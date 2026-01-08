@@ -153,7 +153,7 @@ export class TrackQueryService {
 			.leftJoin('track.subGenre', 'subGenre')
 
 			.leftJoin('track.trackArtists', 'trackArtist')
-			.leftJoin('trackArtist.artistRole', 'artistRole')
+			// .leftJoin('trackArtist.artistRole', 'artistRole')
 			.leftJoin('trackArtist.artist', 'artist')
 
 			.leftJoin('track.trackLanguage', 'trackLanguage')
@@ -182,7 +182,7 @@ export class TrackQueryService {
 
 		query
 			.addSelect(['trackArtist.id'])
-			.addSelect(['artistRole.name'])
+			// .addSelect(['artistRole.name'])
 			.addSelect(['artist.name', 'artist.picture']);
 
 		query.addSelect([
@@ -532,7 +532,7 @@ export class TrackQueryService {
 			.leftJoin('audioFile.peak', 'peak')
 
 			.leftJoin('track.trackArtists', 'trackArtist')
-			.leftJoin('trackArtist.artistRole', 'artistRole')
+			// .leftJoin('trackArtist.artistRole', 'artistRole')
 			.leftJoin('trackArtist.artist', 'artist')
 
 			.leftJoin('track.trackLanguage', 'trackLanguage')
@@ -672,7 +672,7 @@ export class TrackQueryService {
 			.leftJoin('track.primaryGenre', 'primaryGenre')
 
 			.leftJoin('track.trackArtists', 'trackArtist')
-			.leftJoin('trackArtist.artistRole', 'artistRole')
+			// .leftJoin('trackArtist.artistRole', 'artistRole')
 			.leftJoin('trackArtist.artist', 'artist')
 
 			.leftJoin('trackRevenue.dsp', 'dsp')
@@ -797,14 +797,16 @@ export class TrackQueryService {
 	}
 
 	private addSelectTrackArtist(qb: SelectQueryBuilder<Track>) {
-		return qb
-			.addSelect([
-				'trackArtist.id',
-				'trackArtist.artistId',
-				'trackArtist.artistRoleId',
-			])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
-			.addSelect(['artist.id', 'artist.name', 'artist.picture']);
+		return (
+			qb
+				.addSelect([
+					'trackArtist.id',
+					'trackArtist.artistId',
+					// 'trackArtist.artistRoleId',
+				])
+				// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+				.addSelect(['artist.id', 'artist.name', 'artist.picture'])
+		);
 	}
 
 	private addSelectTrackLanguage(qb: SelectQueryBuilder<Track>) {

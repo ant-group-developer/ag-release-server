@@ -35,6 +35,7 @@ import { NewsPostModule } from './modules/news-post/news-post.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
+import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
 import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
@@ -48,6 +49,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
+import { TrackContributorModule } from './modules/track-contributor/track-contributor.module';
 import { TrackLanguageModule } from './modules/track-language/track-language.module';
 import { TrackLocalizeModule } from './modules/track-localize/track-localize.module';
 import { TrackOriginTypeModule } from './modules/track-origin-type/track-origin-type.module';
@@ -141,6 +143,8 @@ import { UserModule } from './modules/user/user.module';
 		NewsPostModule,
 
 		DeliveryModule,
+		ReleaseContributorModule,
+		TrackContributorModule,
 	],
 	controllers: [AppController],
 	providers: [

@@ -163,7 +163,7 @@ export class ReleaseQueryService {
 			.leftJoin('releaseArtist.artist', 'artist')
 			.leftJoin('artist.genre', 'genre')
 			.leftJoin('artist.country', 'country')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			// .leftJoin('releaseArtist.artistRole', 'artistRole')
 
 			.leftJoin('release.releaseLanguage', 'releaseLanguage')
 
@@ -216,7 +216,7 @@ export class ReleaseQueryService {
 			])
 			.addSelect([
 				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
+				// 'releaseArtist.artistRoleId',
 				'releaseArtist.artistId',
 				'releaseArtist.releaseId',
 				'releaseArtist.addArtistToTracks',
@@ -237,7 +237,7 @@ export class ReleaseQueryService {
 				'genre.picture',
 			])
 			.addSelect(['country.id', 'country.name', 'country.iso2'])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect([
 				'releaseLanguage.id',
 				'releaseLanguage.metadataLanguageCountryId',
@@ -444,7 +444,7 @@ export class ReleaseQueryService {
 			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			// .leftJoin('releaseArtist.artistRole', 'artistRole')
 			.leftJoin('release.label', 'label');
 	}
 
@@ -472,7 +472,7 @@ export class ReleaseQueryService {
 			])
 			.addSelect([
 				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
+				// 'releaseArtist.artistRoleId',
 				'releaseArtist.artistId',
 				'releaseArtist.releaseId',
 				'releaseArtist.addArtistToTracks',
@@ -484,7 +484,7 @@ export class ReleaseQueryService {
 				'artist.picture',
 				'artist.biography',
 			])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
 			.addSelect([
 				'label.id',
 				'label.name',
@@ -536,16 +536,16 @@ export class ReleaseQueryService {
 			relations: {
 				albumFormat: true,
 				releaseCoverArts: true,
-				releaseArtists: {
-					artistRole: true,
-				},
+				// releaseArtists: {
+				// 	artistRole: true,
+				// },
 				releaseLanguage: true,
 				tracks: {
 					trackLanguage: true,
 					audioFile: true,
-					trackArtists: {
-						artistRole: true,
-					},
+					// trackArtists: {
+					// 	artistRole: true,
+					// },
 				},
 				releaseTerritory: true,
 			},
