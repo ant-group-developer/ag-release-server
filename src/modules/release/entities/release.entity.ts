@@ -7,6 +7,7 @@ import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-l
 
 import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
+import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -161,6 +162,12 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.release)
 	releaseArtists: ReleaseArtist[];
+
+	@OneToMany(
+		() => ReleaseContributor,
+		(releaseContributor) => releaseContributor.release,
+	)
+	releaseContributors: ReleaseContributor[];
 
 	@OneToOne(
 		() => ReleaseLanguage,

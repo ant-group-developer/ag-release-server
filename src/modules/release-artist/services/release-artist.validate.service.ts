@@ -68,17 +68,17 @@ export class ReleaseArtistValidateService {
 
 	private async validateUnique({
 		releaseId,
-		artistRoleId,
+		// artistRoleId,
 		artistId,
 	}: {
-		artistRoleId: string;
+		// artistRoleId: string;
 		artistId: string;
 		releaseId: string;
 	}) {
 		const releaseArtist = await this.releaseArtistRepo.findOne({
 			where: {
 				releaseId,
-				artistRoleId,
+				// artistRoleId,
 				artistId,
 			},
 		});
@@ -104,7 +104,11 @@ export class ReleaseArtistValidateService {
 		releaseArtistPrevious: ReleaseArtist;
 		releaseArtistUpdate: ReleaseArtist;
 	}) {
-		const { artistId, artistRoleId, releaseId } = releaseArtistUpdate;
+		const {
+			artistId,
+			//  artistRoleId,
+			releaseId,
+		} = releaseArtistUpdate;
 
 		if (artistId !== releaseArtistPrevious.artistId) {
 			await this.validateForeignKey({
@@ -113,13 +117,13 @@ export class ReleaseArtistValidateService {
 			await this.validateUnique(releaseArtistUpdate);
 		}
 
-		if (artistRoleId !== releaseArtistPrevious.artistRoleId) {
-			await this.validateForeignKey({
-				artistRoleId,
-			});
+		// if (artistRoleId !== releaseArtistPrevious.artistRoleId) {
+		// 	await this.validateForeignKey({
+		// 		artistRoleId,
+		// 	});
 
-			await this.validateUnique(releaseArtistUpdate);
-		}
+		// 	await this.validateUnique(releaseArtistUpdate);
+		// }
 
 		if (releaseId !== releaseArtistPrevious.releaseId) {
 			await this.validateForeignKey({

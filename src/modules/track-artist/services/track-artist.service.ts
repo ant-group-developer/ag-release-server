@@ -34,60 +34,6 @@ export class TrackArtistService {
 		return await this.trackArtistRepo.save(trackArtist);
 	}
 
-	private async mergeTrackArtists({
-		items,
-		typeSource,
-	}: {
-		items: {
-			artistId: string;
-			artistRoleId: string;
-			trackId: string;
-			releaseArtistId: string;
-		}[];
-		typeSource: TypeSource;
-	}) {
-		for (const item of items) {
-			const { artistId, artistRoleId, trackId, releaseArtistId } = item;
-
-			const existing = await this.trackArtistRepo.findOne({
-				where: { artistId, artistRoleId, trackId },
-			});
-
-			if (existing) {
-				if (
-					!existing.isFromReleaseAction &&
-					typeSource === TypeSource.SOURCE2
-				) {
-					existing.isFromReleaseAction = true;
-				}
-
-				if (
-					!existing.isFromTrackAction &&
-					typeSource === TypeSource.SOURCE1
-				) {
-					existing.isFromTrackAction = true;
-				}
-
-				existing.releaseArtistId = releaseArtistId;
-
-				await this.trackArtistRepo.save(existing);
-			} else {
-				const newEntry = this.trackArtistRepo.create({
-					artistId,
-					artistRoleId,
-					trackId,
-					isFromReleaseAction:
-						typeSource === TypeSource.SOURCE2 ? true : false,
-					isFromTrackAction:
-						typeSource === TypeSource.SOURCE1 ? true : false,
-					releaseArtistId: releaseArtistId,
-				});
-
-				await this.trackArtistRepo.save(newEntry);
-			}
-		}
-	}
-
 	async copyArtistFromReleaseSource1({
 		releaseId,
 		trackId,
@@ -102,29 +48,32 @@ export class TrackArtistService {
 		if (releaseArtists.length > 0) {
 			const trackArtist = releaseArtists.map((releaseArtist) => ({
 				artistId: releaseArtist.artistId,
-				artistRoleId: releaseArtist.artistRoleId,
+				// artistRoleId: releaseArtist.artistRoleId,
 				trackId,
 				releaseArtistId: releaseArtist.id,
 			}));
 
 			await this.mergeTrackArtists({
 				items: trackArtist,
-				typeSource: TypeSource.SOURCE1,
+				typeSource: TypeSource.FROM_TRACK,
 			});
 		}
 	}
 
-	async addArtistToTracksSource1(
+	async syncTrackContributorsFromReleaseArtist(
 		releaseArtist: ReleaseArtist,
 		tracksTurnOnCopy: Track[],
 	) {
-		const { artistId, artistRoleId } = releaseArtist;
+		const {
+			artistId,
+			// artistRoleId
+		} = releaseArtist;
 
 		const trackArtistEntities = tracksTurnOnCopy.map((track) => {
 			return this.trackArtistRepo.create({
 				trackId: track.id,
 				artistId,
-				artistRoleId,
+				// artistRoleId,
 				isFromTrackAction: true,
 				releaseArtistId: releaseArtist.id,
 			});
@@ -133,22 +82,25 @@ export class TrackArtistService {
 		await this.trackArtistRepo.save(trackArtistEntities);
 	}
 
-	async addArtistToTracks2(
+	async addArtistToTracks(
 		releaseArtist: ReleaseArtist,
 		tracksOfRelease: Track[],
 	) {
-		const { artistId, artistRoleId } = releaseArtist;
+		const {
+			artistId,
+			// artistRoleId
+		} = releaseArtist;
 
 		const trackArtistEntities = tracksOfRelease.map((track) => ({
 			trackId: track.id,
 			artistId,
-			artistRoleId,
+			// artistRoleId,
 			releaseArtistId: releaseArtist.id,
 		}));
 
 		await this.mergeTrackArtists({
 			items: trackArtistEntities,
-			typeSource: TypeSource.SOURCE2,
+			typeSource: TypeSource.FROM_RELEASE,
 		});
 	}
 
@@ -167,7 +119,7 @@ export class TrackArtistService {
 			const trackArtistEntities = this.trackArtistRepo.create(
 				releaseArtists.map((releaseArtist) => ({
 					artistId: releaseArtist.artistId,
-					artistRoleId: releaseArtist.artistRoleId,
+					// artistRoleId: releaseArtist.artistRoleId,
 					trackId,
 					releaseArtistId: releaseArtist.id,
 					isFromReleaseAction: true,
@@ -235,8 +187,11 @@ export class TrackArtistService {
 		});
 	}
 
-	async updateByReleaseArtist(releaseArtist: ReleaseArtist) {
-		const { artistId, artistRoleId } = releaseArtist;
+	async updateTrackArtist(releaseArtist: ReleaseArtist) {
+		const {
+			artistId,
+			// artistRoleId
+		} = releaseArtist;
 
 		const trackArtistsFromRelease = await this.trackArtistRepo.find({
 			where: { releaseArtistId: releaseArtist.id },
@@ -247,7 +202,7 @@ export class TrackArtistService {
 				return {
 					...trackArtist,
 					artistId: artistId,
-					artistRoleId: artistRoleId,
+					// artistRoleId: artistRoleId,
 				};
 			},
 		);
@@ -298,7 +253,7 @@ export class TrackArtistService {
 		});
 	}
 
-	async deleteArtistTracks2(releaseArtist: ReleaseArtist) {
+	async deleteTrackArtists(releaseArtist: ReleaseArtist) {
 		const { releaseId, id: releaseArtistId } = releaseArtist;
 
 		const trackArtists = await this.trackArtistRepo
@@ -330,5 +285,69 @@ export class TrackArtistService {
 
 	async deleteByReleaseArtist(releaseArtistId: string) {
 		await this.trackArtistRepo.delete({ releaseArtistId });
+	}
+
+	// private
+	private async mergeTrackArtists({
+		items,
+		typeSource,
+	}: {
+		items: {
+			artistId: string;
+			// artistRoleId: string;
+			trackId: string;
+			releaseArtistId: string;
+		}[];
+		typeSource: TypeSource;
+	}) {
+		for (const item of items) {
+			const {
+				artistId,
+				// artistRoleId,
+				trackId,
+				releaseArtistId,
+			} = item;
+
+			const existing = await this.trackArtistRepo.findOne({
+				where: {
+					artistId,
+					//  artistRoleId,
+					trackId,
+				},
+			});
+
+			if (existing) {
+				if (
+					!existing.isFromReleaseAction &&
+					typeSource === TypeSource.FROM_RELEASE
+				) {
+					existing.isFromReleaseAction = true;
+				}
+
+				if (
+					!existing.isFromTrackAction &&
+					typeSource === TypeSource.FROM_TRACK
+				) {
+					existing.isFromTrackAction = true;
+				}
+
+				existing.releaseArtistId = releaseArtistId;
+
+				await this.trackArtistRepo.save(existing);
+			} else {
+				const newEntry = this.trackArtistRepo.create({
+					artistId,
+					// artistRoleId,
+					trackId,
+					isFromReleaseAction:
+						typeSource === TypeSource.FROM_RELEASE ? true : false,
+					isFromTrackAction:
+						typeSource === TypeSource.FROM_TRACK ? true : false,
+					releaseArtistId: releaseArtistId,
+				});
+
+				await this.trackArtistRepo.save(newEntry);
+			}
+		}
 	}
 }

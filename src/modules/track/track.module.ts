@@ -7,6 +7,7 @@ import { Genre } from '../genre/entities/genre.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { Release } from '../release/entities/release.entity';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
+import { TrackContributorModule } from '../track-contributor/track-contributor.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
 import { TrackOriginType } from '../track-origin-type/entities/track-origin-type.entity';
 import { TrackPolicyModule } from '../track-policy/track-policy.module';
@@ -34,6 +35,7 @@ import { TrackService } from './services/track.service';
 		AudioFileModule,
 		TrackLanguageModule,
 		TrackArtistModule,
+		TrackContributorModule,
 		CopyrightModule,
 		TrackPolicyModule,
 		AppConfigModule,

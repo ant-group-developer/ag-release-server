@@ -159,11 +159,19 @@ export class ReleaseQueryService {
 
 			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
 
+			// artist
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
 			.leftJoin('artist.genre', 'genre')
 			.leftJoin('artist.country', 'country')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			// .leftJoin('releaseArtist.artistRole', 'artistRole')
+
+			// contributor
+			.leftJoin('release.releaseContributors', 'releaseContributor')
+			.leftJoin('releaseContributor.artist', 'artistContributor')
+			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
+			.leftJoin('artistContributor.genre', 'genreContributor')
+			.leftJoin('artistContributor.country', 'countryContributor')
 
 			.leftJoin('release.releaseLanguage', 'releaseLanguage')
 
@@ -214,9 +222,11 @@ export class ReleaseQueryService {
 				'releaseCoverArt.height',
 				'releaseCoverArt.type',
 			])
+
+			// artist
 			.addSelect([
 				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
+				// 'releaseArtist.artistRoleId',
 				'releaseArtist.artistId',
 				'releaseArtist.releaseId',
 				'releaseArtist.addArtistToTracks',
@@ -237,7 +247,36 @@ export class ReleaseQueryService {
 				'genre.picture',
 			])
 			.addSelect(['country.id', 'country.name', 'country.iso2'])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+
+			// contributor
+			.addSelect([
+				'releaseContributor.id',
+				'releaseContributor.artistRoleId',
+				'releaseContributor.artistId',
+				'releaseContributor.releaseId',
+				'releaseContributor.addContributorToTracks',
+			])
+			.addSelect([
+				'artistContributor.id',
+				'artistContributor.name',
+				'artistContributor.code',
+				'artistContributor.picture',
+				'artistContributor.biography',
+			])
+			.addSelect([
+				'artistRoleContributor.id',
+				'artistRoleContributor.name',
+				'artistRoleContributor.code',
+			])
+			.addSelect([
+				'genreContributor.id',
+				'genreContributor.name',
+				'genreContributor.code',
+				'genreContributor.picture',
+			])
+
+			// language
 			.addSelect([
 				'releaseLanguage.id',
 				'releaseLanguage.metadataLanguageCountryId',
@@ -442,9 +481,17 @@ export class ReleaseQueryService {
 		queryBuilder
 			.leftJoin('release.albumFormat', 'albumFormat')
 			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+
+			// artist
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
-			.leftJoin('releaseArtist.artistRole', 'artistRole')
+			// .leftJoin('releaseArtist.artistRole', 'artistRole')
+
+			// contributor
+			.leftJoin('release.releaseContributors', 'releaseContributor')
+			.leftJoin('releaseContributor.artist', 'artistContributor')
+			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
+
 			.leftJoin('release.label', 'label');
 	}
 
@@ -470,9 +517,11 @@ export class ReleaseQueryService {
 				'releaseCoverArt.height',
 				'releaseCoverArt.type',
 			])
+
+			// artist
 			.addSelect([
 				'releaseArtist.id',
-				'releaseArtist.artistRoleId',
+				// 'releaseArtist.artistRoleId',
 				'releaseArtist.artistId',
 				'releaseArtist.releaseId',
 				'releaseArtist.addArtistToTracks',
@@ -484,7 +533,30 @@ export class ReleaseQueryService {
 				'artist.picture',
 				'artist.biography',
 			])
-			.addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+			// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
+
+			// contributor
+			.addSelect([
+				'releaseContributor.id',
+				'releaseContributor.artistRoleId',
+				'releaseContributor.artistId',
+				'releaseContributor.releaseId',
+				'releaseContributor.addContributorToTracks',
+			])
+			.addSelect([
+				'artistContributor.id',
+				'artistContributor.name',
+				'artistContributor.code',
+				'artistContributor.picture',
+				'artistContributor.biography',
+			])
+			.addSelect([
+				'artistRoleContributor.id',
+				'artistRoleContributor.name',
+				'artistRoleContributor.code',
+			])
+
+			// label
 			.addSelect([
 				'label.id',
 				'label.name',
@@ -536,16 +608,16 @@ export class ReleaseQueryService {
 			relations: {
 				albumFormat: true,
 				releaseCoverArts: true,
-				releaseArtists: {
-					artistRole: true,
-				},
+				// releaseArtists: {
+				// 	artistRole: true,
+				// },
 				releaseLanguage: true,
 				tracks: {
 					trackLanguage: true,
 					audioFile: true,
-					trackArtists: {
-						artistRole: true,
-					},
+					// trackArtists: {
+					// 	artistRole: true,
+					// },
 				},
 				releaseTerritory: true,
 			},

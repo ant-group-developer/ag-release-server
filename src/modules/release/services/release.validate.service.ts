@@ -5,7 +5,6 @@ import {
 	ResponseError,
 } from 'src/common/dtos/common.response.dto';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
-import { mainArtistRole } from 'src/modules/artist-role/constants/artist-role.constant';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -373,19 +372,19 @@ export class ReleaseValidateService {
 		}
 
 		// release artists validation
-		if (
-			release.isVariousArtist === false &&
-			!release.releaseArtists.some(
-				(ra) => ra.artistRole.code === mainArtistRole.code,
-			)
-		) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'core-detail',
-					field: 'releaseArtists',
-				}),
-			);
-		}
+		// if (
+		// 	release.isVariousArtist === false &&
+		// 	!release.releaseArtists.some(
+		// 		(ra) => ra.artistRole.code === mainArtistRole.code,
+		// 	)
+		// ) {
+		// 	result.push(
+		// 		new FieldErrorDetails({
+		// 			page: 'core-detail',
+		// 			field: 'releaseArtists',
+		// 		}),
+		// 	);
+		// }
 
 		return result;
 	}
@@ -478,19 +477,19 @@ export class ReleaseValidateService {
 			}
 
 			// track artists validation
-			if (
-				!track.trackArtists.some(
-					(ta) => ta.artistRole.code === mainArtistRole.code,
-				)
-			) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.trackArtists`,
-						trackId: track.id,
-					}),
-				);
-			}
+			// if (
+			// 	!track.trackArtists.some(
+			// 		(ta) => ta.artistRole.code === mainArtistRole.code,
+			// 	)
+			// ) {
+			// 	result.push(
+			// 		new FieldErrorDetails({
+			// 			page: 'tracks',
+			// 			field: `tracks.${index}.trackArtists`,
+			// 			trackId: track.id,
+			// 		}),
+			// 	);
+			// }
 
 			//
 			if (track.audioFile && !track.audioFile.preview) {

@@ -10,9 +10,9 @@ import {
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 export class CreateTrackArtistDto {
-	@IsNotEmpty()
-	@IsUUID()
-	artistRoleId: string;
+	// @IsNotEmpty()
+	// @IsUUID()
+	// artistRoleId: string;
 
 	@IsNotEmpty()
 	@IsString()
@@ -25,10 +25,10 @@ export class CreateTrackArtistDto {
 }
 
 export class UpdateTrackArtistDto extends PartialType(CreateTrackArtistDto) {
-	@IsNotEmpty()
-	@IsUUID()
-	@ValidateIf((_, value) => value !== undefined)
-	artistRoleId: string;
+	// @IsNotEmpty()
+	// @IsUUID()
+	// @ValidateIf((_, value) => value !== undefined)
+	// artistRoleId: string;
 
 	@IsNotEmpty()
 	@Length(10, 10)
