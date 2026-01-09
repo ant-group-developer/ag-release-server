@@ -9,25 +9,49 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { NewsPost } from './news-post.entity';
 
-@Entity('news_posts_translation')
+@Entity('news_posts_translation', {
+	comment: 'Bảng lưu nội dung dịch đa ngôn ngữ cho bài viết tin tức',
+})
 @Unique(['newsPostId', 'languageCode'])
 export class NewsPostTranslation extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID bài viết tin tức gốc',
+	})
 	newsPostId: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		comment: 'Mã ngôn ngữ của bản dịch',
+	})
 	languageCode: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		comment: 'Tiêu đề bài viết theo ngôn ngữ',
+	})
 	title: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NOTE,
+		nullable: true,
+		comment: 'Mô tả ngắn bài viết theo ngôn ngữ',
+	})
 	description: string;
 
-	@Column({ type: 'text' })
+	@Column({
+		type: 'text',
+		comment: 'Nội dung đầy đủ của bài viết theo ngôn ngữ',
+	})
 	content: string;
 
-	@Column({ default: false })
+	@Column({
+		default: false,
+		comment: 'Đánh dấu bản dịch mặc định của bài viết',
+	})
 	isDefault: boolean;
 
 	@ManyToOne(() => NewsPost, (newsPost) => newsPost.newsPostTranslations, {
@@ -36,7 +60,6 @@ export class NewsPostTranslation extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'news_post_id' })
 	newsPost: NewsPost;
 
-	// vitual column
 	languageName?: string | null;
 
 	@ManyToOne(() => Language)

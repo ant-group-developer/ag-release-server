@@ -7,35 +7,54 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
 import { NewsPostTranslation } from './news-post-translation.entity';
 
-@Entity('news_posts')
+@Entity('news_posts', {
+	comment: 'Bài viết tin tức, hỗ trợ đa ngôn ngữ thông qua bảng translation',
+})
 export class NewsPost extends BaseUserTrackedUUIDEntity {
-	// vitual column
 	title?: string | null;
 	description?: string | null;
 	content?: string | null;
 	languageCode?: string | null;
 	languageName?: string | null;
 
-	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: LENGTH_PICTURE,
+		nullable: true,
+		comment: 'Ảnh thumbnail của bài viết',
+	})
 	thumbnail: string | null;
 
 	@Column({
 		type: 'enum',
 		enum: NewsPostStatus,
 		default: NewsPostStatus.PRIVATE,
+		comment: 'Trạng thái bài viết (private / public / draft...)',
 	})
 	status: NewsPostStatus;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID danh mục tin tức',
+	})
 	newsCategoryId: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Slug dùng cho URL bài viết',
+	})
 	slug: string;
 
-	@Column({ type: 'text', array: true, default: '{}' })
+	@Column({
+		type: 'text',
+		array: true,
+		default: '{}',
+		comment: 'Danh sách từ khóa SEO của bài viết',
+	})
 	keywords: string[];
 
-	// relation
 	@ManyToOne(() => NewsCategory, (category) => category.id)
 	@JoinColumn({ name: 'news_category_id' })
 	newsCategory: NewsCategory;

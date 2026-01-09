@@ -5,40 +5,47 @@ import { Language } from 'src/modules/language/entities/language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
-@Entity('track_language')
+@Entity('track_language', {
+	comment:
+		'Thông tin ngôn ngữ và quốc gia áp dụng cho metadata và audio của track',
+})
 export class TrackLanguage extends BaseUUIDEntity {
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment:
+			'Quốc gia dùng cho metadata ngôn ngữ ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	metadataLanguageCountryId: string | null; // ngon ngu quoc gia
+	metadataLanguageCountryId: string | null;
 
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Ngôn ngữ audio của track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	audioLanguageId: string | null; // ngon ngu bai hat
+	audioLanguageId: string | null;
 
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Ngôn ngữ metadata của track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	metadataLanguageId: string | null; // ngon ngu metadata
+	metadataLanguageId: string | null;
 
-	@Column({ type: 'varchar', length: 10 })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID track',
+	})
 	trackId: string;
 
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Quốc gia thu âm của track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	recordingCountryId: string | null; // quoc gia thu am
+	recordingCountryId: string | null;
 
-	// relation
 	@ManyToOne(() => Country)
 	@JoinColumn({ name: 'metadata_language_country_id' })
 	metadataLanguageCountry: Country | null;

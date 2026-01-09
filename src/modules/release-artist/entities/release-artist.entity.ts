@@ -3,29 +3,30 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
-@Entity('release_artist')
-@Unique([
-	'artistId',
-	//  'artistRoleId',
-	'releaseId',
-])
+@Entity('release_artist', {
+	comment: 'Bảng liên kết nghệ sĩ tham gia release',
+})
+@Unique(['artistId', 'releaseId'])
 export class ReleaseArtist extends BaseUUIDEntity {
-	// @Column({ type: 'uuid' })
-	// artistRoleId: string;
-
-	@Column({ type: 'varchar', length: 10 })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID nghệ sĩ tham gia release',
+	})
 	artistId: string;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID release',
+	})
 	releaseId: string;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Tự động thêm nghệ sĩ này vào tất cả track thuộc release',
+	})
 	addArtistToTracks: boolean;
-
-	//relation
-	// @ManyToOne(() => ArtistRole)
-	// @JoinColumn({ name: 'artist_role_id' })
-	// artistRole: ArtistRole;
 
 	@ManyToOne(() => Artist)
 	@JoinColumn({ name: 'artist_id' })

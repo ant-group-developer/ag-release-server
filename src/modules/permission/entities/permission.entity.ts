@@ -8,15 +8,32 @@ import { RolePermission } from 'src/modules/role/entities/role-permission.entity
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('permissions')
+@Entity('permissions', {
+	comment: 'Danh mục quyền hạn (permission) dùng cho hệ thống phân quyền',
+})
 export class Permission extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên quyền hạn',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã quyền hạn duy nhất trong hệ thống',
+	})
 	code: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NOTE,
+		nullable: true,
+		comment: 'Mô tả hoặc ghi chú cho quyền hạn',
+	})
 	note: string | null;
 
 	@OneToMany(
@@ -33,7 +50,6 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// virtual column
 	userCount?: number;
 	rolePermissionCount?: number;
 }

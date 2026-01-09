@@ -4,15 +4,26 @@ import { Role } from '../role/entities/role.entity';
 import { Tenant } from '../tenant/tenant.entity';
 import { User } from '../user/entities/user.entity';
 
-@Entity('user_role')
+@Entity('user_role', {
+	comment: 'Bảng gán role cho user theo từng tenant (RBAC đa tenant)',
+})
 export class UserRole extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID người dùng',
+	})
 	userId: string;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID vai trò được gán',
+	})
 	roleId: string;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID tenant mà role này có hiệu lực',
+	})
 	tenantId: string;
 
 	@ManyToOne(() => User)

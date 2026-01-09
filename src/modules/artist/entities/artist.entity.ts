@@ -13,52 +13,112 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { ArtistSource } from '../enum/artist.enum';
 
-@Entity('artists')
+@Entity('artists', {
+	comment:
+		'Dữ liệu gốc của nghệ sĩ, bao gồm định danh, thông tin mô tả và liên kết nền tảng',
+})
 export class Artist extends BaseUserTrackedCustomIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		comment: 'Tên hiển thị của nghệ sĩ',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã nghệ sĩ duy nhất trong hệ thống',
+	})
 	code: string;
 
-	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: LENGTH_PICTURE,
+		nullable: true,
+		comment: 'Ảnh đại diện của nghệ sĩ',
+	})
 	picture: string | null;
 
-	@Column({ type: 'varchar', length: 250, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 250,
+		nullable: true,
+		comment: 'Tiểu sử ngắn của nghệ sĩ',
+	})
 	biography: string | null;
 
 	@Column({
 		type: 'enum',
 		enum: ArtistSource,
 		default: ArtistSource.ANT_MUSIC,
+		comment: 'Nguồn dữ liệu khởi tạo nghệ sĩ',
 	})
 	artistSource: ArtistSource;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'ID nghệ sĩ từ hệ thống hoặc nguồn bên ngoài',
+	})
 	idSource: string;
 
-	@Column({ type: 'varchar', length: 10, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'ID thể loại tham chiếu',
+	})
 	genreId: string | null;
 
-	@Column({ type: 'uuid', nullable: true })
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'ID quốc gia tham chiếu',
+	})
 	countryId: string | null;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'ID nghệ sĩ trên Spotify',
+	})
 	spotifyId: string | null;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'ID nghệ sĩ trên Apple Music',
+	})
 	appleMusicId: string | null;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'Thể loại chính theo DSP',
+	})
 	primaryGenre: string | null;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'Quốc gia xuất xứ theo DSP',
+	})
 	originCountry: string | null;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu nghệ sĩ đã được quét dữ liệu hay chưa',
+	})
 	isScanned: boolean;
 
-	// relations
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
 	releaseArtists: ReleaseArtist[];
 
@@ -84,7 +144,6 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	@JoinColumn({ name: 'country_id' })
 	country: Country | null;
 
-	// count relation
 	releaseCount?: number;
 	trackCount?: number;
 }
