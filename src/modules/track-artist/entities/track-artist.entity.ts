@@ -3,40 +3,45 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
-@Entity('track_artist')
-@Unique([
-	'artistId',
-	// 'artistRoleId',
-	'trackId',
-])
+@Entity('track_artist', {
+	comment: 'Bảng liên kết nghệ sĩ tham gia từng track',
+})
+@Unique(['artistId', 'trackId'])
 export class TrackArtist extends BaseUUIDEntity {
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID nghệ sĩ tham gia track',
+	})
 	artistId: string;
 
-	// @Column({ type: 'uuid' })
-	// artistRoleId: string;
-
-	@Column({ type: 'varchar', length: 10 })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID track',
+	})
 	trackId: string;
 
-	// others
 	@Column({
 		type: 'uuid',
 		nullable: true,
-		comment: 'column for auto sync artist from release',
+		comment:
+			'ID release_artist dùng để đồng bộ nghệ sĩ từ release xuống track',
 	})
 	releaseArtistId: string | null;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo tự động từ thao tác đồng bộ release',
+	})
 	isFromReleaseAction: boolean;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ thao tác chỉnh sửa trực tiếp trên track',
+	})
 	isFromTrackAction: boolean;
-
-	// relation
-	// @ManyToOne(() => ArtistRole)
-	// @JoinColumn({ name: 'artist_role_id' })
-	// artistRole: ArtistRole;
 
 	@ManyToOne(() => Artist)
 	@JoinColumn({ name: 'artist_id' })

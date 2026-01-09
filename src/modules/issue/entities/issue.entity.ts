@@ -9,41 +9,70 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { IssueLevel } from '../../issue-level/entities/issue-level.entity';
 
-@Entity('issues')
+@Entity('issues', {
+	comment: 'Danh mục các issue / lỗi / vi phạm dùng để đánh giá và chấm điểm',
+})
 export class Issue extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên issue bằng tiếng Việt',
+	})
 	nameVi: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên issue bằng tiếng Anh',
+	})
 	nameEn: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã issue duy nhất trong hệ thống',
+	})
 	code: string;
 
 	@Column({
 		type: 'int',
 		default: 0,
-		comment: 'Base score (can be overridden per tenant_issue)',
+		comment: 'Điểm cơ bản của issue (có thể bị override theo tenant)',
 	})
 	score: number;
 
 	@Column({
 		type: 'int',
 		default: 0,
-		comment: 'Default duration impact (days)',
+		comment: 'Số ngày ảnh hưởng mặc định của issue',
 	})
 	numberOfDaysAffect: number | null;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NOTE,
+		nullable: true,
+		comment: 'Mô tả chi tiết về issue',
+	})
 	description: string | null;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NOTE,
+		nullable: true,
+		comment: 'Ghi chú bổ sung cho issue',
+	})
 	note: string | null;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID cấp độ issue (issue level)',
+	})
 	issueLevelId: string;
 
-	// user
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -52,7 +81,6 @@ export class Issue extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// relation
 	@ManyToOne(() => IssueLevel, (issueLevel) => issueLevel.issues)
 	@JoinColumn({ name: 'issue_level_id' })
 	issueLevel: IssueLevel;

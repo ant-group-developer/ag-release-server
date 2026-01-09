@@ -9,24 +9,49 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('labels')
+@Entity('labels', {
+	comment: 'Danh mục label / hãng phát hành nhạc thuộc từng tenant',
+})
 export class Label extends BaseUserTrackedCustomIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên label / hãng phát hành',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã label duy nhất trong hệ thống',
+	})
 	code: string;
 
-	@Column({ type: 'varchar', length: LENGTH_PICTURE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: LENGTH_PICTURE,
+		nullable: true,
+		comment: 'Ảnh đại diện hoặc logo của label',
+	})
 	picture: string | null;
 
-	@Column({ type: 'varchar', length: 200, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 200,
+		nullable: true,
+		comment: 'Mô tả ngắn về label',
+	})
 	description: string | null;
 
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID tenant sở hữu label này',
+	})
 	tenantId: string;
 
 	@ManyToOne(() => Tenant)
@@ -41,7 +66,6 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// count relation
 	releaseCount?: number;
 	trackCount?: number;
 }

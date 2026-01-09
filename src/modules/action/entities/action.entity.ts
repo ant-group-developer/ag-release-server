@@ -9,22 +9,35 @@ import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.enti
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('actions')
+@Entity('actions', {
+	comment:
+		'Danh sách hành động hệ thống dùng cho tích hợp DSP và các chính sách xử lý',
+})
 export class Action extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên hành động',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã hành động duy nhất trong hệ thống',
+	})
 	code: string;
 
 	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_NOTE,
 		nullable: true,
+		comment: 'Mô tả hoặc ghi chú cho hành động',
 	})
 	note: string | null;
 
-	//user
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -33,13 +46,11 @@ export class Action extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// relation
 	@OneToMany(() => DspAction, (dspAction) => dspAction.action)
 	dspActions: DspAction[];
 
 	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.action)
 	trackPolicies?: TrackPolicy[];
 
-	// virtual
 	dspActionCount?: number;
 }

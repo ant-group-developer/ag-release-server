@@ -8,18 +8,35 @@ import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('track_sensitives')
+@Entity('track_sensitives', {
+	comment:
+		'Danh mục mức độ nhạy cảm nội dung của track (explicit, clean, v.v.)',
+})
 export class TrackSensitive extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên mức độ nhạy cảm của track',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã mức độ nhạy cảm',
+	})
 	code: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_PICTURE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_PICTURE,
+		nullable: true,
+		comment: 'Icon đại diện cho mức độ nhạy cảm',
+	})
 	icon: string | null;
 
-	//
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -31,6 +48,5 @@ export class TrackSensitive extends BaseUserTrackedUUIDEntity {
 	@OneToMany(() => Track, (track) => track.trackSensitive)
 	tracks: Track[];
 
-	// virtual column
 	trackCount?: number;
 }

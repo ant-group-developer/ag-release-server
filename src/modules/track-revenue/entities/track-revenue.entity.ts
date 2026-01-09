@@ -3,33 +3,56 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Track } from '../../track/entities/track.entity';
 
-@Entity('track_revenue')
+@Entity('track_revenue', {
+	comment:
+		'Bảng lưu doanh thu của track theo từng DSP, quốc gia và ngày báo cáo',
+})
 export class TrackRevenue extends BaseEntity {
-	// Transaction Date
-	@Column({ type: 'date' })
+	@Column({
+		type: 'date',
+		comment: 'Ngày phát sinh doanh thu (report date)',
+	})
 	reportDate: Date;
 
-	// Source
-	@Column({ type: 'varchar', length: 10 })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID DSP nguồn doanh thu',
+	})
 	dspId: string;
 
-	// Territory
-	@Column({ type: 'varchar', length: 2 })
+	@Column({
+		type: 'varchar',
+		length: 2,
+		comment: 'Mã quốc gia (ISO-2) phát sinh doanh thu',
+	})
 	countryCode: string;
 
-	// Currency
-	@Column({ type: 'varchar', length: 3 })
+	@Column({
+		type: 'varchar',
+		length: 3,
+		comment: 'Mã tiền tệ (ISO-4217)',
+	})
 	currencyCode: string;
 
-	// Net Amount
-	@Column({ type: 'numeric', precision: 24, scale: 21 })
+	@Column({
+		type: 'numeric',
+		precision: 24,
+		scale: 21,
+		comment: 'Số tiền doanh thu ròng',
+	})
 	amount: number;
 
-	// Configuration
-	@Column({ type: 'varchar' })
+	@Column({
+		type: 'varchar',
+		comment: 'Cấu hình phân phối / loại giao dịch từ DSP',
+	})
 	configuration: string;
 
-	@Column({ type: 'varchar' })
+	@Column({
+		type: 'varchar',
+		comment: 'ID track phát sinh doanh thu',
+	})
 	trackId: string;
 
 	@ManyToOne(() => Track, { onDelete: 'CASCADE' })

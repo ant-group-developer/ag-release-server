@@ -9,15 +9,26 @@ import { TrackLanguage } from 'src/modules/track-language/entities/track-languag
 import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
-@Entity('languages')
+@Entity('languages', {
+	comment: 'Danh mục ngôn ngữ dùng cho metadata và nội dung release/track',
+})
 export class Language extends BaseUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên ngôn ngữ',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã ngôn ngữ (ví dụ: en, vi, ja)',
+	})
 	code: string;
 
-	// release
 	@OneToMany(
 		() => ReleaseLocalize,
 		(releaseLocalize) => releaseLocalize.language,
@@ -36,7 +47,6 @@ export class Language extends BaseUUIDEntity {
 	)
 	releaseMetadataLanguages: ReleaseLanguage[];
 
-	// track
 	@OneToMany(
 		() => TrackLanguage,
 		(trackLanguage) => trackLanguage.audioLanguage,
@@ -52,7 +62,6 @@ export class Language extends BaseUUIDEntity {
 	@OneToMany(() => TrackLocalize, (trackLocalize) => trackLocalize.language)
 	trackLocalizes: TrackLocalize[];
 
-	// count relation
 	releaseLocalizesCount?: number;
 	releaseAudiolanguagesCount?: number;
 	releaseMetadataLanguagesCount?: number;

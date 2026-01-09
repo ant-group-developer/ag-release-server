@@ -6,20 +6,35 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
-@Entity('track_origin_types')
+@Entity('track_origin_types', {
+	comment: 'Danh mục nguồn gốc của track (original, cover, remix, AI, v.v.)',
+})
 export class TrackOriginType extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên loại nguồn gốc track',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã loại nguồn gốc track',
+	})
 	code: string;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu loại nguồn gốc mặc định',
+	})
 	isDefault: boolean;
 
 	@OneToMany(() => Track, (track) => track.trackOriginType)
 	tracks: Track[];
 
-	// count relation
 	tracksCount?: number;
 }

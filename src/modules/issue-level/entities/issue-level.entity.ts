@@ -9,28 +9,53 @@ import { Issue } from 'src/modules/issue/entities/issue.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('issue_level')
+@Entity('issue_level', {
+	comment: 'Danh mục cấp độ issue, dùng để phân loại mức độ nghiêm trọng',
+})
 export class IssueLevel extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên cấp độ issue (tiếng Việt)',
+	})
 	nameVi: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment: 'Tên cấp độ issue (tiếng Anh)',
+	})
 	nameEn: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã cấp độ issue duy nhất',
+	})
 	code: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_COLOR })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_COLOR,
+		comment: 'Màu hiển thị đại diện cho cấp độ issue',
+	})
 	color: string;
 
-	@Column({ type: 'int', default: 1, comment: '1 = lowest severity' })
+	@Column({
+		type: 'int',
+		default: 1,
+		comment: 'Thứ hạng mức độ nghiêm trọng (1 = thấp nhất)',
+	})
 	severityRank: number;
 
 	@Column({
 		type: 'numeric',
 		precision: 5,
 		scale: 2,
-		comment: 'Score multiplier',
+		comment: 'Hệ số nhân điểm cho issue thuộc cấp độ này',
 		transformer: {
 			to: (value: number) => value,
 			from: (value: string | null) =>
@@ -39,13 +64,16 @@ export class IssueLevel extends BaseUserTrackedUUIDEntity {
 	})
 	weight: number;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NOTE, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NOTE,
+		nullable: true,
+		comment: 'Ghi chú mô tả thêm cho cấp độ issue',
+	})
 	note: string | null;
 
-	// virtual
 	issuesCount?: number;
 
-	// user
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -54,7 +82,6 @@ export class IssueLevel extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
 
-	// relation
 	@OneToMany(() => Issue, (issue) => issue.issueLevel)
 	issues: Issue[];
 }

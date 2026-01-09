@@ -26,30 +26,47 @@ import {
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
 
-@Entity('releases')
+@Entity('releases', {
+	comment:
+		'Bảng phát hành (release), chứa metadata chính của album/single/EP',
+})
 export class Release extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: 20, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 20,
+		nullable: true,
+		comment: 'Mã UPC của release',
+	})
 	upc: string | null;
 
-	@Column({ type: 'varchar', length: 10 })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID định dạng album (single, EP, album...)',
+	})
 	albumFormatId: string;
 
 	@Column({
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		comment: 'Thể loại chính ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	primaryGenreId: string | null;
 
-	@Column({ type: 'varchar', length: 10, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'Thể loại phụ',
+	})
 	subGenreId: string | null;
 
 	@Column({
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		comment: 'Label phát hành ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	labelId: string | null;
 
@@ -57,49 +74,54 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 150,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		comment: 'Tiêu đề release ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	title: string;
 
-	@Column({ type: 'varchar', length: 150, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 150,
+		nullable: true,
+		comment: 'Phiên bản release (Deluxe, Remastered...)',
+	})
 	version: string | null;
 
-	@Column({ type: 'enum', enum: ReleaseStatus, default: ReleaseStatus.DRAFT })
+	@Column({
+		type: 'enum',
+		enum: ReleaseStatus,
+		default: ReleaseStatus.DRAFT,
+		comment: 'Trạng thái release (draft / submitted / published...)',
+	})
 	status: ReleaseStatus;
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025 ' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Năm C-Line (bản quyền ghi âm) ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	cLineYear: number | null;
 
 	@Column({
 		type: 'varchar',
 		length: 200,
-		comment:
-			'Example: Exclusive Licensed AMG' +
-			'&' +
-			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Chủ sở hữu C-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	cLineOwner: string | null;
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment:
+			'Năm P-Line (bản quyền sản xuất) ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	pLineYear: number | null;
 
 	@Column({
 		type: 'varchar',
 		length: 200,
-		comment:
-			'Example: Exclusive Licensed AMG' +
-			'&' +
-			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Chủ sở hữu P-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	pLineOwner: string | null;
 
@@ -107,27 +129,37 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 100,
 		nullable: true,
+		comment: 'Mã catalog nội bộ',
 	})
 	catalogId: string | null;
 
-	@Column({ type: Boolean, default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu release nhiều nghệ sĩ (Various Artists)',
+	})
 	isVariousArtist: boolean;
 
-	// release time
 	@Column({
 		type: 'enum',
 		enum: ReleaseTimeMode,
 		default: ReleaseTimeMode.GLOBAL_MIDNIGHT,
+		comment: 'Chế độ phát hành theo thời gian',
 	})
 	releaseTimeMode: ReleaseTimeMode;
 
-	@Column({ type: 'uuid', nullable: true, name: 'release_timezone_id' })
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		name: 'release_timezone_id',
+		comment: 'ID múi giờ phát hành',
+	})
 	releaseTimezoneId: string | null;
 
 	@Column({
 		type: 'date',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Ngày phát hành ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	releaseDate: Date | null;
 
@@ -135,11 +167,10 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: 'Format: HH:ss. Example: 18:00',
+		comment: 'Giờ phát hành (HH:mm)',
 	})
 	releaseTime: string | null;
 
-	// relation
 	@ManyToOne(() => AlbumFormat)
 	@JoinColumn({ name: 'album_format_id' })
 	albumFormat: AlbumFormat;
@@ -156,7 +187,6 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'label_id' })
 	label: Label | null;
 
-	// tracks
 	@OneToMany(() => Track, (track) => track.release)
 	tracks: Track[];
 
@@ -208,14 +238,15 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	)
 	releaseTerritory: ReleaseTerritory | null;
 
-	// count relation
 	tracksCount?: number;
 	totalDuration?: number;
 
-	// virtual column
 	coverArtThumbnails?: ICoverArtThumbnails;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID tenant sở hữu release',
+	})
 	tenantId: string;
 
 	@ManyToOne(() => Tenant)

@@ -67,12 +67,12 @@ export interface GeneralConfig {
 }
 
 export interface AppConfigShape {
-	auth0: Auth0Config;
-	website: WebsiteConfig;
-	backupDatabase: BackupDatabase;
-	telegram: Telegram;
-	acrCloud: AcrCloud;
-	general: GeneralConfig;
+	auth0: Auth0Config; // Cấu hình xác thực và phân quyền bằng Auth0
+	website: WebsiteConfig; // Cấu hình website công khai (domain, branding, liên kết)
+	backupDatabase: BackupDatabase; // Cấu hình sao lưu cơ sở dữ liệu và lịch backup
+	telegram: Telegram; // Cấu hình bot Telegram và hệ thống thông báo
+	acrCloud: AcrCloud; // Cấu hình ACRCloud dùng cho nhận diện âm thanh
+	general: GeneralConfig; // Các cấu hình chung ở cấp độ toàn hệ thống
 }
 
 export type AppConfigValueMap = {

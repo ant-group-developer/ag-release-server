@@ -6,19 +6,26 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
-@Entity('artist_roles')
+@Entity('artist_roles', {
+	comment: 'Danh mục vai trò của nghệ sĩ trong track hoặc release',
+})
 export class ArtistRole extends BaseUserTrackedUUIDEntity {
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		unique: true,
+		comment:
+			'Tên vai trò của nghệ sĩ (ví dụ: Main Artist, Featuring, Composer)',
+	})
 	name: string;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE, unique: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã vai trò nghệ sĩ duy nhất trong hệ thống',
+	})
 	code: string;
-
-	// @OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artistRole)
-	// releaseArtists: ReleaseArtist[];
-
-	// @OneToMany(() => TrackArtist, (trackArtist) => trackArtist.artistRole)
-	// trackArtists: TrackArtist[];
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

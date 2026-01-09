@@ -25,43 +25,59 @@ import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ScanCopyrightStatus } from '../enum/track.enum';
 import { ITrack } from '../interfaces/track.interface';
 
-@Entity('tracks')
+@Entity('tracks', {
+	comment: 'Bảng track chứa metadata chi tiết của từng bài hát trong release',
+})
 export class Track extends BaseCustomIDEntity implements ITrack {
-	@Column({ type: 'varchar', length: 100 })
+	@Column({
+		type: 'varchar',
+		length: 100,
+		comment: 'Tiêu đề track',
+	})
 	title: string;
 
 	@Column({
 		type: 'varchar',
 		length: 50,
 		nullable: true,
-		comment: `This will appear next to the track title excluding artist name. For example. 'Extended Version'This will appear next to the track title excluding artist name. For example. 'Extended Version'`,
+		comment: 'Phiên bản track (ví dụ: Extended Version, Remix)',
 	})
 	version: string | null;
 
-	@Column({ type: 'varchar', length: 20, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 20,
+		nullable: true,
+		comment: 'Mã ISRC của track',
+	})
 	isrc: string | null;
 
-	@Column({ type: 'varchar', length: 20, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 20,
+		nullable: true,
+		comment: 'Mã ISWC của track',
+	})
 	iswc: string | null;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID release chứa track',
+	})
 	releaseId: string;
 
 	@Column({
 		type: 'int',
-		comment: 'Example: 2025' + '&' + COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Năm P-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	pLineYear: number | null;
 
 	@Column({
 		type: 'varchar',
 		length: 200,
-		comment:
-			'Example: 2025 Exclusive Licensed AMG' +
-			' & ' +
-			COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Chủ sở hữu P-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	pLineOwner: string | null;
 
@@ -69,61 +85,89 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		comment: 'Thể loại chính ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	primaryGenreId: string | null;
 
-	@Column({ type: 'varchar', length: 10, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'Thể loại phụ',
+	})
 	subGenreId: string | null;
 
-	@Column({ type: 'int', default: 0 })
+	@Column({
+		type: 'int',
+		default: 0,
+		comment: 'Thứ tự track trong release',
+	})
 	order: number;
 
-	// other
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Loại track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	trackTypeId: string | null;
 
 	@Column({
 		type: 'uuid',
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
 		nullable: true,
+		comment: 'Nguồn gốc track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	trackOriginTypeId: string | null;
 
-	@Column({ type: 'uuid', nullable: true })
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Mức độ nhạy cảm nội dung',
+	})
 	trackSensitiveId: string | null;
 
-	@Column({ type: Boolean, default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Track được tạo bằng AI',
+	})
 	isByAi: boolean;
 
-	@Column({ type: 'text', nullable: true })
+	@Column({
+		type: 'text',
+		nullable: true,
+		comment: 'Lời bài hát',
+	})
 	lyric: string;
 
 	@Column({
 		type: 'enum',
 		enum: ScanCopyrightStatus,
 		default: ScanCopyrightStatus.UN_SCANNED,
+		comment: 'Trạng thái quét bản quyền',
 	})
 	scanCopyrightStatus: ScanCopyrightStatus;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Sao chép artist từ release',
+	})
 	copyArtistsFromRelease: boolean;
 
-	@Column({ type: 'boolean', default: false })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Sao chép contributor từ release',
+	})
 	copyContributorsFromRelease: boolean;
 
 	@Column({
 		type: 'uuid',
 		nullable: true,
-		comment: COMMENT_FOR_NULLABLE_DRAFT,
+		comment: 'Price tier áp dụng cho track ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	priceTierId: string | null;
 
-	// relation
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })
 	release: Release;

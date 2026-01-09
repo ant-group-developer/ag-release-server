@@ -18,73 +18,89 @@ import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
 import { TenantType } from './tenant.enum';
 
-@Entity({ name: 'tenants' })
+@Entity('tenants', {
+	comment:
+		'Bảng tenant đại diện cho tổ chức / label / đối tác trong hệ thống',
+})
 @Tree('closure-table')
 export class Tenant extends BaseUserTrackedUUIDEntity {
 	@Column({
 		length: LENGTH_PICTURE,
 		nullable: true,
-		comment:
-			'Example: https://storage.googleapis.com/public-ant/logo/ag.png',
+		comment: 'Logo của tenant (URL ảnh)',
 	})
 	logo: string;
 
-	@Column({ type: 'smallint', name: 'max_labels' })
+	@Column({
+		type: 'smallint',
+		name: 'max_labels',
+		comment: 'Số lượng label tối đa tenant được phép tạo',
+	})
 	maxLabels: number;
 
 	@Column({
 		length: LENGTH_PICTURE,
 		nullable: true,
-		comment:
-			'Example: https://storage.googleapis.com/public-ant/logo/ag.png',
+		comment: 'Icon đại diện của tenant (URL ảnh)',
 	})
 	icon: string;
 
 	@Column({
 		length: 100,
 		nullable: true,
-		comment:
-			'Example: ANT Music - Distribution Unlimited Music All Platform',
+		comment: 'Tiêu đề hiển thị của tenant',
 	})
 	title: string;
 
 	@Column({
 		length: 50,
 		nullable: true,
-		comment: 'ANT Music',
+		comment: 'Tên tenant',
 	})
 	name: string;
 
 	@Column({
 		length: 50,
 		nullable: true,
-		comment: 'The domain must be without http:// or https://',
+		comment: 'Domain của tenant (không bao gồm http/https)',
 	})
 	domain: string;
 
 	@Column({
 		length: 50,
-		comment: 'This email will be used to send notifications',
+		comment: 'Email dùng để nhận thông báo hệ thống',
 	})
 	email: string;
 
 	@Column({
 		length: 10,
-		comment: 'Example: #4540BF',
 		nullable: true,
+		comment: 'Màu chủ đạo của tenant (ví dụ: #4540BF)',
 	})
 	primaryColor: string;
 
-	@Column({ type: 'boolean', default: true })
+	@Column({
+		type: 'boolean',
+		default: true,
+		comment: 'Trạng thái kích hoạt của tenant',
+	})
 	isActive: boolean;
 
-	@Column({ type: 'enum', enum: TenantType, default: TenantType.LABEL })
+	@Column({
+		type: 'enum',
+		enum: TenantType,
+		default: TenantType.LABEL,
+		comment: 'Loại tenant (label, distributor, partner...)',
+	})
 	type: TenantType;
 
-	@Column({ type: 'uuid', nullable: true })
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'ID gói dịch vụ (tenant tier) đang áp dụng',
+	})
 	tenantTierId: string | null;
 
-	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User | null;
