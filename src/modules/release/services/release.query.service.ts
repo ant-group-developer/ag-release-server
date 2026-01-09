@@ -263,6 +263,8 @@ export class ReleaseQueryService {
 				'artistContributor.code',
 				'artistContributor.picture',
 				'artistContributor.biography',
+				'artistContributor.genreId',
+				'artistContributor.countryId',
 			])
 			.addSelect([
 				'artistRoleContributor.id',
@@ -274,6 +276,11 @@ export class ReleaseQueryService {
 				'genreContributor.name',
 				'genreContributor.code',
 				'genreContributor.picture',
+			])
+			.addSelect([
+				'countryContributor.id',
+				'countryContributor.name',
+				'countryContributor.iso2',
 			])
 
 			// language

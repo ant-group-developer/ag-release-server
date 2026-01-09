@@ -17,6 +17,7 @@ import {
 
 import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
+import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
@@ -182,6 +183,12 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 
 	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.track)
 	trackArtists: TrackArtist[];
+
+	@OneToMany(
+		() => TrackContributor,
+		(trackContributor) => trackContributor.track,
+	)
+	trackContributors: TrackContributor[];
 
 	@OneToOne(() => TrackLanguage, (trackLanguage) => trackLanguage.track)
 	trackLanguage: TrackLanguage;
