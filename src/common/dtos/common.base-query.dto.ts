@@ -99,6 +99,7 @@ export abstract class BaseQueryDto {
 	endUpdatedAt?: Date;
 }
 
+// keywords là 1 mảng string
 export abstract class BaseQueryDto2 {
 	@IsOptional()
 	@IsArray()

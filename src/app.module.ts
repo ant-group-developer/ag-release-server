@@ -23,6 +23,7 @@ import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { DistributionChannelModule } from './modules/distribution-channel/distribution-channel.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -145,6 +146,8 @@ import { UserModule } from './modules/user/user.module';
 		DeliveryModule,
 		ReleaseContributorModule,
 		TrackContributorModule,
+
+		DistributionChannelModule,
 	],
 	controllers: [AppController],
 	providers: [
