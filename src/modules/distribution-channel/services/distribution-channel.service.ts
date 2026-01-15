@@ -1,7 +1,7 @@
 // services/distribution-channel.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { DistributionChannelException } from '../const/distribution-channel.constant';
 import {
 	CreateDistributionChannelDto,
@@ -15,51 +15,125 @@ import { DistributionChannelQueryService } from './distribution-channel-query.se
 export class DistributionChannelService {
 	constructor(
 		@InjectRepository(DistributionChannel)
-		private readonly repo: Repository<DistributionChannel>,
+		private readonly distributionChannelRepo: Repository<DistributionChannel>,
 		private readonly queryService: DistributionChannelQueryService,
 	) {}
 
 	async create(input: {
 		data: CreateDistributionChannelDto;
 		userId: string;
+		tenantId?: string | null;
+		manager?: EntityManager;
 	}) {
-		const { data, userId } = input;
+		const { data, userId, manager, tenantId } = input;
+
+		const repo = this.getDistributionChannelRepo(manager);
 
 		// await this.validateUnique(data);
 
-		const entity = this.repo.create({
+		const entity = repo.create({
 			...data,
+			tenantId,
 			creatorId: userId,
 			modifierId: userId,
 		});
 
-		return this.repo.save(entity);
+		if (entity.aggregatorId !== null && entity.isSystemDefault === true) {
+			await this.clearSystemDefaultByAggregator({
+				aggregatorId: entity.aggregatorId,
+				manager,
+			});
+		}
+
+		return repo.save(entity);
+	}
+
+	async bulkCreate({
+		data,
+		userId,
+		manager,
+		tenantId,
+	}: {
+		data: CreateDistributionChannelDto[];
+		userId: string;
+		manager?: EntityManager;
+		tenantId?: string | null;
+	}) {
+		for (const d of data) {
+			await this.create({
+				data: d,
+				userId,
+				manager,
+				tenantId,
+			});
+		}
 	}
 
 	async findOne(id: string) {
-		const entity = await this.repo.findOneBy({ id });
+		const entity = await this.distributionChannelRepo.findOneBy({ id });
 		if (!entity) {
 			throw DistributionChannelException.NOT_FOUND();
 		}
 		return entity;
 	}
 
-	async update(input: {
+	async update({
+		id,
+		data,
+		userId,
+		manager,
+	}: {
 		id: string;
 		data: UpdateDistributionChannelDto;
 		userId: string;
+		manager?: EntityManager;
 	}) {
-		const { id, data, userId } = input;
+		const repo = this.getDistributionChannelRepo(manager);
+
+		const { aggregatorId, isSystemDefault } = data;
 
 		await this.findOne(id);
 		// await this.validateUnique(data, id);
 
-		await this.repo.update(id, {
+		if (isSystemDefault && aggregatorId) {
+			await this.clearSystemDefaultByAggregator({
+				aggregatorId,
+				manager,
+			});
+		}
+
+		await repo.update(id, {
 			...data,
+			credentials: data.credentials as any,
 			modifierId: userId,
 		});
 
 		return this.findOne(id);
+	}
+
+	async bulkUpdate(
+		input: {
+			id: string;
+			data: UpdateDistributionChannelDto;
+			userId: string;
+			manager?: EntityManager;
+		}[],
+	) {
+		for (const i of input) {
+			await this.update(i);
+		}
+	}
+
+	async clearSystemDefaultByAggregator({
+		aggregatorId,
+		manager,
+	}: {
+		aggregatorId: string;
+		manager?: EntityManager;
+	}) {
+		const repo = this.getDistributionChannelRepo(manager);
+
+		await repo.update({ aggregatorId }, { isSystemDefault: false });
 	}
 
 	async getList(filter: GetListDistributionChannelsDto) {
@@ -68,7 +142,7 @@ export class DistributionChannelService {
 
 	async delete(id: string) {
 		await this.findOne(id);
-		await this.repo.delete(id);
+		await this.distributionChannelRepo.delete(id);
 	}
 
 	// private async validateUnique(
@@ -89,4 +163,10 @@ export class DistributionChannelService {
 	// 		throw DistributionChannelException.DUPLICATED();
 	// 	}
 	// }
+
+	protected getDistributionChannelRepo(manager?: EntityManager) {
+		return manager
+			? manager.getRepository(DistributionChannel)
+			: this.distributionChannelRepo;
+	}
 }

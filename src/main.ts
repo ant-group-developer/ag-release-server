@@ -1,11 +1,15 @@
+import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { corsConfig } from './common/config/cors.config';
 import { setupSwagger } from './common/config/swagger.config';
 import { globalValidationPipe } from './common/config/validation.config';
 
+export let APP_GOLBAL: INestApplication<any>;
+
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
+	APP_GOLBAL = app;
 
 	// Set up global validation pipe with class-transformer options
 	app.useGlobalPipes(globalValidationPipe);

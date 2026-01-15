@@ -45,4 +45,11 @@ export class DistributionChannelException {
 			messageCode: 'distributionChannel.message.error.duplicated',
 		});
 	}
+
+	static ID_REQUIRED_FOR_UPDATE() {
+		return new ResponseError({
+			message: 'Distribution channel id is required for update',
+			messageCode: 'distributionChannel.error.idRequiredForUpdate',
+		});
+	}
 }

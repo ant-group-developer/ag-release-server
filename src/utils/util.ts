@@ -128,3 +128,11 @@ export function pickFields<T extends Record<string, string>, K extends keyof T>(
 	});
 	return result;
 }
+
+// input 1 -> 100
+export const randomFail = (percent: number = 0) => {
+	if (Math.random() < percent / 100) {
+		throw new Error('RANDOM_FAIL');
+	}
+	return true;
+};

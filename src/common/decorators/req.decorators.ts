@@ -6,3 +6,10 @@ export const UserId = createParamDecorator(
 		return request.user!.sub;
 	},
 );
+
+export const User = createParamDecorator(
+	(data: unknown, ctx: ExecutionContext): string => {
+		const request = ctx.switchToHttp().getRequest();
+		return request.user;
+	},
+);
