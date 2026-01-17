@@ -89,6 +89,9 @@ export class UpdateTenantIntegrationDto {
 	@IsBoolean()
 	isActive?: boolean;
 
+	@IsEnum(DspAgreementType)
+	agreementType: DspAgreementType;
+
 	@IsOptional()
 	@IsArray()
 	@ValidateNested({ each: true })

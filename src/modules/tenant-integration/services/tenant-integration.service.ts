@@ -390,7 +390,7 @@ export class TenantIntegrationService {
 			);
 
 			// update cha (nếu có field)
-			if (Object.keys(updateData as any).length) {
+			if (Object.keys(updateData).length) {
 				await tiRepo.update(id, {
 					...updateData,
 					modifierId: userId,

@@ -9,7 +9,7 @@ import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDsp } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -229,8 +229,8 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	)
 	releaseCoverArts?: ReleaseCoverArt[];
 
-	@OneToMany(() => ReleaseDsp, (releaseDsp) => releaseDsp.release)
-	releaseDsp: ReleaseDsp[];
+	@OneToMany(() => ReleaseDspDelivery, (releaseDsp) => releaseDsp.release)
+	releaseDsp: ReleaseDspDelivery[];
 
 	@OneToOne(
 		() => ReleaseTerritory,

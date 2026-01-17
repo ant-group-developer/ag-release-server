@@ -1,92 +1,54 @@
-// import { ApiProperty, PartialType } from '@nestjs/swagger';
-// import {
-// 	IsEnum,
-// 	IsNotEmpty,
-// 	IsOptional,
-// 	IsString,
-// 	Length,
-// 	MaxLength,
-// 	ValidateIf,
-// } from 'class-validator';
-// import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
-// import { ReleaseStatus, ReleaseType } from '../enum/release.enum';
+// dto/release-dsp-delivery.dto.ts
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 
-// export class CreateReleaseDto {
-// 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@MaxLength(150)
-// 	title: string;
+export class CreateReleaseDspDeliveryDto {
+	@ApiProperty({ type: 'string', format: 'uuid' })
+	@IsUUID()
+	releaseId: string;
 
-// 	@ApiProperty({
-// 		example: 'Original Version',
-// 		maxLength: 150,
-// 		required: false,
-// 	})
-// 	@IsOptional()
-// 	@IsString()
-// 	@MaxLength(150)
-// 	version?: string | null;
+	@ApiProperty({ type: 'string', example: 'spotify' })
+	@IsString()
+	dspId: string;
 
-// 	@ApiProperty({ example: '893123456789', required: false })
-// 	@IsOptional()
-// 	@IsString()
-// 	@MaxLength(20)
-// 	upc?: string | null;
+	@ApiPropertyOptional({ enum: ReleaseDspStatus })
+	@IsEnum(ReleaseDspStatus)
+	@IsOptional()
+	status?: ReleaseDspStatus;
+}
 
-// 	@ApiProperty({ example: 'JzCTrtvkEn' })
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@Length(10, 10)
-// 	primaryGenreId: string;
+export class UpdateReleaseDspDeliveryDto extends PartialType(
+	CreateReleaseDspDeliveryDto,
+) {}
 
-// 	@ApiProperty({ example: 'JzCTrtvkEn', required: false })
-// 	@IsOptional()
-// 	@IsString()
-// 	@Length(10, 10)
-// 	subGenreId?: string | null;
+export enum OrderFieldReleaseDspDelivery {
+	CREATED_AT = 'createdAt',
+	UPDATED_AT = 'updatedAt',
+	RELEASE_ID = 'releaseId',
+	DSP_ID = 'dspId',
+	STATUS = 'status',
+}
 
-// 	@ApiProperty({ example: 'Zz2jDwRg6T' })
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@Length(10, 10)
-// 	labelId: string;
+export class GetListReleaseDspDeliveriesDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({ type: 'string', format: 'uuid' })
+	@IsUUID()
+	@IsOptional()
+	releaseId?: string;
 
-// 	@ApiProperty({ enum: ReleaseStatus, example: ReleaseStatus.DRAFT })
-// 	@IsEnum(ReleaseStatus)
-// 	status: ReleaseStatus;
+	@ApiPropertyOptional({ type: 'string', example: 'spotify' })
+	@IsString()
+	@IsOptional()
+	dspId?: string;
 
-// 	@ApiProperty({ enum: ReleaseType, example: ReleaseType.SINGLE })
-// 	@IsEnum(ReleaseType)
-// 	type: ReleaseType;
-// }
+	@ApiPropertyOptional({ enum: ReleaseDspStatus })
+	@IsEnum(ReleaseDspStatus)
+	@IsOptional()
+	status?: ReleaseDspStatus;
 
-// export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@MaxLength(150)
-// 	@ValidateIf((_, value) => value !== undefined)
-// 	title: string;
-
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@Length(10, 10)
-// 	@ValidateIf((_, value) => value !== undefined)
-// 	primaryGenreId: string;
-
-// 	@IsString()
-// 	@IsNotEmpty()
-// 	@Length(10, 10)
-// 	@ValidateIf((_, value) => value !== undefined)
-// 	labelId: string;
-
-// 	@IsEnum(ReleaseStatus)
-// 	@ValidateIf((_, value) => value !== undefined)
-// 	status: ReleaseStatus;
-
-// 	@IsEnum(ReleaseType)
-// 	@ValidateIf((_, value) => value !== undefined)
-// 	type: ReleaseType;
-// }
-
-// export class QueryGetListReleaseDto extends BaseQueryDto {}
+	@ApiPropertyOptional({ enum: OrderFieldReleaseDspDelivery })
+	@IsOptional()
+	fieldOrder: OrderFieldReleaseDspDelivery =
+		OrderFieldReleaseDspDelivery.UPDATED_AT;
+}

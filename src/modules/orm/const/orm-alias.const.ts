@@ -5,4 +5,5 @@ export class OrmAlias {
 	static tenantIntegration = 'tenantIntegration';
 	static dsp = 'dsp';
 	static tenant = 'tenant';
+	static releaseDspDelivery = 'releaseDspDelivery';
 }

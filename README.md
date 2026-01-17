@@ -95,3 +95,22 @@ openssl rsa -in "secrets/jwtRS256.key" -pubout -out "secrets/jwtRS256.key.pub"
 ```
 
 sudo -u postgres /usr/local/pgsql/src/bin/psql/psql -d agrelease -c "GRANT USAGE, CREATE ON SCHEMA public TO agrelease;"
+
+-- rule code
+<module-name>/
+├── const/
+│ └── _.constant.ts # Success / Exception / messageCode
+├── controllers/
+│ └── _.controller.ts # HTTP layer
+├── dto/
+│ └── _.dto.ts # Request / Query DTO
+├── entities/
+│ └── _.entity.ts # TypeORM entities
+├── enum/ | enums/
+│ └── _.enum.ts # Enum nghiệp vụ
+├── fm/
+│ └── _.fm.ts # ORM Field Mapping (genFm)
+├── services/
+│ ├── _.service.ts # Business logic
+│ └── _-query.service.ts # Query / listing logic
+├── <module>.module.ts
