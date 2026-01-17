@@ -23,6 +23,7 @@ import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { DistributionChannelModule } from './modules/distribution-channel/distribution-channel.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -36,13 +37,14 @@ import { PermissionModule } from './modules/permission/permission.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
-import { ReleaseDspModule } from './modules/release-dsp/release-dsp.module';
+import { ReleaseDspDeliveryModule } from './modules/release-dsp/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
+import { TenantIntegrationModule } from './modules/tenant-integration/tenant-integration.module';
 import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
@@ -94,7 +96,7 @@ import { UserModule } from './modules/user/user.module';
 		// ReleaseLanguageModule,
 		// ReleaseCoverArtModule,
 		ReleaseLocalizeModule,
-		ReleaseDspModule,
+		ReleaseDspDeliveryModule,
 
 		TrackModule,
 		TrackArtistModule,
@@ -145,6 +147,9 @@ import { UserModule } from './modules/user/user.module';
 		DeliveryModule,
 		ReleaseContributorModule,
 		TrackContributorModule,
+
+		DistributionChannelModule,
+		TenantIntegrationModule,
 	],
 	controllers: [AppController],
 	providers: [

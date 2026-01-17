@@ -126,6 +126,7 @@ export class TrackQueryService {
 		this.addSelectAudioFile(qb);
 		this.addSelectFileAndPeak(qb);
 		this.addSelectTrackArtist(qb);
+		this.addSelectTrackContributor(qb);
 		this.addSelectTrackLanguage(qb);
 		this.addSelectMetadataLanguage(qb);
 		this.addSelectMetadataLanguageCountry(qb);
@@ -531,9 +532,19 @@ export class TrackQueryService {
 			.leftJoin('audioFile.file', 'file')
 			.leftJoin('audioFile.peak', 'peak')
 
+			// artist
 			.leftJoin('track.trackArtists', 'trackArtist')
 			// .leftJoin('trackArtist.artistRole', 'artistRole')
 			.leftJoin('trackArtist.artist', 'artist')
+			.leftJoin('artist.genre', 'genre')
+			.leftJoin('artist.country', 'country')
+
+			// contributor
+			.leftJoin('track.trackContributors', 'trackContributor')
+			.leftJoin('trackContributor.artistRole', 'artistRoleContributor')
+			.leftJoin('trackContributor.artist', 'artistContributor')
+			.leftJoin('artistContributor.country', 'countryContributor')
+			.leftJoin('artistContributor.genre', 'artistContributorGenre')
 
 			.leftJoin('track.trackLanguage', 'trackLanguage')
 			.leftJoin(
@@ -802,10 +813,73 @@ export class TrackQueryService {
 				.addSelect([
 					'trackArtist.id',
 					'trackArtist.artistId',
+					'trackArtist.artistId',
 					// 'trackArtist.artistRoleId',
 				])
+
+				// role
 				// .addSelect(['artistRole.id', 'artistRole.name', 'artistRole.code'])
-				.addSelect(['artist.id', 'artist.name', 'artist.picture'])
+
+				// artist
+				.addSelect([
+					'artist.id',
+					'artist.name',
+					'artist.picture',
+					'artist.genreId',
+					'artist.countryId',
+				])
+
+				// genre
+				.addSelect(['genre.id', 'genre.name', 'genre.picture'])
+
+				// country
+				.addSelect([
+					'country.id',
+					'country.name',
+					'country.iso3',
+					'country.iso2',
+				])
+		);
+	}
+
+	private addSelectTrackContributor(qb: SelectQueryBuilder<Track>) {
+		return (
+			qb
+				.addSelect([
+					'trackContributor.id',
+					'trackContributor.artistId',
+					'trackContributor.artistRoleId',
+				])
+
+				// role
+				.addSelect([
+					'artistRoleContributor.id',
+					'artistRoleContributor.name',
+					'artistRoleContributor.code',
+				])
+
+				// artist
+				.addSelect([
+					'artistContributor.id',
+					'artistContributor.name',
+					'artistContributor.picture',
+					'artistContributor.countryId',
+					'artistContributor.genreId',
+				])
+
+				// genre
+				.addSelect([
+					'artistContributorGenre.id',
+					'artistContributorGenre.name',
+					'artistContributorGenre.picture',
+				])
+
+				// country
+				.addSelect([
+					'countryContributor.id',
+					'countryContributor.name',
+					'countryContributor.iso2',
+				])
 		);
 	}
 
