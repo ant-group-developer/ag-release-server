@@ -136,3 +136,9 @@ export const randomFail = (percent: number = 0) => {
 	}
 	return true;
 };
+
+export const handleTenantId = (
+	tenantId: string | undefined,
+): string | undefined => {
+	return tenantId === 'system-tenant' ? undefined : tenantId;
+};

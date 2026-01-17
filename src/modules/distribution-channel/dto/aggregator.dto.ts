@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	IsArray,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -15,6 +16,7 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { AggregatorFieldOrder } from '../enum/enum';
 import { CreateDistributionChannelDto } from './distribution-channel.dto';
 
 export class CreateAggregatorDto {
@@ -68,4 +70,8 @@ export class GetListAggregatorsDto extends BaseQueryDto2 {
 		example: 'merlin',
 	})
 	search?: string;
+
+	@IsOptional()
+	@IsEnum(AggregatorFieldOrder)
+	fieldOrder: AggregatorFieldOrder = AggregatorFieldOrder.name;
 }

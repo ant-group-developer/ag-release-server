@@ -11,7 +11,10 @@ import {
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { DistributionChannelProtocol } from '../enum/enum';
-import { OrderFieldDistributionChannel } from '../enums/distribution-channel.enum';
+import {
+	DspAgreementType,
+	OrderFieldDistributionChannel,
+} from '../enums/distribution-channel.enum';
 
 export class DistributionChannelCredentialsDto {
 	@IsString()
@@ -26,8 +29,8 @@ export class DistributionChannelCredentialsDto {
 	@IsString()
 	password: string;
 
-	@IsString()
-	path: string;
+	// @IsString()
+	// path: string;
 }
 
 export class CreateDistributionChannelDto {
@@ -91,6 +94,9 @@ export class CreateDistributionChannelDto {
 	@IsBoolean()
 	@IsOptional()
 	isActive?: boolean;
+
+	@IsEnum(DspAgreementType)
+	agreementType: DspAgreementType;
 }
 
 export class UpdateDistributionChannelDto extends PartialType(

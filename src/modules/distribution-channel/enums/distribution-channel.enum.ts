@@ -8,3 +8,10 @@ export enum OrderFieldDistributionChannel {
 	IS_SYSTEM_DEFAULT = 'isSystemDefault',
 	IS_ACTIVE = 'isActive',
 }
+
+export enum DspAgreementType {
+	ANT = 'ANT', // ANT Music
+	MERLIN = 'MERLIN', // Merlin
+	DIRECT = 'DIRECT', // Thoả thuận trực tiếp
+	CI = 'CI', // CI (Content/Custom Integration)
+}

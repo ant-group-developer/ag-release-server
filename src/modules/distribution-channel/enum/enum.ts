@@ -3,3 +3,7 @@ export enum DistributionChannelProtocol {
 	SFTP = 'SFTP',
 	API = 'API',
 }
+
+export enum AggregatorFieldOrder {
+	name = 'aggregator.name',
+}

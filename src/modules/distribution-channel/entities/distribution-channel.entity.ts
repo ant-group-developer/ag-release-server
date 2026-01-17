@@ -2,6 +2,7 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Dsp } from '../../dsp/entities/dsp.entity';
 import { Tenant } from '../../tenant/tenant.entity';
+import { DspAgreementType } from '../enums/distribution-channel.enum';
 import { Aggregator } from './aggregator.entity';
 
 @Entity('distribution_channels', {
@@ -73,6 +74,13 @@ export class DistributionChannel extends BaseUserTrackedUUIDEntity {
 		comment: 'Kênh phân phối đang hoạt động hay không',
 	})
 	isActive: boolean;
+
+	@Column({
+		type: 'enum',
+		enum: DspAgreementType,
+		name: 'agreement_type',
+	})
+	agreementType: DspAgreementType;
 }
 
 // sql

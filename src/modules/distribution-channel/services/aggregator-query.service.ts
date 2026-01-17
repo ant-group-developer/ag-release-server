@@ -3,10 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
-import { orderAndPaging } from 'src/modules/orm/utils/orm.utils';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GetListAggregatorsDto } from '../dto/aggregator.dto';
 import { Aggregator } from '../entities/aggregator.entity';
+import { AggregatorFm } from '../fm/aggregator.fm';
 
 @Injectable()
 export class AggregatorQueryService {
@@ -27,8 +28,20 @@ export class AggregatorQueryService {
 		});
 	}
 
+	leftJoinAggregatorWithDistributionChannel(
+		qb: SelectQueryBuilder<Aggregator>,
+	) {
+		qb.leftJoinAndSelect(
+			AggregatorFm.distributionChannels,
+			OrmAlias.distributionChannel,
+		);
+	}
+
 	private createQbGetList(filter: GetListAggregatorsDto) {
 		const qb = this.aggregatorRepo.createQueryBuilder(OrmAlias.aggregator);
+
+		this.leftJoinAggregatorWithDistributionChannel(qb);
+
 		this.applyFilter({ qb, filter });
 
 		return qb;
@@ -46,15 +59,15 @@ export class AggregatorQueryService {
 		if (keyword?.length) {
 			qb.andWhere(
 				`(
-				${OrmAlias.aggregator}.code ILIKE ANY(:keywords)
-				OR ${OrmAlias.aggregator}.name ILIKE ANY(:keywords)
-			)`,
+					${OrmAlias.aggregator}.code ILIKE ANY(:keywords)
+					OR ${OrmAlias.aggregator}.name ILIKE ANY(:keywords)
+				)`,
 				{
 					keywords: keyword.map((k) => `%${k}%`),
 				},
 			);
 		}
 
-		orderAndPaging({ qb, filter, alias: OrmAlias.aggregator });
+		orderAndPaging2({ qb, filter });
 	}
 }
