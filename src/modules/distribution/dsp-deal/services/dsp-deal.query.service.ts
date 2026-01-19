@@ -43,14 +43,9 @@ export class DspDealsQueryService {
 		qb: SelectQueryBuilder<DspDealEntity>;
 		filter: GetListDspDealsDto;
 	}) {
-		const {
-			// dspId,
-			dealTypeId,
-			visibility,
-			enabled,
-		} = filter;
+		const { dspId, dealTypeId, visibility, enabled } = filter;
 
-		// if (dspId) qb.andWhere('dspDeal.dspId = :dspId', { dspId });
+		if (dspId) qb.andWhere('dspDeal.dspId = :dspId', { dspId });
 		if (dealTypeId)
 			qb.andWhere('dspDeal.dealTypeId = :dealTypeId', { dealTypeId });
 		if (visibility)

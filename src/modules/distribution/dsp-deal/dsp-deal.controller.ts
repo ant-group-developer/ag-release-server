@@ -38,12 +38,10 @@ export class DspDealsController {
 	@ApiParam({ name: 'dspId', type: Number })
 	@ApiResponse({ status: 201, type: DspDealEntity })
 	async create(
-		@Param('dspId', ParseIntPipe) dspId: number,
-		@Body() data: Omit<CreateDspDealDto, 'dspId'>,
+		@Param('dspId') dspId: string,
+		@Body() data: CreateDspDealDto,
 	) {
-		const result = await this.svc.create({
-			data: { ...data, dspId: String(dspId) },
-		});
+		const result = await this.svc.create({ data: { ...data, dspId } });
 		return DspDealSuccess.CREATE(result);
 	}
 
@@ -53,14 +51,10 @@ export class DspDealsController {
 	@ApiQuery({ type: GetListDspDealsDto })
 	@ApiResponse({ status: 200, type: [DspDealEntity] })
 	async getList(
-		@Param('dspId', ParseIntPipe) dspId: number,
+		@Param('dspId') dspId: string,
 		@Query() query: GetListDspDealsDto,
 	) {
-		// const result = await this.svc.getList({
-		// 	...query,
-		// 	// dspId: String(dspId),
-		// });
-
+		query.dspId = dspId;
 		const result = await this.svc.getList(query);
 		return new ResponseSuccess({ data: result });
 	}

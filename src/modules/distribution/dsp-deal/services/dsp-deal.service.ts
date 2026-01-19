@@ -28,7 +28,7 @@ export class DspDealsService {
 		const entity = this.repo.create({
 			...data,
 			enabled: data.enabled ?? true,
-			priority: data.priority ?? 0,
+			order: data.order ?? 0,
 		});
 
 		const transaction = await newTransaction(this.repo);

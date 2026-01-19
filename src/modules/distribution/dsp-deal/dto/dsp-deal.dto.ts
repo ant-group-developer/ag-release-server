@@ -30,7 +30,7 @@ export class CreateDspDealDto {
 	@Type(() => Number)
 	@IsInt()
 	@Min(0)
-	priority?: number;
+	order?: number;
 }
 
 export class UpdateDspDealDto {
@@ -50,10 +50,10 @@ export class UpdateDspDealDto {
 }
 
 export class GetListDspDealsDto extends BaseQueryDto2 {
-	// @ApiPropertyOptional()
-	// @IsOptional()
-	// @IsString()
-	// dspId?: string; // bigint string
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsString()
+	dspId?: string; // bigint string
 
 	@ApiPropertyOptional()
 	@IsOptional()

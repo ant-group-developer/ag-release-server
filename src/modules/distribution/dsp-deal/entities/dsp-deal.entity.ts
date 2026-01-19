@@ -10,10 +10,10 @@ export class DspDealEntity extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'bigint', primary: true, generated: 'increment' })
 	id: string;
 
-	@Column({ name: 'dsp_id', type: 'bigint' })
+	@Column({ name: 'dsp_id', type: 'varchar' })
 	dspId: string;
 
-	@Column({ name: 'deal_type_id', type: 'bigint' })
+	@Column({ name: 'deal_type_id', type: 'uuid' })
 	dealTypeId: string;
 
 	@Column({ type: 'varchar', length: 20 })
@@ -23,7 +23,7 @@ export class DspDealEntity extends BaseUserTrackedUUIDEntity {
 	enabled: boolean;
 
 	@Column({ type: 'int', default: 0 })
-	priority: number;
+	order: number;
 
 	@ManyToOne(() => Dsp, { eager: false, onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'dsp_id' })
