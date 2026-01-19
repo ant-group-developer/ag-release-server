@@ -24,6 +24,7 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionChannelModule } from './modules/distribution-channel/distribution-channel.module';
+import { DistributionModule } from './modules/distribution/distribution.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -150,6 +151,7 @@ import { UserModule } from './modules/user/user.module';
 
 		DistributionChannelModule,
 		TenantIntegrationModule,
+		DistributionModule,
 	],
 	controllers: [AppController],
 	providers: [
