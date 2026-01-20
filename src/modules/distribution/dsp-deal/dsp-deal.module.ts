@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DspDealsController } from './dsp-deal.controller';
-import { DspDealEntity } from './entities/dsp-deal.entity';
+import { DspDeal } from './entities/dsp-deal.entity';
 import { DspDealsQueryService } from './services/dsp-deal.query.service';
 import { DspDealsService } from './services/dsp-deal.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([DspDealEntity])],
+	imports: [TypeOrmModule.forFeature([DspDeal])],
 	controllers: [DspDealsController],
 	providers: [DspDealsService, DspDealsQueryService],
 	exports: [DspDealsService],

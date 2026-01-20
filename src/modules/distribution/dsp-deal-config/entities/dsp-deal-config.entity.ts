@@ -1,7 +1,7 @@
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
-import { DealTypeEntity } from '../../deal-type/entities/deal-type.entity';
+import { DealType } from '../../deal-type/entities/deal-type.entity';
 import {
 	DspDealConfigScope,
 	DspDealConfigStatus,
@@ -46,9 +46,9 @@ export class DspDealConfigEntity {
 	@JoinColumn({ name: 'dsp_id' })
 	dsp?: Dsp;
 
-	@ManyToOne(() => DealTypeEntity, { onDelete: 'CASCADE' })
+	@ManyToOne(() => DealType, { onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'deal_type_id' })
-	dealType?: DealTypeEntity;
+	dealType?: DealType;
 
 	@ManyToOne(() => User, { onDelete: 'CASCADE', nullable: true })
 	@JoinColumn({ name: 'user_id' })

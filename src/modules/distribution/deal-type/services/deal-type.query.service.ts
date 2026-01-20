@@ -5,13 +5,13 @@ import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GetListDealTypesDto } from '../dto/deal-type.dto';
-import { DealTypeEntity } from '../entities/deal-type.entity';
+import { DealType } from '../entities/deal-type.entity';
 
 @Injectable()
 export class DealTypeQueryService {
 	constructor(
-		@InjectRepository(DealTypeEntity)
-		private readonly repo: Repository<DealTypeEntity>,
+		@InjectRepository(DealType)
+		private readonly repo: Repository<DealType>,
 	) {}
 
 	async getList(filter: GetListDealTypesDto) {
@@ -38,7 +38,7 @@ export class DealTypeQueryService {
 		qb,
 		filter,
 	}: {
-		qb: SelectQueryBuilder<DealTypeEntity>;
+		qb: SelectQueryBuilder<DealType>;
 		filter: GetListDealTypesDto;
 	}) {
 		const alias = OrmAlias.dealType ?? 'dealType';

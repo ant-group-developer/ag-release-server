@@ -2,7 +2,7 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
-import { DealTypeEntity } from '../../deal-type/entities/deal-type.entity';
+import { DealType } from '../../deal-type/entities/deal-type.entity';
 import { DspDealConfigEntity } from '../../dsp-deal-config/entities/dsp-deal-config.entity';
 import { UserDspDealSelectionMode } from '../enum/user-dsp-deal-selection.enum';
 
@@ -31,9 +31,9 @@ export class UserDspDealSelectionEntity extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'dsp_id' })
 	dsp?: Dsp;
 
-	@ManyToOne(() => DealTypeEntity, { onDelete: 'CASCADE' })
+	@ManyToOne(() => DealType, { onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'deal_type_id' })
-	dealType?: DealTypeEntity;
+	dealType?: DealType;
 
 	@ManyToOne(() => DspDealConfigEntity, {
 		onDelete: 'SET NULL',

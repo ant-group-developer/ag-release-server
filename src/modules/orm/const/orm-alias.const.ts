@@ -7,4 +7,5 @@ export class OrmAlias {
 	static tenant = 'tenant';
 	static releaseDspDelivery = 'releaseDspDelivery';
 	static dealType = 'dealType';
+	static dspDeal = 'dspDeal';
 }

@@ -9,7 +9,7 @@ import {
 	Min,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { DspDealVisibility } from '../enum/dsp-deal.enum';
+import { DspDealVisibility, FieldOrderDspDeal } from '../enum/dsp-deal.enum';
 
 export class CreateDspDealDto {
 	// dspId + dealTypeId lấy từ param hoặc body đều được
@@ -70,4 +70,8 @@ export class GetListDspDealsDto extends BaseQueryDto2 {
 	@Type(() => Boolean)
 	@IsBoolean()
 	enabled?: boolean;
+
+	// @IsEnum(FieldOrderDspDeal)
+	@IsOptional()
+	fieldOrder: string = FieldOrderDspDeal.createdAt;
 }

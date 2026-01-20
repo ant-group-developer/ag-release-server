@@ -2,7 +2,7 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { Column, Entity, Index } from 'typeorm';
 
 @Entity({ name: 'deal_types' })
-export class DealTypeEntity extends BaseUserTrackedUUIDEntity {
+export class DealType extends BaseUserTrackedUUIDEntity {
 	@Index({ unique: true })
 	@Column({ type: 'varchar' })
 	code: string;

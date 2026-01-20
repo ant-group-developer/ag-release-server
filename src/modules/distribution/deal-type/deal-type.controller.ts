@@ -28,7 +28,7 @@ import {
 	GetListDealTypesDto,
 	UpdateDealTypeDto,
 } from './dto/deal-type.dto';
-import { DealTypeEntity } from './entities/deal-type.entity';
+import { DealType } from './entities/deal-type.entity';
 import { DealTypesService } from './services/deal-type.service';
 
 @ApiTags('Deal Types')
@@ -39,15 +39,14 @@ export class DealTypesController {
 
 	@Post()
 	@ApiOperation({ summary: 'Create deal type' })
-	@ApiResponse({ status: 201, type: DealTypeEntity })
+	@ApiResponse({ status: 201, type: DealType })
 	async create(
 		@Body() data: CreateDealTypeDto,
 		@User() user: UserReq,
-	): Promise<ResponseSuccess<DealTypeEntity>> {
+	): Promise<ResponseSuccess<DealType>> {
 		const result = await this.svc.create({
 			data,
 			userId: user.id,
-			tenantId: user.tenantId === 'system-tenant' ? null : user.tenantId,
 		});
 		return DealTypeSuccess.CREATE(result);
 	}
@@ -55,12 +54,12 @@ export class DealTypesController {
 	@Put(':id')
 	@ApiOperation({ summary: 'Update deal type' })
 	@ApiParam({ name: 'id', format: 'uuid' })
-	@ApiResponse({ status: 200, type: DealTypeEntity })
+	@ApiResponse({ status: 200, type: DealType })
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateDealTypeDto,
 		@UserId() userId: string,
-	): Promise<ResponseSuccess<DealTypeEntity>> {
+	): Promise<ResponseSuccess<DealType>> {
 		const result = await this.svc.update({ id, data, userId });
 		return DealTypeSuccess.UPDATE(result);
 	}
@@ -68,7 +67,7 @@ export class DealTypesController {
 	@Get(':id')
 	@ApiOperation({ summary: 'Get deal type detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })
-	@ApiResponse({ status: 200, type: DealTypeEntity })
+	@ApiResponse({ status: 200, type: DealType })
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.svc.findOne(id);
 		return new ResponseSuccess({ data: result });
@@ -77,7 +76,7 @@ export class DealTypesController {
 	@Get()
 	@ApiOperation({ summary: 'Get list deal types' })
 	@ApiQuery({ type: GetListDealTypesDto })
-	@ApiResponse({ status: 200, type: [DealTypeEntity] })
+	@ApiResponse({ status: 200, type: [DealType] })
 	async getList(@Query() query: GetListDealTypesDto) {
 		const result = await this.svc.getList(query);
 		return new ResponseSuccess({ data: result });

@@ -8,14 +8,14 @@ import {
 	GetListDspDealsDto,
 	UpdateDspDealDto,
 } from '../dto/dsp-deal.dto';
-import { DspDealEntity } from '../entities/dsp-deal.entity';
+import { DspDeal } from '../entities/dsp-deal.entity';
 import { DspDealsQueryService } from './dsp-deal.query.service';
 
 @Injectable()
 export class DspDealsService {
 	constructor(
-		@InjectRepository(DspDealEntity)
-		private readonly repo: Repository<DspDealEntity>,
+		@InjectRepository(DspDeal)
+		private readonly repo: Repository<DspDeal>,
 		private readonly queryService: DspDealsQueryService,
 	) {}
 
@@ -35,7 +35,7 @@ export class DspDealsService {
 
 		try {
 			const { manager } = transaction;
-			const txRepo = manager.getRepository(DspDealEntity);
+			const txRepo = manager.getRepository(DspDeal);
 
 			const row = await txRepo.save(entity);
 
@@ -65,7 +65,7 @@ export class DspDealsService {
 
 		try {
 			const { manager } = transaction;
-			const txRepo = manager.getRepository(DspDealEntity);
+			const txRepo = manager.getRepository(DspDeal);
 
 			await txRepo.update(id, {
 				...data,

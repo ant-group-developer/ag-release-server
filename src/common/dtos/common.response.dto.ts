@@ -1,6 +1,7 @@
 // src/common/dtos/response.dto.ts
 
 import { HttpException } from '@nestjs/common';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { omit } from 'lodash';
 import {
 	DEFAULT_SENSITIVE_KEYS,
@@ -13,10 +14,20 @@ import {
 } from '../constants/common.default.constants';
 
 export class ResponseSuccess<T> {
+	@ApiProperty({ example: 200 })
 	statusCode: number;
+
+	@ApiProperty({ example: 'Success' })
 	message: string;
+
+	@ApiProperty({ example: 'SUCCESS' })
 	messageCode: string;
+
+	@ApiPropertyOptional({ example: 'Some warning' })
 	messageWarning?: string;
+
+	// generic => subclass sẽ override để gắn type cụ thể
+	@ApiPropertyOptional()
 	data?: T;
 
 	constructor({
@@ -32,8 +43,6 @@ export class ResponseSuccess<T> {
 		message?: string;
 		messageCode?: string;
 		messageWarning?: string;
-
-		// remove sensitive field
 		sensitiveKeys?: string[];
 		isRemoveSensitiveFields?: boolean;
 		data?: T;
@@ -43,29 +52,38 @@ export class ResponseSuccess<T> {
 		this.messageCode = messageCode;
 		this.messageWarning = messageWarning;
 
-		if (isRemoveSensitiveFields && data) {
-			sensitiveKeys.push(...DEFAULT_SENSITIVE_KEYS);
-			this.data = this.removeSensitiveFields(data, sensitiveKeys);
+		// IMPORTANT: nếu không remove sensitive thì vẫn phải gán data
+		if (data !== undefined) {
+			if (isRemoveSensitiveFields && data) {
+				sensitiveKeys.push(...DEFAULT_SENSITIVE_KEYS);
+				this.data = this.removeSensitiveFields(data, sensitiveKeys);
+			} else {
+				this.data = data;
+			}
 		}
 	}
 
 	private removeSensitiveFields<T>(data: T, sensitiveKeys: string[]): T {
+		// array
 		if (Array.isArray(data)) {
 			return data.map((item) =>
 				this.removeSensitiveFields(item, sensitiveKeys),
 			) as T;
 		}
 
+		// object (trừ Date)
 		if (data && typeof data === 'object' && !(data instanceof Date)) {
-			const shallow = omit(data, sensitiveKeys);
+			const shallow = omit(data as Record<string, any>, sensitiveKeys);
+
 			return Object.fromEntries(
-				Object.entries(shallow).map(([k, v]) => [
-					k,
-					this.removeSensitiveFields(v, sensitiveKeys),
+				Object.entries(shallow).map(([key, value]) => [
+					key,
+					this.removeSensitiveFields(value, sensitiveKeys),
 				]),
 			) as T;
 		}
 
+		// primitive, null, undefined, Date
 		return data;
 	}
 }

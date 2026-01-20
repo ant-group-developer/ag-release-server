@@ -4,13 +4,13 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GetListDspDealsDto } from '../dto/dsp-deal.dto';
-import { DspDealEntity } from '../entities/dsp-deal.entity';
+import { DspDeal } from '../entities/dsp-deal.entity';
 
 @Injectable()
 export class DspDealsQueryService {
 	constructor(
-		@InjectRepository(DspDealEntity)
-		private readonly repo: Repository<DspDealEntity>,
+		@InjectRepository(DspDeal)
+		private readonly repo: Repository<DspDeal>,
 	) {}
 
 	async getList(filter: GetListDspDealsDto) {
@@ -40,7 +40,7 @@ export class DspDealsQueryService {
 		qb,
 		filter,
 	}: {
-		qb: SelectQueryBuilder<DspDealEntity>;
+		qb: SelectQueryBuilder<DspDeal>;
 		filter: GetListDspDealsDto;
 	}) {
 		const { dspId, dealTypeId, visibility, enabled } = filter;

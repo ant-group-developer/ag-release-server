@@ -8,14 +8,14 @@ import {
 	GetListDealTypesDto,
 	UpdateDealTypeDto,
 } from '../dto/deal-type.dto';
-import { DealTypeEntity } from '../entities/deal-type.entity';
+import { DealType } from '../entities/deal-type.entity';
 import { DealTypeQueryService } from './deal-type.query.service';
 
 @Injectable()
 export class DealTypesService {
 	constructor(
-		@InjectRepository(DealTypeEntity)
-		private readonly repo: Repository<DealTypeEntity>,
+		@InjectRepository(DealType)
+		private readonly repo: Repository<DealType>,
 
 		private readonly queryService: DealTypeQueryService,
 	) {}
@@ -23,11 +23,9 @@ export class DealTypesService {
 	async create({
 		data,
 		userId,
-		tenantId,
 	}: {
 		data: CreateDealTypeDto;
 		userId: string;
-		tenantId?: string | null;
 	}) {
 		await this.validateUnique({ code: data.code, name: data.name });
 
@@ -35,15 +33,13 @@ export class DealTypesService {
 			...data,
 			creatorId: userId,
 			modifierId: userId,
-			// nếu BaseUserTracked có tenantId thì set ở đây
-			// tenantId,
 		});
 
 		const transaction = await newTransaction(this.repo);
 
 		try {
 			const { manager } = transaction;
-			const txRepo = manager.getRepository(DealTypeEntity);
+			const txRepo = manager.getRepository(DealType);
 
 			const row = await txRepo.save(entity);
 
@@ -86,7 +82,7 @@ export class DealTypesService {
 
 		try {
 			const { manager } = transaction;
-			const txRepo = manager.getRepository(DealTypeEntity);
+			const txRepo = manager.getRepository(DealType);
 
 			await txRepo.update(id, {
 				...data,

@@ -4,7 +4,6 @@ import {
 	Delete,
 	Get,
 	Param,
-	ParseIntPipe,
 	Post,
 	Put,
 	Query,
@@ -24,7 +23,7 @@ import {
 	GetListDspDealsDto,
 	UpdateDspDealDto,
 } from './dto/dsp-deal.dto';
-import { DspDealEntity } from './entities/dsp-deal.entity';
+import { DspDeal } from './entities/dsp-deal.entity';
 import { DspDealsService } from './services/dsp-deal.service';
 
 @ApiTags('DSP Deals')
@@ -35,8 +34,8 @@ export class DspDealsController {
 
 	@Post()
 	@ApiOperation({ summary: 'Create DSP deal mapping' })
-	@ApiParam({ name: 'dspId', type: Number })
-	@ApiResponse({ status: 201, type: DspDealEntity })
+	@ApiParam({ name: 'dspId', type: String })
+	@ApiResponse({ status: 201, type: DspDeal })
 	async create(
 		@Param('dspId') dspId: string,
 		@Body() data: CreateDspDealDto,
@@ -47,9 +46,9 @@ export class DspDealsController {
 
 	@Get()
 	@ApiOperation({ summary: 'Get list DSP deals by DSP' })
-	@ApiParam({ name: 'dspId', type: Number })
+	@ApiParam({ name: 'dspId', type: String })
 	@ApiQuery({ type: GetListDspDealsDto })
-	@ApiResponse({ status: 200, type: [DspDealEntity] })
+	@ApiResponse({ status: 200, type: [DspDeal] })
 	async getList(
 		@Param('dspId') dspId: string,
 		@Query() query: GetListDspDealsDto,
@@ -61,34 +60,31 @@ export class DspDealsController {
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Get DSP deal detail' })
-	@ApiParam({ name: 'dspId', type: Number })
-	@ApiParam({ name: 'id', type: Number })
-	@ApiResponse({ status: 200, type: DspDealEntity })
-	async findOne(@Param('id', ParseIntPipe) id: number) {
-		const result = await this.svc.findOne(String(id));
+	@ApiParam({ name: 'dspId', type: String })
+	@ApiParam({ name: 'id', type: String })
+	@ApiResponse({ status: 200, type: DspDeal })
+	async findOne(@Param('id') id: string) {
+		const result = await this.svc.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Put(':id')
 	@ApiOperation({ summary: 'Update DSP deal mapping' })
-	@ApiParam({ name: 'dspId', type: Number })
-	@ApiParam({ name: 'id', type: Number })
-	@ApiResponse({ status: 200, type: DspDealEntity })
-	async update(
-		@Param('id', ParseIntPipe) id: number,
-		@Body() data: UpdateDspDealDto,
-	) {
-		const result = await this.svc.update({ id: String(id), data });
+	@ApiParam({ name: 'dspId', type: String })
+	@ApiParam({ name: 'id', type: String })
+	@ApiResponse({ status: 200, type: DspDeal })
+	async update(@Param('id') id: string, @Body() data: UpdateDspDealDto) {
+		const result = await this.svc.update({ id, data });
 		return DspDealSuccess.UPDATE(result);
 	}
 
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete DSP deal mapping' })
-	@ApiParam({ name: 'dspId', type: Number })
-	@ApiParam({ name: 'id', type: Number })
+	@ApiParam({ name: 'dspId', type: String })
+	@ApiParam({ name: 'id', type: String })
 	@ApiResponse({ status: 200 })
-	async delete(@Param('id', ParseIntPipe) id: number) {
-		await this.svc.delete(String(id));
+	async delete(@Param('id') id: string) {
+		await this.svc.delete(id);
 		return DspDealSuccess.DELETE();
 	}
 }
