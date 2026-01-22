@@ -6,11 +6,20 @@ import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspReleaseStatus } from 'src/modules/distribution2/dsp-release-status/entities/dsp-release-status.entity';
+import { DspRoutingSetting } from 'src/modules/distribution2/dsp-routing/entities/dsp-routing-setting.entity';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 
 @Entity('dsps', {
 	comment:
@@ -84,6 +93,15 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 
 	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.dsp)
 	trackPolicies?: TrackPolicy[];
+
+	@OneToOne(
+		() => DspRoutingSetting,
+		(dspRoutingSetting) => dspRoutingSetting.dsp,
+	)
+	dspRoutingSetting: DspRoutingSetting;
+
+	@OneToMany(() => DspReleaseStatus, (releaseStatuses) => releaseStatuses.dsp)
+	releaseStatuses: DspReleaseStatus[];
 
 	releaseDspsCount?: number;
 }

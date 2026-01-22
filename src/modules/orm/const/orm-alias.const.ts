@@ -8,4 +8,6 @@ export class OrmAlias {
 	static releaseDspDelivery = 'releaseDspDelivery';
 	static dealType = 'dealType';
 	static dspDeal = 'dspDeal';
+	static dspRouting = 'dspRouting';
+	static dspReleaseStatus = 'dspReleaseStatus';
 }
