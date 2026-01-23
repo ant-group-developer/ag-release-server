@@ -24,6 +24,16 @@ export class DspRoutingService {
 		private readonly queryService: DspRoutingQueryService,
 	) {}
 
+	// distribution
+
+	// phân phối release -> vào bảng dsp_release_status lấy list các bảng
+	// chia ra 2 loại, ci, spotify
+	//
+
+	// ci
+	// import: tạo batch id trên ci, parse release, đẩy sang thư mục ci
+	// export: list dsp, tạo file export
+	// crud
 	async create(data: CreateDspRoutingSettingDto) {
 		const transaction = await newTransaction(this.repo);
 
@@ -213,6 +223,7 @@ export class DspRoutingService {
 		return this.queryService.getList(filter);
 	}
 
+	// private
 	private async resolveAndValidateConfigSelection(
 		deliveryRepo: Repository<DeliveryConfig>,
 		input: {
