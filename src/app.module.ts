@@ -24,6 +24,7 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionChannelModule } from './modules/distribution-channel/distribution-channel.module';
+import { DistributionModule } from './modules/distribution/distribution.module';
 import { Distribution2Module } from './modules/distribution2/distribution2.module';
 import { FileDistributionCiModule } from './modules/distribution2/file-distribution/ci/file-distribution-ci.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
@@ -153,7 +154,7 @@ import { UserModule } from './modules/user/user.module';
 
 		DistributionChannelModule,
 		TenantIntegrationModule,
-		// DistributionModule,
+		DistributionModule,
 		Distribution2Module,
 
 		SftpModule,
