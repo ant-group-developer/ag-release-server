@@ -290,7 +290,7 @@ export class TenantIntegrationService {
 				},
 				{
 					agreementType: DspAgreementType.CI,
-					name: 'Thoả thuận trực tiếp', // nếu muốn hiển thị "CI" thì đổi lại
+					name: 'CI', // nếu muốn hiển thị "CI" thì đổi lại
 					description: null,
 					requiresCredentials: true,
 					credentials: emptyCredentials,
