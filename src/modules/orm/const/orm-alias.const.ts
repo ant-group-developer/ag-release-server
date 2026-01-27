@@ -10,4 +10,6 @@ export class OrmAlias {
 	static dspDeal = 'dspDeal';
 	static dspRouting = 'dspRouting';
 	static dspReleaseStatus = 'dspReleaseStatus';
+	static sftpConfig = 'sftpConfig';
+	static dspRoutingConfig = 'dspRoutingConfig';
 }
