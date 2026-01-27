@@ -1,11 +1,8 @@
 // src/modules/distribution/dsp-routing/dto/dsp-routing.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import {
-	FieldOrderDspRouting,
-	RoutingModeEnum,
-} from '../enum/dsp-routing.enum';
+import { FieldOrderDspRouting } from '../enum/dsp-routing.enum';
 
 export class CreateDspRoutingSettingDto {
 	@ApiProperty({ example: 'dsp_001' })
@@ -64,13 +61,13 @@ export class GetListDspRoutingSettingsDto extends BaseQueryDto2 {
 	@IsString()
 	dspId?: string;
 
-	@ApiPropertyOptional({
-		example: RoutingModeEnum.AGGREGATOR,
-		enum: RoutingModeEnum,
-	})
-	@IsOptional()
-	@IsEnum(RoutingModeEnum)
-	mode?: RoutingModeEnum;
+	// @ApiPropertyOptional({
+	// 	example: RoutingModeEnum.AGGREGATOR,
+	// 	enum: RoutingModeEnum,
+	// })
+	// @IsOptional()
+	// @IsEnum(RoutingModeEnum)
+	// mode?: RoutingModeEnum;
 
 	@IsOptional()
 	fieldOrder: string = FieldOrderDspRouting.createdAt;

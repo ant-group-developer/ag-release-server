@@ -46,10 +46,13 @@ export class DspRoutingQueryService {
 		qb: SelectQueryBuilder<DspRoutingSetting>;
 		filter: GetListDspRoutingSettingsDto;
 	}) {
-		const { dspId, mode } = filter;
+		const {
+			dspId,
+			// mode
+		} = filter;
 
 		if (dspId) qb.andWhere('dspRouting.dspId = :dspId', { dspId });
-		if (mode) qb.andWhere('dspRouting.mode = :mode', { mode });
+		// if (mode) qb.andWhere('dspRouting.mode = :mode', { mode });
 
 		orderAndPaging2({
 			qb,

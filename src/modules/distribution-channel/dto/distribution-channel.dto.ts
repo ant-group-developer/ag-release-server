@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-	IsBoolean,
 	IsEnum,
 	IsNumber,
 	IsOptional,
@@ -10,9 +9,8 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { DistributionChannelProtocol } from '../enum/enum';
 import {
-	DspAgreementType,
+	// DspAgreementType,
 	OrderFieldDistributionChannel,
 } from '../enums/distribution-channel.enum';
 
@@ -38,23 +36,23 @@ export class CreateDistributionChannelDto {
 	@IsUUID()
 	id?: string;
 
-	@ApiPropertyOptional({
-		type: 'string',
-		format: 'uuid',
-		nullable: true,
-	})
-	@IsUUID()
-	@IsOptional()
-	tenantId: string | null;
+	// @ApiPropertyOptional({
+	// 	type: 'string',
+	// 	format: 'uuid',
+	// 	nullable: true,
+	// })
+	// @IsUUID()
+	// @IsOptional()
+	// tenantId: string | null;
 
-	@ApiPropertyOptional({
-		type: 'string',
-		nullable: true,
-		example: 'spotify',
-	})
-	@IsString()
-	@IsOptional()
-	dspId: string | null;
+	// @ApiPropertyOptional({
+	// 	type: 'string',
+	// 	nullable: true,
+	// 	example: 'spotify',
+	// })
+	// @IsString()
+	// @IsOptional()
+	// dspId: string | null;
 
 	@ApiPropertyOptional({
 		type: 'string',
@@ -65,12 +63,12 @@ export class CreateDistributionChannelDto {
 	@IsOptional()
 	aggregatorId: string | null;
 
-	@ApiProperty({
-		enum: DistributionChannelProtocol,
-		example: DistributionChannelProtocol.SFTP,
-	})
-	@IsEnum(DistributionChannelProtocol)
-	protocol: DistributionChannelProtocol;
+	// @ApiProperty({
+	// 	enum: DistributionChannelProtocol,
+	// 	example: DistributionChannelProtocol.SFTP,
+	// })
+	// @IsEnum(DistributionChannelProtocol)
+	// protocol: DistributionChannelProtocol;
 
 	@ApiProperty({
 		type: () => DistributionChannelCredentialsDto,
@@ -79,24 +77,24 @@ export class CreateDistributionChannelDto {
 	@Type(() => DistributionChannelCredentialsDto)
 	credentials: DistributionChannelCredentialsDto;
 
-	@ApiPropertyOptional({
-		type: 'boolean',
-		default: false,
-	})
-	@IsBoolean()
-	@IsOptional()
-	isSystemDefault?: boolean;
+	// @ApiPropertyOptional({
+	// 	type: 'boolean',
+	// 	default: false,
+	// })
+	// @IsBoolean()
+	// @IsOptional()
+	// isSystemDefault?: boolean;
 
-	@ApiPropertyOptional({
-		type: 'boolean',
-		default: true,
-	})
-	@IsBoolean()
-	@IsOptional()
-	isActive?: boolean;
+	// @ApiPropertyOptional({
+	// 	type: 'boolean',
+	// 	default: true,
+	// })
+	// @IsBoolean()
+	// @IsOptional()
+	// isActive?: boolean;
 
-	@IsEnum(DspAgreementType)
-	agreementType: DspAgreementType;
+	// @IsEnum(DspAgreementType)
+	// agreementType: DspAgreementType;
 }
 
 export class UpdateDistributionChannelDto extends PartialType(
@@ -104,21 +102,21 @@ export class UpdateDistributionChannelDto extends PartialType(
 ) {}
 
 export class GetListDistributionChannelsDto extends BaseQueryDto2 {
-	@ApiPropertyOptional({
-		type: 'string',
-		format: 'uuid',
-	})
-	@IsUUID()
-	@IsOptional()
-	tenantId?: string;
+	// @ApiPropertyOptional({
+	// 	type: 'string',
+	// 	format: 'uuid',
+	// })
+	// @IsUUID()
+	// @IsOptional()
+	// tenantId?: string;
 
-	@ApiPropertyOptional({
-		type: 'string',
-		example: 'spotify',
-	})
-	@IsString()
-	@IsOptional()
-	dspId?: string;
+	// @ApiPropertyOptional({
+	// 	type: 'string',
+	// 	example: 'spotify',
+	// })
+	// @IsString()
+	// @IsOptional()
+	// dspId?: string;
 
 	@ApiPropertyOptional({
 		enum: OrderFieldDistributionChannel,

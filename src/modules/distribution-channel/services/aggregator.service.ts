@@ -2,9 +2,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { newTransaction } from 'src/utils/utils.transaction';
-import { Not, Repository } from 'typeorm';
+import { EntityManager, Not, Repository } from 'typeorm';
 import { AggregatorException } from '../const/aggregator.constant';
-import { DistributionChannelException } from '../const/distribution-channel.constant';
 import {
 	CreateAggregatorDto,
 	GetListAggregatorsDto,
@@ -33,7 +32,7 @@ export class AggregatorService {
 		userId: string;
 		tenantId?: string | null;
 	}) {
-		const { distributionChannels, ...rest } = data;
+		const { distributionChannel, ...rest } = data;
 
 		await this.validateUnique({
 			code: data.code,
@@ -53,20 +52,24 @@ export class AggregatorService {
 			const repo = manager.getRepository(Aggregator);
 
 			const aggregator = await repo.save(entity);
-			if (distributionChannels !== undefined) {
-				distributionChannels.map(
-					(d) => (d.aggregatorId = aggregator.id),
-				);
-
-				await this.distributionChannelService.bulkCreate({
-					data: distributionChannels,
+			if (distributionChannel !== undefined) {
+				await this.distributionChannelService.create({
+					data: {
+						...distributionChannel,
+						aggregatorId: aggregator.id,
+					},
 					userId,
 					manager,
 					tenantId,
 				});
 			}
 
+			if (entity.isSystemDefault) {
+				await this.resetSystemDefault({ id: entity.id, manager });
+			}
+
 			await queryRunner.commitTransaction();
+
 			return this.findOne(aggregator.id);
 		} catch (e) {
 			await queryRunner.rollbackTransaction();
@@ -79,7 +82,7 @@ export class AggregatorService {
 	async findOne(id: string) {
 		const entity = await this.aggregatorRepo.findOne({
 			where: { id },
-			relations: { distributionChannels: true },
+			relations: { distributionChannel: true },
 		});
 		if (!entity) {
 			throw AggregatorException.NOT_FOUND();
@@ -96,7 +99,7 @@ export class AggregatorService {
 		data: UpdateAggregatorDto;
 		userId: string;
 	}) {
-		const { distributionChannels, ...rest } = data;
+		const { distributionChannel, ...rest } = data;
 
 		// ensure exists
 		await this.findOne(id);
@@ -119,26 +122,24 @@ export class AggregatorService {
 				modifierId: userId,
 			});
 
-			if (distributionChannels !== undefined) {
-				const dataParsed = distributionChannels.map((d) => {
-					if (!d.id) {
-						throw DistributionChannelException.ID_REQUIRED_FOR_UPDATE();
-					}
-
-					return {
-						id: d.id,
-						data: {
-							aggregatorId: d.aggregatorId,
-							protocol: d.protocol,
-							credentials: d.credentials,
-							isSystemDefault: d.isSystemDefault,
-							isActive: d.isActive,
-						},
-						userId,
-						manager,
-					};
+			if (
+				distributionChannel !== undefined &&
+				distributionChannel.id !== undefined
+			) {
+				await this.distributionChannelService.update({
+					id: distributionChannel.id,
+					data: {
+						aggregatorId: distributionChannel.aggregatorId,
+						credentials: distributionChannel.credentials,
+						// isActive: distributionChannel.isActive,
+					},
+					userId,
+					manager,
 				});
-				await this.distributionChannelService.bulkUpdate(dataParsed);
+			}
+
+			if (rest.isSystemDefault) {
+				await this.resetSystemDefault({ id, manager });
 			}
 			return await this.findOne(id);
 		} catch (error) {
@@ -195,5 +196,27 @@ export class AggregatorService {
 				throw AggregatorException.NAME_EXISTED();
 			}
 		}
+	}
+
+	async resetSystemDefault({
+		id,
+		manager,
+	}: {
+		id: string;
+		manager?: EntityManager;
+	}) {
+		const repo = this.getAggregatorRepo(manager);
+
+		await repo.update(
+			{ isSystemDefault: true },
+			{ isSystemDefault: false },
+		);
+		await repo.update({ id }, { isSystemDefault: true });
+	}
+
+	protected getAggregatorRepo(manager?: EntityManager) {
+		return manager
+			? manager.getRepository(Aggregator)
+			: this.aggregatorRepo;
 	}
 }

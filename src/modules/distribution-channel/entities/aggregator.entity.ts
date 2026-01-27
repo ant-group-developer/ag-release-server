@@ -4,7 +4,8 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { Column, Entity, Index, OneToMany } from 'typeorm';
+import { DspRoutingSetting } from 'src/modules/distribution2/dsp-routing/entities/dsp-routing-setting.entity';
+import { Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import { DistributionChannel } from './distribution-channel.entity';
 
 @Entity('aggregators', {
@@ -40,15 +41,37 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	})
 	contactEmail?: string;
 
+	@Column({
+		type: 'boolean',
+		name: 'is_system_default',
+		default: false,
+		comment: 'Kênh mặc định do hệ thống cấu hình',
+	})
+	isSystemDefault: boolean;
+
+	@Column({
+		type: 'boolean',
+		name: 'is_active',
+		default: true,
+		comment: 'Kênh phân phối đang hoạt động hay không',
+	})
+	isActive: boolean;
+
 	// =========================
 	// RELATIONS
 	// =========================
 
-	@OneToMany(
+	@OneToOne(
 		() => DistributionChannel,
 		(distributionChannel) => distributionChannel.aggregator,
 	)
-	distributionChannels: DistributionChannel[];
+	distributionChannel: DistributionChannel;
+
+	@OneToMany(
+		() => DspRoutingSetting,
+		(dspRoutingSettings) => dspRoutingSettings.aggregator,
+	)
+	dspRoutingSettings: DspRoutingSetting[];
 }
 
 // sql

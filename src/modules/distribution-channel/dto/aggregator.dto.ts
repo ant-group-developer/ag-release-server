@@ -2,13 +2,12 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-	IsArray,
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	MaxLength,
-	ValidateNested,
 } from 'class-validator';
 import {
 	DEFAULT_LENGTH_CODE,
@@ -51,15 +50,31 @@ export class CreateAggregatorDto {
 	contactEmail?: string;
 
 	@ApiPropertyOptional({
+		type: 'boolean',
+		default: false,
+	})
+	@IsBoolean()
+	@IsOptional()
+	isSystemDefault?: boolean;
+
+	@ApiPropertyOptional({
+		type: 'boolean',
+		default: true,
+	})
+	@IsBoolean()
+	@IsOptional()
+	isActive?: boolean;
+
+	@ApiPropertyOptional({
 		description: 'Danh sách distribution channels',
 		type: () => CreateDistributionChannelDto,
 		isArray: true,
 	})
 	@IsOptional()
-	@IsArray()
-	@ValidateNested({ each: true })
+	// @IsArray()
+	// @ValidateNested({ each: true })
 	@Type(() => CreateDistributionChannelDto)
-	distributionChannels?: CreateDistributionChannelDto[];
+	distributionChannel?: CreateDistributionChannelDto;
 }
 
 export class UpdateAggregatorDto extends PartialType(CreateAggregatorDto) {}

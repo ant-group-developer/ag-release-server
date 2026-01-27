@@ -10,7 +10,7 @@ import {
 } from 'class-validator';
 
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
+// import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
 import { TenantIntegrationOrderBy } from '../enum/enum';
 
 import { Type } from 'class-transformer';
@@ -25,8 +25,8 @@ export class CreateTenantIntegrationConnectionDto {
 	@IsUUID()
 	id: string;
 
-	@IsEnum(DspAgreementType)
-	agreementType: DspAgreementType;
+	// @IsEnum(DspAgreementType)
+	// agreementType: DspAgreementType;
 
 	/**
 	 * ANT / Merlin: có thể null
@@ -57,8 +57,8 @@ export class CreateTenantIntegrationDto {
 	@IsUUID()
 	tenantId: string;
 
-	@IsEnum(DspAgreementType)
-	agreementType: DspAgreementType;
+	// @IsEnum(DspAgreementType)
+	// agreementType: DspAgreementType;
 
 	@IsArray()
 	@ArrayMinSize(1)
@@ -89,8 +89,8 @@ export class UpdateTenantIntegrationDto {
 	@IsBoolean()
 	isActive?: boolean;
 
-	@IsEnum(DspAgreementType)
-	agreementType: DspAgreementType;
+	// @IsEnum(DspAgreementType)
+	// agreementType: DspAgreementType;
 
 	@IsOptional()
 	@IsArray()

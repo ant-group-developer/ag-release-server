@@ -1,5 +1,5 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
+// import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
 import {
 	Column,
 	Entity,
@@ -36,13 +36,13 @@ export class TenantIntegration extends BaseUserTrackedUUIDEntity {
 	})
 	tenantId: string;
 
-	@Column({
-		type: 'enum',
-		enum: DspAgreementType,
-		name: 'agreement_type',
-		default: DspAgreementType.ANT,
-	})
-	agreementType: DspAgreementType;
+	// @Column({
+	// 	type: 'enum',
+	// 	enum: DspAgreementType,
+	// 	name: 'agreement_type',
+	// 	default: DspAgreementType.ANT,
+	// })
+	// agreementType: DspAgreementType;
 
 	@ManyToOne(() => Dsp, {
 		onDelete: 'CASCADE',
@@ -68,7 +68,10 @@ export type ConnectionCredentials = {
 };
 
 @Entity('tenant_integration_connections')
-@Unique('uq_tic_ti_agreement', ['tenantIntegrationId', 'agreementType'])
+@Unique('uq_tic_ti_agreement', [
+	'tenantIntegrationId',
+	// 'agreementType'
+])
 export class TenantIntegrationConnection extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid', name: 'tenant_integration_id' })
 	tenantIntegrationId: string;
@@ -91,12 +94,12 @@ export class TenantIntegrationConnection extends BaseUserTrackedUUIDEntity {
 	})
 	requiresCredentials: boolean;
 
-	@Column({
-		type: 'enum',
-		enum: DspAgreementType,
-		name: 'agreement_type',
-	})
-	agreementType: DspAgreementType;
+	// @Column({
+	// 	type: 'enum',
+	// 	enum: DspAgreementType,
+	// 	name: 'agreement_type',
+	// })
+	// agreementType: DspAgreementType;
 
 	@Column({ type: 'varchar', length: 20, nullable: true })
 	protocol: string | null;
