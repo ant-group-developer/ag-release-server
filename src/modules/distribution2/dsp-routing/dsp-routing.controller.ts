@@ -15,9 +15,9 @@ import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { DspRoutingSuccess } from './const/dsp-routing.const';
 import {
 	AutoCreateDspRoutingSettingDto,
-	CreateDspRoutingSettingDto,
 	GetListDspRoutingSettingsDto,
 	UpdateDspRoutingSettingDto,
+	UpsertDspRoutingSettingDto,
 } from './dto/dsp-routing.dto';
 import { DspRoutingSetting } from './entities/dsp-routing-setting.entity';
 import { DspRoutingService } from './services/dsp-routing.service';
@@ -34,8 +34,8 @@ export class DspRoutingController {
 			'Create dsp routing setting (choose existing delivery config records)',
 	})
 	@ApiResponse({ status: 201, type: DspRoutingSetting })
-	async create(@Body() data: CreateDspRoutingSettingDto) {
-		const result = await this.svc.create(data);
+	async upsert(@Body() data: UpsertDspRoutingSettingDto) {
+		const result = await this.svc.upsert(data);
 		return DspRoutingSuccess.CREATE(result);
 	}
 

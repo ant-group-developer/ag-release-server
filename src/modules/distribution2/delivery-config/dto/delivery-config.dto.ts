@@ -1,51 +1,39 @@
 // src/modules/distribution/delivery-config/dto/delivery-config.dto.ts
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
 	IsBoolean,
 	IsIn,
 	IsInt,
+	IsNumber,
 	IsOptional,
 	IsString,
+	IsUUID,
 	MaxLength,
 	Min,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 
-export class CreateDeliveryConfigDto {
+export class UpsertDeliveryConfigDto {
+	@IsOptional()
+	@IsUUID()
+	id?: string;
+
 	@ApiProperty({ example: 'Spotify Direct' })
 	@IsString()
 	@MaxLength(255)
 	name: string;
 
-	@ApiPropertyOptional({
-		example: 'SPOTIFY',
-		description: 'SPOTIFY | CI | MERLIN | ...',
-	})
-	@IsOptional()
 	@IsString()
-	@MaxLength(50)
-	providerCode?: string;
+	host: string;
 
-	@ApiProperty({ example: 'sftp.example.com' })
-	@IsString()
-	@MaxLength(255)
-	sftpHost: string;
+	@IsNumber()
+	port: number;
 
-	@ApiProperty({ example: 'username' })
 	@IsString()
-	@MaxLength(255)
-	sftpUsername: string;
+	username: string;
 
-	@ApiPropertyOptional({ example: 'ENCRYPTED_TEXT' })
-	@IsOptional()
 	@IsString()
-	sftpPasswordEncrypted?: string;
-
-	@ApiPropertyOptional({ example: '/', default: '/' })
-	@IsOptional()
-	@IsString()
-	@MaxLength(255)
-	remotePath?: string;
+	password: string;
 
 	@ApiPropertyOptional({ example: true, default: true })
 	@IsOptional()
@@ -53,47 +41,63 @@ export class CreateDeliveryConfigDto {
 	isActive?: boolean;
 }
 
-export class UpdateDeliveryConfigDto {
-	@ApiPropertyOptional({ example: 'Spotify Direct' })
-	@IsOptional()
+export class CreateDeliveryConfigDto {
+	@ApiProperty({ example: 'Spotify Direct' })
 	@IsString()
 	@MaxLength(255)
-	name?: string;
+	name: string;
 
-	@ApiPropertyOptional({ example: 'SPOTIFY' })
-	@IsOptional()
 	@IsString()
-	@MaxLength(50)
-	providerCode?: string;
+	host: string;
 
-	@ApiPropertyOptional({ example: 'sftp.example.com' })
-	@IsOptional()
+	@IsNumber()
+	port: number;
+
 	@IsString()
-	@MaxLength(255)
-	sftpHost?: string;
+	username: string;
 
-	@ApiPropertyOptional({ example: 'username' })
-	@IsOptional()
 	@IsString()
-	@MaxLength(255)
-	sftpUsername?: string;
+	password: string;
 
-	@ApiPropertyOptional({ example: 'ENCRYPTED_TEXT' })
-	@IsOptional()
-	@IsString()
-	sftpPasswordEncrypted?: string;
+	// @ApiPropertyOptional({
+	// 	example: 'SPOTIFY',
+	// 	description: 'SPOTIFY | CI | MERLIN | ...',
+	// })
+	// @IsOptional()
+	// @IsString()
+	// @MaxLength(50)
+	// providerCode?: string;
 
-	@ApiPropertyOptional({ example: '/' })
-	@IsOptional()
-	@IsString()
-	@MaxLength(255)
-	remotePath?: string;
+	// @ApiProperty({ example: 'sftp.example.com' })
+	// @IsString()
+	// @MaxLength(255)
+	// sftpHost: string;
 
-	@ApiPropertyOptional({ example: true })
+	// @ApiProperty({ example: 'username' })
+	// @IsString()
+	// @MaxLength(255)
+	// sftpUsername: string;
+
+	// @ApiPropertyOptional({ example: 'ENCRYPTED_TEXT' })
+	// @IsOptional()
+	// @IsString()
+	// sftpPasswordEncrypted?: string;
+
+	// @ApiPropertyOptional({ example: '/', default: '/' })
+	// @IsOptional()
+	// @IsString()
+	// @MaxLength(255)
+	// remotePath?: string;
+
+	@ApiPropertyOptional({ example: true, default: true })
 	@IsOptional()
 	@IsBoolean()
 	isActive?: boolean;
 }
+
+export class UpdateDeliveryConfigDto extends PartialType(
+	CreateDeliveryConfigDto,
+) {}
 
 export class GetListDeliveryConfigsDto extends BaseQueryDto2 {
 	@ApiPropertyOptional({ example: ['spotify', 'direct'], type: [String] })

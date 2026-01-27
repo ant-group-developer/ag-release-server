@@ -4,8 +4,7 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { DspRoutingSetting } from 'src/modules/distribution2/dsp-routing/entities/dsp-routing-setting.entity';
-import { Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
+import { Column, Entity, Index, OneToOne } from 'typeorm';
 import { DistributionChannel } from './distribution-channel.entity';
 
 @Entity('aggregators', {
@@ -67,11 +66,11 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	)
 	distributionChannel: DistributionChannel;
 
-	@OneToMany(
-		() => DspRoutingSetting,
-		(dspRoutingSettings) => dspRoutingSettings.aggregator,
-	)
-	dspRoutingSettings: DspRoutingSetting[];
+	// @OneToMany(
+	// 	() => DspRoutingSetting,
+	// 	(dspRoutingSettings) => dspRoutingSettings.aggregator,
+	// )
+	// dspRoutingSettings: DspRoutingSetting[];
 }
 
 // sql
