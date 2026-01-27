@@ -37,22 +37,25 @@ export class DistributionChannelQueryService {
 		qb: SelectQueryBuilder<DistributionChannel>,
 		filter: GetListDistributionChannelsDto,
 	) {
-		const { tenantId, dspId, keyword } = filter;
+		const {
+			//  tenantId, dspId,
+			keyword,
+		} = filter;
 
-		if (tenantId) {
-			qb.andWhere(
-				`${OrmAlias.distributionChannel}.tenantId = :tenantId`,
-				{
-					tenantId,
-				},
-			);
-		}
+		// if (tenantId) {
+		// 	qb.andWhere(
+		// 		`${OrmAlias.distributionChannel}.tenantId = :tenantId`,
+		// 		{
+		// 			tenantId,
+		// 		},
+		// 	);
+		// }
 
-		if (dspId) {
-			qb.andWhere(`${OrmAlias.distributionChannel}.dspId = :dspId`, {
-				dspId,
-			});
-		}
+		// if (dspId) {
+		// 	qb.andWhere(`${OrmAlias.distributionChannel}.dspId = :dspId`, {
+		// 		dspId,
+		// 	});
+		// }
 
 		if (keyword?.length) {
 			qb.andWhere(

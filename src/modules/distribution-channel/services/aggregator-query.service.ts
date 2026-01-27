@@ -32,7 +32,7 @@ export class AggregatorQueryService {
 		qb: SelectQueryBuilder<Aggregator>,
 	) {
 		qb.leftJoinAndSelect(
-			AggregatorFm.distributionChannels,
+			AggregatorFm.distributionChannel,
 			OrmAlias.distributionChannel,
 		);
 	}

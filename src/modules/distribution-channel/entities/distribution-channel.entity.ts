@@ -1,8 +1,6 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { Dsp } from '../../dsp/entities/dsp.entity';
-import { Tenant } from '../../tenant/tenant.entity';
-import { DspAgreementType } from '../enums/distribution-channel.enum';
+import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { DistributionChannelCredentialsDto } from '../dto/distribution-channel.dto';
 import { Aggregator } from './aggregator.entity';
 
 @Entity('distribution_channels', {
@@ -14,29 +12,29 @@ export class DistributionChannel extends BaseUserTrackedUUIDEntity {
 	// RELATIONS
 	// =========================
 
-	@Column({ type: 'uuid', name: 'tenant_id', nullable: true })
-	tenantId: string | null;
+	// @Column({ type: 'uuid', name: 'tenant_id', nullable: true })
+	// tenantId: string | null;
 
-	@ManyToOne(() => Tenant, { onDelete: 'CASCADE', nullable: true })
-	@JoinColumn({ name: 'tenant_id' })
-	tenant: Tenant | null;
+	// @ManyToOne(() => Tenant, { onDelete: 'CASCADE', nullable: true })
+	// @JoinColumn({ name: 'tenant_id' })
+	// tenant: Tenant | null;
 
-	@Column({
-		type: 'varchar',
-		length: 10,
-		name: 'dsp_id',
-		nullable: true,
-	})
-	dspId: string | null;
+	// @Column({
+	// 	type: 'varchar',
+	// 	length: 10,
+	// 	name: 'dsp_id',
+	// 	nullable: true,
+	// })
+	// dspId: string | null;
 
-	@ManyToOne(() => Dsp, { onDelete: 'RESTRICT', nullable: true })
-	@JoinColumn({ name: 'dsp_id' })
-	dsp: Dsp | null;
+	// @ManyToOne(() => Dsp, { onDelete: 'RESTRICT', nullable: true })
+	// @JoinColumn({ name: 'dsp_id' })
+	// dsp: Dsp | null;
 
 	@Column({ type: 'uuid', name: 'aggregator_id', nullable: true })
 	aggregatorId: string | null;
 
-	@ManyToOne(() => Aggregator, { nullable: true, onDelete: 'SET NULL' })
+	@OneToOne(() => Aggregator, { nullable: true, onDelete: 'SET NULL' })
 	@JoinColumn({ name: 'aggregator_id' })
 	aggregator: Aggregator | null;
 
@@ -44,12 +42,12 @@ export class DistributionChannel extends BaseUserTrackedUUIDEntity {
 	// CONFIG
 	// =========================
 
-	@Column({
-		type: 'varchar',
-		length: 20,
-		comment: 'Giao thức kết nối: FTP | SFTP | API',
-	})
-	protocol: string;
+	// @Column({
+	// 	type: 'varchar',
+	// 	length: 20,
+	// 	comment: 'Giao thức kết nối: FTP | SFTP | API',
+	// })
+	// protocol: string;
 
 	@Column({
 		type: 'jsonb',
@@ -57,30 +55,30 @@ export class DistributionChannel extends BaseUserTrackedUUIDEntity {
 		comment:
 			'Thông tin xác thực kết nối (username, password, key, token, path...)',
 	})
-	credentials: Record<string, any>;
+	credentials: DistributionChannelCredentialsDto | null;
 
-	@Column({
-		type: 'boolean',
-		name: 'is_system_default',
-		default: false,
-		comment: 'Kênh mặc định do hệ thống cấu hình',
-	})
-	isSystemDefault: boolean;
+	// @Column({
+	// 	type: 'boolean',
+	// 	name: 'is_system_default',
+	// 	default: false,
+	// 	comment: 'Kênh mặc định do hệ thống cấu hình',
+	// })
+	// isSystemDefault: boolean;
 
-	@Column({
-		type: 'boolean',
-		name: 'is_active',
-		default: true,
-		comment: 'Kênh phân phối đang hoạt động hay không',
-	})
-	isActive: boolean;
+	// @Column({
+	// 	type: 'boolean',
+	// 	name: 'is_active',
+	// 	default: true,
+	// 	comment: 'Kênh phân phối đang hoạt động hay không',
+	// })
+	// isActive: boolean;
 
-	@Column({
-		type: 'enum',
-		enum: DspAgreementType,
-		name: 'agreement_type',
-	})
-	agreementType: DspAgreementType;
+	// @Column({
+	// 	type: 'enum',
+	// 	enum: DspAgreementType,
+	// 	name: 'agreement_type',
+	// })
+	// agreementType: DspAgreementType;
 }
 
 // sql

@@ -1,7 +1,7 @@
 // tenant-integration.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
+// import { DspAgreementType } from 'src/modules/distribution-channel/enums/distribution-channel.enum';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { newTransaction } from 'src/utils/utils.transaction';
@@ -44,14 +44,14 @@ export class TenantIntegrationService {
 		});
 
 		// Optional: check trùng agreementType trong request
-		const types = (data.integrationConnections ?? []).map(
-			(x) => x.agreementType,
-		);
-		if (new Set(types).size !== types.length) {
-			throw new BadRequestException(
-				'Không được truyền trùng agreementType',
-			);
-		}
+		// const types = (data.integrationConnections ?? []).map(
+		// 	(x) => x.agreementType,
+		// );
+		// if (new Set(types).size !== types.length) {
+		// 	throw new BadRequestException(
+		// 		'Không được truyền trùng agreementType',
+		// 	);
+		// }
 
 		const tx = await newTransaction(this.tenantIntegrationRepo);
 
@@ -77,7 +77,7 @@ export class TenantIntegrationService {
 				connRepo.create({
 					// luôn override theo saved.id
 					tenantIntegrationId: saved.id,
-					agreementType: c.agreementType,
+					// agreementType: c.agreementType,
 					// isActive: c.isActive ?? true,
 					protocol: c.protocol ?? null,
 					credentials: c.credentials ?? null,
@@ -260,21 +260,21 @@ export class TenantIntegrationService {
 
 			// 6) Build 4 connections cho mỗi TI
 			const connectionTemplates: Array<{
-				agreementType: DspAgreementType;
+				// agreementType: DspAgreementType;
 				name: string;
 				description: string | null;
 				requiresCredentials: boolean;
 				credentials: ConnectionCredentials | null;
 			}> = [
 				{
-					agreementType: DspAgreementType.ANT,
+					// agreementType: DspAgreementType.ANT,
 					name: 'ANT Music',
 					description: 'Không cần thông tin xác thực kết nối.',
 					requiresCredentials: false,
 					credentials: null,
 				},
 				{
-					agreementType: DspAgreementType.MERLIN,
+					// agreementType: DspAgreementType.MERLIN,
 					name: 'Merlin',
 					description:
 						'Thông tin xác thực kết nối sẽ được nhập bằng Tài khoản Quản lý. Vui lòng đảm bảo bạn đã điền và gửi cho họ bằng tính "Client Distribution Deals".',
@@ -282,14 +282,14 @@ export class TenantIntegrationService {
 					credentials: null,
 				},
 				{
-					agreementType: DspAgreementType.DIRECT,
+					// agreementType: DspAgreementType.DIRECT,
 					name: 'Thoả thuận trực tiếp',
 					description: null,
 					requiresCredentials: true,
 					credentials: emptyCredentials,
 				},
 				{
-					agreementType: DspAgreementType.CI,
+					// agreementType: DspAgreementType.CI,
 					name: 'CI', // nếu muốn hiển thị "CI" thì đổi lại
 					description: null,
 					requiresCredentials: true,
@@ -302,7 +302,7 @@ export class TenantIntegrationService {
 				for (const tpl of connectionTemplates) {
 					toInsertConn.push({
 						tenantIntegrationId: ti.id,
-						agreementType: tpl.agreementType,
+						// agreementType: tpl.agreementType,
 						name: tpl.name,
 						description: tpl.description,
 						requiresCredentials: tpl.requiresCredentials,

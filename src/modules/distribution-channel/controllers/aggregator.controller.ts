@@ -46,7 +46,7 @@ export class AggregatorController {
 		const result = await this.aggregatorService.create({
 			data,
 			userId: user.id,
-			tenantId: user.tenantId === 'system-tenant' ? null : user.tenantId,
+			// tenantId: user.tenantId === 'system-tenant' ? null : user.tenantId,
 		});
 		return AggregatorSuccess.CREATE(result);
 	}

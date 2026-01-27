@@ -33,17 +33,20 @@ export class DistributionChannelService {
 
 		const entity = repo.create({
 			...data,
-			tenantId,
+			// tenantId,
 			creatorId: userId,
 			modifierId: userId,
 		});
 
-		if (entity.aggregatorId !== null && entity.isSystemDefault === true) {
-			await this.clearSystemDefaultByAggregator({
-				aggregatorId: entity.aggregatorId,
-				manager,
-			});
-		}
+		// if (
+		// 	entity.aggregatorId !== null
+		// 	// && entity.isSystemDefault === true
+		// ) {
+		// 	await this.clearSystemDefaultByAggregator({
+		// 		aggregatorId: entity.aggregatorId,
+		// 		manager,
+		// 	});
+		// }
 
 		return repo.save(entity);
 	}
@@ -90,21 +93,27 @@ export class DistributionChannelService {
 	}) {
 		const repo = this.getDistributionChannelRepo(manager);
 
-		const { aggregatorId, isSystemDefault } = data;
+		// const {
+		// 	// aggregatorId,
+		// 	// isSystemDefault
+		// } = data;
 
 		await this.findOne(id);
 		// await this.validateUnique(data, id);
 
-		if (isSystemDefault && aggregatorId) {
-			await this.clearSystemDefaultByAggregator({
-				aggregatorId,
-				manager,
-			});
-		}
+		// if (
+		// 	// isSystemDefault &&
+		// 	aggregatorId
+		// ) {
+		// 	await this.clearSystemDefaultByAggregator({
+		// 		aggregatorId,
+		// 		manager,
+		// 	});
+		// }
 
 		await repo.update(id, {
 			...data,
-			credentials: data.credentials as any,
+			credentials: data.credentials,
 			modifierId: userId,
 		});
 
@@ -124,17 +133,17 @@ export class DistributionChannelService {
 		}
 	}
 
-	async clearSystemDefaultByAggregator({
-		aggregatorId,
-		manager,
-	}: {
-		aggregatorId: string;
-		manager?: EntityManager;
-	}) {
-		const repo = this.getDistributionChannelRepo(manager);
+	// async clearSystemDefaultByAggregator({
+	// 	aggregatorId,
+	// 	manager,
+	// }: {
+	// 	aggregatorId: string;
+	// 	manager?: EntityManager;
+	// }) {
+	// 	const repo = this.getDistributionChannelRepo(manager);
 
-		await repo.update({ aggregatorId }, { isSystemDefault: false });
-	}
+	// 	await repo.update({ aggregatorId }, { isSystemDefault: false });
+	// }
 
 	async getList(filter: GetListDistributionChannelsDto) {
 		return this.queryService.getList(filter);

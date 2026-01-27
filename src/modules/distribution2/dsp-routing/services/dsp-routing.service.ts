@@ -13,7 +13,7 @@ import {
 	UpdateDspRoutingSettingDto,
 } from '../dto/dsp-routing.dto';
 import { DspRoutingSetting } from '../entities/dsp-routing-setting.entity';
-import { RoutingModeEnum } from '../enum/dsp-routing.enum';
+// import { RoutingModeEnum } from '../enum/dsp-routing.enum';
 import { DspRoutingQueryService } from './dsp-routing.query.service';
 
 @Injectable()
@@ -46,20 +46,20 @@ export class DspRoutingService {
 
 			await this.validateUnique({ dspId: data.dspId });
 
-			const resolved = await this.resolveAndValidateConfigSelection(
-				deliveryRepo,
-				{
-					directConfigId: data.directConfigId ?? null,
-					specificAggregatorConfigId:
-						data.specificAggregatorConfigId ?? null,
-				},
-			);
+			// const resolved = await this.resolveAndValidateConfigSelection(
+			// 	deliveryRepo,
+			// 	{
+			// 		directConfigId: data.directConfigId ?? null,
+			// 		specificAggregatorConfigId:
+			// 			data.specificAggregatorConfigId ?? null,
+			// 	},
+			// );
 
 			const entity = routingRepo.create({
 				dspId: data.dspId,
-				mode: resolved.mode,
-				directConfigId: resolved.directConfigId,
-				specificAggregatorConfigId: resolved.specificAggregatorConfigId,
+				// mode: resolved.mode,
+				// directConfigId: resolved.directConfigId,
+				// specificAggregatorConfigId: resolved.specificAggregatorConfigId,
 			});
 			await routingRepo.save(entity);
 
@@ -120,10 +120,10 @@ export class DspRoutingService {
 				.map((dspId) =>
 					routingRepo.create({
 						dspId,
-						mode: resolved.mode,
-						directConfigId: resolved.directConfigId,
-						specificAggregatorConfigId:
-							resolved.specificAggregatorConfigId,
+						// mode: resolved.mode,
+						// directConfigId: resolved.directConfigId,
+						// specificAggregatorConfigId:
+						// resolved.specificAggregatorConfigId,
 					}),
 				);
 
@@ -162,29 +162,29 @@ export class DspRoutingService {
 			const txDeliveryRepo = manager.getRepository(DeliveryConfig);
 
 			// partial update: undefined = keep old, null = clear
-			const nextDirectConfigId =
-				data.directConfigId !== undefined
-					? (data.directConfigId ?? null)
-					: existed.directConfigId;
+			// const nextDirectConfigId =
+			// 	data.directConfigId !== undefined
+			// 		? (data.directConfigId ?? null)
+			// 		: existed.directConfigId;
 
-			const nextSpecificAggConfigId =
-				data.specificAggregatorConfigId !== undefined
-					? (data.specificAggregatorConfigId ?? null)
-					: existed.specificAggregatorConfigId;
+			// const nextSpecificAggConfigId =
+			// 	data.specificAggregatorConfigId !== undefined
+			// 		? (data.specificAggregatorConfigId ?? null)
+			// 		: existed.specificAggregatorConfigId;
 
 			// infer mode from ids (direct wins if provided)
-			const resolved = await this.resolveAndValidateConfigSelection(
-				txDeliveryRepo,
-				{
-					directConfigId: nextDirectConfigId,
-					specificAggregatorConfigId: nextSpecificAggConfigId,
-				},
-			);
+			// const resolved = await this.resolveAndValidateConfigSelection(
+			// 	txDeliveryRepo,
+			// 	{
+			// 		directConfigId: nextDirectConfigId,
+			// 		specificAggregatorConfigId: nextSpecificAggConfigId,
+			// 	},
+			// );
 
 			await txRoutingRepo.update(id, {
-				mode: resolved.mode,
-				directConfigId: resolved.directConfigId,
-				specificAggregatorConfigId: resolved.specificAggregatorConfigId,
+				// mode: resolved.mode,
+				// directConfigId: resolved.directConfigId,
+				// specificAggregatorConfigId: resolved.specificAggregatorConfigId,
 			});
 
 			await transaction.commitTransaction();
@@ -192,8 +192,8 @@ export class DspRoutingService {
 			return this.repo.findOne({
 				where: { id },
 				relations: {
-					directConfig: true,
-					specificAggregatorConfig: true,
+					// directConfig: true,
+					// specificAggregatorConfig: true,
 				},
 			});
 		} catch (e) {
@@ -213,7 +213,7 @@ export class DspRoutingService {
 	async findOne(id: string) {
 		const entity = await this.repo.findOne({
 			where: { id },
-			relations: { directConfig: true, specificAggregatorConfig: true },
+			// relations: { directConfig: true, specificAggregatorConfig: true },
 		});
 		if (!entity) throw DspRoutingException.NOT_FOUND();
 		return entity;
@@ -246,7 +246,7 @@ export class DspRoutingService {
 			);
 
 			return {
-				mode: RoutingModeEnum.DIRECT,
+				// mode: RoutingModeEnum.DIRECT,
 				directConfigId: direct.id,
 				specificAggregatorConfigId: null,
 			};
@@ -263,7 +263,7 @@ export class DspRoutingService {
 		}
 
 		return {
-			mode: RoutingModeEnum.AGGREGATOR,
+			// mode: RoutingModeEnum.AGGREGATOR,
 			directConfigId: null,
 			specificAggregatorConfigId: specificId,
 		};

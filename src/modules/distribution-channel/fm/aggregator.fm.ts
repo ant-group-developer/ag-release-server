@@ -5,5 +5,5 @@ export class AggregatorFm extends OrmFmService {
 	protected static mainAlias = OrmAlias.aggregator;
 
 	static code = this.genFm('code');
-	static distributionChannels = this.genFm('distributionChannels');
+	static distributionChannel = this.genFm('distributionChannel');
 }
