@@ -49,4 +49,6 @@ export class UpdateDspRoutingConfigDto extends PartialType(
 	CreateDspRoutingConfigDto,
 ) {}
 
-export class GetListDspRoutingConfigsDto extends BaseQueryDto2 {}
+export class GetListDspRoutingConfigsDto extends BaseQueryDto2 {
+	fieldOrder: string = 'dspRoutingConfig.createdAt';
+}

@@ -28,7 +28,10 @@ export class AggregatorsService {
 	}
 
 	async findOne(id: string) {
-		const entity = await this.repo.findOne({ where: { id } });
+		const entity = await this.repo.findOne({
+			where: { id },
+			relations: { sftpConfig: true },
+		});
 		if (!entity) throw AggregatorException.NOT_FOUND();
 		return entity;
 	}

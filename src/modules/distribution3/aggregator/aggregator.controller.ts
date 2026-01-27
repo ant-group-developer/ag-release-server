@@ -10,6 +10,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AppResponseSuccess } from 'src/app.const';
 import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
@@ -54,16 +55,14 @@ export class AggregatorsController {
 	@ApiOperation({ summary: 'Get aggregator detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiResponse({ status: 200, type: Aggregator })
-	async getDetail(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<Aggregator> {
-		return this.svc.findOne(id);
+	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
+		return AppResponseSuccess.COMMON(await this.svc.findOne(id));
 	}
 
 	@Get()
 	@ApiOperation({ summary: 'Get aggregators' })
 	async getList(@Query() filter: GetListAggregatorsDto) {
-		return this.svc.getList(filter);
+		return AppResponseSuccess.COMMON(await this.svc.getList(filter));
 	}
 
 	@Delete(':id')

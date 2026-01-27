@@ -28,9 +28,8 @@ export class AggregatorQueryService {
 	}
 
 	private createQbGetList(filter: GetListAggregatorsDto) {
-		const qb = this.repo.createQueryBuilder(
-			OrmAlias.aggregator ?? 'aggregator',
-		);
+		const qb = this.repo.createQueryBuilder(OrmAlias.aggregator);
+		qb.leftJoinAndSelect('aggregator.sftpConfig', 'sftpConfig');
 		this.applyFilter({ qb, filter });
 		return qb;
 	}
@@ -42,15 +41,15 @@ export class AggregatorQueryService {
 		qb: SelectQueryBuilder<Aggregator>;
 		filter: GetListAggregatorsDto;
 	}) {
-		const alias = OrmAlias.aggregator ?? 'aggregator';
+		const alias = OrmAlias.aggregator;
 		const { keyword } = filter;
 
 		if (keyword?.length) {
 			qb.andWhere(
 				`(
-          ${alias}.code ILIKE ANY(:keywords)
-          OR ${alias}.name ILIKE ANY(:keywords)
-        )`,
+					${alias}.code ILIKE ANY(:keywords)
+					OR ${alias}.name ILIKE ANY(:keywords)
+				)`,
 				{ keywords: keyword.map((k) => `%${k}%`) },
 			);
 		}

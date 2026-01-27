@@ -11,6 +11,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AppResponseSuccess } from 'src/app.const';
 import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
@@ -58,16 +59,14 @@ export class SftpConfigsController {
 	@ApiOperation({ summary: 'Get sftp config detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiResponse({ status: 200, type: SftpConfig })
-	async getDetail(
-		@Param('id', ParseUUIDPipe) id: string,
-	): Promise<SftpConfig> {
-		return this.svc.getDetail(id);
+	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
+		return AppResponseSuccess.COMMON(await this.svc.getDetail(id));
 	}
 
 	@Get()
 	@ApiOperation({ summary: 'Get sftp configs' })
 	async getList(@Query() filter: GetListSftpConfigsDto) {
-		return this.svc.getList(filter);
+		return AppResponseSuccess.COMMON(await this.svc.getList(filter));
 	}
 
 	@Delete(':id')

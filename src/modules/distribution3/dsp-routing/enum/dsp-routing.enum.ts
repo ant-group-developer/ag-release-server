@@ -1,4 +1,5 @@
 export enum RoutingModeEnum {
-	DIRECT = 'DIRECT',
-	AGGREGATOR = 'AGGREGATOR',
+	DIRECT = 'direct',
+	AGGREGATOR = 'aggregator',
+	SYSTEM = 'system',
 }

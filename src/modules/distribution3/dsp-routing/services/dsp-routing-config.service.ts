@@ -38,6 +38,15 @@ export class DspRoutingConfigsService {
 		return entity;
 	}
 
+	async getDetailByDspId(dspId: string) {
+		const entity = await this.repo.findOne({
+			where: { dspId },
+			relations: { aggregator: true },
+		});
+		if (!entity) throw DspRoutingConfigException.NOT_FOUND();
+		return entity;
+	}
+
 	async upsert({
 		data,
 		userId,
