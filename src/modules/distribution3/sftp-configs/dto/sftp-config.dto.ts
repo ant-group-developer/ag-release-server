@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderSftpConfig } from '../const/sftp-config.const';
-import { SftpMetadata } from '../entities/sftp-config.entity';
+import { SftpMetadata } from '../type/sftp-config.type';
 
 export class CreateSftpConfigDto {
 	@ApiPropertyOptional({

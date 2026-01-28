@@ -2,13 +2,7 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { Aggregator } from '../../aggregator/entities/aggregator.entity';
-
-export type SftpMetadata = {
-	host: string; // sftp host
-	port: number; // sftp port, ví dụ 22
-	username: string;
-	password: string; // nên encrypt khi lưu DB
-};
+import { SftpMetadata } from '../type/sftp-config.type';
 
 @Entity({ name: 'sftp_configs' })
 export class SftpConfig extends BaseUserTrackedUUIDEntity {

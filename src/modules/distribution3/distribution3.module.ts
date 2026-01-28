@@ -5,6 +5,7 @@ import { DspRoutingConfigsModule } from './dsp-routing/dsp-routing.module';
 import { SftpConfigsModule } from './sftp-configs/sftp-config.module';
 
 @Module({
+	controllers: [],
 	imports: [SftpConfigsModule, DspRoutingConfigsModule, AggregatorsModule],
 })
 export class Distribution3Module {}
