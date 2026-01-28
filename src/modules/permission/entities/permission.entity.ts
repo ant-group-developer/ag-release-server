@@ -29,6 +29,13 @@ export class Permission extends BaseUserTrackedUUIDEntity {
 	code: string;
 
 	@Column({
+		type: 'boolean',
+		default: true,
+		comment: 'Trạng thái hoạt động của quyền hạn',
+	})
+	isActive: boolean;
+
+	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_NOTE,
 		nullable: true,

@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -33,6 +34,9 @@ export class CreatePermissionDto {
 	@IsOptional()
 	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
+
+	@IsOptional()
+	isActive?: boolean;
 }
 
 export class BulkCreatePermissionDto {
@@ -54,10 +58,19 @@ export class UpdatePermissionDto extends PartialType(CreatePermissionDto) {
 	@MaxLength(DEFAULT_LENGTH_CODE)
 	@IsNotEmpty()
 	code: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
 }
 
 export class QueryGetListPermissionDto extends BaseQueryDto {
 	fieldOrder: FieldOrderPermission = FieldOrderPermission.NAME;
+
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
 }
 
 export class BulkDeletePermissionDto {

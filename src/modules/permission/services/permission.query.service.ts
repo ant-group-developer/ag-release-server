@@ -51,9 +51,15 @@ export class PermissionQueryService {
 
 			skip,
 			pageSize,
+			isActive,
 		} = data;
 
 		const query = this.permissionRepo.createQueryBuilder('permission');
+
+		const activeFilter = isActive ?? true;
+		query.andWhere('permission.isActive = :isActive', {
+			isActive: activeFilter,
+		});
 
 		if (keyword) {
 			query.andWhere('permission.name ILIKE :keyword', {

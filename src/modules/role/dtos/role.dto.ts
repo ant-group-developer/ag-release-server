@@ -1,5 +1,6 @@
 import {
 	IsArray,
+	IsBoolean,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -36,6 +37,10 @@ export class CreateRoleDto {
 	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
 
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
+
 	@IsNotEmpty()
 	@IsArray()
 	@IsUUID('4', { each: true })
@@ -67,14 +72,23 @@ export class UpdateRoleDto {
 	@MaxLength(DEFAULT_LENGTH_NOTE)
 	note?: string;
 
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
+
+	@ValidateIf((_, value) => value !== undefined)
 	@IsArray()
-	@IsNotEmpty()
+	@IsOptional()
 	@IsUUID('4', { each: true })
-	permissionIds: string[];
+	permissionIds?: string[];
 }
 
 // query
-export class GetListRole extends BaseQueryDto {}
+export class GetListRole extends BaseQueryDto {
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
+}
 
 // delete
 export class BulkDeleteRoleDto {
