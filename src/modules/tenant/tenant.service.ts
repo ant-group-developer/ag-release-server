@@ -6,7 +6,6 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Request } from 'express';
 import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
@@ -14,10 +13,7 @@ import { Brackets, FindOneOptions, In, TreeRepository } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
-import {
-	checkIsNotSystemAdmin,
-	checkIsNotSystemTenant,
-} from '../user/utils/user-type.util';
+import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -26,7 +22,6 @@ import {
 import { TenantMessages } from './tenant.constant';
 import { Tenant } from './tenant.entity';
 import { TenantType } from './tenant.enum';
-import { parentFirstSort } from './tenant.util';
 
 @Injectable()
 export class TenantService {
@@ -97,6 +92,13 @@ export class TenantService {
 			);
 		}
 
+		// Filter by isActive at SQL level
+		if (query.isActive !== undefined) {
+			queryBuilder.andWhere('t.is_active = :isActive', {
+				isActive: query.isActive,
+			});
+		}
+
 		const baseTenants = await queryBuilder.getMany();
 
 		if (!baseTenants.length) {
@@ -141,6 +143,9 @@ export class TenantService {
 					user: { id: true, name: true, email: true },
 				},
 			},
+			order: {
+				name: 'ASC',
+			},
 		});
 
 		// 2.1) Re-attach counts onto enriched entities
@@ -155,8 +160,34 @@ export class TenantService {
 		}
 
 		// 3) In-memory filter to keep semantics and still include ancestors later
-		const { keyword, type } = query;
-		const matched = enriched.filter((cat) => {
+		const { keyword, type, isActive } = query;
+
+		// 3.1) If isActive filter is true, exclude children whose parent is inactive
+		let filteredByParentActive = enriched;
+		if (isActive === true) {
+			const idToTenant = new Map<string, Tenant>(
+				enriched.map((t) => [t.id, t]),
+			);
+
+			// Check if any ancestor is inactive
+			const hasInactiveAncestor = (tenant: Tenant): boolean => {
+				let current = tenant.parent;
+				while (current) {
+					const parentTenant = idToTenant.get(current.id);
+					if (parentTenant && !parentTenant.isActive) {
+						return true;
+					}
+					current = parentTenant?.parent ?? null;
+				}
+				return false;
+			};
+
+			filteredByParentActive = enriched.filter(
+				(t) => !hasInactiveAncestor(t),
+			);
+		}
+
+		const matched = filteredByParentActive.filter((cat) => {
 			if (
 				keyword &&
 				!cat.name.toLowerCase().includes(keyword.toLowerCase())
@@ -167,7 +198,9 @@ export class TenantService {
 		});
 
 		// 4) Collect ancestors of matched nodes (from the already-loaded set)
-		const idToCat = new Map<string, Tenant>(enriched.map((c) => [c.id, c]));
+		const idToCat = new Map<string, Tenant>(
+			filteredByParentActive.map((c) => [c.id, c]),
+		);
 		const ancestorIds = new Set<string>();
 		for (const node of matched) {
 			let p = node.parent;
@@ -211,62 +244,6 @@ export class TenantService {
 			},
 
 			order: { name: 'ASC' },
-		});
-	}
-
-	async findAllFlattenActive(req: Request): Promise<PageDto<Tenant>> {
-		const queryBuilder = this.tenantTreeRepo
-			.createQueryBuilder('tenant')
-			.select([
-				'tenant.id',
-				'tenant.name',
-				'tenant.title',
-				'tenant.logo',
-				'tenant.icon',
-				'tenant.type',
-				'user.id',
-				'user.name',
-				'user.email',
-				'parent.id',
-				'parent.name',
-				'tenantUser.id',
-				'tenantUser.type',
-				'user.id',
-				'user.name',
-				'user.email',
-			])
-			.leftJoin('tenant.tenantUser', 'tenantUser')
-			.leftJoin('tenantUser.user', 'user')
-			.leftJoin('tenant.parent', 'parent')
-			.where('tenant.isActive = :isActive', { isActive: true })
-			.andWhere('tenantUser.type = :type', {
-				type: TenantUserType.OWNER,
-			})
-			.orderBy('tenant.name', 'ASC');
-
-		const tenantId = req.user!.tenantId;
-		const userType = req.user!.type;
-		if (checkIsNotSystemAdmin(userType)) {
-			queryBuilder.andWhere(
-				new Brackets((qb) => {
-					qb.andWhere('tenant.id = :tenantId', { tenantId }).orWhere(
-						'parent.id = :tenantId',
-						{ tenantId },
-					);
-				}),
-			);
-		}
-
-		const data = await queryBuilder.getMany();
-		const sorted = parentFirstSort(data);
-
-		return new PageDto({
-			items: sorted,
-			metadata: {
-				currentPage: 1,
-				pageSize: sorted.length,
-				totalItems: sorted.length,
-			},
 		});
 	}
 

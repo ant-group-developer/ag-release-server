@@ -11,6 +11,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { OrderDirection } from 'src/common/enums/common';
 import {
 	TenantOwnerOrAdminOnly,
 	TenantWhiteLabelOnly,
@@ -25,8 +26,9 @@ import {
 	FindTenantsDto,
 	UpdateTenantDto,
 } from './dtos/tenant.dto';
+import { SYSTEM_TENANT_ID } from './tenant.constant';
 import { Tenant } from './tenant.entity';
-import { TenantType } from './tenant.enum';
+import { TenantOrderBy, TenantType } from './tenant.enum';
 import { TenantService } from './tenant.service';
 
 @ApiTags('Tenants')
@@ -57,10 +59,24 @@ export class TenantController {
 
 	@Get('active')
 	@ApiOperation({ summary: 'Get all tenants flatten which is actived' })
-	async findAllFlattenActive(
+	async findAllActive(
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const result = await this.tenantService.findAllFlattenActive(req);
+		const tenantId = checkIsSystemAdmin(req.user!.type)
+			? SYSTEM_TENANT_ID
+			: req.user!.tenantId;
+		const result = await this.tenantService.findAll(
+			{
+				isActive: true,
+				fieldOrder: TenantOrderBy.NAME,
+				page: 1,
+				pageSize: 999,
+				skip: 0,
+				limit: 999,
+				orderBy: OrderDirection.ASC,
+			},
+			tenantId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
