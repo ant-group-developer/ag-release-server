@@ -35,7 +35,7 @@ export class DatabaseInitService implements OnModuleInit {
 			name: this.configService.get<string>('DEFAULT_NAME')!,
 			email: this.configService.get<string>('DEFAULT_EMAIL')!,
 			password: this.configService.get<string>('DEFAULT_PASS') ?? '',
-			type: this.configService.get<UserType>('USER_TYPE')!,
+			type: this.configService.get<UserType>('DEFAULT_USER_TYPE')!,
 			creatorId: this.configService.get<string>('DEFAULT_USER_ID')!,
 			modifierId: this.configService.get<string>('DEFAULT_USER_ID')!,
 		};

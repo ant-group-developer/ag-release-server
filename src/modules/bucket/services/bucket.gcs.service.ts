@@ -19,13 +19,14 @@ export class BucketGcsService {
 	private baseUrlPrivate: string;
 
 	constructor(private readonly configService: ConfigService) {
-		const keyFilePath = this.configService.get<string>('PATH_GCS_KEY');
+		const keyFilePath = this.configService.get<string>('GCS_PATH_KEY');
 
 		this.storage = new Storage({ keyFilename: keyFilePath });
 		this.publicBucketName =
-			this.configService.get<string>('PUBLIC_BUCKET')!;
-		this.privateBucketName =
-			this.configService.get<string>('PROTECTED_BUCKET')!;
+			this.configService.get<string>('GCS_PUBLIC_BUCKET')!;
+		this.privateBucketName = this.configService.get<string>(
+			'GCS_PROTECTED_BUCKET',
+		)!;
 		this.baseUrlPublic = `https://storage.googleapis.com/${this.publicBucketName}`;
 		this.baseUrlPrivate = `https://storage.cloud.google.com/${this.privateBucketName}`;
 	}
