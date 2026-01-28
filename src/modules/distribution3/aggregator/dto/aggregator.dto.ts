@@ -1,7 +1,8 @@
 // src/modules/aggregators/dto/create-aggregator.dto.ts
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+	IsBoolean,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -30,6 +31,32 @@ export class CreateAggregatorDto {
 	@ValidateNested()
 	@Type(() => CreateSftpConfigDto)
 	sftpConfig?: CreateSftpConfigDto;
+
+	@ApiPropertyOptional({
+		type: 'boolean',
+		default: false,
+	})
+	@IsBoolean()
+	@IsOptional()
+	isDefault?: boolean;
+
+	@ApiPropertyOptional({
+		type: 'boolean',
+		default: true,
+	})
+	@IsBoolean()
+	@IsOptional()
+	isActive?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	ddexId?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	ddexName?: string | null;
 }
 
 export class UpdateAggregatorDto extends PartialType(CreateAggregatorDto) {}

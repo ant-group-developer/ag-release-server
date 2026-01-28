@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AggregatorsModule } from '../aggregator/aggregator.module';
 import { SftpConfigsModule } from '../sftp-configs/sftp-config.module';
 import { DspRoutingConfigsController } from './dsp-routing-config.controller';
 import { DspRoutingConfig } from './entities/dsp-routing-config.entity';
@@ -15,6 +16,7 @@ import { DspRoutingConfigsService } from './services/dsp-routing-config.service'
 			//  Aggregator, SftpConfig
 		]),
 		SftpConfigsModule,
+		AggregatorsModule,
 	],
 	controllers: [DspRoutingConfigsController],
 	providers: [DspRoutingConfigsService, DspRoutingConfigQueryService],

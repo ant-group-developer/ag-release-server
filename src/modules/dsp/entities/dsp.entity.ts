@@ -74,6 +74,13 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	enablePolicy: boolean;
 
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexId: string | null;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexName: string | null;
+
+	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;

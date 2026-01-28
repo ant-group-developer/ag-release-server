@@ -23,19 +23,6 @@ export class AggregatorsService {
 		private readonly sftpConfigsService: SftpConfigsService,
 	) {}
 
-	async getList(filter: GetListAggregatorsDto) {
-		return this.queryService.getList(filter);
-	}
-
-	async findOne(id: string) {
-		const entity = await this.repo.findOne({
-			where: { id },
-			relations: { sftpConfig: true },
-		});
-		if (!entity) throw AggregatorException.NOT_FOUND();
-		return entity;
-	}
-
 	async create({
 		data,
 		userId,
@@ -60,6 +47,10 @@ export class AggregatorsService {
 				modifierId: userId,
 			});
 
+			if (data.isDefault) {
+				await this.resetDefault({ manager });
+			}
+
 			const aggregator = await aggregatorRepo.save(entity);
 
 			if (sftpConfig) {
@@ -81,6 +72,27 @@ export class AggregatorsService {
 		}
 	}
 
+	async getList(filter: GetListAggregatorsDto) {
+		return this.queryService.getList(filter);
+	}
+
+	async findOne(id: string) {
+		const entity = await this.repo.findOne({
+			where: { id },
+			relations: { sftpConfig: true },
+		});
+		if (!entity) throw AggregatorException.NOT_FOUND();
+		return entity;
+	}
+
+	async getDefault() {
+		const entity = await this.repo.findOne({
+			where: { isActive: true, isDefault: true },
+		});
+		if (!entity) throw AggregatorException.NOT_FOUND_DEFAULT();
+		return entity;
+	}
+
 	async update({
 		id,
 		data,
@@ -90,24 +102,76 @@ export class AggregatorsService {
 		data: UpdateAggregatorDto;
 		userId: string;
 	}) {
-		const entity = await this.repo.findOne({ where: { id } });
-		if (!entity) throw AggregatorException.NOT_FOUND();
+		// Bắt đầu transaction
+		const queryRunner = await newTransaction(this.repo);
 
-		await this.validateUnique({
-			id,
-			code: data.code,
-			name: data.name,
-		});
+		try {
+			const { manager } = queryRunner;
 
-		await this.repo.update(
-			{ id },
-			{
-				...data,
-				modifierId: userId,
-			},
-		);
+			const aggregatorRepo = manager.getRepository(Aggregator);
+			const entity = await aggregatorRepo.findOne({ where: { id } });
 
-		return this.findOne(id);
+			// Nếu không tìm thấy entity
+			if (!entity) throw AggregatorException.NOT_FOUND();
+
+			const { sftpConfig, ...rest } = data;
+
+			// Kiểm tra tính duy nhất cho code và name
+			await this.validateUnique({
+				idExclude: id,
+				code: data.code,
+				name: data.name,
+			});
+
+			if (
+				(data.isActive === false && data.isDefault) || // bản ghi mới là default nhưng ko active
+				(data.isActive === false && entity.isDefault) || // bản ghi trong db là default, nhưng tắt active
+				(data.isDefault === false && entity.isDefault) // ko được tắt default của bản ghi đang default
+			) {
+				throw AggregatorException.DEFAULT_ACTIVE_ERROR();
+			}
+
+			// Nếu isDefault được thiết lập, reset các default cũ
+			if (data.isDefault) {
+				await this.resetDefault({ manager });
+			}
+
+			// Cập nhật thông tin của aggregator
+			await aggregatorRepo.update(
+				{ id },
+				{
+					...rest,
+					modifierId: userId, // Cập nhật modifierId khi thay đổi
+				},
+			);
+
+			// Nếu có cập nhật về SFTP config, xử lý
+			if (sftpConfig) {
+				await this.sftpConfigsService.upsert({
+					userId,
+					data: { ...sftpConfig, aggregatorId: id },
+					manager,
+				});
+			}
+
+			// Commit transaction
+			await queryRunner.commitTransaction();
+
+			// Trả về kết quả sau khi cập nhật
+			return this.findOne(id);
+		} catch (e) {
+			// Rollback transaction nếu có lỗi
+			await queryRunner.rollbackTransaction();
+			throw e;
+		} finally {
+			// Release queryRunner
+			await queryRunner.release();
+		}
+	}
+
+	async resetDefault({ manager }: { manager?: EntityManager }) {
+		const repo = this.getDeliveryAggregatorRepo(manager);
+		await repo.update({ isDefault: true }, { isDefault: false });
 	}
 
 	async delete({ id, userId }: { id: string; userId: string }) {
@@ -121,11 +185,11 @@ export class AggregatorsService {
 	}
 
 	private async validateUnique({
-		id,
+		idExclude,
 		code,
 		name,
 	}: {
-		id?: string;
+		idExclude?: string;
 		code?: string;
 		name?: string;
 	}) {
@@ -133,7 +197,7 @@ export class AggregatorsService {
 			const existCode = await this.repo.findOne({
 				where: {
 					code,
-					...(id ? { id: Not(id) } : {}),
+					...(idExclude ? { id: Not(idExclude) } : {}),
 				},
 			});
 			if (existCode) throw AggregatorException.CODE_EXISTED();
@@ -143,7 +207,7 @@ export class AggregatorsService {
 			const existName = await this.repo.findOne({
 				where: {
 					name,
-					...(id ? { id: Not(id) } : {}),
+					...(idExclude ? { id: Not(idExclude) } : {}),
 				},
 			});
 			if (existName) throw AggregatorException.NAME_EXISTED();

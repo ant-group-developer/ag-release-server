@@ -1,11 +1,12 @@
 // src/modules/aggregators/const/aggregator.const.ts
+import { AppResponseSuccess } from 'src/app.const';
 import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 import { Aggregator } from '../entities/aggregator.entity';
 
-export class AggregatorSuccess {
+export class AggregatorSuccess extends AppResponseSuccess {
 	static CREATE(data?: Aggregator) {
 		return new ResponseSuccess<Aggregator>({
 			message: 'Create success',
@@ -32,6 +33,14 @@ export class AggregatorSuccess {
 }
 
 export class AggregatorException {
+	static NOT_FOUND_DEFAULT() {
+		return new ResponseError({
+			statusCode: 404,
+			message: 'Default aggregator not found',
+			messageCode: 'aggregator.message.error.defaultNotFound',
+		});
+	}
+
 	static NOT_FOUND() {
 		return new ResponseError({
 			statusCode: 404,
@@ -51,6 +60,14 @@ export class AggregatorException {
 		return new ResponseError({
 			message: 'Aggregator name already existed',
 			messageCode: 'aggregator.message.error.nameExisted',
+		});
+	}
+
+	static DEFAULT_ACTIVE_ERROR() {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Cannot deactivate an active default aggregator',
+			messageCode: 'aggregator.message.error.defaultActiveError',
 		});
 	}
 }

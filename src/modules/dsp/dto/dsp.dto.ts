@@ -82,6 +82,16 @@ export class CreateDspDto {
 	@ValidateNested({ each: true })
 	@Type(() => CreateDspActionDto)
 	dspActions?: CreateDspActionDto[];
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	ddexId?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	ddexName?: string | null;
 }
 
 class UpdateDspActionDto {
