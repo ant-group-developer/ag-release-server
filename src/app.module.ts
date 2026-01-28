@@ -28,6 +28,7 @@ import { DistributionModule } from './modules/distribution/distribution.module';
 import { Distribution2Module } from './modules/distribution2/distribution2.module';
 import { FileDistributionCiModule } from './modules/distribution2/file-distribution/ci/file-distribution-ci.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
+import { Distribution3Module } from './modules/distribution3/distribution3.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -159,6 +160,8 @@ import { UserModule } from './modules/user/user.module';
 
 		SftpModule,
 		FileDistributionCiModule,
+
+		Distribution3Module,
 	],
 	controllers: [AppController],
 	providers: [

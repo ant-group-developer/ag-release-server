@@ -1,5 +1,4 @@
 export class OrmAlias {
-	static aggregator = 'aggregator';
 	static distributionChannel = 'distributionChannel';
 	static tenantIntegrationConnection = 'tenantIntegrationConnection';
 	static tenantIntegration = 'tenantIntegration';
@@ -10,4 +9,8 @@ export class OrmAlias {
 	static dspDeal = 'dspDeal';
 	static dspRouting = 'dspRouting';
 	static dspReleaseStatus = 'dspReleaseStatus';
+
+	static aggregator = 'aggregator';
+	static sftpConfig = 'sftpConfig';
+	static dspRoutingConfig = 'dspRoutingConfig';
 }
