@@ -169,6 +169,25 @@ export class AggregatorsService {
 		}
 	}
 
+	// async incrementDspUsageCount(id: string): Promise<void> {
+	// 	await this.repo
+	// 		.createQueryBuilder()
+	// 		.update(Aggregator)
+	// 		.set({ dspUsageCount: () => 'dspUsageCount + 1' }) // Cộng 1 vào dspUsageCount
+	// 		.where('id = :id', { id })
+	// 		.execute();
+	// }
+
+	// // Hàm trừ 1 từ dspUsageCount
+	// async decrementDspUsageCount(id: string): Promise<void> {
+	// 	await this.repo
+	// 		.createQueryBuilder()
+	// 		.update(Aggregator)
+	// 		.set({ dspUsageCount: () => 'dspUsageCount - 1' }) // Trừ 1 từ dspUsageCount
+	// 		.where('id = :id', { id })
+	// 		.execute();
+	// }
+
 	async resetDefault({ manager }: { manager?: EntityManager }) {
 		const repo = this.getDeliveryAggregatorRepo(manager);
 		await repo.update({ isDefault: true }, { isDefault: false });

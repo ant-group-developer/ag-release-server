@@ -32,4 +32,13 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => DspRoutingConfig, (d) => d.aggregator)
 	dspRoutingConfigs: DspRoutingConfig[];
+
+	// vitual column
+	// @Column({
+	// 	type: 'int',
+	// 	name: 'dsp_usage_count',
+	// 	default: 0,
+	// 	comment: 'Số lần sử dụng DSP',
+	// })
+	dspUsageCount?: number;
 }

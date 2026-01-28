@@ -175,6 +175,8 @@ export class DspRoutingConfigsService {
 		return this.getDetail(id);
 	}
 
+	handleAggregatorDefaultChange() {}
+
 	async delete({ id, userId }: { id: string; userId: string }) {
 		const entity = await this.repo.findOne({ where: { id } });
 		if (!entity) throw DspRoutingConfigException.NOT_FOUND();
