@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
+import { AggregatorsService } from '../../aggregator/services/aggregators.service';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
 import { DspRoutingConfigException } from '../const/dsp-routing-config.const';
 import {
@@ -23,6 +24,7 @@ export class DspRoutingConfigsService {
 		private readonly queryService: DspRoutingConfigQueryService,
 
 		private readonly sftpConfigsService: SftpConfigsService,
+		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
 	async getList(filter: GetListDspRoutingConfigsDto) {
@@ -32,19 +34,44 @@ export class DspRoutingConfigsService {
 	async getDetail(id: string) {
 		const entity = await this.repo.findOne({
 			where: { id },
-			relations: { aggregator: true },
+			relations: { aggregator: true, sftpConfig: true },
 		});
 		if (!entity) throw DspRoutingConfigException.NOT_FOUND();
 		return entity;
 	}
 
-	async getDetailByDspId(dspId: string) {
+	async getDetailByDspIdOrCreate({
+		dspId,
+		userId,
+	}: {
+		dspId: string;
+		userId: string;
+	}) {
 		const entity = await this.repo.findOne({
 			where: { dspId },
-			relations: { aggregator: true },
+			relations: { aggregator: true, sftpConfig: true },
 		});
-		if (!entity) throw DspRoutingConfigException.NOT_FOUND();
+
+		if (!entity) {
+			const config = await this.createDefault({ dspId, userId });
+			return config;
+		}
+
 		return entity;
+	}
+
+	async createDefault({ dspId, userId }: { dspId: string; userId: string }) {
+		const agg = await this.aggregatorsService.getDefault();
+		const config = await this.upsert({
+			data: {
+				dspId,
+				aggregatorId: agg.id,
+				mode: RoutingModeEnum.AGGREGATOR,
+			},
+			userId,
+		});
+
+		return config;
 	}
 
 	async upsert({
@@ -147,6 +174,8 @@ export class DspRoutingConfigsService {
 
 		return this.getDetail(id);
 	}
+
+	handleAggregatorDefaultChange() {}
 
 	async delete({ id, userId }: { id: string; userId: string }) {
 		const entity = await this.repo.findOne({ where: { id } });

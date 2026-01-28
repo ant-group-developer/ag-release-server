@@ -1,4 +1,3 @@
-// src/modules/aggregators/aggregator.entity.ts
 import {
 	DEFAULT_LENGTH_CODE,
 	DEFAULT_LENGTH_NAME,
@@ -16,9 +15,30 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_CODE })
 	code: string;
 
+	@Column({ type: 'boolean', default: true })
+	isActive: boolean;
+
+	@Column({ type: 'boolean', default: false })
+	isDefault: boolean;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexId: string | null;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexName: string | null;
+
 	@OneToOne(() => SftpConfig, (c) => c.aggregator)
 	sftpConfig: SftpConfig;
 
 	@OneToMany(() => DspRoutingConfig, (d) => d.aggregator)
 	dspRoutingConfigs: DspRoutingConfig[];
+
+	// vitual column
+	// @Column({
+	// 	type: 'int',
+	// 	name: 'dsp_usage_count',
+	// 	default: 0,
+	// 	comment: 'Số lần sử dụng DSP',
+	// })
+	dspUsageCount?: number;
 }

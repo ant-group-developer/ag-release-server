@@ -47,8 +47,8 @@ export class DspRoutingConfigQueryService {
 		if (keyword?.length) {
 			qb.andWhere(
 				`(
-          ${alias}.dspId ILIKE ANY(:keywords)
-        )`,
+					${alias}.dspId ILIKE ANY(:keywords)
+				)`,
 				{ keywords: keyword.map((k) => `%${k}%`) },
 			);
 		}

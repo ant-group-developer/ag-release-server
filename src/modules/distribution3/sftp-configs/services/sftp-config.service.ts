@@ -47,7 +47,10 @@ export class SftpConfigsService {
 
 		if (data.aggregatorId) {
 			const existed = await repo.findOne({
-				where: { aggregatorId: data.aggregatorId },
+				where: {
+					aggregatorId: data.aggregatorId,
+					...(data.id ? { id: Not(data.id) } : {}),
+				},
 			});
 			if (existed) throw SftpConfigException.AGGREGATOR_HAS_CONFIG();
 		}

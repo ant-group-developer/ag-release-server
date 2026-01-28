@@ -34,12 +34,12 @@ export class DspRoutingConfigsController {
 	@Post()
 	@ApiOperation({ summary: 'Create dsp routing config' })
 	@ApiResponse({ status: 201, type: DspRoutingConfig })
-	async create(
+	async upsert(
 		@Body() data: CreateDspRoutingConfigDto,
 		@User() user: UserReq,
 	): Promise<ResponseSuccess<DspRoutingConfig>> {
 		const result = await this.svc.upsert({ data, userId: user.id });
-		return DspRoutingConfigSuccess.CREATE(result);
+		return DspRoutingConfigSuccess.COMMON(result);
 	}
 
 	@Put(':id')
@@ -56,9 +56,12 @@ export class DspRoutingConfigsController {
 	}
 
 	@Get('by-dsp/:dspId')
-	async getDetailByDspId(@Param('dspId') dspId: string) {
+	async getDetailByDspId(
+		@Param('dspId') dspId: string,
+		@UserId() userId: string,
+	) {
 		return AppResponseSuccess.COMMON(
-			await this.svc.getDetailByDspId(dspId),
+			await this.svc.getDetailByDspIdOrCreate({ dspId, userId }),
 		);
 	}
 

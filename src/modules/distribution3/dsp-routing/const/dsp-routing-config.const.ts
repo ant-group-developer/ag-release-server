@@ -1,11 +1,12 @@
 // src/modules/dsp-routing-configs/const/dsp-routing-config.const.ts
+import { AppResponseSuccess } from 'src/app.const';
 import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
 
-export class DspRoutingConfigSuccess {
+export class DspRoutingConfigSuccess extends AppResponseSuccess {
 	static CREATE(data?: DspRoutingConfig) {
 		return new ResponseSuccess<DspRoutingConfig>({
 			message: 'Create success',
