@@ -27,7 +27,7 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 			synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE'),
 
 			logging: this.configService.get<boolean>('DB_LOGGING'),
-			retryAttempts: 3,
+			retryAttempts: this.configService.get<number>('DB_RETRY_CONNECT'),
 		};
 	}
 }

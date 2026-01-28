@@ -60,10 +60,14 @@ export class DatabaseBackupService implements OnModuleInit {
 			database: this.configService.get<string>('DB_DATABASE')!,
 		};
 
-		this.bucketName = this.configService.get<string>('PROTECTED_BUCKET')!;
-		this.baseUrlGcs = this.configService.get<string>('BASE_URL_GCS')!;
+		this.bucketName = this.configService.get<string>(
+			'GCS_PROTECTED_BUCKET',
+		)!;
+		this.baseUrlGcs = this.configService.get<string>(
+			'BACKUP_BASE_URL_GCS',
+		)!;
 		this.baseUrlConsoleGcsBackup = this.configService.get<string>(
-			'BASE_URL_CONSOLE_GCS_BACKUP',
+			'BACKUP_BASE_URL_CONSOLE_GCS',
 		)!;
 	}
 
@@ -179,8 +183,9 @@ export class DatabaseBackupService implements OnModuleInit {
 					DB_NAME: database,
 					DB_PASSWORD: password,
 
-					RCLONE_CONFIG:
-						this.configService.get<string>('RCLONE_CONFIG_PATH')!,
+					RCLONE_CONFIG: this.configService.get<string>(
+						'BACKUP_RCLONE_CONFIG_PATH',
+					)!,
 					BUCKET_NAME: this.bucketName,
 					BACKUP_PATH: backupPath,
 				},

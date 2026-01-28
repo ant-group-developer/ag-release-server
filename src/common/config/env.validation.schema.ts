@@ -20,16 +20,13 @@ export const envValidationSchema = Joi.object({
 
 	// Default user
 	DEFAULT_USER_ID: Joi.string().required(),
-	USER_TYPE: Joi.string().required(),
+	DEFAULT_USER_TYPE: Joi.string().required(),
 	DEFAULT_EMAIL: Joi.string().required(),
 
 	// Email
 	EMAIL_USER: Joi.string().required(),
 	EMAIL_PASS: Joi.string().required(),
 	EMAIL_SERVICE: Joi.string().required(),
-
-	// Telegram
-	// TELEGRAM_TOKEN: Joi.string().required(),
 
 	// JWT
 	JWT_PRIVATE_KEY_PATH: Joi.string().required(),
@@ -41,12 +38,12 @@ export const envValidationSchema = Joi.object({
 	JWT_KID: Joi.string().default('v1'),
 
 	// BACK UP
-	RCLONE_CONFIG_PATH: Joi.string().required(),
-	BASE_URL_GCS: Joi.string().required(),
-	BASE_URL_CONSOLE_GCS_BACKUP: Joi.string().required(),
+	BACKUP_RCLONE_CONFIG_PATH: Joi.string().required(),
+	BACKUP_BASE_URL_GCS: Joi.string().required(),
+	BACKUP_BASE_URL_CONSOLE_GCS: Joi.string().required(),
 
 	// GCS
-	PUBLIC_BUCKET: Joi.string().required(),
-	PATH_GCS_KEY: Joi.string().required(),
-	PROTECTED_BUCKET: Joi.string().required(),
+	GCS_PUBLIC_BUCKET: Joi.string().required(),
+	GCS_PATH_KEY: Joi.string().required(),
+	GCS_PROTECTED_BUCKET: Joi.string().required(),
 });
