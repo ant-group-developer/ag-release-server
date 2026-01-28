@@ -39,7 +39,9 @@ export class RoleQueryService {
 			'permission.code',
 		]);
 
-		query.where('role.id = :id', { id });
+		query
+			.where('permission.isActive = :isActive', { isActive: true })
+			.andWhere('role.id = :id', { id });
 
 		return query;
 	}
@@ -64,6 +66,7 @@ export class RoleQueryService {
 
 			skip,
 			pageSize,
+			isActive,
 		} = data;
 
 		const query = this.roleRepo.createQueryBuilder('role');
@@ -80,6 +83,11 @@ export class RoleQueryService {
 			'permission.name',
 			'permission.code',
 		]);
+
+		query.where('permission.isActive = :isActive', { isActive: true });
+
+		const activeFilter = isActive ?? true;
+		query.andWhere('role.isActive = :isActive', { isActive: activeFilter });
 
 		if (keyword) {
 			query.andWhere('role.name ILIKE :keyword', {

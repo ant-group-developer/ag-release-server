@@ -35,6 +35,14 @@ export class Role extends BaseUserTrackedUUIDEntity {
 	code: string;
 
 	@Column({
+		name: 'is_active',
+		type: 'boolean',
+		default: true,
+		comment: 'Trạng thái hoạt động của vai trò',
+	})
+	isActive: boolean;
+
+	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_NOTE,
 		nullable: true,

@@ -131,10 +131,13 @@ export class RoleService {
 		await this.updateRole(roleDb, rest, userId);
 
 		// skip if error
-		const messageWarnings = await this.updateRolePermissionSafe(
-			roleDb,
-			permissionIds,
-		);
+		let messageWarnings: any[] = [];
+		if (permissionIds) {
+			messageWarnings = await this.updateRolePermissionSafe(
+				roleDb,
+				permissionIds,
+			);
+		}
 
 		const result = await this.getOne(id);
 
@@ -160,7 +163,7 @@ export class RoleService {
 
 	private async updateRolePermissionSafe(
 		roleDb: Role,
-		permissionIds: UpdateRoleDto['permissionIds'],
+		permissionIds: string[],
 	) {
 		await this.deleteRolePermissionOfRole({ roleId: roleDb.id });
 
