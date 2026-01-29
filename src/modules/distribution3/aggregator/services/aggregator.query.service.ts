@@ -19,6 +19,7 @@ export class AggregatorQueryService {
 		const { page, pageSize } = filter;
 
 		const qb = this.createQbGetList(filter);
+
 		const [items, totalItems] = await qb.getManyAndCount();
 
 		return new PageDto({

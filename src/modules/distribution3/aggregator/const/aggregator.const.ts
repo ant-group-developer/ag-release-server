@@ -1,9 +1,11 @@
 // src/modules/aggregators/const/aggregator.const.ts
 import { AppResponseSuccess } from 'src/app.const';
+import { FieldOrderCommon } from 'src/common/constants/common.class';
 import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
+import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { Aggregator } from '../entities/aggregator.entity';
 
 export class AggregatorSuccess extends AppResponseSuccess {
@@ -70,4 +72,10 @@ export class AggregatorException {
 			messageCode: 'aggregator.message.error.defaultActiveError',
 		});
 	}
+}
+
+export class FieldOrderAggregator extends FieldOrderCommon {
+	protected static mainAlias = OrmAlias.aggregator;
+
+	static name1 = this.genFm('name');
 }
