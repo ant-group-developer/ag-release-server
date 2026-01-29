@@ -75,7 +75,7 @@ export class CountryService implements OnModuleInit {
 		return new PageDto({
 			items: countries,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},

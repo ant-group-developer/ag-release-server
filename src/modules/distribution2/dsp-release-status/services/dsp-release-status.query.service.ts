@@ -26,7 +26,7 @@ export class DspReleaseStatusQueryService {
 			items,
 			metadata: {
 				pageSize,
-				currentPage: page,
+				page,
 				totalItems,
 			},
 		});

@@ -1,6 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 
@@ -27,9 +26,9 @@ export class DspReleaseStatus extends BaseUUIDEntity {
 	@JoinColumn({ name: 'dsp_id', referencedColumnName: 'id' })
 	dsp: Dsp;
 
-	@ManyToOne(() => Release, (release) => release.dspStatuses, {
-		onDelete: 'CASCADE',
-	})
-	@JoinColumn({ name: 'release_id', referencedColumnName: 'id' })
-	release: Release;
+	// @ManyToOne(() => Release, (release) => release.dspStatuses, {
+	// 	onDelete: 'CASCADE',
+	// })
+	// @JoinColumn({ name: 'release_id', referencedColumnName: 'id' })
+	// release: Release;
 }

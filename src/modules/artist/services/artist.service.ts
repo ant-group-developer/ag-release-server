@@ -122,7 +122,7 @@ export class ArtistService {
 		return new PageDto({
 			items: artists,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},
@@ -158,7 +158,7 @@ export class ArtistService {
 		return new PageDto({
 			items: finalArtists,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},

@@ -24,7 +24,7 @@ export class DspRoutingConfigQueryService {
 
 		return new PageDto({
 			items,
-			metadata: { pageSize, currentPage: page, totalItems },
+			metadata: { pageSize, page: page, totalItems },
 		});
 	}
 

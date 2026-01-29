@@ -109,7 +109,7 @@ export class RoleService {
 		return new PageDto({
 			items: roles,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},

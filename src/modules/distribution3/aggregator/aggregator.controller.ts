@@ -15,9 +15,12 @@ import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
-import { GetListAggregatorsDto } from 'src/modules/distribution-channel/dto/aggregator.dto';
 import { AggregatorSuccess } from './const/aggregator.const';
-import { CreateAggregatorDto, UpdateAggregatorDto } from './dto/aggregator.dto';
+import {
+	CreateAggregatorDto,
+	GetListAggregatorDto,
+	UpdateAggregatorDto,
+} from './dto/aggregator.dto';
 import { Aggregator } from './entities/aggregator.entity';
 import { AggregatorsService } from './services/aggregators.service';
 
@@ -61,7 +64,7 @@ export class AggregatorsController {
 
 	@Get()
 	@ApiOperation({ summary: 'Get aggregators' })
-	async getList(@Query() filter: GetListAggregatorsDto) {
+	async getList(@Query() filter: GetListAggregatorDto) {
 		return AppResponseSuccess.COMMON(await this.svc.getList(filter));
 	}
 

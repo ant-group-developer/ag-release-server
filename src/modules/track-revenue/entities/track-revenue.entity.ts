@@ -37,7 +37,7 @@ export class TrackRevenue extends BaseEntity {
 
 	@Column({
 		type: 'numeric',
-		precision: 24,
+		precision: 30,
 		scale: 21,
 		comment: 'Số tiền doanh thu ròng',
 	})
@@ -52,6 +52,7 @@ export class TrackRevenue extends BaseEntity {
 	@Column({
 		type: 'varchar',
 		comment: 'ID track phát sinh doanh thu',
+		length: 10,
 	})
 	trackId: string;
 

@@ -87,7 +87,7 @@ export class GenreService implements OnModuleInit {
 		return new PageDto({
 			items: genres,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},

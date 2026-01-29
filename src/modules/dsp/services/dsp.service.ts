@@ -121,7 +121,7 @@ export class DspService {
 		return new PageDto({
 			items: dsps,
 			metadata: {
-				currentPage: page,
+				page: page,
 				pageSize,
 				totalItems,
 			},

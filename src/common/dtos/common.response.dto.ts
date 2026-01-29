@@ -89,17 +89,17 @@ export class ResponseSuccess<T> {
 }
 
 export class Metadata {
-	currentPage: number;
+	page: number;
 	pageSize: number;
 	totalItems: number;
 	totalPages: number;
 
 	constructor({
-		currentPage = 1,
+		page = 1,
 		pageSize = 0,
 		totalItems = 0,
 	}: Partial<Metadata> = {}) {
-		this.currentPage = currentPage;
+		this.page = page;
 		this.pageSize = pageSize;
 		this.totalItems = totalItems;
 		this.totalPages = pageSize > 0 ? Math.ceil(totalItems / pageSize) : 0;
@@ -118,7 +118,7 @@ export class PageDto<T> {
 		metadata?: Partial<Metadata>;
 	}) {
 		this.metadata = new Metadata({
-			currentPage: metadata?.currentPage ?? 1,
+			page: metadata?.page ?? 1,
 			pageSize: metadata?.pageSize ?? items.length,
 			totalItems: metadata?.totalItems ?? items.length,
 		});

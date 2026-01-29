@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from '@nestjs/typeorm';
+import { config } from 'dotenv';
+import { DataSource } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 @Injectable()
@@ -31,3 +33,23 @@ export class DatabaseConfigService implements TypeOrmOptionsFactory {
 		};
 	}
 }
+
+config();
+
+const configService = new ConfigService();
+
+export default new DataSource({
+	type: 'postgres',
+	host: configService.get('DB_HOST'),
+	port: configService.get('DB_PORT'),
+	username: configService.get('DB_USERNAME'),
+	password: configService.get('DB_PASSWORD'),
+	database: configService.get('DB_DATABASE'),
+	entities: [
+		__dirname + '/../../**/*.entity{.ts,.js}',
+		__dirname + '/../../**/*.entities{.ts,.js}',
+	],
+	migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
+	migrationsTableName: 'migrations',
+	namingStrategy: new SnakeNamingStrategy(),
+});

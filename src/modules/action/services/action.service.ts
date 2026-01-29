@@ -58,7 +58,7 @@ export class ActionService {
 
 		return new PageDto({
 			items: actions,
-			metadata: { currentPage: page, pageSize, totalItems },
+			metadata: { page: page, pageSize, totalItems },
 		});
 	}
 

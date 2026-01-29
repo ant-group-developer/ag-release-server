@@ -2,10 +2,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { GetListAggregatorsDto } from 'src/modules/distribution-channel/dto/aggregator.dto';
 import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import { GetListAggregatorDto } from '../dto/aggregator.dto';
 import { Aggregator } from '../entities/aggregator.entity';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class AggregatorQueryService {
 		private readonly repo: Repository<Aggregator>,
 	) {}
 
-	async getList(filter: GetListAggregatorsDto) {
+	async getList(filter: GetListAggregatorDto) {
 		const { page, pageSize } = filter;
 
 		const qb = this.createQbGetList(filter);
@@ -23,11 +23,11 @@ export class AggregatorQueryService {
 
 		return new PageDto({
 			items,
-			metadata: { pageSize, currentPage: page, totalItems },
+			metadata: { pageSize, page: page, totalItems },
 		});
 	}
 
-	private createQbGetList(filter: GetListAggregatorsDto) {
+	private createQbGetList(filter: GetListAggregatorDto) {
 		const qb = this.repo.createQueryBuilder(OrmAlias.aggregator);
 		qb.leftJoinAndSelect('aggregator.sftpConfig', 'sftpConfig');
 		this.applyFilter({ qb, filter });
@@ -39,7 +39,7 @@ export class AggregatorQueryService {
 		filter,
 	}: {
 		qb: SelectQueryBuilder<Aggregator>;
-		filter: GetListAggregatorsDto;
+		filter: GetListAggregatorDto;
 	}) {
 		const alias = OrmAlias.aggregator;
 		const { keyword } = filter;

@@ -46,7 +46,7 @@ export class NewsCategoryService {
 			await this.newsCategoryQueryService.getList(query);
 		return new PageDto({
 			items,
-			metadata: { currentPage: page, pageSize, totalItems },
+			metadata: { page: page, pageSize, totalItems },
 		});
 	}
 

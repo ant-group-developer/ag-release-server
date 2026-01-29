@@ -102,7 +102,7 @@ export class TenantService {
 		if (!baseTenants.length) {
 			return new PageDto({
 				items: [],
-				metadata: { currentPage: 1, pageSize: 0, totalItems: 0 },
+				metadata: { page: 1, pageSize: 0, totalItems: 0 },
 			});
 		}
 
@@ -196,7 +196,7 @@ export class TenantService {
 		return new PageDto({
 			items: trees,
 			metadata: {
-				currentPage: 1,
+				page: 1,
 				pageSize: trees.length,
 				totalItems: trees.length,
 			},
@@ -263,7 +263,7 @@ export class TenantService {
 		return new PageDto({
 			items: sorted,
 			metadata: {
-				currentPage: 1,
+				page: 1,
 				pageSize: sorted.length,
 				totalItems: sorted.length,
 			},

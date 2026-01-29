@@ -57,7 +57,7 @@ export class IssueService {
 		const [items, totalItems] = await this.issueQueryService.getList(query);
 		return new PageDto({
 			items,
-			metadata: { currentPage: page, pageSize, totalItems },
+			metadata: { page: page, pageSize, totalItems },
 		});
 	}
 

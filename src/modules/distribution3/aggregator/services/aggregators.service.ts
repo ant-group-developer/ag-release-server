@@ -1,13 +1,13 @@
 // src/modules/aggregators/services/aggregator.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { GetListAggregatorsDto } from 'src/modules/distribution-channel/dto/aggregator.dto';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
 import { AggregatorException } from '../const/aggregator.const';
 import {
 	CreateAggregatorDto,
+	GetListAggregatorDto,
 	UpdateAggregatorDto,
 } from '../dto/aggregator.dto';
 import { Aggregator } from '../entities/aggregator.entity';
@@ -72,7 +72,7 @@ export class AggregatorsService {
 		}
 	}
 
-	async getList(filter: GetListAggregatorsDto) {
+	async getList(filter: GetListAggregatorDto) {
 		return this.queryService.getList(filter);
 	}
 

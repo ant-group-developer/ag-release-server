@@ -26,7 +26,7 @@ export class DspRoutingQueryService {
 		const [items, totalItems] = await qb.getManyAndCount();
 		return new PageDto({
 			items,
-			metadata: { pageSize, currentPage: page, totalItems },
+			metadata: { pageSize, page, totalItems },
 		});
 	}
 

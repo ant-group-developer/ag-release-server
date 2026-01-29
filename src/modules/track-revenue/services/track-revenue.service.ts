@@ -18,7 +18,7 @@ export class TrackRevenueService {
 		const [items, totalItems] = await qb.getManyAndCount();
 		return new PageDto({
 			items,
-			metadata: { pageSize, totalItems, currentPage: page },
+			metadata: { pageSize, totalItems, page: page },
 		});
 	}
 
