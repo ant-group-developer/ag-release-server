@@ -9,7 +9,6 @@ import { DspRoutingConfigException } from '../const/dsp-routing-config.const';
 import {
 	CreateDspRoutingConfigDto,
 	GetListDspRoutingConfigsDto,
-	UpdateDspRoutingConfigDto,
 } from '../dto/dsp-routing-config.dto';
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
 import { RoutingModeEnum } from '../enum/dsp-routing.enum';
@@ -26,6 +25,103 @@ export class DspRoutingConfigsService {
 		private readonly sftpConfigsService: SftpConfigsService,
 		private readonly aggregatorsService: AggregatorsService,
 	) {}
+
+	async createDefault({ dspId, userId }: { dspId: string; userId: string }) {
+		const agg = await this.aggregatorsService.getDefault();
+		const config = await this.upsert({
+			data: {
+				dspId,
+				aggregatorId: agg.id,
+				mode: RoutingModeEnum.AGGREGATOR,
+			},
+			userId,
+		});
+
+		return config;
+	}
+
+	async upsert({
+		data,
+		userId,
+	}: {
+		data: CreateDspRoutingConfigDto;
+		userId: string;
+	}) {
+		const { sftpConfig, ...rest } = data;
+
+		const queryRunner = await newTransaction(this.repo);
+
+		try {
+			const { manager } = queryRunner;
+
+			const routingRepo = manager.getRepository(DspRoutingConfig);
+
+			// 1) validate theo mode
+			this.queryService.validateCreateRoutingConfig({
+				mode: rest.mode,
+				aggregatorId: rest.aggregatorId,
+			});
+
+			const existed = await routingRepo.findOne({
+				where: { dspId: rest.dspId },
+			});
+
+			let routingDb: DspRoutingConfig;
+
+			if (!existed) {
+				const entity = routingRepo.create({
+					...rest,
+					isActive: rest.isActive ?? true,
+					creatorId: userId,
+					modifierId: userId,
+				});
+
+				routingDb = await routingRepo.save(entity);
+			} else {
+				// update: không set creatorId
+				Object.assign(existed, {
+					...rest,
+					isActive: rest.isActive ?? existed.isActive,
+					modifierId: userId,
+				});
+
+				routingDb = await routingRepo.save(existed);
+			}
+
+			// 3) nếu có sftpConfig -> tạo mới và gán vào routing
+			if (sftpConfig) {
+				const createdSftp = await this.sftpConfigsService.upsert({
+					userId,
+					data: {
+						...sftpConfig,
+						aggregatorId: null,
+					},
+					manager,
+				});
+
+				// update dspRouting
+				routingDb.sftpConfigId = createdSftp.id;
+				routingDb.modifierId = userId;
+
+				await routingRepo.save(routingDb);
+			}
+
+			await this.aggregatorsService.syncDspUsageCountOnRoutingChange({
+				oldAggregatorId: existed?.aggregatorId ?? null,
+				newAggregatorId: routingDb.aggregatorId ?? null,
+				manager,
+			});
+
+			await queryRunner.commitTransaction();
+
+			return this.getDetail(routingDb.id);
+		} catch (e) {
+			await queryRunner.rollbackTransaction();
+			throw e;
+		} finally {
+			await queryRunner.release();
+		}
+	}
 
 	async getList(filter: GetListDspRoutingConfigsDto) {
 		return this.queryService.getList(filter);
@@ -60,120 +156,28 @@ export class DspRoutingConfigsService {
 		return entity;
 	}
 
-	async createDefault({ dspId, userId }: { dspId: string; userId: string }) {
-		const agg = await this.aggregatorsService.getDefault();
-		const config = await this.upsert({
-			data: {
-				dspId,
-				aggregatorId: agg.id,
-				mode: RoutingModeEnum.AGGREGATOR,
-			},
-			userId,
-		});
+	// async update({
+	// 	id,
+	// 	data,
+	// 	userId,
+	// }: {
+	// 	id: string;
+	// 	data: UpdateDspRoutingConfigDto;
+	// 	userId: string;
+	// }) {
+	// 	const entity = await this.repo.findOne({ where: { id } });
+	// 	if (!entity) throw DspRoutingConfigException.NOT_FOUND();
 
-		return config;
-	}
+	// 	await this.repo.update(
+	// 		{ id },
+	// 		{
+	// 			...data,
+	// 			modifierId: userId,
+	// 		},
+	// 	);
 
-	async upsert({
-		data,
-		userId,
-	}: {
-		data: CreateDspRoutingConfigDto;
-		userId: string;
-	}) {
-		const { sftpConfig, ...rest } = data;
-
-		const queryRunner = await newTransaction(this.repo);
-
-		try {
-			const { manager } = queryRunner;
-
-			const routingRepo = manager.getRepository(DspRoutingConfig);
-
-			// 1) validate theo mode
-			if (
-				rest.mode === RoutingModeEnum.AGGREGATOR &&
-				!rest.aggregatorId
-			) {
-				throw DspRoutingConfigException.AGGREGATOR_ID_REQUIRED();
-			}
-
-			const existed = await routingRepo.findOne({
-				where: { dspId: rest.dspId },
-			});
-
-			let routing: DspRoutingConfig;
-
-			if (!existed) {
-				const entity = routingRepo.create({
-					...rest,
-					isActive: rest.isActive ?? true,
-					creatorId: userId,
-					modifierId: userId,
-				});
-
-				routing = await routingRepo.save(entity);
-			} else {
-				// update: không set creatorId
-				Object.assign(existed, {
-					...rest,
-					isActive: rest.isActive ?? existed.isActive,
-					modifierId: userId,
-				});
-
-				routing = await routingRepo.save(existed);
-			}
-
-			// 3) nếu có sftpConfig -> tạo mới và gán vào routing
-			if (sftpConfig) {
-				const createdSftp = await this.sftpConfigsService.upsert({
-					userId,
-					data: {
-						...sftpConfig,
-						aggregatorId: null,
-					},
-					manager,
-				});
-
-				routing.sftpConfigId = createdSftp.id;
-				routing.modifierId = userId;
-
-				await routingRepo.save(routing);
-			}
-
-			await queryRunner.commitTransaction();
-
-			return this.getDetail(routing.id);
-		} catch (e) {
-			await queryRunner.rollbackTransaction();
-			throw e;
-		} finally {
-			await queryRunner.release();
-		}
-	}
-
-	async update({
-		id,
-		data,
-		userId,
-	}: {
-		id: string;
-		data: UpdateDspRoutingConfigDto;
-		userId: string;
-	}) {
-		const entity = await this.repo.findOne({ where: { id } });
-		if (!entity) throw DspRoutingConfigException.NOT_FOUND();
-
-		await this.repo.update(
-			{ id },
-			{
-				...data,
-				modifierId: userId,
-			},
-		);
-
-		return this.getDetail(id);
-	}
+	// 	return this.getDetail(id);
+	// }
 
 	handleAggregatorDefaultChange() {}
 

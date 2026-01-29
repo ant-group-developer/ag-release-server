@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { EntityManager, Not, Repository } from 'typeorm';
+import { RoutingModeEnum } from '../../dsp-routing/enum/dsp-routing.enum';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
 import { AggregatorException } from '../const/aggregator.const';
 import {
@@ -169,24 +170,93 @@ export class AggregatorsService {
 		}
 	}
 
-	// async incrementDspUsageCount(id: string): Promise<void> {
-	// 	await this.repo
-	// 		.createQueryBuilder()
-	// 		.update(Aggregator)
-	// 		.set({ dspUsageCount: () => 'dspUsageCount + 1' }) // Cộng 1 vào dspUsageCount
-	// 		.where('id = :id', { id })
-	// 		.execute();
-	// }
+	async syncDspUsageCountOnRoutingChange({
+		oldAggregatorId,
+		newAggregatorId,
+		manager,
+	}: {
+		oldAggregatorId: string | null;
+		newAggregatorId: string | null;
+		manager?: EntityManager;
+	}): Promise<void> {
+		if (oldAggregatorId === newAggregatorId) return;
 
-	// // Hàm trừ 1 từ dspUsageCount
-	// async decrementDspUsageCount(id: string): Promise<void> {
-	// 	await this.repo
-	// 		.createQueryBuilder()
-	// 		.update(Aggregator)
-	// 		.set({ dspUsageCount: () => 'dspUsageCount - 1' }) // Trừ 1 từ dspUsageCount
-	// 		.where('id = :id', { id })
-	// 		.execute();
-	// }
+		if (oldAggregatorId) {
+			await this.decreaseDspUsageCount({
+				aggregatorId: oldAggregatorId,
+				manager,
+			});
+		}
+
+		if (newAggregatorId) {
+			await this.increaseDspUsageCount({
+				aggregatorId: newAggregatorId,
+				manager,
+			});
+		}
+	}
+
+	async refillDspUsageCount({
+		manager,
+	}: {
+		manager?: EntityManager;
+	} = {}): Promise<void> {
+		const repo = manager ? manager.getRepository(Aggregator) : this.repo;
+
+		// 1) reset all to 0
+		await repo
+			.createQueryBuilder()
+			.update(Aggregator)
+			.set({ dspUsageCount: 0 })
+			.execute();
+
+		// 2) compute counts from dsp_routing_configs (only active + aggregator mode)
+		await repo.query(
+			`
+				UPDATE "aggregators" a
+				SET "dsp_usage_count" = x.cnt
+				FROM (
+					SELECT
+						"aggregator_id" AS aggregator_id,
+						COUNT(DISTINCT "dsp_id")::int AS cnt
+					FROM "dsp_routing_configs"
+					WHERE "aggregator_id" IS NOT NULL
+						AND "is_active" = true
+						AND "mode"::text = $1
+					GROUP BY "aggregator_id"
+				) x
+				WHERE a."id" = x.aggregator_id
+			`,
+			[RoutingModeEnum.AGGREGATOR], // 'aggregator'
+		);
+	}
+
+	private async increaseDspUsageCount({
+		manager,
+		aggregatorId,
+	}: {
+		manager?: EntityManager;
+		aggregatorId: string;
+	}): Promise<void> {
+		const repo = this.getDeliveryAggregatorRepo(manager);
+		await repo.increment({ id: aggregatorId }, 'dspUsageCount', 1);
+	}
+
+	private async decreaseDspUsageCount({
+		manager,
+		aggregatorId,
+	}: {
+		manager?: EntityManager;
+		aggregatorId: string;
+	}): Promise<void> {
+		const repo = this.getDeliveryAggregatorRepo(manager);
+		await repo
+			.createQueryBuilder()
+			.update()
+			.set({ dspUsageCount: () => `GREATEST("dsp_usage_count" - 1, 0)` })
+			.where('id = :id', { id: aggregatorId })
+			.execute();
+	}
 
 	async resetDefault({ manager }: { manager?: EntityManager }) {
 		const repo = this.getDeliveryAggregatorRepo(manager);
@@ -194,10 +264,6 @@ export class AggregatorsService {
 	}
 
 	async delete({ id, userId }: { id: string; userId: string }) {
-		const entity = await this.repo.findOne({ where: { id } });
-		if (!entity) throw AggregatorException.NOT_FOUND();
-
-		await this.repo.update({ id }, { modifierId: userId });
 		await this.repo.delete({ id });
 
 		return { id };

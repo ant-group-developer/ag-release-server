@@ -41,6 +41,12 @@ export class AggregatorsController {
 		return AggregatorSuccess.CREATE(result);
 	}
 
+	@Post('refill-dsp-usage-count')
+	async refillDspUsageCount() {
+		await this.svc.refillDspUsageCount();
+		return AggregatorSuccess.COMMON();
+	}
+
 	@Put(':id')
 	@ApiOperation({ summary: 'Update aggregator' })
 	@ApiParam({ name: 'id', format: 'uuid' })

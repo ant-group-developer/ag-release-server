@@ -7,7 +7,6 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Post,
-	Put,
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -20,7 +19,6 @@ import { SftpConfigSuccess } from './const/sftp-config.const';
 import {
 	CreateSftpConfigDto,
 	GetListSftpConfigsDto,
-	UpdateSftpConfigDto,
 } from './dto/sftp-config.dto';
 import { SftpConfig } from './entities/sftp-config.entity';
 import { SftpConfigsService } from './services/sftp-config.service';
@@ -42,18 +40,18 @@ export class SftpConfigsController {
 		return SftpConfigSuccess.CREATE(result);
 	}
 
-	@Put(':id')
-	@ApiOperation({ summary: 'Update sftp config' })
-	@ApiParam({ name: 'id', format: 'uuid' })
-	@ApiResponse({ status: 200, type: SftpConfig })
-	async update(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Body() data: UpdateSftpConfigDto,
-		@UserId() userId: string,
-	): Promise<ResponseSuccess<SftpConfig>> {
-		const result = await this.svc.update({ id, data, userId });
-		return SftpConfigSuccess.UPDATE(result);
-	}
+	// @Put(':id')
+	// @ApiOperation({ summary: 'Update sftp config' })
+	// @ApiParam({ name: 'id', format: 'uuid' })
+	// @ApiResponse({ status: 200, type: SftpConfig })
+	// async update(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Body() data: UpdateSftpConfigDto,
+	// 	@UserId() userId: string,
+	// ): Promise<ResponseSuccess<SftpConfig>> {
+	// 	const result = await this.svc.update({ id, data, userId });
+	// 	return SftpConfigSuccess.UPDATE(result);
+	// }
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Get sftp config detail' })

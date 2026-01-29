@@ -36,7 +36,7 @@ export class ResponseSuccess<T> {
 		messageCode = SUCCESS_MESSAGE_CODE_DEFAULT,
 		messageWarning,
 		sensitiveKeys = [],
-		isRemoveSensitiveFields = true,
+		isRemoveSensitiveFields = false,
 		data,
 	}: {
 		statusCode?: number;

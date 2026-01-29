@@ -7,6 +7,14 @@ import {
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
 
 export class DspRoutingConfigSuccess extends AppResponseSuccess {
+	static COMMON<DspRoutingConfig>(data?: DspRoutingConfig) {
+		return new ResponseSuccess({
+			data,
+			isRemoveSensitiveFields: true,
+			sensitiveKeys: ['password', 'privateKey'],
+		});
+	}
+
 	static CREATE(data?: DspRoutingConfig) {
 		return new ResponseSuccess<DspRoutingConfig>({
 			message: 'Create success',

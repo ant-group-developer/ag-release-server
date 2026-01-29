@@ -6,8 +6,13 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { GetListDspRoutingConfigsDto } from '../dto/dsp-routing-config.dto';
+import { DspRoutingConfigException } from '../const/dsp-routing-config.const';
+import {
+	CreateDspRoutingConfigDto,
+	GetListDspRoutingConfigsDto,
+} from '../dto/dsp-routing-config.dto';
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
+import { RoutingModeEnum } from '../enum/dsp-routing.enum';
 
 @Injectable()
 export class DspRoutingConfigQueryService {
@@ -15,6 +20,16 @@ export class DspRoutingConfigQueryService {
 		@InjectRepository(DspRoutingConfig)
 		private readonly repo: Repository<DspRoutingConfig>,
 	) {}
+
+	// validate
+
+	validateCreateRoutingConfig(
+		data: Pick<CreateDspRoutingConfigDto, 'mode' | 'aggregatorId'>,
+	) {
+		if (data.mode === RoutingModeEnum.AGGREGATOR && !data.aggregatorId) {
+			throw DspRoutingConfigException.AGGREGATOR_ID_REQUIRED();
+		}
+	}
 
 	async getList(filter: GetListDspRoutingConfigsDto) {
 		const { page, pageSize } = filter;
