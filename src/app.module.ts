@@ -23,8 +23,6 @@ import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
-import { Distribution2Module } from './modules/distribution2/distribution2.module';
-import { FileDistributionCiModule } from './modules/distribution2/file-distribution/ci/file-distribution-ci.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
 import { Distribution3Module } from './modules/distribution3/distribution3.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
@@ -150,10 +148,7 @@ import { UserModule } from './modules/user/user.module';
 		ReleaseContributorModule,
 		TrackContributorModule,
 
-		Distribution2Module,
-
 		SftpModule,
-		FileDistributionCiModule,
 
 		Distribution3Module,
 	],
