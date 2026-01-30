@@ -49,7 +49,7 @@ export class TrackSensitiveService {
 
 		return new PageDto({
 			items,
-			metadata: { page: page, pageSize, totalItems },
+			metadata: { page, pageSize, totalItems },
 		});
 	}
 

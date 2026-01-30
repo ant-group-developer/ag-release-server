@@ -73,7 +73,7 @@ export class LabelService {
 		return new PageDto({
 			items: labels,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

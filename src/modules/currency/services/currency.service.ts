@@ -85,7 +85,7 @@ export class CurrencyService implements OnModuleInit {
 		return new PageDto({
 			items: currencies,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

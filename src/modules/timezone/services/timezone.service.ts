@@ -45,7 +45,7 @@ export class TimezoneService {
 		return new PageDto({
 			items: timezones,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

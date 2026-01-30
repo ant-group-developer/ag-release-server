@@ -24,7 +24,7 @@ export class AggregatorQueryService {
 
 		return new PageDto({
 			items,
-			metadata: { pageSize, page: page, totalItems },
+			metadata: { pageSize, page, totalItems },
 		});
 	}
 

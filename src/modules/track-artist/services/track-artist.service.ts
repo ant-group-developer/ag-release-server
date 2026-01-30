@@ -156,7 +156,7 @@ export class TrackArtistService {
 		return new PageDto({
 			items: trackArtists,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

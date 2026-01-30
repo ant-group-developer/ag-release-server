@@ -82,7 +82,7 @@ export class NewsPostTranslationService {
 
 		return new PageDto({
 			items,
-			metadata: { totalItems, pageSize, page: page },
+			metadata: { totalItems, pageSize, page },
 		});
 	}
 

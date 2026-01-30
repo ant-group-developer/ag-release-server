@@ -70,7 +70,7 @@ export class ReleaseArtistService {
 		return new PageDto({
 			items: releaseArtists,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

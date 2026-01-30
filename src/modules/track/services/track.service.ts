@@ -65,7 +65,7 @@ export class TrackService {
 		return new PageDto({
 			items: enhancedTracks,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},
@@ -81,7 +81,7 @@ export class TrackService {
 		return new PageDto({
 			items,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},
@@ -99,7 +99,7 @@ export class TrackService {
 		return new PageDto({
 			items: tracksDb,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

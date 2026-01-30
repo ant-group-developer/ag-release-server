@@ -73,7 +73,7 @@ export class TrackTypeService {
 		return new PageDto({
 			items: trackTypes,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

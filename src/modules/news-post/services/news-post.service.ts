@@ -120,7 +120,7 @@ export class NewsPostService {
 
 		return new PageDto({
 			items: listAssigneed,
-			metadata: { page: page, pageSize, totalItems },
+			metadata: { page, pageSize, totalItems },
 		});
 	}
 
@@ -139,7 +139,7 @@ export class NewsPostService {
 
 		return new PageDto({
 			items: listAssigneed,
-			metadata: { page: page, pageSize, totalItems },
+			metadata: { page, pageSize, totalItems },
 		});
 	}
 

@@ -87,7 +87,7 @@ export class TrackOriginTypeService {
 		return new PageDto({
 			items: trackOriginTypes,
 			metadata: {
-				page: page,
+				page,
 				pageSize,
 				totalItems,
 			},

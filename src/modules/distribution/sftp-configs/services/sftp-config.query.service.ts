@@ -23,7 +23,7 @@ export class SftpConfigQueryService {
 
 		return new PageDto({
 			items,
-			metadata: { pageSize, page: page, totalItems },
+			metadata: { pageSize, page, totalItems },
 		});
 	}
 

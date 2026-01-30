@@ -254,7 +254,7 @@ export class DatabaseBackupService implements OnModuleInit {
 
 		return new PageDto({
 			items,
-			metadata: { pageSize, page: page, totalItems },
+			metadata: { pageSize, page, totalItems },
 		});
 	}
 
