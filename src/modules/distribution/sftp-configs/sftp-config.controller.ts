@@ -10,7 +10,6 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AppResponseSuccess } from 'src/app.const';
 import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
@@ -22,6 +21,7 @@ import {
 } from './dto/sftp-config.dto';
 import { SftpConfig } from './entities/sftp-config.entity';
 import { SftpConfigsService } from './services/sftp-config.service';
+import { SftpMetadata } from './type/sftp-config.type';
 
 @ApiTags('SftpConfigs')
 @SystemAdminOnly()
@@ -37,34 +37,44 @@ export class SftpConfigsController {
 		@User() user: UserReq,
 	): Promise<ResponseSuccess<SftpConfig>> {
 		const result = await this.svc.upsert({ data, userId: user.id });
-		return SftpConfigSuccess.CREATE(result);
+		return SftpConfigSuccess.COMMON(result);
 	}
 
-	// @Put(':id')
-	// @ApiOperation({ summary: 'Update sftp config' })
-	// @ApiParam({ name: 'id', format: 'uuid' })
-	// @ApiResponse({ status: 200, type: SftpConfig })
-	// async update(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Body() data: UpdateSftpConfigDto,
-	// 	@UserId() userId: string,
-	// ): Promise<ResponseSuccess<SftpConfig>> {
-	// 	const result = await this.svc.update({ id, data, userId });
-	// 	return SftpConfigSuccess.UPDATE(result);
-	// }
+	@Post(':id/test')
+	@ApiOperation({ summary: 'test SFTP connection' })
+	async testConnectById(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<any>> {
+		const result = await this.svc.testConnectById(id);
+
+		return SftpConfigSuccess.COMMON(result);
+	}
+
+	@Post('test')
+	@ApiOperation({ summary: 'test SFTP connection' })
+	async testConnect(@Body() data: SftpMetadata) {
+		const result = await this.svc.testConnect({
+			host: data.host,
+			port: data.port,
+			username: data.username,
+			password: data.password,
+		});
+
+		return SftpConfigSuccess.COMMON(result);
+	}
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Get sftp config detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiResponse({ status: 200, type: SftpConfig })
 	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
-		return AppResponseSuccess.COMMON(await this.svc.getDetail(id));
+		return SftpConfigSuccess.COMMON(await this.svc.getDetail(id));
 	}
 
 	@Get()
 	@ApiOperation({ summary: 'Get sftp configs' })
 	async getList(@Query() filter: GetListSftpConfigsDto) {
-		return AppResponseSuccess.COMMON(await this.svc.getList(filter));
+		return SftpConfigSuccess.COMMON(await this.svc.getList(filter));
 	}
 
 	@Delete(':id')
@@ -73,7 +83,7 @@ export class SftpConfigsController {
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,
 		@UserId() userId: string,
-	): Promise<ResponseSuccess<{ id: string }>> {
+	) {
 		const result = await this.svc.delete({ id, userId });
 		return SftpConfigSuccess.DELETE(result);
 	}

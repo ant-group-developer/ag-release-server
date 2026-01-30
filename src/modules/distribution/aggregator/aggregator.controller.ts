@@ -10,7 +10,6 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AppResponseSuccess } from 'src/app.const';
 import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
@@ -38,7 +37,7 @@ export class AggregatorsController {
 		@User() user: UserReq,
 	): Promise<ResponseSuccess<Aggregator>> {
 		const result = await this.svc.create({ data, userId: user.id });
-		return AggregatorSuccess.CREATE(result);
+		return AggregatorSuccess.COMMON(result);
 	}
 
 	@Post('refill-dsp-usage-count')
@@ -57,7 +56,7 @@ export class AggregatorsController {
 		@UserId() userId: string,
 	): Promise<ResponseSuccess<Aggregator>> {
 		const result = await this.svc.update({ id, data, userId });
-		return AggregatorSuccess.UPDATE(result);
+		return AggregatorSuccess.COMMON(result);
 	}
 
 	@Get(':id')
@@ -65,13 +64,13 @@ export class AggregatorsController {
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiResponse({ status: 200, type: Aggregator })
 	async getDetail(@Param('id', ParseUUIDPipe) id: string) {
-		return AppResponseSuccess.COMMON(await this.svc.findOne(id));
+		return AggregatorSuccess.COMMON(await this.svc.findOne(id));
 	}
 
 	@Get()
 	@ApiOperation({ summary: 'Get aggregators' })
 	async getList(@Query() filter: GetListAggregatorDto) {
-		return AppResponseSuccess.COMMON(await this.svc.getList(filter));
+		return AggregatorSuccess.COMMON(await this.svc.getList(filter));
 	}
 
 	@Delete(':id')
@@ -80,8 +79,8 @@ export class AggregatorsController {
 	async delete(
 		@Param('id', ParseUUIDPipe) id: string,
 		@UserId() userId: string,
-	): Promise<ResponseSuccess<{ id: string }>> {
+	) {
 		const result = await this.svc.delete({ id, userId });
-		return AggregatorSuccess.DELETE(result);
+		return AggregatorSuccess.COMMON(result);
 	}
 }

@@ -6,6 +6,7 @@ import { AggregatorsModule } from '../aggregator/aggregator.module';
 import { SftpConfigsModule } from '../sftp-configs/sftp-config.module';
 import { DspRoutingConfigsController } from './dsp-routing-config.controller';
 import { DspRoutingConfig } from './entities/dsp-routing-config.entity';
+import { DspRoutingConsumer } from './services/dsp-routing-config.consumer';
 import { DspRoutingConfigQueryService } from './services/dsp-routing-config.query.service';
 import { DspRoutingConfigsService } from './services/dsp-routing-config.service';
 
@@ -19,7 +20,11 @@ import { DspRoutingConfigsService } from './services/dsp-routing-config.service'
 		AggregatorsModule,
 	],
 	controllers: [DspRoutingConfigsController],
-	providers: [DspRoutingConfigsService, DspRoutingConfigQueryService],
+	providers: [
+		DspRoutingConsumer,
+		DspRoutingConfigsService,
+		DspRoutingConfigQueryService,
+	],
 	exports: [DspRoutingConfigsService, DspRoutingConfigQueryService],
 })
 export class DspRoutingConfigsModule {}

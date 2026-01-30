@@ -45,6 +45,10 @@ export class DspRoutingConfigQueryService {
 
 	private createQbGetList(filter: GetListDspRoutingConfigsDto) {
 		const qb = this.repo.createQueryBuilder(OrmAlias.dspRoutingConfig);
+		qb.leftJoinAndSelect(
+			`${OrmAlias.dspRoutingConfig}.${OrmAlias.aggregator}`,
+			OrmAlias.aggregator,
+		);
 		this.applyFilter({ qb, filter });
 		return qb;
 	}

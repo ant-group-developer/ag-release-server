@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { decryptSecretSafe, encryptSecret } from 'src/utils/util.encrypt';
+import SftpClient from 'ssh2-sftp-client';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { SftpConfigException } from '../const/sftp-config.const';
 import {
@@ -9,6 +10,7 @@ import {
 	GetListSftpConfigsDto,
 } from '../dto/sftp-config.dto';
 import { SftpConfig } from '../entities/sftp-config.entity';
+import { SftpMetadata } from '../type/sftp-config.type';
 import { SftpConfigQueryService } from './sftp-config.query.service';
 
 @Injectable()
@@ -16,8 +18,7 @@ export class SftpConfigsService {
 	constructor(
 		@InjectRepository(SftpConfig)
 		private readonly repo: Repository<SftpConfig>,
-		// @InjectRepository(Aggregator)
-		// private readonly aggregatorRepo: Repository<Aggregator>,
+
 		private readonly queryService: SftpConfigQueryService,
 	) {}
 
@@ -73,49 +74,57 @@ export class SftpConfigsService {
 		return entity;
 	}
 
-	// async update({
-	// 	id,
-	// 	data,
-	// 	userId,
-	// }: {
-	// 	id: string;
-	// 	data: UpdateSftpConfigDto;
-	// 	userId: string;
-	// }) {
-	// 	const entity = await this.repo.findOne({ where: { id } });
-	// 	if (!entity) throw SftpConfigException.NOT_FOUND();
-
-	// 	if (data.aggregatorId && data.aggregatorId !== entity.aggregatorId) {
-	// 		// const aggregator = await this.aggregatorRepo.findOne({
-	// 		// 	where: { id: data.aggregatorId },
-	// 		// });
-	// 		// if (!aggregator) throw SftpConfigException.AGGREGATOR_NOT_FOUND();
-
-	// 		const existed = await this.repo.findOne({
-	// 			where: { aggregatorId: data.aggregatorId, id: Not(id) },
-	// 		});
-	// 		if (existed) throw SftpConfigException.AGGREGATOR_HAS_CONFIG();
-	// 	}
-
-	// 	await this.repo.update(
-	// 		{ id },
-	// 		{
-	// 			...data,
-	// 			modifierId: userId,
-	// 		},
-	// 	);
-
-	// 	return this.getDetail(id);
-	// }
-
 	async delete({ id, userId }: { id: string; userId: string }) {
-		const entity = await this.repo.findOne({ where: { id } });
-		if (!entity) throw SftpConfigException.NOT_FOUND();
-
-		await this.repo.update({ id }, { modifierId: userId });
 		await this.repo.delete({ id });
+	}
 
-		return { id };
+	async testConnectById(id: string): Promise<{
+		status: boolean;
+		latencyMs?: number;
+		error?: any;
+	}> {
+		const config = await this.getDetail(id);
+		return await this.testConnect(config?.metadata);
+	}
+
+	async testConnect(cfg?: SftpMetadata): Promise<{
+		status: boolean;
+		latencyMs?: number;
+		error?: any;
+	}> {
+		if (!cfg) {
+			return {
+				status: true,
+				latencyMs: 0,
+			};
+		}
+
+		const sftp = new SftpClient();
+		const start = Date.now();
+
+		try {
+			await sftp.connect({
+				host: cfg.host,
+				port: cfg.port ?? 22,
+				username: cfg.username,
+				password: cfg.password,
+				readyTimeout: 10 * 1000,
+			});
+
+			const latencyMs = Date.now() - start;
+
+			return {
+				status: true,
+				latencyMs,
+			};
+		} catch (err) {
+			return {
+				status: false,
+				error: err?.message || String(err),
+			};
+		} finally {
+			await sftp.end();
+		}
 	}
 
 	protected getDeliverySftpConfigRepo(manager?: EntityManager) {
@@ -130,6 +139,7 @@ export class SftpConfigsService {
 		if (e.metadata?.privateKey)
 			e.metadata.privateKey = decryptSecretSafe(e.metadata.privateKey);
 	}
+
 	private decryptSecretEntityList(listE: SftpConfig[]) {
 		listE.map((e) => this.decryptSecretEntity(e));
 	}

@@ -2,6 +2,7 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { Aggregator } from '../../aggregator/entities/aggregator.entity';
+import { DspRoutingConfig } from '../../dsp-routing/entities/dsp-routing-config.entity';
 import { SftpMetadata } from '../type/sftp-config.type';
 
 @Entity({ name: 'sftp_configs' })
@@ -20,4 +21,9 @@ export class SftpConfig extends BaseUserTrackedUUIDEntity {
 
 	@Column({ type: 'json', nullable: true })
 	metadata?: SftpMetadata;
+
+	@OneToOne(() => DspRoutingConfig, {
+		onDelete: 'CASCADE',
+	})
+	dspRoutingConfig: DspRoutingConfig | null;
 }

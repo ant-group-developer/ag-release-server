@@ -3,6 +3,7 @@ import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	IsBoolean,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -14,8 +15,9 @@ import {
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { OrderDirection } from 'src/common/enums/common';
 import { CreateSftpConfigDto } from '../../sftp-configs/dto/sftp-config.dto';
-import { FieldOrderAggregator } from '../const/aggregator.const';
+import { FieldOrderAggregator } from '../enum/distribution.enum';
 
 export class CreateAggregatorDto {
 	@IsString()
@@ -63,5 +65,10 @@ export class CreateAggregatorDto {
 export class UpdateAggregatorDto extends PartialType(CreateAggregatorDto) {}
 
 export class GetListAggregatorDto extends BaseQueryDto2 {
-	fieldOrder: string = FieldOrderAggregator.name1;
+	@IsOptional()
+	@IsEnum(FieldOrderAggregator)
+	fieldOrder: FieldOrderAggregator = FieldOrderAggregator.name;
+
+	@IsOptional()
+	orderBy: OrderDirection = OrderDirection.ASC;
 }

@@ -10,9 +10,8 @@ import {
 	Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { User, UserId } from 'src/common/decorators/req.decorators';
+import { UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { UserReq } from 'src/common/interface/common.interface';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { DspRoutingConfigSuccess } from './const/dsp-routing-config.const';
 import {
@@ -33,24 +32,11 @@ export class DspRoutingConfigsController {
 	@ApiResponse({ status: 201, type: DspRoutingConfig })
 	async upsert(
 		@Body() data: CreateDspRoutingConfigDto,
-		@User() user: UserReq,
+		@UserId() userId: string,
 	): Promise<ResponseSuccess<DspRoutingConfig>> {
-		const result = await this.svc.upsert({ data, userId: user.id });
+		const result = await this.svc.upsert({ data, userId });
 		return DspRoutingConfigSuccess.COMMON(result);
 	}
-
-	// @Put(':id')
-	// @ApiOperation({ summary: 'Update dsp routing config' })
-	// @ApiParam({ name: 'id', format: 'uuid' })
-	// @ApiResponse({ status: 200, type: DspRoutingConfig })
-	// async update(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Body() data: UpdateDspRoutingConfigDto,
-	// 	@UserId() userId: string,
-	// ): Promise<ResponseSuccess<DspRoutingConfig>> {
-	// 	const result = await this.svc.update({ id, data, userId });
-	// 	return DspRoutingConfigSuccess.UPDATE(result);
-	// }
 
 	@Get('by-dsp/:dspId')
 	async getDetailByDspId(

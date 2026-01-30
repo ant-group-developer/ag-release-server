@@ -1,14 +1,20 @@
 // src/modules/aggregators/const/aggregator.const.ts
 import { AppResponseSuccess } from 'src/app.const';
-import { FieldOrderCommon } from 'src/common/constants/common.class';
 import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
-import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { Aggregator } from '../entities/aggregator.entity';
 
 export class AggregatorSuccess extends AppResponseSuccess {
+	static COMMON<Aggregator>(data?: Aggregator) {
+		return new ResponseSuccess({
+			data,
+			isRemoveSensitiveFields: true,
+			sensitiveKeys: ['password', 'privateKey'],
+		});
+	}
+
 	static CREATE(data?: Aggregator) {
 		return new ResponseSuccess<Aggregator>({
 			message: 'Create success',
@@ -72,10 +78,18 @@ export class AggregatorException {
 			messageCode: 'aggregator.message.error.defaultActiveError',
 		});
 	}
-}
 
-export class FieldOrderAggregator extends FieldOrderCommon {
-	protected static mainAlias = OrmAlias.aggregator;
+	static CANNOT_DELETE_IN_USE() {
+		return new ResponseError({
+			message: 'Aggregator is being used by DSP routing',
+			messageCode: 'aggregator.message.error.cannotDeleteInUse',
+		});
+	}
 
-	static name1 = this.genFm('name');
+	static CANNOT_DELETE_DEFAULT() {
+		return new ResponseError({
+			message: 'Default aggregator cannot be deleted',
+			messageCode: 'aggregator.message.error.cannotDeleteDefault',
+		});
+	}
 }

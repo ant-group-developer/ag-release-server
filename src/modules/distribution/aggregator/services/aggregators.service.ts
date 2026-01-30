@@ -1,6 +1,8 @@
 // src/modules/aggregators/services/aggregator.service.ts
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AppEvent } from 'src/common/enums/common';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { RoutingModeEnum } from '../../dsp-routing/enum/dsp-routing.enum';
@@ -22,6 +24,7 @@ export class AggregatorsService {
 		private readonly queryService: AggregatorQueryService,
 
 		private readonly sftpConfigsService: SftpConfigsService,
+		private readonly eventEmitter: EventEmitter2,
 	) {}
 
 	async create({
@@ -32,6 +35,7 @@ export class AggregatorsService {
 		userId: string;
 	}) {
 		const { sftpConfig, ...rest } = data;
+		let hasAggregatorDefaultChanged: boolean = false;
 
 		await this.validateUnique({ code: data.code, name: data.name });
 
@@ -50,6 +54,7 @@ export class AggregatorsService {
 
 			if (data.isDefault) {
 				await this.resetDefault({ manager });
+				hasAggregatorDefaultChanged = true;
 			}
 
 			const aggregator = await aggregatorRepo.save(entity);
@@ -63,6 +68,10 @@ export class AggregatorsService {
 			}
 
 			await queryRunner.commitTransaction();
+
+			if (hasAggregatorDefaultChanged) {
+				this.eventEmitter.emit(AppEvent.AGGREGATOR_DEFAULT_CHANGED);
+			}
 
 			return this.findOne(aggregator.id);
 		} catch (e) {
@@ -103,6 +112,8 @@ export class AggregatorsService {
 		data: UpdateAggregatorDto;
 		userId: string;
 	}) {
+		const { sftpConfig, ...rest } = data;
+		let hasAggregatorDefaultChanged: boolean = false;
 		// Bắt đầu transaction
 		const queryRunner = await newTransaction(this.repo);
 
@@ -114,8 +125,6 @@ export class AggregatorsService {
 
 			// Nếu không tìm thấy entity
 			if (!entity) throw AggregatorException.NOT_FOUND();
-
-			const { sftpConfig, ...rest } = data;
 
 			// Kiểm tra tính duy nhất cho code và name
 			await this.validateUnique({
@@ -135,6 +144,7 @@ export class AggregatorsService {
 			// Nếu isDefault được thiết lập, reset các default cũ
 			if (data.isDefault) {
 				await this.resetDefault({ manager });
+				hasAggregatorDefaultChanged = true;
 			}
 
 			// Cập nhật thông tin của aggregator
@@ -157,6 +167,10 @@ export class AggregatorsService {
 
 			// Commit transaction
 			await queryRunner.commitTransaction();
+
+			if (hasAggregatorDefaultChanged) {
+				this.eventEmitter.emit(AppEvent.AGGREGATOR_DEFAULT_CHANGED);
+			}
 
 			// Trả về kết quả sau khi cập nhật
 			return this.findOne(id);
@@ -264,9 +278,8 @@ export class AggregatorsService {
 	}
 
 	async delete({ id, userId }: { id: string; userId: string }) {
+		await this.validateDelete(id);
 		await this.repo.delete({ id });
-
-		return { id };
 	}
 
 	private async validateUnique({
@@ -296,6 +309,18 @@ export class AggregatorsService {
 				},
 			});
 			if (existName) throw AggregatorException.NAME_EXISTED();
+		}
+	}
+
+	private async validateDelete(id: string) {
+		const aggregator = await this.findOne(id);
+
+		if (aggregator.isDefault) {
+			throw AggregatorException.CANNOT_DELETE_DEFAULT();
+		}
+
+		if (aggregator.dspUsageCount > 0) {
+			throw AggregatorException.CANNOT_DELETE_IN_USE();
 		}
 	}
 

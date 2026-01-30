@@ -8,6 +8,14 @@ import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { SftpConfig } from '../entities/sftp-config.entity';
 
 export class SftpConfigSuccess {
+	static COMMON<SftpConfig>(data?: SftpConfig) {
+		return new ResponseSuccess({
+			data,
+			isRemoveSensitiveFields: true,
+			sensitiveKeys: ['password', 'privateKey'],
+		});
+	}
+
 	static CREATE(data?: SftpConfig) {
 		return new ResponseSuccess<SftpConfig>({
 			message: 'Create success',
@@ -24,8 +32,8 @@ export class SftpConfigSuccess {
 		});
 	}
 
-	static DELETE(data?: { id: string }) {
-		return new ResponseSuccess<{ id: string }>({
+	static DELETE(data?: any) {
+		return new ResponseSuccess<{}>({
 			message: 'Delete success',
 			messageCode: 'sftpConfig.message.success.delete',
 			data,

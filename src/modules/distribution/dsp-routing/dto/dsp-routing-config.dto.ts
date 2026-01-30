@@ -12,7 +12,10 @@ import {
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { CreateSftpConfigDto } from '../../sftp-configs/dto/sftp-config.dto';
-import { RoutingModeEnum } from '../enum/dsp-routing.enum';
+import {
+	FieldOrderDspRoutingConfig,
+	RoutingModeEnum,
+} from '../enum/dsp-routing.enum';
 
 export class CreateDspRoutingConfigDto {
 	@ApiProperty({ example: 'DSP_01' })
@@ -50,5 +53,8 @@ export class UpdateDspRoutingConfigDto extends PartialType(
 ) {}
 
 export class GetListDspRoutingConfigsDto extends BaseQueryDto2 {
-	fieldOrder: string = 'dspRoutingConfig.createdAt';
+	@IsOptional()
+	@IsEnum(FieldOrderDspRoutingConfig)
+	fieldOrder: FieldOrderDspRoutingConfig =
+		FieldOrderDspRoutingConfig.createdAt;
 }

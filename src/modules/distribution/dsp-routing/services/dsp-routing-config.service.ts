@@ -1,5 +1,5 @@
 // src/modules/dsp-routing-configs/services/dsp-routing-config.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
@@ -16,6 +16,7 @@ import { DspRoutingConfigQueryService } from './dsp-routing-config.query.service
 
 @Injectable()
 export class DspRoutingConfigsService {
+	private readonly logger = new Logger(DspRoutingConfigsService.name);
 	constructor(
 		@InjectRepository(DspRoutingConfig)
 		private readonly repo: Repository<DspRoutingConfig>,
@@ -26,13 +27,19 @@ export class DspRoutingConfigsService {
 		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
-	async createDefault({ dspId, userId }: { dspId: string; userId: string }) {
+	async createSystemDefault({
+		dspId,
+		userId,
+	}: {
+		dspId: string;
+		userId: string;
+	}) {
 		const agg = await this.aggregatorsService.getDefault();
 		const config = await this.upsert({
 			data: {
 				dspId,
 				aggregatorId: agg.id,
-				mode: RoutingModeEnum.AGGREGATOR,
+				mode: RoutingModeEnum.SYSTEM,
 			},
 			userId,
 		});
@@ -149,37 +156,24 @@ export class DspRoutingConfigsService {
 		});
 
 		if (!entity) {
-			const config = await this.createDefault({ dspId, userId });
+			const config = await this.createSystemDefault({ dspId, userId });
 			return config;
 		}
 
 		return entity;
 	}
 
-	// async update({
-	// 	id,
-	// 	data,
-	// 	userId,
-	// }: {
-	// 	id: string;
-	// 	data: UpdateDspRoutingConfigDto;
-	// 	userId: string;
-	// }) {
-	// 	const entity = await this.repo.findOne({ where: { id } });
-	// 	if (!entity) throw DspRoutingConfigException.NOT_FOUND();
-
-	// 	await this.repo.update(
-	// 		{ id },
-	// 		{
-	// 			...data,
-	// 			modifierId: userId,
-	// 		},
-	// 	);
-
-	// 	return this.getDetail(id);
-	// }
-
-	handleAggregatorDefaultChange() {}
+	async handleAggregatorDefaultChanged() {
+		try {
+			const aggDefault = await this.aggregatorsService.getDefault();
+			await this.repo.update(
+				{ mode: RoutingModeEnum.SYSTEM },
+				{ aggregatorId: aggDefault.id },
+			);
+		} catch (error) {
+			this.logger.error(error);
+		}
+	}
 
 	async delete({ id, userId }: { id: string; userId: string }) {
 		const entity = await this.repo.findOne({ where: { id } });
