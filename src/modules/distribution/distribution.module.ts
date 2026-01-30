@@ -8,4 +8,4 @@ import { SftpConfigsModule } from './sftp-configs/sftp-config.module';
 	controllers: [],
 	imports: [SftpConfigsModule, DspRoutingConfigsModule, AggregatorsModule],
 })
-export class Distribution3Module {}
+export class DistributionModule {}

@@ -23,8 +23,8 @@ import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { DistributionModule } from './modules/distribution/distribution.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
-import { Distribution3Module } from './modules/distribution3/distribution3.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -150,7 +150,7 @@ import { UserModule } from './modules/user/user.module';
 
 		SftpModule,
 
-		Distribution3Module,
+		DistributionModule,
 	],
 	controllers: [AppController],
 	providers: [

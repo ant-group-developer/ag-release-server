@@ -25,7 +25,7 @@ import { SftpConfigsService } from './services/sftp-config.service';
 
 @ApiTags('SftpConfigs')
 @SystemAdminOnly()
-@Controller('distribution3/sftp-configs')
+@Controller('distribution/sftp-configs')
 export class SftpConfigsController {
 	constructor(private readonly svc: SftpConfigsService) {}
 

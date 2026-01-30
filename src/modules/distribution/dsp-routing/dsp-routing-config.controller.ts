@@ -24,7 +24,7 @@ import { DspRoutingConfigsService } from './services/dsp-routing-config.service'
 
 @ApiTags('DspRoutingConfigs')
 @SystemAdminOnly()
-@Controller('distribution3/dsp-routing-configs')
+@Controller('distribution/dsp-routing-configs')
 export class DspRoutingConfigsController {
 	constructor(private readonly svc: DspRoutingConfigsService) {}
 

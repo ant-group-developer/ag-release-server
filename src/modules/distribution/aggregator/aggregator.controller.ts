@@ -26,7 +26,7 @@ import { AggregatorsService } from './services/aggregators.service';
 
 @ApiTags('Aggregators')
 @SystemAdminOnly()
-@Controller('distribution3/aggregators')
+@Controller('distribution/aggregators')
 export class AggregatorsController {
 	constructor(private readonly svc: AggregatorsService) {}
 
