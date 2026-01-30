@@ -1,12 +1,6 @@
 // src/modules/sftp-configs/dto/sftp-config.dto.ts
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-	IsObject,
-	IsOptional,
-	IsString,
-	IsUUID,
-	MaxLength,
-} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsObject, IsOptional, IsUUID, MaxLength } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderSftpConfig } from '../const/sftp-config.const';
 import { SftpMetadata } from '../type/sftp-config.type';
@@ -39,23 +33,7 @@ export class CreateSftpConfigDto {
 	metadata?: SftpMetadata;
 }
 
-export class UpdateSftpConfigDto {
-	@ApiPropertyOptional({ example: 'DSP_01' })
-	@IsOptional()
-	@IsString()
-	@MaxLength(10)
-	dspId?: string;
-
-	@ApiPropertyOptional({ format: 'uuid' })
-	@IsOptional()
-	@IsUUID()
-	aggregatorId?: string;
-
-	@ApiPropertyOptional({ type: Object })
-	@IsOptional()
-	@IsObject()
-	metadata?: Record<string, any>;
-}
+export class UpdateSftpConfigDto extends PartialType(CreateSftpConfigDto) {}
 
 export class GetListSftpConfigsDto extends BaseQueryDto2 {
 	@IsOptional()

@@ -33,7 +33,7 @@ export class SftpConfigSuccess {
 	}
 
 	static DELETE(data?: any) {
-		return new ResponseSuccess<{}>({
+		return new ResponseSuccess<any>({
 			message: 'Delete success',
 			messageCode: 'sftpConfig.message.success.delete',
 			data,

@@ -10,7 +10,10 @@ import {
 	GetListSftpConfigsDto,
 } from '../dto/sftp-config.dto';
 import { SftpConfig } from '../entities/sftp-config.entity';
-import { SftpMetadata } from '../type/sftp-config.type';
+import {
+	PartialTestConnectionDto,
+	SftpMetadata,
+} from '../type/sftp-config.type';
 import { SftpConfigQueryService } from './sftp-config.query.service';
 
 @Injectable()
@@ -78,13 +81,27 @@ export class SftpConfigsService {
 		await this.repo.delete({ id });
 	}
 
-	async testConnectById(id: string): Promise<{
+	async testConnectById({
+		id,
+		data,
+	}: {
+		id: string;
+		data: PartialTestConnectionDto;
+	}): Promise<{
 		status: boolean;
 		latencyMs?: number;
 		error?: any;
 	}> {
-		const config = await this.getDetail(id);
-		return await this.testConnect(config?.metadata);
+		const { metadata } = await this.getDetail(id);
+
+		const testConfig = {
+			host: data.host ?? metadata?.host ?? '',
+			port: data.port ?? metadata?.port ?? 0,
+			username: data.username ?? metadata?.username ?? '',
+			password: data.password ?? metadata?.password,
+		};
+
+		return await this.testConnect(testConfig);
 	}
 
 	async testConnect(cfg?: SftpMetadata): Promise<{
@@ -122,6 +139,47 @@ export class SftpConfigsService {
 				status: false,
 				error: err?.message || String(err),
 			};
+		} finally {
+			await sftp.end();
+		}
+	}
+
+	async lsById(id: string, remotePath?: string) {
+		const config = await this.getDetail(id);
+		return this.ls({ cfg: config?.metadata, remotePath });
+	}
+
+	async ls({
+		cfg,
+		remotePath,
+	}: {
+		cfg?: SftpMetadata;
+		remotePath?: string;
+	}): Promise<{
+		status: boolean;
+		path?: string;
+		items?: any[];
+		error?: any;
+	}> {
+		if (!cfg) return { status: false, error: 'SFTP_CONFIG_NOT_FOUND' };
+
+		const sftp = new SftpClient();
+
+		try {
+			await sftp.connect({
+				host: cfg.host,
+				port: cfg.port ?? 22,
+				username: cfg.username,
+				password: cfg.password,
+				readyTimeout: 10_000,
+			});
+
+			const p = (remotePath?.trim() || cfg.path?.trim() || '/').trim();
+			const items = await sftp.list(p);
+
+			return { status: true, path: p, items };
+		} catch (err) {
+			return { status: false, error: err?.message || String(err) };
 		} finally {
 			await sftp.end();
 		}

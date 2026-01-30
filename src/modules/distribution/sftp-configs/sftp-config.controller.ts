@@ -9,7 +9,13 @@ import {
 	Post,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+	ApiOperation,
+	ApiParam,
+	ApiQuery,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { User, UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
@@ -21,7 +27,10 @@ import {
 } from './dto/sftp-config.dto';
 import { SftpConfig } from './entities/sftp-config.entity';
 import { SftpConfigsService } from './services/sftp-config.service';
-import { SftpMetadata } from './type/sftp-config.type';
+import {
+	PartialTestConnectionDto,
+	SftpMetadata,
+} from './type/sftp-config.type';
 
 @ApiTags('SftpConfigs')
 @SystemAdminOnly()
@@ -44,8 +53,9 @@ export class SftpConfigsController {
 	@ApiOperation({ summary: 'test SFTP connection' })
 	async testConnectById(
 		@Param('id') id: string,
-	): Promise<ResponseSuccess<any>> {
-		const result = await this.svc.testConnectById(id);
+		@Body() data: PartialTestConnectionDto,
+	) {
+		const result = await this.svc.testConnectById({ id, data });
 
 		return SftpConfigSuccess.COMMON(result);
 	}
@@ -60,6 +70,18 @@ export class SftpConfigsController {
 			password: data.password,
 		});
 
+		return SftpConfigSuccess.COMMON(result);
+	}
+
+	@Get(':id/ls')
+	@ApiOperation({ summary: 'List SFTP directory by config id' })
+	@ApiQuery({
+		name: 'path',
+		required: false,
+		description: 'Remote path to list',
+	})
+	async lsById(@Param('id') id: string, @Query('path') remotePath?: string) {
+		const result = await this.svc.lsById(id, remotePath);
 		return SftpConfigSuccess.COMMON(result);
 	}
 

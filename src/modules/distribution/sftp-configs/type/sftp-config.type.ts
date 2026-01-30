@@ -1,3 +1,4 @@
+import { PartialType } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class SftpMetadata {
@@ -19,3 +20,5 @@ export class SftpMetadata {
 	@IsOptional()
 	path?: string;
 }
+
+export class PartialTestConnectionDto extends PartialType(SftpMetadata) {}
