@@ -22,6 +22,7 @@ import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
+import { DDEXModule } from './modules/ddex';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
@@ -151,6 +152,8 @@ import { UserModule } from './modules/user/user.module';
 		SftpModule,
 
 		DistributionModule,
+
+		DDEXModule,
 	],
 	controllers: [AppController],
 	providers: [

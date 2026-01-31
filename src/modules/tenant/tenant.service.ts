@@ -97,6 +97,13 @@ export class TenantService {
 			);
 		}
 
+		// Filter by isActive at SQL level
+		if (query.isActive !== undefined) {
+			queryBuilder.andWhere('t.is_active = :isActive', {
+				isActive: query.isActive,
+			});
+		}
+
 		const baseTenants = await queryBuilder.getMany();
 
 		if (!baseTenants.length) {
@@ -141,6 +148,9 @@ export class TenantService {
 					user: { id: true, name: true, email: true },
 				},
 			},
+			order: {
+				name: 'ASC',
+			},
 		});
 
 		// 2.1) Re-attach counts onto enriched entities
@@ -155,8 +165,34 @@ export class TenantService {
 		}
 
 		// 3) In-memory filter to keep semantics and still include ancestors later
-		const { keyword, type } = query;
-		const matched = enriched.filter((cat) => {
+		const { keyword, type, isActive } = query;
+
+		// 3.1) If isActive filter is true, exclude children whose parent is inactive
+		let filteredByParentActive = enriched;
+		if (isActive === true) {
+			const idToTenant = new Map<string, Tenant>(
+				enriched.map((t) => [t.id, t]),
+			);
+
+			// Check if any ancestor is inactive
+			const hasInactiveAncestor = (tenant: Tenant): boolean => {
+				let current = tenant.parent;
+				while (current) {
+					const parentTenant = idToTenant.get(current.id);
+					if (parentTenant && !parentTenant.isActive) {
+						return true;
+					}
+					current = parentTenant?.parent ?? null;
+				}
+				return false;
+			};
+
+			filteredByParentActive = enriched.filter(
+				(t) => !hasInactiveAncestor(t),
+			);
+		}
+
+		const matched = filteredByParentActive.filter((cat) => {
 			if (
 				keyword &&
 				!cat.name.toLowerCase().includes(keyword.toLowerCase())
@@ -167,7 +203,9 @@ export class TenantService {
 		});
 
 		// 4) Collect ancestors of matched nodes (from the already-loaded set)
-		const idToCat = new Map<string, Tenant>(enriched.map((c) => [c.id, c]));
+		const idToCat = new Map<string, Tenant>(
+			filteredByParentActive.map((c) => [c.id, c]),
+		);
 		const ancestorIds = new Set<string>();
 		for (const node of matched) {
 			let p = node.parent;

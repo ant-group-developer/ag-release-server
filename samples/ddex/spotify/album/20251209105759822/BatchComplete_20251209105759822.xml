@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ern-c-sftp:ManifestMessage MessageVersionId="ern-c-sftp/16" xs:schemaLocation="http://ddex.net/xml/ern-c-sftp/16 http://ddex.net/xml/ern-c-sftp/16/ern-choreography-sftp.xsd"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ern-c-sftp="http://ddex.net/xml/ern-c-sftp/16">
+    <MessageHeader>
+        <MessageSender>
+            <PartyId>PADPIDA20250804056</PartyId>
+            <PartyName>
+                <FullName>ANT MUSIC LLC</FullName>
+            </PartyName>
+        </MessageSender>
+        <MessageRecipient>
+            <PartyId>PADPIDA2011072101T</PartyId>
+            <PartyName>
+                <FullName>Spotify</FullName>
+            </PartyName>
+        </MessageRecipient>
+        <MessageCreatedDateTime>2025-12-09T10:57:30+00:07</MessageCreatedDateTime>
+    </MessageHeader>
+    <IsTestFlag>false</IsTestFlag>
+    <RootDirectory>./</RootDirectory>
+    <NumberOfMessages>1</NumberOfMessages>
+    <MessageInBatch>
+        <MessageType>NewReleaseMessage</MessageType>
+        <MessageId>00001</MessageId>
+        <URL>850080651018/850080651018.xml</URL>
+        <IncludedReleaseId>
+            <ICPN>850080651018</ICPN>
+        </IncludedReleaseId>
+        <DeliveryType>NewReleaseDelivery</DeliveryType>
+        <ProductType>AudioProduct</ProductType>
+    </MessageInBatch>
+</ern-c-sftp:ManifestMessage>

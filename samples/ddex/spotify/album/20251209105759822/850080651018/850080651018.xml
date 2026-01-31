@@ -1,0 +1,672 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage xmlns:ern="http://ddex.net/xml/ern/43"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://ddex.net/xml/ern/43 http://ddex.net/xml/ern/43/release-notification.xsd" ReleaseProfileVersionId="Audio" LanguageAndScriptCode="en" AvsVersionId="3">
+    <MessageHeader>
+        <MessageThreadId>Baseline</MessageThreadId>
+        <MessageId>00001</MessageId>
+        <MessageSender>
+            <PartyId>PADPIDA20250804056</PartyId>
+            <PartyName>
+                <FullName>ANT MUSIC LLC</FullName>
+            </PartyName>
+        </MessageSender>
+        <MessageRecipient>
+            <PartyId>PADPIDA2011072101T</PartyId>
+            <PartyName>
+                <FullName>Spotify</FullName>
+            </PartyName>
+        </MessageRecipient>
+        <MessageCreatedDateTime>2025-12-09T10:57:30+00:07</MessageCreatedDateTime>
+    </MessageHeader>
+    <PartyList>
+        <Party>
+            <PartyReference>P1</PartyReference>
+            <PartyName>
+                <FullName>Donald S. Evans</FullName>
+            </PartyName>
+            <PartyId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">spotify:artist:34nZgjuSy4ogN8SS1tC67n</ProprietaryId>
+            </PartyId>
+        </Party>
+        <Party>
+            <PartyReference>P2</PartyReference>
+            <PartyName>
+                <FullName>AMG</FullName>
+            </PartyName>
+        </Party>
+    </PartyList>
+    <ResourceList>
+        <SoundRecording>
+            <ResourceReference>A1</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500010</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T1S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500010_T1S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>Sensation</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Sensation</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M16S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A2</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500011</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T2S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500011_T2S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>Faith In You</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Faith In You</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M44S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A3</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500012</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T3S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500012_T3S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>Green House</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Green House</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M37S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A4</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500013</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T4S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500013_T4S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>In The Sunshine</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>In The Sunshine</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M35S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A5</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500014</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T5S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500014_T5S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>When It Was</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>When It Was</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M30S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A6</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500015</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T6S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500015_T6S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>Maple Mist Prelude</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Maple Mist Prelude</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M34S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <SoundRecording>
+            <ResourceReference>A7</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>QT6KL2500016</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T7S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>resources/QT6KL2500016_T7S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <DisplayTitleText>Silent Dawn Over Leaves</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Silent Dawn Over Leaves</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P1</ContributorPartyReference>
+                <Role>Composer</Role>
+            </Contributor>
+            <Duration>PT0H3M36S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <Image>
+            <ResourceReference>A8</ResourceReference>
+            <Type>FrontCoverImage</Type>
+            <ResourceId>
+                <ProprietaryId Namespace="PADPIDA20250804056">front-cover-image:850080651018</ProprietaryId>
+            </ResourceId>
+            <CLine>
+                <Year>2025</Year>
+                <CLineText>AMG, Exclusive Licensed ANT MUSIC</CLineText>
+            </CLine>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+            <TechnicalDetails>
+                <TechnicalResourceDetailsReference>T8</TechnicalResourceDetailsReference>
+                <File>
+                    <URI>resources/850080651018.jpg</URI>
+                </File>
+            </TechnicalDetails>
+        </Image>
+    </ResourceList>
+    <ReleaseList>
+        <Release>
+            <ReleaseReference>R0</ReleaseReference>
+            <ReleaseType>Album</ReleaseType>
+            <ReleaseId>
+                <ICPN>850080651018</ICPN>
+            </ReleaseId>
+            <DisplayTitleText>Faith In You</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Faith In You</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Donald S. Evans</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <PLine>
+                <Year>2025</Year>
+                <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+            </PLine>
+            <CLine>
+                <Year>2025</Year>
+                <CLineText>AMG, Exclusive Licensed ANT MUSIC</CLineText>
+            </CLine>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <OriginalReleaseDate>2025-12-20</OriginalReleaseDate>
+            <ReleaseVisibilityReference>V0</ReleaseVisibilityReference>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+            <ResourceGroup>
+                <SequenceNumber>1</SequenceNumber>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>1</SequenceNumber>
+                    <ReleaseResourceReference>A1</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>2</SequenceNumber>
+                    <ReleaseResourceReference>A2</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>3</SequenceNumber>
+                    <ReleaseResourceReference>A3</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>4</SequenceNumber>
+                    <ReleaseResourceReference>A4</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>5</SequenceNumber>
+                    <ReleaseResourceReference>A5</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>6</SequenceNumber>
+                    <ReleaseResourceReference>A6</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>7</SequenceNumber>
+                    <ReleaseResourceReference>A7</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <LinkedReleaseResourceReference>A8</LinkedReleaseResourceReference>
+            </ResourceGroup>
+        </Release>
+        <TrackRelease>
+            <ReleaseReference>R1</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R1</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A1</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V1</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R2</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R2</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A2</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V2</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R3</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R3</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A3</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V3</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R4</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R4</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A4</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V4</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R5</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R5</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A5</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V5</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R6</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R6</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A6</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V6</ReleaseVisibilityReference>
+        </TrackRelease>
+        <TrackRelease>
+            <ReleaseReference>R7</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA20250804056">850080651018_R7</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A7</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>Jazz</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V7</ReleaseVisibilityReference>
+        </TrackRelease>
+    </ReleaseList>
+    <DealList>
+        <ReleaseDeal>
+            <DealReleaseReference>R0</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R1</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T1S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R2</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T2S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R3</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T3S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R4</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T4S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R5</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T5S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R6</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T6S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseDeal>
+            <DealReleaseReference>R7</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>US</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-12-20T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T7S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseVisibility>
+            <VisibilityReference>V0</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <ReleaseDisplayStartDateTime>2025-12-20T00:00:00</ReleaseDisplayStartDateTime>
+            <CoverArtPreviewStartDateTime>2025-12-20T00:00:00</CoverArtPreviewStartDateTime>
+            <FullTrackListingPreviewStartDateTime>2025-12-20T00:00:00</FullTrackListingPreviewStartDateTime>
+        </ReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V1</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V2</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V3</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V4</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V5</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V6</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V7</VisibilityReference>
+            <TerritoryCode>US</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-12-20T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+    </DealList>
+</ern:NewReleaseMessage>
