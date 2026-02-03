@@ -90,7 +90,7 @@ export class AlbumFormatService implements OnModuleInit {
 		return new PageDto({
 			items: albumFormats,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

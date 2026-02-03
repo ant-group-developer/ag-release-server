@@ -24,12 +24,8 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DDEXModule } from './modules/ddex';
 import { DeliveryModule } from './modules/delivery/delivery.module';
-import { DistributionChannelModule } from './modules/distribution-channel/distribution-channel.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
-import { Distribution2Module } from './modules/distribution2/distribution2.module';
-import { FileDistributionCiModule } from './modules/distribution2/file-distribution/ci/file-distribution-ci.module';
 import { SftpModule } from './modules/distribution2/sftp/sftp.module';
-import { Distribution3Module } from './modules/distribution3/distribution3.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { GenreModule } from './modules/genre/genre.module';
@@ -50,7 +46,6 @@ import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
-import { TenantIntegrationModule } from './modules/tenant-integration/tenant-integration.module';
 import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
@@ -154,15 +149,9 @@ import { UserModule } from './modules/user/user.module';
 		ReleaseContributorModule,
 		TrackContributorModule,
 
-		DistributionChannelModule,
-		TenantIntegrationModule,
-		DistributionModule,
-		Distribution2Module,
-
 		SftpModule,
-		FileDistributionCiModule,
 
-		Distribution3Module,
+		DistributionModule,
 
 		DDEXModule,
 	],

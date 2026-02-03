@@ -46,4 +46,7 @@ export const envValidationSchema = Joi.object({
 	GCS_PUBLIC_BUCKET: Joi.string().required(),
 	GCS_PATH_KEY: Joi.string().required(),
 	GCS_PROTECTED_BUCKET: Joi.string().required(),
+
+	// SECRET_KEY_HEX
+	SECRET_KEY_HEX: Joi.string().required(),
 });

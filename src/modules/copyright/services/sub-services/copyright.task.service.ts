@@ -73,7 +73,7 @@ export class CopyrightTaskService {
 		return new PageDto({
 			items,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

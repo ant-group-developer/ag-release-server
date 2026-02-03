@@ -77,7 +77,7 @@ export class LanguageService implements OnModuleInit {
 		return new PageDto({
 			items: languages,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

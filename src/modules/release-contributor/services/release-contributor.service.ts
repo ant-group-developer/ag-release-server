@@ -71,7 +71,7 @@ export class ReleaseContributorService {
 		return new PageDto({
 			items,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

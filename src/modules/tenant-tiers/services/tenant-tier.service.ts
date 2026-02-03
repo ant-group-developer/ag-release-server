@@ -47,7 +47,7 @@ export class TenantTierService {
 			await this.tenantTierQueryService.getList(query);
 		return new PageDto({
 			items,
-			metadata: { currentPage: page, pageSize, totalItems },
+			metadata: { page, pageSize, totalItems },
 		});
 	}
 

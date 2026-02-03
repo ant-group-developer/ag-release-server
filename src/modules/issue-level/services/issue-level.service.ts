@@ -64,7 +64,7 @@ export class IssueLevelService {
 
 		return new PageDto({
 			items,
-			metadata: { currentPage: page, pageSize, totalItems },
+			metadata: { page, pageSize, totalItems },
 		});
 	}
 

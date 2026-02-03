@@ -110,7 +110,7 @@ export class ArtistRoleService implements OnModuleInit {
 		return new PageDto({
 			items: artistRoles,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

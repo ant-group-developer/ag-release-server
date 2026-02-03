@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Request } from 'express';
 import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
@@ -13,7 +14,10 @@ import { Brackets, FindOneOptions, In, TreeRepository } from 'typeorm';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
-import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
+import {
+	checkIsNotSystemAdmin,
+	checkIsNotSystemTenant,
+} from '../user/utils/user-type.util';
 import {
 	CreateTenantDto,
 	FindTenantsDto,
@@ -22,6 +26,7 @@ import {
 import { TenantMessages } from './tenant.constant';
 import { Tenant } from './tenant.entity';
 import { TenantType } from './tenant.enum';
+import { parentFirstSort } from './tenant.util';
 
 @Injectable()
 export class TenantService {
@@ -104,7 +109,7 @@ export class TenantService {
 		if (!baseTenants.length) {
 			return new PageDto({
 				items: [],
-				metadata: { currentPage: 1, pageSize: 0, totalItems: 0 },
+				metadata: { page: 1, pageSize: 0, totalItems: 0 },
 			});
 		}
 
@@ -229,7 +234,7 @@ export class TenantService {
 		return new PageDto({
 			items: trees,
 			metadata: {
-				currentPage: 1,
+				page: 1,
 				pageSize: trees.length,
 				totalItems: trees.length,
 			},
@@ -244,6 +249,62 @@ export class TenantService {
 			},
 
 			order: { name: 'ASC' },
+		});
+	}
+
+	async findAllFlattenActive(req: Request): Promise<PageDto<Tenant>> {
+		const queryBuilder = this.tenantTreeRepo
+			.createQueryBuilder('tenant')
+			.select([
+				'tenant.id',
+				'tenant.name',
+				'tenant.title',
+				'tenant.logo',
+				'tenant.icon',
+				'tenant.type',
+				'user.id',
+				'user.name',
+				'user.email',
+				'parent.id',
+				'parent.name',
+				'tenantUser.id',
+				'tenantUser.type',
+				'user.id',
+				'user.name',
+				'user.email',
+			])
+			.leftJoin('tenant.tenantUser', 'tenantUser')
+			.leftJoin('tenantUser.user', 'user')
+			.leftJoin('tenant.parent', 'parent')
+			.where('tenant.isActive = :isActive', { isActive: true })
+			.andWhere('tenantUser.type = :type', {
+				type: TenantUserType.OWNER,
+			})
+			.orderBy('tenant.name', 'ASC');
+
+		const tenantId = req.user!.tenantId;
+		const userType = req.user!.type;
+		if (checkIsNotSystemAdmin(userType)) {
+			queryBuilder.andWhere(
+				new Brackets((qb) => {
+					qb.andWhere('tenant.id = :tenantId', { tenantId }).orWhere(
+						'parent.id = :tenantId',
+						{ tenantId },
+					);
+				}),
+			);
+		}
+
+		const data = await queryBuilder.getMany();
+		const sorted = parentFirstSort(data);
+
+		return new PageDto({
+			items: sorted,
+			metadata: {
+				page: 1,
+				pageSize: sorted.length,
+				totalItems: sorted.length,
+			},
 		});
 	}
 

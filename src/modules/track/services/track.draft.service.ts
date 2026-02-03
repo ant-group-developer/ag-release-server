@@ -75,7 +75,7 @@ export class TrackDraftService {
 		return new PageDto({
 			items: tracksDb,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},

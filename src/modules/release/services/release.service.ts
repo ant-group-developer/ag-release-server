@@ -89,7 +89,7 @@ export class ReleaseService {
 		return new PageDto({
 			items: enhancedRelease,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},
@@ -109,7 +109,7 @@ export class ReleaseService {
 		return new PageDto({
 			items: enhancedRelease,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},
@@ -127,7 +127,7 @@ export class ReleaseService {
 		return new PageDto({
 			items: items,
 			metadata: {
-				currentPage: page,
+				page,
 				pageSize,
 				totalItems,
 			},
