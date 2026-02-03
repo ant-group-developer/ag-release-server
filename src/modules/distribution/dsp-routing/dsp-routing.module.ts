@@ -1,0 +1,30 @@
+// src/modules/dsp-routing-configs/dsp-routing-config.module.ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { AggregatorsModule } from '../aggregator/aggregator.module';
+import { SftpConfigsModule } from '../sftp-configs/sftp-config.module';
+import { DspRoutingConfigsController } from './dsp-routing-config.controller';
+import { DspRoutingConfig } from './entities/dsp-routing-config.entity';
+import { DspRoutingConsumer } from './services/dsp-routing-config.consumer';
+import { DspRoutingConfigQueryService } from './services/dsp-routing-config.query.service';
+import { DspRoutingConfigsService } from './services/dsp-routing-config.service';
+
+@Module({
+	imports: [
+		TypeOrmModule.forFeature([
+			DspRoutingConfig,
+			//  Aggregator, SftpConfig
+		]),
+		SftpConfigsModule,
+		AggregatorsModule,
+	],
+	controllers: [DspRoutingConfigsController],
+	providers: [
+		DspRoutingConsumer,
+		DspRoutingConfigsService,
+		DspRoutingConfigQueryService,
+	],
+	exports: [DspRoutingConfigsService, DspRoutingConfigQueryService],
+})
+export class DspRoutingConfigsModule {}

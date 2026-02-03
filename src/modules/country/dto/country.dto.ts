@@ -1,8 +1,16 @@
-import { IsNumber, IsString, ValidateIf } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import {
+	IsEnum,
+	IsNumber,
+	IsOptional,
+	IsString,
+	ValidateIf,
+} from 'class-validator';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsNotEmpty, MaxLength } from 'class-validator';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { FieldOrderCountry } from '../enum/country.enum';
 
 export class CreateCountryDto {
 	@ApiProperty({
@@ -12,7 +20,7 @@ export class CreateCountryDto {
 	})
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	name: string;
 
 	@ApiProperty({
@@ -112,73 +120,88 @@ export class CreateCountryDto {
 	@IsNotEmpty()
 	@MaxLength(30)
 	nationality: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(30)
+	continent: string;
 }
 
 export class UpdateCountryDto extends PartialType(CreateCountryDto) {
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@ValidateIf((_, value) => value !== undefined)
-	name: string;
+	name?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	iso3: string;
+	iso3?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	iso2: string;
+	iso2?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	numericCode: string;
+	numericCode?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	phoneCode: string;
+	phoneCode?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	capital: string;
+	capital?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	currency: string;
+	currency?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	currencyName: string;
+	currencyName?: string;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(10)
 	@ValidateIf((_, value) => value !== undefined)
-	currencySymbol: string;
+	currencySymbol?: string;
 
 	@IsNumber()
 	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
-	regionId: number;
+	regionId?: number;
 
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(30)
 	@ValidateIf((_, value) => value !== undefined)
-	nationality: string;
+	nationality?: string;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(30)
+	@ValidateIf((_, value) => value !== undefined)
+	continent?: string;
 }
 
-export class QueryGetListCountryDto extends BaseQueryDto {}
+export class QueryGetListCountryDto extends BaseQueryDto {
+	@IsOptional()
+	@IsEnum(FieldOrderCountry)
+	fieldOrder: FieldOrderCountry = FieldOrderCountry.NAME;
+}

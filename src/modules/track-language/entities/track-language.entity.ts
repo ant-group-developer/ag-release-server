@@ -1,34 +1,66 @@
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
-@Entity('track_language')
+@Entity('track_language', {
+	comment:
+		'Thông tin ngôn ngữ và quốc gia áp dụng cho metadata và audio của track',
+})
 export class TrackLanguage extends BaseUUIDEntity {
-	@Column({ type: 'uuid' })
-	metadataLanguageCountryId: string;
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment:
+			'Quốc gia dùng cho metadata ngôn ngữ ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	metadataLanguageCountryId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Ngôn ngữ audio của track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	audioLanguageId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Ngôn ngữ metadata của track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	metadataLanguageId: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 10,
+		comment: 'ID track',
+	})
+	trackId: string;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Quốc gia thu âm của track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	recordingCountryId: string | null;
 
 	@ManyToOne(() => Country)
 	@JoinColumn({ name: 'metadata_language_country_id' })
-	metadataLanguageCountry: Country;
+	metadataLanguageCountry: Country | null;
 
-	@Column({ type: 'uuid' })
-	audioLanguageId: string;
+	@ManyToOne(() => Country)
+	@JoinColumn({ name: 'recording_country_id' })
+	recordingCountry: Country | null;
 
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'audio_language_id' })
-	audioLanguage: Language;
-
-	@Column({ type: 'uuid' })
-	metadataLanguageId: string;
+	audioLanguage: Language | null;
 
 	@ManyToOne(() => Language)
 	@JoinColumn({ name: 'metadata_language_id' })
-	metadataLanguage: Language;
-
-	@Column({ type: 'varchar', length: 10 })
-	trackId: string;
+	metadataLanguage: Language | null;
 
 	@OneToOne(() => Track, (track) => track.trackLanguage)
 	@JoinColumn({ name: 'track_id' })

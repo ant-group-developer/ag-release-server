@@ -1,8 +1,17 @@
+
 # compiled output
 /dist
 /node_modules
 /build
-
+/exports
+/backups
+/ddex_batches
+/downloads
+/release_parsed
+/import
+/tmp
+/download_unzip
+/src/modules/access-bomb/file
 # Logs
 logs
 *.log
@@ -57,3 +66,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 .history
 credential.json
+**/keys/*
+secrets

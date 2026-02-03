@@ -1,16 +1,8 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { OrganizationUser } from 'src/modules/organization-user/entities/organization-user.entity';
-import { Organization } from 'src/modules/organization/entities/organization.entity';
-import { UserPermission } from 'src/modules/user-permission/entities/user-permission.entity';
-import {
-	Column,
-	Entity,
-	JoinColumn,
-	ManyToOne,
-	OneToMany,
-	OneToOne,
-} from 'typeorm';
+import { UserRole } from 'src/modules/user-role/user-role.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { UserType } from '../enum/user.enum';
+import { TenantUser } from './tenant-user.entity';
 
 @Entity('users')
 export class User extends BaseUUIDEntity {
@@ -23,23 +15,35 @@ export class User extends BaseUUIDEntity {
 	@Column({ type: 'varchar', nullable: true })
 	telegramId: string | null;
 
+	@Column({ type: 'varchar', nullable: true })
+	avatar: string | null;
+
 	@Column({ type: 'enum', enum: UserType, default: UserType.USER })
 	type: UserType;
 
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive: boolean;
 
-	@OneToMany(() => UserPermission, (userPermission) => userPermission.user)
-	userPermissions: UserPermission[];
+	@Column({ select: false, default: '' })
+	password: string;
 
-	@OneToOne(() => Organization, (organization) => organization.owner)
-	organization: Organization | null;
+	@Column({ default: false, name: 'email_verified' })
+	emailVerified: boolean;
 
-	@OneToOne(
-		() => OrganizationUser,
-		(organizationUser) => organizationUser.user,
-	)
-	organizationUser: OrganizationUser | null;
+	@Column({ name: 'last_login', nullable: true })
+	lastLogin: Date;
+
+	@Column({ name: 'last_active', nullable: true })
+	lastActive: Date;
+
+	@Column({ name: 'last_ip', nullable: true })
+	lastIp: string;
+
+	@OneToMany(() => UserRole, (userRole) => userRole.user)
+	userRoles: UserRole[];
+
+	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.user)
+	tenantUser: TenantUser[];
 
 	@Column({ type: 'uuid', nullable: true })
 	creatorId: string;

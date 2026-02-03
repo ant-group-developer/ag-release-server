@@ -20,6 +20,8 @@
 		"esModuleInterop": true,
 		"paths": {
 			"src/*": ["src/*"]
-		}
+		},
+		"types": ["jest"],
+		"typeRoots": ["./src/types", "./node_modules/@types"]
 	}
 }

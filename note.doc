@@ -1,31 +1,152 @@
-user.email: unique
-language.code: unique
-permission.name: unique chưa sửa
-
-artist_role.id length = uuid
-track_artist oke
-release_artist
-
-release.id => uuid
-track
-release_artist
-release_localize
-release_language
- 
-countries
-phonecode => phone_code
-
-21/6
-
-export abstract class BaseCustomIDEntity {
-	@PrimaryColumn({ default: generateId(), length: 10 })
-	id: string;
-
-	@CreateDateColumn({ type: 'timestamptz' })
-	createdAt: Date;
-
-	@UpdateDateColumn({ type: 'timestamptz' })
-	updatedAt: Date;
+{
+    "statusCode": 200,
+    "message": "Success",
+    "messageCode": "success",
+    "data": {
+        "id": "GqaakYjn7G",
+        "createdAt": "2025-07-31T07:29:58.428Z",
+        "updatedAt": "2025-07-31T07:29:58.428Z",
+        "title": "Yellow Leaves",
+        "version": "",
+        "isrc": null,
+        "iswc": null,
+        "releaseId": "97860665-3d68-4be1-83de-0163e4b444b4",
+        "pLineOwner": "2025 ExclusiveAMG",
+        "primaryGenreId": "muLS9sHg22",
+        "subGenreId": "GMaRiKhY1z",
+        "order": 0,
+        "trackTypeId": null,
+        "trackOriginTypeId": null,
+        "isSensitiveContent": null,
+        "lyric": null,
+        "copyArtistsFromRelease": false,
+        "audioFile": {
+            "id": "2d77f8b0-69f2-4189-b8eb-6b49dfb6d187",
+            "createdAt": "2025-07-31T07:29:58.454Z",
+            "updatedAt": "2025-07-31T07:29:58.454Z",
+            "sampleRate": "44100",
+            "bitrate": "1411200",
+            "bitDepth": 16,
+            "duration": 157,
+            "hook": null,
+            "preview": null,
+            "trackId": "GqaakYjn7G",
+            "fileId": "a074e292-b6a8-49b7-b4b1-d43d4b54cc97",
+            "peakId": "0d927bf0-4b5f-4afc-bdda-49c94393dfae",
+            "file": {
+                "id": "a074e292-b6a8-49b7-b4b1-d43d4b54cc97",
+                "createdAt": "2025-07-31T07:29:48.562Z",
+                "updatedAt": "2025-07-31T07:29:58.004Z",
+                "isSubmitted": true,
+                "fileName": "Yellow Leaves.wav",
+                "key": "2025_07_31/releases/97860665-3d68-4be1-83de-0163e4b444b4/tracks/Yellow Leaves/20250731142948_Yellow Leaves.wav",
+                "contentType": "audio/wav",
+                "extension": "wav",
+                "fileSize": "27718608",
+                "bucket": "ant-music-assets-protected"
+            },
+            "peak": {
+                "id": "0d927bf0-4b5f-4afc-bdda-49c94393dfae",
+                "createdAt": "2025-07-31T07:29:48.538Z",
+                "updatedAt": "2025-07-31T07:29:56.479Z",
+                "isSubmitted": true,
+                "fileName": "Yellow Leaves.json",
+                "key": "2025_07_31/releases/97860665-3d68-4be1-83de-0163e4b444b4/tracks/Yellow Leaves/20250731142948_Yellow Leaves.json",
+                "contentType": "application/json",
+                "extension": "json",
+                "fileSize": "19654",
+                "bucket": "ant-music-assets-protected"
+            }
+        },
+        "trackArtists": [
+            {
+                "id": "e5a1f4da-95ee-406a-ba1c-ad2a109b7279",
+                "createdAt": "2025-07-31T07:29:58.484Z",
+                "updatedAt": "2025-07-31T07:29:58.484Z",
+                "artistId": "7MgW_15r5S",
+                "artistRoleId": "599858ad-2c4b-4d0f-8036-e74e28da7717",
+                "trackId": "GqaakYjn7G",
+                "releaseArtistId": "d7410c06-ef23-49d1-8610-84b82dfd73be",
+                "isFromReleaseAction": true,
+                "isFromTrackAction": false,
+                "artistRole": {
+                    "id": "599858ad-2c4b-4d0f-8036-e74e28da7717",
+                    "createdAt": "2025-07-31T06:27:48.786Z",
+                    "updatedAt": "2025-07-31T06:27:48.786Z",
+                    "creatorId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "modifierId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "name": "Main Artist",
+                    "value": "main_artist"
+                },
+                "artist": {
+                    "id": "7MgW_15r5S",
+                    "createdAt": "2025-07-31T06:32:38.498Z",
+                    "updatedAt": "2025-07-31T08:23:13.681Z",
+                    "creatorId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "modifierId": "3adcd1d1-fcaf-4495-9e54-0a8bd0ad09f2",
+                    "name": "Eric Dietz",
+                    "picture": "https://ui-avatars.com/api/?name=Eric%20Dietz&background=29b6f6&color=fff&size=128&bold=true&length=2",
+                    "biography": null
+                }
+            }
+        ],
+        "trackLanguage": {
+            "id": "bfae48b8-d61e-449f-ade3-f31b55d9e68b",
+            "createdAt": "2025-07-31T07:11:57.557Z",
+            "updatedAt": "2025-07-31T07:18:37.289Z",
+            "metadataLanguageCountryId": "11741384-a922-45a4-bf60-1f44d86dd23c",
+            "audioLanguageId": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+            "metadataLanguageId": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+            "trackId": "GqaakYjn7G",
+            "recordingCountryId": "11741384-a922-45a4-bf60-1f44d86dd23c",
+            "metadataLanguageCountry": {
+                "id": "11741384-a922-45a4-bf60-1f44d86dd23c",
+                "createdAt": "2025-07-31T06:26:37.408Z",
+                "updatedAt": "2025-07-31T06:26:37.408Z",
+                "name": "Armenia",
+                "iso3": "ARM",
+                "iso2": "AM",
+                "numericCode": "51",
+                "phoneCode": "374",
+                "capital": "Yerevan",
+                "currency": "AMD",
+                "currencyName": "Armenian Dram",
+                "currencySymbol": "֏",
+                "regionId": 1,
+                "nationality": "Armenian",
+                "continent": "Asia"
+            },
+            "recordingCountry": {
+                "id": "11741384-a922-45a4-bf60-1f44d86dd23c",
+                "createdAt": "2025-07-31T06:26:37.408Z",
+                "updatedAt": "2025-07-31T06:26:37.408Z",
+                "name": "Armenia",
+                "iso3": "ARM",
+                "iso2": "AM",
+                "numericCode": "51",
+                "phoneCode": "374",
+                "capital": "Yerevan",
+                "currency": "AMD",
+                "currencyName": "Armenian Dram",
+                "currencySymbol": "֏",
+                "regionId": 1,
+                "nationality": "Armenian",
+                "continent": "Asia"
+            },
+            "audioLanguage": {
+                "id": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+                "createdAt": "2025-07-31T06:27:20.757Z",
+                "updatedAt": "2025-07-31T06:27:20.757Z",
+                "name": "English",
+                "code": "en"
+            },
+            "metadataLanguage": {
+                "id": "f6992692-39f2-4ec1-9c5f-630069c0f2c0",
+                "createdAt": "2025-07-31T06:27:20.757Z",
+                "updatedAt": "2025-07-31T06:27:20.757Z",
+                "name": "English",
+                "code": "en"
+            }
+        }
+    }
 }
-
-default phai la hang so khi init db

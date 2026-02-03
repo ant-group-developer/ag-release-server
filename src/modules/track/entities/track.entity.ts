@@ -1,3 +1,4 @@
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseCustomIDEntity } from 'src/common/entities/base.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -14,44 +15,167 @@ import {
 	OneToOne,
 } from 'typeorm';
 
-@Entity('tracks')
-export class Track extends BaseCustomIDEntity {
-	@Column({ type: 'varchar', length: 100 })
-	title: string;
+import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
+import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
+import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
+import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
+import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
+import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
+import { ScanCopyrightStatus } from '../enum/track.enum';
+import { ITrack } from '../interfaces/track.interface';
 
-	@Column({ type: 'varchar', length: 100, nullable: true })
-	picture: string | null;
+@Entity('tracks', {
+	comment: 'Bảng track chứa metadata chi tiết của từng bài hát trong release',
+})
+export class Track extends BaseCustomIDEntity implements ITrack {
+	@Column({
+		type: 'varchar',
+		length: 100,
+		comment: 'Tiêu đề track',
+	})
+	title: string;
 
 	@Column({
 		type: 'varchar',
 		length: 50,
 		nullable: true,
-		comment: `This will appear next to the track title excluding artist name. For example. 'Extended Version'This will appear next to the track title excluding artist name. For example. 'Extended Version'`,
+		comment: 'Phiên bản track (ví dụ: Extended Version, Remix)',
 	})
 	version: string | null;
 
-	@Column({ type: 'varchar', length: 20, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 20,
+		nullable: true,
+		comment: 'Mã ISRC của track',
+	})
 	isrc: string | null;
 
-	@Column({ type: 'varchar', length: 20, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: 20,
+		nullable: true,
+		comment: 'Mã ISWC của track',
+	})
 	iswc: string | null;
 
-	@Column({ type: 'uuid' })
+	@Column({
+		type: 'uuid',
+		comment: 'ID release chứa track',
+	})
 	releaseId: string;
+
+	@Column({
+		type: 'int',
+		nullable: true,
+		comment: 'Năm P-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	pLineYear: number | null;
+
+	@Column({
+		type: 'varchar',
+		length: 200,
+		nullable: true,
+		comment: 'Chủ sở hữu P-Line ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	pLineOwner: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'Thể loại chính ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	primaryGenreId: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		comment: 'Thể loại phụ',
+	})
+	subGenreId: string | null;
+
+	@Column({
+		type: 'int',
+		default: 0,
+		comment: 'Thứ tự track trong release',
+	})
+	order: number;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Loại track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	trackTypeId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Nguồn gốc track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	trackOriginTypeId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Mức độ nhạy cảm nội dung',
+	})
+	trackSensitiveId: string | null;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Track được tạo bằng AI',
+	})
+	isByAi: boolean;
+
+	@Column({
+		type: 'text',
+		nullable: true,
+		comment: 'Lời bài hát',
+	})
+	lyric: string;
+
+	@Column({
+		type: 'enum',
+		enum: ScanCopyrightStatus,
+		default: ScanCopyrightStatus.UN_SCANNED,
+		comment: 'Trạng thái quét bản quyền',
+	})
+	scanCopyrightStatus: ScanCopyrightStatus;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Sao chép artist từ release',
+	})
+	copyArtistsFromRelease: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Sao chép contributor từ release',
+	})
+	copyContributorsFromRelease: boolean;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Price tier áp dụng cho track ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	priceTierId: string | null;
 
 	@ManyToOne(() => Release)
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
-	@Column({ type: 'varchar', length: 10 })
-	primaryGenreId: string;
-
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'primary_genre_id' })
-	primaryGenre: Genre;
-
-	@Column({ type: 'varchar', length: 10, nullable: true })
-	subGenreId: string | null;
+	primaryGenre: Genre | null;
 
 	@ManyToOne(() => Genre)
 	@JoinColumn({ name: 'sub_genre_id' })
@@ -60,6 +184,12 @@ export class Track extends BaseCustomIDEntity {
 	@OneToMany(() => TrackArtist, (trackArtist) => trackArtist.track)
 	trackArtists: TrackArtist[];
 
+	@OneToMany(
+		() => TrackContributor,
+		(trackContributor) => trackContributor.track,
+	)
+	trackContributors: TrackContributor[];
+
 	@OneToOne(() => TrackLanguage, (trackLanguage) => trackLanguage.track)
 	trackLanguage: TrackLanguage;
 
@@ -67,5 +197,33 @@ export class Track extends BaseCustomIDEntity {
 	trackLocalizes: TrackLocalize[];
 
 	@OneToOne(() => AudioFile, (audioFile) => audioFile.track)
-	audioFile: AudioFile;
+	audioFile: AudioFile | null;
+
+	@ManyToOne(() => TrackType)
+	@JoinColumn({ name: 'track_type_id' })
+	trackType: TrackType | null;
+
+	@ManyToOne(() => TrackOriginType)
+	@JoinColumn({ name: 'track_origin_type_id' })
+	trackOriginType: TrackOriginType | null;
+
+	@OneToMany(
+		() => TrackScanHistory,
+		(trackScanHistory) => trackScanHistory.track,
+	)
+	trackScanHistories?: TrackScanHistory[];
+
+	@ManyToOne(() => PriceTier)
+	@JoinColumn({ name: 'price_tier_id' })
+	priceTier: PriceTier | null;
+
+	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.track)
+	trackPolicies?: TrackPolicy[];
+
+	@ManyToOne(() => TrackSensitive, (trackSensitive) => trackSensitive.tracks)
+	@JoinColumn({ name: 'track_sensitive_id' })
+	trackSensitive: TrackSensitive | null;
+
+	@OneToMany(() => TrackRevenue, (trackRevenue) => trackRevenue.track)
+	trackRevenues?: TrackRevenue[];
 }

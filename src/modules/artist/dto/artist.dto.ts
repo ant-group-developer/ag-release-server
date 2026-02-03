@@ -1,12 +1,42 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
+	IsArray,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
+	Length,
 	MaxLength,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/base-query.dto';
+import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+
+import { Transform, Type } from 'class-transformer';
+import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
+
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { FieldOrderArtist } from '../enum/artist.enum';
+
+class CreateArtistProfileDto {
+	@IsNotEmpty()
+	@MaxLength(DEFAULT_LENGTH_NAME)
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
+	@IsString()
+	name: string;
+
+	@IsNotEmpty()
+	@MaxLength(100)
+	url: string;
+
+	@IsNotEmpty()
+	@Length(10, 10)
+	dspId: string;
+}
 
 export class CreateArtistDto {
 	@ApiProperty({
@@ -15,19 +45,19 @@ export class CreateArtistDto {
 		example: 'John Doe',
 	})
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	name: string;
 
 	@ApiProperty({
 		description: 'Picture of the artist',
-		maxLength: 100,
+		maxLength: LENGTH_PICTURE,
 		required: false,
 		type: 'string',
 		example: 'http://example.com/picture.jpg',
 	})
 	@IsOptional()
-	@MaxLength(100)
+	@MaxLength(LENGTH_PICTURE)
 	@IsString()
 	picture: string | null;
 
@@ -42,14 +72,78 @@ export class CreateArtistDto {
 	@IsString()
 	@MaxLength(250)
 	biography: string | null;
+
+	@Length(10, 10)
+	@IsOptional()
+	genreId?: string;
+
+	@IsUUID()
+	@IsOptional()
+	countryId?: string;
+
+	@IsOptional()
+	@ValidateNested({ each: true })
+	@Type(() => CreateArtistProfileDto)
+	@IsArray()
+	artistProfiles?: CreateArtistProfileDto[];
+}
+
+class UpdateArtistProfileDto {
+	@IsUUID()
+	@IsOptional()
+	id?: string;
+
+	@IsNotEmpty()
+	@MaxLength(50)
+	name: string;
+
+	@IsNotEmpty()
+	@MaxLength(100)
+	url: string;
+
+	@IsNotEmpty()
+	@Length(10, 10)
+	dspId: string;
 }
 
 export class UpdateArtistDto extends PartialType(CreateArtistDto) {
 	@IsString()
-	@MaxLength(100)
+	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
+
+	@IsOptional()
+	@ValidateNested({ each: true })
+	@Type(() => UpdateArtistProfileDto)
+	@IsArray()
+	artistProfiles?: UpdateArtistProfileDto[];
 }
 
-export class QueryGetListArtistDto extends BaseQueryDto {}
+export class QueryGetListArtistDto extends BaseQueryDto {
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsArray()
+	idInclude?: string[];
+
+	@IsOptional()
+	@IsEnum(FieldOrderArtist)
+	fieldOrder: FieldOrderArtist = FieldOrderArtist.NAME;
+
+	@IsOptional()
+	code?: string;
+
+	@ApiPropertyOptional({
+		description: 'Tenant IDs to filter labels (comma-separated)',
+		type: 'string',
+		format: 'uuid',
+	})
+	@CsvUuidArray()
+	tenantIds?: string[];
+}

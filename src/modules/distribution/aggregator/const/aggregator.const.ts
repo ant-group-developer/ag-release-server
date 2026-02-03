@@ -1,0 +1,95 @@
+// src/modules/aggregators/const/aggregator.const.ts
+import { AppResponseSuccess } from 'src/app.const';
+import {
+	ResponseError,
+	ResponseSuccess,
+} from 'src/common/dtos/common.response.dto';
+import { Aggregator } from '../entities/aggregator.entity';
+
+export class AggregatorSuccess extends AppResponseSuccess {
+	static COMMON<Aggregator>(data?: Aggregator) {
+		return new ResponseSuccess({
+			data,
+			isRemoveSensitiveFields: true,
+			sensitiveKeys: ['password', 'privateKey'],
+		});
+	}
+
+	static CREATE(data?: Aggregator) {
+		return new ResponseSuccess<Aggregator>({
+			message: 'Create success',
+			messageCode: 'aggregator.message.success.create',
+			data,
+		});
+	}
+
+	static UPDATE(data?: Aggregator) {
+		return new ResponseSuccess<Aggregator>({
+			message: 'Update success',
+			messageCode: 'aggregator.message.success.update',
+			data,
+		});
+	}
+
+	static DELETE(data?: { id: string }) {
+		return new ResponseSuccess<{ id: string }>({
+			message: 'Delete success',
+			messageCode: 'aggregator.message.success.delete',
+			data,
+		});
+	}
+}
+
+export class AggregatorException {
+	static NOT_FOUND_DEFAULT() {
+		return new ResponseError({
+			statusCode: 404,
+			message: 'Default aggregator not found',
+			messageCode: 'aggregator.message.error.defaultNotFound',
+		});
+	}
+
+	static NOT_FOUND() {
+		return new ResponseError({
+			statusCode: 404,
+			message: 'Aggregator not found',
+			messageCode: 'aggregator.message.error.notFound',
+		});
+	}
+
+	static CODE_EXISTED() {
+		return new ResponseError({
+			message: 'Aggregator code already existed',
+			messageCode: 'aggregator.message.error.codeExisted',
+		});
+	}
+
+	static NAME_EXISTED() {
+		return new ResponseError({
+			message: 'Aggregator name already existed',
+			messageCode: 'aggregator.message.error.nameExisted',
+		});
+	}
+
+	static DEFAULT_ACTIVE_ERROR() {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Cannot deactivate an active default aggregator',
+			messageCode: 'aggregator.message.error.defaultActiveError',
+		});
+	}
+
+	static CANNOT_DELETE_IN_USE() {
+		return new ResponseError({
+			message: 'Aggregator is being used by DSP routing',
+			messageCode: 'aggregator.message.error.cannotDeleteInUse',
+		});
+	}
+
+	static CANNOT_DELETE_DEFAULT() {
+		return new ResponseError({
+			message: 'Default aggregator cannot be deleted',
+			messageCode: 'aggregator.message.error.cannotDeleteDefault',
+		});
+	}
+}

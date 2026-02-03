@@ -1,27 +1,77 @@
+import {
+	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.entity';
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
-import { OrganizationDsp } from 'src/modules/organization-dsp/entities/organization-dsp.entity';
+import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
+import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
-@Entity('dsps')
+@Entity('dsps', {
+	comment:
+		'Danh mục các nền tảng DSP (Digital Service Provider) trong hệ thống',
+})
 export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
-	@Column({ name: 'name', type: 'varchar', unique: true, length: 100 })
+	@Column({
+		type: 'varchar',
+		unique: true,
+		length: DEFAULT_LENGTH_NAME,
+		comment: 'Tên nền tảng DSP',
+	})
 	name: string;
 
-	@Column({ name: 'picture', type: 'varchar', length: 100, nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		unique: true,
+		comment: 'Mã DSP duy nhất trong hệ thống',
+	})
+	code: string;
+
+	@Column({
+		type: 'varchar',
+		length: LENGTH_PICTURE,
+		nullable: true,
+		comment: 'Ảnh đại diện hoặc logo của DSP',
+	})
 	picture: string | null;
 
 	@Column({
-		name: 'can_link_artist_profile',
 		type: 'boolean',
 		default: false,
+		comment: 'Đánh dấu DSP đang được kích hoạt hay không',
 	})
-	canLinkArtistProfile: boolean;
+	isActive: boolean;
 
-	@OneToMany(() => OrganizationDsp, (organizationDsp) => organizationDsp.dsp)
-	organizationDsps: OrganizationDsp[];
+	@Column('varchar', {
+		array: true,
+		nullable: false,
+		length: 100,
+		default: [],
+		comment:
+			'Danh sách format link dùng để nhận diện hoặc map URL nghệ sĩ/track',
+	})
+	formatLinks: string[];
 
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Bật/tắt hệ thống policy cho DSP này',
+	})
+	enablePolicy: boolean;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexId: string | null;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexName: string | null;
+
+	// relation
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;
@@ -29,4 +79,18 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
+
+	@OneToMany(() => ReleaseDspDelivery, (releaseDsp) => releaseDsp.dsp)
+	releaseDsps: ReleaseDspDelivery[];
+
+	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.dsp)
+	artistProfiles: ArtistProfile[];
+
+	@OneToMany(() => DspAction, (dspAction) => dspAction.dsp)
+	dspActions: DspAction[] | [];
+
+	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.dsp)
+	trackPolicies?: TrackPolicy[];
+
+	releaseDspsCount?: number;
 }

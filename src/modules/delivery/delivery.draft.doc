@@ -1,0 +1,129 @@
+Thành phần
+Vai trò chính
+Mô tả chi tiết
+
+MessageHeader
+Thông tin giao tiếp
+Xác định ai gửi, ai nhận, thời gian, loại message (Live/Test/Update/Takedown).
+
+PartyList
+Thông tin nghệ sĩ / bên liên quan
+Danh sách nghệ sĩ, tác giả, producer, label, publisher…, mỗi người có PartyReference riêng (đặc trưng của ERN-4).
+
+ResourceList
+Thông tin bài hát (SoundRecording, Video, Artwork)
+Mô tả từng tài nguyên: ISRC, tiêu đề, nghệ sĩ tham gia, thời lượng, thông tin kỹ thuật, file path…
+
+ReleaseList
+Thông tin các releases (album/single)
+Gom các resource thành release với UPC, tiêu đề, ngày phát hành, label, và danh sách các track thuộc về release đó.
+
+DealList
+Thông tin deal (phân phối, bản quyền, lãnh thổ)
+Mô tả điều khoản phân phối: vùng lãnh thổ, mô hình thương mại (Streaming / Download), ngày hiệu lực, DSP đích.
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage
+    xmlns:ern="http://ddex.net/xml/ern/44"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://ddex.net/xml/ern/44 ern-v44.xsd">
+
+    <!-- ========== 1. MESSAGE HEADER ========== -->
+    <ern:MessageHeader>
+        <ern:MessageId>ANTMUSIC-20251018-0001</ern:MessageId>
+        <ern:MessageSender>
+            <ern:PartyId>PADPIDA123456789</ern:PartyId>
+            <ern:PartyName>ANT Music LLC</ern:PartyName>
+        </ern:MessageSender>
+        <ern:MessageRecipient>
+            <ern:PartyId>PADPID_SPOTIFY</ern:PartyId>
+            <ern:PartyName>Spotify</ern:PartyName>
+        </ern:MessageRecipient>
+        <ern:MessageCreatedDateTime>2025-10-18T08:00:00Z</ern:MessageCreatedDateTime>
+        <ern:MessageControlType>Live</ern:MessageControlType>
+    </ern:MessageHeader>
+
+    <!-- ========== 2. PARTY LIST ========== -->
+    <ern:PartyList>
+        <ern:Party>
+            <ern:PartyReference>P001</ern:PartyReference>
+            <ern:PartyName>
+                <ern:FullName>Sơn Tùng M-TP</ern:FullName>
+            </ern:PartyName>
+            <ern:PartyId>
+                <ern:ISNI>0000 0001 2345 6789</ern:ISNI>
+            </ern:PartyId>
+        </ern:Party>
+
+        <ern:Party>
+            <ern:PartyReference>P002</ern:PartyReference>
+            <ern:PartyName>
+                <ern:FullName>ANT Music LLC</ern:FullName>
+            </ern:PartyName>
+        </ern:Party>
+    </ern:PartyList>
+
+    <!-- ========== 3. RESOURCE LIST (bài hát) ========== -->
+    <ern:ResourceList>
+        <ern:SoundRecording>
+            <ern:ResourceReference>A1</ern:ResourceReference>
+            <ern:SoundRecordingId>
+                <ern:ISRC>VN-ANT-25-00012</ern:ISRC>
+            </ern:SoundRecordingId>
+            <ern:ReferenceTitle>
+                <ern:TitleText>MAKING MY WAY</ern:TitleText>
+            </ern:ReferenceTitle>
+            <ern:Contributor>
+                <ern:ContributorPartyReference>P001</ern:ContributorPartyReference>
+                <ern:ContributorRole>MainArtist</ern:ContributorRole>
+            </ern:Contributor>
+            <ern:Duration>PT3M32S</ern:Duration>
+            <ern:TechnicalDetails>
+                <ern:AudioCodecType>FLAC</ern:AudioCodecType>
+                <ern:BitRate>1411</ern:BitRate>
+                <ern:SamplingRate>44100</ern:SamplingRate>
+                <ern:FilePath>making_my_way.wav</ern:FilePath>
+            </ern:TechnicalDetails>
+        </ern:SoundRecording>
+    </ern:ResourceList>
+
+    <!-- ========== 4. RELEASE LIST (phát hành) ========== -->
+    <ern:ReleaseList>
+        <ern:Release>
+            <ern:ReleaseId>
+                <ern:ICPN>8934567890123</ern:ICPN>
+            </ern:ReleaseId>
+            <ern:ReferenceTitle>
+                <ern:TitleText>MAKING MY WAY - Single</ern:TitleText>
+            </ern:ReferenceTitle>
+            <ern:ReleaseType>Single</ern:ReleaseType>
+            <ern:DisplayArtist>
+                <ern:PartyReference>P001</ern:PartyReference>
+            </ern:DisplayArtist>
+            <ern:LabelName>ANT Music</ern:LabelName>
+            <ern:OriginalReleaseDate>2025-10-20</ern:OriginalReleaseDate>
+            <ern:ReleaseResourceReferenceList>
+                <ern:ReleaseResourceReference>A1</ern:ReleaseResourceReference>
+            </ern:ReleaseResourceReferenceList>
+        </ern:Release>
+    </ern:ReleaseList>
+
+    <!-- ========== 5. DEAL LIST (deal phân phối) ========== -->
+    <ern:DealList>
+        <ern:Deal>
+            <ern:DealReleaseReference>1</ern:DealReleaseReference>
+            <ern:DealTerms>
+                <ern:Usage>
+                    <ern:UseType>Streaming</ern:UseType>
+                </ern:Usage>
+                <ern:TerritoryCode>WORLD</ern:TerritoryCode>
+                <ern:CommercialModelType>SubscriptionModel</ern:CommercialModelType>
+                <ern:StartDate>2025-10-20</ern:StartDate>
+            </ern:DealTerms>
+        </ern:Deal>
+    </ern:DealList>
+
+</ern:NewReleaseMessage>
+
+
