@@ -11,7 +11,7 @@ export class SftpConfigSuccess {
 	static COMMON<SftpConfig>(data?: SftpConfig) {
 		return new ResponseSuccess({
 			data,
-			// isRemoveSensitiveFields: true,
+			isRemoveSensitiveFields: true,
 			sensitiveKeys: ['password', 'privateKey'],
 		});
 	}
