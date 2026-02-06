@@ -2,8 +2,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { decryptSecretSafe, encryptSecret } from 'src/utils/util.encrypt';
-import SftpClient from 'ssh2-sftp-client';
 import { EntityManager, Not, Repository } from 'typeorm';
+import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
 import { SftpConfigException } from '../const/sftp-config.const';
 import {
 	CreateSftpConfigDto,
@@ -23,6 +23,8 @@ export class SftpConfigsService {
 		private readonly repo: Repository<SftpConfig>,
 
 		private readonly queryService: SftpConfigQueryService,
+
+		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
 	async upsert({
@@ -46,11 +48,13 @@ export class SftpConfigsService {
 			if (existed) throw SftpConfigException.AGGREGATOR_HAS_CONFIG();
 		}
 
-		if (data.metadata?.password)
-			data.metadata.password = encryptSecret(data.metadata?.password);
+		if (data.metadata?.password) {
+			data.metadata.password = encryptSecret(data.metadata.password);
+		}
 
-		if (data.metadata?.privateKey)
-			data.metadata.privateKey = encryptSecret(data.metadata?.privateKey);
+		if (data.metadata?.privateKey) {
+			data.metadata.privateKey = encryptSecret(data.metadata.privateKey);
+		}
 
 		const entity = repo.create({
 			...data,
@@ -73,14 +77,18 @@ export class SftpConfigsService {
 			relations: { aggregator: true },
 		});
 		if (!entity) throw SftpConfigException.NOT_FOUND();
+
 		this.decryptSecretEntity(entity);
 		return entity;
 	}
 
-	async delete({ id, userId }: { id: string; userId: string }) {
+	async delete({ id }: { id: string; userId: string }) {
 		await this.repo.delete({ id });
 	}
 
+	/**
+	 * Test connect using config in DB + override fields
+	 */
 	async testConnectById({
 		id,
 		data,
@@ -94,59 +102,36 @@ export class SftpConfigsService {
 	}> {
 		const { metadata } = await this.getDetail(id);
 
-		const testConfig = {
+		const testConfig: SftpMetadata = {
 			host: data.host ?? metadata?.host ?? '',
-			port: data.port ?? metadata?.port ?? 0,
+			port: data.port ?? metadata?.port ?? 22,
 			username: data.username ?? metadata?.username ?? '',
 			password: data.password ?? metadata?.password,
+			privateKey: metadata?.privateKey,
+			path: metadata?.path,
 		};
 
-		return await this.testConnect(testConfig);
+		return this.sftpConnectService.testConnect(testConfig);
 	}
 
+	/**
+	 * Test connect with raw config (no DB)
+	 */
 	async testConnect(cfg?: SftpMetadata): Promise<{
 		status: boolean;
 		latencyMs?: number;
 		error?: any;
 	}> {
 		if (!cfg) {
-			return {
-				status: true,
-				latencyMs: 0,
-			};
+			return { status: false, latencyMs: 0 };
 		}
 
-		const sftp = new SftpClient();
-		const start = Date.now();
-
-		try {
-			await sftp.connect({
-				host: cfg.host,
-				port: cfg.port ?? 22,
-				username: cfg.username,
-				password: cfg.password,
-				readyTimeout: 10 * 1000,
-			});
-
-			const latencyMs = Date.now() - start;
-
-			return {
-				status: true,
-				latencyMs,
-			};
-		} catch (err) {
-			return {
-				status: false,
-				error: err?.message || String(err),
-			};
-		} finally {
-			await sftp.end();
-		}
+		return this.sftpConnectService.testConnect(cfg);
 	}
 
 	async lsById(id: string, remotePath?: string) {
 		const config = await this.getDetail(id);
-		return this.ls({ cfg: config?.metadata, remotePath });
+		return this.ls({ cfg: config.metadata, remotePath });
 	}
 
 	async ls({
@@ -161,27 +146,17 @@ export class SftpConfigsService {
 		items?: any[];
 		error?: any;
 	}> {
-		if (!cfg) return { status: false, error: 'SFTP_CONFIG_NOT_FOUND' };
+		if (!cfg) {
+			return { status: false, error: 'SFTP_CONFIG_NOT_FOUND' };
+		}
 
-		const sftp = new SftpClient();
+		const p = (remotePath?.trim() || cfg.path?.trim() || '/').trim();
 
 		try {
-			await sftp.connect({
-				host: cfg.host,
-				port: cfg.port ?? 22,
-				username: cfg.username,
-				password: cfg.password,
-				readyTimeout: 10_000,
-			});
-
-			const p = (remotePath?.trim() || cfg.path?.trim() || '/').trim();
-			const items = await sftp.list(p);
-
+			const items = await this.sftpConnectService.listDirect(cfg, p);
 			return { status: true, path: p, items };
-		} catch (err) {
+		} catch (err: any) {
 			return { status: false, error: err?.message || String(err) };
-		} finally {
-			await sftp.end();
 		}
 	}
 
@@ -189,16 +164,19 @@ export class SftpConfigsService {
 		return manager ? manager.getRepository(SftpConfig) : this.repo;
 	}
 
-	// private
-	private decryptSecretEntity(e: SftpConfig) {
-		if (e.metadata?.password)
-			e.metadata.password = decryptSecretSafe(e.metadata.password);
+	// ===== PRIVATE =====
 
-		if (e.metadata?.privateKey)
+	private decryptSecretEntity(e: SftpConfig) {
+		if (e.metadata?.password) {
+			e.metadata.password = decryptSecretSafe(e.metadata.password);
+		}
+
+		if (e.metadata?.privateKey) {
 			e.metadata.privateKey = decryptSecretSafe(e.metadata.privateKey);
+		}
 	}
 
 	private decryptSecretEntityList(listE: SftpConfig[]) {
-		listE.map((e) => this.decryptSecretEntity(e));
+		listE.forEach((e) => this.decryptSecretEntity(e));
 	}
 }

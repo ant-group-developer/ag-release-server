@@ -11,7 +11,6 @@ import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { GENRE_MAPPING, LANGUAGE_MAPPING } from './const';
 
-import { SftpService } from '../../sftp/sftp.service';
 import { ImportReleaseCiDto } from './dto';
 import {
 	CiJobStatus,
@@ -31,7 +30,7 @@ export class FileDistributionCiService {
 		private readonly ciHistoryRepo: Repository<DistributionCiHistory>,
 
 		private readonly bucketService: BucketService,
-		private readonly sftpService: SftpService,
+		// private readonly sftpService: SftpService,
 	) {}
 
 	// import
@@ -56,7 +55,7 @@ export class FileDistributionCiService {
 
 		// 3) upload folder lên SFTP
 		try {
-			await this.sftpService.uploadFolder(localDir, remoteDir);
+			// await this.sftpService.uploadFolder(localDir, remoteDir);
 		} catch (err: any) {
 			// Parse đã SUCCESS nhưng upload FAIL.
 			// Entity hiện tại không có "uploadStatus", nên mình ghi lỗi vào history mới nhất của release+batch.
