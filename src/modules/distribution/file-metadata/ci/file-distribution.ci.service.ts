@@ -11,6 +11,7 @@ import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { GENRE_MAPPING, LANGUAGE_MAPPING } from './const';
 
+import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
 import { ImportReleaseCiDto } from './dto';
 import {
 	CiJobStatus,
@@ -30,7 +31,7 @@ export class FileDistributionCiService {
 		private readonly ciHistoryRepo: Repository<DistributionCiHistory>,
 
 		private readonly bucketService: BucketService,
-		// private readonly sftpService: SftpService,
+		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
 	// import
@@ -48,14 +49,20 @@ export class FileDistributionCiService {
 			batchId,
 		);
 
-		// 2) build remote dir
-		// const remoteDir = this.buildCiRemoteDir(batchId, upc);
-
 		const remoteDir = '/import';
 
 		// 3) upload folder lên SFTP
 		try {
-			// await this.sftpService.uploadFolder(localDir, remoteDir);
+			await this.sftpConnectService.uploadFolder({
+				sftp: {
+					host: '193.181.210.85',
+					port: 22,
+					username: '',
+					password: '',
+				},
+				localDir,
+				remoteDir,
+			});
 		} catch (err: any) {
 			// Parse đã SUCCESS nhưng upload FAIL.
 			// Entity hiện tại không có "uploadStatus", nên mình ghi lỗi vào history mới nhất của release+batch.
@@ -115,6 +122,7 @@ export class FileDistributionCiService {
 			const releaseDir = path.join(outputRoot, upc);
 			fs.mkdirSync(releaseDir, { recursive: true });
 
+			// image
 			const { audioFiles, coverImage } =
 				await this.fetchFilesFromGCS(release);
 
@@ -124,6 +132,7 @@ export class FileDistributionCiService {
 				upc,
 			);
 
+			// tracks
 			this.processTracks(release, audioFiles, releaseDir, upc);
 
 			const rows = await this.parseCiRawRowsFromRelease(release);
