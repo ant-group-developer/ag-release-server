@@ -5,9 +5,12 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Post,
+	Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import * as path from 'path';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { PublicRoute } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
@@ -15,12 +18,17 @@ import {
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
+import { BucketGcsService } from '../services/bucket.gcs.service';
 import { BucketService } from '../services/bucket.service';
 
 @ApiTags('GCS Upload')
 @Controller('bucket/gcs')
 export class BucketGcsController {
-	constructor(private readonly bucketService: BucketService) {}
+	constructor(
+		private readonly bucketService: BucketService,
+
+		private readonly bucketGcsService: BucketGcsService,
+	) {}
 
 	// create
 	@Post('private')
@@ -60,6 +68,28 @@ export class BucketGcsController {
 	}
 
 	// read
+	@PublicRoute()
+	@Get('private/download-folder')
+	async downloadFolder(@Query('prefix') prefix: string) {
+		// Tạo tên thư mục duy nhất để tránh conflict
+		const timestamp = Date.now();
+		const destFolder = path.join(
+			process.cwd(),
+			'test_folder',
+			`${prefix.replace(/\//g, '_')}_${timestamp}`,
+		);
+
+		const result = await this.bucketService.downloadFolder({
+			prefix,
+			destFolder,
+			isPublic: false,
+		});
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);

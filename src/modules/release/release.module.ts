@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { BucketModule } from '../bucket/bucket.module';
+import { Country } from '../country/entities/country.entity';
+import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
+import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
@@ -14,6 +17,7 @@ import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { Release } from './entities/release.entity';
+import { ReleaseMetadataService } from './services/release-metadata.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
@@ -27,6 +31,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Genre,
 			Label,
 			Timezone,
+
+			Country,
 		]),
 
 		ReleaseLanguageModule,
@@ -37,6 +43,9 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		TrackModule,
 		BucketModule,
 		OrmModule,
+
+		SftpConnectModule,
+		SftpConfigsModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [
@@ -44,6 +53,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseDraftService,
 		ReleaseValidateService,
 		ReleaseQueryService,
+
+		ReleaseMetadataService,
 	],
 })
 export class ReleaseModule {}

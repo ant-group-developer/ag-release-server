@@ -5,7 +5,10 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 
-import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
+import {
+	COMMENT_FOR_NULLABLE_DRAFT,
+	DEFAULT_LENGTH_NAME,
+} from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 // import { DspReleaseStatus } from 'src/modules/distribution2/dsp-release-status/entities/dsp-release-status.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
@@ -254,6 +257,21 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant;
 
-	// @OneToMany(() => DspReleaseStatus, (dspStatuses) => dspStatuses.release)
-	// dspStatuses: DspReleaseStatus[];
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		nullable: true,
+		comment:
+			'Prefix folder metadata CI trên bucket (ví dụ: releases/{releaseId}/release_metadata_ci/)',
+	})
+	prefixKeyBucketMetadataCi: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_NAME,
+		nullable: true,
+		comment:
+			'Prefix folder metadata Spotify trên bucket (ví dụ: releases/{releaseId}/release_metadata_spotify/)',
+	})
+	prefixKeyBucketMetadataSpotify: string | null;
 }

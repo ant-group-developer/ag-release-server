@@ -157,4 +157,34 @@ export class ReleaseController {
 
 		return ReleaseSuccess.CREATE(result);
 	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/start-release')
+	async startRelease(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.startRelease(id);
+	}
+
+	// distribution
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/parse-metadata')
+	async parseMetadata(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.parseMetadata(id);
+		return result;
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/upload-metadata-ci-to-sftp')
+	async uploadMetadataCiToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToSftp(id);
+		return result;
+	}
 }

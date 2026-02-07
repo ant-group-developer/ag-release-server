@@ -27,6 +27,23 @@ export class SftpConfigsService {
 		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
+	async getSftpCi() {
+		const e = await this.repo.findOne({
+			relations: { aggregator: true },
+			where: {
+				aggregator: {
+					name: 'CI',
+				},
+			},
+		});
+
+		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
+
+		this.decryptSecretEntity(e);
+
+		return e.metadata;
+	}
+
 	async upsert({
 		data,
 		userId,

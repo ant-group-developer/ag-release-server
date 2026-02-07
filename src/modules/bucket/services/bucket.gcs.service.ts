@@ -111,6 +111,26 @@ export class BucketGcsService {
 		return file;
 	}
 
+	async getFilesByPrefix({
+		prefix,
+		isPublic = false,
+	}: {
+		prefix: string;
+		isPublic?: boolean;
+	}) {
+		const bucketName = this.getBucketName({ isPublic });
+		const bucket = this.storage.bucket(bucketName);
+
+		const [files] = await bucket.getFiles({ prefix });
+
+		return files
+			.filter((f) => !f.name.endsWith('/'))
+			.map((f) => ({
+				key: f.name,
+				file: f,
+			}));
+	}
+
 	// delete
 	async deletePublicFile(key: string) {
 		const file = await this.findOne({
