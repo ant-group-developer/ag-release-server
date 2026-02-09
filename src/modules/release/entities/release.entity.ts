@@ -5,12 +5,8 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 
-import {
-	COMMENT_FOR_NULLABLE_DRAFT,
-	DEFAULT_LENGTH_NAME,
-} from 'src/common/constants/common.default.constants';
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
-// import { DspReleaseStatus } from 'src/modules/distribution2/dsp-release-status/entities/dsp-release-status.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
@@ -257,15 +253,6 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant;
 
-	// @Column({
-	// 	type: 'varchar',
-	// 	length: DEFAULT_LENGTH_NAME,
-	// 	nullable: true,
-	// 	comment:
-	// 		'Prefix folder metadata CI trên bucket (ví dụ: releases/{releaseId}/release_metadata_ci/)',
-	// })
-	// prefixKeyBucketMetadataCi: string | null;
-
 	@Column({
 		type: 'jsonb',
 		nullable: true,
@@ -278,11 +265,12 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	} | null;
 
 	@Column({
-		type: 'varchar',
-		length: DEFAULT_LENGTH_NAME,
+		type: 'jsonb',
 		nullable: true,
-		comment:
-			'Prefix folder metadata Spotify trên bucket (ví dụ: releases/{releaseId}/release_metadata_spotify/)',
+		comment: 'Metadata spotify',
 	})
-	prefixKeyBucketMetadataSpotify: string | null;
+	metadataSpotify: {
+		folderBucket: string | null;
+		folderServer: string | null;
+	} | null;
 }
