@@ -49,6 +49,7 @@ export class ReleaseMetadataService {
 	async parseMetadata(releaseId: string) {
 		// parseMetadataCi
 		await this.parseMetadataCi(releaseId);
+
 		// parseMetadataSpotify
 	}
 
@@ -58,47 +59,22 @@ export class ReleaseMetadataService {
 
 	// parse release
 	async parseMetadataCi(releaseId: string) {
+		await this.createMetadataCiAndUploadToBucket(releaseId);
+		await this.uploadMetadataCiToSftp(releaseId);
+	}
+
+	async createMetadataCiAndUploadToBucket(releaseId: string) {
 		// b1
-		const outputDir = await this.createMetadataCiOnServer(releaseId);
+
+		await this.createMetadataCiOnServer(releaseId);
 
 		// b2
-		const { prefixKeyBucketMetadataCi } =
-			await this.uploadMetadataCiToBucket({
-				localDir: outputDir,
-				releaseId,
-			});
-
-		await this.releaseRepo.update(releaseId, { prefixKeyBucketMetadataCi });
+		await this.uploadMetadataCiToBucket({
+			releaseId,
+		});
 	}
 
-	async uploadMetadataCiToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
-		const timestamp = Date.now();
-		const localDir = `/release_download_bucket/${timestamp}_${releaseId}`;
-
-		if (!release.prefixKeyBucketMetadataCi) {
-			throw ReleaseException.MISSING_PREFIX_KEY_BUCKET_METADATA_CI();
-		}
-
-		// download folder
-		await this.bucketSv.downloadFolder({
-			prefix: release.prefixKeyBucketMetadataCi,
-			destFolder: localDir,
-		});
-
-		const sftp = await this.sftpConfigsService.getSftpCi();
-
-		await this.sftpConnectService.uploadFolder({
-			sftp,
-			localDir,
-			remoteDir: '/home/dev/import',
-		});
-
-		await removeFolder(localDir);
-	}
-
-	// private
-	private async createMetadataCiOnServer(releaseId: string) {
+	async createMetadataCiOnServer(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
 		const batchId = Date.now().toString();
 		this.logger.log(batchId);
@@ -132,17 +108,31 @@ export class ReleaseMetadataService {
 			templatePath,
 		});
 
-		return outputRoot;
+		const outputDir = outputRoot.replace(/\\/g, '/');
+
+		await this.releaseRepo.update(releaseId, {
+			metadataCi: {
+				...release.metadataCi,
+				batchId,
+				folderServer: outputDir,
+			},
+		});
+
+		return { outputDir, batchId };
 	}
 
 	async uploadMetadataCiToBucket({
-		localDir,
+		// localDir,
 		releaseId,
 	}: {
-		localDir: string;
+		// localDir: string;
 		releaseId: string;
 	}) {
+		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const localDir = release.metadataCi?.folderServer ?? '';
+
 		const bucketDtos: CreateBucketDto[] = [];
+		const folderBucket = `releases/${releaseId}/release_metadata_ci/${release.metadataCi?.batchId}/${release.upc}`;
 
 		// b1: quét folder, build input cho bulkCreate
 		const walk = (dir: string) => {
@@ -161,19 +151,17 @@ export class ReleaseMetadataService {
 					.relative(localDir, fullPath)
 					.replace(/\\/g, '/');
 
-				const contentType =
-					mime.lookup(fullPath) || 'application/octet-stream';
-
 				bucketDtos.push({
 					file: {
 						fileName: entry.name,
-						contentType,
+						contentType:
+							mime.lookup(fullPath) || 'application/octet-stream',
 						extension: path.extname(entry.name).replace('.', ''),
 						fileSize: stat.size,
 					},
 					folderBucket: {
 						uploadPurpose: UploadPurpose.release_metadata_ci,
-						releaseId,
+						key: `${folderBucket}/${entry.name}`,
 					},
 					key: relativePath,
 				});
@@ -212,11 +200,48 @@ export class ReleaseMetadataService {
 		// b4: xoá folder local sau khi upload THÀNH CÔNG
 		await removeFolder(localDir);
 
+		await this.releaseRepo.update(releaseId, {
+			metadataCi: {
+				...release.metadataCi,
+				folderBucket,
+			},
+		});
+
 		return {
-			prefixKeyBucketMetadataCi: `releases/${releaseId}/${UploadPurpose.release_metadata_ci}`,
+			folderBucket,
 		};
 	}
 
+	async downloadMetadataCiFromBucket(releaseId: string) {
+		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+
+		if (!release.metadataCi?.folderBucket) {
+			throw ReleaseException.MISSING_PREFIX_KEY_BUCKET_METADATA_CI();
+		}
+
+		await this.bucketSv.downloadFolder({
+			prefix: release.metadataCi.folderBucket,
+			destFolder: release.metadataCi.folderServer ?? '',
+		});
+	}
+
+	async uploadMetadataCiToSftp(releaseId: string) {
+		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+
+		const sftp = await this.sftpConfigsService.getSftpCi();
+
+		await this.downloadMetadataCiFromBucket(releaseId);
+
+		await this.sftpConnectService.uploadFolder({
+			sftp,
+			localDir: release.metadataCi?.folderServer ?? '',
+			remoteDir: '/home/dev/import',
+		});
+
+		await removeFolder(release.metadataCi?.folderServer ?? '');
+	}
+
+	// private
 	private async fetchAudioAndImageReleaseFromGCS(release: Release): Promise<{
 		audioFiles: { buffer: Buffer; extension: string }[];
 		coverImage: { buffer: Buffer; extension: string };

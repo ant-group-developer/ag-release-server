@@ -40,16 +40,41 @@ export class ReleaseService {
 	) {}
 
 	// distribution
-	async startRelease(id: string) {
-		return await this.releaseMetadataService.parseMetadata(id);
-	}
-
 	async parseMetadata(id: string) {
 		return await this.releaseMetadataService.parseMetadata(id);
 	}
 
+	async createMetadataCiOnServer(id: string) {
+		return await this.releaseMetadataService.createMetadataCiOnServer(id);
+	}
+
+	async uploadMetadataCiToBucket({
+		id,
+		// localDir,
+	}: {
+		id: string;
+		// localDir: string;
+	}) {
+		return await this.releaseMetadataService.uploadMetadataCiToBucket({
+			// localDir,
+			releaseId: id,
+		});
+	}
+
+	async downloadMetadataCiFromBucket(releaseId: string) {
+		return await this.releaseMetadataService.downloadMetadataCiFromBucket(
+			releaseId,
+		);
+	}
+
 	async uploadMetadataCiToSftp(id: string) {
 		return await this.releaseMetadataService.uploadMetadataCiToSftp(id);
+	}
+
+	async createMetadataCiAndUploadToBucket(id: string) {
+		return await this.releaseMetadataService.createMetadataCiAndUploadToBucket(
+			id,
+		);
 	}
 
 	// nghiệp vụ

@@ -159,32 +159,63 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/start-release')
-	async startRelease(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result = await this.releaseService.startRelease(id);
-	}
-
-	// distribution
-	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/parse-metadata')
+	@Post(':id/parse-release')
 	async parseMetadata(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
 	) {
 		const result = await this.releaseService.parseMetadata(id);
+	}
+
+	// distribution
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-on-server')
+	async createMetadataCiOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.createMetadataCiOnServer(id);
 		return result;
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/upload-metadata-ci-to-bucket')
+	async uploadMetadataCiToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		// @Body('localDir') localDir: string,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToBucket({
+			id,
+			// localDir,
+		});
+		return result;
+	}
+
+	@Post(':id/download-metadata-ci-to-bucket')
+	async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
+		const result =
+			await this.releaseService.downloadMetadataCiFromBucket(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/upload-metadata-ci-to-sftp')
 	async uploadMetadataCiToSftp(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
 	) {
 		const result = await this.releaseService.uploadMetadataCiToSftp(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-and-upload-to-bucket')
+	async createMetadataCiAndUploadToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataCiAndUploadToBucket(id);
 		return result;
 	}
 }

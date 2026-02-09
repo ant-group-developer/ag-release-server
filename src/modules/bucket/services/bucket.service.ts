@@ -37,23 +37,24 @@ export class BucketService {
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
 		const { file, folderBucket, key: keyForMapping } = data;
 
-		// create file
-		const fullKeyBucket = this.getFullKey({
-			previousKey: this.getPreviousKey(folderBucket),
-			fileName: generateFileNameWithTimestamp(file.fileName),
-		});
+		const keyBucket =
+			folderBucket.key ??
+			this.getFullKey({
+				previousKey: this.getPreviousKey(folderBucket),
+				fileName: generateFileNameWithTimestamp(file.fileName),
+			});
 
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
 			...file,
-			key: fullKeyBucket,
+			key: keyBucket,
 			bucket,
 		});
 
 		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType: newFile.contentType,
-			key: fullKeyBucket,
+			key: keyBucket,
 			isPublic: false,
 		});
 
@@ -76,10 +77,9 @@ export class BucketService {
 		releaseId,
 		trackFileName,
 	}: CreateBucketDto['folderBucket']) {
-		// const datePrefix = dayjs().format('YYYY_MM');
 		const subFolder = FolderBucketMap[uploadPurpose];
 		const trackSegment = trackFileName ? `/${trackFileName}` : '';
-		// return `releases/${datePrefix}/${releaseId}/${subFolder}${trackSegment}`;
+
 		return `releases/${releaseId}/${subFolder}${trackSegment}`;
 	}
 

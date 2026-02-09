@@ -191,20 +191,40 @@ export class SftpConnectService {
 		remoteDir: string,
 		onFileUploaded?: (file: string) => void,
 	) {
-		await client.mkdir(remoteDir, true);
+		try {
+			await client.mkdir(remoteDir, true);
+		} catch (error: any) {
+			// Bỏ qua lỗi nếu thư mục đã tồn tại
+			if (error.code !== 4) throw error; // 4 = SSH_FX_FAILURE (thư mục đã tồn tại)
+		}
 
-		for (const entry of fs.readdirSync(localDir, { withFileTypes: true })) {
+		const entries = fs.readdirSync(localDir, { withFileTypes: true });
+		const uploadTasks: Promise<void>[] = [];
+
+		for (const entry of entries) {
 			const lp = path.join(localDir, entry.name);
 			const rp = path.posix.join(remoteDir, entry.name);
 
 			if (entry.isSymbolicLink()) continue;
 
 			if (entry.isDirectory()) {
+				// Upload thư mục con tuần tự để tránh race condition khi tạo thư mục
 				await this.uploadRecursive(client, lp, rp, onFileUploaded);
 			} else if (entry.isFile()) {
-				await client.put(lp, rp);
-				onFileUploaded?.(lp);
+				// Upload các file song song
+				uploadTasks.push(
+					client
+						.put(lp, rp)
+						.then(() => onFileUploaded?.(lp))
+						.catch((error) => {
+							console.error(`Failed to upload ${lp}:`, error);
+							throw error; // hoặc log và tiếp tục tùy yêu cầu
+						}),
+				);
 			}
 		}
+
+		// Đợi tất cả file trong thư mục hiện tại upload xong
+		await Promise.all(uploadTasks);
 	}
 }

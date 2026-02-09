@@ -257,14 +257,25 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant;
 
+	// @Column({
+	// 	type: 'varchar',
+	// 	length: DEFAULT_LENGTH_NAME,
+	// 	nullable: true,
+	// 	comment:
+	// 		'Prefix folder metadata CI trên bucket (ví dụ: releases/{releaseId}/release_metadata_ci/)',
+	// })
+	// prefixKeyBucketMetadataCi: string | null;
+
 	@Column({
-		type: 'varchar',
-		length: DEFAULT_LENGTH_NAME,
+		type: 'jsonb',
 		nullable: true,
-		comment:
-			'Prefix folder metadata CI trên bucket (ví dụ: releases/{releaseId}/release_metadata_ci/)',
+		comment: 'Metadata CI info: { prefixKeyBucket, batchId }',
 	})
-	prefixKeyBucketMetadataCi: string | null;
+	metadataCi: {
+		folderBucket: string | null;
+		folderServer: string | null;
+		batchId: string | null;
+	} | null;
 
 	@Column({
 		type: 'varchar',
