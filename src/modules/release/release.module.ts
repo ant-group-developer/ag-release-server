@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { BucketModule } from '../bucket/bucket.module';
 import { Country } from '../country/entities/country.entity';
+import { DdexSpotifyService } from '../ddex/ddex-gen.service';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { Genre } from '../genre/entities/genre.entity';
@@ -55,6 +56,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseQueryService,
 
 		ReleaseMetadataService,
+		DdexSpotifyService,
 	],
 })
 export class ReleaseModule {}

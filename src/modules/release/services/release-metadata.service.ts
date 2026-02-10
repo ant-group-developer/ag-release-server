@@ -59,53 +59,53 @@ export class ReleaseMetadataService {
 
 	// parse release
 	// spotify
-	async parseMetadataSpotify(releaseId: string) {}
-	async createMetadataSpotifyOnServer(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
-		const batchId = Date.now().toString();
-		this.logger.log(batchId);
+	// async parseMetadataSpotify(releaseId: string) {}
+	// async createMetadataOnServer(releaseId: string) {
+	// 	const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+	// 	const batchId = Date.now().toString();
+	// 	this.logger.log(batchId);
 
-		const upc = release.upc;
-		if (!upc) {
-			throw ReleaseException.MISSING_UPC();
-		}
+	// 	const upc = release.upc;
+	// 	if (!upc) {
+	// 		throw ReleaseException.MISSING_UPC();
+	// 	}
 
-		const outputRoot = path.resolve('release_parsed', batchId);
-		const templatePath = path.resolve(
-			'src/modules/access-bomb/file/file-ci.xlsx',
-		);
+	// 	const outputRoot = path.resolve('release_parsed', batchId);
+	// 	const templatePath = path.resolve(
+	// 		'src/modules/access-bomb/file/file-ci.xlsx',
+	// 	);
 
-		const releaseDir = path.join(outputRoot, upc);
-		fs.mkdirSync(releaseDir, { recursive: true });
+	// 	const releaseDir = path.join(outputRoot, upc);
+	// 	fs.mkdirSync(releaseDir, { recursive: true });
 
-		// image
-		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromGCS(release);
+	// 	// image
+	// 	const { audioFiles, coverImage } =
+	// 		await this.fetchAudioAndImageReleaseFromGCS(release);
 
-		await this.processCoverImageCi(coverImage, releaseDir, upc);
+	// 	await this.processCoverImageCi(coverImage, releaseDir, upc);
 
-		// tracks
-		this.processTracksCi(release, audioFiles, releaseDir, upc);
+	// 	// tracks
+	// 	this.processTracksCi(release, audioFiles, releaseDir, upc);
 
-		await this.processFileExcelCi({
-			release,
-			upc,
-			releaseDir,
-			templatePath,
-		});
+	// 	await this.processFileExcelCi({
+	// 		release,
+	// 		upc,
+	// 		releaseDir,
+	// 		templatePath,
+	// 	});
 
-		const outputDir = outputRoot.replace(/\\/g, '/');
+	// 	const outputDir = outputRoot.replace(/\\/g, '/');
 
-		await this.releaseRepo.update(releaseId, {
-			metadataCi: {
-				...release.metadataCi,
-				batchId,
-				folderServer: outputDir,
-			},
-		});
+	// 	await this.releaseRepo.update(releaseId, {
+	// 		metadataCi: {
+	// 			...release.metadataCi,
+	// 			batchId,
+	// 			folderServer: outputDir,
+	// 		},
+	// 	});
 
-		return { outputDir, batchId };
-	}
+	// 	return { outputDir, batchId };
+	// }
 
 	// ci
 	async parseMetadataCi(releaseId: string) {

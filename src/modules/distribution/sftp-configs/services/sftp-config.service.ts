@@ -44,6 +44,23 @@ export class SftpConfigsService {
 		return e.metadata;
 	}
 
+	async getSftpSpotify() {
+		const e = await this.repo.findOne({
+			relations: { aggregator: true },
+			where: {
+				aggregator: {
+					name: 'Spotify',
+				},
+			},
+		});
+
+		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
+
+		this.decryptSecretEntity(e);
+
+		return e.metadata;
+	}
+
 	async upsert({
 		data,
 		userId,

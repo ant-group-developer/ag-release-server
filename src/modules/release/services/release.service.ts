@@ -4,6 +4,7 @@ import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { DdexSpotifyService } from 'src/modules/ddex/ddex-gen.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
 	getFileCsvFromRaw,
@@ -37,6 +38,7 @@ export class ReleaseService {
 		private readonly releaseQueryService: ReleaseQueryService,
 		private readonly bucketService: BucketService,
 		private readonly releaseMetadataService: ReleaseMetadataService,
+		private readonly ddexSpotifyService: DdexSpotifyService,
 	) {}
 
 	// distribution
@@ -46,6 +48,14 @@ export class ReleaseService {
 
 	async createMetadataCiOnServer(id: string) {
 		return await this.releaseMetadataService.createMetadataCiOnServer(id);
+	}
+
+	async createMetadataSpotifyOnServer(id: string) {
+		return await this.ddexSpotifyService.createMetadataSpotifyOnServer(id);
+	}
+
+	async uploadMetadataSpotifyToSftp(id: string) {
+		return await this.ddexSpotifyService.uploadMetadataSpotifyToSftp(id);
 	}
 
 	async uploadMetadataCiToBucket({

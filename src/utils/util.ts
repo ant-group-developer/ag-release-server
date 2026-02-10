@@ -185,3 +185,19 @@ export async function removeFolder(path: string) {
 		force: true,
 	});
 }
+
+export function genBatchId(): string {
+	const d = new Date();
+
+	const pad = (n: number, l = 2) => n.toString().padStart(l, '0');
+
+	return (
+		d.getFullYear().toString() +
+		pad(d.getMonth() + 1) +
+		pad(d.getDate()) +
+		pad(d.getHours()) +
+		pad(d.getMinutes()) +
+		pad(d.getSeconds()) +
+		pad(d.getMilliseconds(), 3)
+	);
+}

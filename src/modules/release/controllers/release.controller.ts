@@ -218,4 +218,36 @@ export class ReleaseController {
 			await this.releaseService.createMetadataCiAndUploadToBucket(id);
 		return result;
 	}
+
+	// spotify
+	@Post(':id/create-metadata-spotify-on-server')
+	async createMetadataSpotifyOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataSpotifyOnServer(id);
+		return result;
+	}
+
+	@Post(':id/upload-metadata-spotify-to-sftp')
+	async uploadMetadataSpotifyToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		return result;
+	}
+
+	@Post(':id/create-and-upload-metadata-spotify')
+	async createAndUploadMetadataSpotify(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		await this.releaseService.createMetadataSpotifyOnServer(id);
+		const result =
+			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		return result;
+	}
 }
