@@ -9,6 +9,8 @@ import {
 	genBatchId,
 	removeFolder,
 	resizeCoverImageTo3000x3000,
+	uploadFileToSftp,
+	zipFolder,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { BucketService } from '../bucket/services/bucket.service';
@@ -114,18 +116,25 @@ export class DdexSpotifyService {
 		fs.writeFileSync(batchXmlPath, batchCompleteXml, 'utf-8');
 		this.logger.log(`[BATCH_XML_CREATED] ${batchXmlPath}`);
 
-		// 8. Update database with metadata
-		const outputDir = outputRoot.replace(/\\/g, '/');
+		// ZIP
+		const zipPath = `${outputRoot}.zip`;
+		await zipFolder(outputRoot, zipPath);
+
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
 				...release.metadataSpotify,
-				folderServer: outputDir,
+				folderServer: zipPath.replace(/\\/g, '/'),
+				// batchId,
 			},
 		});
 
 		this.logger.log(`[COMPLETED] Batch ${batchId} - ${upc}`);
 
-		return { outputDir, batchId };
+		return {
+			// batchId,
+			outputDir: outputRoot,
+			zipPath,
+		};
 	}
 
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
@@ -133,10 +142,16 @@ export class DdexSpotifyService {
 
 		const sftp = await this.sftpConfigsService.getSftpSpotify();
 
-		await this.sftpConnectService.uploadFolder({
+		// await this.sftpConnectService.uploadFile({
+		// 	sftp,
+		// 	localFile: release.metadataSpotify?.folderServer ?? '',
+		// 	remoteDir: '/home/spotify',
+		// });
+
+		await uploadFileToSftp({
 			sftp,
-			localDir: release.metadataSpotify?.folderServer ?? '',
-			remoteDir: '/home/dev/spotify',
+			localFile: release.metadataSpotify?.folderServer ?? '',
+			remoteDir: '/home/spotify',
 		});
 
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');

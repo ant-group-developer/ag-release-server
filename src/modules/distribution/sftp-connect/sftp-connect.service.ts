@@ -144,6 +144,53 @@ export class SftpConnectService {
 		}
 	}
 
+	async uploadFile({
+		sftp,
+		localFile,
+		remoteDir,
+	}: {
+		sftp: {
+			host: string;
+			port?: number;
+			username: string;
+			password?: string;
+			privateKey?: string | Buffer;
+		};
+		localFile: string;
+		remoteDir: string;
+	}) {
+		const client = new SftpClient();
+
+		try {
+			if (!fs.statSync(localFile).isFile()) {
+				throw new Error('localFile is not a file');
+			}
+
+			await client.connect({
+				host: sftp.host,
+				port: sftp.port ?? 22,
+				username: sftp.username,
+				password: sftp.password,
+				// privateKey: sftp.privateKey,
+			});
+
+			try {
+				await client.mkdir(remoteDir, true);
+			} catch (e: any) {
+				if (e.code !== 4) throw e;
+			}
+
+			const remotePath = path.posix.join(
+				remoteDir,
+				path.basename(localFile),
+			);
+
+			await client.put(localFile, remotePath);
+		} finally {
+			await client.end();
+		}
+	}
+
 	async uploadFolder({
 		sftp,
 		localDir,
@@ -191,40 +238,20 @@ export class SftpConnectService {
 		remoteDir: string,
 		onFileUploaded?: (file: string) => void,
 	) {
-		try {
-			await client.mkdir(remoteDir, true);
-		} catch (error: any) {
-			// Bỏ qua lỗi nếu thư mục đã tồn tại
-			if (error.code !== 4) throw error; // 4 = SSH_FX_FAILURE (thư mục đã tồn tại)
-		}
+		await client.mkdir(remoteDir, true);
 
-		const entries = fs.readdirSync(localDir, { withFileTypes: true });
-		const uploadTasks: Promise<void>[] = [];
-
-		for (const entry of entries) {
+		for (const entry of fs.readdirSync(localDir, { withFileTypes: true })) {
 			const lp = path.join(localDir, entry.name);
 			const rp = path.posix.join(remoteDir, entry.name);
 
 			if (entry.isSymbolicLink()) continue;
 
 			if (entry.isDirectory()) {
-				// Upload thư mục con tuần tự để tránh race condition khi tạo thư mục
 				await this.uploadRecursive(client, lp, rp, onFileUploaded);
 			} else if (entry.isFile()) {
-				// Upload các file song song
-				uploadTasks.push(
-					client
-						.put(lp, rp)
-						.then(() => onFileUploaded?.(lp))
-						.catch((error) => {
-							console.error(`Failed to upload ${lp}:`, error);
-							throw error; // hoặc log và tiếp tục tùy yêu cầu
-						}),
-				);
+				await client.put(lp, rp);
+				onFileUploaded?.(lp);
 			}
 		}
-
-		// Đợi tất cả file trong thư mục hiện tại upload xong
-		await Promise.all(uploadTasks);
 	}
 }
