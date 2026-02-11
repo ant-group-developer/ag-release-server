@@ -128,7 +128,7 @@ export class ReleaseMetadataService {
 		const batchId = Date.now().toString();
 		this.logger.log(batchId);
 
-		const upc = release.upc;
+		const { upc } = release;
 		if (!upc) {
 			throw ReleaseException.MISSING_UPC();
 		}
