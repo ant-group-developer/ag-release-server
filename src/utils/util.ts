@@ -142,3 +142,62 @@ export const handleTenantId = (
 ): string | undefined => {
 	return tenantId === 'system-tenant' ? undefined : tenantId;
 };
+
+// image
+import sharp from 'sharp';
+export async function resizeCoverImageTo3000x3000({
+	buffer,
+}: {
+	buffer: Buffer;
+}): Promise<sharp.Sharp> {
+	const img = sharp(buffer);
+	const meta = await img.metadata();
+
+	const width = meta.width ?? 0;
+	const height = meta.height ?? 0;
+
+	if (width >= 3000 && height >= 3000) {
+		return img;
+	}
+
+	return img.resize(3000, 3000, { fit: 'cover' });
+}
+
+export function resizeCoverImage({
+	buffer,
+	output,
+}: {
+	buffer: Buffer;
+	extension?: string;
+	output: {
+		width: number;
+		height: number;
+	};
+}) {
+	const img = sharp(buffer);
+
+	return img.resize(output.width, output.height, { fit: 'cover' });
+}
+
+export async function removeFolder(path: string) {
+	await fs.promises.rm(path, {
+		recursive: true,
+		force: true,
+	});
+}
+
+export function genBatchId(): string {
+	const d = new Date();
+
+	const pad = (n: number, l = 2) => n.toString().padStart(l, '0');
+
+	return (
+		d.getFullYear().toString() +
+		pad(d.getMonth() + 1) +
+		pad(d.getDate()) +
+		pad(d.getHours()) +
+		pad(d.getMinutes()) +
+		pad(d.getSeconds()) +
+		pad(d.getMilliseconds(), 3)
+	);
+}

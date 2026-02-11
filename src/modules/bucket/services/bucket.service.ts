@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import dayjs from 'dayjs';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
+import { pipeline } from 'stream/promises';
 import { FolderBucketMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
@@ -35,23 +37,24 @@ export class BucketService {
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
 		const { file, folderBucket, key: keyForMapping } = data;
 
-		// create file
-		const fullKeyBucket = this.getFullKey({
-			previousKey: this.getPreviousKey(folderBucket),
-			fileName: generateFileNameWithTimestamp(file.fileName),
-		});
+		const keyBucket =
+			folderBucket.key ??
+			this.getFullKey({
+				previousKey: this.getPreviousKey(folderBucket),
+				fileName: generateFileNameWithTimestamp(file.fileName),
+			});
 
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
 			...file,
-			key: fullKeyBucket,
+			key: keyBucket,
 			bucket,
 		});
 
 		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
 			contentType: newFile.contentType,
-			key: fullKeyBucket,
+			key: keyBucket,
 			isPublic: false,
 		});
 
@@ -74,10 +77,10 @@ export class BucketService {
 		releaseId,
 		trackFileName,
 	}: CreateBucketDto['folderBucket']) {
-		const datePrefix = dayjs().format('YYYY_MM');
 		const subFolder = FolderBucketMap[uploadPurpose];
 		const trackSegment = trackFileName ? `/${trackFileName}` : '';
-		return `releases/${datePrefix}/${releaseId}/${subFolder}${trackSegment}`;
+
+		return `releases/${releaseId}/${subFolder}${trackSegment}`;
 	}
 
 	private getFullKey({
@@ -180,6 +183,106 @@ export class BucketService {
 		return {
 			fileBuffer: contents,
 			fileDb,
+		};
+	}
+
+	async downloadFolder({
+		prefix,
+		destFolder,
+		isPublic = false,
+	}: {
+		prefix: string;
+		destFolder: string;
+		isPublic?: boolean;
+	}): Promise<{
+		downloadedCount: number;
+		failedCount: number;
+		destFolder: string;
+		errors: Array<{ key: string; error: string }>;
+	}> {
+		// 1. Lấy metadata từ DB
+		const filesDb = await this.bucketFileService.getFilesByPrefix({
+			prefix,
+		});
+
+		if (filesDb.length === 0) {
+			throw new Error(`No files found with prefix: ${prefix}`);
+		}
+
+		// 2. Map key -> FileEntity
+		const dbMap = new Map<string, FileEntity>();
+		filesDb.forEach((f) => {
+			dbMap.set(f.key, f);
+		});
+
+		// 3. Lấy files từ GCS
+		const filesGcs = await this.bucketGcsService.getFilesByPrefix({
+			prefix,
+			isPublic,
+		});
+
+		// 4. Tạo thư mục đích
+		await fs.promises.mkdir(destFolder, { recursive: true });
+
+		let downloadedCount = 0;
+		let failedCount = 0;
+		const errors: Array<{ key: string; error: string }> = [];
+
+		// 5. Download từng file
+		for (const { key, file } of filesGcs) {
+			try {
+				const fileDb = dbMap.get(key);
+				if (!fileDb) {
+					failedCount++;
+					errors.push({ key, error: 'File not found in database' });
+					continue;
+				}
+
+				// Tính relative path
+				let relativePath = key.startsWith(prefix)
+					? key.substring(prefix.length)
+					: key;
+
+				if (relativePath.startsWith('/')) {
+					relativePath = relativePath.substring(1);
+				}
+
+				// Thay tên file gốc nếu có
+				if (fileDb.fileName) {
+					const pathParts = relativePath.split('/');
+					pathParts[pathParts.length - 1] = fileDb.fileName;
+					relativePath = pathParts.join('/');
+				}
+
+				const fullPath = path.join(destFolder, relativePath);
+				const dir = path.dirname(fullPath);
+
+				// Tạo thư mục cha
+				await fs.promises.mkdir(dir, { recursive: true });
+
+				// Download file
+				const stream = file.createReadStream();
+				const writeStream = fs.createWriteStream(fullPath);
+				await pipeline(stream, writeStream);
+
+				downloadedCount++;
+			} catch (error) {
+				failedCount++;
+				errors.push({
+					key,
+					error:
+						error instanceof Error
+							? error.message
+							: 'Unknown error',
+				});
+			}
+		}
+
+		return {
+			downloadedCount,
+			failedCount,
+			destFolder,
+			errors,
 		};
 	}
 

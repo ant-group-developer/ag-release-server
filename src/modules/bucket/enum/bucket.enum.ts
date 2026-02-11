@@ -20,4 +20,8 @@ export enum UploadPurpose {
 	TRACK_AUDIO = 'track_audio',
 	PEAK_AUDIO = 'peak_audio',
 	RELEASE_COVER_ART = 'release_cover_art',
+
+	// metadata
+	release_metadata_ci = 'release_metadata_ci',
+	release_metadata_spotify = 'release_metadata_spotify',
 }

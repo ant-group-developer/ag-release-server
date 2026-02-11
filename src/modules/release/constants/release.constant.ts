@@ -39,6 +39,24 @@ export class ReleaseException {
 		});
 	}
 
+	static MISSING_UPC(data?: any) {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Missing UPC',
+			messageCode: 'release.message.error.missingUpc',
+			data,
+		});
+	}
+
+	static MISSING_PREFIX_KEY_BUCKET_METADATA_CI(data?: any) {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Missing prefixKeyBucketMetadataCi',
+			messageCode: 'release.message.error.prefixKeyBucketMetadataCi',
+			data,
+		});
+	}
+
 	static ALBUM_FORMAT_NOT_FOUND(data?: any) {
 		return new ResponseError({
 			message: 'Album format not found',

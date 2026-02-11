@@ -160,6 +160,7 @@ export class TenantService {
 				(t as any).tenantUserCount as number,
 			]),
 		);
+
 		for (const t of enriched) {
 			(t as any).tenantUserCount = countMap.get(t.id) ?? 0;
 		}

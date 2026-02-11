@@ -157,4 +157,97 @@ export class ReleaseController {
 
 		return ReleaseSuccess.CREATE(result);
 	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/parse-release')
+	async parseMetadata(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.parseMetadata(id);
+	}
+
+	// distribution
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-on-server')
+	async createMetadataCiOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.createMetadataCiOnServer(id);
+		return result;
+	}
+
+	@Post(':id/upload-metadata-ci-to-bucket')
+	async uploadMetadataCiToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		// @Body('localDir') localDir: string,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToBucket({
+			id,
+			// localDir,
+		});
+		return result;
+	}
+
+	@Post(':id/download-metadata-ci-to-bucket')
+	async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
+		const result =
+			await this.releaseService.downloadMetadataCiFromBucket(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/upload-metadata-ci-to-sftp')
+	async uploadMetadataCiToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToSftp(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-and-upload-to-bucket')
+	async createMetadataCiAndUploadToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataCiAndUploadToBucket(id);
+		return result;
+	}
+
+	// spotify
+	@Post(':id/create-metadata-spotify-on-server')
+	async createMetadataSpotifyOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataSpotifyOnServer(id);
+		return result;
+	}
+
+	@Post(':id/upload-metadata-spotify-to-sftp')
+	async uploadMetadataSpotifyToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		return result;
+	}
+
+	@Post(':id/create-and-upload-metadata-spotify')
+	async createAndUploadMetadataSpotify(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		await this.releaseService.createMetadataSpotifyOnServer(id);
+		const result =
+			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		return result;
+	}
 }

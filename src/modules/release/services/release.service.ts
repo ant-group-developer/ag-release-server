@@ -4,6 +4,7 @@ import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { DdexSpotifyService } from 'src/modules/ddex/ddex-gen.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
 	getFileCsvFromRaw,
@@ -24,6 +25,7 @@ import {
 	IReleaseDetail,
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
+import { ReleaseMetadataService } from './release-metadata.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -35,8 +37,57 @@ export class ReleaseService {
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
 		private readonly bucketService: BucketService,
+		private readonly releaseMetadataService: ReleaseMetadataService,
+		private readonly ddexSpotifyService: DdexSpotifyService,
 	) {}
 
+	// distribution
+	async parseMetadata(id: string) {
+		return await this.releaseMetadataService.parseMetadata(id);
+	}
+
+	async createMetadataCiOnServer(id: string) {
+		return await this.releaseMetadataService.createMetadataCiOnServer(id);
+	}
+
+	async createMetadataSpotifyOnServer(id: string) {
+		return await this.ddexSpotifyService.createMetadataSpotifyOnServer(id);
+	}
+
+	async uploadMetadataSpotifyToSftp(id: string) {
+		return await this.ddexSpotifyService.uploadMetadataSpotifyToSftp(id);
+	}
+
+	async uploadMetadataCiToBucket({
+		id,
+		// localDir,
+	}: {
+		id: string;
+		// localDir: string;
+	}) {
+		return await this.releaseMetadataService.uploadMetadataCiToBucket({
+			// localDir,
+			releaseId: id,
+		});
+	}
+
+	async downloadMetadataCiFromBucket(releaseId: string) {
+		return await this.releaseMetadataService.downloadMetadataCiFromBucket(
+			releaseId,
+		);
+	}
+
+	async uploadMetadataCiToSftp(id: string) {
+		return await this.releaseMetadataService.uploadMetadataCiToSftp(id);
+	}
+
+	async createMetadataCiAndUploadToBucket(id: string) {
+		return await this.releaseMetadataService.createMetadataCiAndUploadToBucket(
+			id,
+		);
+	}
+
+	// nghiệp vụ
 	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;

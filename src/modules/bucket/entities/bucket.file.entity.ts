@@ -29,7 +29,7 @@ export class FileEntity extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
-		length: 30,
+		length: 200,
 		comment: 'MIME type của file (ví dụ: audio/wav, image/png)',
 	})
 	contentType: string;

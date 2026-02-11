@@ -37,13 +37,19 @@ class CreateFileDto {
 }
 
 class FolderBucket {
+	// nếu không truyền keyBucket thì hệ thống sẽ tự generate
+	key?: string;
+
+	// mục đích upload, dùng để xác định cấu trúc folder
 	@IsEnum(UploadPurpose)
 	uploadPurpose: UploadPurpose;
 
+	// id của release, dùng cho các upload gắn với release
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
 
+	// tên file track, chỉ dùng cho upload track file
 	@IsOptional()
 	@MaxLength(80)
 	trackFileName?: string;

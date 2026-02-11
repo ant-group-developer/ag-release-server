@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
 
 import { FileEntity } from '../entities/bucket.file.entity';
 import { ICreateFile } from '../interfaces/bucket.interface';
@@ -26,6 +26,17 @@ export class BucketFileService {
 		}
 
 		return file;
+	}
+
+	async getFilesByPrefix({ prefix }: { prefix: string; isPublic?: boolean }) {
+		return this.fileRepo.find({
+			where: {
+				key: Like(`${prefix}%`),
+			},
+			order: {
+				key: 'ASC',
+			},
+		});
 	}
 
 	async update(id: string, { fileName }: { fileName: string }) {

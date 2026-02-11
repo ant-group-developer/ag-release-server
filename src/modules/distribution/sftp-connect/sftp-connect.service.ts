@@ -1,0 +1,230 @@
+// src/modules/distribution2/sftp/sftp.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
+import SftpClient, { FileInfo } from 'ssh2-sftp-client';
+import { SftpMetadata } from '../sftp-configs/type/sftp-config.type';
+
+@Injectable()
+export class SftpConnectService {
+	private readonly logger = new Logger(SftpConnectService.name);
+
+	private createClient(): SftpClient {
+		return new SftpClient();
+	}
+
+	/**
+	 * Test connect only
+	 * DÙNG CHO: testConnectById
+	 */
+	async testConnect(config: SftpMetadata): Promise<{
+		status: boolean;
+		latencyMs?: number;
+		error?: any;
+	}> {
+		const client = this.createClient();
+		const start = Date.now();
+
+		try {
+			await client.connect({
+				host: config.host,
+				port: config.port ?? 22,
+				username: config.username,
+				password: config.password,
+				privateKey: config.privateKey,
+				readyTimeout: 10_000,
+			});
+
+			// test nhẹ
+			await client.list('.');
+
+			return {
+				status: true,
+				latencyMs: Date.now() - start,
+			};
+		} catch (err: any) {
+			this.logger.error('SFTP testConnect failed', err);
+			return {
+				status: false,
+				error: err?.message || String(err),
+			};
+		} finally {
+			await client.end();
+		}
+	}
+
+	/**
+	 * Connect & return client (manual control)
+	 */
+	async connect(config: SftpMetadata): Promise<SftpClient> {
+		const client = this.createClient();
+
+		await client.connect({
+			host: config.host,
+			port: config.port ?? 22,
+			username: config.username,
+			password: config.password,
+			privateKey: config.privateKey,
+			readyTimeout: 10_000,
+		});
+
+		return client;
+	}
+
+	/**
+	 * List directory
+	 */
+	async listDirect(
+		config: SftpMetadata,
+		remotePath: string,
+	): Promise<FileInfo[]> {
+		const client = this.createClient();
+
+		try {
+			await client.connect({
+				host: config.host,
+				port: config.port ?? 22,
+				username: config.username,
+				password: config.password,
+				privateKey: config.privateKey,
+				readyTimeout: 10_000,
+			});
+
+			return await client.list(remotePath);
+		} finally {
+			await client.end();
+		}
+	}
+
+	/**
+	 * Upload local folder → remote folder (recursive)
+	 */
+	async sendFolderTo(
+		config: SftpMetadata,
+		localDir: string,
+		remoteDir: string,
+	): Promise<void> {
+		const client = this.createClient();
+
+		try {
+			await client.connect({
+				host: config.host,
+				port: config.port ?? 22,
+				username: config.username,
+				password: config.password,
+				privateKey: config.privateKey,
+				readyTimeout: 10_000,
+			});
+
+			await this.uploadDirectory(client, localDir, remoteDir);
+		} finally {
+			await client.end();
+		}
+	}
+
+	// ===== PRIVATE =====
+	private async uploadDirectory(
+		client: SftpClient,
+		localDir: string,
+		remoteDir: string,
+	): Promise<void> {
+		await client.mkdir(remoteDir, true);
+
+		const items = fs.readdirSync(localDir, { withFileTypes: true });
+
+		for (const item of items) {
+			const localPath = path.join(localDir, item.name);
+			const remotePath = path.posix.join(remoteDir, item.name);
+
+			if (item.isDirectory()) {
+				await this.uploadDirectory(client, localPath, remotePath);
+			} else {
+				await client.put(localPath, remotePath);
+			}
+		}
+	}
+
+	async uploadFolder({
+		sftp,
+		localDir,
+		remoteDir,
+	}: {
+		sftp: {
+			host: string;
+			port?: number;
+			username: string;
+			password?: string;
+			privateKey?: string | Buffer;
+		};
+		localDir: string;
+		remoteDir: string;
+	}) {
+		const client = new SftpClient();
+
+		try {
+			if (!fs.statSync(localDir).isDirectory()) {
+				throw new Error('localDir is not a directory');
+			}
+
+			await client.connect({
+				host: sftp.host,
+				port: sftp.port ?? 22,
+				username: sftp.username,
+				password: sftp.password,
+				privateKey: sftp.privateKey,
+			});
+
+			// Lấy tên thư mục cần upload
+			const folderName = path.basename(localDir);
+			// Tạo đường dẫn remote mới bao gồm tên thư mục
+			const targetRemoteDir = path.posix.join(remoteDir, folderName);
+
+			await this.uploadRecursive(client, localDir, targetRemoteDir);
+		} finally {
+			await client.end();
+		}
+	}
+
+	private async uploadRecursive(
+		client: SftpClient,
+		localDir: string,
+		remoteDir: string,
+		onFileUploaded?: (file: string) => void,
+	) {
+		try {
+			await client.mkdir(remoteDir, true);
+		} catch (error: any) {
+			// Bỏ qua lỗi nếu thư mục đã tồn tại
+			if (error.code !== 4) throw error; // 4 = SSH_FX_FAILURE (thư mục đã tồn tại)
+		}
+
+		const entries = fs.readdirSync(localDir, { withFileTypes: true });
+		const uploadTasks: Promise<void>[] = [];
+
+		for (const entry of entries) {
+			const lp = path.join(localDir, entry.name);
+			const rp = path.posix.join(remoteDir, entry.name);
+
+			if (entry.isSymbolicLink()) continue;
+
+			if (entry.isDirectory()) {
+				// Upload thư mục con tuần tự để tránh race condition khi tạo thư mục
+				await this.uploadRecursive(client, lp, rp, onFileUploaded);
+			} else if (entry.isFile()) {
+				// Upload các file song song
+				uploadTasks.push(
+					client
+						.put(lp, rp)
+						.then(() => onFileUploaded?.(lp))
+						.catch((error) => {
+							console.error(`Failed to upload ${lp}:`, error);
+							throw error; // hoặc log và tiếp tục tùy yêu cầu
+						}),
+				);
+			}
+		}
+
+		// Đợi tất cả file trong thư mục hiện tại upload xong
+		await Promise.all(uploadTasks);
+	}
+}

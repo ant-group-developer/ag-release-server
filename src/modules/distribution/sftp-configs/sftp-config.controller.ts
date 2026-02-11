@@ -63,12 +63,7 @@ export class SftpConfigsController {
 	@Post('test')
 	@ApiOperation({ summary: 'test SFTP connection' })
 	async testConnect(@Body() data: SftpMetadata) {
-		const result = await this.svc.testConnect({
-			host: data.host,
-			port: data.port,
-			username: data.username,
-			password: data.password,
-		});
+		const result = await this.svc.testConnect(data);
 
 		return SftpConfigSuccess.COMMON(result);
 	}

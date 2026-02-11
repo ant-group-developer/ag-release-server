@@ -7,7 +7,6 @@ import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-l
 
 import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
-// import { DspReleaseStatus } from 'src/modules/distribution2/dsp-release-status/entities/dsp-release-status.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
@@ -254,6 +253,24 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant;
 
-	// @OneToMany(() => DspReleaseStatus, (dspStatuses) => dspStatuses.release)
-	// dspStatuses: DspReleaseStatus[];
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata CI info: { prefixKeyBucket, batchId }',
+	})
+	metadataCi: {
+		folderBucket: string | null;
+		folderServer: string | null;
+		batchId: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata spotify',
+	})
+	metadataSpotify: {
+		folderBucket: string | null;
+		folderServer: string | null;
+	} | null;
 }
