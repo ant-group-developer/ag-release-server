@@ -159,6 +159,21 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/gen-upc')
+	async genUpc(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<any>> {
+		const userId = req.user!.sub;
+
+		const result = await this.releaseService.genUpc(id, userId);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/parse-release')
 	async parseMetadata(
 		@Param('id', ParseUUIDPipe) id: string,

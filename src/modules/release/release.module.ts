@@ -6,6 +6,7 @@ import { Country } from '../country/entities/country.entity';
 import { DdexSpotifyService } from '../ddex/ddex-gen.service';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
+import { UpcModule } from '../external/upc/upc.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
@@ -47,6 +48,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 		SftpConnectModule,
 		SftpConfigsModule,
+		UpcModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

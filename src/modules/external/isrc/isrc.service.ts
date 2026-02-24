@@ -1,57 +1,16 @@
 import { Metadata } from '@grpc/grpc-js';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
-import { firstValueFrom, Observable, timeout } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { ISRC_CLIENT_NAME, ISRC_SERVICE_NAME } from './const/isrc.constants';
+import {
+	CreateIsrc,
+	IsrcGrpcService,
+	ListIsrcRequest,
+	ListPrefixIsrcRequest,
+} from './interfaces/isrc.grpc.interface';
 
 /* ===== REQUEST TYPES ===== */
-
-export interface ListIsrcRequest {
-	page?: number;
-	pageSize?: number;
-	search?: string;
-	code?: string;
-	recordingArtist?: string;
-	registrantName?: string;
-	yearOfProduction?: string;
-	assetType?: string;
-	prefixIsrcId?: string;
-	immersive?: boolean;
-	explicit?: boolean;
-	isAdded?: boolean;
-	sortBy?: string;
-	orderBy?: string;
-}
-
-export interface CreateIsrcRequest {
-	registrantName: string;
-	recordingArtist: string;
-	recordingTitle: string;
-	versionTitle: string;
-	assetType: string;
-	immersive: boolean;
-	explicit: boolean;
-	yearOfProduction: number;
-	duration: number;
-	isAdded: boolean;
-	prefixIsrcId: string;
-}
-
-export interface ListPrefixIsrcRequest {
-	page?: number;
-	pageSize?: number;
-	search?: string;
-	sortBy?: string;
-	orderBy?: string;
-}
-
-/* ===== gRPC CONTRACT ===== */
-
-export interface IsrcGrpcService {
-	listIsrc(data: ListIsrcRequest): Observable<any>;
-	createIsrc(data: CreateIsrcRequest): Observable<any>;
-	listPrefixIsrc(data: ListPrefixIsrcRequest): Observable<any>;
-}
 
 /* ===== SERVICE ===== */
 
@@ -77,33 +36,31 @@ export class IsrcService implements OnModuleInit {
 		return metadata;
 	}
 
+	async newISRC() {}
+
 	async list(payload: ListIsrcRequest, token: string) {
 		const metadata = this.buildMetadata(token);
 
 		return firstValueFrom(
-			(this.grpcService as any)
-				.listIsrc(payload, metadata)
-				.pipe(timeout(30000)),
+			this.grpcService.listIsrc(payload).pipe(timeout(30000)),
 		);
 	}
 
-	async create(payload: CreateIsrcRequest, token: string) {
+	async create(payload: CreateIsrc, token: string) {
 		const metadata = this.buildMetadata(token);
 
-		return firstValueFrom(
-			(this.grpcService as any)
-				.createIsrc(payload, metadata)
-				.pipe(timeout(10000)),
+		const resGRPC = await firstValueFrom(
+			this.grpcService.createIsrc(payload).pipe(timeout(10000)),
 		);
+
+		return resGRPC;
 	}
 
 	async listPrefix(payload: ListPrefixIsrcRequest, token: string) {
 		const metadata = this.buildMetadata(token);
 
 		return firstValueFrom(
-			(this.grpcService as any)
-				.listPrefixIsrc(payload, metadata)
-				.pipe(timeout(10000)),
+			this.grpcService.listPrefixIsrc(payload).pipe(timeout(10000)),
 		);
 	}
 }

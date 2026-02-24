@@ -1,11 +1,9 @@
 // src/modules/external/isrc/isrc.controller.ts
 
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
-import {
-	CreateIsrcRequest,
-	IsrcService,
-	ListIsrcRequest,
-} from './isrc.service';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { CreateIsrc, ListIsrcRequest } from './interfaces/isrc.grpc.interface';
+import { IsrcService } from './isrc.service';
 
 @Controller('isrc')
 export class IsrcController {
@@ -19,8 +17,12 @@ export class IsrcController {
 
 	// POST /isrc
 	@Post()
-	async create(@Body() body: CreateIsrcRequest, @Req() req: any) {
-		return this.isrcService.create(body, req.headers.authorization);
+	async create(@Body() body: CreateIsrc, @Req() req: any) {
+		const data = await this.isrcService.create(
+			body,
+			req.headers.authorization,
+		);
+		return new ResponseSuccess(data);
 	}
 
 	// GET /isrc/prefix

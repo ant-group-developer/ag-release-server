@@ -12,7 +12,7 @@ import { IsrcService } from './isrc.service';
 				name: ISRC_CLIENT_NAME,
 				transport: Transport.GRPC,
 				options: {
-					url: process.env.ISRC_GRPC_URL || '192.168.1.8:50051',
+					url: process.env.GRPC_ISRC_URL,
 					package: ISRC_PACKAGE_NAME,
 					protoPath: join(process.cwd(), 'proto/isrc.proto'),
 				},
