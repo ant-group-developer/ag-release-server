@@ -95,7 +95,7 @@ export class ReleaseService {
 		release.status = ReleaseStatus.PROCESSING;
 
 		if (!release.upc) {
-			release.upc = 'new_upc';
+			release.upc = '';
 		}
 
 		// validate nonDraft
@@ -106,6 +106,7 @@ export class ReleaseService {
 			throw new ResponseError({
 				message:
 					'Release validation failed. Please check the input data.',
+				data: errors,
 			});
 		}
 
@@ -352,8 +353,7 @@ export class ReleaseService {
 		}
 
 		// -------- Map dữ liệu sang CreateUpc --------
-
-		const prefixUpcId = 'a086e16e-5527-43ea-94cb-10818f86fe57';
+		const prefixUpcId = 'ac694309-730e-4fa4-8269-4b834b9cb169';
 		if (!prefixUpcId) {
 			throw new BadRequestException('Release chưa có prefixUpcId');
 		}
