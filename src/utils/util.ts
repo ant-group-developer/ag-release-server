@@ -201,3 +201,152 @@ export function genBatchId(): string {
 		pad(d.getMilliseconds(), 3)
 	);
 }
+
+import archiver from 'archiver';
+export function zipFolder(sourceDir: string, zipPath: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const output = fs.createWriteStream(zipPath);
+		const archive = archiver('zip', { zlib: { level: 9 } });
+
+		output.on('close', () => resolve());
+		archive.on('error', (err) => reject(err));
+
+		archive.pipe(output);
+		archive.directory(sourceDir, false);
+		archive.finalize();
+	});
+}
+
+import * as path from 'path';
+import SftpClient from 'ssh2-sftp-client';
+
+// export async function uploadFileToSftp({
+// 	sftp,
+// 	localFile,
+// 	remoteDir,
+// 	remoteFileName,
+// }: {
+// 	sftp: {
+// 		host: string;
+// 		port?: number;
+// 		username: string;
+// 		password?: string;
+// 		privateKey?: string | Buffer;
+// 	};
+// 	localFile: string;
+// 	remoteDir: string;
+// 	remoteFileName?: string;
+// }): Promise<{ remotePath: string }> {
+// 	return new Promise((resolve, reject) => {
+// 		if (!fs.statSync(localFile).isFile()) {
+// 			return reject(new Error('localFile is not a file'));
+// 		}
+
+// 		const conn = new Client();
+
+// 		conn.on('ready', () => {
+// 			conn.sftp((err?: Error, sftpClient?: SFTPWrapper) => {
+// 				if (err || !sftpClient) {
+// 					conn.end();
+// 					return reject(err ?? new Error('SFTP init failed'));
+// 				}
+
+// 				const fileName = remoteFileName ?? path.basename(localFile);
+// 				const remotePath = path.posix.join(remoteDir, fileName);
+
+// 				// mkdir -p (best effort)
+// 				const parts = remoteDir.split('/').filter(Boolean);
+// 				let current = '';
+// 				(async () => {
+// 					try {
+// 						for (const p of parts) {
+// 							current += `/${p}`;
+// 							await new Promise<void>((res) =>
+// 								sftpClient.mkdir(current, () => res()),
+// 							);
+// 						}
+
+// 						sftpClient.fastPut(
+// 							localFile,
+// 							remotePath,
+// 							{
+// 								concurrency: 2, // Spotify-safe max speed
+// 								chunkSize: 128 * 1024, // 128KB
+// 							},
+// 							(err?: Error) => {
+// 								conn.end();
+// 								if (err) return reject(err);
+// 								resolve({ remotePath });
+// 							},
+// 						);
+// 					} catch (e) {
+// 						conn.end();
+// 						reject(e);
+// 					}
+// 				})();
+// 			});
+// 		})
+// 			.on('error', (err: Error) => reject(err))
+// 			.connect({
+// 				host: sftp.host,
+// 				port: sftp.port ?? 22,
+// 				username: sftp.username,
+// 				password: sftp.password,
+// 				privateKey: sftp.privateKey,
+// 				keepaliveInterval: 10_000,
+// 				keepaliveCountMax: 5,
+// 			});
+// 	});
+// }
+
+export async function uploadFileToSftp({
+	sftp,
+	localFile,
+	remoteDir,
+	remoteFileName,
+}: {
+	sftp: {
+		host: string;
+		port?: number;
+		username: string;
+		password?: string;
+		privateKey?: string | Buffer;
+	};
+	localFile: string;
+	remoteDir: string;
+	remoteFileName?: string;
+}): Promise<{ remotePath: string }> {
+	const client = new SftpClient();
+
+	try {
+		if (!fs.statSync(localFile).isFile()) {
+			throw new Error('localFile is not a file');
+		}
+
+		await client.connect({
+			host: sftp.host,
+			port: sftp.port ?? 22,
+			username: sftp.username,
+			password: sftp.password,
+			privateKey: sftp.privateKey,
+			// keepaliveInterval: 10_000,
+			// keepaliveCountMax: 5,
+		});
+
+		// mkdir -p
+		await client.mkdir(remoteDir, true);
+
+		const fileName = remoteFileName ?? path.basename(localFile);
+		const remotePath = path.posix.join(remoteDir, fileName);
+
+		// FAST MODE (gần FileZilla nhất)
+		await client.put(localFile, remotePath, {
+			concurrency: 2,
+			chunkSize: 128 * 1024,
+		});
+
+		return { remotePath };
+	} finally {
+		await client.end();
+	}
+}

@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DdexSpotifyService } from 'src/modules/ddex/ddex-gen.service';
+import { UpcService } from 'src/modules/external/upc/upc.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
 	getFileCsvFromRaw,
@@ -39,6 +40,7 @@ export class ReleaseService {
 		private readonly bucketService: BucketService,
 		private readonly releaseMetadataService: ReleaseMetadataService,
 		private readonly ddexSpotifyService: DdexSpotifyService,
+		private readonly upcService: UpcService,
 	) {}
 
 	// distribution
@@ -201,7 +203,7 @@ export class ReleaseService {
 	async update(
 		id: string,
 		data: UpdateReleaseDto,
-		userId: string,
+		userId?: string,
 	): Promise<IRelease> {
 		const { labelId, primaryGenreId, subGenreId, releaseTimezoneId } = data;
 
@@ -339,5 +341,48 @@ export class ReleaseService {
 			stream: response.data,
 			contentType: response.headers['content-type'],
 		};
+	}
+
+	async genUpc(releaseId: string, userId: string) {
+		const release = await this.releaseQueryService.getOneDetail(releaseId);
+
+		// Nếu release đã có UPC
+		if (release.upc) {
+			return { upc: release.upc, alreadyExists: true };
+		}
+
+		// -------- Map dữ liệu sang CreateUpc --------
+
+		const prefixUpcId = 'a086e16e-5527-43ea-94cb-10818f86fe57';
+		if (!prefixUpcId) {
+			throw new BadRequestException('Release chưa có prefixUpcId');
+		}
+
+		const payload = {
+			prefixUpcId,
+			packagingLevel: 'Each',
+			description: release.title,
+			desc1Language: 'en',
+			brandName: release.label?.name ?? '',
+			brand1Language: 'en',
+			status: 'ACTIVE',
+			industry: 'MUSIC',
+			isVariable: false,
+			isPurchasable: true,
+			isAdded: false,
+			targetMarkets: ['VN'],
+		};
+
+		const res = await this.upcService.create(payload, 'token');
+
+		const newUpc = res.data.gtin; // theo proto UpcItem
+		if (!newUpc) {
+			throw new BadRequestException('Service UPC không trả về GTIN');
+		}
+
+		// -------- Update release --------
+		await this.releaseRepo.update(releaseId, { upc: newUpc });
+
+		return newUpc;
 	}
 }

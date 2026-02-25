@@ -88,6 +88,16 @@ export class TrackController {
 		});
 	}
 
+	@Post(':id/gen-isrc')
+	async genISRC(@Param('id') id: string) {
+		const result = await this.trackService.genISRC(id);
+
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackMessageCodeSuccess.CREATE,
+		});
+	}
+
 	@Get(':id')
 	async getDetail(
 		@Param('id') id: string,
