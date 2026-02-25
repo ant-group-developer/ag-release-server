@@ -255,14 +255,49 @@ export class ReleaseController {
 		return result;
 	}
 
+	// @Post(':id/create-and-upload-metadata-spotify')
+	// async createAndUploadMetadataSpotify(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	// await this.releaseService.createMetadataSpotifyOnServer(id);
+	// 	// const result =
+	// 	// 	await this.releaseService.uploadMetadataSpotifyToSftp(id);
+	// 	// return result;
+
+	// 	this.uploadSafe(id);
+	// }
+
+	// async uploadSafe(id: string) {
+	// 	try {
+	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
+	// 		const result =
+	// 			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+	// 	} catch (error) {
+	// 		console.log(error);
+	// 	}
+	// }
+
 	@Post(':id/create-and-upload-metadata-spotify')
-	async createAndUploadMetadataSpotify(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		await this.releaseService.createMetadataSpotifyOnServer(id);
-		const result =
-			await this.releaseService.uploadMetadataSpotifyToSftp(id);
-		return result;
+	createAndUploadMetadataSpotify(@Param('id', ParseUUIDPipe) id: string) {
+		void this.uploadSafe(id);
+
+		return {
+			message: 'Processing...',
+		};
+	}
+
+	private async uploadSafe(id: string) {
+		try {
+			await this.releaseService.createMetadataSpotifyOnServer(id);
+			return await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		} catch (error) {
+			console.log(error);
+			// tuỳ bạn: throw để client nhận 500, hoặc return lỗi có format
+			// throw error;
+			// hoặc:
+			// this.logger.error(error);
+			// throw new InternalServerErrorException('Upload metadata spotify failed');
+		}
 	}
 }

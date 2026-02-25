@@ -74,7 +74,7 @@ export class DdexSpotifyService {
 
 		this.logger.log(`[DDEX_SPOTIFY] Starting batch: ${batchId}`);
 
-		const upc = release.upc;
+		const upc = release.upc ?? 'new_upc';
 		if (!upc) {
 			throw new Error('Release missing UPC');
 		}

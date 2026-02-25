@@ -191,7 +191,7 @@ export class TrackService {
 
 		// Duration: lấy từ audioFile nếu có (tuỳ field thực tế)
 		// Nếu audioFile không có duration, bạn cần thay bằng field đúng
-		const duration = (track.audioFile as any)?.duration ?? 0;
+		const duration = track.audioFile?.duration ?? 0;
 		if (!duration || duration <= 0) {
 			throw new BadRequestException('Thiếu duration (giây) từ audioFile');
 		}
