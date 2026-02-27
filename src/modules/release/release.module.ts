@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { BucketModule } from '../bucket/bucket.module';
 import { Country } from '../country/entities/country.entity';
-import { DdexSpotifyService } from '../ddex/ddex-gen.service';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { UpcModule } from '../external/upc/upc.module';
@@ -19,7 +18,8 @@ import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { Release } from './entities/release.entity';
-import { ReleaseMetadataService } from './services/release-metadata.service';
+import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
+import { ReleaseDdexSpotifyService } from './services/release.ddex-spotify.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
@@ -57,8 +57,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseValidateService,
 		ReleaseQueryService,
 
-		ReleaseMetadataService,
-		DdexSpotifyService,
+		ReleaseDdexCiService,
+		ReleaseDdexSpotifyService,
 	],
 })
 export class ReleaseModule {}

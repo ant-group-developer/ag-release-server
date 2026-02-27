@@ -4,8 +4,9 @@ import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
-import { DdexSpotifyService } from 'src/modules/ddex/ddex-gen.service';
 import { UpcService } from 'src/modules/external/upc/upc.service';
+import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
+import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
 	getFileCsvFromRaw,
@@ -26,7 +27,7 @@ import {
 	IReleaseDetail,
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
-import { ReleaseMetadataService } from './release-metadata.service';
+import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -37,57 +38,15 @@ export class ReleaseService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
+
 		private readonly bucketService: BucketService,
-		private readonly releaseMetadataService: ReleaseMetadataService,
-		private readonly ddexSpotifyService: DdexSpotifyService,
+
+		private readonly releaseDdexCiService: ReleaseDdexCiService,
+		private readonly releaseDdexSpotifyService: ReleaseDdexSpotifyService,
+
 		private readonly upcService: UpcService,
+		private readonly trackService: TrackService,
 	) {}
-
-	// distribution
-	async parseMetadata(id: string) {
-		return await this.releaseMetadataService.parseMetadata(id);
-	}
-
-	async createMetadataCiOnServer(id: string) {
-		return await this.releaseMetadataService.createMetadataCiOnServer(id);
-	}
-
-	async createMetadataSpotifyOnServer(id: string) {
-		return await this.ddexSpotifyService.createMetadataSpotifyOnServer(id);
-	}
-
-	async uploadMetadataSpotifyToSftp(id: string) {
-		return await this.ddexSpotifyService.uploadMetadataSpotifyToSftp(id);
-	}
-
-	async uploadMetadataCiToBucket({
-		id,
-		// localDir,
-	}: {
-		id: string;
-		// localDir: string;
-	}) {
-		return await this.releaseMetadataService.uploadMetadataCiToBucket({
-			// localDir,
-			releaseId: id,
-		});
-	}
-
-	async downloadMetadataCiFromBucket(releaseId: string) {
-		return await this.releaseMetadataService.downloadMetadataCiFromBucket(
-			releaseId,
-		);
-	}
-
-	async uploadMetadataCiToSftp(id: string) {
-		return await this.releaseMetadataService.uploadMetadataCiToSftp(id);
-	}
-
-	async createMetadataCiAndUploadToBucket(id: string) {
-		return await this.releaseMetadataService.createMetadataCiAndUploadToBucket(
-			id,
-		);
-	}
 
 	// nghiệp vụ
 	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
@@ -95,7 +54,13 @@ export class ReleaseService {
 		release.status = ReleaseStatus.PROCESSING;
 
 		if (!release.upc) {
-			release.upc = '';
+			await this.genUpc(id);
+		}
+
+		for (const t of release.tracks) {
+			if (!t.isrc) {
+				await this.trackService.genISRC(t.id);
+			}
 		}
 
 		// validate nonDraft
@@ -344,7 +309,7 @@ export class ReleaseService {
 		};
 	}
 
-	async genUpc(releaseId: string, userId: string) {
+	async genUpc(releaseId: string) {
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -384,5 +349,68 @@ export class ReleaseService {
 		await this.releaseRepo.update(releaseId, { upc: newUpc });
 
 		return newUpc;
+	}
+
+	// distribution
+	async parseMetadata(id: string) {
+		return await this.releaseDdexCiService.parseMetadata(id);
+	}
+
+	// ci
+	async createMetadataCiAndUploadToSftp(id: string) {
+		return await this.releaseDdexCiService.createMetadataCiAndUploadToSftp(
+			id,
+		);
+	}
+
+	async createMetadataCiOnServer(id: string) {
+		return await this.releaseDdexCiService.createMetadataCiOnServer(id);
+	}
+
+	async uploadMetadataCiToBucket({
+		id,
+		// localDir,
+	}: {
+		id: string;
+		// localDir: string;
+	}) {
+		return await this.releaseDdexCiService.uploadMetadataCiToBucket({
+			// localDir,
+			releaseId: id,
+		});
+	}
+
+	async downloadMetadataCiFromBucket(releaseId: string) {
+		return await this.releaseDdexCiService.downloadMetadataCiFromBucket(
+			releaseId,
+		);
+	}
+
+	async uploadMetadataCiToSftp(id: string) {
+		return await this.releaseDdexCiService.uploadMetadataCiToSftp(id);
+	}
+
+	async createMetadataCiAndUploadToBucket(id: string) {
+		return await this.releaseDdexCiService.createMetadataCiAndUploadToBucket(
+			id,
+		);
+	}
+
+	// sportify
+	async createAndUploadMetadataSpotify(id: string) {
+		await this.createMetadataSpotifyOnServer(id);
+		await this.uploadMetadataSpotifyToSftp(id);
+	}
+
+	async createMetadataSpotifyOnServer(id: string) {
+		return await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
+			id,
+		);
+	}
+
+	async uploadMetadataSpotifyToSftp(id: string) {
+		return await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
+			id,
+		);
 	}
 }

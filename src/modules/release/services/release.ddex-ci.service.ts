@@ -18,9 +18,12 @@ import {
 	CiRawRow,
 } from 'src/modules/distribution/file-metadata/ci/interface';
 import { SftpConfigsService } from 'src/modules/distribution/sftp-configs/services/sftp-config.service';
-import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
-import { removeFolder, resizeCoverImageTo3000x3000 } from 'src/utils/util';
+import {
+	removeFolder,
+	resizeCoverImageTo3000x3000,
+	uploadFileToSftp,
+} from 'src/utils/util';
 import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { ReleaseException } from '../constants/release.constant';
@@ -28,21 +31,18 @@ import { Release } from '../entities/release.entity';
 import { ReleaseQueryService } from './release.query.service';
 
 @Injectable()
-export class ReleaseMetadataService {
-	private readonly logger = new Logger(ReleaseMetadataService.name);
+export class ReleaseDdexCiService {
+	private readonly logger = new Logger(ReleaseDdexCiService.name);
 
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
-
 		private readonly releaseQuery: ReleaseQueryService,
-
-		private readonly bucketSv: BucketService,
 
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 
-		private readonly sftpConnectService: SftpConnectService,
+		private readonly bucketSv: BucketService,
 		private readonly sftpConfigsService: SftpConfigsService,
 	) {}
 
@@ -53,62 +53,13 @@ export class ReleaseMetadataService {
 		// parseMetadataSpotify
 	}
 
-	// các hàm parse
-	// b1: tạo file dưới server
-	// b2: đẩy file lên bucket, lưu vào bảng release
-
-	// parse release
-	// spotify
-	// async parseMetadataSpotify(releaseId: string) {}
-	// async createMetadataOnServer(releaseId: string) {
-	// 	const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
-	// 	const batchId = Date.now().toString();
-	// 	this.logger.log(batchId);
-
-	// 	const upc = release.upc;
-	// 	if (!upc) {
-	// 		throw ReleaseException.MISSING_UPC();
-	// 	}
-
-	// 	const outputRoot = path.resolve('release_parsed', batchId);
-	// 	const templatePath = path.resolve(
-	// 		'src/modules/access-bomb/file/file-ci.xlsx',
-	// 	);
-
-	// 	const releaseDir = path.join(outputRoot, upc);
-	// 	fs.mkdirSync(releaseDir, { recursive: true });
-
-	// 	// image
-	// 	const { audioFiles, coverImage } =
-	// 		await this.fetchAudioAndImageReleaseFromGCS(release);
-
-	// 	await this.processCoverImageCi(coverImage, releaseDir, upc);
-
-	// 	// tracks
-	// 	this.processTracksCi(release, audioFiles, releaseDir, upc);
-
-	// 	await this.processFileExcelCi({
-	// 		release,
-	// 		upc,
-	// 		releaseDir,
-	// 		templatePath,
-	// 	});
-
-	// 	const outputDir = outputRoot.replace(/\\/g, '/');
-
-	// 	await this.releaseRepo.update(releaseId, {
-	// 		metadataCi: {
-	// 			...release.metadataCi,
-	// 			batchId,
-	// 			folderServer: outputDir,
-	// 		},
-	// 	});
-
-	// 	return { outputDir, batchId };
-	// }
-
 	// ci
 	async parseMetadataCi(releaseId: string) {
+		await this.createMetadataCiAndUploadToBucket(releaseId);
+		await this.uploadMetadataCiToSftp(releaseId);
+	}
+
+	async createMetadataCiAndUploadToSftp(releaseId: string) {
 		await this.createMetadataCiAndUploadToBucket(releaseId);
 		await this.uploadMetadataCiToSftp(releaseId);
 	}
@@ -124,7 +75,7 @@ export class ReleaseMetadataService {
 	}
 
 	async createMetadataCiOnServer(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 		const batchId = Date.now().toString();
 		this.logger.log(batchId);
 
@@ -177,7 +128,7 @@ export class ReleaseMetadataService {
 		// localDir: string;
 		releaseId: string;
 	}) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 		const localDir = release.metadataCi?.folderServer ?? '';
 
 		const bucketDtos: CreateBucketDto[] = [];
@@ -262,7 +213,7 @@ export class ReleaseMetadataService {
 	}
 
 	async downloadMetadataCiFromBucket(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		if (!release.metadataCi?.folderBucket) {
 			throw ReleaseException.MISSING_PREFIX_KEY_BUCKET_METADATA_CI();
@@ -275,16 +226,16 @@ export class ReleaseMetadataService {
 	}
 
 	async uploadMetadataCiToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		const sftp = await this.sftpConfigsService.getSftpCi();
 
 		await this.downloadMetadataCiFromBucket(releaseId);
 
-		await this.sftpConnectService.uploadFolder({
+		await uploadFileToSftp({
 			sftp,
 			localDir: release.metadataCi?.folderServer ?? '',
-			remoteDir: '/home/dev/import',
+			remoteDir: sftp.path ?? '',
 		});
 
 		await removeFolder(release.metadataCi?.folderServer ?? '');

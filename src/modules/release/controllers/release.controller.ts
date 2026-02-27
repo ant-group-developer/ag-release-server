@@ -166,7 +166,7 @@ export class ReleaseController {
 	): Promise<ResponseSuccess<any>> {
 		const userId = req.user!.sub;
 
-		const result = await this.releaseService.genUpc(id, userId);
+		const result = await this.releaseService.genUpc(id);
 
 		return new ResponseSuccess({
 			data: result,
@@ -182,7 +182,17 @@ export class ReleaseController {
 		const result = await this.releaseService.parseMetadata(id);
 	}
 
-	// distribution
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-and-upload-metadata-ci')
+	createMetadataCiAndUploadToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		this.releaseService
+			.createMetadataCiAndUploadToSftp(id)
+			.catch((_e) => {});
+		return new ResponseSuccess({ message: 'Đang được xử lý' });
+	}
 
 	// @RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/create-metadata-ci-on-server')
@@ -255,49 +265,15 @@ export class ReleaseController {
 		return result;
 	}
 
-	// @Post(':id/create-and-upload-metadata-spotify')
-	// async createAndUploadMetadataSpotify(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	// await this.releaseService.createMetadataSpotifyOnServer(id);
-	// 	// const result =
-	// 	// 	await this.releaseService.uploadMetadataSpotifyToSftp(id);
-	// 	// return result;
-
-	// 	this.uploadSafe(id);
-	// }
-
-	// async uploadSafe(id: string) {
-	// 	try {
-	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
-	// 		const result =
-	// 			await this.releaseService.uploadMetadataSpotifyToSftp(id);
-	// 	} catch (error) {
-	// 		console.log(error);
-	// 	}
-	// }
-
 	@Post(':id/create-and-upload-metadata-spotify')
-	createAndUploadMetadataSpotify(@Param('id', ParseUUIDPipe) id: string) {
-		void this.uploadSafe(id);
+	createAndUploadMetadataSpotify(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		this.releaseService
+			.createAndUploadMetadataSpotify(id)
+			.catch((_e) => {});
 
-		return {
-			message: 'Processing...',
-		};
-	}
-
-	private async uploadSafe(id: string) {
-		try {
-			await this.releaseService.createMetadataSpotifyOnServer(id);
-			return await this.releaseService.uploadMetadataSpotifyToSftp(id);
-		} catch (error) {
-			console.log(error);
-			// tuỳ bạn: throw để client nhận 500, hoặc return lỗi có format
-			// throw error;
-			// hoặc:
-			// this.logger.error(error);
-			// throw new InternalServerErrorException('Upload metadata spotify failed');
-		}
+		return new ResponseSuccess({ message: 'Đang được xử lý' });
 	}
 }

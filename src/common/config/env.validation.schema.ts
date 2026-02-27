@@ -49,4 +49,14 @@ export const envValidationSchema = Joi.object({
 
 	// CRYPTO_SECRET_KEY
 	CRYPTO_SECRET_KEY: Joi.string().required(),
+
+	// ===== DDEX =====
+	DDEX_PARTY_ID_SENDER: Joi.string().required(),
+	DDEX_PARTY_NAME_SENDER: Joi.string().required(),
+	DDEX_PARTY_ID_SPOTIFY: Joi.string().required(),
+	DDEX_PARTY_NAME_SPOTIFY: Joi.string().required(),
+
+	// ===== GRPC =====
+	GRPC_UPC_URL: Joi.string().required(),
+	GRPC_ISRC_URL: Joi.string().required(),
 });

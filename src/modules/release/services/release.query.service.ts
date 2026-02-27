@@ -735,7 +735,7 @@ export class ReleaseQueryService {
 		return toSnakeCaseKeys(raw);
 	}
 
-	async findOneReleaseFullCi(releaseId: string): Promise<Release> {
+	async findOneReleaseFull(releaseId: string): Promise<Release> {
 		const qb = this.releaseRepo
 			.createQueryBuilder('release')
 			.where('release.id = :releaseId', { releaseId })

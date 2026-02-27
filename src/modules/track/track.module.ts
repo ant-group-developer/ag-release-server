@@ -45,6 +45,6 @@ import { TrackService } from './services/track.service';
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [TrackService, TrackDraftService, TrackQueryService],
-	exports: [TrackDraftService],
+	exports: [TrackDraftService, TrackService],
 })
 export class TrackModule {}
