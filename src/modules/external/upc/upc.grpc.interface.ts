@@ -1,3 +1,4 @@
+import { Metadata } from '@grpc/grpc-js';
 import { Observable } from 'rxjs';
 
 /* ===== REQUEST TYPES ===== */
@@ -125,9 +126,16 @@ export interface ListPrefixUpcResponse {
 /* ===== gRPC CONTRACT ===== */
 
 export interface UpcGrpcService {
-	listUpc(data: QueryUpcRequest): Observable<QueryUpcResponse>;
-	createUpc(data: CreateUpcRequest): Observable<CreateUpcResponse>;
+	listUpc(
+		data: QueryUpcRequest,
+		metadata?: Metadata,
+	): Observable<QueryUpcResponse>;
+	createUpc(
+		data: CreateUpcRequest,
+		metadata?: Metadata,
+	): Observable<CreateUpcResponse>;
 	listPrefixUpc(
 		data: ListPrefixUpcRequest,
+		metadata?: Metadata,
 	): Observable<ListPrefixUpcResponse>;
 }

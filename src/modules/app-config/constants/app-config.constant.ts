@@ -64,7 +64,7 @@ export const appConfigDefault: AppConfigShape = {
 	generator: {
 		prefixUpcDefaultId: '',
 		prefixIsrcDefaultId: '',
-		// API_KEY: '',
+		API_KEY_GRPC_ISRC_UPC: '',
 		DDEX_PARTY_ID_SENDER: '',
 		DDEX_PARTY_NAME_SENDER: '',
 	},

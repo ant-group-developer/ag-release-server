@@ -116,6 +116,10 @@ export class UpdateGeneratorDto {
 	@IsString()
 	@IsNotEmpty()
 	DDEX_PARTY_NAME_SENDER: string;
+
+	@IsString()
+	@IsNotEmpty()
+	API_KEY_GRPC_ISRC_UPC: string;
 }
 
 export class UpdateConfigDto {

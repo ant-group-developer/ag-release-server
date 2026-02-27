@@ -31,6 +31,6 @@ export class UpcController {
 	// GET /upc/prefix
 	@Get('prefix')
 	async listPrefix(@Query() query: ListPrefixUpcRequest, @Req() req: any) {
-		return this.upcService.listPrefix(query, req.headers.authorization);
+		return this.upcService.listPrefix(query);
 	}
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { AppConfigModule } from 'src/modules/app-config/app-config.module';
 import { UPC_CLIENT_NAME, UPC_PACKAGE_NAME } from './upc.const';
 import { UpcController } from './upc.controller';
 import { UpcService } from './upc.service';
@@ -18,6 +19,7 @@ import { UpcService } from './upc.service';
 				},
 			},
 		]),
+		AppConfigModule,
 	],
 	providers: [UpcService],
 	exports: [UpcService],

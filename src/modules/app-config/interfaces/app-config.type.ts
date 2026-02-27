@@ -70,6 +70,8 @@ export interface IGenerator {
 	prefixUpcDefaultId: string;
 	prefixIsrcDefaultId: string;
 
+	API_KEY_GRPC_ISRC_UPC: string;
+
 	DDEX_PARTY_ID_SENDER: string;
 	DDEX_PARTY_NAME_SENDER: string;
 }

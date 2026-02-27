@@ -204,4 +204,13 @@ export class AppConfigService implements OnModuleInit {
 			return '';
 		}
 	}
+
+	async getAPI_KEY_GRPC_ISRC_UPC() {
+		try {
+			const r = await this.getOneOrCreate();
+			return r.config.generator.API_KEY_GRPC_ISRC_UPC;
+		} catch (error) {
+			return '';
+		}
+	}
 }
