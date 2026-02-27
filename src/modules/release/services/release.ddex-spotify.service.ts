@@ -1,10 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 
-import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { DspService } from 'src/modules/dsp/services/dsp.service';
 import { Track } from 'src/modules/track/entities/track.entity';
 import {
 	genBatchId,
@@ -42,17 +45,17 @@ interface CoverImageInfo {
 }
 
 @Injectable()
-export class ReleaseDdexSpotifyService {
+export class ReleaseDdexSpotifyService implements OnModuleInit {
 	private readonly logger = new Logger(ReleaseDdexSpotifyService.name);
 	private readonly generator = new ERN43Generator();
 
-	// Spotify DPID (Party ID)
-	private readonly DDEX_PARTY_ID_SPOTIFY: string;
-	private readonly DDEX_PARTY_NAME_SPOTIFY: string;
-
 	// Your company DPID
-	private readonly DDEX_PARTY_ID_SENDER: string;
-	private readonly DDEX_PARTY_NAME_SENDER: string;
+	private DDEX_PARTY_ID_SENDER: string;
+	private DDEX_PARTY_NAME_SENDER: string;
+
+	// Spotify DPID (Party ID)
+	private DDEX_PARTY_ID_SPOTIFY: string;
+	private DDEX_PARTY_NAME_SPOTIFY: string;
 
 	constructor(
 		@InjectRepository(Release)
@@ -60,24 +63,17 @@ export class ReleaseDdexSpotifyService {
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucketSv: BucketService,
 		private readonly sftpConfigsService: SftpConfigsService,
-		// private readonly sftpConnectService: SftpConnectService,
-		private readonly configService: ConfigService,
-	) {
-		this.DDEX_PARTY_ID_SPOTIFY = this.configService.get<string>(
-			'DDEX_PARTY_ID_SPOTIFY',
-		)!;
+		private readonly appConfigSv: AppConfigService,
+		private readonly dspSv: DspService,
+	) {}
 
-		this.DDEX_PARTY_NAME_SPOTIFY = this.configService.get<string>(
-			'DDEX_PARTY_NAME_SPOTIFY',
-		)!;
+	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
+	async handleDdexPartyUpdated() {
+		await this.reloadConfig();
+	}
 
-		this.DDEX_PARTY_ID_SENDER = this.configService.get<string>(
-			'DDEX_PARTY_ID_SENDER',
-		)!;
-
-		this.DDEX_PARTY_NAME_SENDER = this.configService.get<string>(
-			'DDEX_PARTY_NAME_SENDER',
-		)!;
+	async onModuleInit() {
+		await this.reloadConfig();
 	}
 
 	async createDdexFile({
@@ -191,6 +187,19 @@ export class ReleaseDdexSpotifyService {
 		});
 
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');
+	}
+
+	private async reloadConfig() {
+		this.DDEX_PARTY_ID_SENDER =
+			await this.appConfigSv.getDdexPartyIdSender();
+
+		this.DDEX_PARTY_NAME_SENDER =
+			await this.appConfigSv.getDdexPartyNameSender();
+
+		const { ddexId, ddexName } = await this.dspSv.getDdexPartySpotify();
+
+		this.DDEX_PARTY_ID_SPOTIFY = ddexId;
+		this.DDEX_PARTY_NAME_SPOTIFY = ddexName;
 	}
 
 	// ==================== FILE PROCESSING ====================

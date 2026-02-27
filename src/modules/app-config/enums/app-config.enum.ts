@@ -28,6 +28,7 @@ export enum AppConfigKey {
 
 	// track
 	GENERAL = 'general',
+	generator = 'generator',
 }
 
 export enum ScheduleType {

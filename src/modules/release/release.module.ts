@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
+import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Country } from '../country/entities/country.entity';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
+import { DspModule } from '../dsp/dsp.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
@@ -37,6 +39,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Country,
 		]),
 
+		AppConfigModule,
+
 		ReleaseLanguageModule,
 		ReleaseCoverArtModule,
 		ReleaseArtistModule,
@@ -49,6 +53,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		SftpConnectModule,
 		SftpConfigsModule,
 		UpcModule,
+		DspModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

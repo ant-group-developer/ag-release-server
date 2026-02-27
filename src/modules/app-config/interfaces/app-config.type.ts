@@ -66,6 +66,14 @@ export interface GeneralConfig {
 	preview: number;
 }
 
+export interface IGenerator {
+	prefixUpcDefaultId: string;
+	prefixIsrcDefaultId: string;
+
+	DDEX_PARTY_ID_SENDER: string;
+	DDEX_PARTY_NAME_SENDER: string;
+}
+
 export interface AppConfigShape {
 	auth0: Auth0Config; // Cấu hình xác thực và phân quyền bằng Auth0
 	website: WebsiteConfig; // Cấu hình website công khai (domain, branding, liên kết)
@@ -73,6 +81,7 @@ export interface AppConfigShape {
 	telegram: Telegram; // Cấu hình bot Telegram và hệ thống thông báo
 	acrCloud: AcrCloud; // Cấu hình ACRCloud dùng cho nhận diện âm thanh
 	general: GeneralConfig; // Các cấu hình chung ở cấp độ toàn hệ thống
+	generator: IGenerator;
 }
 
 export type AppConfigValueMap = {
@@ -99,4 +108,7 @@ export type AppConfigValueMap = {
 	[AppConfigKey.TELEGRAM_TOKEN]: string;
 	[AppConfigKey.CHAT_ID]: string;
 	[AppConfigKey.GENERAL]: GeneralConfig;
+
+	//
+	[AppConfigKey.generator]: IGenerator;
 };

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
@@ -46,6 +47,7 @@ export class ReleaseService {
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	// nghiệp vụ
@@ -317,8 +319,7 @@ export class ReleaseService {
 			return { upc: release.upc, alreadyExists: true };
 		}
 
-		// -------- Map dữ liệu sang CreateUpc --------
-		const prefixUpcId = 'ac694309-730e-4fa4-8269-4b834b9cb169';
+		const prefixUpcId = await this.appConfigService.getPrefixUpcDefaultId();
 		if (!prefixUpcId) {
 			throw new BadRequestException('Release chưa có prefixUpcId');
 		}

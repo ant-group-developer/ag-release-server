@@ -100,6 +100,24 @@ export class UpdateTrackConfigDto {
 	preview: number;
 }
 
+export class UpdateGeneratorDto {
+	@IsString()
+	@IsNotEmpty()
+	prefixUpcDefaultId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	prefixIsrcDefaultId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	DDEX_PARTY_ID_SENDER: string;
+
+	@IsString()
+	@IsNotEmpty()
+	DDEX_PARTY_NAME_SENDER: string;
+}
+
 export class UpdateConfigDto {
 	@IsOptional()
 	@ValidateNested()
@@ -130,4 +148,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateTrackConfigDto)
 	general?: UpdateTrackConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateGeneratorDto)
+	generator?: UpdateGeneratorDto;
 }
