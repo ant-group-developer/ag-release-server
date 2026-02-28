@@ -66,29 +66,14 @@ export class AppConfigService implements OnModuleInit {
 		return result;
 	}
 
-	// public
 	async update(payload: UpdateConfigDto) {
-		const {
-			website,
-			telegram,
-			acrCloud,
-			backupDatabase,
-			general,
-			generator,
-		} = payload;
+		const { website } = payload;
 
 		const dataDb = await this.getOneOrCreate();
 
 		const { config: configDb } = dataDb;
 
-		const {
-			website: websiteDb,
-			telegram: telegramDb,
-			acrCloud: acrCloudDb,
-			backupDatabase: backupDatabaseDb,
-			general: generalDb,
-			generator: generatorDb,
-		} = configDb;
+		const { website: websiteDb } = configDb;
 
 		if (website?.logo !== undefined) {
 			if (website.logo === null) {
@@ -103,16 +88,8 @@ export class AppConfigService implements OnModuleInit {
 			website.logo = websiteDb.logo;
 		}
 
-		dataDb.config.website = website ?? websiteDb;
-
-		dataDb.config.telegram = telegram ?? telegramDb;
-		dataDb.config.acrCloud = acrCloud ?? acrCloudDb;
-		dataDb.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
-		dataDb.config.general = general ?? generalDb;
-		dataDb.config.generator = generator ?? generatorDb;
-
 		// const
-		const result = await this.appConfigRepo.save(dataDb);
+		const result = await this.appConfigRepo.save({ ...dataDb, ...payload });
 
 		this.config = result.config;
 		this.emitEventUpdate();

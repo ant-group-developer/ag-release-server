@@ -4,11 +4,13 @@ import { firstValueFrom } from 'rxjs';
 
 import { Metadata } from '@grpc/grpc-js';
 import { timeout } from 'rxjs/operators';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { PageDto } from 'src/common/dtos/common.response.dto';
+import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
+import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
 import { UPC_CLIENT_NAME, UPC_SERVICE_NAME } from './upc.const';
+import { ListPrefixUpcDto } from './upc.dto';
 import {
 	CreateUpc,
-	ListPrefixUpcRequest,
 	QueryUpcRequest,
 	UpcGrpcService,
 } from './upc.grpc.interface';
@@ -16,32 +18,31 @@ import {
 @Injectable()
 export class UpcService implements OnModuleInit {
 	private grpcService: UpcGrpcService;
-	private x_api_key: string;
 
 	constructor(
 		@Inject(UPC_CLIENT_NAME)
 		private readonly client: ClientGrpc,
 
-		private readonly appConfigSv: AppConfigService,
+		private readonly appConfigSv: AppConfigService2,
 	) {}
 
 	onModuleInit() {
 		this.grpcService =
 			this.client.getService<UpcGrpcService>(UPC_SERVICE_NAME);
-
-		// this.x_api_key = await this.appConfigSv.getAPI_KEY_GRPC_ISRC_UPC();
-		this.x_api_key = 'ak_6230e487bdfc7ed3083c465d1fb0f4728b4';
 	}
 
 	private buildMetadata() {
-		const x_api_key = this.x_api_key;
+		const x_api_key =
+			this.appConfigSv.getValue(
+				AppConfigKey2.GENERATOR_API_KEY_GRPC_ISRC_UPC,
+			) ?? '';
 
 		const md = new Metadata();
 		md.set('x-api-key', x_api_key);
 		return md;
 	}
 
-	async list(payload: QueryUpcRequest, token: string) {
+	async list(payload: QueryUpcRequest) {
 		return firstValueFrom(
 			this.grpcService
 				.listUpc(payload, this.buildMetadata())
@@ -49,7 +50,7 @@ export class UpcService implements OnModuleInit {
 		);
 	}
 
-	async create(payload: CreateUpc, token: string) {
+	async create(payload: CreateUpc) {
 		return firstValueFrom(
 			this.grpcService
 				.createUpc(payload, this.buildMetadata())
@@ -57,11 +58,25 @@ export class UpcService implements OnModuleInit {
 		);
 	}
 
-	async listPrefix(payload: ListPrefixUpcRequest) {
-		return firstValueFrom(
+	async listPrefix(payload: ListPrefixUpcDto) {
+		const { keyword, fieldOrder } = payload;
+
+		const res = await firstValueFrom(
 			this.grpcService
-				.listPrefixUpc(payload, this.buildMetadata())
+				.listPrefixUpc(
+					{
+						...payload,
+						search: keyword?.[0] ?? '',
+						sortBy: fieldOrder,
+					},
+					this.buildMetadata(),
+				)
 				.pipe(timeout(10_000)),
 		);
+
+		return new PageDto({
+			items: res?.data ?? [],
+			metadata: res?.metadata ?? {},
+		});
 	}
 }

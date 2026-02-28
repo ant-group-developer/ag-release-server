@@ -35,3 +35,8 @@ export enum VirtualColumnRelease {
 export const VirtualColumnReleaseArr = Object.values(
 	VirtualColumnRelease,
 ) as string[];
+
+export enum ReleaseCodeConst {
+	CI = 'CI',
+	SPOTIFY = 'SPOTIFY',
+}
