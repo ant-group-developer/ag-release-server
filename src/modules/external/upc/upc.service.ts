@@ -5,7 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import { Metadata } from '@grpc/grpc-js';
 import { timeout } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
+import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
 import { UPC_CLIENT_NAME, UPC_SERVICE_NAME } from './upc.const';
 import { ListPrefixUpcDto } from './upc.dto';
 import {
@@ -17,25 +18,24 @@ import {
 @Injectable()
 export class UpcService implements OnModuleInit {
 	private grpcService: UpcGrpcService;
-	private x_api_key: string;
 
 	constructor(
 		@Inject(UPC_CLIENT_NAME)
 		private readonly client: ClientGrpc,
 
-		private readonly appConfigSv: AppConfigService,
+		private readonly appConfigSv: AppConfigService2,
 	) {}
 
 	onModuleInit() {
 		this.grpcService =
 			this.client.getService<UpcGrpcService>(UPC_SERVICE_NAME);
-
-		// this.x_api_key = await this.appConfigSv.getAPI_KEY_GRPC_ISRC_UPC();
-		this.x_api_key = 'ak_3b68755e0f82dd774700bf3641409cac2df';
 	}
 
 	private buildMetadata() {
-		const x_api_key = this.x_api_key;
+		const x_api_key =
+			this.appConfigSv.getValue(
+				AppConfigKey2.GENERATOR_API_KEY_GRPC_ISRC_UPC,
+			) ?? '';
 
 		const md = new Metadata();
 		md.set('x-api-key', x_api_key);

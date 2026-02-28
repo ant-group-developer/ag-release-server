@@ -5,7 +5,8 @@ import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
+import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
 import { ISRC_CLIENT_NAME, ISRC_SERVICE_NAME } from './const/isrc.constants';
 import {
 	CreateIsrc,
@@ -17,23 +18,27 @@ import { ListPrefixIsrcDto } from './isrc.dto';
 @Injectable()
 export class IsrcService implements OnModuleInit {
 	private grpcService: IsrcGrpcService;
-	private x_api_key: string;
 
 	constructor(
 		@Inject(ISRC_CLIENT_NAME)
 		private readonly client: ClientGrpc,
-		private readonly appConfigSv: AppConfigService,
+		private readonly appConfigSv: AppConfigService2,
 	) {}
 
 	onModuleInit() {
 		this.grpcService =
 			this.client.getService<IsrcGrpcService>(ISRC_SERVICE_NAME);
-		this.x_api_key = 'ak_3b68755e0f82dd774700bf3641409cac2df';
 	}
 
 	private buildMetadata(): Metadata {
 		const md = new Metadata();
-		md.set('x-api-key', this.x_api_key);
+
+		const x_api_key =
+			this.appConfigSv.getValue(
+				AppConfigKey2.GENERATOR_API_KEY_GRPC_ISRC_UPC,
+			) ?? '';
+
+		md.set('x-api-key', x_api_key);
 		return md;
 	}
 

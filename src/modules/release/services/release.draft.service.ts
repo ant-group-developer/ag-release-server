@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
@@ -16,7 +15,6 @@ import {
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
-import { ReleaseStatus } from '../enum/release.enum';
 import { IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -100,11 +98,11 @@ export class ReleaseDraftService {
 
 		const release = await this.releaseQueryService.findOne(id);
 
-		if (release.status !== ReleaseStatus.DRAFT) {
-			throw new ResponseError({
-				message: 'Error release.status',
-			});
-		}
+		// if (release.status !== ReleaseStatus.DRAFT) {
+		// 	throw new ResponseError({
+		// 		message: 'Error release.status',
+		// 	});
+		// }
 
 		await this.releaseValidateService.handleValidateDataUpdate({
 			release,
