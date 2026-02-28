@@ -3,6 +3,7 @@ import { DdexController } from './ddex.controller';
 import { DDEXService } from './ddex.service';
 
 @Module({
+	// imports: [IsrcModule],
 	controllers: [DdexController],
 	providers: [DDEXService],
 	exports: [DDEXService],

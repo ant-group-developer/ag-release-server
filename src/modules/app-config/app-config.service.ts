@@ -68,8 +68,14 @@ export class AppConfigService implements OnModuleInit {
 
 	// public
 	async update(payload: UpdateConfigDto) {
-		const { website, telegram, acrCloud, backupDatabase, general } =
-			payload;
+		const {
+			website,
+			telegram,
+			acrCloud,
+			backupDatabase,
+			general,
+			generator,
+		} = payload;
 
 		const dataDb = await this.getOneOrCreate();
 
@@ -81,6 +87,7 @@ export class AppConfigService implements OnModuleInit {
 			acrCloud: acrCloudDb,
 			backupDatabase: backupDatabaseDb,
 			general: generalDb,
+			generator: generatorDb,
 		} = configDb;
 
 		if (website?.logo !== undefined) {
@@ -102,6 +109,7 @@ export class AppConfigService implements OnModuleInit {
 		dataDb.config.acrCloud = acrCloud ?? acrCloudDb;
 		dataDb.config.backupDatabase = backupDatabase ?? backupDatabaseDb;
 		dataDb.config.general = general ?? generalDb;
+		dataDb.config.generator = generator ?? generatorDb;
 
 		// const
 		const result = await this.appConfigRepo.save(dataDb);
@@ -127,8 +135,14 @@ export class AppConfigService implements OnModuleInit {
 	}
 
 	getValue<K extends AppConfigKey>(key: K): AppConfigValueMap[K] {
-		const { acrCloud, telegram, website, backupDatabase, general } =
-			this.config;
+		const {
+			acrCloud,
+			telegram,
+			website,
+			backupDatabase,
+			general,
+			generator,
+		} = this.config;
 
 		const values: AppConfigValueMap = {
 			[AppConfigKey.ALL]: this.config,
@@ -156,8 +170,47 @@ export class AppConfigService implements OnModuleInit {
 
 			// track
 			[AppConfigKey.GENERAL]: general,
+			[AppConfigKey.generator]: generator,
 		};
 
 		return values[key];
+	}
+
+	// get value
+	async getPrefixIsrcDefaultId() {
+		const r = await this.getOneOrCreate();
+		return r.config.generator.prefixIsrcDefaultId;
+	}
+
+	async getPrefixUpcDefaultId() {
+		const r = await this.getOneOrCreate();
+		return r.config.generator.prefixUpcDefaultId;
+	}
+
+	async getDdexPartyIdSender() {
+		try {
+			const r = await this.getOneOrCreate();
+			return r.config.generator.DDEX_PARTY_ID_SENDER;
+		} catch (error) {
+			return '';
+		}
+	}
+
+	async getDdexPartyNameSender() {
+		try {
+			const r = await this.getOneOrCreate();
+			return r.config.generator.DDEX_PARTY_NAME_SENDER;
+		} catch (error) {
+			return '';
+		}
+	}
+
+	async getAPI_KEY_GRPC_ISRC_UPC() {
+		try {
+			const r = await this.getOneOrCreate();
+			return r.config.generator.API_KEY_GRPC_ISRC_UPC;
+		} catch (error) {
+			return '';
+		}
 	}
 }

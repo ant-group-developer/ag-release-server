@@ -49,4 +49,8 @@ export const envValidationSchema = Joi.object({
 
 	// CRYPTO_SECRET_KEY
 	CRYPTO_SECRET_KEY: Joi.string().required(),
+
+	// ===== GRPC =====
+	GRPC_UPC_URL: Joi.string().required(),
+	GRPC_ISRC_URL: Joi.string().required(),
 });

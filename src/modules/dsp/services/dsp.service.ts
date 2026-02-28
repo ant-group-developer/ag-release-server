@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import difference from 'lodash/difference';
 import {
@@ -6,6 +7,7 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
+import { AppEvent } from 'src/common/enums/common';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';
@@ -18,6 +20,7 @@ import { DspQueryService } from './dsp.query.service';
 
 @Injectable()
 export class DspService {
+	private readonly logger = new Logger(DspService.name);
 	constructor(
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
@@ -26,7 +29,13 @@ export class DspService {
 		private readonly dspQueryService: DspQueryService,
 
 		private readonly dspActionService: DspActionService,
+		private readonly eventEmitter: EventEmitter2,
 	) {}
+
+	private emitEventDdexParty() {
+		this.logger.log(`Event: ${AppEvent.UPDATE_DDEX_PARTY}}`);
+		this.eventEmitter.emit(AppEvent.UPDATE_DDEX_PARTY);
+	}
 
 	// create
 	async handleCreate(data: CreateDspDto, userId: string) {
@@ -56,6 +65,7 @@ export class DspService {
 			modifierId: userId,
 			creatorId: userId,
 		});
+		this.emitEventDdexParty();
 		return await this.dspRepo.save(dsp);
 	}
 
@@ -200,6 +210,8 @@ export class DspService {
 			await this.bucketService.deletePublicFile(dsp.picture);
 		}
 
+		this.emitEventDdexParty();
+
 		await this.dspRepo.update(dsp.id, { ...data, modifierId: userId });
 		return await this.findOne(dsp.id);
 	}
@@ -295,5 +307,19 @@ export class DspService {
 				data: between,
 			});
 		}
+	}
+
+	async getDdexPartySpotify() {
+		const dsp = await this.dspRepo.findOne({
+			where: {
+				code: 'SPOTIFY',
+			},
+		});
+
+		if (!dsp) {
+			return { ddexId: '', ddexName: '' };
+		}
+
+		return { ddexId: dsp.ddexId ?? '', ddexName: dsp.ddexName ?? '' };
 	}
 }

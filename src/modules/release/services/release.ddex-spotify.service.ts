@@ -1,9 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 
+import { OnEvent } from '@nestjs/event-emitter';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { DspService } from 'src/modules/dsp/services/dsp.service';
 import { Track } from 'src/modules/track/entities/track.entity';
 import {
 	genBatchId,
@@ -13,12 +17,8 @@ import {
 	zipFolder,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import { BucketService } from '../bucket/services/bucket.service';
-import { SftpConfigsService } from '../distribution/sftp-configs/services/sftp-config.service';
-import { SftpConnectService } from '../distribution/sftp-connect/sftp-connect.service';
-import { Release } from '../release/entities/release.entity';
-import { ReleaseQueryService } from '../release/services/release.query.service';
-import { ERN43Generator } from './generators/ern43.generator';
+import { BucketService } from '../../bucket/services/bucket.service';
+import { ERN43Generator } from '../../ddex/generators/ern43.generator';
 import {
 	DDEXContributor,
 	DDEXData,
@@ -27,7 +27,10 @@ import {
 	DDEXParty,
 	DDEXRelease,
 	DDEXResource,
-} from './interfaces/ddex-input.interface';
+} from '../../ddex/interfaces/ddex-input.interface';
+import { SftpConfigsService } from '../../distribution/sftp-configs/services/sftp-config.service';
+import { Release } from '../entities/release.entity';
+import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -42,17 +45,17 @@ interface CoverImageInfo {
 }
 
 @Injectable()
-export class DdexSpotifyService {
-	private readonly logger = new Logger(DdexSpotifyService.name);
+export class ReleaseDdexSpotifyService implements OnModuleInit {
+	private readonly logger = new Logger(ReleaseDdexSpotifyService.name);
 	private readonly generator = new ERN43Generator();
 
-	// Spotify DPID (Party ID)
-	private readonly SPOTIFY_DPID = 'PADPIDA2011072101T';
-	private readonly SPOTIFY_NAME = 'Spotify';
-
 	// Your company DPID
-	private readonly SENDER_DPID = 'PADPIDA20250804056';
-	private readonly SENDER_NAME = 'ANT MUSIC LLC';
+	private DDEX_PARTY_ID_SENDER: string;
+	private DDEX_PARTY_NAME_SENDER: string;
+
+	// Spotify DPID (Party ID)
+	private DDEX_PARTY_ID_SPOTIFY: string;
+	private DDEX_PARTY_NAME_SPOTIFY: string;
 
 	constructor(
 		@InjectRepository(Release)
@@ -60,15 +63,59 @@ export class DdexSpotifyService {
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucketSv: BucketService,
 		private readonly sftpConfigsService: SftpConfigsService,
-		private readonly sftpConnectService: SftpConnectService,
+		private readonly appConfigSv: AppConfigService,
+		private readonly dspSv: DspService,
 	) {}
+
+	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
+	async handleDdexPartyUpdated() {
+		await this.reloadConfig();
+	}
+
+	async onModuleInit() {
+		await this.reloadConfig();
+	}
+
+	async createDdexFile({
+		releaseId,
+		outputDir,
+	}: {
+		releaseId: string;
+		outputDir: string;
+	}) {
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+
+		const ddexData = this.parseDDEXDataFromRelease(release);
+
+		const xmlContent = this.generator.generate(ddexData);
+		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
+		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
+		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
+	}
+
+	createBatchCompleteFile({
+		batchId,
+		upc,
+		outputDir,
+	}: {
+		batchId: string;
+		upc: string;
+		outputDir: string;
+	}) {
+		const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
+		const batchXmlPath = path.join(
+			outputDir,
+			`BatchComplete_${batchId}.xml`,
+		);
+		fs.writeFileSync(batchXmlPath, batchCompleteXml, 'utf-8');
+		this.logger.log(`[BATCH_XML_CREATED] ${batchXmlPath}`);
+	}
 
 	/**
 	 * Main entry point - tạo metadata Spotify trên server
-	 * Tương tự createMetadataSpotifyOnServer của CI
 	 */
 	async createMetadataSpotifyOnServer(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		const batchId = genBatchId();
 
@@ -93,28 +140,19 @@ export class DdexSpotifyService {
 			await this.fetchAudioAndImageReleaseFromGCS(release);
 
 		// 3. Process and save cover image
-		await this.processCoverImageSpotify(coverImage, resourcesDir, upc);
+		await this.processCoverImageSpotify({
+			coverImage,
+			outputDir: resourcesDir,
+			upc,
+		});
 
 		// 4. Process and save audio files
-		this.processAudioFilesSpotify(audioFiles, resourcesDir);
+		this.processAudioFilesSpotify({ audioFiles, outputDir: resourcesDir });
 
-		// 5. Parse DB data to DDEX structure
-		const ddexData = this.parseDDEXDataFromRelease(release, batchId);
+		// 5. DDEX file
+		await this.createDdexFile({ releaseId, outputDir: releaseDir });
 
-		// 6. Generate main DDEX XML
-		const xmlContent = this.generator.generate(ddexData);
-		const mainXmlPath = path.join(releaseDir, `${upc}.xml`);
-		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
-		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
-
-		// 7. Generate BatchComplete XML
-		const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
-		const batchXmlPath = path.join(
-			releaseDir,
-			`BatchComplete_${batchId}.xml`,
-		);
-		fs.writeFileSync(batchXmlPath, batchCompleteXml, 'utf-8');
-		this.logger.log(`[BATCH_XML_CREATED] ${batchXmlPath}`);
+		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
 		// ZIP
 		const zipPath = `${outputRoot}.zip`;
@@ -138,23 +176,30 @@ export class DdexSpotifyService {
 	}
 
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFullCi(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		const sftp = await this.sftpConfigsService.getSftpSpotify();
 
-		// await this.sftpConnectService.uploadFile({
-		// 	sftp,
-		// 	localFile: release.metadataSpotify?.folderServer ?? '',
-		// 	remoteDir: '/home/spotify',
-		// });
-
 		await uploadFileToSftp({
 			sftp,
-			localFile: release.metadataSpotify?.folderServer ?? '',
-			remoteDir: '/home/spotify',
+			localDir: release.metadataSpotify?.folderServer ?? '',
+			remoteDir: sftp.path,
 		});
 
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');
+	}
+
+	private async reloadConfig() {
+		this.DDEX_PARTY_ID_SENDER =
+			await this.appConfigSv.getDdexPartyIdSender();
+
+		this.DDEX_PARTY_NAME_SENDER =
+			await this.appConfigSv.getDdexPartyNameSender();
+
+		const { ddexId, ddexName } = await this.dspSv.getDdexPartySpotify();
+
+		this.DDEX_PARTY_ID_SPOTIFY = ddexId;
+		this.DDEX_PARTY_NAME_SPOTIFY = ddexName;
 	}
 
 	// ==================== FILE PROCESSING ====================
@@ -219,18 +264,22 @@ export class DdexSpotifyService {
 	 * Process cover image - resize and save to resources folder
 	 * Format: resources/{UPC}.jpg
 	 */
-	private async processCoverImageSpotify(
-		coverImage: CoverImageInfo,
-		resourcesDir: string,
-		upc: string,
-	): Promise<void> {
+	private async processCoverImageSpotify({
+		coverImage,
+		outputDir,
+		upc,
+	}: {
+		coverImage: CoverImageInfo;
+		outputDir: string;
+		upc: string;
+	}): Promise<void> {
 		const img = await resizeCoverImageTo3000x3000({
 			buffer: coverImage.buffer,
 		});
 
 		const ext = this.normalizeImageExtension(coverImage.extension);
 		const fileName = `${upc}${ext}`;
-		const outputPath = path.join(resourcesDir, fileName);
+		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
 		this.logger.log(`[COVER_SAVED] ${fileName}`);
@@ -241,15 +290,18 @@ export class DdexSpotifyService {
 	 * Format: resources/{ISRC}_T{trackNo}S.{ext}
 	 * Example: resources/QT6KL2500010_T1S.wav
 	 */
-	private processAudioFilesSpotify(
-		audioFiles: AudioFileInfo[],
-		resourcesDir: string,
-	) {
+	private processAudioFilesSpotify({
+		audioFiles,
+		outputDir,
+	}: {
+		audioFiles: AudioFileInfo[];
+		outputDir: string;
+	}) {
 		for (const audio of audioFiles) {
 			const ext = this.normalizeAudioExtension(audio.extension);
 			const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
 			const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
-			const filePath = path.join(resourcesDir, fileName);
+			const filePath = path.join(outputDir, fileName);
 
 			fs.writeFileSync(filePath, audio.buffer);
 			this.logger.log(`[AUDIO_SAVED] ${fileName}`);
@@ -261,10 +313,7 @@ export class DdexSpotifyService {
 	/**
 	 * Parse Release entity sang DDEXData structure
 	 */
-	private parseDDEXDataFromRelease(
-		release: Release,
-		batchId: string,
-	): DDEXData {
+	private parseDDEXDataFromRelease(release: Release): DDEXData {
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
 
 		// Build all sections
@@ -275,14 +324,14 @@ export class DdexSpotifyService {
 
 		return {
 			messageHeader: {
-				messageId: batchId.slice(-5), // Last 5 digits
+				messageId: '00001', // Last 5 digits
 				sender: {
-					partyId: this.SENDER_DPID,
-					partyName: this.SENDER_NAME,
+					partyId: this.DDEX_PARTY_ID_SENDER,
+					partyName: this.DDEX_PARTY_NAME_SENDER,
 				},
 				recipient: {
-					partyId: this.SPOTIFY_DPID,
-					partyName: this.SPOTIFY_NAME,
+					partyId: this.DDEX_PARTY_ID_SPOTIFY,
+					partyName: this.DDEX_PARTY_NAME_SPOTIFY,
 				},
 			},
 			parties,
@@ -312,7 +361,7 @@ export class DdexSpotifyService {
 				// Add Spotify ID if available
 				if (artist.spotifyId) {
 					party.partyId = {
-						namespace: this.SPOTIFY_DPID,
+						namespace: this.DDEX_PARTY_ID_SPOTIFY,
 						value: `spotify:artist:${artist.spotifyId}`,
 					};
 				}
@@ -431,8 +480,8 @@ export class DdexSpotifyService {
 			resources.push({
 				reference: `A${trackNo}`,
 				type: 'SoundRecording',
-				isrc: track.isrc || undefined,
-				title: this.buildTrackTitle(track),
+				isrc: track.isrc || 'abc',
+				title: this.buildTrackTitle(track) ?? 'abc',
 				displayArtistName,
 				displayArtists,
 				contributors,
@@ -447,7 +496,7 @@ export class DdexSpotifyService {
 					text:
 						track.pLineOwner ||
 						release.pLineOwner ||
-						this.SENDER_NAME,
+						this.DDEX_PARTY_NAME_SENDER,
 				},
 				technicalDetails: {
 					reference: `T${trackNo}S`,
@@ -468,7 +517,7 @@ export class DdexSpotifyService {
 			imageType: 'FrontCoverImage',
 			cLine: {
 				year: release.cLineYear || new Date().getFullYear(),
-				text: release.cLineOwner || this.SENDER_NAME,
+				text: release.cLineOwner || this.DDEX_PARTY_NAME_SENDER,
 			},
 			technicalDetails: {
 				reference: `T${coverArtIndex}`,
@@ -535,11 +584,11 @@ export class DdexSpotifyService {
 			labelRef,
 			pLine: {
 				year: release.pLineYear || new Date().getFullYear(),
-				text: release.pLineOwner || this.SENDER_NAME,
+				text: release.pLineOwner || this.DDEX_PARTY_NAME_SENDER,
 			},
 			cLine: {
 				year: release.cLineYear || new Date().getFullYear(),
-				text: release.cLineOwner || this.SENDER_NAME,
+				text: release.cLineOwner || this.DDEX_PARTY_NAME_SENDER,
 			},
 			genre: release.primaryGenre?.name || 'Pop',
 			releaseDate: this.formatDateYYYYMMDD(release?.releaseDate),
@@ -606,15 +655,15 @@ export class DdexSpotifyService {
     <MessageHeader>
         <MessageId>${batchId}</MessageId>
         <MessageSender>
-            <PartyId>${this.SENDER_DPID}</PartyId>
+            <PartyId>${this.DDEX_PARTY_ID_SENDER}</PartyId>
             <PartyName>
-                <FullName>${this.SENDER_NAME}</FullName>
+                <FullName>${this.DDEX_PARTY_NAME_SENDER}</FullName>
             </PartyName>
         </MessageSender>
         <MessageRecipient>
-            <PartyId>${this.SPOTIFY_DPID}</PartyId>
+            <PartyId>${this.DDEX_PARTY_ID_SPOTIFY}</PartyId>
             <PartyName>
-                <FullName>${this.SPOTIFY_NAME}</FullName>
+                <FullName>${this.DDEX_PARTY_NAME_SPOTIFY}</FullName>
             </PartyName>
         </MessageRecipient>
         <MessageCreatedDateTime>${now}</MessageCreatedDateTime>

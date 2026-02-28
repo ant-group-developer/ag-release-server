@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
@@ -21,6 +22,7 @@ export class TrackService {
 		private readonly trackQueryService: TrackQueryService,
 
 		private readonly isrcService: IsrcService,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	async submit(
@@ -153,22 +155,25 @@ export class TrackService {
 		const track = await this.trackQueryService.getDetailOne(trackId);
 
 		// Nếu đã có ISRC thì tuỳ bạn: return luôn hoặc throw
-		if (track.isrc) return { isrc: track.isrc, alreadyExists: true };
+		if (track.isrc) return track.isrc;
 
 		// -------- Map dữ liệu từ Track sang CreateIsrc --------
 		// Artist: lấy nghệ sĩ chính (tuỳ cấu trúc TrackArtist của bạn)
 		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? '';
 
 		if (!mainArtistName) {
-			throw new BadRequestException('Track thiếu thông tin nghệ sĩ');
+			throw new ResponseError({
+				message: 'Bài hát thiếu thông tin nghệ sĩ',
+				data: track.title,
+			});
 		}
 
 		// Registrant: lấy từ P-Line owner hoặc release label (tuỳ domain)
 		const registrantName = track.release?.label?.name ?? '';
 		if (!registrantName) {
-			throw new BadRequestException(
-				'Thiếu thông tin registrantName (P-Line owner/label)',
-			);
+			throw new ResponseError({
+				message: 'Thiếu thông tin registrantName (P-Line owner/label)',
+			});
 		}
 
 		// Version title: ưu tiên version, không có thì "Original"
@@ -197,8 +202,8 @@ export class TrackService {
 		}
 
 		// Prefix: thay bằng logic thật (config/db)
-		// const prefixIsrcId = await this.getDefaultPrefixIsrcId(); // bạn tự implement
-		const prefixIsrcId = 'b601c40e-198e-4e42-b907-ddfa077c4b16';
+		const prefixIsrcId =
+			await this.appConfigService.getPrefixIsrcDefaultId();
 		if (!prefixIsrcId) {
 			throw new BadRequestException('Chưa cấu hình prefixIsrcId');
 		}

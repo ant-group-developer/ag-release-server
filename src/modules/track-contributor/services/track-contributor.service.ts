@@ -255,4 +255,16 @@ export class TrackContributorService {
 			}
 		}
 	}
+
+	async deleteRecordOfTrackSafe({ trackId }: { trackId: string }) {
+		await this.deleteRecordOfTrack({ trackId }).catch((_e) => {
+			this.logger.log(_e.message);
+		});
+	}
+
+	async deleteRecordOfTrack({ trackId }: { trackId: string }) {
+		await this.trackContributorRepo.delete({
+			trackId,
+		});
+	}
 }

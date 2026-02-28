@@ -13,6 +13,7 @@ services:
         command: yarn start:prod
         restart: unless-stopped
         volumes:
+            - ./proto:/app/proto:ro
             - ./credential.json:/app/credential.json:ro
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro

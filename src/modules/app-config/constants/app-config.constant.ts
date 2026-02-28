@@ -60,4 +60,12 @@ export const appConfigDefault: AppConfigShape = {
 		sampleLength: 60,
 		preview: 60 + 42,
 	},
+
+	generator: {
+		prefixUpcDefaultId: '',
+		prefixIsrcDefaultId: '',
+		API_KEY_GRPC_ISRC_UPC: '',
+		DDEX_PARTY_ID_SENDER: '',
+		DDEX_PARTY_NAME_SENDER: '',
+	},
 };
