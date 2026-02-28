@@ -4,11 +4,12 @@ import { firstValueFrom } from 'rxjs';
 
 import { Metadata } from '@grpc/grpc-js';
 import { timeout } from 'rxjs/operators';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { UPC_CLIENT_NAME, UPC_SERVICE_NAME } from './upc.const';
+import { ListPrefixUpcDto } from './upc.dto';
 import {
 	CreateUpc,
-	ListPrefixUpcRequest,
 	QueryUpcRequest,
 	UpcGrpcService,
 } from './upc.grpc.interface';
@@ -41,7 +42,7 @@ export class UpcService implements OnModuleInit {
 		return md;
 	}
 
-	async list(payload: QueryUpcRequest, token: string) {
+	async list(payload: QueryUpcRequest) {
 		return firstValueFrom(
 			this.grpcService
 				.listUpc(payload, this.buildMetadata())
@@ -49,7 +50,7 @@ export class UpcService implements OnModuleInit {
 		);
 	}
 
-	async create(payload: CreateUpc, token: string) {
+	async create(payload: CreateUpc) {
 		return firstValueFrom(
 			this.grpcService
 				.createUpc(payload, this.buildMetadata())
@@ -57,11 +58,25 @@ export class UpcService implements OnModuleInit {
 		);
 	}
 
-	async listPrefix(payload: ListPrefixUpcRequest) {
-		return firstValueFrom(
+	async listPrefix(payload: ListPrefixUpcDto) {
+		const { keyword, fieldOrder } = payload;
+
+		const res = await firstValueFrom(
 			this.grpcService
-				.listPrefixUpc(payload, this.buildMetadata())
+				.listPrefixUpc(
+					{
+						...payload,
+						search: keyword?.[0] ?? '',
+						sortBy: fieldOrder,
+					},
+					this.buildMetadata(),
+				)
 				.pipe(timeout(10_000)),
 		);
+
+		return new PageDto({
+			items: res?.data ?? [],
+			metadata: res?.metadata ?? {},
+		});
 	}
 }

@@ -225,7 +225,7 @@ export class TrackService {
 		// -------- Call gRPC tạo ISRC --------
 		// token: tuỳ bạn lấy ở đâu (service-to-service thì có thể dùng internal token)
 		// const token = await this.getInternalToken(); // bạn tự implement
-		const res = await this.isrcService.create(payload, 'token');
+		const res = await this.isrcService.create(payload);
 		// created giả định có created.isrc (bạn sửa theo response thật)
 		const newIsrc = res.data.code;
 		if (!newIsrc) {

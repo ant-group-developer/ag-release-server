@@ -339,7 +339,7 @@ export class ReleaseService {
 			targetMarkets: ['VN'],
 		};
 
-		const res = await this.upcService.create(payload, 'token');
+		const res = await this.upcService.create(payload);
 
 		const newUpc = res.data.gtin; // theo proto UpcItem
 		if (!newUpc) {

@@ -1,3 +1,5 @@
+// isrc.grpc.interface.ts
+import { Metadata } from '@grpc/grpc-js';
 import { Observable } from 'rxjs';
 
 export interface ListIsrcRequest {
@@ -17,43 +19,6 @@ export interface ListIsrcRequest {
 	orderBy?: string;
 }
 
-export interface CreateIsrc {
-	/** Tên đơn vị đăng ký ISRC */
-	registrantName: string;
-
-	/** Nghệ sĩ chính */
-	recordingArtist: string;
-
-	/** Tên bản ghi */
-	recordingTitle: string;
-
-	/** Phiên bản (Remix, Live...) */
-	versionTitle: string;
-
-	/** Loại tài sản (SOUND_RECORDING...) */
-	assetType: string;
-
-	/** Có phải immersive audio */
-	immersive: boolean;
-
-	/** Có nội dung explicit */
-	explicit: boolean;
-
-	/** Năm sản xuất */
-	yearOfProduction: number;
-
-	/** Thời lượng (giây) */
-	duration: number;
-
-	/** Có phải bản bổ sung */
-	isAdded: boolean;
-
-	/** ID Prefix ISRC */
-	prefixIsrcId: string;
-}
-
-export interface CreateIsrcRequest extends CreateIsrc {}
-
 export interface IsrcItem {
 	id: string;
 	code: string;
@@ -64,12 +29,39 @@ export interface IsrcItem {
 	assetType: string;
 	immersive: boolean;
 	explicit: boolean;
-	yearOfProduction: string; // proto đang để string
-	duration: number; // int32 -> number
+	yearOfProduction: string;
+	duration: number;
 	isAdded: boolean;
 	prefixIsrcId: string;
-	createdAt: string; // ISO datetime string
-	updatedAt: string; // ISO datetime string
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PaginationMeta {
+	totalItems: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface ListIsrcResponse {
+	data: IsrcItem[];
+	metadata: PaginationMeta;
+	message: string;
+}
+
+export interface CreateIsrc {
+	registrantName: string;
+	recordingArtist: string;
+	recordingTitle: string;
+	versionTitle: string;
+	assetType: string;
+	immersive: boolean;
+	explicit: boolean;
+	yearOfProduction: number;
+	duration: number;
+	isAdded: boolean;
+	prefixIsrcId: string;
 }
 
 export interface CreateIsrcResponse {
@@ -85,10 +77,32 @@ export interface ListPrefixIsrcRequest {
 	orderBy?: string;
 }
 
-/* ===== gRPC CONTRACT ===== */
+export interface PrefixIsrcItem {
+	id: string;
+	code: string;
+	maxQuantity: number;
+	createdAt: string;
+	updatedAt: string;
+	type: string;
+}
+
+export interface ListPrefixIsrcResponse {
+	data: PrefixIsrcItem[];
+	metadata: PaginationMeta;
+	message: string;
+}
 
 export interface IsrcGrpcService {
-	listIsrc(data: ListIsrcRequest): Observable<any>;
-	createIsrc(data: CreateIsrcRequest): Observable<CreateIsrcResponse>;
-	listPrefixIsrc(data: ListPrefixIsrcRequest): Observable<any>;
+	listIsrc(
+		data: ListIsrcRequest,
+		metadata?: Metadata,
+	): Observable<ListIsrcResponse>;
+	createIsrc(
+		data: CreateIsrc,
+		metadata?: Metadata,
+	): Observable<CreateIsrcResponse>;
+	listPrefixIsrc(
+		data: ListPrefixIsrcRequest,
+		metadata?: Metadata,
+	): Observable<ListPrefixIsrcResponse>;
 }
