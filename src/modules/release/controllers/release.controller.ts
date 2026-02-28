@@ -293,9 +293,9 @@ export class ReleaseController {
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
 	) {
-		this.releaseService
-			.createAndUploadMetadataSpotify(id)
-			.catch((_e) => {});
+		this.releaseService.createAndUploadMetadataSpotify(id).catch((_e) => {
+			console.log(_e);
+		});
 
 		return new ResponseSuccess({ message: 'Đang được xử lý' });
 	}

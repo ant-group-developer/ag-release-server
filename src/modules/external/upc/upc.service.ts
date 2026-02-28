@@ -31,7 +31,7 @@ export class UpcService implements OnModuleInit {
 			this.client.getService<UpcGrpcService>(UPC_SERVICE_NAME);
 
 		// this.x_api_key = await this.appConfigSv.getAPI_KEY_GRPC_ISRC_UPC();
-		this.x_api_key = 'ak_6230e487bdfc7ed3083c465d1fb0f4728b4';
+		this.x_api_key = 'ak_3b68755e0f82dd774700bf3641409cac2df';
 	}
 
 	private buildMetadata() {

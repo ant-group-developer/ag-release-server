@@ -1,6 +1,7 @@
 // src/modules/sftp-configs/services/sftp-config.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ReleaseCodeConst } from 'src/modules/release/enum/release.enum';
 import { decryptSecretSafe, encryptSecret } from 'src/utils/util.encrypt';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
@@ -32,7 +33,7 @@ export class SftpConfigsService {
 			relations: { aggregator: true },
 			where: {
 				aggregator: {
-					name: 'CI',
+					code: ReleaseCodeConst.CI,
 				},
 			},
 		});
@@ -49,7 +50,7 @@ export class SftpConfigsService {
 			relations: { aggregator: true },
 			where: {
 				aggregator: {
-					name: 'Spotify',
+					code: ReleaseCodeConst.SPOTIFY,
 				},
 			},
 		});

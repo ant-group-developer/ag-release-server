@@ -28,7 +28,7 @@ export class IsrcService implements OnModuleInit {
 	onModuleInit() {
 		this.grpcService =
 			this.client.getService<IsrcGrpcService>(ISRC_SERVICE_NAME);
-		this.x_api_key = 'ak_6230e487bdfc7ed3083c465d1fb0f4728b4';
+		this.x_api_key = 'ak_3b68755e0f82dd774700bf3641409cac2df';
 	}
 
 	private buildMetadata(): Metadata {

@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
+import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
@@ -22,7 +23,7 @@ export class TrackService {
 		private readonly trackQueryService: TrackQueryService,
 
 		private readonly isrcService: IsrcService,
-		private readonly appConfigService: AppConfigService,
+		private readonly appConfigService: AppConfigService2,
 	) {}
 
 	async submit(
@@ -202,8 +203,10 @@ export class TrackService {
 		}
 
 		// Prefix: thay bằng logic thật (config/db)
-		const prefixIsrcId =
-			await this.appConfigService.getPrefixIsrcDefaultId();
+		const prefixIsrcId = this.appConfigService.getValue(
+			AppConfigKey2.GENERATOR_PREFIX_ISRC_DEFAULT_ID,
+		);
+
 		if (!prefixIsrcId) {
 			throw new BadRequestException('Chưa cấu hình prefixIsrcId');
 		}

@@ -3,8 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
+import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import {
+	CreateUpc,
+	UpcIndustry,
+	UpcLanguage,
+	UpcPackagingLevel,
+	UpcStatus,
+	UpcYesNo,
+} from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
 import { TrackService } from 'src/modules/track/services/track.service';
@@ -47,7 +56,7 @@ export class ReleaseService {
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
-		private readonly appConfigService: AppConfigService,
+		private readonly appConfigService: AppConfigService2,
 	) {}
 
 	// nghiệp vụ
@@ -319,23 +328,32 @@ export class ReleaseService {
 			return { upc: release.upc, alreadyExists: true };
 		}
 
-		const prefixUpcId = await this.appConfigService.getPrefixUpcDefaultId();
+		const prefixUpcId = this.appConfigService.getValue(
+			AppConfigKey2.GENERATOR_PREFIX_UPC_DEFAULT_ID,
+		);
+
 		if (!prefixUpcId) {
 			throw new BadRequestException('Release chưa có prefixUpcId');
 		}
 
-		const payload = {
+		const payload: CreateUpc = {
 			prefixUpcId,
-			packagingLevel: 'Each',
+
+			packagingLevel: UpcPackagingLevel.EACH,
+
 			description: release.title,
-			desc1Language: 'en',
+			desc1Language: UpcLanguage.EN,
+
 			brandName: release.label?.name ?? '',
-			brand1Language: 'en',
-			status: 'ACTIVE',
-			industry: 'MUSIC',
-			isVariable: false,
-			isPurchasable: true,
-			isAdded: false,
+			brand1Language: UpcLanguage.EN,
+
+			status: UpcStatus.IN_USE, // không có ACTIVE
+			industry: UpcIndustry.GENERAL, // không có MUSIC
+
+			isVariable: UpcYesNo.NO,
+			isPurchasable: UpcYesNo.YES,
+			isAdded: UpcYesNo.NO,
+
 			targetMarkets: ['VN'],
 		};
 
