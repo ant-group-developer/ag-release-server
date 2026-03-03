@@ -270,5 +270,228 @@ export function generateExample() {
 		data: albumExample,
 	});
 
-	return { singleXml, albumXml };
+	// Generate ERN 3.8.2 Add
+	const ern382Xml = ddexService.generate({
+		version: '3.8.2',
+		data: ern382AddExample,
+	});
+
+	return { singleXml, albumXml, ern382Xml };
 }
+
+// ==================== ERN 3.8.2 Add Example ====================
+export const ern382AddExample: DDEXData = {
+	messageHeader: {
+		messageThreadId: 'R1000001',
+		messageId: '1111',
+		messageFileName: '4061707105869.xml',
+		sender: {
+			partyId: 'PADPIDA20250111111',
+			partyName: 'TEST Content Provider',
+			isDPID: true,
+		},
+		recipient: {
+			partyId: 'PADPIDA20250111111',
+			partyName: 'Singing Network Technology shanghai CO. LTD.',
+			isDPID: true,
+		},
+		createdDateTime: '2025-11-25T12:43:22+08:00',
+		messageControlType: 'LiveMessage',
+	},
+	updateIndicator: 'OriginalMessage',
+	parties: [], // ERN 3.8.2 does not use PartyList
+	resources: [
+		// Sound Recording
+		{
+			reference: 'A1',
+			type: 'SoundRecording',
+			isrc: 'DEAR41867226',
+			title: 'TEST Audio',
+			subTitle: 'TEST Version',
+			languageOfPerformance: 'zh',
+			duration: 'PT2M45S',
+			isArtistRelated: false,
+			applicableTerritoryCode: 'CN',
+			displayArtists: [
+				{
+					partyRef: 'TEST Artist',
+					role: 'MainArtist',
+					sequenceNumber: 1,
+					applicableTerritoryCode: 'zh-Hans',
+				},
+			],
+			resourceContributors: [
+				{
+					fullName: 'TEST Artist',
+					role: 'MainArtist',
+					sequenceNumber: 1,
+					languageAndScriptCode: 'zh-Hans',
+				},
+			],
+			indirectResourceContributors: [
+				{
+					fullName: 'TEST Lyricist',
+					role: 'Lyricist',
+					languageAndScriptCode: 'zh-Hans',
+				},
+				{
+					fullName: 'TEST Composer',
+					role: 'Composer',
+					languageAndScriptCode: 'zh-Hans',
+				},
+				{
+					fullName: 'TEST Producer',
+					role: 'UserDefined',
+					userDefinedValue: 'Producer',
+					languageAndScriptCode: 'zh-Hans',
+				},
+			],
+			pLine: { year: 2024, text: 'Kanjian Music' },
+			sequenceNumber: 1,
+			genre: 'POP',
+			subGenre: 'K-POP',
+			technicalDetails: {
+				reference: 'T_audio_DEAR41867226',
+				fileUri: 'DEAR41867226.mp3',
+				fileName: 'DEAR41867226.mp3',
+				filePath: 'resources/',
+				audioCodecType: 'MP3',
+				bitRate: 128,
+				numberOfChannels: '2',
+				samplingRate: 44100,
+				bitsPerSample: 16,
+				hashSum: '9661274900293eead3a3fbe7966a59bc',
+				hashSumAlgorithmType: 'MD5',
+			},
+		},
+		// Image (Cover Art)
+		{
+			reference: 'A3',
+			type: 'Image',
+			imageType: 'FrontCoverImage',
+			applicableTerritoryCode: 'CN',
+			imageCodecType: 'JPEG',
+			imageHeight: 3000,
+			imageWidth: 3000,
+			technicalDetails: {
+				reference: 'T_cover_4061707105869',
+				fileUri: '4061707105869.jpg',
+				fileName: '4061707105869.jpg',
+				filePath: 'resources/',
+				hashSum: '349c0c8c02d53d508106d1341c7d6e38',
+				hashSumAlgorithmType: 'MD5',
+			},
+		},
+		// Text (Lyrics)
+		{
+			reference: 'A2',
+			type: 'Text',
+			textType: 'LyricText',
+			territoryCodes: ['CN', 'US'],
+			technicalDetails: {
+				reference: 'T_lyrics_DEAR41867226',
+				fileUri: 'DEAR41867226.txt',
+				fileName: 'DEAR41867226.txt',
+				filePath: 'resources/',
+				hashSum: '9661274900293eead3a3fbe7966a59bc_lyric',
+				hashSumAlgorithmType: 'MD5',
+			},
+		},
+	],
+	releases: [
+		// Main Release (Album)
+		{
+			reference: 'R0',
+			type: 'Album',
+			icpn: '4061707105869',
+			isEan: false,
+			title: 'TEST CONTENT',
+			displayArtistName: 'TEST Artist',
+			displayArtists: [
+				{
+					partyRef: 'TEST Artist',
+					role: 'MainArtist',
+					sequenceNumber: 1,
+					applicableTerritoryCode: 'zh-Hans',
+				},
+			],
+			labelRef: 'Kanjian Music',
+			labelName: 'Kanjian Music',
+			territoryCodes: ['CN'],
+			genre: 'POP',
+			subGenre: 'K-POP',
+			releaseDate: '2025-11-25',
+			isMainRelease: true,
+			resourceRefs: ['A1', 'A2', 'A3'],
+			linkedResourceRefs: [{ ref: 'A2', linkDescription: 'Lyrics' }],
+			pLine: { year: 2024, text: 'Kanjian Music' },
+			cLine: { year: 2024, text: 'Kanjian Music' },
+		},
+		// Track Release
+		{
+			reference: 'R1',
+			type: 'TrackRelease',
+			icpn: '',
+			isrc: 'DEAR41867226',
+			title: 'TEST Audio',
+			subTitle: 'TEST Version',
+			displayArtistName: 'TEST Artist',
+			displayArtists: [
+				{
+					partyRef: 'TEST Artist',
+					role: 'MainArtist',
+					sequenceNumber: 1,
+					applicableTerritoryCode: 'zh-Hans',
+				},
+			],
+			labelRef: 'Kanjian Music',
+			labelName: 'Kanjian Music',
+			territoryCodes: ['CN'],
+			genre: '1',
+			subGenre: '1',
+			releaseDate: '2025-11-25',
+			resourceRefs: ['A1', 'A2'],
+			linkedResourceRefs: [{ ref: 'A2', linkDescription: 'Lyrics' }],
+			pLine: { year: 2024, text: 'Kanjian Music' },
+			cLine: { year: 2024, text: 'Kanjian Music' },
+		},
+	],
+	deals: [
+		// Release R0 - SubscriptionModel + ConditionalDownload
+		{
+			releaseRef: 'R0',
+			territories: ['CN', 'US'],
+			validityStartDateTime: '2025-11-25T12:43:22+08:00',
+			validityEndDateTime: '2099-12-31T00:00:00Z',
+			commercialModelTypes: ['SubscriptionModel'],
+			useTypes: ['ConditionalDownload'],
+		},
+		// Release R0 - AdvertisementSupportedModel + OnDemandStream
+		{
+			releaseRef: 'R0',
+			territories: ['CN', 'US'],
+			validityStartDateTime: '2025-11-25T12:43:22+08:00',
+			validityEndDateTime: '2099-12-31T00:00:00Z',
+			commercialModelTypes: ['AdvertisementSupportedModel'],
+			useTypes: ['OnDemandStream'],
+		},
+		// Release R1 - SubscriptionModel + ConditionalDownload
+		{
+			releaseRef: 'R1',
+			territories: ['CN', 'US'],
+			validityStartDateTime: '2025-11-25T12:43:22+08:00',
+			validityEndDateTime: '2099-12-31T00:00:00Z',
+			commercialModelTypes: ['SubscriptionModel'],
+			useTypes: ['ConditionalDownload'],
+		},
+		// Release R1 - AdvertisementSupportedModel + OnDemandStream
+		{
+			releaseRef: 'R1',
+			territories: ['CN', 'US'],
+			validityStartDateTime: '2025-11-25T12:43:22+08:00',
+			validityEndDateTime: '2099-12-31T00:00:00Z',
+			commercialModelTypes: ['AdvertisementSupportedModel'],
+			useTypes: ['OnDemandStream'],
+		},
+	],
+};
