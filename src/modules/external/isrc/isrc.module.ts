@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { AppConfigModule } from 'src/modules/app-config/app-config.module';
 import { ISRC_CLIENT_NAME, ISRC_PACKAGE_NAME } from './const/isrc.constants';
 import { IsrcController } from './isrc.controller';
 import { IsrcService } from './isrc.service';
@@ -18,6 +19,8 @@ import { IsrcService } from './isrc.service';
 				},
 			},
 		]),
+
+		AppConfigModule,
 	],
 	providers: [IsrcService],
 	exports: [IsrcService],

@@ -7,14 +7,13 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import { Track } from 'src/modules/track/entities/track.entity';
 import {
 	genBatchId,
 	removeFolder,
 	resizeCoverImageTo3000x3000,
-	uploadFileToSftp,
-	zipFolder,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { BucketService } from '../../bucket/services/bucket.service';
@@ -65,6 +64,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly sftpConfigsService: SftpConfigsService,
 		private readonly appConfigSv: AppConfigService,
 		private readonly dspSv: DspService,
+
+		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
 	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
@@ -155,13 +156,13 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
 		// ZIP
-		const zipPath = `${outputRoot}.zip`;
-		await zipFolder(outputRoot, zipPath);
+		// const zipPath = `${outputRoot}.zip`;
+		// await zipFolder(outputRoot, zipPath);
 
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
 				...release.metadataSpotify,
-				folderServer: zipPath.replace(/\\/g, '/'),
+				folderServer: outputRoot.replace(/\\/g, '/'),
 				// batchId,
 			},
 		});
@@ -171,7 +172,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		return {
 			// batchId,
 			outputDir: outputRoot,
-			zipPath,
+			outputRoot,
 		};
 	}
 
@@ -180,10 +181,10 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const sftp = await this.sftpConfigsService.getSftpSpotify();
 
-		await uploadFileToSftp({
+		await this.sftpConnectService.uploadFolder({
 			sftp,
 			localDir: release.metadataSpotify?.folderServer ?? '',
-			remoteDir: sftp.path,
+			remoteDir: sftp.path ?? '',
 		});
 
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');

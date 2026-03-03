@@ -240,9 +240,9 @@ export async function uploadFileToSftp({
 	const client = new SftpClient();
 
 	try {
-		if (!fs.statSync(localDir).isFile()) {
-			throw new Error('localDir is not a file');
-		}
+		// if (!fs.statSync(localDir).isFile()) {
+		// 	throw new Error('localDir is not a file');
+		// }
 
 		await client.connect({
 			host: sftp.host,

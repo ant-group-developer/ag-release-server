@@ -96,54 +96,6 @@ export class SftpConnectService {
 		}
 	}
 
-	/**
-	 * Upload local folder → remote folder (recursive)
-	 */
-	async sendFolderTo(
-		config: SftpMetadata,
-		localDir: string,
-		remoteDir: string,
-	): Promise<void> {
-		const client = this.createClient();
-
-		try {
-			await client.connect({
-				host: config.host,
-				port: config.port ?? 22,
-				username: config.username,
-				password: config.password,
-				privateKey: config.privateKey,
-				readyTimeout: 10_000,
-			});
-
-			await this.uploadDirectory(client, localDir, remoteDir);
-		} finally {
-			await client.end();
-		}
-	}
-
-	// ===== PRIVATE =====
-	private async uploadDirectory(
-		client: SftpClient,
-		localDir: string,
-		remoteDir: string,
-	): Promise<void> {
-		await client.mkdir(remoteDir, true);
-
-		const items = fs.readdirSync(localDir, { withFileTypes: true });
-
-		for (const item of items) {
-			const localPath = path.join(localDir, item.name);
-			const remotePath = path.posix.join(remoteDir, item.name);
-
-			if (item.isDirectory()) {
-				await this.uploadDirectory(client, localPath, remotePath);
-			} else {
-				await client.put(localPath, remotePath);
-			}
-		}
-	}
-
 	async uploadFile({
 		sftp,
 		localFile,
