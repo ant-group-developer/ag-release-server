@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
-import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import {
 	CreateUpc,
@@ -56,7 +55,7 @@ export class ReleaseService {
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
-		private readonly appConfigService: AppConfigService2,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	// nghiệp vụ
@@ -328,9 +327,8 @@ export class ReleaseService {
 			return { upc: release.upc, alreadyExists: true };
 		}
 
-		const prefixUpcId = this.appConfigService.getValue(
-			AppConfigKey2.GENERATOR_PREFIX_UPC_DEFAULT_ID,
-		);
+		const prefixUpcId =
+			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
 		if (!prefixUpcId) {
 			throw new BadRequestException('Release chưa có prefixUpcId');
@@ -415,7 +413,7 @@ export class ReleaseService {
 		);
 	}
 
-	// sportify
+	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
 		await this.createMetadataSpotifyOnServer(id);
 		await this.uploadMetadataSpotifyToSftp(id);

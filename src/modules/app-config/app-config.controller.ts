@@ -6,16 +6,15 @@ import {
 } from '../auth/decorators/auth.decorator';
 import { AppConfigService } from './app-config.service';
 import { UpdateConfigDto } from './dtos/app-config.dto';
-import { AppConfigKey } from './enums/app-config.enum';
 
-@Controller('app-config')
+@Controller('app-config/v2')
 export class AppConfigController {
 	constructor(private readonly appConfigService: AppConfigService) {}
 
 	@SystemAdminOnly()
 	@Get()
 	get() {
-		const data = this.appConfigService.getValue(AppConfigKey.ALL);
+		const data = this.appConfigService.getCache();
 		return new ResponseSuccess({ data });
 	}
 

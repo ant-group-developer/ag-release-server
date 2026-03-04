@@ -7,6 +7,7 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { DDEXService } from 'src/modules/ddex';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -17,7 +18,6 @@ import {
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { BucketService } from '../../bucket/services/bucket.service';
-import { ERN43Generator } from '../../ddex/generators/ern43.generator';
 import {
 	DDEXContributor,
 	DDEXData,
@@ -46,11 +46,6 @@ interface CoverImageInfo {
 @Injectable()
 export class ReleaseDdexSpotifyService implements OnModuleInit {
 	private readonly logger = new Logger(ReleaseDdexSpotifyService.name);
-	private readonly generator = new ERN43Generator();
-
-	// Your company DPID
-	private DDEX_PARTY_ID_SENDER: string;
-	private DDEX_PARTY_NAME_SENDER: string;
 
 	// Spotify DPID (Party ID)
 	private DDEX_PARTY_ID_SPOTIFY: string;
@@ -65,17 +60,10 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly appConfigSv: AppConfigService,
 		private readonly dspSv: DspService,
 
+		private readonly dDEXService: DDEXService,
+
 		private readonly sftpConnectService: SftpConnectService,
 	) {}
-
-	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
-	async handleDdexPartyUpdated() {
-		await this.reloadConfig();
-	}
-
-	async onModuleInit() {
-		await this.reloadConfig();
-	}
 
 	async createDdexFile({
 		releaseId,
@@ -88,7 +76,11 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const ddexData = this.parseDDEXDataFromRelease(release);
 
-		const xmlContent = this.generator.generate(ddexData);
+		const xmlContent = this.dDEXService.generate({
+			version: '4.3',
+			data: ddexData,
+		});
+
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
 		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
@@ -155,10 +147,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
-		// ZIP
-		// const zipPath = `${outputRoot}.zip`;
-		// await zipFolder(outputRoot, zipPath);
-
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
 				...release.metadataSpotify,
@@ -170,7 +158,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		this.logger.log(`[COMPLETED] Batch ${batchId} - ${upc}`);
 
 		return {
-			// batchId,
 			outputDir: outputRoot,
 			outputRoot,
 		};
@@ -190,13 +177,16 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');
 	}
 
+	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
+	async handleDdexPartyUpdated() {
+		await this.reloadConfig();
+	}
+
+	async onModuleInit() {
+		await this.reloadConfig();
+	}
+
 	private async reloadConfig() {
-		this.DDEX_PARTY_ID_SENDER =
-			await this.appConfigSv.getDdexPartyIdSender();
-
-		this.DDEX_PARTY_NAME_SENDER =
-			await this.appConfigSv.getDdexPartyNameSender();
-
 		const { ddexId, ddexName } = await this.dspSv.getDdexPartySpotify();
 
 		this.DDEX_PARTY_ID_SPOTIFY = ddexId;
@@ -327,8 +317,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			messageHeader: {
 				messageId: '00001', // Last 5 digits
 				sender: {
-					partyId: this.DDEX_PARTY_ID_SENDER,
-					partyName: this.DDEX_PARTY_NAME_SENDER,
+					partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+					partyName: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
 				},
 				recipient: {
 					partyId: this.DDEX_PARTY_ID_SPOTIFY,
@@ -497,7 +487,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					text:
 						track.pLineOwner ||
 						release.pLineOwner ||
-						this.DDEX_PARTY_NAME_SENDER,
+						this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
 				},
 				technicalDetails: {
 					reference: `T${trackNo}S`,
@@ -518,7 +508,9 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			imageType: 'FrontCoverImage',
 			cLine: {
 				year: release.cLineYear || new Date().getFullYear(),
-				text: release.cLineOwner || this.DDEX_PARTY_NAME_SENDER,
+				text:
+					release.cLineOwner ||
+					this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
 			},
 			technicalDetails: {
 				reference: `T${coverArtIndex}`,
@@ -585,11 +577,15 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			labelRef,
 			pLine: {
 				year: release.pLineYear || new Date().getFullYear(),
-				text: release.pLineOwner || this.DDEX_PARTY_NAME_SENDER,
+				text:
+					release.pLineOwner ||
+					this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
 			},
 			cLine: {
 				year: release.cLineYear || new Date().getFullYear(),
-				text: release.cLineOwner || this.DDEX_PARTY_NAME_SENDER,
+				text:
+					release.cLineOwner ||
+					this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
 			},
 			genre: release.primaryGenre?.name || 'Pop',
 			releaseDate: this.formatDateYYYYMMDD(release?.releaseDate),
@@ -656,9 +652,9 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
     <MessageHeader>
         <MessageId>${batchId}</MessageId>
         <MessageSender>
-            <PartyId>${this.DDEX_PARTY_ID_SENDER}</PartyId>
+            <PartyId>${this.appConfigSv.DDEX_PARTY_ID_SENDER()}</PartyId>
             <PartyName>
-                <FullName>${this.DDEX_PARTY_NAME_SENDER}</FullName>
+                <FullName>${this.appConfigSv.DDEX_PARTY_NAME_SENDER()}</FullName>
             </PartyName>
         </MessageSender>
         <MessageRecipient>
