@@ -310,9 +310,7 @@ export class ERN43Generator {
 			releaseElements.push(this.buildMainRelease(mainRelease, resources));
 		}
 
-		// Track releases (R1, R2, ...)
-		const trackReleases = releases.filter((r) => r.reference !== 'R0');
-		// Build track releases from resources
+		// Track releases from sound recordings (R1, R2, ...)
 		const soundRecordings = resources.filter(
 			(r) => r.type === 'SoundRecording',
 		);
