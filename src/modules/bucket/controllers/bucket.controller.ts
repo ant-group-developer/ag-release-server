@@ -40,6 +40,7 @@ export class BucketGcsController {
 		});
 	}
 
+	// @PublicRoute()
 	@Post('private/bulk')
 	async bulkCreate(@Body() data: BulkCreateBucketDto) {
 		const result = await this.bucketService.bulkCreate(data);

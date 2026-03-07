@@ -100,6 +100,13 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/full')
+	async findOneFull(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.findOneFull(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id/download/csv-metadata')
 	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileCsvMetadata(id);
