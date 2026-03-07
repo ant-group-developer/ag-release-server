@@ -18,6 +18,9 @@ import { FileEntity } from '../entities/bucket.file.entity';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService } from './bucket.file.service';
 import { BucketGcsService } from './bucket.gcs.service';
+import { ReleaseTemplateFile } from '../entities/release-template-file.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class BucketService {
@@ -26,11 +29,13 @@ export class BucketService {
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketFileService: BucketFileService,
-	) {}
+		@InjectRepository(ReleaseTemplateFile)
+		private readonly releaseTemplateFileRepo: Repository<ReleaseTemplateFile>,
+	) { }
 
 	@OnEvent(AppEvent.DELETE_LOGO)
 	handleDeleteLogo(urlPublic: string) {
-		this.deletePublicFileSafe(urlPublic).catch((_e) => {});
+		this.deletePublicFileSafe(urlPublic).catch((_e) => { });
 	}
 
 	// create
@@ -63,6 +68,17 @@ export class BucketService {
 			urlUpload,
 			key: keyForMapping,
 		};
+	}
+
+	async createTemplate(data: CreateBucketDto): Promise<IResCreateBucket> {
+		const bucket = await this.create(data);
+
+		await this.releaseTemplateFileRepo.save(
+			this.releaseTemplateFileRepo.create({
+				file_id: bucket.fileId,
+			}),
+		);
+		return bucket;
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
@@ -144,6 +160,22 @@ export class BucketService {
 			isPublic: false,
 			fileName,
 		});
+	}
+
+	async getUrlDownTemplateFile() {
+		const [template] = await this.releaseTemplateFileRepo.find({
+			relations: ['file'],
+			order: {
+				createdAt: 'DESC',
+			},
+			take: 1,
+		});
+
+		if (!template || !template.file) {
+			throw new Error('Template file not found');
+		}
+
+		return await this.getUrlDown(template.file.id);
 	}
 
 	async getDetail(id: string) {

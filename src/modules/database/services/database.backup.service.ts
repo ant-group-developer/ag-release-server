@@ -1,13 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
 import * as path from 'path';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { AppEvent, DateFormat } from 'src/common/enums/common';
+import { DateFormat } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
@@ -18,30 +16,8 @@ import { StatusBackup } from '../enums/database.enum';
 const execFileAsync = promisify(execFile);
 
 @Injectable()
-export class DatabaseBackupService implements OnModuleInit {
+export class DatabaseBackupService {
 	private logger = new Logger(DatabaseBackupService.name);
-
-	private configDB: {
-		type: string;
-		host: string;
-		port: number;
-		username: string;
-		password: string;
-		database: string;
-	};
-
-	private notifyOnFailed: boolean;
-	private notifyOnSuccess: boolean;
-
-	private toDrive: boolean;
-	private toGcs: boolean;
-
-	private bucketName: string;
-	private baseUrlGcs: string;
-
-	private baseUrlConsoleGcsBackup: string;
-	private fileName: string;
-	private shell: string;
 
 	constructor(
 		@InjectRepository(Backup)
@@ -50,56 +26,7 @@ export class DatabaseBackupService implements OnModuleInit {
 		private readonly appConfigService: AppConfigService,
 		private readonly configService: ConfigService,
 		private readonly notificationService: NotificationService,
-	) {
-		this.configDB = {
-			type: 'postgres',
-			host: this.configService.get<string>('DB_HOST')!,
-			port: this.configService.get<number>('DB_PORT') || 5432,
-			username: this.configService.get<string>('DB_USERNAME')!,
-			password: this.configService.get<string>('DB_PASSWORD')!,
-			database: this.configService.get<string>('DB_DATABASE')!,
-		};
-
-		this.bucketName = this.configService.get<string>(
-			'GCS_PROTECTED_BUCKET',
-		)!;
-		this.baseUrlGcs = this.configService.get<string>(
-			'BACKUP_BASE_URL_GCS',
-		)!;
-		this.baseUrlConsoleGcsBackup = this.configService.get<string>(
-			'BACKUP_BASE_URL_CONSOLE_GCS',
-		)!;
-	}
-
-	onModuleInit() {
-		this.reloadConfig();
-	}
-
-	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
-	handleAppConfigUpdated() {
-		this.reloadConfig();
-	}
-
-	private reloadConfig() {
-		this.toDrive = this.appConfigService.getValue(
-			AppConfigKey.DATABASE_TO_DRIVE,
-		);
-
-		this.toGcs = this.appConfigService.getValue(
-			AppConfigKey.DATABASE_TO_GCS,
-		);
-
-		this.notifyOnSuccess = this.appConfigService.getValue(
-			AppConfigKey.NOTIFY_ON_SUCCESS,
-		);
-
-		this.notifyOnFailed = this.appConfigService.getValue(
-			AppConfigKey.NOTIFY_ON_FAILED,
-		);
-
-		this.fileName = this.appConfigService.getValue(AppConfigKey.FILE_NAME);
-		this.shell = this.appConfigService.getValue(AppConfigKey.SHELL);
-	}
+	) {}
 
 	async eventBackup() {
 		const data = await this.newJobBackup();
@@ -147,8 +74,11 @@ export class DatabaseBackupService implements OnModuleInit {
 	}
 
 	private generateBackupFileName(): string {
+		const fileName =
+			this.appConfigService.cache.config.backupDatabase.fileName;
+
 		return generateFileNameWithTimestamp(
-			this.fileName,
+			fileName,
 			DateFormat['YYYY-MM-DD_HH-mm-ss'],
 		);
 	}
@@ -159,20 +89,51 @@ export class DatabaseBackupService implements OnModuleInit {
 	}
 
 	private buildBackupRecord(fileName: string) {
+		const cfg = this.appConfigService.cache.config.backupDatabase;
+
+		const bucketName = this.configService.get<string>(
+			'GCS_PROTECTED_BUCKET',
+		)!;
+		const baseUrlGcs = this.configService.get<string>(
+			'BACKUP_BASE_URL_GCS',
+		)!;
+		const baseUrlConsoleGcsBackup = this.configService.get<string>(
+			'BACKUP_BASE_URL_CONSOLE_GCS',
+		)!;
+
 		return {
-			urlDrive: this.toDrive
+			urlDrive: cfg.toDrive
 				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
 				: null,
-			urlGcs: this.toGcs
-				? `${this.baseUrlGcs}/${this.bucketName}/backups/${fileName}`
+
+			urlGcs: cfg.toGcs
+				? `${baseUrlGcs}/${bucketName}/backups/${fileName}`
 				: null,
-			urlFolderGcs: this.getUrlConsoleGcsBackup(fileName),
+
+			urlFolderGcs: baseUrlConsoleGcsBackup + `/${fileName}`,
 		};
 	}
 
 	private async runScriptBackup(backupPath: string) {
-		const { username, host, port, database, password } = this.configDB;
 		const scriptBackupPath = './scripts/script.backup.sh';
+
+		// DB config đọc trực tiếp từ env/config
+		const username = this.configService.get<string>('DB_USERNAME')!;
+		const host = this.configService.get<string>('DB_HOST')!;
+		const port = this.configService.get<number>('DB_PORT') || 5432;
+		const database = this.configService.get<string>('DB_DATABASE')!;
+		const password = this.configService.get<string>('DB_PASSWORD')!;
+
+		// Backup config đọc trực tiếp từ cache
+		const cfg = this.appConfigService.cache.config.backupDatabase;
+
+		// GCS/Rclone config đọc trực tiếp
+		const bucketName = this.configService.get<string>(
+			'GCS_PROTECTED_BUCKET',
+		)!;
+		const rcloneConfigPath = this.configService.get<string>(
+			'BACKUP_RCLONE_CONFIG_PATH',
+		)!;
 
 		try {
 			const { stdout } = await execFileAsync(scriptBackupPath, {
@@ -183,13 +144,11 @@ export class DatabaseBackupService implements OnModuleInit {
 					DB_NAME: database,
 					DB_PASSWORD: password,
 
-					RCLONE_CONFIG: this.configService.get<string>(
-						'BACKUP_RCLONE_CONFIG_PATH',
-					)!,
-					BUCKET_NAME: this.bucketName,
+					RCLONE_CONFIG: rcloneConfigPath,
+					BUCKET_NAME: bucketName,
 					BACKUP_PATH: backupPath,
 				},
-				shell: this.shell,
+				shell: cfg.shell,
 			});
 
 			return {
@@ -229,18 +188,15 @@ export class DatabaseBackupService implements OnModuleInit {
 		return Math.floor((Date.now() - start) / 1000);
 	}
 
-	private getUrlConsoleGcsBackup(fileName: string) {
-		return this.baseUrlConsoleGcsBackup + `/${fileName}`;
-	}
-
 	//
 	async sendNotificationBackup(result: Backup) {
-		const { status } = result;
+		const cfg = this.appConfigService.cache.config.backupDatabase;
 
-		if (status === StatusBackup.SUCCESS && this.notifyOnSuccess) {
+		if (result.status === StatusBackup.SUCCESS && cfg.notifyOnSuccess) {
 			await this.notificationService.notifyOnBackupSuccess(result);
 		}
-		if (status === StatusBackup.FAILED && this.notifyOnFailed) {
+
+		if (result.status === StatusBackup.FAILED && cfg.notifyOnFailed) {
 			await this.notificationService.notifyOnBackupFailed(result);
 		}
 	}

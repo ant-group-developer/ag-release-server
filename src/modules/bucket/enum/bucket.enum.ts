@@ -24,4 +24,5 @@ export enum UploadPurpose {
 	// metadata
 	release_metadata_ci = 'release_metadata_ci',
 	release_metadata_spotify = 'release_metadata_spotify',
+	release_template_file = 'release_template_file',
 }

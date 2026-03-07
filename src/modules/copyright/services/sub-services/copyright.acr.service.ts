@@ -1,21 +1,18 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import FormData from 'form-data';
 import { lastValueFrom } from 'rxjs';
-import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { AcrResponse, ResultScan } from '../../interface/copyright.interface';
 
 @Injectable()
-export class CopyrightAcrService implements OnModuleInit {
+export class CopyrightAcrService {
 	private readonly logger = new Logger(CopyrightAcrService.name);
 
-	private ACR_HOST: string;
-	private ACR_ACCESS_KEY: string;
-	private ACR_ACCESS_SECRET: string;
+	// private ACR_HOST: string;
+	// private ACR_ACCESS_KEY: string;
+	// private ACR_ACCESS_SECRET: string;
 	private ENDPOINT = '/v1/identify';
 	private SIGNATURE_VERSION = '1';
 	private DATA_TYPE = 'audio';
@@ -24,25 +21,6 @@ export class CopyrightAcrService implements OnModuleInit {
 		private readonly http: HttpService,
 		private readonly appConfigService: AppConfigService,
 	) {}
-
-	onModuleInit() {
-		this.reloadConfig();
-	}
-
-	private reloadConfig() {
-		this.ACR_HOST = this.appConfigService.getValue(AppConfigKey.ACR_HOST);
-		this.ACR_ACCESS_KEY = this.appConfigService.getValue(
-			AppConfigKey.ACR_ACCESS_KEY,
-		);
-		this.ACR_ACCESS_SECRET = this.appConfigService.getValue(
-			AppConfigKey.ACR_ACCESS_SECRET,
-		);
-	}
-
-	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
-	handleAppConfigUpdated() {
-		this.reloadConfig();
-	}
 
 	private sign({
 		method,
@@ -83,22 +61,22 @@ export class CopyrightAcrService implements OnModuleInit {
 		key: { startSecond: number; endSecond: number };
 	}): Promise<ResultScan> {
 		const method = 'POST';
-		const url = `${this.ACR_HOST}${this.ENDPOINT}`;
+		const url = `${this.appConfigService.ACR_HOST()}${this.ENDPOINT}`;
 		const timestamp = Math.floor(Date.now() / 1000);
 		const signature = this.sign({
 			method,
 			uri: this.ENDPOINT,
-			accessKey: this.ACR_ACCESS_KEY,
+			accessKey: this.appConfigService.ACR_ACCESS_KEY(),
 			dataType: this.DATA_TYPE,
 			signatureVersion: this.SIGNATURE_VERSION,
 			timestamp,
-			secret: this.ACR_ACCESS_SECRET,
+			secret: this.appConfigService.ACR_ACCESS_SECRET(),
 		});
 
 		const form = new FormData();
 		form.append('sample', buffer, { filename: `sample.wav` });
 		form.append('sample_bytes', buffer.length);
-		form.append('access_key', this.ACR_ACCESS_KEY);
+		form.append('access_key', this.appConfigService.ACR_ACCESS_KEY());
 		form.append('data_type', this.DATA_TYPE);
 		form.append('signature_version', this.SIGNATURE_VERSION);
 		form.append('signature', signature);

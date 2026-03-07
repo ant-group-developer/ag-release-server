@@ -28,7 +28,7 @@ export class BucketGcsController {
 		private readonly bucketService: BucketService,
 
 		private readonly bucketGcsService: BucketGcsService,
-	) {}
+	) { }
 
 	// create
 	@Post('private')
@@ -40,6 +40,14 @@ export class BucketGcsController {
 		});
 	}
 
+	@Post('private/template')
+	async createTemplate(@Body() data: CreateBucketDto) {
+		const result = await this.bucketService.createTemplate(data);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
 	@Post('private/bulk')
 	async bulkCreate(@Body() data: BulkCreateBucketDto) {
 		const result = await this.bucketService.bulkCreate(data);
@@ -89,7 +97,14 @@ export class BucketGcsController {
 			data: result,
 		});
 	}
+	@Get('private/download-template')
+	async getUrlDownTemplateFile() {
+		const result = await this.bucketService.getUrlDownTemplateFile();
 
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);

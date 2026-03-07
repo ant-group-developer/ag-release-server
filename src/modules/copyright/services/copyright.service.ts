@@ -1,9 +1,6 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Injectable, Logger } from '@nestjs/common';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { ScanCopyrightStatus } from 'src/modules/track/enum/track.enum';
 import {
@@ -21,12 +18,12 @@ import { CopyrightTaskService } from './sub-services/copyright.task.service';
 import { CopyrightTrackService } from './sub-services/copyright.track.service';
 
 @Injectable()
-export class CopyrightService implements OnModuleInit {
+export class CopyrightService {
 	private readonly logger = new Logger(CopyrightService.name);
 	private scanControllers = new Map<string, AbortController>();
 
-	private scoreWarning: number;
-	private chunkDuration: number;
+	// private scoreWarning: number;
+	// private chunkDuration: number;
 
 	constructor(
 		private readonly bucketService: BucketService,
@@ -37,25 +34,6 @@ export class CopyrightService implements OnModuleInit {
 		private readonly copyrightTrackService: CopyrightTrackService,
 		private readonly copyrightResultService: CopyrightResultService,
 	) {}
-
-	onModuleInit() {
-		this.reloadConfig();
-	}
-
-	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
-	handleAppConfigUpdated() {
-		this.reloadConfig();
-	}
-
-	private reloadConfig() {
-		this.scoreWarning = this.appConfigService.getValue(
-			AppConfigKey.SCORE_WARNING,
-		);
-
-		this.chunkDuration = this.appConfigService.getValue(
-			AppConfigKey.CHUNK_DURATION,
-		);
-	}
 
 	// task
 	async handleCreateTask(
@@ -72,7 +50,8 @@ export class CopyrightService implements OnModuleInit {
 				filter,
 				status: ScanStatus.PENDING,
 				trackNeedScanIds,
-				chunkDuration: chunkDuration ?? this.chunkDuration,
+				chunkDuration:
+					chunkDuration ?? this.appConfigService.chunkDuration(),
 			},
 			userId,
 		);
@@ -277,7 +256,8 @@ export class CopyrightService implements OnModuleInit {
 		const resultScanAcr = await this.copyrightAcrService.scanBuffer({
 			buffer: fileBuffer,
 			duration: track.audioFile.duration,
-			chunkDuration: chunkDuration ?? this.chunkDuration,
+			chunkDuration:
+				chunkDuration ?? this.appConfigService.chunkDuration(),
 		});
 
 		const trackScanHistory = await this.copyrightResultService.create({
@@ -360,8 +340,8 @@ export class CopyrightService implements OnModuleInit {
 
 				if (
 					curr.end === next.start && // 2 đoạn liên tiếp
-					curr.score > this.scoreWarning && // check theo điểm
-					next.score > this.scoreWarning
+					curr.score > this.appConfigService.scoreWarning() && // check theo điểm
+					next.score > this.appConfigService.scoreWarning()
 				) {
 					// this.logger.log(curr, next);
 					return true;
