@@ -28,6 +28,7 @@ export class PriceTierQueryService {
 
 			.select([
 				'priceTier.id',
+				'priceTier.code',
 				'priceTier.amount',
 				'priceTier.currencyId',
 				'priceTier.isDefault',

@@ -22,4 +22,5 @@ export const FolderBucketMap: Record<
 	[UploadPurpose.RELEASE_COVER_ART]: 'release_cover_art',
 	[UploadPurpose.release_metadata_ci]: 'release_metadata_ci',
 	[UploadPurpose.release_metadata_spotify]: 'release_metadata_spotify',
+	[UploadPurpose.release_template_file]: 'release_template_file',
 };

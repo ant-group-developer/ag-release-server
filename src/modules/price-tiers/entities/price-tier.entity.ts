@@ -9,6 +9,14 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 })
 export class PriceTier extends BaseUserTrackedUUIDEntity {
 	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Mã price tier (có thể null)',
+	})
+	code: string | null;
+
+	@Column({
 		type: 'numeric',
 		precision: 10,
 		scale: 2,
