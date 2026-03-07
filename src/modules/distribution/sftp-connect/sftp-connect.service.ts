@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
 import { SftpMetadata } from '../sftp-configs/type/sftp-config.type';
+import { exec, spawn } from 'child_process';
 
 @Injectable()
 export class SftpConnectService {
@@ -182,6 +183,71 @@ export class SftpConnectService {
 		} finally {
 			await client.end();
 		}
+	}
+
+	async uploadFolderScp({
+		sftp,
+		localDir,
+		remoteDir,
+	}: {
+		sftp: {
+			host: string;
+			port?: number;
+			username: string;
+			password?: string;
+		};
+		localDir: string;
+		remoteDir: string;
+	}) {
+		const port = sftp.port ?? 22;
+
+		return new Promise((resolve, reject) => {
+			const args = [
+				'-p',
+				sftp.password ?? '',
+				'scp',
+				'-P',
+				String(port),
+				'-r',
+				'-o',
+				'StrictHostKeyChecking=no',
+				'-o',
+				'UserKnownHostsFile=/dev/null',
+				localDir,
+				`${sftp.username}@${sftp.host}:${remoteDir}`,
+			];
+
+			const scp = spawn('sshpass', args);
+
+			let stdout = '';
+			let stderr = '';
+
+			scp.stdout.on('data', (data) => {
+				stdout += data.toString();
+				console.log(data.toString());
+			});
+
+			scp.stderr.on('data', (data) => {
+				stderr += data.toString();
+				console.error(data.toString());
+			});
+
+			scp.on('close', (code) => {
+				if (code === 0) {
+					resolve(stdout);
+				} else {
+					reject(
+						new Error(
+							`scp failed with code ${code}\nstdout: ${stdout}\nstderr: ${stderr}`,
+						),
+					);
+				}
+			});
+
+			scp.on('error', (err) => {
+				reject(err);
+			});
+		});
 	}
 
 	private async uploadRecursive(

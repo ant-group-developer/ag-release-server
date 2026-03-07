@@ -16,11 +16,11 @@ export class PriceTierQueryService {
 
 		@InjectRepository(Currency)
 		private readonly currencyRepo: Repository<Currency>,
-	) {}
+	) { }
 
 	// private
 	private createQueryGetList(query: QueryGetListPriceTier) {
-		const { skip, pageSize, fieldOrder, orderBy } = query;
+		const { skip, pageSize, fieldOrder, orderBy, keyword } = query;
 
 		const qb = this.priceTierRepo
 			.createQueryBuilder('priceTier')
@@ -38,6 +38,14 @@ export class PriceTierQueryService {
 			])
 			.addSelect(['currency.id', 'currency.name', 'currency.code']);
 
+		if (keyword?.trim()) {
+			qb.andWhere(
+				'(priceTier.code ILIKE :keyword OR CAST(priceTier.amount AS TEXT) ILIKE :keyword)',
+				{
+					keyword: `%${keyword}%`,
+				},
+			);
+		}
 		if (fieldOrder === FieldOrderCurrency.CURRENCY_NAME) {
 			qb.orderBy('currency.name', orderBy);
 		} else {
