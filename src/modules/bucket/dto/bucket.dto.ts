@@ -23,7 +23,6 @@ class CreateFileDto {
 
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(30)
 	contentType: string;
 
 	@IsString()

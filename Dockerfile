@@ -17,7 +17,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Cài tool cần khi runtime (backup, rclone…)
-RUN apk add --no-cache postgresql-client rclone dos2unix
+RUN apk add --no-cache postgresql-client rclone dos2unix openssh-client sshpass
 
 # 1. Chỉ cài production dependencies
 COPY package.json yarn.lock ./
