@@ -14,6 +14,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
 import {
+	PublicRoute,
 	RequirePermissions,
 	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
@@ -23,6 +24,7 @@ import {
 	ReleaseException,
 	ReleaseSuccess,
 } from '../constants/release.constant';
+import { ImportOneReleaseDto } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
@@ -52,6 +54,18 @@ export class ReleaseDraftController {
 		);
 
 		return ReleaseSuccess.CREATE(result);
+	}
+
+	@PublicRoute()
+	@Post('import/one')
+	async importOneRelease(@Body() payload: ImportOneReleaseDto) {
+		return this.releaseDraftService.importOneRelease(payload);
+	}
+
+	@PublicRoute()
+	@Post('import')
+	async importReleases(@Body() payload: ImportOneReleaseDto[]) {
+		return this.releaseDraftService.importReleases(payload);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

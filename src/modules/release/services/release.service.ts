@@ -105,6 +105,19 @@ export class ReleaseService {
 		};
 	}
 
+	async findOneFull(id: string): Promise<IReleaseDetail> {
+		const release = await this.releaseQueryService.findOneReleaseFull(id);
+
+		const { releaseCoverArts, ...restOfRelease } = release;
+
+		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
+
+		return {
+			...restOfRelease,
+			coverArtThumbnails,
+		};
+	}
+
 	async getList(
 		query: QueryGetListReleaseDto,
 	): Promise<PageDto<IReleaseDetail>> {

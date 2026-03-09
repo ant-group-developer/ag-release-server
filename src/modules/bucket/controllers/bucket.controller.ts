@@ -28,7 +28,7 @@ export class BucketGcsController {
 		private readonly bucketService: BucketService,
 
 		private readonly bucketGcsService: BucketGcsService,
-	) { }
+	) {}
 
 	// create
 	@Post('private')
@@ -48,6 +48,7 @@ export class BucketGcsController {
 			data: result,
 		});
 	}
+
 	@Post('private/bulk')
 	async bulkCreate(@Body() data: BulkCreateBucketDto) {
 		const result = await this.bucketService.bulkCreate(data);
