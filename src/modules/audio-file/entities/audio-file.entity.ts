@@ -65,8 +65,9 @@ export class AudioFile extends BaseUUIDEntity {
 	@Column({
 		type: 'uuid',
 		comment: 'ID file peak waveform',
+		nullable: true,
 	})
-	peakId: string;
+	peakId: string | null;
 
 	@OneToOne(() => Track, (track) => track.audioFile)
 	@JoinColumn({ name: 'track_id' })
@@ -78,5 +79,5 @@ export class AudioFile extends BaseUUIDEntity {
 
 	@OneToOne(() => FileEntity)
 	@JoinColumn({ name: 'peak_id' })
-	peak: FileEntity;
+	peak: FileEntity | null;
 }

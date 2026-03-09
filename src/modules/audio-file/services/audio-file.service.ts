@@ -121,6 +121,7 @@ export class AudioFileService {
 
 	async deleteAudioAndPeak(audioFile: AudioFile) {
 		await this.bucketService.deleteSafe(audioFile.fileId);
-		await this.bucketService.deleteSafe(audioFile.peakId);
+		if (audioFile.peakId)
+			await this.bucketService.deleteSafe(audioFile.peakId);
 	}
 }

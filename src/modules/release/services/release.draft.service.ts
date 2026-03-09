@@ -1,24 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
+import { Genre } from 'src/modules/genre/entities/genre.entity';
+import { Label } from 'src/modules/label/entities/label.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
+import { ReleaseCoverArtSize } from 'src/modules/release-cover-art/enum/release-cover-art.enum';
 import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { ReleaseLanguageDraftService } from 'src/modules/release-language/services/release-language.draft.service';
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { ReleaseTerritoryService } from 'src/modules/release-territory/services/release-territory.service';
+import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
+import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
+import { newTransaction } from 'src/utils/utils.transaction';
 import { DataSource, Repository } from 'typeorm';
-import { ImportOneReleaseDto } from '../dto/release-sftp.dto';
+import { ImportOneReleaseDto, LookupMaps } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
-import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -202,196 +210,218 @@ export class ReleaseDraftService {
 	}
 
 	// other
+	// coverArt
+	async autoFillCoverArts(id: string) {
+		return await this.releaseCoverArtService.autoFillCoverArts({
+			releaseId: id,
+		});
+	}
+
 	async getErrorsSchemaRelease(id: string) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
 
 	// sftp
-	// async importReleases(payloads: any[]) {
-	// 	return this.dataSource.transaction(async (manager) => {
-	// 		for (const payload of payloads) {
-	// 			await manager.getRepository(Release).insert({
-	// 				id: payload.id,
-	// 				creatorId: payload.creatorId,
-	// 				modifierId: payload.modifierId,
-	// 				upc: payload.upc,
-	// 				albumFormatId: payload.albumFormatId,
-	// 				primaryGenreId: payload.primaryGenreId,
-	// 				subGenreId: payload.subGenreId,
-	// 				labelId: payload.labelId,
-	// 				title: payload.title,
-	// 				version: payload.version,
-	// 				status: payload.status,
-	// 				cLineYear: payload.cLineYear,
-	// 				cLineOwner: payload.cLineOwner,
-	// 				pLineYear: payload.pLineYear,
-	// 				pLineOwner: payload.pLineOwner,
-	// 				catalogId: payload.catalogId,
-	// 				isVariousArtist: payload.isVariousArtist,
-	// 				releaseTimeMode: payload.releaseTimeMode,
-	// 				releaseTimezoneId: payload.releaseTimezoneId,
-	// 				releaseDate: payload.releaseDate,
-	// 				releaseTime: payload.releaseTime,
-	// 				tenantId: payload.tenantId,
-	// 				coverArtThumbnails: payload.coverArtThumbnails ?? null,
-	// 			});
+	async importOneRelease(payload: ImportOneReleaseDto, maps?: LookupMaps) {
+		// console.log(JSON.stringify(payload, null, 2));
+		const m = maps ?? (await this.buildLookupMaps());
 
-	// 			for (const track of payload.tracks ?? []) {
-	// 				await manager.getRepository(Track).insert({
-	// 					id: track.id,
-	// 					title: track.title,
-	// 					version: track.version,
-	// 					isrc: track.isrc,
-	// 					iswc: track.iswc,
-	// 					releaseId: payload.id,
-	// 					pLineYear: track.pLineYear,
-	// 					pLineOwner: track.pLineOwner,
-	// 					primaryGenreId: track.primaryGenreId,
-	// 					subGenreId: track.subGenreId,
-	// 					order: track.order,
-	// 					trackTypeId: track.trackTypeId,
-	// 					trackOriginTypeId: track.trackOriginTypeId,
-	// 					trackSensitiveId: track.trackSensitiveId,
-	// 					isByAi: track.isByAi,
-	// 					lyric: track.lyric,
-	// 					scanCopyrightStatus: track.scanCopyrightStatus,
-	// 					copyArtistsFromRelease: track.copyArtistsFromRelease,
-	// 					copyContributorsFromRelease:
-	// 						track.copyContributorsFromRelease,
-	// 					priceTierId: track.priceTierId,
-	// 				});
+		const albumFormatId = m.albumFormat.get(payload.albumFormat ?? '');
+		const primaryGenreId = m.genre.get(payload.primaryGenre ?? '');
+		const subGenreId = m.genre.get(payload.subGenre ?? '');
+		const labelId = m.label.get(payload.label ?? '');
 
-	// 				if (track.audioFile) {
-	// 					await manager.getRepository(AudioFile).insert({
-	// 						id: track.audioFile.id,
-	// 						sampleRate: track.audioFile.sampleRate,
-	// 						bitrate: track.audioFile.bitrate,
-	// 						bitDepth: track.audioFile.bitDepth,
-	// 						duration: track.audioFile.duration,
-	// 						sampleLength: track.audioFile.sampleLength,
-	// 						preview: track.audioFile.preview,
-	// 						trackId: track.id,
-	// 						fileId: track.audioFile.fileId,
-	// 						peakId: track.audioFile.peakId,
-	// 					});
-	// 				}
+		const errors: string[] = [];
 
-	// 				for (const trackArtist of track.trackArtists ?? []) {
-	// 					await manager.getRepository(Artist).insert({
-	// 						id: trackArtist.artist.id,
-	// 						name: trackArtist.artist.name,
-	// 						code: trackArtist.artist.code,
-	// 						picture: trackArtist.artist.picture,
-	// 						biography: trackArtist.artist.biography,
-	// 						artistSource: trackArtist.artist.artistSource,
-	// 						idSource: trackArtist.artist.idSource,
-	// 						genreId: trackArtist.artist.genreId,
-	// 						countryId: trackArtist.artist.countryId,
-	// 						spotifyId: trackArtist.artist.spotifyId,
-	// 						appleMusicId: trackArtist.artist.appleMusicId,
-	// 						primaryGenre: trackArtist.artist.primaryGenre,
-	// 						originCountry: trackArtist.artist.originCountry,
-	// 						isScanned: trackArtist.artist.isScanned,
-	// 					});
+		if (!albumFormatId)
+			errors.push(`albumFormat không hợp lệ: "${payload.albumFormat}"`);
 
-	// 					await manager.getRepository(TrackArtist).insert({
-	// 						id: trackArtist.id,
-	// 						artistId: trackArtist.artistId,
-	// 						trackId: track.id,
-	// 						releaseArtistId: trackArtist.releaseArtistId,
-	// 						isFromReleaseAction:
-	// 							trackArtist.isFromReleaseAction,
-	// 						isFromTrackAction: trackArtist.isFromTrackAction,
-	// 					});
-	// 				}
+		if (payload.primaryGenre && !primaryGenreId)
+			errors.push(
+				`primaryGenre không tồn tại: "${payload.primaryGenre}"`,
+			);
 
-	// 				if (track.trackLanguage) {
-	// 					await manager.getRepository(TrackLanguage).insert({
-	// 						id: track.trackLanguage.id,
-	// 						metadataLanguageCountryId:
-	// 							track.trackLanguage.metadataLanguageCountryId,
-	// 						audioLanguageId:
-	// 							track.trackLanguage.audioLanguageId,
-	// 						metadataLanguageId:
-	// 							track.trackLanguage.metadataLanguageId,
-	// 						trackId: track.id,
-	// 						recordingCountryId:
-	// 							track.trackLanguage.recordingCountryId,
-	// 					});
-	// 				}
-	// 			}
-	// 		}
+		if (payload.subGenre && !subGenreId)
+			errors.push(`subGenre không tồn tại: "${payload.subGenre}"`);
 
-	// 		return {
-	// 			success: true,
-	// 			total: payloads.length,
-	// 		};
-	// 	});
-	// }
+		if (payload.label && !labelId)
+			errors.push(`label không tồn tại: "${payload.label}"`);
 
-	async importOneRelease(payload: ImportOneReleaseDto) {
-		console.log(payload);
-		// return;
+		if (errors.length) throw new Error(errors.join(' | '));
 
-		return this.dataSource.transaction(async (manager) => {
+		const DEFAULT_TENANT_ID = '9f0c7eda-dca7-4f65-b787-6a21e6717c59';
+
+		const queryRunner = await newTransaction(this.releaseRepo);
+
+		try {
+			const { manager } = queryRunner;
+
 			await manager.getRepository(Release).insert({
 				id: payload.id,
-				upc: payload.upc,
+				upc: payload.upc ?? null,
 				title: payload.title ?? '',
 				version: payload.version ?? null,
 				status: ReleaseStatus.PROCESSING,
-				catalogId: payload.catalogId ?? undefined,
-				isVariousArtist: payload.isVariousArtist,
-				// releaseTimeMode,
-				// releaseTimezoneId: payload.releaseTimezoneId ?? undefined,
-				releaseDate: payload.releaseDate ?? undefined,
-				releaseTime: payload.releaseTime ?? undefined,
-				cLineYear: payload.cLineYear ?? undefined,
-				cLineOwner: payload.cLineOwner ?? undefined,
-				pLineYear: payload.pLineYear ?? undefined,
-				pLineOwner: payload.pLineOwner ?? undefined,
+				catalogId: payload.catalogId ?? null,
+				isVariousArtist: payload.isVariousArtist ?? false,
+				releaseTimeMode:
+					(payload.releaseTimeMode as ReleaseTimeMode) ??
+					ReleaseTimeMode.GLOBAL_MIDNIGHT,
+				releaseTimezoneId: payload.releaseTimezoneId ?? null,
+				// releaseDate: payload.releaseDate ?? null,
+				// releaseTime: payload.releaseTime ?? null,
+				cLineYear: payload.cLineYear ?? null,
+				cLineOwner: payload.cLineOwner ?? null,
+				pLineYear: payload.pLineYear ?? null,
+				pLineOwner: payload.pLineOwner ?? null,
+				albumFormatId,
+				primaryGenreId: primaryGenreId ?? null,
+				subGenreId: subGenreId ?? null,
+				labelId: labelId ?? null,
+				tenantId: payload.tenantId ?? DEFAULT_TENANT_ID,
 			});
 
+			if (payload.thumbnailId) {
+				await this.releaseCoverArtService.bulkCreate({
+					data: [
+						{
+							releaseId: payload.id,
+							fileId: payload.thumbnailId,
+							width: 3000,
+							height: 3000,
+							type: ReleaseCoverArtSize.ORIGINAL,
+						},
+					],
+					manager,
+				});
+
+				await this.releaseCoverArtService.autoFillCoverArts({
+					releaseId: payload.id,
+					manager,
+				});
+			}
+
 			for (const track of payload.tracks ?? []) {
+				const trackPrimaryGenreId = m.genre.get(
+					track.primaryGenre ?? '',
+				);
+				const trackSubGenreId = m.genre.get(track.subGenre ?? '');
+				const trackTypeId = m.trackType.get(track.trackType ?? '');
+				const trackSensitiveId = m.trackSensitive.get(
+					track.trackSensitive ?? '',
+				);
+				const priceTierId = m.priceTier.get(track.priceTier ?? '');
+
 				await manager.getRepository(Track).insert({
 					id: track.id,
 					releaseId: payload.id,
-					title: track.title ?? undefined,
+					title: track.title ?? '',
 					order: track.order,
-					pLineYear: track.pLineYear ?? undefined,
-					pLineOwner: track.pLineOwner ?? undefined,
-					lyric: track.lyric ?? undefined,
+					pLineYear: track.pLineYear ?? null,
+					pLineOwner: track.pLineOwner ?? null,
+					lyric: track.lyric ?? '',
 					isByAi: track.isByAi === 'y',
+					primaryGenreId: trackPrimaryGenreId ?? null,
+					subGenreId: trackSubGenreId ?? null,
+					trackTypeId: trackTypeId ?? null,
+					trackSensitiveId: trackSensitiveId ?? null,
+					priceTierId: priceTierId ?? null,
 				});
 
 				if (track.audioFile) {
 					await manager.getRepository(AudioFile).insert({
 						fileId: track.audioFile.fileId,
-						sampleRate: String(track.audioFile.sampleRate),
-						bitrate: track.audioFile.bitrate,
-						bitDepth: track.audioFile.bitDepth,
-						duration: track.audioFile.duration,
-						sampleLength: track.audioFile.sampleLength,
-						preview: track.audioFile.preview,
+						sampleRate: track.audioFile.sampleRate ?? null,
+						bitrate: track.audioFile.bitrate ?? null,
+						bitDepth: track.audioFile.bitDepth ?? null,
+						duration: track.audioFile.duration ?? null,
+						sampleLength: track.audioFile.sampleLength ?? null,
+						preview: track.audioFile.preview ?? null,
 						trackId: track.id,
 					});
 				}
 			}
 
-			return { success: true };
-		});
+			await queryRunner.commitTransaction();
+
+			return {
+				success: true,
+				releaseId: payload.id,
+			};
+		} catch (e) {
+			await queryRunner.rollbackTransaction();
+			throw e;
+		} finally {
+			await queryRunner.release();
+		}
 	}
 
 	async importReleases(payloads: ImportOneReleaseDto[]) {
+		console.log(payloads);
+
+		const maps = await this.buildLookupMaps();
+
 		const results = await Promise.allSettled(
-			payloads.map((p) => this.importOneRelease(p)),
+			payloads.map((p) => this.importOneRelease(p, maps)),
 		);
 
-		return {
+		const failed = results
+			.map((r, i) => ({ r, i }))
+			.filter(({ r }) => r.status === 'rejected')
+			.map(({ r, i }) => ({
+				releaseId: payloads[i].id,
+				error: (r as PromiseRejectedResult).reason?.message,
+			}));
+
+		const result = {
 			total: payloads.length,
 			success: results.filter((r) => r.status === 'fulfilled').length,
-			failed: results.filter((r) => r.status === 'rejected').length,
+			failed: failed.length,
+			errors: failed,
+			ids: results.map((r) =>
+				r.status === 'fulfilled' ? r.value.releaseId : null,
+			),
+		};
+		console.log(result);
+	}
+
+	async buildLookupMaps(): Promise<LookupMaps> {
+		const albumFormatRepo = this.dataSource.getRepository(AlbumFormat);
+		const genreRepo = this.dataSource.getRepository(Genre);
+		const labelRepo = this.dataSource.getRepository(Label);
+		const trackTypeRepo = this.dataSource.getRepository(TrackType);
+		const trackSensitiveRepo =
+			this.dataSource.getRepository(TrackSensitive);
+		const priceTierRepo = this.dataSource.getRepository(PriceTier);
+
+		const [
+			albumFormats,
+			genres,
+			labels,
+			trackTypes,
+			trackSensitives,
+			priceTiers,
+		] = await Promise.all([
+			albumFormatRepo.find(),
+			genreRepo.find(),
+			labelRepo.find(),
+			trackTypeRepo.find(),
+			trackSensitiveRepo.find(),
+			priceTierRepo.find(),
+		]);
+
+		return {
+			albumFormat: new Map(albumFormats.map((r) => [r.name, r.id])),
+			genre: new Map(genres.map((r) => [r.name, r.id])),
+			label: new Map(labels.map((r) => [r.name, r.id])),
+			trackType: new Map(trackTypes.map((r) => [r.name, r.id])),
+			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
+			priceTier: new Map(
+				priceTiers.flatMap((r) =>
+					r.code ? [[r.code, r.id] as const] : [],
+				),
+			),
 		};
 	}
 }
