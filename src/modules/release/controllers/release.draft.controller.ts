@@ -76,7 +76,7 @@ export class ReleaseDraftController {
 		return this.releaseDraftService.importOneRelease(payload);
 	}
 
-	@PublicRoute()
+	// @PublicRoute()
 	@Post('import')
 	async importReleases(@Body() payload: ImportOneReleaseDto[]) {
 		return this.releaseDraftService.importReleases(payload);
