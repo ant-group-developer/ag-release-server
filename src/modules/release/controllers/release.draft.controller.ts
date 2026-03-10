@@ -37,6 +37,20 @@ import { ReleaseDraftService } from '../services/release.draft.service';
 export class ReleaseDraftController {
 	constructor(private readonly releaseDraftService: ReleaseDraftService) {}
 
+	@Get('maps')
+	async getLookupMaps() {
+		const maps = await this.releaseDraftService.buildLookupMaps();
+
+		return {
+			albumFormat: Object.fromEntries(maps.albumFormat),
+			genre: Object.fromEntries(maps.genre),
+			label: Object.fromEntries(maps.label),
+			trackType: Object.fromEntries(maps.trackType),
+			trackSensitive: Object.fromEntries(maps.trackSensitive),
+			priceTier: Object.fromEntries(maps.priceTier),
+		};
+	}
+
 	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
@@ -77,6 +91,16 @@ export class ReleaseDraftController {
 	): Promise<ResponseSuccess<IReleaseDetail>> {
 		const userId = req.user!.sub;
 		const result = await this.releaseDraftService.update(id, data, userId);
+
+		return ReleaseSuccess.UPDATE(result);
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/auto-fill-cover-arts')
+	async autoFillCoverArts(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<any>> {
+		const result = await this.releaseDraftService.autoFillCoverArts(id);
 
 		return ReleaseSuccess.UPDATE(result);
 	}

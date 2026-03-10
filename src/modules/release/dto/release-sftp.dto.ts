@@ -21,6 +21,7 @@ export interface ImportOneReleaseDto {
 	releaseTime: string | null;
 	thumbnailId: string | null;
 	tracks: ImportOneTrackDto[];
+	tenantId?: string;
 }
 
 export interface ImportOneTrackDto {
@@ -47,4 +48,13 @@ export interface ImportOneAudioFileDto {
 	sampleLength: number;
 	preview: number;
 	fileId: string;
+}
+
+export interface LookupMaps {
+	albumFormat: Map<string, string>;
+	genre: Map<string, string>;
+	label: Map<string, string>;
+	trackType: Map<string, string>;
+	trackSensitive: Map<string, string>;
+	priceTier: Map<string, string>;
 }
