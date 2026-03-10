@@ -63,6 +63,7 @@ import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserRoleModule } from './modules/user-role/user-role.module';
 import { UserModule } from './modules/user/user.module';
+import { ExcelModule } from './modules/excel/excel.module';
 
 @Module({
 	imports: [
@@ -72,7 +73,7 @@ import { UserModule } from './modules/user/user.module';
 		}),
 		// TypeOrmModule.forRootAsync({
 		// 	imports: [ConfigModule],
-		// 	useClass: DatabaseConfigService,
+		// 	import { Excel } from './modules/excel/entities/excel.entity';
 		// }),
 
 		CacheModule,
@@ -155,6 +156,7 @@ import { UserModule } from './modules/user/user.module';
 		DDEXModule,
 		IsrcModule,
 		UpcModule,
+		ExcelModule,
 	],
 	controllers: [AppController],
 	providers: [
