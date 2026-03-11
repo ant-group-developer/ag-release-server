@@ -16,7 +16,7 @@ export class PriceTierQueryService {
 
 		@InjectRepository(Currency)
 		private readonly currencyRepo: Repository<Currency>,
-	) { }
+	) {}
 
 	// private
 	private createQueryGetList(query: QueryGetListPriceTier) {
