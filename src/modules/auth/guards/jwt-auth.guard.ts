@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AUTH_PUBLIC_KEY } from '../constants/key';
 
@@ -22,6 +23,26 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 				context.getClass(),
 			]) ?? false;
 		if (isPublic) return true;
+
+		const req = context.switchToHttp().getRequest<Request>();
+
+		const apiKey = req.headers['x-api-key'];
+
+		if (
+			typeof apiKey === 'string' &&
+			apiKey === process.env.INTERNAL_API_KEY
+		) {
+			(req as any).user = {
+				id: 'internal-service',
+				type: 'system_admin',
+				permission: ['internal:*'],
+				tenantId: null,
+			};
+
+			(req as any).authType = 'api-key';
+			return true;
+		}
+
 		return super.canActivate(context);
 	}
 

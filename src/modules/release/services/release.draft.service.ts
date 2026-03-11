@@ -217,8 +217,12 @@ export class ReleaseDraftService {
 		});
 	}
 
-	async getErrorsSchemaRelease(id: string) {
+	async getErrorsSchemaReleaseById(id: string) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
+		return this.releaseValidateService.getErrorsSchemaRelease(release);
+	}
+
+	getErrorsSchemaRelease(release: any) {
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
 
