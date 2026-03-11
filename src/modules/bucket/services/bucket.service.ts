@@ -18,9 +18,11 @@ import {
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
 import { ReleaseTemplateFile } from '../entities/release-template-file.entity';
+import { StorageProvider } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
-import { BucketFileService } from './bucket.file.service';
-import { BucketGcsService } from './bucket.gcs.service';
+import { BucketFileService } from './bucket-file.service';
+import { BucketGcsService } from './bucket-gcs.service';
+import { BucketR2Service } from './bucket-r2.service';
 
 @Injectable()
 export class BucketService {
@@ -28,6 +30,7 @@ export class BucketService {
 
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketR2Service: BucketR2Service,
 		private readonly bucketFileService: BucketFileService,
 		@InjectRepository(ReleaseTemplateFile)
 		private readonly releaseTemplateFileRepo: Repository<ReleaseTemplateFile>,
@@ -57,7 +60,9 @@ export class BucketService {
 			bucket,
 		});
 
-		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
+		const urlUpload = await this.getStorageService(
+			file.storageProvider!,
+		).getSignedUrlUpload({
 			contentType: newFile.contentType,
 			key: keyBucket,
 			isPublic: false,
@@ -145,7 +150,7 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key } = file;
 
-		return this.bucketGcsService.getSignedUrlRead({
+		return this.getStorageService(file.storageProvider).getSignedUrlRead({
 			key,
 			isPublic: false,
 		});
@@ -155,7 +160,7 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key, fileName } = file;
 
-		return this.bucketGcsService.getSignedUrlDown({
+		return this.getStorageService(file.storageProvider).getSignedUrlDown({
 			key,
 			isPublic: false,
 			fileName,
@@ -185,7 +190,9 @@ export class BucketService {
 			...file,
 			urlPublic: this.getUrlPublic(file.key),
 			urlPrivate: this.getUrlPrivate(file.key),
-			urlRead: await this.bucketGcsService.getSignedUrlRead({
+			urlRead: await this.getStorageService(
+				file.storageProvider,
+			).getSignedUrlRead({
 				key: file.key,
 				isPublic: false,
 			}),
@@ -408,5 +415,16 @@ export class BucketService {
 			this.logger.error(messageWarning);
 			return messageWarning ?? 'Unknown error';
 		});
+	}
+
+	private getStorageService(provider: StorageProvider) {
+		switch (provider) {
+			case StorageProvider.R2:
+				return this.bucketR2Service;
+
+			case StorageProvider.GCS:
+			default:
+				return this.bucketGcsService;
+		}
 	}
 }

@@ -51,6 +51,14 @@ export class ReleaseDraftController {
 		};
 	}
 
+	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	@Post('')
+	getErrorsSchemaRelease(@Body('release') release: any) {
+		const result = this.releaseDraftService.getErrorsSchemaRelease(release);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
@@ -107,9 +115,9 @@ export class ReleaseDraftController {
 
 	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	@Get(':id/validate')
-	async getErrorsSchemaRelease(@Param('id') id: string) {
+	async getErrorsSchemaReleaseById(@Param('id') id: string) {
 		const result =
-			await this.releaseDraftService.getErrorsSchemaRelease(id);
+			await this.releaseDraftService.getErrorsSchemaReleaseById(id);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -18,17 +18,12 @@ import {
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
-import { BucketGcsService } from '../services/bucket.gcs.service';
 import { BucketService } from '../services/bucket.service';
 
 @ApiTags('GCS Upload')
 @Controller('bucket/gcs')
 export class BucketGcsController {
-	constructor(
-		private readonly bucketService: BucketService,
-
-		private readonly bucketGcsService: BucketGcsService,
-	) {}
+	constructor(private readonly bucketService: BucketService) {}
 
 	// create
 	@Post('private')
