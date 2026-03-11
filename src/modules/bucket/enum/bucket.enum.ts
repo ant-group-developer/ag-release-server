@@ -26,3 +26,14 @@ export enum UploadPurpose {
 	release_metadata_spotify = 'release_metadata_spotify',
 	release_template_file = 'release_template_file',
 }
+
+export enum Type {
+	READ = 'read',
+	WRITE = 'write',
+}
+
+export enum StorageProvider {
+	GCS = 'gcs',
+	// MINIO = 'minio',
+	R2 = 'r2',
+}

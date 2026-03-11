@@ -13,7 +13,6 @@ export interface ICreateFile {
 	key: string;
 	bucket: string;
 }
-
 // gcs
 export interface IGetSignedUrlUpload {
 	key: string;

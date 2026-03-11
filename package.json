@@ -26,6 +26,8 @@
 		"migration:show": "npm run typeorm -- migration:show -d src/common/config/database.config.ts"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1006.0",
+		"@aws-sdk/s3-request-presigner": "^3.1006.0",
 		"@google-cloud/storage": "^7.16.0",
 		"@grpc/grpc-js": "^1.14.3",
 		"@grpc/proto-loader": "^0.8.0",
