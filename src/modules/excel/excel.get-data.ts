@@ -7,6 +7,7 @@ import { Genre } from '../genre/entities/genre.entity';
 import { Language } from '../language/entities/language.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.entity';
+import { AppConfig } from '../app-config/entities/app-config.entity';
 
 @Injectable()
 export class ExcelGetDataService {
@@ -23,7 +24,10 @@ export class ExcelGetDataService {
 		private readonly languageRepo: Repository<Language>,
 		@InjectRepository(Action)
 		private readonly actionRepo: Repository<Action>,
-	) {}
+
+		@InjectRepository(AppConfig)
+		private readonly appRepo: Repository<AppConfig>,
+	) { }
 	async getAlbumFormats(): Promise<string[]> {
 		const data = await this.albumFormatRepo.find({
 			select: ['name'],
@@ -31,6 +35,13 @@ export class ExcelGetDataService {
 		});
 
 		return data.map((item) => item.name);
+	}
+
+	async getLogo() {
+		const appConfig = await this.appRepo.find();
+
+		const configData = appConfig[0].config;
+		return configData?.website?.logo ?? null;
 	}
 
 	async getPriceTiers(): Promise<string[]> {
