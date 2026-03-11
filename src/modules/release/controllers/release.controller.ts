@@ -28,6 +28,7 @@ import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { ReleaseSuccess } from '../constants/release.constant';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import {
 	IRelease,
@@ -137,6 +138,12 @@ export class ReleaseController {
 		streamDownload(res, data);
 	}
 
+	@Get(':id/dsp/delivery')
+	async getReleaseDspDelivery(@Param('id') id: string) {
+		const data = await this.releaseService.getReleaseDspDelivery(id);
+		return new ResponseSuccess({ data });
+	}
+
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
@@ -158,9 +165,10 @@ export class ReleaseController {
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
+		@Body() dto: SubmitReleaseDto,
 	): Promise<ResponseSuccess<IReleaseNonDraft>> {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, userId);
+		const result = await this.releaseService.submit(id, userId, dto);
 
 		return ReleaseSuccess.CREATE(result);
 	}

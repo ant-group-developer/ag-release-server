@@ -1,10 +1,10 @@
 // src/modules/distribution2/sftp/sftp.service.ts
 import { Injectable, Logger } from '@nestjs/common';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
 import { SftpMetadata } from '../sftp-configs/type/sftp-config.type';
-import { exec, spawn } from 'child_process';
 
 @Injectable()
 export class SftpConnectService {
