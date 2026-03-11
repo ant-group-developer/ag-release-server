@@ -35,6 +35,7 @@ import {
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
+import { SubmitReleaseDto } from '../dto/submit-release.dto';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -130,6 +131,12 @@ export class ReleaseController {
 		streamDownload(res, data);
 	}
 
+	@Get(':id/dsp/delivery')
+	async getReleaseDspDelivery(@Param('id') id: string) {
+		const data = await this.releaseService.getReleaseDspDelivery(id);
+		return new ResponseSuccess({ data });
+	}
+
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
@@ -151,9 +158,10 @@ export class ReleaseController {
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
+		@Body() dto: SubmitReleaseDto,
 	): Promise<ResponseSuccess<IReleaseNonDraft>> {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, userId);
+		const result = await this.releaseService.submit(id, userId, dto);
 
 		return ReleaseSuccess.CREATE(result);
 	}

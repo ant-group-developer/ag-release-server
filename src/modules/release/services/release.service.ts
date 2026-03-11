@@ -39,9 +39,15 @@ import {
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
+import { SubmitReleaseDto } from '../dto/submit-release.dto';
+import { Logger } from '@nestjs/common';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { ReleaseDspStatus } from 'src/modules/release-dsp/enum/release-dsp.enum';
 
 @Injectable()
 export class ReleaseService {
+	private readonly logger = new Logger('ReleaseSpotifyService');
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
@@ -56,10 +62,62 @@ export class ReleaseService {
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
 		private readonly appConfigService: AppConfigService,
-	) {}
 
+		@InjectRepository(ReleaseDspDelivery)
+		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
+	) { }
+
+	async getReleaseDspDelivery(releaseId: string) {
+
+		const dsps = await this.dspRepo.find({
+			where: { isActive: true },
+			order: { createdAt: 'DESC' },
+		});
+
+		const deliveries = await this.releaseDspDeliveryRepo.find({
+			where: { releaseId },
+		});
+
+		const deliveryMap = new Map(
+			deliveries.map(d => [d.dspId, d])
+		);
+
+		const result = [];
+
+		for (const dsp of dsps) {
+
+			let delivery = deliveryMap.get(dsp.id);
+
+			if (!delivery) {
+				delivery = await this.releaseDspDeliveryRepo.save({
+					releaseId,
+					dspId: dsp.id,
+					status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+					lastEnqueuedAt: null,
+					lastDeliveredAt: null,
+				});
+			}
+
+			result.push({
+				dsp: {
+					id: dsp.id,
+					name: dsp.name,
+					code: dsp.code,
+					picture: dsp.picture,
+				},
+				status: delivery.status,
+				lastEnqueuedAt: delivery.lastEnqueuedAt,
+				lastDeliveredAt: delivery.lastDeliveredAt,
+			});
+		}
+
+		return result;
+	}
 	// nghiệp vụ
-	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
+	async submit(id: string, userId: string, dto: SubmitReleaseDto): Promise<IReleaseNonDraft> {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
@@ -85,7 +143,68 @@ export class ReleaseService {
 			});
 		}
 
-		await this.releaseRepo.save({ ...release, creatorId: userId });
+		const codeArray = dto.code;
+		if (codeArray.includes('SPOTIFY')) {
+			const dsp = await this.dspRepo.findOne({
+				where: { code: 'SPOTIFY' }
+			});
+			if (!dsp) {
+				throw new Error('DSP SPOTIFY not found');
+			}
+
+			const exist = await this.releaseDspDeliveryRepo.findOne({
+				where: {
+					releaseId: id,
+					dspId: dsp.id,
+				},
+			});
+
+			if (exist) {
+				await this.releaseDspDeliveryRepo.update(
+					{ releaseId: id, dspId: dsp.id },
+					{
+						status: ReleaseDspStatus.PROCESSING,
+						lastEnqueuedAt: new Date(),
+						lastDeliveredAt: null,
+					},
+				);
+			} else {
+				await this.releaseDspDeliveryRepo.save({
+					releaseId: id,
+					dspId: dsp.id,
+					status: ReleaseDspStatus.PROCESSING,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				});
+			}
+
+			setImmediate(async () => {
+				try {
+					await this.createAndUploadMetadataSpotify(id);
+
+					await this.releaseDspDeliveryRepo.update(
+						{ releaseId: id, dspId: dsp?.id },
+						{
+							status: ReleaseDspStatus.DISTRIBUTED,
+							lastDeliveredAt: new Date(),
+						},
+					);
+
+				} catch (error) {
+					await this.releaseDspDeliveryRepo.update(
+						{ releaseId: id, dspId: dsp?.id },
+						{
+							status: ReleaseDspStatus.ISSUES,
+						},
+					);
+
+					this.logger.error(
+						`Spotify metadata process failed for release ${id}`,
+						error.stack,
+					);
+				}
+			});
+		}
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
@@ -275,7 +394,7 @@ export class ReleaseService {
 			}
 		}
 
-		archive.finalize().catch((_e) => {});
+		archive.finalize().catch((_e) => { });
 
 		return {
 			contentType: 'application/zip',
@@ -415,19 +534,38 @@ export class ReleaseService {
 
 	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
+		this.logger.log(`Start create & upload metadata Spotify - releaseId=${id}`);
+
 		await this.createMetadataSpotifyOnServer(id);
+
+		this.logger.log(`Metadata created on server - releaseId=${id}`);
+
 		await this.uploadMetadataSpotifyToSftp(id);
+
+		this.logger.log(`Metadata uploaded to SFTP - releaseId=${id}`);
+
+		this.logger.log(`Finish create & upload metadata Spotify - releaseId=${id}`);
 	}
 
 	async createMetadataSpotifyOnServer(id: string) {
-		return await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
-			id,
-		);
+		this.logger.log(`Creating metadata Spotify on server - releaseId=${id}`);
+
+		const result =
+			await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(id);
+
+		this.logger.log(`Created metadata Spotify successfully - releaseId=${id}`);
+
+		return result;
 	}
 
 	async uploadMetadataSpotifyToSftp(id: string) {
-		return await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
-			id,
-		);
+		this.logger.log(`Uploading metadata Spotify to SFTP - releaseId=${id}`);
+
+		const result =
+			await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(id);
+
+		this.logger.log(`Uploaded metadata Spotify successfully - releaseId=${id}`);
+
+		return result;
 	}
 }

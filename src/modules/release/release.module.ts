@@ -27,6 +27,8 @@ import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
+import { Dsp } from '../dsp/entities/dsp.entity';
+import { ReleaseDspDelivery } from '../release-dsp/entities/release-dsp.entity';
 
 @Module({
 	imports: [
@@ -36,8 +38,9 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Genre,
 			Label,
 			Timezone,
-
+			Dsp,
 			Country,
+			ReleaseDspDelivery
 		]),
 
 		AppConfigModule,

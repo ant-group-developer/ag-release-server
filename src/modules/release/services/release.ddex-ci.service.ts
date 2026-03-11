@@ -230,7 +230,7 @@ export class ReleaseDdexCiService {
 
 		await this.downloadMetadataCiFromBucket(releaseId);
 
-		await this.sftpConnectService.uploadFolder({
+		await this.sftpConnectService.uploadFolderScp({
 			sftp,
 			localDir: release.metadataCi?.folderServer ?? '',
 			remoteDir: sftp.path ?? '',
