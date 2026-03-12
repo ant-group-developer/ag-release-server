@@ -48,6 +48,8 @@ export interface ImportOneAudioFileDto {
 	sampleLength: number;
 	preview: number;
 	fileId: string;
+	// peakId: string;
+	peakFileId: string;
 }
 
 export interface LookupMaps {
