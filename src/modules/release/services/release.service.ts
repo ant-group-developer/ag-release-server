@@ -43,6 +43,7 @@ import {
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 
 @Injectable()
 export class ReleaseService {
@@ -69,47 +70,113 @@ export class ReleaseService {
 		private readonly dspRepo: Repository<Dsp>,
 	) {}
 
-	async getReleaseDspDelivery(releaseId: string) {
+	async getReleaseDspDelivery(
+		releaseId: string,
+		query: ReleaseQueryDspDeliveryDto,
+	) {
+		const { keyword, status, fieldOrder, orderBy, skip, limit } = query;
 		const dsps = await this.dspRepo.find({
 			where: { isActive: true },
-			order: { createdAt: 'DESC' },
+			select: ['id'],
 		});
 
-		const deliveries = await this.releaseDspDeliveryRepo.find({
+		const existDeliveries = await this.releaseDspDeliveryRepo.find({
 			where: { releaseId },
+			select: ['dspId'],
 		});
 
-		const deliveryMap = new Map(deliveries.map((d) => [d.dspId, d]));
+		const existDspIds = new Set(existDeliveries.map((d) => d.dspId));
 
-		const result = [];
+		const newRecords = dsps
+			.filter((dsp) => !existDspIds.has(dsp.id))
+			.map((dsp) => ({
+				releaseId,
+				dspId: dsp.id,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				lastEnqueuedAt: null,
+				lastDeliveredAt: null,
+			}));
 
-		for (const dsp of dsps) {
-			let delivery = deliveryMap.get(dsp.id);
+		if (newRecords.length) {
+			await this.releaseDspDeliveryRepo.insert(newRecords);
+		}
 
-			if (!delivery) {
-				delivery = await this.releaseDspDeliveryRepo.save({
-					releaseId,
-					dspId: dsp.id,
-					status: ReleaseDspStatus.NEVER_DISTRIBUTED,
-					lastEnqueuedAt: null,
-					lastDeliveredAt: null,
-				});
-			}
+		const qb = this.dspRepo
+			.createQueryBuilder('dsp')
+			.leftJoin(
+				ReleaseDspDelivery,
+				'delivery',
+				'delivery.dspId = dsp.id AND delivery.releaseId = :releaseId',
+				{ releaseId },
+			)
+			.where('dsp.isActive = true');
 
-			result.push({
-				dsp: {
-					id: dsp.id,
-					name: dsp.name,
-					code: dsp.code,
-					picture: dsp.picture,
-				},
-				status: delivery.status,
-				lastEnqueuedAt: delivery.lastEnqueuedAt,
-				lastDeliveredAt: delivery.lastDeliveredAt,
+		if (keyword) {
+			qb.andWhere('(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)', {
+				keyword: `%${keyword}%`,
 			});
 		}
 
-		return result;
+		if (status) {
+			qb.andWhere(
+				'COALESCE(delivery.status, :defaultStatus) = :status',
+				{
+					status,
+					defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				},
+			);
+		}
+
+		const sortableFields: Record<string, string> = {
+			dsp_name: 'dsp.name',
+			dsp_code: 'dsp.code',
+			status: 'delivery.status',
+			lastEnqueuedAt: 'delivery.lastEnqueuedAt',
+			lastDeliveredAt: 'delivery.lastDeliveredAt',
+			createdAt: 'dsp.createdAt',
+		};
+
+		const sortField = sortableFields[fieldOrder] ?? 'dsp.createdAt';
+
+		qb.orderBy(sortField, orderBy.toUpperCase() as 'ASC' | 'DESC');
+
+		const total = await qb.clone().getCount();
+
+		qb.skip(skip).take(limit);
+
+		const raw = await qb
+			.select([
+				'dsp.id as dsp_id',
+				'dsp.name as dsp_name',
+				'dsp.code as dsp_code',
+				'dsp.picture as dsp_picture',
+				'delivery.status as delivery_status',
+				'delivery.last_enqueued_at as delivery_last_enqueued_at',
+				'delivery.last_delivered_at as delivery_last_delivered_at',
+			])
+			.getRawMany();
+
+		const items = raw.map((row) => ({
+			dsp: {
+				id: row.dsp_id,
+				name: row.dsp_name,
+				code: row.dsp_code,
+				picture: row.dsp_picture,
+			},
+			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
+			lastEnqueuedAt: row.delivery_last_enqueued_at,
+			lastDeliveredAt: row.delivery_last_delivered_at,
+		}));
+
+		return {
+			items,
+			metadata: {
+				totalItems: total,
+				totalPages: Math.ceil(total / limit),
+				page: Math.floor(skip / limit) + 1,
+				pageSize: limit,
+			},
+		};
 	}
 	// nghiệp vụ
 	async submit(
@@ -175,6 +242,9 @@ export class ReleaseService {
 					lastEnqueuedAt: new Date(),
 					lastDeliveredAt: null,
 				});
+				await this.releaseRepo.update(id, {
+					status: ReleaseStatus.PROCESSING,
+				});
 			}
 
 			setImmediate(async () => {
@@ -185,6 +255,7 @@ export class ReleaseService {
 						{ releaseId: id, dspId: dsp?.id },
 						{
 							status: ReleaseDspStatus.DISTRIBUTED,
+							lastEnqueuedAt: new Date(),
 							lastDeliveredAt: new Date(),
 						},
 					);
@@ -193,6 +264,7 @@ export class ReleaseService {
 						{ releaseId: id, dspId: dsp?.id },
 						{
 							status: ReleaseDspStatus.ISSUES,
+							lastEnqueuedAt: new Date(),
 						},
 					);
 
