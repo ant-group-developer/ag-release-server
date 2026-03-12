@@ -51,14 +51,6 @@ export class ReleaseDraftController {
 		};
 	}
 
-	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
-	@Post('')
-	getErrorsSchemaRelease(@Body('release') release: any) {
-		const result = this.releaseDraftService.getErrorsSchemaRelease(release);
-
-		return new ResponseSuccess({ data: result });
-	}
-
 	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
@@ -77,6 +69,26 @@ export class ReleaseDraftController {
 
 		return ReleaseSuccess.CREATE(result);
 	}
+
+	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	// @PublicRoute()
+	@Post('validate-list')
+	getErrorsSchemaReleases(@Body('releases') releases: any) {
+		const result =
+			this.releaseDraftService.getErrorsSchemaReleases(releases);
+
+		// return new ResponseSuccess({ data: result });
+
+		return result;
+	}
+
+	// @PublicRoute()
+	// @Post('validate')
+	// getErrorsSchemaRelease(@Body('release') release: any) {
+	// 	const result = this.releaseDraftService.getErrorsSchemaRelease(release);
+
+	// 	return new ResponseSuccess({ data: result });
+	// }
 
 	@PublicRoute()
 	@Post('import/one')

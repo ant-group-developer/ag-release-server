@@ -222,8 +222,40 @@ export class ReleaseDraftService {
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
 
-	getErrorsSchemaRelease(release: any) {
-		return this.releaseValidateService.getErrorsSchemaRelease(release);
+	async getErrorsSchemaReleases(releases: any) {
+		const maps = await this.buildLookupMaps();
+
+		const success: string[] = [];
+		const failed: { id: string; errors: string }[] = [];
+
+		for (const r of releases) {
+			const errors: string[] = [];
+
+			if (r.albumFormat && !maps.albumFormat.has(r.albumFormat))
+				errors.push(`Không tồn tại loại album: ${r.albumFormat}`);
+
+			if (r.primaryGenre && !maps.genre.has(r.primaryGenre))
+				errors.push(`Không tồn tại thể loại: ${r.primaryGenre}`);
+
+			if (r.subGenre && !maps.genre.has(r.subGenre))
+				errors.push(`Không tồn tại sub thể loại: ${r.subGenre}`);
+
+			if (r.label && !maps.label.has(r.label))
+				errors.push(`Không tồn tại label: ${r.label}`);
+
+			if (
+				r.thumbnail &&
+				(r.thumbnail.width < 3000 || r.thumbnail.height < 3000)
+			)
+				errors.push(
+					`Ảnh bìa phải tối thiểu 3000x3000, hiện tại: ${r.thumbnail.width}x${r.thumbnail.height}`,
+				);
+
+			if (errors.length === 0) success.push(r.id);
+			else failed.push({ id: r.id, errors: errors.join(', ') });
+		}
+
+		return { success, failed };
 	}
 
 	// sftp
@@ -336,6 +368,7 @@ export class ReleaseDraftService {
 				if (track.audioFile) {
 					await manager.getRepository(AudioFile).insert({
 						fileId: track.audioFile.fileId,
+						peakId: track.audioFile.peakFileId,
 						sampleRate: track.audioFile.sampleRate ?? null,
 						bitrate: track.audioFile.bitrate ?? null,
 						bitDepth: track.audioFile.bitDepth ?? null,
@@ -362,7 +395,7 @@ export class ReleaseDraftService {
 	}
 
 	async importReleases(payloads: ImportOneReleaseDto[]) {
-		console.log(payloads);
+		console.log(JSON.stringify(payloads));
 
 		const maps = await this.buildLookupMaps();
 
