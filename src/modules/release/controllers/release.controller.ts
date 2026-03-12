@@ -36,6 +36,7 @@ import {
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -139,8 +140,8 @@ export class ReleaseController {
 	}
 
 	@Get(':id/dsp/delivery')
-	async getReleaseDspDelivery(@Param('id') id: string) {
-		const data = await this.releaseService.getReleaseDspDelivery(id);
+	async getReleaseDspDelivery(@Param('id') id: string, @Query() query: ReleaseQueryDspDeliveryDto): Promise<ResponseSuccess<PageDto<any>>> {
+		const data = await this.releaseService.getReleaseDspDelivery(id, query);
 		return new ResponseSuccess({ data });
 	}
 

@@ -11,6 +11,7 @@ import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.enti
 import { ExcelController } from './excel.controller';
 import { ExcelGetDataService } from './excel.get-data';
 import { ExcelService } from './excel.service';
+import { AppConfig } from '../app-config/entities/app-config.entity';
 
 @Module({
 	imports: [
@@ -23,6 +24,7 @@ import { ExcelService } from './excel.service';
 			ReleaseLanguage,
 			Language,
 			Action,
+			AppConfig
 		]),
 	],
 	controllers: [ExcelController],
