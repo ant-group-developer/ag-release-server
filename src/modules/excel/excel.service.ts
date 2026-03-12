@@ -7,7 +7,7 @@ import { ExcelGetDataService } from './excel.get-data';
 
 @Injectable()
 export class ExcelService {
-	constructor(private readonly excelGetDataService: ExcelGetDataService) {}
+	constructor(private readonly excelGetDataService: ExcelGetDataService) { }
 
 	async downloadTemplate(res: Response) {
 		const [
@@ -29,8 +29,8 @@ export class ExcelService {
 		const workbook = new ExcelJS.Workbook();
 
 		/* =====================================================
-       COLORS
-    ===================================================== */
+	   COLORS
+	===================================================== */
 
 		const blueBg = 'FFB8CCE4';
 		const lightBlueBg = 'FFD6DDE4';
@@ -40,8 +40,8 @@ export class ExcelService {
 		const greyContent = 'FFBFBFBF';
 
 		/* =====================================================
-       SHEET 1
-    ===================================================== */
+	   SHEET 1
+	===================================================== */
 
 		const sheet1 = workbook.addWorksheet('METADATA TEMPLATE');
 
@@ -68,10 +68,16 @@ export class ExcelService {
 
 		/* LOGO PATH */
 
-		const logoPath = path.join(
+		const defaultLogoPath = path.join(
 			process.cwd(),
 			'src/modules/excel/asset/logo.png',
 		);
+
+		const logo = await this.excelGetDataService.getLogo();
+
+		const logoPath = logo
+			? path.join(process.cwd(), logo)
+			: defaultLogoPath;
 
 		/* ADD IMAGE */
 
@@ -228,12 +234,12 @@ export class ExcelService {
 		sheet1.getRow(3).height = 22;
 
 		/* =====================================================
-       MERGE ROW 4 → 8
-    ===================================================== */
+	   MERGE ROW 4 → 8
+	===================================================== */
 		sheet1.mergeCells('A4:BC8');
 		/* =====================================================
-       ROW 9 SECTIONS
-    ===================================================== */
+	   ROW 9 SECTIONS
+	===================================================== */
 
 		function setSection(range: string, text: string) {
 			sheet1.mergeCells(range);
@@ -301,8 +307,8 @@ export class ExcelService {
 		}
 
 		/* =====================================================
-       ROW 10 HEADERS
-    ===================================================== */
+	   ROW 10 HEADERS
+	===================================================== */
 
 		const headers = [
 			'CHECK NO.',
@@ -388,8 +394,8 @@ export class ExcelService {
 		});
 
 		/* =====================================================
-       ROW 11 INSTRUCTIONS
-    ===================================================== */
+	   ROW 11 INSTRUCTIONS
+	===================================================== */
 
 		const instructions = [
 			'1,2,n',
@@ -478,8 +484,8 @@ export class ExcelService {
 		instructionRow.height = 90;
 
 		/* =====================================================
-       GREY CELLS
-    ===================================================== */
+	   GREY CELLS
+	===================================================== */
 
 		const greyCells = [
 			'C10',
@@ -543,8 +549,8 @@ export class ExcelService {
 		});
 
 		/* =====================================================
-       ROW 12 SAMPLE
-    ===================================================== */
+	   ROW 12 SAMPLE
+	===================================================== */
 
 		sheet1.addRow([
 			1,
@@ -625,8 +631,8 @@ export class ExcelService {
 		});
 
 		/* =====================================================
-       ROW 13 COLUMN INDEX
-    ===================================================== */
+	   ROW 13 COLUMN INDEX
+	===================================================== */
 
 		const nums = [];
 		for (let i = 1; i <= 55; i++) nums.push(i);
@@ -654,8 +660,8 @@ export class ExcelService {
 
 		sheet1.views = [{ state: 'frozen', ySplit: 13 }];
 		/* =====================================================
-      WHITE BORDER TABLE
-    ===================================================== */
+	  WHITE BORDER TABLE
+	===================================================== */
 
 		for (let r = 1; r <= 3; r++) {
 			for (let c = 1; c <= 8; c++) {
@@ -684,8 +690,8 @@ export class ExcelService {
 		}
 
 		/* =====================================================
-       SHEET 2
-    ===================================================== */
+	   SHEET 2
+	===================================================== */
 
 		const sheet2 = workbook.addWorksheet('SYSTEM DATA', {
 			state: 'hidden',
@@ -734,8 +740,8 @@ export class ExcelService {
 			});
 		}
 		/* =====================================================
-       DROPDOWN LISTS FOR SHEET 1
-    ===================================================== */
+	   DROPDOWN LISTS FOR SHEET 1
+	===================================================== */
 
 		const startRow = 14;
 		const maxRow = 5000;
@@ -807,8 +813,8 @@ export class ExcelService {
 
 		setDropdown(54, policyRange);
 		/* =====================================================
-       DOWNLOAD
-    ===================================================== */
+	   DOWNLOAD
+	===================================================== */
 
 		res.setHeader(
 			'Content-Type',
