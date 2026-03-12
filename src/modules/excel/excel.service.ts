@@ -68,10 +68,7 @@ export class ExcelService {
 
 		/* LOGO PATH */
 
-		const defaultLogoPath = path.join(
-			process.cwd(),
-			'src/modules/excel/asset/logo.png',
-		);
+		const defaultLogoPath = path.join(__dirname, 'asset/logo.png');
 
 		const logo = await this.excelGetDataService.getLogo();
 
