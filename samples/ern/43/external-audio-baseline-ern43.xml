@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage xmlns:ern="http://ddex.net/xml/ern/43"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://ddex.net/xml/ern/43 http://ddex.net/xml/ern/43/release-notification.xsd" ReleaseProfileVersionId="Audio" LanguageAndScriptCode="en" AvsVersionId="3">
+    <MessageHeader>
+        <MessageThreadId>Baseline</MessageThreadId>
+        <MessageId>00001</MessageId>
+        <MessageSender>
+            <PartyId>YOUR DPID</PartyId>
+            <PartyName>
+                <FullName>YOUR COMPANY NAME</FullName>
+            </PartyName>
+        </MessageSender>
+        <MessageRecipient>
+            <PartyId>PADPIDA1011072101T</PartyId>
+            <PartyName>
+                <FullName>Spotify</FullName>
+            </PartyName>
+        </MessageRecipient>
+        <MessageCreatedDateTime>2024-07-17T00:00:00Z</MessageCreatedDateTime>
+    </MessageHeader>
+    <PartyList>
+        <Party>
+            <PartyReference>P1</PartyReference>
+            <PartyName>
+                <FullName>DDEX All Stars</FullName>
+            </PartyName>
+            <PartyId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">spotify:artist:6tBOn9inwc3aZ7wjD4i35z</ProprietaryId>
+            </PartyId>
+            <PartyId>
+                <ISNI>0000000000000000</ISNI>
+            </PartyId>
+        </Party>
+        <Party>
+            <PartyReference>P2</PartyReference>
+            <PartyName>
+                <FullName>ERN Recordings</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P3</PartyReference>
+            <PartyName>
+                <FullName>The Featured Artist</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P4</PartyReference>
+            <PartyName>
+                <FullName>The Producer</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P5</PartyReference>
+            <PartyName>
+                <FullName>The Remixer</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P6</PartyReference>
+            <PartyName>
+                <FullName>The Composer</FullName>
+            </PartyName>
+        </Party>
+    </PartyList>
+    <ResourceList>
+        <SoundRecording>
+            <ResourceReference>A1</ResourceReference>
+            <Type>MusicalWorkSoundRecording</Type>
+            <SoundRecordingEdition>
+                <Type>NonImmersiveEdition</Type>
+                <ResourceId>
+                    <ISRC>USXYZ2300001</ISRC>
+                </ResourceId>
+                <PLine>
+                    <Year>2025</Year>
+                    <PLineText>ERN Recordings</PLineText>
+                </PLine>
+                <RecordingMode>Stereo</RecordingMode>
+                <TechnicalDetails>
+                    <TechnicalResourceDetailsReference>T1S</TechnicalResourceDetailsReference>
+                    <DeliveryFile>
+                        <Type>AudioFile</Type>
+                        <File>
+                            <URI>USXYZ2300001_T1S.wav</URI>
+                        </File>
+                        <IsProvidedInDelivery>true</IsProvidedInDelivery>
+                    </DeliveryFile>
+                </TechnicalDetails>
+            </SoundRecordingEdition>
+            <WorkId>
+                <ISWC>T0345246801</ISWC>
+            </WorkId>
+            <DisplayTitleText>The First Track</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>The First Track</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">DDEX All Stars</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <DisplayArtist SequenceNumber="2">
+                <ArtistPartyReference>P3</ArtistPartyReference>
+                <DisplayArtistRole>FeaturedArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <DisplayArtist SequenceNumber="3">
+                <ArtistPartyReference>P5</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+                <ArtisticRole>Remixer</ArtisticRole>
+            </DisplayArtist>
+            <Contributor SequenceNumber="1">
+                <ContributorPartyReference>P4</ContributorPartyReference>
+                <Role Namespace="DPID" UserDefinedValue="Producer">UserDefined</Role>
+            </Contributor>
+            <Contributor SequenceNumber="2">
+                <ContributorPartyReference>P6</ContributorPartyReference>
+                <Role>ComposerLyricist</Role>
+            </Contributor>
+            <Duration>PT0H4M33S</Duration>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+        </SoundRecording>
+        <Image>
+            <ResourceReference>A2</ResourceReference>
+            <Type>FrontCoverImage</Type>
+            <ResourceId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">front-cover-image:1234567891011</ProprietaryId>
+            </ResourceId>
+            <CLine>
+                <Year>2025</Year>
+                <CLineText>ERN Recordings</CLineText>
+            </CLine>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+            <TechnicalDetails>
+                <TechnicalResourceDetailsReference>T2</TechnicalResourceDetailsReference>
+                <File>
+                    <URI>1234567891011.jpg</URI>
+                </File>
+            </TechnicalDetails>
+        </Image>
+    </ResourceList>
+    <ReleaseList>
+        <Release>
+            <ReleaseReference>R0</ReleaseReference>
+            <ReleaseType>Single</ReleaseType>
+            <ReleaseId>
+                <ICPN>1234567891011</ICPN>
+            </ReleaseId>
+            <DisplayTitleText>Baseline</DisplayTitleText>
+            <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
+                <TitleText>Baseline</TitleText>
+            </DisplayTitle>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">DDEX All Stars</DisplayArtistName>
+            <DisplayArtist SequenceNumber="1">
+                <ArtistPartyReference>P1</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <PLine>
+                <Year>2025</Year>
+                <PLineText>ERN Recordings</PLineText>
+            </PLine>
+            <CLine>
+                <Year>2025</Year>
+                <CLineText>ERN Recordings</CLineText>
+            </CLine>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>K-Pop</GenreText>
+            </Genre>
+            <OriginalReleaseDate>2025-01-01</OriginalReleaseDate>
+            <ReleaseVisibilityReference>V0</ReleaseVisibilityReference>
+            <ParentalWarningType>NotExplicit</ParentalWarningType>
+            <ResourceGroup>
+                <SequenceNumber>1</SequenceNumber>
+                <ResourceGroupContentItem>
+                    <SequenceNumber>1</SequenceNumber>
+                    <ReleaseResourceReference>A1</ReleaseResourceReference>
+                </ResourceGroupContentItem>
+                <LinkedReleaseResourceReference>A2</LinkedReleaseResourceReference>
+            </ResourceGroup>
+        </Release>
+        <TrackRelease>
+            <ReleaseReference>R1</ReleaseReference>
+            <ReleaseId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">1234567891011_R1</ProprietaryId>
+            </ReleaseId>
+            <ReleaseResourceReference>A1</ReleaseResourceReference>
+            <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
+            <Genre ApplicableTerritoryCode="Worldwide">
+                <GenreText>K-Pop</GenreText>
+            </Genre>
+            <ReleaseVisibilityReference>V1</ReleaseVisibilityReference>
+        </TrackRelease>
+    </ReleaseList>
+    <DealList>
+        <ReleaseDeal>
+            <DealReleaseReference>R1</DealReleaseReference>
+            <Deal>
+                <DealTerms>
+                    <TerritoryCode>AQ</TerritoryCode>
+                    <ValidityPeriod>
+                        <StartDateTime>2025-01-01T00:00:00</StartDateTime>
+                    </ValidityPeriod>
+                    <CommercialModelType>SubscriptionModel</CommercialModelType>
+                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
+                    <UseType>ConditionalDownload</UseType>
+                    <UseType>Stream</UseType>
+                </DealTerms>
+                <DealTechnicalResourceDetailsReferenceList>
+                    <DealTechnicalResourceDetailsReference>T1S</DealTechnicalResourceDetailsReference>
+                </DealTechnicalResourceDetailsReferenceList>
+            </Deal>
+        </ReleaseDeal>
+        <ReleaseVisibility>
+            <VisibilityReference>V0</VisibilityReference>
+            <TerritoryCode>AQ</TerritoryCode>
+            <ReleaseDisplayStartDateTime>2025-01-01T00:00:00</ReleaseDisplayStartDateTime>
+            <CoverArtPreviewStartDateTime>2025-01-01T00:00:00</CoverArtPreviewStartDateTime>
+            <FullTrackListingPreviewStartDateTime>2025-01-01T00:00:00</FullTrackListingPreviewStartDateTime>
+        </ReleaseVisibility>
+        <TrackReleaseVisibility>
+            <VisibilityReference>V1</VisibilityReference>
+            <TerritoryCode>AQ</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-01-01T00:00:00</TrackListingPreviewStartDateTime>
+        </TrackReleaseVisibility>
+    </DealList>
+</ern:NewReleaseMessage>
