@@ -66,7 +66,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
-	) {}
+	) { }
 
 	async createDdexFile({
 		releaseId,
@@ -114,7 +114,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		upc: string;
 		outputDir: string;
 	}) {
-		const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
+		// const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
+		const batchCompleteXml = this.generateBatchCompleteErnXml(batchId, upc);
 		const batchXmlPath = path.join(
 			outputDir,
 			`BatchComplete_${batchId}.xml`,
@@ -649,8 +650,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			const displayArtistName =
 				track.trackArtists && track.trackArtists.length > 0
 					? track.trackArtists
-							.map((ta) => ta.artist?.name || 'Unknown')
-							.join(', ')
+						.map((ta) => ta.artist?.name || 'Unknown')
+						.join(', ')
 					: 'Unknown Artist';
 
 			// Build resource
@@ -719,7 +720,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		// Get label reference
 		const labelRef = release.label
 			? parties.find((p) => p.name === release.label!.name)?.reference ||
-				'P1'
+			'P1'
 			: 'P1';
 
 		// Build display artists
@@ -742,8 +743,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		const displayArtistName =
 			release.releaseArtists && release.releaseArtists.length > 0
 				? release.releaseArtists
-						.map((ra) => ra.artist?.name || 'Unknown')
-						.join(', ')
+					.map((ra) => ra.artist?.name || 'Unknown')
+					.join(', ')
 				: 'Unknown Artist';
 
 		// Get resource references
@@ -856,6 +857,35 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 </ernm:BatchComplete>`;
 	}
 
+	private generateBatchCompleteErnXml(batchId: string, upc: string): string {
+		const now = new Date().toISOString();
+
+		return `<?xml version="1.0" encoding="UTF-8"?>
+<ernm:BatchComplete xmlns:ernm="http://ddex.net/xml/ern-main/43"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://ddex.net/xml/ern-main/43 http://ddex.net/xml/ern-main/43/batch.xsd">
+    <ernm:MessageHeader>
+        <ernm:MessageId>${batchId}</ernm:MessageId>
+        <ernm:MessageSender>
+            <ernm:PartyId>${this.appConfigSv.DDEX_PARTY_ID_SENDER()}</ernm:PartyId>
+            <ernm:PartyName>
+                <ernm:FullName>${this.appConfigSv.DDEX_PARTY_NAME_SENDER()}</ernm:FullName>
+            </ernm:PartyName>
+        </ernm:MessageSender>
+        <ernm:MessageRecipient>
+            <ernm:PartyId>${this.DDEX_PARTY_ID_SPOTIFY}</ernm:PartyId>
+            <ernm:PartyName>
+                <ernm:FullName>${this.DDEX_PARTY_NAME_SPOTIFY}</ernm:FullName>
+            </ernm:PartyName>
+        </ernm:MessageRecipient>
+        <ernm:MessageCreatedDateTime>${now}</ernm:MessageCreatedDateTime>
+    </ernm:MessageHeader>
+
+    <ernm:BatchId>${batchId}</ernm:BatchId>
+    <ernm:MessageFileName>${upc}.xml</ernm:MessageFileName>
+
+</ernm:BatchComplete>`;
+	}
 	// ==================== HELPER METHODS ====================
 
 	/**
