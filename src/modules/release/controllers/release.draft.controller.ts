@@ -14,6 +14,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
 import {
+	PublicRoute,
 	RequirePermissions,
 	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
@@ -23,6 +24,7 @@ import {
 	ReleaseException,
 	ReleaseSuccess,
 } from '../constants/release.constant';
+import { ImportOneReleaseDto } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
@@ -34,6 +36,20 @@ import { ReleaseDraftService } from '../services/release.draft.service';
 @Controller('releases/draft')
 export class ReleaseDraftController {
 	constructor(private readonly releaseDraftService: ReleaseDraftService) {}
+
+	@Get('maps')
+	async getLookupMaps() {
+		const maps = await this.releaseDraftService.buildLookupMaps();
+
+		return {
+			albumFormat: Object.fromEntries(maps.albumFormat),
+			genre: Object.fromEntries(maps.genre),
+			label: Object.fromEntries(maps.label),
+			trackType: Object.fromEntries(maps.trackType),
+			trackSensitive: Object.fromEntries(maps.trackSensitive),
+			priceTier: Object.fromEntries(maps.priceTier),
+		};
+	}
 
 	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
@@ -54,6 +70,38 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.CREATE(result);
 	}
 
+	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	// @PublicRoute()
+	@Post('validate-list')
+	getErrorsSchemaReleases(@Body('releases') releases: any) {
+		const result =
+			this.releaseDraftService.getErrorsSchemaReleases(releases);
+
+		// return new ResponseSuccess({ data: result });
+
+		return result;
+	}
+
+	// @PublicRoute()
+	// @Post('validate')
+	// getErrorsSchemaRelease(@Body('release') release: any) {
+	// 	const result = this.releaseDraftService.getErrorsSchemaRelease(release);
+
+	// 	return new ResponseSuccess({ data: result });
+	// }
+
+	@PublicRoute()
+	@Post('import/one')
+	async importOneRelease(@Body() payload: ImportOneReleaseDto) {
+		return this.releaseDraftService.importOneRelease(payload);
+	}
+
+	// @PublicRoute()
+	@Post('import')
+	async importReleases(@Body() payload: ImportOneReleaseDto[]) {
+		return this.releaseDraftService.importReleases(payload);
+	}
+
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
@@ -67,11 +115,21 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.UPDATE(result);
 	}
 
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/auto-fill-cover-arts')
+	async autoFillCoverArts(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<any>> {
+		const result = await this.releaseDraftService.autoFillCoverArts(id);
+
+		return ReleaseSuccess.UPDATE(result);
+	}
+
 	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	@Get(':id/validate')
-	async getErrorsSchemaRelease(@Param('id') id: string) {
+	async getErrorsSchemaReleaseById(@Param('id') id: string) {
 		const result =
-			await this.releaseDraftService.getErrorsSchemaRelease(id);
+			await this.releaseDraftService.getErrorsSchemaReleaseById(id);
 		return new ResponseSuccess({ data: result });
 	}
 

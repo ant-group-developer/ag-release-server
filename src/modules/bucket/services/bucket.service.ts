@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { pipeline } from 'stream/promises';
+import { Repository } from 'typeorm';
 import { FolderBucketMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
@@ -15,9 +17,12 @@ import {
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
+import { ReleaseTemplateFile } from '../entities/release-template-file.entity';
+import { StorageProvider } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
-import { BucketFileService } from './bucket.file.service';
-import { BucketGcsService } from './bucket.gcs.service';
+import { BucketFileService } from './bucket-file.service';
+import { BucketGcsService } from './bucket-gcs.service';
+import { BucketR2Service } from './bucket-r2.service';
 
 @Injectable()
 export class BucketService {
@@ -25,7 +30,10 @@ export class BucketService {
 
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketR2Service: BucketR2Service,
 		private readonly bucketFileService: BucketFileService,
+		@InjectRepository(ReleaseTemplateFile)
+		private readonly releaseTemplateFileRepo: Repository<ReleaseTemplateFile>,
 	) {}
 
 	@OnEvent(AppEvent.DELETE_LOGO)
@@ -52,7 +60,9 @@ export class BucketService {
 			bucket,
 		});
 
-		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
+		const urlUpload = await this.getStorageService(
+			file.storageProvider!,
+		).getSignedUrlUpload({
 			contentType: newFile.contentType,
 			key: keyBucket,
 			isPublic: false,
@@ -63,6 +73,17 @@ export class BucketService {
 			urlUpload,
 			key: keyForMapping,
 		};
+	}
+
+	async createTemplate(data: CreateBucketDto): Promise<IResCreateBucket> {
+		const bucket = await this.create(data);
+
+		await this.releaseTemplateFileRepo.save(
+			this.releaseTemplateFileRepo.create({
+				file_id: bucket.fileId,
+			}),
+		);
+		return bucket;
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
@@ -129,7 +150,7 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key } = file;
 
-		return this.bucketGcsService.getSignedUrlRead({
+		return this.getStorageService(file.storageProvider).getSignedUrlRead({
 			key,
 			isPublic: false,
 		});
@@ -139,11 +160,27 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key, fileName } = file;
 
-		return this.bucketGcsService.getSignedUrlDown({
+		return this.getStorageService(file.storageProvider).getSignedUrlDown({
 			key,
 			isPublic: false,
 			fileName,
 		});
+	}
+
+	async getUrlDownTemplateFile() {
+		const [template] = await this.releaseTemplateFileRepo.find({
+			relations: ['file'],
+			order: {
+				createdAt: 'DESC',
+			},
+			take: 1,
+		});
+
+		if (!template || !template.file) {
+			throw new Error('Template file not found');
+		}
+
+		return await this.getUrlDown(template.file.id);
 	}
 
 	async getDetail(id: string) {
@@ -153,7 +190,9 @@ export class BucketService {
 			...file,
 			urlPublic: this.getUrlPublic(file.key),
 			urlPrivate: this.getUrlPrivate(file.key),
-			urlRead: await this.bucketGcsService.getSignedUrlRead({
+			urlRead: await this.getStorageService(
+				file.storageProvider,
+			).getSignedUrlRead({
 				key: file.key,
 				isPublic: false,
 			}),
@@ -376,5 +415,16 @@ export class BucketService {
 			this.logger.error(messageWarning);
 			return messageWarning ?? 'Unknown error';
 		});
+	}
+
+	private getStorageService(provider: StorageProvider) {
+		switch (provider) {
+			case StorageProvider.R2:
+				return this.bucketR2Service;
+
+			case StorageProvider.GCS:
+			default:
+				return this.bucketGcsService;
+		}
 	}
 }

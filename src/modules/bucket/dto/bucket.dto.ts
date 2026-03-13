@@ -13,7 +13,7 @@ import {
 	Min,
 	ValidateNested,
 } from 'class-validator';
-import { UploadPurpose } from '../enum/bucket.enum';
+import { StorageProvider, UploadPurpose } from '../enum/bucket.enum';
 
 class CreateFileDto {
 	@IsString()
@@ -23,7 +23,6 @@ class CreateFileDto {
 
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(30)
 	contentType: string;
 
 	@IsString()
@@ -34,6 +33,10 @@ class CreateFileDto {
 	@IsNumber()
 	@Min(0)
 	fileSize: number;
+
+	@IsOptional()
+	@IsEnum(StorageProvider)
+	storageProvider?: StorageProvider = StorageProvider.GCS;
 }
 
 class FolderBucket {

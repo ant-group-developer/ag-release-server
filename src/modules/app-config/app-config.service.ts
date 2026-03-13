@@ -6,17 +6,12 @@ import { Repository } from 'typeorm';
 import { appConfigDefault } from './constants/app-config.constant';
 import { UpdateConfigDto } from './dtos/app-config.dto';
 import { AppConfig } from './entities/app-config.entity';
-import { AppConfigKey } from './enums/app-config.enum';
-import {
-	AppConfigShape,
-	AppConfigValueMap,
-} from './interfaces/app-config.type';
 
 @Injectable()
 export class AppConfigService implements OnModuleInit {
 	private readonly logger = new Logger(AppConfigService.name);
-	private id: string;
-	private config: AppConfigShape;
+
+	cache: AppConfig;
 
 	constructor(
 		@InjectRepository(AppConfig)
@@ -24,52 +19,75 @@ export class AppConfigService implements OnModuleInit {
 		private readonly eventEmitter: EventEmitter2,
 	) {}
 
-	async onModuleInit() {
-		const result = await this.initDataDefault();
-		this.id = result.id;
-		this.config = result.config;
-	}
-
-	private async initDataDefault() {
-		const appConfig = await this.findOne();
-
-		if (!appConfig) {
-			this.logger.log('Initializing default AppConfig');
-			const entity = this.appConfigRepo.create({
-				config: appConfigDefault,
-			});
-			return this.appConfigRepo.save(entity);
+	getCache(): AppConfig {
+		if (!this.cache) {
+			this.refreshCache().catch((_e) => {});
 		}
 
-		this.logger.log('AppConfig already exists, skipping initialization.');
-		return appConfig;
+		return (
+			this.cache ?? ({ id: '', config: appConfigDefault } as AppConfig)
+		);
 	}
 
-	private emitEventUpdate() {
-		this.logger.log(`Event: ${AppEvent.UPDATE_APP_CONFIG}}`);
-		this.eventEmitter.emit(AppEvent.UPDATE_APP_CONFIG);
+	getValue<T = any>(path: string): T | undefined {
+		const r = this.getCache();
+
+		return path.split('.').reduce<any>((acc, key) => {
+			return acc?.[key];
+		}, r);
 	}
 
-	private async findOne() {
-		return this.appConfigRepo.createQueryBuilder().getOne();
+	// acrCloud
+	ACR_HOST() {
+		return this.getValue('config.acrCloud.acrHost') ?? '';
 	}
 
-	private async getOneOrCreate(): Promise<AppConfig> {
-		const result = new AppConfig();
-		result.id = this.id;
-		result.config = this.config;
+	ACR_ACCESS_KEY() {
+		return this.getValue('config.acrCloud.acrAccessKey') ?? '';
+	}
 
-		if (!result || !result.config) {
-			return this.initDataDefault();
-		}
+	ACR_ACCESS_SECRET() {
+		return this.getValue('config.acrCloud.acrAccessSecret') ?? '';
+	}
 
-		return result;
+	scoreWarning() {
+		return this.getValue('config.acrCloud.scoreWarning') ?? '';
+	}
+
+	chunkDuration() {
+		return this.getValue('config.acrCloud.chunkDuration') ?? '';
+	}
+
+	// ddex
+	DDEX_PARTY_ID_SENDER() {
+		return this.getValue('config.generator.DDEX_PARTY_ID_SENDER') ?? '';
+	}
+
+	DDEX_PARTY_NAME_SENDER() {
+		return this.getValue('config.generator.DDEX_PARTY_NAME_SENDER') ?? '';
+	}
+
+	getPublic() {
+		const website = this.getValue('config.website');
+		const chunkDuration = this.getValue('config.acrCloud.chunkDuration');
+		const general = this.getValue('config.general');
+
+		return {
+			config: {
+				website,
+				acrCloud: {
+					chunkDuration,
+				},
+
+				general,
+			},
+		};
 	}
 
 	async update(payload: UpdateConfigDto) {
 		const { website } = payload;
 
-		const dataDb = await this.getOneOrCreate();
+		const dataDb = this.getCache();
 
 		const { config: configDb } = dataDb;
 
@@ -89,105 +107,47 @@ export class AppConfigService implements OnModuleInit {
 		}
 
 		// const
-		const result = await this.appConfigRepo.save({ ...dataDb, ...payload });
+		const e = { ...dataDb, config: { ...dataDb.config, ...payload } };
 
-		this.config = result.config;
+		const result = await this.appConfigRepo.save(e);
+
+		this.setCache(result);
+
+		return result;
+	}
+
+	// private
+	async onModuleInit() {
+		await this.refreshCache();
+	}
+
+	private setCache(r: AppConfig) {
+		this.cache = r;
 		this.emitEventUpdate();
-		return this.config;
 	}
 
-	getPublic() {
-		const website = this.getValue(AppConfigKey.WEBSITE);
-		const chunkDuration = this.getValue(AppConfigKey.CHUNK_DURATION);
-		const general = this.getValue(AppConfigKey.GENERAL);
+	private async refreshCache() {
+		let appConfig = await this.findOneDb();
 
-		return {
-			website,
-			acrCloud: {
-				chunkDuration,
-			},
-
-			general,
-		};
-	}
-
-	getValue<K extends AppConfigKey>(key: K): AppConfigValueMap[K] {
-		const {
-			acrCloud,
-			telegram,
-			website,
-			backupDatabase,
-			general,
-			generator,
-		} = this.config;
-
-		const values: AppConfigValueMap = {
-			[AppConfigKey.ALL]: this.config,
-
-			[AppConfigKey.WEBSITE]: website,
-			[AppConfigKey.ACR_HOST]: acrCloud.acrHost,
-			[AppConfigKey.ACR_ACCESS_KEY]: acrCloud.acrAccessKey,
-			[AppConfigKey.ACR_ACCESS_SECRET]: acrCloud.acrAccessSecret,
-			[AppConfigKey.CHUNK_DURATION]: acrCloud.chunkDuration,
-			[AppConfigKey.SCORE_WARNING]: acrCloud.scoreWarning,
-
-			// backup
-			[AppConfigKey.CRON_VALUE]: backupDatabase.cronValue,
-			[AppConfigKey.FILE_NAME]: backupDatabase.fileName,
-			[AppConfigKey.SHELL]: backupDatabase.shell,
-
-			[AppConfigKey.DATABASE_TO_DRIVE]: backupDatabase.toDrive,
-			[AppConfigKey.DATABASE_TO_GCS]: backupDatabase.toGcs,
-			[AppConfigKey.NOTIFY_ON_SUCCESS]: backupDatabase.notifyOnSuccess,
-			[AppConfigKey.NOTIFY_ON_FAILED]: backupDatabase.notifyOnFailed,
-
-			// telegram
-			[AppConfigKey.TELEGRAM_TOKEN]: telegram.token,
-			[AppConfigKey.CHAT_ID]: telegram.chatId,
-
-			// track
-			[AppConfigKey.GENERAL]: general,
-			[AppConfigKey.generator]: generator,
-		};
-
-		return values[key];
-	}
-
-	// get value
-	async getPrefixIsrcDefaultId() {
-		const r = await this.getOneOrCreate();
-		return r.config.generator.prefixIsrcDefaultId;
-	}
-
-	async getPrefixUpcDefaultId() {
-		const r = await this.getOneOrCreate();
-		return r.config.generator.prefixUpcDefaultId;
-	}
-
-	async getDdexPartyIdSender() {
-		try {
-			const r = await this.getOneOrCreate();
-			return r.config.generator.DDEX_PARTY_ID_SENDER;
-		} catch (error) {
-			return '';
+		if (!appConfig) {
+			this.logger.log('Initializing default AppConfig');
+			const entity = this.appConfigRepo.create({
+				config: appConfigDefault,
+			});
+			appConfig = await this.appConfigRepo.save(entity);
 		}
+
+		this.setCache(appConfig);
+
+		return appConfig;
 	}
 
-	async getDdexPartyNameSender() {
-		try {
-			const r = await this.getOneOrCreate();
-			return r.config.generator.DDEX_PARTY_NAME_SENDER;
-		} catch (error) {
-			return '';
-		}
+	private async findOneDb() {
+		return this.appConfigRepo.createQueryBuilder().getOne();
 	}
 
-	async getAPI_KEY_GRPC_ISRC_UPC() {
-		try {
-			const r = await this.getOneOrCreate();
-			return r.config.generator.API_KEY_GRPC_ISRC_UPC;
-		} catch (error) {
-			return '';
-		}
+	private emitEventUpdate() {
+		this.logger.log(`Event: ${AppEvent.UPDATE_APP_CONFIG}`);
+		this.eventEmitter.emit(AppEvent.UPDATE_APP_CONFIG);
 	}
 }

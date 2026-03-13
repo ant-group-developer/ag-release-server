@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
-import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
@@ -23,7 +22,7 @@ export class TrackService {
 		private readonly trackQueryService: TrackQueryService,
 
 		private readonly isrcService: IsrcService,
-		private readonly appConfigService: AppConfigService2,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	async submit(
@@ -202,10 +201,8 @@ export class TrackService {
 			throw new BadRequestException('Thiếu duration (giây) từ audioFile');
 		}
 
-		// Prefix: thay bằng logic thật (config/db)
-		const prefixIsrcId = this.appConfigService.getValue(
-			AppConfigKey2.GENERATOR_PREFIX_ISRC_DEFAULT_ID,
-		);
+		const prefixIsrcId =
+			this.appConfigService.cache.config.generator.prefixIsrcDefaultId;
 
 		if (!prefixIsrcId) {
 			throw new BadRequestException('Chưa cấu hình prefixIsrcId');

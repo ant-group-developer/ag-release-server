@@ -1,11 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
-import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import {
 	CreateUpc,
 	UpcIndustry,
@@ -15,6 +15,8 @@ import {
 	UpcYesNo,
 } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspStatus } from 'src/modules/release-dsp/enum/release-dsp.enum';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
@@ -30,6 +32,7 @@ import {
 	QueryGetListReleaseDto2,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
+import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import {
@@ -40,9 +43,11 @@ import {
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 
 @Injectable()
 export class ReleaseService {
+	private readonly logger = new Logger('ReleaseSpotifyService');
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
@@ -56,11 +61,129 @@ export class ReleaseService {
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
-		private readonly appConfigService: AppConfigService2,
+		private readonly appConfigService: AppConfigService,
+
+		@InjectRepository(ReleaseDspDelivery)
+		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
 	) {}
 
+	async getReleaseDspDelivery(
+		releaseId: string,
+		query: ReleaseQueryDspDeliveryDto,
+	) {
+		const { keyword, status, fieldOrder, orderBy, skip, limit } = query;
+		const dsps = await this.dspRepo.find({
+			where: { isActive: true },
+			select: ['id'],
+		});
+
+		const existDeliveries = await this.releaseDspDeliveryRepo.find({
+			where: { releaseId },
+			select: ['dspId'],
+		});
+
+		const existDspIds = new Set(existDeliveries.map((d) => d.dspId));
+
+		const newRecords = dsps
+			.filter((dsp) => !existDspIds.has(dsp.id))
+			.map((dsp) => ({
+				releaseId,
+				dspId: dsp.id,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				lastEnqueuedAt: null,
+				lastDeliveredAt: null,
+			}));
+
+		if (newRecords.length) {
+			await this.releaseDspDeliveryRepo.insert(newRecords);
+		}
+
+		const qb = this.dspRepo
+			.createQueryBuilder('dsp')
+			.leftJoin(
+				ReleaseDspDelivery,
+				'delivery',
+				'delivery.dspId = dsp.id AND delivery.releaseId = :releaseId',
+				{ releaseId },
+			)
+			.where('dsp.isActive = true');
+
+		if (keyword) {
+			qb.andWhere('(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)', {
+				keyword: `%${keyword}%`,
+			});
+		}
+
+		if (status) {
+			qb.andWhere(
+				'COALESCE(delivery.status, :defaultStatus) = :status',
+				{
+					status,
+					defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				},
+			);
+		}
+
+		const sortableFields: Record<string, string> = {
+			dsp_name: 'dsp.name',
+			dsp_code: 'dsp.code',
+			status: 'delivery.status',
+			lastEnqueuedAt: 'delivery.lastEnqueuedAt',
+			lastDeliveredAt: 'delivery.lastDeliveredAt',
+			createdAt: 'dsp.createdAt',
+		};
+
+		const sortField = sortableFields[fieldOrder] ?? 'dsp.createdAt';
+
+		qb.orderBy(sortField, orderBy.toUpperCase() as 'ASC' | 'DESC');
+
+		const total = await qb.clone().getCount();
+
+		qb.skip(skip).take(limit);
+
+		const raw = await qb
+			.select([
+				'dsp.id as dsp_id',
+				'dsp.name as dsp_name',
+				'dsp.code as dsp_code',
+				'dsp.picture as dsp_picture',
+				'delivery.status as delivery_status',
+				'delivery.last_enqueued_at as delivery_last_enqueued_at',
+				'delivery.last_delivered_at as delivery_last_delivered_at',
+			])
+			.getRawMany();
+
+		const items = raw.map((row) => ({
+			dsp: {
+				id: row.dsp_id,
+				name: row.dsp_name,
+				code: row.dsp_code,
+				picture: row.dsp_picture,
+			},
+			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
+			lastEnqueuedAt: row.delivery_last_enqueued_at,
+			lastDeliveredAt: row.delivery_last_delivered_at,
+		}));
+
+		return {
+			items,
+			metadata: {
+				totalItems: total,
+				totalPages: Math.ceil(total / limit),
+				page: Math.floor(skip / limit) + 1,
+				pageSize: limit,
+			},
+		};
+	}
 	// nghiệp vụ
-	async submit(id: string, userId: string): Promise<IReleaseNonDraft> {
+	async submit(
+		id: string,
+		userId: string,
+		dto: SubmitReleaseDto,
+	): Promise<IReleaseNonDraft> {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
@@ -86,7 +209,72 @@ export class ReleaseService {
 			});
 		}
 
-		await this.releaseRepo.save({ ...release, creatorId: userId });
+		const codeArray = dto.code;
+		if (codeArray.includes('SPOTIFY')) {
+			const dsp = await this.dspRepo.findOne({
+				where: { code: 'SPOTIFY' },
+			});
+			if (!dsp) {
+				throw new Error('DSP SPOTIFY not found');
+			}
+
+			const exist = await this.releaseDspDeliveryRepo.findOne({
+				where: {
+					releaseId: id,
+					dspId: dsp.id,
+				},
+			});
+
+			if (exist) {
+				await this.releaseDspDeliveryRepo.update(
+					{ releaseId: id, dspId: dsp.id },
+					{
+						status: ReleaseDspStatus.PROCESSING,
+						lastEnqueuedAt: new Date(),
+						lastDeliveredAt: null,
+					},
+				);
+			} else {
+				await this.releaseDspDeliveryRepo.save({
+					releaseId: id,
+					dspId: dsp.id,
+					status: ReleaseDspStatus.PROCESSING,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				});
+				await this.releaseRepo.update(id, {
+					status: ReleaseStatus.PROCESSING,
+				});
+			}
+
+			setImmediate(async () => {
+				try {
+					await this.createAndUploadMetadataSpotify(id);
+
+					await this.releaseDspDeliveryRepo.update(
+						{ releaseId: id, dspId: dsp?.id },
+						{
+							status: ReleaseDspStatus.DISTRIBUTED,
+							lastEnqueuedAt: new Date(),
+							lastDeliveredAt: new Date(),
+						},
+					);
+				} catch (error) {
+					await this.releaseDspDeliveryRepo.update(
+						{ releaseId: id, dspId: dsp?.id },
+						{
+							status: ReleaseDspStatus.ISSUES,
+							lastEnqueuedAt: new Date(),
+						},
+					);
+
+					this.logger.error(
+						`Spotify metadata process failed for release ${id}`,
+						error.stack,
+					);
+				}
+			});
+		}
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
@@ -95,6 +283,19 @@ export class ReleaseService {
 
 	async getOne(id: string): Promise<IReleaseDetail> {
 		const release = await this.releaseQueryService.getOneDetail(id);
+
+		const { releaseCoverArts, ...restOfRelease } = release;
+
+		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
+
+		return {
+			...restOfRelease,
+			coverArtThumbnails,
+		};
+	}
+
+	async findOneFull(id: string): Promise<IReleaseDetail> {
+		const release = await this.releaseQueryService.findOneReleaseFull(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
 
@@ -328,9 +529,8 @@ export class ReleaseService {
 			return { upc: release.upc, alreadyExists: true };
 		}
 
-		const prefixUpcId = this.appConfigService.getValue(
-			AppConfigKey2.GENERATOR_PREFIX_UPC_DEFAULT_ID,
-		);
+		const prefixUpcId =
+			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
 		if (!prefixUpcId) {
 			throw new BadRequestException('Release chưa có prefixUpcId');
@@ -415,21 +615,54 @@ export class ReleaseService {
 		);
 	}
 
-	// sportify
+	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
+		this.logger.log(
+			`Start create & upload metadata Spotify - releaseId=${id}`,
+		);
+
 		await this.createMetadataSpotifyOnServer(id);
+
+		this.logger.log(`Metadata created on server - releaseId=${id}`);
+
 		await this.uploadMetadataSpotifyToSftp(id);
+
+		this.logger.log(`Metadata uploaded to SFTP - releaseId=${id}`);
+
+		this.logger.log(
+			`Finish create & upload metadata Spotify - releaseId=${id}`,
+		);
 	}
 
 	async createMetadataSpotifyOnServer(id: string) {
-		return await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
-			id,
+		this.logger.log(
+			`Creating metadata Spotify on server - releaseId=${id}`,
 		);
+
+		const result =
+			await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
+				id,
+			);
+
+		this.logger.log(
+			`Created metadata Spotify successfully - releaseId=${id}`,
+		);
+
+		return result;
 	}
 
 	async uploadMetadataSpotifyToSftp(id: string) {
-		return await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
-			id,
+		this.logger.log(`Uploading metadata Spotify to SFTP - releaseId=${id}`);
+
+		const result =
+			await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
+				id,
+			);
+
+		this.logger.log(
+			`Uploaded metadata Spotify successfully - releaseId=${id}`,
 		);
+
+		return result;
 	}
 }

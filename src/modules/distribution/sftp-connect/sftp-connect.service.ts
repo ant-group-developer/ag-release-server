@@ -1,5 +1,6 @@
 // src/modules/distribution2/sftp/sftp.service.ts
 import { Injectable, Logger } from '@nestjs/common';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
@@ -96,54 +97,6 @@ export class SftpConnectService {
 		}
 	}
 
-	/**
-	 * Upload local folder → remote folder (recursive)
-	 */
-	async sendFolderTo(
-		config: SftpMetadata,
-		localDir: string,
-		remoteDir: string,
-	): Promise<void> {
-		const client = this.createClient();
-
-		try {
-			await client.connect({
-				host: config.host,
-				port: config.port ?? 22,
-				username: config.username,
-				password: config.password,
-				privateKey: config.privateKey,
-				readyTimeout: 10_000,
-			});
-
-			await this.uploadDirectory(client, localDir, remoteDir);
-		} finally {
-			await client.end();
-		}
-	}
-
-	// ===== PRIVATE =====
-	private async uploadDirectory(
-		client: SftpClient,
-		localDir: string,
-		remoteDir: string,
-	): Promise<void> {
-		await client.mkdir(remoteDir, true);
-
-		const items = fs.readdirSync(localDir, { withFileTypes: true });
-
-		for (const item of items) {
-			const localPath = path.join(localDir, item.name);
-			const remotePath = path.posix.join(remoteDir, item.name);
-
-			if (item.isDirectory()) {
-				await this.uploadDirectory(client, localPath, remotePath);
-			} else {
-				await client.put(localPath, remotePath);
-			}
-		}
-	}
-
 	async uploadFile({
 		sftp,
 		localFile,
@@ -230,6 +183,71 @@ export class SftpConnectService {
 		} finally {
 			await client.end();
 		}
+	}
+
+	async uploadFolderScp({
+		sftp,
+		localDir,
+		remoteDir,
+	}: {
+		sftp: {
+			host: string;
+			port?: number;
+			username: string;
+			password?: string;
+		};
+		localDir: string;
+		remoteDir: string;
+	}) {
+		const port = sftp.port ?? 22;
+
+		return new Promise((resolve, reject) => {
+			const args = [
+				'-p',
+				sftp.password ?? '',
+				'scp',
+				'-P',
+				String(port),
+				'-r',
+				'-o',
+				'StrictHostKeyChecking=no',
+				'-o',
+				'UserKnownHostsFile=/dev/null',
+				localDir,
+				`${sftp.username}@${sftp.host}:${remoteDir}`,
+			];
+
+			const scp = spawn('sshpass', args);
+
+			let stdout = '';
+			let stderr = '';
+
+			scp.stdout.on('data', (data) => {
+				stdout += data.toString();
+				console.log(data.toString());
+			});
+
+			scp.stderr.on('data', (data) => {
+				stderr += data.toString();
+				console.error(data.toString());
+			});
+
+			scp.on('close', (code) => {
+				if (code === 0) {
+					resolve(stdout);
+				} else {
+					reject(
+						new Error(
+							`scp failed with code ${code}\nstdout: ${stdout}\nstderr: ${stderr}`,
+						),
+					);
+				}
+			});
+
+			scp.on('error', (err) => {
+				reject(err);
+			});
+		});
 	}
 
 	private async uploadRecursive(

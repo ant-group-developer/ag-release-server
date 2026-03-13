@@ -32,7 +32,7 @@ export interface IAudioFile {
 	sampleLength: number | null;
 	trackId: string;
 	fileId: string;
-	peakId: string;
+	peakId: string | null;
 }
 
 export interface IAudioFileDraft {

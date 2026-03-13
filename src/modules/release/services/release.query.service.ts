@@ -147,6 +147,8 @@ export class ReleaseQueryService {
 		});
 	}
 
+	// findOneFull;
+
 	private createQbGetOneDetail(id: string) {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
@@ -337,6 +339,17 @@ export class ReleaseQueryService {
 
 		return release;
 	}
+
+	// async findOneFull(id: string): Promise<Release> {
+	// 	const qb = this.findOneFull(id);
+	// 	const release = await qb.getOne();
+
+	// 	if (!release) {
+	// 		throw ReleaseException.NOT_FOUND();
+	// 	}
+
+	// 	return release;
+	// }
 
 	// private
 	private filterByQuery(

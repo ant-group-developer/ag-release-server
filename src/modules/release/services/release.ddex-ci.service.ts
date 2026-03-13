@@ -18,12 +18,9 @@ import {
 	CiRawRow,
 } from 'src/modules/distribution/file-metadata/ci/interface';
 import { SftpConfigsService } from 'src/modules/distribution/sftp-configs/services/sftp-config.service';
+import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
-import {
-	removeFolder,
-	resizeCoverImageTo3000x3000,
-	uploadFileToSftp,
-} from 'src/utils/util';
+import { removeFolder, resizeCoverImageTo3000x3000 } from 'src/utils/util';
 import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { ReleaseException } from '../constants/release.constant';
@@ -44,6 +41,7 @@ export class ReleaseDdexCiService {
 
 		private readonly bucketSv: BucketService,
 		private readonly sftpConfigsService: SftpConfigsService,
+		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
 	async parseMetadata(releaseId: string) {
@@ -232,7 +230,7 @@ export class ReleaseDdexCiService {
 
 		await this.downloadMetadataCiFromBucket(releaseId);
 
-		await uploadFileToSftp({
+		await this.sftpConnectService.uploadFolderScp({
 			sftp,
 			localDir: release.metadataCi?.folderServer ?? '',
 			remoteDir: sftp.path ?? '',

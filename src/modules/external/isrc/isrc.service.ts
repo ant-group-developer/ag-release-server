@@ -5,8 +5,7 @@ import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { AppConfigService2 } from 'src/modules/app-config/app-config-v2.service';
-import { AppConfigKey2 } from 'src/modules/app-config/enums/app-config.enum';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { ISRC_CLIENT_NAME, ISRC_SERVICE_NAME } from './const/isrc.constants';
 import {
 	CreateIsrc,
@@ -22,7 +21,7 @@ export class IsrcService implements OnModuleInit {
 	constructor(
 		@Inject(ISRC_CLIENT_NAME)
 		private readonly client: ClientGrpc,
-		private readonly appConfigSv: AppConfigService2,
+		private readonly appConfigSv: AppConfigService,
 	) {}
 
 	onModuleInit() {
@@ -34,9 +33,7 @@ export class IsrcService implements OnModuleInit {
 		const md = new Metadata();
 
 		const x_api_key =
-			this.appConfigSv.getValue(
-				AppConfigKey2.GENERATOR_API_KEY_GRPC_ISRC_UPC,
-			) ?? '';
+			this.appConfigSv.cache.config.generator.API_KEY_GRPC_ISRC_UPC;
 
 		md.set('x-api-key', x_api_key);
 		return md;
