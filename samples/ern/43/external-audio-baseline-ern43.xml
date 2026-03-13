@@ -5,33 +5,60 @@
         <MessageThreadId>Baseline</MessageThreadId>
         <MessageId>00001</MessageId>
         <MessageSender>
-            <PartyId>PADPIDA20250804056</PartyId>
+            <PartyId>YOUR DPID</PartyId>
             <PartyName>
-                <FullName>ANT MUSIC LLC</FullName>
+                <FullName>YOUR COMPANY NAME</FullName>
             </PartyName>
         </MessageSender>
         <MessageRecipient>
-            <PartyId>PADPIDA2011072101T</PartyId>
+            <PartyId>PADPIDA1011072101T</PartyId>
             <PartyName>
                 <FullName>Spotify</FullName>
             </PartyName>
         </MessageRecipient>
-        <MessageCreatedDateTime>2025-12-11T10:57:30+00:07</MessageCreatedDateTime>
+        <MessageCreatedDateTime>2024-07-17T00:00:00Z</MessageCreatedDateTime>
     </MessageHeader>
     <PartyList>
         <Party>
             <PartyReference>P1</PartyReference>
             <PartyName>
-                <FullName>Fuuji Liam</FullName>
+                <FullName>DDEX All Stars</FullName>
             </PartyName>
             <PartyId>
-                <ProprietaryId Namespace="PADPIDA2011072101T">spotify:artist:37i9dQZF1E4vh3bs2l4OK0</ProprietaryId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">spotify:artist:6tBOn9inwc3aZ7wjD4i35z</ProprietaryId>
+            </PartyId>
+            <PartyId>
+                <ISNI>0000000000000000</ISNI>
             </PartyId>
         </Party>
         <Party>
             <PartyReference>P2</PartyReference>
             <PartyName>
-                <FullName>AMG</FullName>
+                <FullName>ERN Recordings</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P3</PartyReference>
+            <PartyName>
+                <FullName>The Featured Artist</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P4</PartyReference>
+            <PartyName>
+                <FullName>The Producer</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P5</PartyReference>
+            <PartyName>
+                <FullName>The Remixer</FullName>
+            </PartyName>
+        </Party>
+        <Party>
+            <PartyReference>P6</PartyReference>
+            <PartyName>
+                <FullName>The Composer</FullName>
             </PartyName>
         </Party>
     </PartyList>
@@ -42,11 +69,11 @@
             <SoundRecordingEdition>
                 <Type>NonImmersiveEdition</Type>
                 <ResourceId>
-                    <ISRC>QT6KL2500011</ISRC>
+                    <ISRC>USXYZ2300001</ISRC>
                 </ResourceId>
                 <PLine>
                     <Year>2025</Year>
-                    <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                    <PLineText>ERN Recordings</PLineText>
                 </PLine>
                 <RecordingMode>Stereo</RecordingMode>
                 <TechnicalDetails>
@@ -54,43 +81,59 @@
                     <DeliveryFile>
                         <Type>AudioFile</Type>
                         <File>
-                            <URI>resources/QT6KL2500017_T1S.wav</URI>
+                            <URI>USXYZ2300001_T1S.wav</URI>
                         </File>
                         <IsProvidedInDelivery>true</IsProvidedInDelivery>
                     </DeliveryFile>
                 </TechnicalDetails>
             </SoundRecordingEdition>
-            <DisplayTitleText>Timeless</DisplayTitleText>
+            <WorkId>
+                <ISWC>T0345246801</ISWC>
+            </WorkId>
+            <DisplayTitleText>The First Track</DisplayTitleText>
             <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
-                <TitleText>Timeless</TitleText>
+                <TitleText>The First Track</TitleText>
             </DisplayTitle>
-            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Fuuji Liam</DisplayArtistName>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">DDEX All Stars</DisplayArtistName>
             <DisplayArtist SequenceNumber="1">
                 <ArtistPartyReference>P1</ArtistPartyReference>
                 <DisplayArtistRole>MainArtist</DisplayArtistRole>
             </DisplayArtist>
+            <DisplayArtist SequenceNumber="2">
+                <ArtistPartyReference>P3</ArtistPartyReference>
+                <DisplayArtistRole>FeaturedArtist</DisplayArtistRole>
+            </DisplayArtist>
+            <DisplayArtist SequenceNumber="3">
+                <ArtistPartyReference>P5</ArtistPartyReference>
+                <DisplayArtistRole>MainArtist</DisplayArtistRole>
+                <ArtisticRole>Remixer</ArtisticRole>
+            </DisplayArtist>
             <Contributor SequenceNumber="1">
-                <ContributorPartyReference>P1</ContributorPartyReference>
-                <Role>Composer</Role>
+                <ContributorPartyReference>P4</ContributorPartyReference>
+                <Role Namespace="DPID" UserDefinedValue="Producer">UserDefined</Role>
             </Contributor>
-            <Duration>PT0H4M58S</Duration>
+            <Contributor SequenceNumber="2">
+                <ContributorPartyReference>P6</ContributorPartyReference>
+                <Role>ComposerLyricist</Role>
+            </Contributor>
+            <Duration>PT0H4M33S</Duration>
             <ParentalWarningType>NotExplicit</ParentalWarningType>
         </SoundRecording>
         <Image>
             <ResourceReference>A2</ResourceReference>
             <Type>FrontCoverImage</Type>
             <ResourceId>
-                <ProprietaryId Namespace="PADPIDA20250804056">front-cover-image:850080651025</ProprietaryId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">front-cover-image:1234567891011</ProprietaryId>
             </ResourceId>
             <CLine>
                 <Year>2025</Year>
-                <CLineText>AMG, Exclusive Licensed ANT MUSIC</CLineText>
+                <CLineText>ERN Recordings</CLineText>
             </CLine>
             <ParentalWarningType>NotExplicit</ParentalWarningType>
             <TechnicalDetails>
                 <TechnicalResourceDetailsReference>T2</TechnicalResourceDetailsReference>
                 <File>
-                    <URI>resources/850080651025.jpg</URI>
+                    <URI>1234567891011.jpg</URI>
                 </File>
             </TechnicalDetails>
         </Image>
@@ -100,13 +143,13 @@
             <ReleaseReference>R0</ReleaseReference>
             <ReleaseType>Single</ReleaseType>
             <ReleaseId>
-                <ICPN>850080651025</ICPN>
+                <ICPN>1234567891011</ICPN>
             </ReleaseId>
-            <DisplayTitleText>Timeless</DisplayTitleText>
+            <DisplayTitleText>Baseline</DisplayTitleText>
             <DisplayTitle ApplicableTerritoryCode="Worldwide" IsDefault="true">
-                <TitleText>Timeless</TitleText>
+                <TitleText>Baseline</TitleText>
             </DisplayTitle>
-            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">Fuuji Liam</DisplayArtistName>
+            <DisplayArtistName ApplicableTerritoryCode="Worldwide" IsDefault="true">DDEX All Stars</DisplayArtistName>
             <DisplayArtist SequenceNumber="1">
                 <ArtistPartyReference>P1</ArtistPartyReference>
                 <DisplayArtistRole>MainArtist</DisplayArtistRole>
@@ -114,16 +157,16 @@
             <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
             <PLine>
                 <Year>2025</Year>
-                <PLineText>AMG, Exclusive Licensed ANT MUSIC</PLineText>
+                <PLineText>ERN Recordings</PLineText>
             </PLine>
             <CLine>
                 <Year>2025</Year>
-                <CLineText>AMG, Exclusive Licensed ANT MUSIC</CLineText>
+                <CLineText>ERN Recordings</CLineText>
             </CLine>
             <Genre ApplicableTerritoryCode="Worldwide">
-                <GenreText>Piano</GenreText>
+                <GenreText>K-Pop</GenreText>
             </Genre>
-            <OriginalReleaseDate>2025-12-11</OriginalReleaseDate>
+            <OriginalReleaseDate>2025-01-01</OriginalReleaseDate>
             <ReleaseVisibilityReference>V0</ReleaseVisibilityReference>
             <ParentalWarningType>NotExplicit</ParentalWarningType>
             <ResourceGroup>
@@ -138,39 +181,24 @@
         <TrackRelease>
             <ReleaseReference>R1</ReleaseReference>
             <ReleaseId>
-                <ProprietaryId Namespace="PADPIDA20250804056">850080651025_R1</ProprietaryId>
+                <ProprietaryId Namespace="PADPIDA2011072101T">1234567891011_R1</ProprietaryId>
             </ReleaseId>
             <ReleaseResourceReference>A1</ReleaseResourceReference>
             <ReleaseLabelReference ApplicableTerritoryCode="Worldwide">P2</ReleaseLabelReference>
             <Genre ApplicableTerritoryCode="Worldwide">
-                <GenreText>Piano</GenreText>
+                <GenreText>K-Pop</GenreText>
             </Genre>
             <ReleaseVisibilityReference>V1</ReleaseVisibilityReference>
         </TrackRelease>
     </ReleaseList>
     <DealList>
         <ReleaseDeal>
-            <DealReleaseReference>R0</DealReleaseReference>
-            <Deal>
-                <DealTerms>
-                    <TerritoryCode>US</TerritoryCode>
-                    <ValidityPeriod>
-                        <StartDateTime>2025-12-11T00:00:00</StartDateTime>
-                    </ValidityPeriod>
-                    <CommercialModelType>SubscriptionModel</CommercialModelType>
-                    <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
-                    <UseType>ConditionalDownload</UseType>
-                    <UseType>Stream</UseType>
-                </DealTerms>
-            </Deal>
-        </ReleaseDeal>
-        <ReleaseDeal>
             <DealReleaseReference>R1</DealReleaseReference>
             <Deal>
                 <DealTerms>
-                    <TerritoryCode>US</TerritoryCode>
+                    <TerritoryCode>AQ</TerritoryCode>
                     <ValidityPeriod>
-                        <StartDateTime>2025-12-11T00:00:00</StartDateTime>
+                        <StartDateTime>2025-01-01T00:00:00</StartDateTime>
                     </ValidityPeriod>
                     <CommercialModelType>SubscriptionModel</CommercialModelType>
                     <CommercialModelType>AdvertisementSupportedModel</CommercialModelType>
@@ -184,15 +212,15 @@
         </ReleaseDeal>
         <ReleaseVisibility>
             <VisibilityReference>V0</VisibilityReference>
-            <TerritoryCode>US</TerritoryCode>
-            <ReleaseDisplayStartDateTime>2025-12-11T00:00:00</ReleaseDisplayStartDateTime>
-            <CoverArtPreviewStartDateTime>2025-12-11T00:00:00</CoverArtPreviewStartDateTime>
-            <FullTrackListingPreviewStartDateTime>2025-12-11T00:00:00</FullTrackListingPreviewStartDateTime>
+            <TerritoryCode>AQ</TerritoryCode>
+            <ReleaseDisplayStartDateTime>2025-01-01T00:00:00</ReleaseDisplayStartDateTime>
+            <CoverArtPreviewStartDateTime>2025-01-01T00:00:00</CoverArtPreviewStartDateTime>
+            <FullTrackListingPreviewStartDateTime>2025-01-01T00:00:00</FullTrackListingPreviewStartDateTime>
         </ReleaseVisibility>
         <TrackReleaseVisibility>
             <VisibilityReference>V1</VisibilityReference>
-            <TerritoryCode>US</TerritoryCode>
-            <TrackListingPreviewStartDateTime>2025-12-11T00:00:00</TrackListingPreviewStartDateTime>
+            <TerritoryCode>AQ</TerritoryCode>
+            <TrackListingPreviewStartDateTime>2025-01-01T00:00:00</TrackListingPreviewStartDateTime>
         </TrackReleaseVisibility>
     </DealList>
 </ern:NewReleaseMessage>

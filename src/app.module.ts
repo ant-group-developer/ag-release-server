@@ -27,6 +27,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
+import { ErnModule } from './modules/ern/ern.module';
 import { ExcelModule } from './modules/excel/excel.module';
 import { IsrcModule } from './modules/external/isrc/isrc.module';
 import { UpcModule } from './modules/external/upc/upc.module';
@@ -157,6 +158,8 @@ import { UserModule } from './modules/user/user.module';
 		IsrcModule,
 		UpcModule,
 		ExcelModule,
+
+		ErnModule,
 	],
 	controllers: [AppController],
 	providers: [
