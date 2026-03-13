@@ -233,6 +233,7 @@ export class ReleaseDraftService {
 	}
 
 	async getErrorsSchemaReleasesFromSftp(releases: any[]) {
+		console.log(releases);
 		const maps = await this.buildLookupMaps();
 
 		const success: string[] = [];
@@ -592,6 +593,8 @@ export class ReleaseDraftService {
 	} {
 		const errors: string[] = [];
 
+		console.log(r);
+
 		const normalize = (value?: string | null) => (value ?? '').trim();
 
 		const getId = (
@@ -824,7 +827,14 @@ export class ReleaseDraftService {
 	}
 
 	// sftp
-	async importOneRelease(payload: ReleaseRawSftp, maps?: LookupMaps) {
+	async importOneRelease(
+		payload: ReleaseRawSftp,
+		maps?: LookupMaps,
+	): Promise<{
+		success: boolean;
+		releaseId: string;
+		release: Release;
+	}> {
 		const m = maps ?? (await this.buildLookupMaps());
 
 		const { errors, fakeRelease } = this.mapAndValidateExistence(
@@ -882,7 +892,6 @@ export class ReleaseDraftService {
 				for (const track of fakeRelease.tracks) {
 					await manager.save(Track, track);
 
-					// nếu track có trackLanguage thì save luôn
 					if ((track as any).trackLanguage) {
 						await manager.save(
 							TrackLanguage,
@@ -890,12 +899,10 @@ export class ReleaseDraftService {
 						);
 					}
 
-					// nếu cần save artists
 					if (track.trackArtists?.length) {
 						await manager.save(TrackArtist, track.trackArtists);
 					}
 
-					// nếu cần save contributors
 					if (track.trackContributors?.length) {
 						await manager.save(
 							TrackContributor,
@@ -910,6 +917,7 @@ export class ReleaseDraftService {
 			return {
 				success: true,
 				releaseId: fakeRelease.id,
+				release: fakeRelease as Release,
 			};
 		} catch (e) {
 			await queryRunner.rollbackTransaction();
@@ -928,24 +936,67 @@ export class ReleaseDraftService {
 			payloads.map((p) => this.importOneRelease(p, maps)),
 		);
 
-		const failed = results
-			.map((r, i) => ({ r, i }))
-			.filter(({ r }) => r.status === 'rejected')
-			.map(({ r, i }) => ({
-				releaseId: payloads[i].id,
-				error: (r as PromiseRejectedResult).reason?.message,
-			}));
+		const errors: {
+			releaseId: string | null;
+			error: string;
+			type: 'import' | 'schema';
+		}[] = [];
+
+		const ids: (string | null)[] = [];
+
+		for (let i = 0; i < results.length; i++) {
+			const item = results[i];
+			const payload = payloads[i];
+
+			if (item.status === 'rejected') {
+				errors.push({
+					releaseId: payload.id ?? null,
+					error: item.reason?.message || 'Import release failed',
+					type: 'import',
+				});
+				ids.push(null);
+				continue;
+			}
+
+			const { releaseId, release } = item.value;
+			ids.push(releaseId);
+
+			const schemaErrors =
+				this.releaseValidateService.getErrorsSchemaRelease(release);
+
+			if (schemaErrors.length > 0) {
+				try {
+					await this.handleDelete(releaseId);
+
+					errors.push({
+						releaseId,
+						error: `Schema validation failed: ${JSON.stringify(schemaErrors)}`,
+						type: 'schema',
+					});
+				} catch (deleteError: any) {
+					errors.push({
+						releaseId,
+						error: `Schema validation failed and delete failed: ${
+							deleteError?.message || 'Unknown delete error'
+						}`,
+						type: 'schema',
+					});
+				}
+			}
+		}
 
 		const result = {
 			total: payloads.length,
-			success: results.filter((r) => r.status === 'fulfilled').length,
-			failed: failed.length,
-			errors: failed,
-			ids: results.map((r) =>
-				r.status === 'fulfilled' ? r.value.releaseId : null,
-			),
+			success:
+				results.filter((r) => r.status === 'fulfilled').length -
+				errors.filter((e) => e.type === 'schema').length,
+			failed: errors.length,
+			errors,
+			ids,
 		};
+
 		console.log(result);
+		return result;
 	}
 
 	async buildLookupMaps(): Promise<LookupMaps> {
