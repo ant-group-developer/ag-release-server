@@ -12,6 +12,7 @@ import { ExcelController } from './excel.controller';
 import { ExcelGetDataService } from './excel.get-data';
 import { ExcelService } from './excel.service';
 import { AppConfig } from '../app-config/entities/app-config.entity';
+import { Dsp } from '../dsp/entities/dsp.entity';
 
 @Module({
 	imports: [
@@ -24,7 +25,8 @@ import { AppConfig } from '../app-config/entities/app-config.entity';
 			ReleaseLanguage,
 			Language,
 			Action,
-			AppConfig
+			AppConfig,
+			Dsp
 		]),
 	],
 	controllers: [ExcelController],
