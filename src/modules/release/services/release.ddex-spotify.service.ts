@@ -31,7 +31,7 @@ import { SftpConfigsService } from '../../distribution/sftp-configs/services/sft
 import { Release } from '../entities/release.entity';
 import { ReleaseQueryService } from './release.query.service';
 import { ErnService } from './../../ern/ern.service';
-import { ErnInput } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ErnInput, ManifestInput } from 'src/modules/ern/interfaces/ern-input.interface';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -166,7 +166,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		// await this.createDdexFile({ releaseId, outputDir: releaseDir });
 		await this.createErnFile({ releaseId, outputDir: releaseDir });
 
-		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
+		await this.createManifestFile({
+			batchId,
+			upc,
+			outputRoot,
+		});
+		// this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
@@ -182,6 +187,59 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			outputDir: outputRoot,
 			outputRoot,
 		};
+	}
+	async createManifestFile({
+		batchId,
+		upc,
+		outputRoot,
+	}: {
+		batchId: string;
+		upc: string;
+		outputRoot: string;
+	}) {
+		const manifest: ManifestInput = {
+			sender: {
+				partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+				name: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
+			},
+
+			recipient: {
+				partyId: this.DDEX_PARTY_ID_SPOTIFY,
+				name: this.DDEX_PARTY_NAME_SPOTIFY,
+			},
+
+			messages: [
+				{
+					messageId: '00001',
+
+					url: `./${upc}/${upc}.xml`,
+
+					releaseId: {
+						icpn: upc,
+						proprietaryId: {
+							namespace: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+							value: upc,
+						},
+					},
+
+					deliveryType: 'NewReleaseDelivery',
+					productType: 'AudioProduct',
+
+					hashSum: {
+						value: 'TEMP_HASH',
+						algorithm: 'SHA1',
+					},
+				},
+			],
+		};
+
+		const xml = this.ernService.generateManifest(manifest);
+
+		const manifestPath = path.join(outputRoot, `BatchComplete_${batchId}.xml`);
+
+		fs.writeFileSync(manifestPath, xml, 'utf-8');
+
+		this.logger.log(`[MANIFEST_CREATED] ${manifestPath}`);
 	}
 
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
