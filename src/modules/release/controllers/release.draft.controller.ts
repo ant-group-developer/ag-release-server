@@ -24,7 +24,7 @@ import {
 	ReleaseException,
 	ReleaseSuccess,
 } from '../constants/release.constant';
-import { ImportOneReleaseDto } from '../dto/release-sftp.dto';
+import { ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
@@ -45,9 +45,17 @@ export class ReleaseDraftController {
 			albumFormat: Object.fromEntries(maps.albumFormat),
 			genre: Object.fromEntries(maps.genre),
 			label: Object.fromEntries(maps.label),
+
+			language: Object.fromEntries(maps.language),
+			country: Object.fromEntries(maps.country),
+
 			trackType: Object.fromEntries(maps.trackType),
 			trackSensitive: Object.fromEntries(maps.trackSensitive),
+			trackOriginType: Object.fromEntries(maps.trackOriginType),
+
 			priceTier: Object.fromEntries(maps.priceTier),
+
+			distributionType: Object.fromEntries(maps.distributionType),
 		};
 	}
 
@@ -73,11 +81,23 @@ export class ReleaseDraftController {
 	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	// @PublicRoute()
 	@Post('validate-list')
-	getErrorsSchemaReleases(@Body('releases') releases: any) {
+	getErrorsSchemaReleasesSftp(@Body('releases') releases: any) {
 		const result =
-			this.releaseDraftService.getErrorsSchemaReleases(releases);
+			this.releaseDraftService.getErrorsSchemaReleasesFromSftp(releases);
 
 		// return new ResponseSuccess({ data: result });
+
+		return result;
+	}
+
+	@Post('map-and-validate')
+	async mapAndValidateExistence(@Body() release: any) {
+		const maps = await this.releaseDraftService.buildLookupMaps();
+
+		const result = this.releaseDraftService.mapAndValidateExistence(
+			release,
+			maps,
+		);
 
 		return result;
 	}
@@ -92,13 +112,13 @@ export class ReleaseDraftController {
 
 	@PublicRoute()
 	@Post('import/one')
-	async importOneRelease(@Body() payload: ImportOneReleaseDto) {
+	async importOneRelease(@Body() payload: ReleaseRawSftp) {
 		return this.releaseDraftService.importOneRelease(payload);
 	}
 
 	// @PublicRoute()
 	@Post('import')
-	async importReleases(@Body() payload: ImportOneReleaseDto[]) {
+	async importReleases(@Body() payload: ReleaseRawSftp[]) {
 		return this.releaseDraftService.importReleases(payload);
 	}
 

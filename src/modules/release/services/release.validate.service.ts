@@ -197,6 +197,8 @@ export class ReleaseValidateService {
 
 	// validate schema release
 	getErrorsSchemaRelease(release: Release) {
+		console.log(release);
+
 		const result: FieldErrorDetails[] = [];
 
 		if (release) {
@@ -204,6 +206,8 @@ export class ReleaseValidateService {
 			result.push(...this.validateLanguage(release.releaseLanguage));
 			result.push(...this.validateTracks(release.tracks));
 		}
+
+		console.log(result);
 
 		return result;
 	}
