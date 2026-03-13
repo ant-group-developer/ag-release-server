@@ -3,6 +3,10 @@
 	"collection": "@nestjs/schematics",
 	"sourceRoot": "src",
 	"compilerOptions": {
+		"assets": [
+			"modules/excel/asset/**/*"
+		],
+		"watchAssets": true,
 		"deleteOutDir": true
 	}
 }

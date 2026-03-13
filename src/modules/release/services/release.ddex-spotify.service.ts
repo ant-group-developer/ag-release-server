@@ -30,6 +30,8 @@ import {
 import { SftpConfigsService } from '../../distribution/sftp-configs/services/sftp-config.service';
 import { Release } from '../entities/release.entity';
 import { ReleaseQueryService } from './release.query.service';
+import { ErnService } from './../../ern/ern.service';
+import { ErnInput } from 'src/modules/ern/interfaces/ern-input.interface';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -61,6 +63,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly dspSv: DspService,
 
 		private readonly dDEXService: DDEXService,
+		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
 	) {}
@@ -80,6 +83,22 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			version: '4.3',
 			data: ddexData,
 		});
+
+		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
+		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
+		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
+	}
+
+	async createErnFile({
+		releaseId,
+		outputDir,
+	}: {
+		releaseId: string;
+		outputDir: string;
+	}) {
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const input: ErnInput = this.parseErnInputFromRelease(release);
+		const xmlContent = this.ernService.generate(input);
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
@@ -112,7 +131,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const batchId = genBatchId();
 
-		this.logger.log(`[DDEX_SPOTIFY] Starting batch: ${batchId}`);
+		this.logger.log(`[ERN_SPOTIFY] Starting batch: ${batchId}`);
 
 		const upc = release.upc ?? 'new_upc';
 		if (!upc) {
@@ -143,7 +162,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		this.processAudioFilesSpotify({ audioFiles, outputDir: resourcesDir });
 
 		// 5. DDEX file
-		await this.createDdexFile({ releaseId, outputDir: releaseDir });
+		// await this.createDdexFile({ releaseId, outputDir: releaseDir });
+		await this.createErnFile({ releaseId, outputDir: releaseDir });
 
 		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
@@ -329,6 +349,172 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			resources,
 			releases,
 			deals,
+		};
+	}
+
+	private parseErnInputFromRelease(release: Release): ErnInput {
+
+		const cover = release.releaseCoverArts?.[0];
+
+		const territories = this.getTerritoriesFromRelease(release);
+
+		return {
+			version: '4.3',
+
+			message: {
+				id: release.upc ?? release.id,
+
+				sender: {
+					partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+					name: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
+				},
+
+				recipient: {
+					partyId: this.DDEX_PARTY_ID_SPOTIFY,
+					name: this.DDEX_PARTY_NAME_SPOTIFY,
+				},
+			},
+
+			release: {
+				upc: release.upc ?? '',
+				title: release.title ?? '',
+				version: release.version ?? undefined,
+
+				type: release.albumFormat?.code ?? 'ALBUM',
+
+				releaseDate: release.releaseDate
+					? this.formatDateYYYYMMDD(release.releaseDate)
+					: '',
+
+				genre: release.primaryGenre?.name ?? 'Pop',
+				subGenre: release.subGenre?.name ?? undefined,
+
+				labelName: release.label?.name ?? '',
+
+				catalogNumber: release.catalogId ?? undefined,
+
+				artists: release.releaseArtists.map((ra) => ({
+					name: ra.artist?.name ?? '',
+					role: 'MainArtist',
+				})),
+
+				pLine:
+					release.pLineYear && release.pLineOwner
+						? {
+							year: release.pLineYear,
+							text: `${release.pLineYear} ${release.pLineOwner}`,
+						}
+						: undefined,
+
+				cLine:
+					release.cLineYear && release.cLineOwner
+						? {
+							year: release.cLineYear,
+							text: `${release.cLineYear} ${release.cLineOwner}`,
+						}
+						: undefined,
+
+				territories,
+
+				coverArt: cover
+					? {
+						fileName: cover.file?.fileName ?? '',
+						filePath: cover.file?.key ?? '',
+						codecType: 'image/jpeg',
+						width: cover.width,
+						height: cover.height,
+					}
+					: undefined,
+			},
+
+			tracks: [...release.tracks]
+				.sort((a, b) => a.order - b.order)
+				.map((track) => ({
+					isrc: track.isrc ?? '',
+
+					title: track.title ?? '',
+
+					version: track.version ?? undefined,
+
+					duration: this.convertDurationToISO8601(
+						track.audioFile?.duration ?? 0
+					),
+
+					order: track.order,
+
+					genre:
+						track.primaryGenre?.name ??
+						release.primaryGenre?.name ??
+						undefined,
+
+					subGenre: track.subGenre?.name ?? undefined,
+
+					languageOfPerformance:
+						track.trackLanguage?.audioLanguage?.code ?? undefined,
+
+					parentalWarning:
+						track.trackSensitive?.code === 'explicit'
+							? 'Explicit'
+							: 'NotExplicit',
+
+					artists: track.trackArtists.map((ta) => ({
+						name: ta.artist?.name ?? '',
+						role: 'MainArtist',
+					})),
+
+					contributors: track.trackContributors?.map((c) => ({
+						name: c.artist?.name ?? '',
+						role: c.artistRole?.code ?? '',
+					})),
+
+					pLine:
+						track.pLineYear && track.pLineOwner
+							? {
+								year: track.pLineYear,
+								text: `${track.pLineYear} ${track.pLineOwner}`,
+							}
+							: undefined,
+
+					recordingMode: 'Stereo',
+
+					audioFile: track.audioFile
+						? {
+							fileName: track.audioFile.file?.fileName,
+
+							filePath: track.audioFile.file?.key,
+
+							codecType: track.audioFile.file?.extension.toUpperCase() ?? 'WAV',
+
+							bitRate: track.audioFile.bitrate ?? undefined,
+
+							samplingRate: track.audioFile.sampleRate
+								? parseInt(track.audioFile.sampleRate.replace(/[^0-9]/g, ''))
+								: undefined,
+
+							bitDepth: track.audioFile.bitDepth ?? undefined,
+						}
+						: undefined
+				})),
+
+			deals: [
+				{
+					territories,
+
+					startDate: release.releaseDate
+						? this.formatDateYYYYMMDD(release.releaseDate)
+						: '',
+
+					commercialModels: [
+						'SubscriptionModel',
+						'AdvertisementSupportedModel',
+					],
+
+					useTypes: [
+						'OnDemandStream',
+						'ConditionalDownload',
+					],
+				},
+			],
 		};
 	}
 

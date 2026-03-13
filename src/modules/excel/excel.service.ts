@@ -7,7 +7,7 @@ import { ExcelGetDataService } from './excel.get-data';
 
 @Injectable()
 export class ExcelService {
-	constructor(private readonly excelGetDataService: ExcelGetDataService) { }
+	constructor(private readonly excelGetDataService: ExcelGetDataService) {}
 
 	async downloadTemplate(res: Response) {
 		const [
@@ -17,6 +17,7 @@ export class ExcelService {
 			trackSensitives,
 			languages,
 			policies,
+			dsps
 		] = await Promise.all([
 			this.excelGetDataService.getAlbumFormats(),
 			this.excelGetDataService.getPriceTiers(),
@@ -24,6 +25,7 @@ export class ExcelService {
 			this.excelGetDataService.getTrackSensitives(),
 			this.excelGetDataService.getLanguages(),
 			this.excelGetDataService.getTrackPolicies(),
+			this.excelGetDataService.getDsps(),
 		]);
 
 		const workbook = new ExcelJS.Workbook();
@@ -68,10 +70,7 @@ export class ExcelService {
 
 		/* LOGO PATH */
 
-		const defaultLogoPath = path.join(
-			process.cwd(),
-			'src/modules/excel/asset/logo.png',
-		);
+		const defaultLogoPath = path.join(__dirname, 'asset/logo.png');
 
 		const logo = await this.excelGetDataService.getLogo();
 
@@ -566,7 +565,7 @@ export class ExcelService {
 			'WORLD',
 			'US|CA|JP|DE',
 			'12/9/2001',
-			'BOM',
+			'Spotify',
 			'12/22/2009',
 			'A1-2425G-ABC1234002-M',
 			'2005',
@@ -693,9 +692,7 @@ export class ExcelService {
 	   SHEET 2
 	===================================================== */
 
-		const sheet2 = workbook.addWorksheet('SYSTEM DATA', {
-			state: 'hidden',
-		});
+		const sheet2 = workbook.addWorksheet('SYSTEM DATA');
 
 		sheet2.columns = [
 			{ header: 'Release type', key: 'releaseType', width: 25 },
@@ -704,6 +701,7 @@ export class ExcelService {
 			{ header: 'Sensitive content', key: 'sensitive', width: 25 },
 			{ header: 'Language', key: 'language', width: 25 },
 			{ header: 'Policy', key: 'policy', width: 25 },
+			{ header: 'DSP', key: 'dsp', width: 25 },
 		];
 
 		const maxLength = Math.max(
@@ -713,6 +711,7 @@ export class ExcelService {
 			trackSensitives.length,
 			languages.length,
 			policies.length,
+			dsps.length
 		);
 		const headerRow = sheet2.getRow(1);
 
@@ -737,8 +736,14 @@ export class ExcelService {
 				sensitive: trackSensitives[i] || '',
 				language: languages[i] || '',
 				policy: policies[i] || '',
+				dsp: dsps[i] || '',
 			});
 		}
+
+		await sheet2.protect('ant-protect', {
+			selectLockedCells: false,
+			selectUnlockedCells: false,
+		});
 		/* =====================================================
 	   DROPDOWN LISTS FOR SHEET 1
 	===================================================== */

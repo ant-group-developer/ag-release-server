@@ -8,32 +8,6 @@ import {
 
 @Injectable()
 export class DDEXService {
-	// spotify
-	genDdexSpotify() {
-		this.generate({
-			version: '4.3',
-			data: {
-				messageHeader: {
-					messageId: '',
-					messageThreadId: 'Baseline',
-					sender: {
-						partyId: '',
-						partyName: '',
-					},
-					recipient: {
-						partyId: '',
-						partyName: '',
-					},
-				},
-				parties: [],
-				resources: [],
-				releases: [],
-				deals: [],
-			},
-		});
-	}
-
-	// private
 	/**
 	 * Generate DDEX XML from input data
 	 * @param input Contains version and data for generation
@@ -58,14 +32,4 @@ export class DDEXService {
 				throw new Error(`Unsupported DDEX version: ${version}`);
 		}
 	}
-
-	// private getDataHeader(): DDEXMessageHeader {
-	// 	return {
-	// 		messageThreadId: 'Baseline',
-	// 		messageId: Date.now().toString(),
-	// 		sender: this.sender,
-	// 		recipient: this.recipient,
-	// 		createdDateTime: new Date().toISOString(),
-	// 	};
-	// }
 }

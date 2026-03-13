@@ -29,6 +29,8 @@ import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
+import { ReleaseDspDeliveryLogModule } from '../release-dsp-delivery-log/release-dsp-delivery-log.module';
+import { ErnModule } from '../ern/ern.module';
 
 @Module({
 	imports: [
@@ -59,6 +61,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		UpcModule,
 		DspModule,
 		DDEXModule,
+		ReleaseDspDeliveryLogModule,
+		ErnModule
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

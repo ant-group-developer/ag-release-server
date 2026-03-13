@@ -3,11 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Action } from '../action/entities/action.entity';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
+import { AppConfig } from '../app-config/entities/app-config.entity';
 import { Genre } from '../genre/entities/genre.entity';
 import { Language } from '../language/entities/language.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.entity';
-import { AppConfig } from '../app-config/entities/app-config.entity';
+import { Dsp } from '../dsp/entities/dsp.entity';
 
 @Injectable()
 export class ExcelGetDataService {
@@ -27,7 +28,10 @@ export class ExcelGetDataService {
 
 		@InjectRepository(AppConfig)
 		private readonly appRepo: Repository<AppConfig>,
-	) { }
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
+	) {}
 	async getAlbumFormats(): Promise<string[]> {
 		const data = await this.albumFormatRepo.find({
 			select: ['name'],
@@ -99,6 +103,14 @@ export class ExcelGetDataService {
 		const data = await this.actionRepo.find({
 			select: ['name'],
 			order: { name: 'ASC' },
+		});
+		return data.map((item) => item.name);
+	}
+
+	async getDsps(): Promise<string[]>{
+		const data = await this.dspRepo.find({
+			select: ['name'],
+			order: { name: 'ASC'}
 		});
 		return data.map((item) => item.name);
 	}

@@ -1,0 +1,3097 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage xmlns:ern="http://ddex.net/xml/2010/ern-main/32"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       LanguageAndScriptCode="en"
+                       xsi:schemaLocation="http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd"
+                       MessageSchemaVersionId="2010/ern-main/32">
+  <MessageHeader>
+    <MessageThreadId>PADPIDA200903020158750158</MessageThreadId>
+    <MessageId>PADPIDA200903020158750158</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDA20090302015</PartyId>
+      <PartyName>
+        <FullName>Consolidated Independent</FullName>
+      </PartyName>
+    </MessageSender>
+    <SentOnBehalfOf>
+      <PartyId>#unknown#</PartyId>
+      <PartyName>
+        <FullName>test state51</FullName>
+      </PartyName>
+    </SentOnBehalfOf>
+    <MessageRecipient>
+      <PartyId>PADPIDA2006111001O</PartyId>
+      <PartyName>
+        <FullName>VPD</FullName>
+      </PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2011-04-08T17:26:05+00:00</MessageCreatedDateTime>
+  </MessageHeader>
+  <UpdateIndicator>UpdateMessage</UpdateIndicator>
+  <ResourceList>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR6V40900100</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4680088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A4680088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Roger</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Roger</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Roger</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cécile Hercule</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cécile Hercule</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Cecile Hercule</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Cecile Hercule</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Editorial Avenue</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Moumkine Music / M2o Solutions</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T4840033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T4840033_01_001.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>Muqm2ZplZhTzQPdWWuTmhhxqNL4</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRZ080901293</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4850088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A4850088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Non Non Non (Ecoutez Barbara)</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Non Non Non (Ecoutez Barbara)</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Non Non Non (Ecoutez Barbara)</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Camélia Jordana</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Camélia Jordana</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Doriand</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Edgar Ficat</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>La fiancée</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Doriand</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Edgar Ficat</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>La fiancée</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Sony Music France</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5030033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T5030033_01_002.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>rMuzAOWv9xyf9t5D0ZYthZ46Qs4</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRIGW1000380</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5040088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A5040088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Dee Doo</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Dee Doo</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Dee Doo</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cocoon</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cocoon</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mark Daumail</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Morgane Imbeaud</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mark Daumail</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Morgane Imbeaud</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Sober &amp; Gentle</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Sony ATV</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Cartell Music under exclusive license from Sober &amp; Gentle / Barclay</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5230033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T5230033_01_003.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>JvcgmyLa7wm3gJoC0XvWe5S1jt0</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR2PY1000020</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5240088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A5240088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Les Passants</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Les Passants</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Les Passants</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Isabelle Geffroy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Tryss</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Isabelle Geffroy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Tryss</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Play On</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5420033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T5420033_01_004.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>NCrzwEKJTPdRf5GZj5NIeHlljZY</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRYDE0900110</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5430088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A5430088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>On The Radio</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>On The Radio</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>On The Radio</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>The Rodeo</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>The Rodeo</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Dorothee Hannequin</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Dorothee Hannequin</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Emergence</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Chrisalis Strengholt Music France</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Cartell Music under exclusive license from Naïve/Emergence</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5590033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T5590033_01_005.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>5bIrgG0zbT0SXHnvvWFRd5BcBs0</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR9W10905333</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5770088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A5770088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Le Poinconeur des Lilas</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Le Poinconeur des Lilas</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Le Poinconeur des Lilas</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Yves Lacombe, Pierre Ganem, Jean-Claude Camors, Laurent Vercambre</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Yves Lacombe</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Pierre Ganem</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Claude Camors</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Laurent Vercambre</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Serge Gainsbourg</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Serge Gainsbourg</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 One World Films</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5890033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T5890033_02_001.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>zw1GnwFirKWjw/vxPrVzJwynJow</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR2PY1000160</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5900088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A5900088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Le Long De La Route</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Le Long De La Route</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Le Long De La Route</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Isabelle Geffroy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mickael Geraud</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Isabelle Geffroy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mickael Geraud</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Play On</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6070033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6070033_02_002.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>QD4kzXHAkOacN7KjhXLx7YlJ0AI</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRZ111002219</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6080088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6080088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>My Name Is Trouble</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>My Name Is Trouble</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>My Name Is Trouble</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Keren Ann</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Keren Ann</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Keren Ann Zeidel</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Keren Ann Zeidel</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Keren Ann Zeidel c/o EMI Music Publishing France</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 EMI</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6200033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6200033_02_003.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>kacxk72MY9Rogcb8lQtGhO79voQ</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR6F31001630</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6210088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6210088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Battez-Vous</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Battez-Vous</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Battez-Vous</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Brigitte</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Brigitte</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Aurélie Maggiori &amp; Sylvie Hoarau</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Aurélie Maggiori &amp; Sylvie Hoarau</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 3eme Bureau</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6330033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6330033_02_004.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>w8l+negQcPLMPQeG5b8bVJoRFsM</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR9W11002211</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6340088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6340088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Odile</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Odile</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Odile</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>N.Miranda</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>N.Miranda</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Bag Lady Music</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Bag Lady Music</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6490033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6490033_02_005.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>3qZmNZz4sinNIBp6+bOX28C7YTU</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR13Z1000021</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6500088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6500088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Cent Mille Fois</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Cent Mille Fois</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Cent Mille Fois</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Melanie Pain</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Melanie Pain</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mélanie Pain</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mathieu Coupat</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mélanie Pain</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Kwaidan</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Strictly confidential</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Mathieu Coupat</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Kwaidan &amp; Cartell Music under exclusive licence to cinq7 / Wagram Music</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6690033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6690033_02_006.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>7dk5NEpbEo9/wifikwLScvZVHqg</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRUM71001149</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6700088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6700088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Another Day</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Another Day</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Another Day</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Félix Perez</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Sébastien Lafargue</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Félix Perez</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Sébastien Lafargue</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Licensed courtesy of Universal Music Australia Pty Limited</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Mercury (France)</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T6880033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T6880033_02_007.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>iuA2QsEFu2oN8uNFJo/6+AIyH9E</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FRUM70901066</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6890088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A6890088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Dans Ma Rue</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Dans Ma Rue</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Dans Ma Rue</TitleText>
+          <SubTitle></SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Fefe</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Fefe</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>FEFE</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>FEFE</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>FE² Editions</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Universal Publishing France</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Cartell Music under exclusive license from Polydor</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T7050033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T7050033_02_008.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>KbLK8n/Cbg29BGrquJXm7PfJgCA</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <SoundRecording>
+      <SoundRecordingId>
+        <ISRC>FR13Z1000051</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">7060088</ProprietaryId>
+      </SoundRecordingId>
+      <ResourceReference>A7060088</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Oublions l'Amerique</TitleText>
+        <SubTitle>If your font supports it, and utf-8 is working then you should see a snowman here: ☃</SubTitle>
+      </ReferenceTitle>
+      <Duration>PT00H00M23S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="DisplayTitle">
+          <TitleText>Oublions l'Amerique (If your font supports it, and utf-8 is working then you should see a snowman here: ☃)</TitleText>
+        </Title>
+        <Title TitleType="FormalTitle">
+          <TitleText>Oublions l'Amerique</TitleText>
+          <SubTitle>If your font supports it, and utf-8 is working then you should see a snowman here: ☃</SubTitle>
+        </Title>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nouvelle Vague feat. Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nouvelle Vague</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Manuel Castillo Fenoy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Marc Laurent</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Composer</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Manuel Castillo Fenoy</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Marc Laurent</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>Lyricist</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <IndirectResourceContributor>
+          <PartyName>
+            <FullName>Copyright Control</FullName>
+          </PartyName>
+          <IndirectResourceContributorRole>MusicPublisher</IndirectResourceContributorRole>
+        </IndirectResourceContributor>
+        <LabelName>Cartell Music</LabelName>
+        <PLine>
+          <Year>2010</Year>
+          <PLineText>2010 Kwaidan license to Cartell Music|Cartell Music under exclusive licence from Barclay</PLineText>
+        </PLine>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T7240033</TechnicalResourceDetailsReference>
+          <AudioCodecType>PCM</AudioCodecType>
+          <BitRate UnitOfMeasure="kbps">1411</BitRate>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <PreviewDetails>
+            <StartPoint>30</StartPoint>
+            <ExpressionType>Instructive</ExpressionType>
+          </PreviewDetails>
+          <File>
+            <FileName>A10341T0000000S6YP_T7240033_02_009.wav</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>LcE574Ssr4hDMFnj8ig4CJQLC00</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ImageId>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4650054</ProprietaryId>
+      </ImageId>
+      <ResourceReference>A4650054</ResourceReference>
+      <ImageDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <TechnicalImageDetails>
+          <TechnicalResourceDetailsReference>T4650054</TechnicalResourceDetailsReference>
+          <ImageCodecType>JPEG</ImageCodecType>
+          <ImageHeight>800</ImageHeight>
+          <ImageWidth>800</ImageWidth>
+          <File>
+            <FileName>A10341T0000000S6YP_T4650054.jpg</FileName>
+            <FilePath>resources/</FilePath>
+            <HashSum>
+              <HashSum>b9SynRzxpXnlfFVZXcHzzANYUkQ</HashSum>
+              <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+            </HashSum>
+          </File>
+        </TechnicalImageDetails>
+      </ImageDetailsByTerritory>
+    </Image>
+  </ResourceList>
+  <ReleaseList>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S6ZN</GRid>
+        <ISRC>FR6V40900100</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4690087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R4680088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Roger</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A4680088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Cécile Hercule</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cécile Hercule</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cécile Hercule</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S70H</GRid>
+        <ISRC>FRZ080901293</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4860087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R4850088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Non Non Non (Ecoutez Barbara)</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A4850088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Camélia Jordana</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Camélia Jordana</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Camélia Jordana</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S71F</GRid>
+        <ISRC>FRIGW1000380</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5050087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R5040088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Dee Doo</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A5040088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Cocoon</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cocoon</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Cocoon</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S72D</GRid>
+        <ISRC>FR2PY1000020</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5250087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R5240088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Les Passants</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A5240088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Zaz</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S73B</GRid>
+        <ISRC>FRYDE0900110</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5440087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R5430088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>On The Radio</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A5430088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>The Rodeo</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>The Rodeo</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>The Rodeo</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S749</GRid>
+        <ISRC>FR9W10905333</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5780087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R5770088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Le Poinconeur des Lilas</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A5770088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Jean-Yves Lacombe, Pierre Ganem, Jean-Claude Camors, Laurent Vercambre</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Yves Lacombe, Pierre Ganem, Jean-Claude Camors, Laurent Vercambre</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Yves Lacombe</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Pierre Ganem</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Jean-Claude Camors</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Laurent Vercambre</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S757</GRid>
+        <ISRC>FR2PY1000160</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">5910087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R5900088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Le Long De La Route</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A5900088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Zaz</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Zaz</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S765</GRid>
+        <ISRC>FRZ111002219</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6090087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6080088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>My Name Is Trouble</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6080088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Keren Ann</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Keren Ann</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Keren Ann</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S773</GRid>
+        <ISRC>FR6F31001630</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6220087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6210088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Battez-Vous</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6210088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Brigitte</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Brigitte</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Brigitte</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S781</GRid>
+        <ISRC>FR9W11002211</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6350087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6340088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Odile</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6340088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nadeah Miranda</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S790</GRid>
+        <ISRC>FR13Z1000021</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6510087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6500088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Cent Mille Fois</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6500088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Melanie Pain</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Melanie Pain</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Melanie Pain</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S7AY</GRid>
+        <ISRC>FRUM71001149</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6710087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6700088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Another Day</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6700088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Madjo</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Madjo</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000UB0Q</GRid>
+        <ISRC>FRUM70901066</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">6900087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R6890088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Dans Ma Rue</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A6890088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Fefe</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Fefe</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Fefe</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000UB1O</GRid>
+        <ISRC>FR13Z1000051</ISRC>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">7070087</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R7060088</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Oublions l'Amerique</TitleText>
+        <SubTitle>If your font supports it, and utf-8 is working then you should see a snowman here: ☃</SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A7060088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nouvelle Vague feat. Nadeah Miranda</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nouvelle Vague feat. Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nouvelle Vague</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Nadeah Miranda</FullName>
+          </PartyName>
+          <ArtistRole>FeaturedArtist</ArtistRole>
+        </DisplayArtist>
+        <RelatedRelease>
+          <ReleaseId>
+            <GRid>A10341T0000000S6YP</GRid>
+            <ICPN IsEan="true">9332727019135</ICPN>
+            <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+            <ProprietaryId Namespace="DPID:PADPIDA20090302015">5760032</ProprietaryId>
+          </ReleaseId>
+          <ReferenceTitle>
+            <TitleText>So Frenchy So Chic</TitleText>
+            <SubTitle></SubTitle>
+          </ReferenceTitle>
+          <ReleaseRelationshipType>IsReleaseFromRelease</ReleaseRelationshipType>
+        </RelatedRelease>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H00M23S</Duration>
+    </Release>
+    <Release>
+      <ReleaseId>
+        <GRid>A10341T0000000S6YP</GRid>
+        <ICPN IsEan="true">9332727019135</ICPN>
+        <CatalogNumber Namespace="cartell-music">CARTELL015</CatalogNumber>
+        <ProprietaryId Namespace="DPID:PADPIDA20090302015">4660032</ProprietaryId>
+      </ReleaseId>
+      <ReleaseReference>R4660032</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>So Frenchy So Chic</TitleText>
+        <SubTitle></SubTitle>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference>A4650054</ReleaseResourceReference>
+        <ReleaseResourceReference>A4680088</ReleaseResourceReference>
+        <ReleaseResourceReference>A4850088</ReleaseResourceReference>
+        <ReleaseResourceReference>A5040088</ReleaseResourceReference>
+        <ReleaseResourceReference>A5240088</ReleaseResourceReference>
+        <ReleaseResourceReference>A5430088</ReleaseResourceReference>
+        <ReleaseResourceReference>A5770088</ReleaseResourceReference>
+        <ReleaseResourceReference>A5900088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6080088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6210088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6340088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6500088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6700088</ReleaseResourceReference>
+        <ReleaseResourceReference>A6890088</ReleaseResourceReference>
+        <ReleaseResourceReference>A7060088</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType UserDefinedValue="Double Album"
+                   Namespace="DPID:PADPIDA20090302015">Album</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Various Artists</DisplayArtistName>
+        <LabelName>Cartell Music</LabelName>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Various Artists</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayArtist>
+          <PartyName>
+            <FullName>Various Artists</FullName>
+          </PartyName>
+          <ArtistRole>Artist</ArtistRole>
+        </DisplayArtist>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <ResourceGroup>
+          <ResourceGroup>
+            <SequenceNumber>1</SequenceNumber>
+            <ResourceGroupContentItem>
+              <SequenceNumber>1</SequenceNumber>
+              <ReleaseResourceReference>A4680088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>2</SequenceNumber>
+              <ReleaseResourceReference>A4850088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>3</SequenceNumber>
+              <ReleaseResourceReference>A5040088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>4</SequenceNumber>
+              <ReleaseResourceReference>A5240088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>5</SequenceNumber>
+              <ReleaseResourceReference>A5430088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+          </ResourceGroup>
+          <ResourceGroup>
+            <SequenceNumber>2</SequenceNumber>
+            <ResourceGroupContentItem>
+              <SequenceNumber>1</SequenceNumber>
+              <ReleaseResourceReference>A5770088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>2</SequenceNumber>
+              <ReleaseResourceReference>A5900088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>3</SequenceNumber>
+              <ReleaseResourceReference>A6080088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>4</SequenceNumber>
+              <ReleaseResourceReference>A6210088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>5</SequenceNumber>
+              <ReleaseResourceReference>A6340088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>6</SequenceNumber>
+              <ReleaseResourceReference>A6500088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>7</SequenceNumber>
+              <ReleaseResourceReference>A6700088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>8</SequenceNumber>
+              <ReleaseResourceReference>A6890088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+            <ResourceGroupContentItem>
+              <SequenceNumber>9</SequenceNumber>
+              <ReleaseResourceReference>A7060088</ReleaseResourceReference>
+            </ResourceGroupContentItem>
+          </ResourceGroup>
+        </ResourceGroup>
+        <Genre>
+          <GenreText>Alternative</GenreText>
+          <SubGenre>Pop</SubGenre>
+        </Genre>
+        <Genre>
+          <GenreText>World</GenreText>
+          <SubGenre></SubGenre>
+        </Genre>
+        <OriginalReleaseDate>2011-02-04</OriginalReleaseDate>
+      </ReleaseDetailsByTerritory>
+      <Duration>PT00H05M22S</Duration>
+      <PLine>
+        <Year>2011</Year>
+        <PLineText>2011 Cartell Music</PLineText>
+      </PLine>
+      <CLine>
+        <Year>2011</Year>
+        <CLineText>2011 Cartell Music</CLineText>
+      </CLine>
+    </Release>
+  </ReleaseList>
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R4660032</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R4680088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R4850088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5040088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5040088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5240088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5240088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5430088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5430088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5770088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5900088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R5900088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6080088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6210088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6340088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6340088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6500088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6500088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6700088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6890088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R6890088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R7060088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+    <ReleaseDeal>
+      <DealReleaseReference>R7060088</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>NZ</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-08</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <Deal>
+        <DealTerms>
+          <Usage>
+            <UseType>Download</UseType>
+          </Usage>
+          <TerritoryCode>AU</TerritoryCode>
+          <PriceInformation>
+            <PriceRangeType Namespace="DPID:PADPIDA20090302015">premium</PriceRangeType>
+          </PriceInformation>
+          <ValidityPeriod>
+            <StartDate>2011-02-04</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+      <EffectiveDate>2011-02-04</EffectiveDate>
+    </ReleaseDeal>
+  </DealList>
+</ern:NewReleaseMessage>
