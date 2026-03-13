@@ -27,6 +27,7 @@ import {
 } from 'src/utils/util.file';
 import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import {
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
@@ -43,7 +44,6 @@ import {
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
-import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 
 @Injectable()
 export class ReleaseService {
@@ -112,19 +112,19 @@ export class ReleaseService {
 			.where('dsp.isActive = true');
 
 		if (keyword) {
-			qb.andWhere('(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)', {
-				keyword: `%${keyword}%`,
-			});
+			qb.andWhere(
+				'(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)',
+				{
+					keyword: `%${keyword}%`,
+				},
+			);
 		}
 
 		if (status) {
-			qb.andWhere(
-				'COALESCE(delivery.status, :defaultStatus) = :status',
-				{
-					status,
-					defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
-				},
-			);
+			qb.andWhere('COALESCE(delivery.status, :defaultStatus) = :status', {
+				status,
+				defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
+			});
 		}
 
 		const sortableFields: Record<string, string> = {

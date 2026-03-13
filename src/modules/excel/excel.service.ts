@@ -7,7 +7,7 @@ import { ExcelGetDataService } from './excel.get-data';
 
 @Injectable()
 export class ExcelService {
-	constructor(private readonly excelGetDataService: ExcelGetDataService) { }
+	constructor(private readonly excelGetDataService: ExcelGetDataService) {}
 
 	async downloadTemplate(res: Response) {
 		const [

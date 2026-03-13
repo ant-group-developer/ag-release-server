@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Action } from '../action/entities/action.entity';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
+import { AppConfig } from '../app-config/entities/app-config.entity';
 import { Genre } from '../genre/entities/genre.entity';
 import { Language } from '../language/entities/language.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
@@ -11,7 +12,6 @@ import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.enti
 import { ExcelController } from './excel.controller';
 import { ExcelGetDataService } from './excel.get-data';
 import { ExcelService } from './excel.service';
-import { AppConfig } from '../app-config/entities/app-config.entity';
 
 @Module({
 	imports: [
@@ -24,7 +24,7 @@ import { AppConfig } from '../app-config/entities/app-config.entity';
 			ReleaseLanguage,
 			Language,
 			Action,
-			AppConfig
+			AppConfig,
 		]),
 	],
 	controllers: [ExcelController],

@@ -27,6 +27,7 @@ import { Permission } from 'src/modules/permission/constants/permission.data.con
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { ReleaseSuccess } from '../constants/release.constant';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
@@ -36,7 +37,6 @@ import {
 	IReleaseNonDraft,
 } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
-import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -140,7 +140,10 @@ export class ReleaseController {
 	}
 
 	@Get(':id/dsp/delivery')
-	async getReleaseDspDelivery(@Param('id') id: string, @Query() query: ReleaseQueryDspDeliveryDto): Promise<ResponseSuccess<PageDto<any>>> {
+	async getReleaseDspDelivery(
+		@Param('id') id: string,
+		@Query() query: ReleaseQueryDspDeliveryDto,
+	): Promise<ResponseSuccess<PageDto<any>>> {
 		const data = await this.releaseService.getReleaseDspDelivery(id, query);
 		return new ResponseSuccess({ data });
 	}
