@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Ern382Builder } from './builders/ern382.builder';
 import { Ern43Builder } from './builders/ern43.builder';
-import { ErnInput } from './interfaces/ern-input.interface';
+import { ManifestBuilder } from './builders/manifest.builder';
+import { ErnInput, ManifestInput } from './interfaces/ern-input.interface';
 
 @Injectable()
 export class ErnService {
@@ -20,5 +21,13 @@ export class ErnService {
 					`Unsupported ERN version: ${input.version as string}`,
 				);
 		}
+	}
+
+	/**
+	 * Generate DDEX ECHO ManifestMessage (BatchComplete) XML.
+	 * Supports ern-c-sftp/17 and echo/11 schemas.
+	 */
+	generateManifest(input: ManifestInput): string {
+		return new ManifestBuilder(input).build();
 	}
 }

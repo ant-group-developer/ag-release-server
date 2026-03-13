@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<echo:ManifestMessage xmlns:echo="http://ddex.net/xml/ern-c-sftp/17"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" MessageVersionId="1.7"
+  xsi:schemaLocation="http://ddex.net/xml/ern-c-sftp/17 http://ddex.net/xml/ern-c-sftp/17/ern-choreography-sftp.xsd">
+  <MessageHeader>
+    <MessageSender>
+      <PartyId>PADPIDA20090302015</PartyId>
+      <PartyName>
+        <FullName>Consolidated Independent Ltd</FullName>
+      </PartyName>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDA1234567890</PartyId>
+      <PartyName>
+        <FullName>TestDSP</FullName>
+      </PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2020-02-13T07:04:10Z</MessageCreatedDateTime>
+  </MessageHeader>
+  <IsTestFlag>false</IsTestFlag>
+  <RootDirectory>./</RootDirectory>
+  <NumberOfMessages>1</NumberOfMessages>
+  <MessageInBatch>
+    <MessageType>NewReleaseMessage</MessageType>
+    <MessageId>61704438710266</MessageId>
+    <URL>./5057805503736/5057805503736.xml</URL>
+    <IncludedReleaseId>
+      <GRid>A10341T0000029FTAH</GRid>
+      <ICPN>5057805503736</ICPN>
+      <ProprietaryId Namespace="PADPIDA20090302015">61533793000032</ProprietaryId>
+    </IncludedReleaseId>
+    <DeliveryType>NewReleaseDelivery</DeliveryType>
+    <ProductType>AudioProduct</ProductType>
+    <HashSum>
+      <HashSumValue>L6CQ54m3s1AYEDhVNj+D7Myhk94</HashSumValue>
+      <HashSumAlgorithmType>SHA1</HashSumAlgorithmType>
+    </HashSum>
+  </MessageInBatch>
+</echo:ManifestMessage>

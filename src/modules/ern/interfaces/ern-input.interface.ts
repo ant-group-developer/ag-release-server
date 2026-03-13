@@ -225,3 +225,62 @@ export interface ErnDealInput {
 	/** Whether this is a takedown deal (ERN 3.8.2) */
 	takeDown?: boolean;
 }
+
+// ============================================================================
+// MANIFEST MESSAGE (BatchComplete)
+// ============================================================================
+
+export type ManifestSchemaVersion = 'ern-c-sftp/17' | 'echo/11';
+
+export interface ManifestInput {
+	/** Schema version: 'ern-c-sftp/17' (default) or 'echo/11' */
+	schemaVersion?: ManifestSchemaVersion;
+	/** Message sender */
+	sender: ErnPartyInput;
+	/** Message recipient */
+	recipient: ErnPartyInput;
+	/** Created datetime (ISO 8601). Auto-generated if omitted */
+	createdDateTime?: string;
+	/** Test flag (default: false) */
+	isTestFlag?: boolean;
+	/** Root directory (default: './') */
+	rootDirectory?: string;
+	/** Delivery type (ern-c-sftp/17 only, e.g. 'NewReleaseDelivery') */
+	deliveryType?: string;
+	/** Product type (ern-c-sftp/17 only, e.g. 'AudioProduct') */
+	productType?: string;
+	/** Batch-level delivery type with namespace (echo/11 only) */
+	batchDeliveryType?: { value: string; namespace: string };
+	/** Batch-level product type with namespace (echo/11 only) */
+	batchProductType?: { value: string; namespace: string };
+	/** Messages in the batch */
+	messages: ManifestMessageEntry[];
+}
+
+export interface ManifestMessageEntry {
+	/** Message type (default: 'NewReleaseMessage') */
+	messageType?: string;
+	/** Message ID */
+	messageId: string;
+	/** URL / path to the ERN XML file */
+	url: string;
+	/** Release identifiers */
+	releaseId: ManifestReleaseId;
+	/** Delivery type per message (ern-c-sftp/17 only) */
+	deliveryType?: string;
+	/** Product type per message (ern-c-sftp/17 only) */
+	productType?: string;
+	/** Hash sum for integrity verification */
+	hashSum?: { value: string; algorithm: string };
+}
+
+export interface ManifestReleaseId {
+	/** GRid identifier */
+	grid?: string;
+	/** ICPN (UPC/EAN) */
+	icpn?: string;
+	/** Whether ICPN is an EAN */
+	isEan?: boolean;
+	/** Proprietary identifier */
+	proprietaryId?: { namespace: string; value: string };
+}
