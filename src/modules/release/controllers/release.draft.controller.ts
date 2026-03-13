@@ -82,6 +82,8 @@ export class ReleaseDraftController {
 	// @PublicRoute()
 	@Post('validate-list')
 	getErrorsSchemaReleasesSftp(@Body('releases') releases: any) {
+		console.log(releases);
+
 		const result =
 			this.releaseDraftService.getErrorsSchemaReleasesFromSftp(releases);
 
