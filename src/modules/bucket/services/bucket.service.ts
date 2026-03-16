@@ -1,9 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import dayjs from 'dayjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
+import { pipeline } from 'stream/promises';
+import { Repository } from 'typeorm';
 import { FolderBucketMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
@@ -13,9 +17,12 @@ import {
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
+import { ReleaseTemplateFile } from '../entities/release-template-file.entity';
+import { StorageProvider } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
-import { BucketFileService } from './bucket.file.service';
-import { BucketGcsService } from './bucket.gcs.service';
+import { BucketFileService } from './bucket-file.service';
+import { BucketGcsService } from './bucket-gcs.service';
+import { BucketR2Service } from './bucket-r2.service';
 
 @Injectable()
 export class BucketService {
@@ -23,7 +30,10 @@ export class BucketService {
 
 	constructor(
 		private readonly bucketGcsService: BucketGcsService,
+		private readonly bucketR2Service: BucketR2Service,
 		private readonly bucketFileService: BucketFileService,
+		@InjectRepository(ReleaseTemplateFile)
+		private readonly releaseTemplateFileRepo: Repository<ReleaseTemplateFile>,
 	) {}
 
 	@OnEvent(AppEvent.DELETE_LOGO)
@@ -35,23 +45,26 @@ export class BucketService {
 	async create(data: CreateBucketDto): Promise<IResCreateBucket> {
 		const { file, folderBucket, key: keyForMapping } = data;
 
-		// create file
-		const fullKeyBucket = this.getFullKey({
-			previousKey: this.getPreviousKey(folderBucket),
-			fileName: generateFileNameWithTimestamp(file.fileName),
-		});
+		const keyBucket =
+			folderBucket.key ??
+			this.getFullKey({
+				previousKey: this.getPreviousKey(folderBucket),
+				fileName: generateFileNameWithTimestamp(file.fileName),
+			});
 
 		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
 			...file,
-			key: fullKeyBucket,
+			key: keyBucket,
 			bucket,
 		});
 
-		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
+		const urlUpload = await this.getStorageService(
+			file.storageProvider!,
+		).getSignedUrlUpload({
 			contentType: newFile.contentType,
-			key: fullKeyBucket,
+			key: keyBucket,
 			isPublic: false,
 		});
 
@@ -60,6 +73,17 @@ export class BucketService {
 			urlUpload,
 			key: keyForMapping,
 		};
+	}
+
+	async createTemplate(data: CreateBucketDto): Promise<IResCreateBucket> {
+		const bucket = await this.create(data);
+
+		await this.releaseTemplateFileRepo.save(
+			this.releaseTemplateFileRepo.create({
+				file_id: bucket.fileId,
+			}),
+		);
+		return bucket;
 	}
 
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
@@ -74,10 +98,10 @@ export class BucketService {
 		releaseId,
 		trackFileName,
 	}: CreateBucketDto['folderBucket']) {
-		const datePrefix = dayjs().format('YYYY_MM');
 		const subFolder = FolderBucketMap[uploadPurpose];
 		const trackSegment = trackFileName ? `/${trackFileName}` : '';
-		return `releases/${datePrefix}/${releaseId}/${subFolder}${trackSegment}`;
+
+		return `releases/${releaseId}/${subFolder}${trackSegment}`;
 	}
 
 	private getFullKey({
@@ -126,7 +150,7 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key } = file;
 
-		return this.bucketGcsService.getSignedUrlRead({
+		return this.getStorageService(file.storageProvider).getSignedUrlRead({
 			key,
 			isPublic: false,
 		});
@@ -136,11 +160,27 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key, fileName } = file;
 
-		return this.bucketGcsService.getSignedUrlDown({
+		return this.getStorageService(file.storageProvider).getSignedUrlDown({
 			key,
 			isPublic: false,
 			fileName,
 		});
+	}
+
+	async getUrlDownTemplateFile() {
+		const [template] = await this.releaseTemplateFileRepo.find({
+			relations: ['file'],
+			order: {
+				createdAt: 'DESC',
+			},
+			take: 1,
+		});
+
+		if (!template || !template.file) {
+			throw new Error('Template file not found');
+		}
+
+		return await this.getUrlDown(template.file.id);
 	}
 
 	async getDetail(id: string) {
@@ -150,7 +190,9 @@ export class BucketService {
 			...file,
 			urlPublic: this.getUrlPublic(file.key),
 			urlPrivate: this.getUrlPrivate(file.key),
-			urlRead: await this.bucketGcsService.getSignedUrlRead({
+			urlRead: await this.getStorageService(
+				file.storageProvider,
+			).getSignedUrlRead({
 				key: file.key,
 				isPublic: false,
 			}),
@@ -180,6 +222,106 @@ export class BucketService {
 		return {
 			fileBuffer: contents,
 			fileDb,
+		};
+	}
+
+	async downloadFolder({
+		prefix,
+		destFolder,
+		isPublic = false,
+	}: {
+		prefix: string;
+		destFolder: string;
+		isPublic?: boolean;
+	}): Promise<{
+		downloadedCount: number;
+		failedCount: number;
+		destFolder: string;
+		errors: Array<{ key: string; error: string }>;
+	}> {
+		// 1. Lấy metadata từ DB
+		const filesDb = await this.bucketFileService.getFilesByPrefix({
+			prefix,
+		});
+
+		if (filesDb.length === 0) {
+			throw new Error(`No files found with prefix: ${prefix}`);
+		}
+
+		// 2. Map key -> FileEntity
+		const dbMap = new Map<string, FileEntity>();
+		filesDb.forEach((f) => {
+			dbMap.set(f.key, f);
+		});
+
+		// 3. Lấy files từ GCS
+		const filesGcs = await this.bucketGcsService.getFilesByPrefix({
+			prefix,
+			isPublic,
+		});
+
+		// 4. Tạo thư mục đích
+		await fs.promises.mkdir(destFolder, { recursive: true });
+
+		let downloadedCount = 0;
+		let failedCount = 0;
+		const errors: Array<{ key: string; error: string }> = [];
+
+		// 5. Download từng file
+		for (const { key, file } of filesGcs) {
+			try {
+				const fileDb = dbMap.get(key);
+				if (!fileDb) {
+					failedCount++;
+					errors.push({ key, error: 'File not found in database' });
+					continue;
+				}
+
+				// Tính relative path
+				let relativePath = key.startsWith(prefix)
+					? key.substring(prefix.length)
+					: key;
+
+				if (relativePath.startsWith('/')) {
+					relativePath = relativePath.substring(1);
+				}
+
+				// Thay tên file gốc nếu có
+				if (fileDb.fileName) {
+					const pathParts = relativePath.split('/');
+					pathParts[pathParts.length - 1] = fileDb.fileName;
+					relativePath = pathParts.join('/');
+				}
+
+				const fullPath = path.join(destFolder, relativePath);
+				const dir = path.dirname(fullPath);
+
+				// Tạo thư mục cha
+				await fs.promises.mkdir(dir, { recursive: true });
+
+				// Download file
+				const stream = file.createReadStream();
+				const writeStream = fs.createWriteStream(fullPath);
+				await pipeline(stream, writeStream);
+
+				downloadedCount++;
+			} catch (error) {
+				failedCount++;
+				errors.push({
+					key,
+					error:
+						error instanceof Error
+							? error.message
+							: 'Unknown error',
+				});
+			}
+		}
+
+		return {
+			downloadedCount,
+			failedCount,
+			destFolder,
+			errors,
 		};
 	}
 
@@ -273,5 +415,16 @@ export class BucketService {
 			this.logger.error(messageWarning);
 			return messageWarning ?? 'Unknown error';
 		});
+	}
+
+	private getStorageService(provider: StorageProvider) {
+		switch (provider) {
+			case StorageProvider.R2:
+				return this.bucketR2Service;
+
+			case StorageProvider.GCS:
+			default:
+				return this.bucketGcsService;
+		}
 	}
 }

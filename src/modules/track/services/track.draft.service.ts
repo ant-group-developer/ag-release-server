@@ -337,6 +337,7 @@ export class TrackDraftService {
 		await Promise.all([
 			this.audioFileService.deleteRecordOfTrackSafe({ trackId }),
 			this.trackArtistService.deleteRecordOfTrack({ trackId }),
+			this.trackContributorService.deleteRecordOfTrack({ trackId }),
 			this.trackLanguageDraftService.deleteRecordOfTrack({
 				trackId,
 			}),

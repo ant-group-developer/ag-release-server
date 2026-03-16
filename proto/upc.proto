@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package upc;
+
+service UpcService {
+  rpc ListUpc (QueryUpcRequest) returns (QueryUpcResponse);
+  rpc CreateUpc (CreateUpcRequest) returns (CreateUpcResponse);
+  rpc ListPrefixUpc (ListPrefixUpcRequest) returns (ListPrefixUpcResponse); 
+}
+
+message QueryUpcRequest {
+  int32 page = 1;
+  int32 pageSize = 2;
+  string search = 3;
+  string prefixUpcId = 4;
+  string status = 5;
+  string industry = 6;
+
+  // Boolean string bên REST → bool trong gRPC
+  bool isVariable = 7;
+  bool isPurchasable = 8;
+  bool isAdded = 9;
+
+  string sortBy = 10;
+  string orderBy = 11;
+}
+
+message UpcItem {
+  string id = 1;
+  string prefixUpcId = 2;
+  string gs1CompanyPrefix = 3;
+  string gtin = 4;
+  string packagingLevel = 5;
+  string description = 6;
+  string desc1Language = 7;
+  string brandName = 8;
+  string brand1Language = 9;
+  string status = 10;
+  string industry = 11;
+  bool isVariable = 12;
+  bool isPurchasable = 13;
+  bool isAdded = 14;
+  repeated string targetMarkets = 15;
+  string createdAt = 16;
+  string updatedAt = 17;
+}
+
+message Pagination {
+  int32 totalItems = 1;
+  int32 page = 2;
+  int32 pageSize = 3;
+  int32 totalPages = 4;
+}
+
+message QueryUpcResponse {
+  repeated UpcItem data = 1;
+  Pagination metadata = 2;
+  string message = 3;
+}
+
+message CreateUpcRequest {
+  string prefixUpcId = 1;
+
+  string packagingLevel = 2;
+  string description = 3;
+  string desc1Language = 4;
+
+  string brandName = 5;
+  string brand1Language = 6;
+
+  string status = 7;
+  string industry = 8;
+
+  bool isVariable = 9;
+  bool isPurchasable = 10;
+  bool isAdded = 11;
+
+  repeated string targetMarkets = 12;
+}
+
+message CreateUpcResponse {
+  UpcItem data = 1;
+  string message = 2;
+}
+
+message ListPrefixUpcRequest {
+  int32 page = 1;
+  int32 pageSize = 2;
+  string search = 3;
+  string sortBy = 4;
+  string orderBy = 5;
+}
+
+message PrefixUpcItem {
+  string id = 1;
+  string code = 2;
+  string brandName = 3;
+  int32 maxQuantity = 4;
+  string createdAt = 5;
+  string updatedAt = 6;
+  string type = 7;
+}
+
+message ListPrefixUpcResponse {
+  repeated PrefixUpcItem data = 1;
+  Pagination metadata = 2;
+  string message = 3;
+}

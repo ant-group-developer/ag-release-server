@@ -25,9 +25,12 @@ import { DatabaseModule } from './modules/database/database.module';
 import { DDEXModule } from './modules/ddex';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
-import { SftpModule } from './modules/distribution2/sftp/sftp.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
+import { ErnModule } from './modules/ern/ern.module';
+import { ExcelModule } from './modules/excel/excel.module';
+import { IsrcModule } from './modules/external/isrc/isrc.module';
+import { UpcModule } from './modules/external/upc/upc.module';
 import { GenreModule } from './modules/genre/genre.module';
 import { IssueLevelModule } from './modules/issue-level/issue-level.module';
 import { IssueModule } from './modules/issue/issue.module';
@@ -71,7 +74,7 @@ import { UserModule } from './modules/user/user.module';
 		}),
 		// TypeOrmModule.forRootAsync({
 		// 	imports: [ConfigModule],
-		// 	useClass: DatabaseConfigService,
+		// 	import { Excel } from './modules/excel/entities/excel.entity';
 		// }),
 
 		CacheModule,
@@ -149,11 +152,14 @@ import { UserModule } from './modules/user/user.module';
 		ReleaseContributorModule,
 		TrackContributorModule,
 
-		SftpModule,
-
 		DistributionModule,
 
 		DDEXModule,
+		IsrcModule,
+		UpcModule,
+		ExcelModule,
+
+		ErnModule,
 	],
 	controllers: [AppController],
 	providers: [

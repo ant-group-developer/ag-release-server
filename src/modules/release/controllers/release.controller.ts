@@ -27,7 +27,9 @@ import { Permission } from 'src/modules/permission/constants/permission.data.con
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { ReleaseSuccess } from '../constants/release.constant';
+import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import {
 	IRelease,
@@ -100,6 +102,13 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/full')
+	async findOneFull(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.findOneFull(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id/download/csv-metadata')
 	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileCsvMetadata(id);
@@ -130,6 +139,15 @@ export class ReleaseController {
 		streamDownload(res, data);
 	}
 
+	@Get(':id/dsp/delivery')
+	async getReleaseDspDelivery(
+		@Param('id') id: string,
+		@Query() query: ReleaseQueryDspDeliveryDto,
+	): Promise<ResponseSuccess<PageDto<any>>> {
+		const data = await this.releaseService.getReleaseDspDelivery(id, query);
+		return new ResponseSuccess({ data });
+	}
+
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
 	async update(
@@ -151,10 +169,153 @@ export class ReleaseController {
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
+		@Body() dto: SubmitReleaseDto,
 	): Promise<ResponseSuccess<IReleaseNonDraft>> {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, userId);
+		const result = await this.releaseService.submit(id, userId, dto);
 
 		return ReleaseSuccess.CREATE(result);
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/gen-upc')
+	async genUpc(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<any>> {
+		const userId = req.user!.sub;
+
+		const result = await this.releaseService.genUpc(id);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/parse-release')
+	async parseMetadata(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.parseMetadata(id);
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-and-upload-metadata-ci')
+	createMetadataCiAndUploadToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		this.releaseService
+			.createMetadataCiAndUploadToSftp(id)
+			.catch((_e) => {});
+		return new ResponseSuccess({ message: 'Đang được xử lý' });
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-on-server')
+	async createMetadataCiOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.createMetadataCiOnServer(id);
+		return result;
+	}
+
+	@Post(':id/upload-metadata-ci-to-bucket')
+	async uploadMetadataCiToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		// @Body('localDir') localDir: string,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToBucket({
+			id,
+			// localDir,
+		});
+		return result;
+	}
+
+	@Post(':id/download-metadata-ci-to-bucket')
+	async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
+		const result =
+			await this.releaseService.downloadMetadataCiFromBucket(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/upload-metadata-ci-to-sftp')
+	async uploadMetadataCiToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.uploadMetadataCiToSftp(id);
+		return result;
+	}
+
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/create-metadata-ci-and-upload-to-bucket')
+	async createMetadataCiAndUploadToBucket(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataCiAndUploadToBucket(id);
+		return result;
+	}
+
+	// spotify
+	@Post(':id/create-metadata-spotify-on-server')
+	async createMetadataSpotifyOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.createMetadataSpotifyOnServer(id);
+		return result;
+	}
+
+	@Post(':id/upload-metadata-spotify-to-sftp')
+	async uploadMetadataSpotifyToSftp(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result =
+			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+		return result;
+	}
+
+	// @Post(':id/create-and-upload-metadata-spotify')
+	// async createAndUploadMetadataSpotify(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	// await this.releaseService.createMetadataSpotifyOnServer(id);
+	// 	// const result =
+	// 	// 	await this.releaseService.uploadMetadataSpotifyToSftp(id);
+	// 	// return result;
+
+	// 	this.uploadSafe(id);
+	// }
+
+	// async uploadSafe(id: string) {
+	// 	try {
+	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
+	// 		const result =
+	// 			await this.releaseService.uploadMetadataSpotifyToSftp(id);
+	// 	} catch (error) {
+	// 		console.log(error);
+	// 	}
+	// }
+
+	@Post(':id/create-and-upload-metadata-spotify')
+	createAndUploadMetadataSpotify(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		this.releaseService.createAndUploadMetadataSpotify(id).catch((_e) => {
+			console.log(_e);
+		});
+
+		return new ResponseSuccess({ message: 'Đang được xử lý' });
 	}
 }

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ERN382Generator } from './generators/ern382.generator';
 import { ERN43Generator } from './generators/ern43.generator';
 import {
 	DDEXGenerateInput,
@@ -25,7 +26,7 @@ export class DDEXService {
 			case '4.3':
 				return new ERN43Generator();
 			case '3.8.2':
-				throw new Error('ERN 3.8.2 generator not yet implemented');
+				return new ERN382Generator();
 			default:
 				// eslint-disable-next-line @typescript-eslint/restrict-template-expressions
 				throw new Error(`Unsupported DDEX version: ${version}`);

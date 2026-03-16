@@ -1,7 +1,8 @@
 /**
- * DDEX ERN 4.3 Input Interfaces
+ * DDEX ERN Input Interfaces (supports ERN 4.3 and ERN 3.8.2)
  * Independent module - no database dependencies
  * Reference: http://ddex.net/xml/ern/43/release-notification.xsd
+ * Reference: http://ddex.net/xml/ern/382/release-notification.xsd
  */
 
 type LiteralUnion<T extends U, U = string> = T | (U & Record<never, never>);
@@ -50,6 +51,14 @@ export type DDEXImageType =
 	| 'Icon'
 	| 'Logo'
 	| 'Unknown'
+	| (string & {});
+
+/** Image Codec Type (avs:ImageCodecType) */
+export type DDEXImageCodecType =
+	| 'JPEG'
+	| 'PNG'
+	| 'GIF'
+	| 'TIFF'
 	| (string & {});
 
 /** Parental Warning Type (avs:ParentalWarningType) */
@@ -112,6 +121,12 @@ export type DDEXUseType =
 	| 'Unknown'
 	| (string & {});
 
+/** Update Indicator Type (for ERN 3.8.2) */
+export type DDEXUpdateIndicator = 'OriginalMessage' | 'UpdateMessage';
+
+/** Message Control Type (for ERN 3.8.2) */
+export type DDEXMessageControlType = 'LiveMessage' | 'TestMessage';
+
 /** Audio Codec Type (avs:AudioCodecType) */
 export type DDEXAudioCodecType =
 	| 'AAC'
@@ -137,6 +152,9 @@ export interface DDEXData {
 	resources: DDEXResource[];
 	releases: DDEXRelease[];
 	deals: DDEXDeal[];
+	// === ERN 3.8.2 specific ===
+	/** Update indicator: OriginalMessage (add) or UpdateMessage (update/takedown) */
+	updateIndicator?: DDEXUpdateIndicator;
 }
 
 // ============================================================================
@@ -154,6 +172,11 @@ export interface DDEXMessageHeader {
 	recipient: DDEXMessagingParty;
 	/** ISO 8601 datetime. Auto-generated if not provided */
 	createdDateTime?: string;
+	// === ERN 3.8.2 specific ===
+	/** XML filename, e.g. "4061707105869.xml" */
+	messageFileName?: string;
+	/** Message control type: LiveMessage or TestMessage */
+	messageControlType?: DDEXMessageControlType;
 }
 
 export interface DDEXMessagingParty {
@@ -161,6 +184,9 @@ export interface DDEXMessagingParty {
 	partyId: string;
 	/** Party name */
 	partyName: string;
+	// === ERN 3.8.2 specific ===
+	/** Whether partyId is a DPID (adds IsDPID="true" attribute) */
+	isDPID?: boolean;
 }
 
 // ============================================================================
@@ -224,7 +250,7 @@ export interface DDEXRelatedParty {
 // RESOURCE (ern:ResourceList)
 // ============================================================================
 
-export type DDEXResourceType = 'SoundRecording' | 'Image';
+export type DDEXResourceType = 'SoundRecording' | 'Image' | 'Text';
 
 export interface DDEXResource {
 	/** Resource reference, pattern: A[\d\-_a-zA-Z]+, e.g., "A1", "A2" */
@@ -271,12 +297,40 @@ export interface DDEXResource {
 	imageType?: DDEXImageType;
 	/** C-Line copyright for images */
 	cLine?: DDEXCopyrightLine;
+	/** Image codec type (ERN 3.8.2) */
+	imageCodecType?: DDEXImageCodecType;
+	/** Image height in pixels (ERN 3.8.2) */
+	imageHeight?: number;
+	/** Image width in pixels (ERN 3.8.2) */
+	imageWidth?: number;
+
+	// === Text / Lyrics specific (ERN 3.8.2) ===
+	/** Text type, e.g., 'LyricText' */
+	textType?: string;
 
 	// === Common ===
 	/** Parental warning type (default: NotExplicit) */
 	parentalWarningType?: DDEXParentalWarningType;
 	/** Territory code this resource applies to */
 	applicableTerritoryCode?: string;
+	/** Whether this is artist-related (ERN 3.8.2), default: false */
+	isArtistRelated?: boolean;
+	/** SubTitle for the resource (ERN 3.8.2) */
+	subTitle?: string;
+
+	// === ERN 3.8.2 inline contributors (no PartyList) ===
+	/** Resource contributors with inline party names */
+	resourceContributors?: DDEXResourceContributor[];
+	/** Indirect resource contributors (Lyricist, Composer, etc.) */
+	indirectResourceContributors?: DDEXIndirectResourceContributor[];
+	/** Genre (for territory-specific details in ERN 3.8.2) */
+	genre?: string;
+	/** Sub-genre */
+	subGenre?: string;
+	/** Sequence number within the release */
+	sequenceNumber?: number;
+	/** Additional territory codes */
+	territoryCodes?: string[];
 }
 
 export interface DDEXDisplayArtist {
@@ -303,6 +357,30 @@ export interface DDEXContributor {
 	// === Optional XSD fields ===
 	/** Instrument played */
 	instrumentType?: string;
+}
+
+/** Resource Contributor (ERN 3.8.2 - inline party name, no party reference) */
+export interface DDEXResourceContributor {
+	/** Full name of the contributor */
+	fullName: string;
+	/** Contributor role (MainArtist, etc.) */
+	role: string;
+	/** Sequence number (1-based) */
+	sequenceNumber: number;
+	/** Language and script code for the name */
+	languageAndScriptCode?: string;
+}
+
+/** Indirect Resource Contributor (ERN 3.8.2 - Lyricist, Composer, Producer, etc.) */
+export interface DDEXIndirectResourceContributor {
+	/** Full name of the contributor */
+	fullName: string;
+	/** Contributor role (Lyricist, Composer, or UserDefined) */
+	role: string;
+	/** User-defined value when role is 'UserDefined' */
+	userDefinedValue?: string;
+	/** Language and script code for the name */
+	languageAndScriptCode?: string;
 }
 
 export interface DDEXCopyrightLine {
@@ -334,6 +412,11 @@ export interface DDEXTechnicalDetails {
 	hashSum?: string;
 	/** Hash algorithm used */
 	hashSumAlgorithmType?: string;
+	// === ERN 3.8.2 specific ===
+	/** File name (e.g., "DEAR41867226.mp3") */
+	fileName?: string;
+	/** File path (e.g., "resources/") */
+	filePath?: string;
 }
 
 // ============================================================================
@@ -343,7 +426,7 @@ export interface DDEXTechnicalDetails {
 export interface DDEXRelease {
 	/** Release reference, R0 for main release, R1+ for track releases */
 	reference: string;
-	/** Release type (Album, Single, EP, etc.) */
+	/** Release type (Album, Single, EP, TrackRelease, etc.) */
 	type: LiteralUnion<DDEXReleaseType, string>;
 	/** ICPN (UPC/EAN), e.g., "850080651018" */
 	icpn: string;
@@ -353,7 +436,7 @@ export interface DDEXRelease {
 	displayArtistName: string;
 	/** Display artists with roles */
 	displayArtists: DDEXDisplayArtist[];
-	/** Reference to label party (e.g., "P2") */
+	/** Reference to label party (e.g., "P2") or label name directly */
 	labelRef: string;
 	/** P-Line copyright */
 	pLine?: DDEXCopyrightLine;
@@ -387,6 +470,26 @@ export interface DDEXRelease {
 	applicableTerritoryCode?: string;
 	/** Is this the main release? */
 	isMainRelease?: boolean;
+
+	// === ERN 3.8.2 specific ===
+	/** Whether ICPN is an EAN (adds IsEan attribute) */
+	isEan?: boolean;
+	/** ISRC for track releases (ERN 3.8.2 uses ISRC instead of ICPN for track releases) */
+	isrc?: string;
+	/** Label name (direct string, used in ERN 3.8.2 instead of label party ref) */
+	labelName?: string;
+	/** Territory codes for ReleaseDetailsByTerritory */
+	territoryCodes?: string[];
+	/** Linked release resource references (e.g., lyrics ref) */
+	linkedResourceRefs?: DDEXLinkedResourceRef[];
+}
+
+/** Linked resource reference with description (ERN 3.8.2) */
+export interface DDEXLinkedResourceRef {
+	/** Resource reference (e.g., "A2") */
+	ref: string;
+	/** Link description (e.g., "Lyrics") */
+	linkDescription?: string;
 }
 
 /** Track Release (for individual track releases within an album) */
@@ -428,6 +531,10 @@ export interface DDEXDeal {
 	isExclusive?: boolean;
 	/** Pre-order date */
 	preOrderReleaseDate?: string;
+
+	// === ERN 3.8.2 specific ===
+	/** Whether this is a takedown deal */
+	takeDown?: boolean;
 }
 
 export interface DDEXPriceInformation {

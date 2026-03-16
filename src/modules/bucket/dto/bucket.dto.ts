@@ -13,7 +13,7 @@ import {
 	Min,
 	ValidateNested,
 } from 'class-validator';
-import { UploadPurpose } from '../enum/bucket.enum';
+import { StorageProvider, UploadPurpose } from '../enum/bucket.enum';
 
 class CreateFileDto {
 	@IsString()
@@ -23,7 +23,6 @@ class CreateFileDto {
 
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(30)
 	contentType: string;
 
 	@IsString()
@@ -34,16 +33,26 @@ class CreateFileDto {
 	@IsNumber()
 	@Min(0)
 	fileSize: number;
+
+	@IsOptional()
+	@IsEnum(StorageProvider)
+	storageProvider?: StorageProvider = StorageProvider.GCS;
 }
 
 class FolderBucket {
+	// nếu không truyền keyBucket thì hệ thống sẽ tự generate
+	key?: string;
+
+	// mục đích upload, dùng để xác định cấu trúc folder
 	@IsEnum(UploadPurpose)
 	uploadPurpose: UploadPurpose;
 
+	// id của release, dùng cho các upload gắn với release
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
 
+	// tên file track, chỉ dùng cho upload track file
 	@IsOptional()
 	@MaxLength(80)
 	trackFileName?: string;

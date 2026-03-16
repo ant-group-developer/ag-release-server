@@ -3,15 +3,11 @@ import { OnEvent } from '@nestjs/event-emitter';
 import TelegramBot from 'node-telegram-bot-api';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
 	private readonly logger = new Logger(TelegramService.name);
-
 	private bot: TelegramBot;
-	private token: string;
-	private chatIdDev: number;
 
 	constructor(private readonly appConfigService: AppConfigService) {}
 
@@ -50,16 +46,10 @@ export class TelegramService implements OnModuleInit {
 	}
 
 	private newBot() {
-		this.token = this.appConfigService.getValue(
-			AppConfigKey.TELEGRAM_TOKEN,
-		);
+		const token = this.appConfigService.cache.config.telegram.token;
 
-		if (this.token) {
-			this.bot = new TelegramBot(this.token);
-
-			this.chatIdDev = Number(
-				this.appConfigService.getValue(AppConfigKey.CHAT_ID),
-			);
+		if (token) {
+			this.bot = new TelegramBot(token);
 
 			this.applyReplyPing();
 			this.sendHelloGroup();
@@ -78,10 +68,11 @@ export class TelegramService implements OnModuleInit {
 	}
 
 	private sendHelloGroup() {
-		if (this.chatIdDev) {
+		const chatIdDev = this.appConfigService.cache.config.telegram.chatId;
+		if (chatIdDev) {
 			this.sendMessageSafe({
-				chatId: this.chatIdDev,
-				message: `Hello, chatId: ${this.chatIdDev}`,
+				chatId: Number(chatIdDev),
+				message: `Hello, chatId: ${chatIdDev}`,
 			});
 		}
 	}
@@ -100,6 +91,9 @@ export class TelegramService implements OnModuleInit {
 	}
 
 	async sendToDev(message: string) {
-		await this.bot.sendMessage(this.chatIdDev, message);
+		await this.bot.sendMessage(
+			this.appConfigService.cache.config.telegram.chatId,
+			message,
+		);
 	}
 }

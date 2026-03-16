@@ -5,13 +5,11 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from '../app-config/app-config.service';
-import { AppConfigKey } from '../app-config/enums/app-config.enum';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 
 @Injectable()
 export class ScheduleService implements OnModuleInit {
 	private readonly logger = new Logger(ScheduleService.name);
-	private cronValue: string;
 
 	constructor(
 		private readonly databaseBackupService: DatabaseBackupService,
@@ -29,9 +27,6 @@ export class ScheduleService implements OnModuleInit {
 	}
 
 	private reloadConfig() {
-		this.cronValue = this.appConfigService.getValue(
-			AppConfigKey.CRON_VALUE,
-		);
 		this.addJobBackup();
 	}
 
@@ -40,12 +35,15 @@ export class ScheduleService implements OnModuleInit {
 		this.deleteIfExists({ jobName });
 
 		try {
-			const jobBackup = new CronJob(this.cronValue, () => {
-				this.logger.log('Start backup');
-				this.databaseBackupService.eventBackup().catch((_e) => {
-					this.logger.log(_e.message);
-				});
-			});
+			const jobBackup = new CronJob(
+				this.appConfigService.cache.config.backupDatabase.cronValue,
+				() => {
+					this.logger.log('Start backup');
+					this.databaseBackupService.eventBackup().catch((_e) => {
+						this.logger.log(_e.message);
+					});
+				},
+			);
 
 			this.schedulerRegistry.addCronJob(jobName, jobBackup);
 			jobBackup.start();

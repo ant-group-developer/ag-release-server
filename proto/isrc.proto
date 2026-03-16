@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package isrc;
+
+service IsrcService {
+  rpc ListIsrc (ListIsrcRequest) returns (ListIsrcResponse);
+  rpc CreateIsrc (CreateIsrcRequest) returns (CreateIsrcResponse);
+  rpc ListPrefixIsrc (ListPrefixIsrcRequest) returns (ListPrefixIsrcResponse);
+}
+
+message ListIsrcRequest {
+  int32 page = 1;
+  int32 pageSize = 2;
+
+  string search = 3;
+  string code = 4;
+  string recordingArtist = 5;
+  string registrantName = 6;
+  string yearOfProduction = 7;
+  string assetType = 8;
+  string prefixIsrcId = 9;
+
+  bool immersive = 10;
+  bool explicit = 11;
+  bool isAdded = 12;
+
+  string sortBy = 13;
+  string orderBy = 14;
+}
+
+message IsrcItem {
+  string id = 1;
+  string code = 2;
+  string registrantName = 3;
+  string recordingArtist = 4;
+  string recordingTitle = 5;
+  string versionTitle = 6;
+  string assetType = 7;
+  bool immersive = 8;
+  bool explicit = 9;
+  string yearOfProduction = 10;
+  int32 duration = 11;
+  bool isAdded = 12;
+  string prefixIsrcId = 13;
+  string createdAt = 14;
+  string updatedAt = 15;
+}
+
+message PaginationMeta {
+  int32 totalItems = 1;
+  int32 page = 2;
+  int32 pageSize = 3;
+  int32 totalPages = 4;
+}
+
+message ListIsrcResponse {
+  repeated IsrcItem data = 1;
+  PaginationMeta metadata = 2;
+  string message = 3;
+}
+
+message CreateIsrcRequest {
+  string registrantName = 1;
+  string recordingArtist = 2;
+  string recordingTitle = 3;
+  string versionTitle = 4;
+  string assetType = 5;
+
+  bool immersive = 6;
+  bool explicit = 7;
+
+  int32 yearOfProduction = 8;
+  int32 duration = 9;
+
+  bool isAdded = 10;
+  string prefixIsrcId = 11;
+}
+
+message CreateIsrcResponse {
+  IsrcItem data = 1;
+  string message = 2;
+}
+
+message ListPrefixIsrcRequest {
+  int32 page = 1;
+  int32 pageSize = 2;
+  string search = 3;
+  string sortBy = 4;
+  string orderBy = 5;
+}
+
+message PrefixIsrcItem {
+  string id = 1;
+  string code = 2;
+  int32 maxQuantity = 3;
+  string createdAt = 4;
+  string updatedAt = 5;
+  string type = 6;
+}
+
+message ListPrefixIsrcResponse {
+  repeated PrefixIsrcItem data = 1;
+  PaginationMeta metadata = 2;
+  string message = 3;
+}

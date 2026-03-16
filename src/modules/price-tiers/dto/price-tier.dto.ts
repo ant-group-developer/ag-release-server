@@ -4,7 +4,10 @@ import {
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
+	IsOptional,
+	IsString,
 	IsUUID,
+	MaxLength,
 	Min,
 	ValidateIf,
 } from 'class-validator';
@@ -17,6 +20,11 @@ export class CreatePriceTierDto {
 	@IsNumber()
 	@Min(0)
 	amount: number;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(50)
+	code: string;
 
 	@IsUUID()
 	@IsNotEmpty()
@@ -40,6 +48,12 @@ export class UpdatePriceTierDto {
 	@IsNumber()
 	@Min(0)
 	amount?: number;
+
+	@IsString()
+	@IsNotEmpty()
+	@MaxLength(50)
+	@IsOptional()
+	code?: string;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsUUID()

@@ -12,6 +12,7 @@
 /tmp
 /download_unzip
 /src/modules/access-bomb/file
+/release_download_bucket
 # Logs
 logs
 *.log
@@ -68,3 +69,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 credential.json
 **/keys/*
 secrets
+
+.agent

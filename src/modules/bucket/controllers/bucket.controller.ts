@@ -5,9 +5,12 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Post,
+	Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import * as path from 'path';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { PublicRoute } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	BulkCreateBucketDto,
 	BulkSubmitDto,
@@ -32,6 +35,16 @@ export class BucketGcsController {
 		});
 	}
 
+	@Post('private/template')
+	async createTemplate(@Body() data: CreateBucketDto) {
+		const result = await this.bucketService.createTemplate(data);
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+
+	// @PublicRoute()
 	@Post('private/bulk')
 	async bulkCreate(@Body() data: BulkCreateBucketDto) {
 		const result = await this.bucketService.bulkCreate(data);
@@ -60,6 +73,35 @@ export class BucketGcsController {
 	}
 
 	// read
+	@PublicRoute()
+	@Get('private/download-folder')
+	async downloadFolder(@Query('prefix') prefix: string) {
+		// Tạo tên thư mục duy nhất để tránh conflict
+		const timestamp = Date.now();
+		const destFolder = path.join(
+			process.cwd(),
+			'test_folder',
+			`${prefix.replace(/\//g, '_')}_${timestamp}`,
+		);
+
+		const result = await this.bucketService.downloadFolder({
+			prefix,
+			destFolder,
+			isPublic: false,
+		});
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
+	@Get('private/download-template')
+	async getUrlDownTemplateFile() {
+		const result = await this.bucketService.getUrlDownTemplateFile();
+
+		return new ResponseSuccess({
+			data: result,
+		});
+	}
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);

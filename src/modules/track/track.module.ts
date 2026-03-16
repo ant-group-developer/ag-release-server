@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { AudioFileModule } from '../audio-file/audio-file.module';
 import { CopyrightModule } from '../copyright/copyright.module';
+import { IsrcModule } from '../external/isrc/isrc.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { Release } from '../release/entities/release.entity';
@@ -39,9 +40,11 @@ import { TrackService } from './services/track.service';
 		CopyrightModule,
 		TrackPolicyModule,
 		AppConfigModule,
+
+		IsrcModule,
 	],
 	controllers: [TrackController, TrackDraftController],
 	providers: [TrackService, TrackDraftService, TrackQueryService],
-	exports: [TrackDraftService],
+	exports: [TrackDraftService, TrackService],
 })
 export class TrackModule {}

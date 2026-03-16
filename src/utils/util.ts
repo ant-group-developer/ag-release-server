@@ -142,3 +142,132 @@ export const handleTenantId = (
 ): string | undefined => {
 	return tenantId === 'system-tenant' ? undefined : tenantId;
 };
+
+// image
+import sharp from 'sharp';
+export async function resizeCoverImageTo3000x3000({
+	buffer,
+}: {
+	buffer: Buffer;
+}): Promise<sharp.Sharp> {
+	const img = sharp(buffer);
+	const meta = await img.metadata();
+
+	const width = meta.width ?? 0;
+	const height = meta.height ?? 0;
+
+	if (width >= 3000 && height >= 3000) {
+		return img;
+	}
+
+	return img.resize(3000, 3000, { fit: 'cover' });
+}
+
+export function resizeCoverImage({
+	buffer,
+	output,
+}: {
+	buffer: Buffer;
+	extension?: string;
+	output: {
+		width: number;
+		height: number;
+	};
+}) {
+	const img = sharp(buffer);
+
+	return img.resize(output.width, output.height, { fit: 'cover' });
+}
+
+export async function removeFolder(path: string) {
+	await fs.promises.rm(path, {
+		recursive: true,
+		force: true,
+	});
+}
+
+export function genBatchId(): string {
+	const d = new Date();
+
+	const pad = (n: number, l = 2) => n.toString().padStart(l, '0');
+
+	return (
+		d.getFullYear().toString() +
+		pad(d.getMonth() + 1) +
+		pad(d.getDate()) +
+		pad(d.getHours()) +
+		pad(d.getMinutes()) +
+		pad(d.getSeconds()) +
+		pad(d.getMilliseconds(), 3)
+	);
+}
+
+import archiver from 'archiver';
+export function zipFolder(sourceDir: string, zipPath: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const output = fs.createWriteStream(zipPath);
+		const archive = archiver('zip', { zlib: { level: 9 } });
+
+		output.on('close', () => resolve());
+		archive.on('error', (err) => reject(err));
+
+		archive.pipe(output);
+		archive.directory(sourceDir, false);
+		archive.finalize();
+	});
+}
+
+import * as path from 'path';
+import SftpClient from 'ssh2-sftp-client';
+
+export async function uploadFileToSftp({
+	sftp,
+	localDir = '',
+	remoteDir = '',
+	remoteFileName,
+}: {
+	sftp: {
+		host: string;
+		port?: number;
+		username: string;
+		password?: string;
+		privateKey?: string | Buffer;
+	};
+	localDir?: string;
+	remoteDir?: string;
+	remoteFileName?: string;
+}): Promise<{ remotePath: string }> {
+	const client = new SftpClient();
+
+	try {
+		// if (!fs.statSync(localDir).isFile()) {
+		// 	throw new Error('localDir is not a file');
+		// }
+
+		await client.connect({
+			host: sftp.host,
+			port: sftp.port ?? 22,
+			username: sftp.username,
+			password: sftp.password,
+			privateKey: sftp.privateKey,
+			// keepaliveInterval: 10_000,
+			// keepaliveCountMax: 5,
+		});
+
+		// mkdir -p
+		await client.mkdir(remoteDir, true);
+
+		const fileName = remoteFileName ?? path.basename(localDir);
+		const remotePath = path.posix.join(remoteDir, fileName);
+
+		// FAST MODE (gần FileZilla nhất)
+		await client.put(localDir, remotePath, {
+			concurrency: 2,
+			chunkSize: 128 * 1024,
+		});
+
+		return { remotePath };
+	} finally {
+		await client.end();
+	}
+}

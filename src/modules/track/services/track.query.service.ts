@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppConfigKey } from 'src/modules/app-config/enums/app-config.enum';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -1040,7 +1039,7 @@ export class TrackQueryService {
 
 	private calculatePreviewAndSampleLength(duration: number) {
 		const { sampleLength: sampleConfig, preview: previewConfig } =
-			this.appConfigService.getValue(AppConfigKey.GENERAL);
+			this.appConfigService.cache.config.general;
 		const preview =
 			duration > previewConfig ? previewConfig : Math.round(duration / 2);
 		const sampleLength =

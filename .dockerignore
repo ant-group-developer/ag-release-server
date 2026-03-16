@@ -1,41 +1,57 @@
 # Dependencies
+
 node_modules
 
 # Build output
+
 dist
 
 # Samples (not needed in production)
+
 samples
 
 # Development files
+
 .git
 .gitignore
 .env
-.env.*
+.env.\*
 !.env.example
 
 # IDE
+
 .vscode
 .idea
 
 # Logs
-*.log
+
+\*.log
 logs
 
 # Tests
+
 coverage
 .nyc_output
 
 # Documentation
+
 docs
-*.md
+\*.md
 !README.md
 
 # Docker
+
 Dockerfile*
 docker-compose*
 .dockerignore
 
 # Misc
+
 .DS_Store
-*.tsbuildinfo
+\*.tsbuildinfo
+
+downloads
+download_unzip
+backups
+exports
+release_parsed

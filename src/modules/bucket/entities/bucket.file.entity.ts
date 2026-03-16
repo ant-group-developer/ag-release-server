@@ -1,5 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Column, Entity } from 'typeorm';
+import { StorageProvider } from '../enum/bucket.enum';
 
 @Entity('files', {
 	comment:
@@ -29,7 +30,7 @@ export class FileEntity extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
-		length: 30,
+		length: 200,
 		comment: 'MIME type của file (ví dụ: audio/wav, image/png)',
 	})
 	contentType: string;
@@ -53,4 +54,11 @@ export class FileEntity extends BaseUUIDEntity {
 		comment: 'Tên bucket lưu trữ file',
 	})
 	bucket: string;
+
+	@Column({
+		type: 'enum',
+		enum: StorageProvider,
+		default: StorageProvider.GCS,
+	})
+	storageProvider: StorageProvider;
 }

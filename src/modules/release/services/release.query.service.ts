@@ -147,6 +147,8 @@ export class ReleaseQueryService {
 		});
 	}
 
+	// findOneFull;
+
 	private createQbGetOneDetail(id: string) {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
@@ -337,6 +339,17 @@ export class ReleaseQueryService {
 
 		return release;
 	}
+
+	// async findOneFull(id: string): Promise<Release> {
+	// 	const qb = this.findOneFull(id);
+	// 	const release = await qb.getOne();
+
+	// 	if (!release) {
+	// 		throw ReleaseException.NOT_FOUND();
+	// 	}
+
+	// 	return release;
+	// }
 
 	// private
 	private filterByQuery(
@@ -733,5 +746,62 @@ export class ReleaseQueryService {
 		}
 
 		return toSnakeCaseKeys(raw);
+	}
+
+	async findOneReleaseFull(releaseId: string): Promise<Release> {
+		const qb = this.releaseRepo
+			.createQueryBuilder('release')
+			.where('release.id = :releaseId', { releaseId })
+
+			// ===== release level =====
+			.leftJoinAndSelect('release.label', 'label')
+			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
+			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
+			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
+
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
+
+			// ===== tracks =====
+			.leftJoinAndSelect('release.tracks', 'track')
+			.leftJoinAndSelect('track.audioFile', 'audioFile')
+
+			.leftJoinAndSelect('track.primaryGenre', 'trackPrimaryGenre')
+			.leftJoinAndSelect('track.subGenre', 'trackSubGenre')
+
+			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('trackArtists.artist', 'trackArtist')
+
+			.leftJoinAndSelect('track.trackSensitive', 'trackSensitive')
+
+			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguage',
+				'metadataLanguage',
+			)
+
+			.leftJoinAndSelect('track.trackContributors', 'trackContributors')
+			.leftJoinAndSelect(
+				'trackContributors.artistRole',
+				'contributorRole',
+			)
+			.leftJoinAndSelect('trackContributors.artist', 'contributorArtist')
+
+			.orderBy('track.order', 'ASC');
+
+		const release = await qb.getOne();
+
+		if (!release) {
+			throw ReleaseException.NOT_FOUND();
+		}
+
+		release.tracks = release.tracks ?? [];
+		release.releaseArtists = release.releaseArtists ?? [];
+		release.releaseCoverArts = release.releaseCoverArts ?? [];
+
+		return release;
 	}
 }
