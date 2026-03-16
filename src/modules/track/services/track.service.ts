@@ -159,7 +159,7 @@ export class TrackService {
 
 		// -------- Map dữ liệu từ Track sang CreateIsrc --------
 		// Artist: lấy nghệ sĩ chính (tuỳ cấu trúc TrackArtist của bạn)
-		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? '';
+		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? 'tesst';
 
 		if (!mainArtistName) {
 			throw new ResponseError({
@@ -182,7 +182,7 @@ export class TrackService {
 			: 'Original Version';
 
 		// Asset type: bạn map theo enum/domain thật của hệ thống ISRC
-		const assetType = 'SOUND_RECORDING';
+		const assetType = 'AUDIO';
 
 		// Explicit: map theo trackSensitive (tuỳ bảng TrackSensitive của bạn)
 		const explicit =
