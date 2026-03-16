@@ -1,5 +1,4 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { PublicRoute } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	GetBatchImportLogsDto,
 	UploadCompleteDto,
@@ -8,7 +7,6 @@ import {
 import { BatchImportService } from '../services/batch-import.service';
 
 @Controller('batch-import')
-@PublicRoute()
 export class BatchImportController {
 	constructor(private readonly batchImportService: BatchImportService) {}
 
