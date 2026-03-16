@@ -10,6 +10,10 @@ import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { DDEXService } from 'src/modules/ddex';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
+import {
+	ErnInput,
+	ManifestInput,
+} from 'src/modules/ern/interfaces/ern-input.interface';
 import { Track } from 'src/modules/track/entities/track.entity';
 import {
 	genBatchId,
@@ -29,9 +33,8 @@ import {
 } from '../../ddex/interfaces/ddex-input.interface';
 import { SftpConfigsService } from '../../distribution/sftp-configs/services/sftp-config.service';
 import { Release } from '../entities/release.entity';
-import { ReleaseQueryService } from './release.query.service';
 import { ErnService } from './../../ern/ern.service';
-import { ErnInput } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -114,7 +117,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		upc: string;
 		outputDir: string;
 	}) {
-		const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
+		// const batchCompleteXml = this.generateBatchCompleteXml(batchId, upc);
+		const batchCompleteXml = this.generateBatchCompleteErnXml(batchId, upc);
 		const batchXmlPath = path.join(
 			outputDir,
 			`BatchComplete_${batchId}.xml`,
@@ -165,7 +169,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		// await this.createDdexFile({ releaseId, outputDir: releaseDir });
 		await this.createErnFile({ releaseId, outputDir: releaseDir });
 
-		this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
+		await this.createManifestFile({
+			batchId,
+			upc,
+			outputRoot,
+		});
+		// this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
@@ -181,6 +190,62 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			outputDir: outputRoot,
 			outputRoot,
 		};
+	}
+	async createManifestFile({
+		batchId,
+		upc,
+		outputRoot,
+	}: {
+		batchId: string;
+		upc: string;
+		outputRoot: string;
+	}) {
+		const manifest: ManifestInput = {
+			sender: {
+				partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+				name: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
+			},
+
+			recipient: {
+				partyId: this.DDEX_PARTY_ID_SPOTIFY,
+				name: this.DDEX_PARTY_NAME_SPOTIFY,
+			},
+
+			messages: [
+				{
+					messageId: '00001',
+
+					url: `./${upc}/${upc}.xml`,
+
+					releaseId: {
+						icpn: upc,
+						proprietaryId: {
+							namespace: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+							value: upc,
+						},
+					},
+
+					deliveryType: 'NewReleaseDelivery',
+					productType: 'AudioProduct',
+
+					hashSum: {
+						value: 'TEMP_HASH',
+						algorithm: 'SHA1',
+					},
+				},
+			],
+		};
+
+		const xml = this.ernService.generateManifest(manifest);
+
+		const manifestPath = path.join(
+			outputRoot,
+			`BatchComplete_${batchId}.xml`,
+		);
+
+		fs.writeFileSync(manifestPath, xml, 'utf-8');
+
+		this.logger.log(`[MANIFEST_CREATED] ${manifestPath}`);
 	}
 
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
@@ -353,7 +418,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	}
 
 	private parseErnInputFromRelease(release: Release): ErnInput {
-
 		const cover = release.releaseCoverArts?.[0];
 
 		const territories = this.getTerritoriesFromRelease(release);
@@ -401,29 +465,29 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				pLine:
 					release.pLineYear && release.pLineOwner
 						? {
-							year: release.pLineYear,
-							text: `${release.pLineYear} ${release.pLineOwner}`,
-						}
+								year: release.pLineYear,
+								text: `${release.pLineYear} ${release.pLineOwner}`,
+							}
 						: undefined,
 
 				cLine:
 					release.cLineYear && release.cLineOwner
 						? {
-							year: release.cLineYear,
-							text: `${release.cLineYear} ${release.cLineOwner}`,
-						}
+								year: release.cLineYear,
+								text: `${release.cLineYear} ${release.cLineOwner}`,
+							}
 						: undefined,
 
 				territories,
 
 				coverArt: cover
 					? {
-						fileName: cover.file?.fileName ?? '',
-						filePath: cover.file?.key ?? '',
-						codecType: 'image/jpeg',
-						width: cover.width,
-						height: cover.height,
-					}
+							fileName: cover.file?.fileName ?? '',
+							filePath: cover.file?.key ?? '',
+							codecType: 'image/jpeg',
+							width: cover.width,
+							height: cover.height,
+						}
 					: undefined,
 			},
 
@@ -437,7 +501,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					version: track.version ?? undefined,
 
 					duration: this.convertDurationToISO8601(
-						track.audioFile?.duration ?? 0
+						track.audioFile?.duration ?? 0,
 					),
 
 					order: track.order,
@@ -470,30 +534,37 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					pLine:
 						track.pLineYear && track.pLineOwner
 							? {
-								year: track.pLineYear,
-								text: `${track.pLineYear} ${track.pLineOwner}`,
-							}
+									year: track.pLineYear,
+									text: `${track.pLineYear} ${track.pLineOwner}`,
+								}
 							: undefined,
 
 					recordingMode: 'Stereo',
 
 					audioFile: track.audioFile
 						? {
-							fileName: track.audioFile.file?.fileName,
+								fileName: track.audioFile.file?.fileName,
 
-							filePath: track.audioFile.file?.key,
+								filePath: track.audioFile.file?.key,
 
-							codecType: track.audioFile.file?.extension.toUpperCase() ?? 'WAV',
+								codecType:
+									track.audioFile.file?.extension.toUpperCase() ??
+									'WAV',
 
-							bitRate: track.audioFile.bitrate ?? undefined,
+								bitRate: track.audioFile.bitrate ?? undefined,
 
-							samplingRate: track.audioFile.sampleRate
-								? parseInt(track.audioFile.sampleRate.replace(/[^0-9]/g, ''))
-								: undefined,
+								samplingRate: track.audioFile.sampleRate
+									? parseInt(
+											track.audioFile.sampleRate.replace(
+												/[^0-9]/g,
+												'',
+											),
+										)
+									: undefined,
 
-							bitDepth: track.audioFile.bitDepth ?? undefined,
-						}
-						: undefined
+								bitDepth: track.audioFile.bitDepth ?? undefined,
+							}
+						: undefined,
 				})),
 
 			deals: [
@@ -509,10 +580,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 						'AdvertisementSupportedModel',
 					],
 
-					useTypes: [
-						'OnDemandStream',
-						'ConditionalDownload',
-					],
+					useTypes: ['OnDemandStream', 'ConditionalDownload'],
 				},
 			],
 		};
@@ -856,6 +924,35 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 </ernm:BatchComplete>`;
 	}
 
+	private generateBatchCompleteErnXml(batchId: string, upc: string): string {
+		const now = new Date().toISOString();
+
+		return `<?xml version="1.0" encoding="UTF-8"?>
+<ernm:BatchComplete xmlns:ernm="http://ddex.net/xml/ern-main/43"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://ddex.net/xml/ern-main/43 http://ddex.net/xml/ern-main/43/batch.xsd">
+    <ernm:MessageHeader>
+        <ernm:MessageId>${batchId}</ernm:MessageId>
+        <ernm:MessageSender>
+            <ernm:PartyId>${this.appConfigSv.DDEX_PARTY_ID_SENDER()}</ernm:PartyId>
+            <ernm:PartyName>
+                <ernm:FullName>${this.appConfigSv.DDEX_PARTY_NAME_SENDER()}</ernm:FullName>
+            </ernm:PartyName>
+        </ernm:MessageSender>
+        <ernm:MessageRecipient>
+            <ernm:PartyId>${this.DDEX_PARTY_ID_SPOTIFY}</ernm:PartyId>
+            <ernm:PartyName>
+                <ernm:FullName>${this.DDEX_PARTY_NAME_SPOTIFY}</ernm:FullName>
+            </ernm:PartyName>
+        </ernm:MessageRecipient>
+        <ernm:MessageCreatedDateTime>${now}</ernm:MessageCreatedDateTime>
+    </ernm:MessageHeader>
+
+    <ernm:BatchId>${batchId}</ernm:BatchId>
+    <ernm:MessageFileName>${upc}.xml</ernm:MessageFileName>
+
+</ernm:BatchComplete>`;
+	}
 	// ==================== HELPER METHODS ====================
 
 	/**

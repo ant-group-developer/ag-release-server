@@ -4,11 +4,11 @@ import { Repository } from 'typeorm';
 import { Action } from '../action/entities/action.entity';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfig } from '../app-config/entities/app-config.entity';
+import { Dsp } from '../dsp/entities/dsp.entity';
 import { Genre } from '../genre/entities/genre.entity';
 import { Language } from '../language/entities/language.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { TrackSensitive } from '../track-sensitive/entities/track-sensitive.entity';
-import { Dsp } from '../dsp/entities/dsp.entity';
 
 @Injectable()
 export class ExcelGetDataService {
@@ -107,10 +107,10 @@ export class ExcelGetDataService {
 		return data.map((item) => item.name);
 	}
 
-	async getDsps(): Promise<string[]>{
+	async getDsps(): Promise<string[]> {
 		const data = await this.dspRepo.find({
 			select: ['name'],
-			order: { name: 'ASC'}
+			order: { name: 'ASC' },
 		});
 		return data.map((item) => item.name);
 	}

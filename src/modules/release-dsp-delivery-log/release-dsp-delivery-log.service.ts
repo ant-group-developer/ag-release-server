@@ -2,201 +2,199 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { ReleaseDspDeliveryLog } from './entities/release-dsp-delivery-log.entity';
-import { CreateReleaseDspDeliveryLogDto } from './dto/create-release-dsp-delivery-log.dto';
-import { UpdateReleaseDspDeliveryLogDto } from './dto/update-release-dsp-delivery-log.dto';
-import { QueryGetListReleaseDspDeliveryLogDto } from './dto/query-release-dsp-delivery-log.dto';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { Release } from '../release/entities/release.entity';
 import { Dsp } from '../dsp/entities/dsp.entity';
+import { Release } from '../release/entities/release.entity';
+import { CreateReleaseDspDeliveryLogDto } from './dto/create-release-dsp-delivery-log.dto';
+import { QueryGetListReleaseDspDeliveryLogDto } from './dto/query-release-dsp-delivery-log.dto';
+import { UpdateReleaseDspDeliveryLogDto } from './dto/update-release-dsp-delivery-log.dto';
+import { ReleaseDspDeliveryLog } from './entities/release-dsp-delivery-log.entity';
 
 @Injectable()
 export class ReleaseDspDeliveryLogService {
-  constructor(
-    @InjectRepository(ReleaseDspDeliveryLog)
-    private readonly repo: Repository<ReleaseDspDeliveryLog>,
-  ) { }
+	constructor(
+		@InjectRepository(ReleaseDspDeliveryLog)
+		private readonly repo: Repository<ReleaseDspDeliveryLog>,
+	) {}
 
-  async create(dto: CreateReleaseDspDeliveryLogDto) {
-    const log = this.repo.create(dto);
-    return this.repo.save(log);
-  }
+	async create(dto: CreateReleaseDspDeliveryLogDto) {
+		const log = this.repo.create(dto);
+		return this.repo.save(log);
+	}
 
-  async findAll(query: QueryGetListReleaseDspDeliveryLogDto) {
-    const {
-      dspId,
-      level,
-      keyword,
-      fieldOrder,
-      orderBy,
-      skip,
-      limit,
-      startCreatedAt,
-      endCreatedAt,
-      startUpdatedAt,
-      endUpdatedAt,
-    } = query;
+	async findAll(query: QueryGetListReleaseDspDeliveryLogDto) {
+		const {
+			dspId,
+			level,
+			keyword,
+			fieldOrder,
+			orderBy,
+			skip,
+			limit,
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+		} = query;
 
-    const qb = this.repo
-      .createQueryBuilder('log')
-      .leftJoin(Release, 'release', 'release.id = log.releaseId')
-      .leftJoin(Dsp, 'dsp', 'dsp.id = log.dspId')
-      .addSelect([
-        'release.id',
-        'release.title',
-        'release.upc',
-        'release.status',
-        'release.releaseDate',
-        'release.version',
-        'release.catalogId',
-        'dsp.id',
-        'dsp.code',
-        'dsp.name',
-      ]);
+		const qb = this.repo
+			.createQueryBuilder('log')
+			.leftJoin(Release, 'release', 'release.id = log.releaseId')
+			.leftJoin(Dsp, 'dsp', 'dsp.id = log.dspId')
+			.addSelect([
+				'release.id',
+				'release.title',
+				'release.upc',
+				'release.status',
+				'release.releaseDate',
+				'release.version',
+				'release.catalogId',
+				'dsp.id',
+				'dsp.code',
+				'dsp.name',
+			]);
 
-    // filter dsp
-    if (dspId?.length) {
-      qb.andWhere('log.dspId IN (:...dspId)', { dspId });
-    }
+		// filter dsp
+		if (dspId?.length) {
+			qb.andWhere('log.dspId IN (:...dspId)', { dspId });
+		}
 
-    // filter level
-    if (level?.length) {
-      qb.andWhere('log.level IN (:...level)', { level });
-    }
+		// filter level
+		if (level?.length) {
+			qb.andWhere('log.level IN (:...level)', { level });
+		}
 
-    // search keyword
-    if (keyword) {
-      qb.andWhere('(log.title LIKE :keyword OR log.content LIKE :keyword)', {
-        keyword: `%${keyword}%`,
-      });
-    }
+		// search keyword
+		if (keyword) {
+			qb.andWhere(
+				'(log.title LIKE :keyword OR log.content LIKE :keyword)',
+				{
+					keyword: `%${keyword}%`,
+				},
+			);
+		}
 
-    // filter createdAt
-    if (startCreatedAt) {
-      qb.andWhere('log.createdAt >= :startCreatedAt', { startCreatedAt });
-    }
+		// filter createdAt
+		if (startCreatedAt) {
+			qb.andWhere('log.createdAt >= :startCreatedAt', { startCreatedAt });
+		}
 
-    if (endCreatedAt) {
-      qb.andWhere('log.createdAt <= :endCreatedAt', { endCreatedAt });
-    }
+		if (endCreatedAt) {
+			qb.andWhere('log.createdAt <= :endCreatedAt', { endCreatedAt });
+		}
 
-    // filter updatedAt
-    if (startUpdatedAt) {
-      qb.andWhere('log.updatedAt >= :startUpdatedAt', { startUpdatedAt });
-    }
+		// filter updatedAt
+		if (startUpdatedAt) {
+			qb.andWhere('log.updatedAt >= :startUpdatedAt', { startUpdatedAt });
+		}
 
-    if (endUpdatedAt) {
-      qb.andWhere('log.updatedAt <= :endUpdatedAt', { endUpdatedAt });
-    }
+		if (endUpdatedAt) {
+			qb.andWhere('log.updatedAt <= :endUpdatedAt', { endUpdatedAt });
+		}
 
-    const allowedOrderFields = [
-      'createdAt',
-      'updatedAt',
-      'title',
-      'level',
-    ];
+		const allowedOrderFields = ['createdAt', 'updatedAt', 'title', 'level'];
 
-    const orderField = allowedOrderFields.includes(fieldOrder)
-      ? fieldOrder
-      : 'createdAt';
+		const orderField = allowedOrderFields.includes(fieldOrder)
+			? fieldOrder
+			: 'createdAt';
 
-    qb.orderBy(`log.${orderField}`, orderBy ?? 'DESC');
+		qb.orderBy(`log.${orderField}`, orderBy ?? 'DESC');
 
-    qb.skip(skip).take(limit);
+		qb.skip(skip).take(limit);
 
-    const { entities, raw } = await qb.getRawAndEntities();
-    const totalItems = await qb.getCount();
+		const { entities, raw } = await qb.getRawAndEntities();
+		const totalItems = await qb.getCount();
 
-    const items = entities.map((log, index) => ({
-      ...log,
-      release: {
-        id: raw[index].release_id,
-        title: raw[index].release_title,
-        upc: raw[index].release_upc,
-        status: raw[index].release_status,
-        releaseDate: raw[index].release_releaseDate,
-        version: raw[index].release_version,
-        catalogId: raw[index].release_catalogId,
-      },
-      dsp: {
-        id: raw[index].dsp_id,
-        code: raw[index].dsp_code,
-        name: raw[index].dsp_name,
-      },
-    }));
+		const items = entities.map((log, index) => ({
+			...log,
+			release: {
+				id: raw[index].release_id,
+				title: raw[index].release_title,
+				upc: raw[index].release_upc,
+				status: raw[index].release_status,
+				releaseDate: raw[index].release_releaseDate,
+				version: raw[index].release_version,
+				catalogId: raw[index].release_catalogId,
+			},
+			dsp: {
+				id: raw[index].dsp_id,
+				code: raw[index].dsp_code,
+				name: raw[index].dsp_name,
+			},
+		}));
 
-    return {
-      items: items,
-      metadata: {
-        totalItems,
-        page: query.page,
-        pageSize: query.pageSize,
-        totalPage: Math.ceil(totalItems / query.pageSize),
-      },
-    };
-  }
+		return {
+			items: items,
+			metadata: {
+				totalItems,
+				page: query.page,
+				pageSize: query.pageSize,
+				totalPage: Math.ceil(totalItems / query.pageSize),
+			},
+		};
+	}
 
-  async findOne(id: string) {
-    const qb = this.repo
-      .createQueryBuilder('log')
-      .leftJoin(Release, 'release', 'release.id = log.releaseId')
-      .leftJoin(Dsp, 'dsp', 'dsp.id = log.dspId')
-      .addSelect([
-        'release.id',
-        'release.title',
-        'release.upc',
-        'release.status',
-        'release.releaseDate',
-        'release.version',
-        'release.catalogId',
-        'dsp.id',
-        'dsp.code',
-        'dsp.name',
-      ])
-      .where('log.id = :id', { id });
+	async findOne(id: string) {
+		const qb = this.repo
+			.createQueryBuilder('log')
+			.leftJoin(Release, 'release', 'release.id = log.releaseId')
+			.leftJoin(Dsp, 'dsp', 'dsp.id = log.dspId')
+			.addSelect([
+				'release.id',
+				'release.title',
+				'release.upc',
+				'release.status',
+				'release.releaseDate',
+				'release.version',
+				'release.catalogId',
+				'dsp.id',
+				'dsp.code',
+				'dsp.name',
+			])
+			.where('log.id = :id', { id });
 
-    const { entities, raw } = await qb.getRawAndEntities();
+		const { entities, raw } = await qb.getRawAndEntities();
 
-    const log = entities[0];
+		const log = entities[0];
 
-    if (!log) {
-      throw new ResponseError({ message: 'Log not found' });
-    }
+		if (!log) {
+			throw new ResponseError({ message: 'Log not found' });
+		}
 
-    const item = {
-      ...log,
-      release: {
-        id: raw[0].release_id,
-        title: raw[0].release_title,
-        upc: raw[0].release_upc,
-        status: raw[0].release_status,
-        releaseDate: raw[0].release_releaseDate,
-        version: raw[0].release_version,
-        catalogId: raw[0].release_catalogId,
-      },
-      dsp: {
-        id: raw[0].dsp_id,
-        code: raw[0].dsp_code,
-        name: raw[0].dsp_name,
-      },
-    };
+		const item = {
+			...log,
+			release: {
+				id: raw[0].release_id,
+				title: raw[0].release_title,
+				upc: raw[0].release_upc,
+				status: raw[0].release_status,
+				releaseDate: raw[0].release_releaseDate,
+				version: raw[0].release_version,
+				catalogId: raw[0].release_catalogId,
+			},
+			dsp: {
+				id: raw[0].dsp_id,
+				code: raw[0].dsp_code,
+				name: raw[0].dsp_name,
+			},
+		};
 
-    return item;
-  }
+		return item;
+	}
 
-  async update(id: string, dto: UpdateReleaseDspDeliveryLogDto) {
-    const log = await this.findOne(id);
+	async update(id: string, dto: UpdateReleaseDspDeliveryLogDto) {
+		const log = await this.findOne(id);
 
-    await this.repo.update(id, dto);
+		await this.repo.update(id, dto);
 
-    return log;
-  }
+		return log;
+	}
 
-  async remove(id: string) {
-    const log = await this.findOne(id);
+	async remove(id: string) {
+		const log = await this.findOne(id);
 
-    await this.repo.remove(log);
+		await this.repo.remove(log);
 
-    return log;
-  }
+		return log;
+	}
 }
