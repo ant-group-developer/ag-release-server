@@ -78,6 +78,8 @@ export interface LookupMaps {
 
 	// Territory
 	distributionType: Map<string, DistributionType>;
+
+	artist: Map<string, string>;
 }
 
 // version 2
@@ -148,6 +150,9 @@ export interface ReleaseRawSftp {
 	/** Qua bảng phụ: lookup country rồi lưu vào release_language.metadataLanguageCountryId */
 	metadataLanguageCountry?: string;
 
+	artists: string[];
+	artistsRoles: string[];
+
 	/** Qua bảng phụ: lưu vào release_territory.distributeWorldwide */
 	distributeWorldwide?: boolean;
 
@@ -178,7 +183,7 @@ export interface ReleaseRawSftp {
 
 export interface TrackRawSftp {
 	/** Dùng trực tiếp: id track */
-	id?: string;
+	// id?: string;
 
 	/** Dùng trực tiếp: lưu vào tracks.title */
 	title?: string;

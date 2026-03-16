@@ -81,9 +81,7 @@ export class ReleaseDraftController {
 	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
 	// @PublicRoute()
 	@Post('validate-list')
-	getErrorsSchemaReleasesSftp(@Body('releases') releases: any) {
-		console.log(releases);
-
+	getErrorsSchemaReleasesSftp(@Body('releases') releases: ReleaseRawSftp[]) {
 		const result =
 			this.releaseDraftService.getErrorsSchemaReleasesFromSftp(releases);
 
@@ -93,7 +91,7 @@ export class ReleaseDraftController {
 	}
 
 	@Post('map-and-validate')
-	async mapAndValidateExistence(@Body() release: any) {
+	async mapAndValidateExistence(@Body() release: ReleaseRawSftp) {
 		const maps = await this.releaseDraftService.buildLookupMaps();
 
 		const result = this.releaseDraftService.mapAndValidateExistence(

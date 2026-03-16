@@ -196,10 +196,14 @@ export class ReleaseValidateService {
 	}
 
 	// validate schema release
-	getErrorsSchemaRelease(release: Release) {
+	getErrorsSchemaRelease(
+		release: Release,
+		skipValidateBucket: boolean = false,
+	) {
 		console.log(release);
 
 		const result: FieldErrorDetails[] = [];
+		if (skipValidateBucket) return result;
 
 		if (release) {
 			result.push(...this.validateRelease(release));
