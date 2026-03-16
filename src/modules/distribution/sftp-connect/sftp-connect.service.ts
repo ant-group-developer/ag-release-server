@@ -189,6 +189,7 @@ export class SftpConnectService {
 		sftp,
 		localDir,
 		remoteDir,
+		timeoutMs = 60_000 * 60,
 	}: {
 		sftp: {
 			host: string;
@@ -198,13 +199,20 @@ export class SftpConnectService {
 		};
 		localDir: string;
 		remoteDir: string;
+		timeoutMs?: number;
 	}) {
 		const port = sftp.port ?? 22;
 
-		return new Promise((resolve, reject) => {
+		if (!sftp.host) throw new Error('Missing sftp.host');
+		if (!sftp.username) throw new Error('Missing sftp.username');
+		if (!sftp.password) throw new Error('Missing sftp.password');
+		if (!localDir) throw new Error('Missing localDir');
+		if (!remoteDir) throw new Error('Missing remoteDir');
+
+		return new Promise<string>((resolve, reject) => {
 			const args = [
 				'-p',
-				sftp.password ?? '',
+				sftp.password!,
 				'scp',
 				'-P',
 				String(port),
@@ -213,30 +221,47 @@ export class SftpConnectService {
 				'StrictHostKeyChecking=no',
 				'-o',
 				'UserKnownHostsFile=/dev/null',
+				'-o',
+				'LogLevel=ERROR',
 				localDir,
 				`${sftp.username}@${sftp.host}:${remoteDir}`,
 			];
 
-			const scp = spawn('sshpass', args);
+			const scp = spawn('sshpass', args, {
+				stdio: ['ignore', 'pipe', 'pipe'],
+			});
 
 			let stdout = '';
 			let stderr = '';
+			let done = false;
+
+			const finish = (error?: Error, result?: string) => {
+				if (done) return;
+				done = true;
+				clearTimeout(timer);
+				if (error) reject(error);
+				else resolve(result ?? stdout);
+			};
+
+			// Timeout để tránh hang vô thời hạn
+			const timer = setTimeout(() => {
+				scp.kill('SIGKILL');
+				finish(new Error(`scp timed out after ${timeoutMs}ms`));
+			}, timeoutMs);
 
 			scp.stdout.on('data', (data) => {
 				stdout += data.toString();
-				console.log(data.toString());
 			});
 
 			scp.stderr.on('data', (data) => {
 				stderr += data.toString();
-				console.error(data.toString());
 			});
 
 			scp.on('close', (code) => {
 				if (code === 0) {
-					resolve(stdout);
+					finish(undefined, stdout);
 				} else {
-					reject(
+					finish(
 						new Error(
 							`scp failed with code ${code}\nstdout: ${stdout}\nstderr: ${stderr}`,
 						),
@@ -245,7 +270,11 @@ export class SftpConnectService {
 			});
 
 			scp.on('error', (err) => {
-				reject(err);
+				finish(
+					new Error(
+						`Failed to start sshpass/scp: ${err.message}\nstdout: ${stdout}\nstderr: ${stderr}`,
+					),
+				);
 			});
 		});
 	}

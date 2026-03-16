@@ -5,6 +5,7 @@ import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule } from '../bucket/bucket.module';
 import { Country } from '../country/entities/country.entity';
 import { DDEXModule } from '../ddex';
+import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { DspModule } from '../dsp/dsp.module';
@@ -63,6 +64,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		DDEXModule,
 		ReleaseDspDeliveryLogModule,
 		ErnModule,
+		DspRoutingConfigsModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

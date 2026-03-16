@@ -203,7 +203,7 @@ export class ReleaseValidateService {
 		console.log(release);
 
 		const result: FieldErrorDetails[] = [];
-		if (skipValidateBucket) return result;
+		// if (skipValidateBucket) return result;
 
 		if (release) {
 			result.push(...this.validateRelease(release));

@@ -50,6 +50,16 @@ export class DspRoutingConfigsController {
 		return DspRoutingConfigSuccess.COMMON(result);
 	}
 
+	@Get('by-dsp-code/:code')
+	async getDetailByDspCode(
+		@Param('code') code: string,
+		@UserId() userId: string,
+	) {
+		const result = await this.svc.resolveSftpMetadataByDspCode(code);
+
+		return DspRoutingConfigSuccess.COMMON(result);
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get dsp routing config detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })

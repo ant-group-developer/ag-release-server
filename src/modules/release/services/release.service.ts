@@ -38,11 +38,7 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import {
-	IRelease,
-	IReleaseDetail,
-	IReleaseNonDraft,
-} from '../interfaces/release.interface';
+import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -182,11 +178,7 @@ export class ReleaseService {
 		};
 	}
 	// nghiệp vụ
-	async submit(
-		id: string,
-		userId: string,
-		dto: SubmitReleaseDto,
-	): Promise<IReleaseNonDraft> {
+	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
@@ -213,24 +205,28 @@ export class ReleaseService {
 		}
 
 		const codeArray = dto.code;
+
+		// spotify
 		if (codeArray.includes('SPOTIFY')) {
-			const dsp = await this.dspRepo.findOne({
+			const dspSpotify = await this.dspRepo.findOne({
 				where: { code: 'SPOTIFY' },
 			});
-			if (!dsp) {
-				throw new Error('DSP SPOTIFY not found');
+
+			if (!dspSpotify) {
+				throw new ResponseError({ message: 'DSP SPOTIFY not found' });
 			}
 
-			const exist = await this.releaseDspDeliveryRepo.findOne({
-				where: {
-					releaseId: id,
-					dspId: dsp.id,
-				},
-			});
+			const dspDeliveryIsExist =
+				await this.releaseDspDeliveryRepo.findOne({
+					where: {
+						releaseId: id,
+						dspId: dspSpotify.id,
+					},
+				});
 
-			if (exist) {
+			if (dspDeliveryIsExist) {
 				await this.releaseDspDeliveryRepo.update(
-					{ releaseId: id, dspId: dsp.id },
+					{ releaseId: id, dspId: dspSpotify.id },
 					{
 						status: ReleaseDspStatus.PROCESSING,
 						lastEnqueuedAt: new Date(),
@@ -240,7 +236,7 @@ export class ReleaseService {
 			} else {
 				await this.releaseDspDeliveryRepo.save({
 					releaseId: id,
-					dspId: dsp.id,
+					dspId: dspSpotify.id,
 					status: ReleaseDspStatus.PROCESSING,
 					lastEnqueuedAt: new Date(),
 					lastDeliveredAt: null,
@@ -255,7 +251,7 @@ export class ReleaseService {
 					await this.createAndUploadMetadataSpotify(id);
 
 					await this.releaseDspDeliveryRepo.update(
-						{ releaseId: id, dspId: dsp?.id },
+						{ releaseId: id, dspId: dspSpotify?.id },
 						{
 							status: ReleaseDspStatus.DISTRIBUTED,
 							lastEnqueuedAt: new Date(),
@@ -264,7 +260,7 @@ export class ReleaseService {
 					);
 				} catch (error) {
 					await this.releaseDspDeliveryRepo.update(
-						{ releaseId: id, dspId: dsp?.id },
+						{ releaseId: id, dspId: dspSpotify?.id },
 						{
 							status: ReleaseDspStatus.ISSUES,
 							lastEnqueuedAt: new Date(),
@@ -273,7 +269,7 @@ export class ReleaseService {
 
 					await this.releaseDspDeliveryLogService.create({
 						releaseId: id,
-						dspId: dsp.id,
+						dspId: dspSpotify.id,
 						title: 'Spotify metadata processing failed',
 						content: error?.message ?? 'Unknown error',
 						level: ReleaseDspDeliveryLogLevel.ERROR,
@@ -290,10 +286,17 @@ export class ReleaseService {
 				}
 			});
 		}
+
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.DISTRIBUTED,
+		});
+
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
-		return this.releaseValidateService.ensureNonDraftRelease(result);
+		// return this.releaseValidateService.ensureNonDraftRelease(result);
+
+		return result;
 	}
 
 	async getOne(id: string): Promise<IReleaseDetail> {

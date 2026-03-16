@@ -8,6 +8,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { DDEXService } from 'src/modules/ddex';
+import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import {
@@ -69,6 +70,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
+		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 	) {}
 
 	async createDdexFile({
@@ -169,7 +171,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		// await this.createDdexFile({ releaseId, outputDir: releaseDir });
 		await this.createErnFile({ releaseId, outputDir: releaseDir });
 
-		await this.createManifestFile({
+		this.createManifestFile({
 			batchId,
 			upc,
 			outputRoot,
@@ -191,7 +193,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			outputRoot,
 		};
 	}
-	async createManifestFile({
+
+	createManifestFile({
 		batchId,
 		upc,
 		outputRoot,
@@ -251,7 +254,10 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
-		const sftp = await this.sftpConfigsService.getSftpSpotify();
+		const sftp =
+			await this.dspRoutingConfigsService.resolveSftpMetadataByDspCode(
+				'SPOTIFY',
+			);
 
 		await this.sftpConnectService.uploadFolderScp({
 			sftp,
