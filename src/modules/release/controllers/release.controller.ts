@@ -31,11 +31,7 @@ import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
-import {
-	IRelease,
-	IReleaseDetail,
-	IReleaseNonDraft,
-} from '../interfaces/release.interface';
+import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
@@ -170,7 +166,7 @@ export class ReleaseController {
 		@Param('id', ParseUUIDPipe) id: string,
 		@Req() req: Request,
 		@Body() dto: SubmitReleaseDto,
-	): Promise<ResponseSuccess<IReleaseNonDraft>> {
+	) {
 		const userId = req.user!.sub;
 		const result = await this.releaseService.submit(id, userId, dto);
 

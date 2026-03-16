@@ -38,11 +38,7 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import {
-	IRelease,
-	IReleaseDetail,
-	IReleaseNonDraft,
-} from '../interfaces/release.interface';
+import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -182,11 +178,7 @@ export class ReleaseService {
 		};
 	}
 	// nghiệp vụ
-	async submit(
-		id: string,
-		userId: string,
-		dto: SubmitReleaseDto,
-	): Promise<IReleaseNonDraft> {
+	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 		release.status = ReleaseStatus.PROCESSING;
 
@@ -294,10 +286,17 @@ export class ReleaseService {
 				}
 			});
 		}
+
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.DISTRIBUTED,
+		});
+
 		const result = await this.releaseQueryService.findOne(id);
 
 		// convert to IReleaseNonDraft
-		return this.releaseValidateService.ensureNonDraftRelease(result);
+		// return this.releaseValidateService.ensureNonDraftRelease(result);
+
+		return result;
 	}
 
 	async getOne(id: string): Promise<IReleaseDetail> {

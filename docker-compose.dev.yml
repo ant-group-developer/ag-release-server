@@ -5,7 +5,7 @@ services:
         build: .
         # pull the port number from $PORT for both host and container
         ports:
-            - '${HOST_PORT:-8080}:${APP_PORT}'
+            - '${HOST_PORT:-4041}:${APP_PORT}'
         env_file:
             - .env
         environment:
