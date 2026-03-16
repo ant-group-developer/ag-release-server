@@ -55,22 +55,16 @@ describe('ManifestBuilder', () => {
 
 		it('should contain MessageHeader with sender and recipient', () => {
 			expect(xml).toContain('<MessageHeader>');
-			expect(xml).toContain(
-				'<PartyId>PADPIDA20090302015</PartyId>',
-			);
+			expect(xml).toContain('<PartyId>PADPIDA20090302015</PartyId>');
 			expect(xml).toContain(
 				'<FullName>Consolidated Independent Ltd</FullName>',
 			);
-			expect(xml).toContain(
-				'<PartyId>PADPIDA1234567890</PartyId>',
-			);
+			expect(xml).toContain('<PartyId>PADPIDA1234567890</PartyId>');
 			expect(xml).toContain('<FullName>TestDSP</FullName>');
 		});
 
 		it('should contain IsTestFlag', () => {
-			expect(xml).toContain(
-				'<IsTestFlag>false</IsTestFlag>',
-			);
+			expect(xml).toContain('<IsTestFlag>false</IsTestFlag>');
 		});
 
 		it('should contain RootDirectory', () => {
@@ -78,9 +72,7 @@ describe('ManifestBuilder', () => {
 		});
 
 		it('should contain NumberOfMessages', () => {
-			expect(xml).toContain(
-				'<NumberOfMessages>1</NumberOfMessages>',
-			);
+			expect(xml).toContain('<NumberOfMessages>1</NumberOfMessages>');
 		});
 
 		it('should contain MessageInBatch', () => {
@@ -88,9 +80,7 @@ describe('ManifestBuilder', () => {
 			expect(xml).toContain(
 				'<MessageType>NewReleaseMessage</MessageType>',
 			);
-			expect(xml).toContain(
-				'<MessageId>61704438710266</MessageId>',
-			);
+			expect(xml).toContain('<MessageId>61704438710266</MessageId>');
 			expect(xml).toContain(
 				'<URL>./5057805503736/5057805503736.xml</URL>',
 			);
@@ -98,13 +88,9 @@ describe('ManifestBuilder', () => {
 
 		it('should contain IncludedReleaseId with GRid, ICPN, ProprietaryId', () => {
 			expect(xml).toContain('<IncludedReleaseId>');
-			expect(xml).toContain(
-				'<GRid>A10341T0000029FTAH</GRid>',
-			);
+			expect(xml).toContain('<GRid>A10341T0000029FTAH</GRid>');
 			expect(xml).toContain('<ICPN>5057805503736</ICPN>');
-			expect(xml).toContain(
-				'Namespace="PADPIDA20090302015"',
-			);
+			expect(xml).toContain('Namespace="PADPIDA20090302015"');
 			expect(xml).toContain('>61533793000032</ProprietaryId>');
 		});
 
@@ -112,9 +98,7 @@ describe('ManifestBuilder', () => {
 			expect(xml).toContain(
 				'<DeliveryType>NewReleaseDelivery</DeliveryType>',
 			);
-			expect(xml).toContain(
-				'<ProductType>AudioProduct</ProductType>',
-			);
+			expect(xml).toContain('<ProductType>AudioProduct</ProductType>');
 		});
 
 		it('should use HashSumValue for ern-c-sftp/17', () => {
@@ -179,9 +163,7 @@ describe('ManifestBuilder', () => {
 			expect(xml).toContain(
 				'xmlns:echo="http://ddex.net/xml/2011/echo/11"',
 			);
-			expect(xml).toContain(
-				'MessageVersionId="2010/ern-main/312"',
-			);
+			expect(xml).toContain('MessageVersionId="2010/ern-main/312"');
 		});
 
 		it('should contain batch-level DeliveryType with UserDefined', () => {
@@ -235,9 +217,7 @@ describe('ManifestBuilder', () => {
 		});
 
 		it('should have correct NumberOfMessages', () => {
-			expect(xml).toContain(
-				'<NumberOfMessages>2</NumberOfMessages>',
-			);
+			expect(xml).toContain('<NumberOfMessages>2</NumberOfMessages>');
 		});
 
 		it('should contain both messages', () => {

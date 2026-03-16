@@ -9,12 +9,14 @@ import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.modu
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { DspModule } from '../dsp/dsp.module';
 import { Dsp } from '../dsp/entities/dsp.entity';
+import { ErnModule } from '../ern/ern.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
+import { ReleaseDspDeliveryLogModule } from '../release-dsp-delivery-log/release-dsp-delivery-log.module';
 import { ReleaseDspDelivery } from '../release-dsp/entities/release-dsp.entity';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
@@ -29,8 +31,6 @@ import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
-import { ReleaseDspDeliveryLogModule } from '../release-dsp-delivery-log/release-dsp-delivery-log.module';
-import { ErnModule } from '../ern/ern.module';
 
 @Module({
 	imports: [
@@ -62,7 +62,7 @@ import { ErnModule } from '../ern/ern.module';
 		DspModule,
 		DDEXModule,
 		ReleaseDspDeliveryLogModule,
-		ErnModule
+		ErnModule,
 	],
 	controllers: [ReleaseController, ReleaseDraftController],
 	providers: [

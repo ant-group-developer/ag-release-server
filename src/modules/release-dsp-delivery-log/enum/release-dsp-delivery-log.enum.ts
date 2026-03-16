@@ -1,5 +1,5 @@
 export enum ReleaseDspDeliveryLogLevel {
-    ERROR = 'error',
-    WARNING = 'warning',
-    INFO = 'info',
+	ERROR = 'error',
+	WARNING = 'warning',
+	INFO = 'info',
 }

@@ -10,6 +10,10 @@ import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { DDEXService } from 'src/modules/ddex';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
+import {
+	ErnInput,
+	ManifestInput,
+} from 'src/modules/ern/interfaces/ern-input.interface';
 import { Track } from 'src/modules/track/entities/track.entity';
 import {
 	genBatchId,
@@ -29,9 +33,8 @@ import {
 } from '../../ddex/interfaces/ddex-input.interface';
 import { SftpConfigsService } from '../../distribution/sftp-configs/services/sftp-config.service';
 import { Release } from '../entities/release.entity';
-import { ReleaseQueryService } from './release.query.service';
 import { ErnService } from './../../ern/ern.service';
-import { ErnInput, ManifestInput } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -66,7 +69,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
-	) { }
+	) {}
 
 	async createDdexFile({
 		releaseId,
@@ -235,7 +238,10 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const xml = this.ernService.generateManifest(manifest);
 
-		const manifestPath = path.join(outputRoot, `BatchComplete_${batchId}.xml`);
+		const manifestPath = path.join(
+			outputRoot,
+			`BatchComplete_${batchId}.xml`,
+		);
 
 		fs.writeFileSync(manifestPath, xml, 'utf-8');
 
@@ -412,7 +418,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	}
 
 	private parseErnInputFromRelease(release: Release): ErnInput {
-
 		const cover = release.releaseCoverArts?.[0];
 
 		const territories = this.getTerritoriesFromRelease(release);
@@ -460,29 +465,29 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				pLine:
 					release.pLineYear && release.pLineOwner
 						? {
-							year: release.pLineYear,
-							text: `${release.pLineYear} ${release.pLineOwner}`,
-						}
+								year: release.pLineYear,
+								text: `${release.pLineYear} ${release.pLineOwner}`,
+							}
 						: undefined,
 
 				cLine:
 					release.cLineYear && release.cLineOwner
 						? {
-							year: release.cLineYear,
-							text: `${release.cLineYear} ${release.cLineOwner}`,
-						}
+								year: release.cLineYear,
+								text: `${release.cLineYear} ${release.cLineOwner}`,
+							}
 						: undefined,
 
 				territories,
 
 				coverArt: cover
 					? {
-						fileName: cover.file?.fileName ?? '',
-						filePath: cover.file?.key ?? '',
-						codecType: 'image/jpeg',
-						width: cover.width,
-						height: cover.height,
-					}
+							fileName: cover.file?.fileName ?? '',
+							filePath: cover.file?.key ?? '',
+							codecType: 'image/jpeg',
+							width: cover.width,
+							height: cover.height,
+						}
 					: undefined,
 			},
 
@@ -496,7 +501,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					version: track.version ?? undefined,
 
 					duration: this.convertDurationToISO8601(
-						track.audioFile?.duration ?? 0
+						track.audioFile?.duration ?? 0,
 					),
 
 					order: track.order,
@@ -529,30 +534,37 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					pLine:
 						track.pLineYear && track.pLineOwner
 							? {
-								year: track.pLineYear,
-								text: `${track.pLineYear} ${track.pLineOwner}`,
-							}
+									year: track.pLineYear,
+									text: `${track.pLineYear} ${track.pLineOwner}`,
+								}
 							: undefined,
 
 					recordingMode: 'Stereo',
 
 					audioFile: track.audioFile
 						? {
-							fileName: track.audioFile.file?.fileName,
+								fileName: track.audioFile.file?.fileName,
 
-							filePath: track.audioFile.file?.key,
+								filePath: track.audioFile.file?.key,
 
-							codecType: track.audioFile.file?.extension.toUpperCase() ?? 'WAV',
+								codecType:
+									track.audioFile.file?.extension.toUpperCase() ??
+									'WAV',
 
-							bitRate: track.audioFile.bitrate ?? undefined,
+								bitRate: track.audioFile.bitrate ?? undefined,
 
-							samplingRate: track.audioFile.sampleRate
-								? parseInt(track.audioFile.sampleRate.replace(/[^0-9]/g, ''))
-								: undefined,
+								samplingRate: track.audioFile.sampleRate
+									? parseInt(
+											track.audioFile.sampleRate.replace(
+												/[^0-9]/g,
+												'',
+											),
+										)
+									: undefined,
 
-							bitDepth: track.audioFile.bitDepth ?? undefined,
-						}
-						: undefined
+								bitDepth: track.audioFile.bitDepth ?? undefined,
+							}
+						: undefined,
 				})),
 
 			deals: [
@@ -568,10 +580,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 						'AdvertisementSupportedModel',
 					],
 
-					useTypes: [
-						'OnDemandStream',
-						'ConditionalDownload',
-					],
+					useTypes: ['OnDemandStream', 'ConditionalDownload'],
 				},
 			],
 		};
@@ -708,8 +717,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			const displayArtistName =
 				track.trackArtists && track.trackArtists.length > 0
 					? track.trackArtists
-						.map((ta) => ta.artist?.name || 'Unknown')
-						.join(', ')
+							.map((ta) => ta.artist?.name || 'Unknown')
+							.join(', ')
 					: 'Unknown Artist';
 
 			// Build resource
@@ -778,7 +787,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		// Get label reference
 		const labelRef = release.label
 			? parties.find((p) => p.name === release.label!.name)?.reference ||
-			'P1'
+				'P1'
 			: 'P1';
 
 		// Build display artists
@@ -801,8 +810,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		const displayArtistName =
 			release.releaseArtists && release.releaseArtists.length > 0
 				? release.releaseArtists
-					.map((ra) => ra.artist?.name || 'Unknown')
-					.join(', ')
+						.map((ra) => ra.artist?.name || 'Unknown')
+						.join(', ')
 				: 'Unknown Artist';
 
 		// Get resource references

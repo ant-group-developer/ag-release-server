@@ -15,6 +15,8 @@ import {
 	UpcYesNo,
 } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
+import { ReleaseDspDeliveryLogLevel } from 'src/modules/release-dsp-delivery-log/enum/release-dsp-delivery-log.enum';
+import { ReleaseDspDeliveryLogService } from 'src/modules/release-dsp-delivery-log/release-dsp-delivery-log.service';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseDspStatus } from 'src/modules/release-dsp/enum/release-dsp.enum';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
@@ -44,8 +46,6 @@ import {
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
-import { ReleaseDspDeliveryLogService } from 'src/modules/release-dsp-delivery-log/release-dsp-delivery-log.service';
-import { ReleaseDspDeliveryLogLevel } from 'src/modules/release-dsp-delivery-log/enum/release-dsp-delivery-log.enum';
 
 @Injectable()
 export class ReleaseService {
@@ -71,7 +71,7 @@ export class ReleaseService {
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
 		private readonly releaseDspDeliveryLogService: ReleaseDspDeliveryLogService,
-	) { }
+	) {}
 
 	async getReleaseDspDelivery(
 		releaseId: string,
@@ -492,7 +492,7 @@ export class ReleaseService {
 			}
 		}
 
-		archive.finalize().catch((_e) => { });
+		archive.finalize().catch((_e) => {});
 
 		return {
 			contentType: 'application/zip',

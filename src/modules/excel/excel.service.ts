@@ -17,7 +17,7 @@ export class ExcelService {
 			trackSensitives,
 			languages,
 			policies,
-			dsps
+			dsps,
 		] = await Promise.all([
 			this.excelGetDataService.getAlbumFormats(),
 			this.excelGetDataService.getPriceTiers(),
@@ -711,7 +711,7 @@ export class ExcelService {
 			trackSensitives.length,
 			languages.length,
 			policies.length,
-			dsps.length
+			dsps.length,
 		);
 		const headerRow = sheet2.getRow(1);
 
