@@ -114,6 +114,8 @@ export class TrackDraftService {
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
+		console.log('log:', data);
+
 		const { audioFile, trackLanguage, ...restOfTrack } = data;
 
 		const track = await this.trackQueryService.getDetailOne(id);
@@ -326,6 +328,11 @@ export class TrackDraftService {
 		});
 
 		await this.trackArtistService.copyArtistFromReleaseSource2({
+			releaseId: track.releaseId,
+			trackId,
+		});
+
+		await this.trackArtistService.copyContributorFromReleaseSource2({
 			releaseId: track.releaseId,
 			trackId,
 		});

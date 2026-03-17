@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
+import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
+import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { TrackArtistMessages } from '../constants/track-artist.constant';
@@ -22,8 +24,14 @@ export class TrackArtistService {
 		@InjectRepository(TrackArtist)
 		private readonly trackArtistRepo: Repository<TrackArtist>,
 
+		@InjectRepository(TrackContributor)
+		private readonly trackContributorRepo: Repository<TrackContributor>,
+
 		@InjectRepository(ReleaseArtist)
 		private readonly releaseArtistRepo: Repository<ReleaseArtist>,
+
+		@InjectRepository(ReleaseContributor)
+		private readonly releaseContributorRepo: Repository<ReleaseContributor>,
 
 		private readonly trackArtistValidateService: TrackArtistValidateService,
 	) {}
@@ -127,6 +135,32 @@ export class TrackArtistService {
 			);
 
 			await this.trackArtistRepo.save(trackArtistEntities);
+		}
+	}
+
+	async copyContributorFromReleaseSource2({
+		releaseId,
+		trackId,
+	}: {
+		releaseId: string;
+		trackId: string;
+	}) {
+		const releaseContributors = await this.releaseContributorRepo.find({
+			where: { releaseId, addContributorToTracks: true },
+		});
+
+		if (releaseContributors.length > 0) {
+			const trackArtistEntities = this.trackContributorRepo.create(
+				releaseContributors.map((releaseContributor) => ({
+					artistId: releaseContributor.artistId,
+					artistRoleId: releaseContributor.artistRoleId,
+					trackId,
+					releaseArtistId: releaseContributor.id,
+					isFromReleaseAction: true,
+				})),
+			);
+
+			await this.trackContributorRepo.save(trackArtistEntities);
 		}
 	}
 

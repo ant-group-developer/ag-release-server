@@ -380,19 +380,14 @@ export class ReleaseValidateService {
 		}
 
 		// release artists validation
-		// if (
-		// 	release.isVariousArtist === false &&
-		// 	!release.releaseArtists.some(
-		// 		(ra) => ra.artistRole.code === mainArtistRole.code,
-		// 	)
-		// ) {
-		// 	result.push(
-		// 		new FieldErrorDetails({
-		// 			page: 'core-detail',
-		// 			field: 'releaseArtists',
-		// 		}),
-		// 	);
-		// }
+		if (!release?.releaseArtists.length) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'core-detail',
+					field: 'releaseArtists',
+				}),
+			);
+		}
 
 		return result;
 	}
@@ -484,20 +479,26 @@ export class ReleaseValidateService {
 				);
 			}
 
+			if (!track.trackLanguage.recordingCountryId) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackLanguage.recordingCountryId`,
+						trackId: track.id,
+					}),
+				);
+			}
+
 			// track artists validation
-			// if (
-			// 	!track.trackArtists.some(
-			// 		(ta) => ta.artistRole.code === mainArtistRole.code,
-			// 	)
-			// ) {
-			// 	result.push(
-			// 		new FieldErrorDetails({
-			// 			page: 'tracks',
-			// 			field: `tracks.${index}.trackArtists`,
-			// 			trackId: track.id,
-			// 		}),
-			// 	);
-			// }
+			if (!track.trackArtists.length) {
+				result.push(
+					new FieldErrorDetails({
+						page: 'tracks',
+						field: `tracks.${index}.trackArtists`,
+						trackId: track.id,
+					}),
+				);
+			}
 
 			//
 			if (track.audioFile && !track.audioFile.preview) {

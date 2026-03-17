@@ -15,11 +15,12 @@ async function testConnect() {
 		await sftp.connect({
 			host: '193.180.215.67',
 			port: 22,
-			username: 'ubuntu',
-			privateKey: fs.readFileSync(
-				'C:/Users/AG Dev BE/.ssh/id_ed25519_server',
-				// 'utf8',
-			), // path private key
+			username: 'dev',
+			privateKey,
+			// privateKey: fs.readFileSync(
+			// 	'C:/Users/AG Dev BE/.ssh/id_ed25519_server',
+			// 	// 'utf8',
+			// ), // path private key
 			// passphrase: 'your-passphrase', // nếu có
 		});
 

@@ -164,6 +164,8 @@ export class ReleaseQueryService {
 			// artist
 			.leftJoin('release.releaseArtists', 'releaseArtist')
 			.leftJoin('releaseArtist.artist', 'artist')
+			.leftJoinAndSelect('artist.artistProfiles', 'artistProfile')
+			.leftJoinAndSelect('artistProfile.dsp', 'artistProfileDsp')
 			.leftJoin('artist.genre', 'genre')
 			.leftJoin('artist.country', 'country')
 			// .leftJoin('releaseArtist.artistRole', 'artistRole')
@@ -171,6 +173,15 @@ export class ReleaseQueryService {
 			// contributor
 			.leftJoin('release.releaseContributors', 'releaseContributor')
 			.leftJoin('releaseContributor.artist', 'artistContributor')
+			.leftJoinAndSelect(
+				'artistContributor.artistProfiles',
+				'artistContributorProfiles',
+			)
+			.leftJoinAndSelect(
+				'artistContributorProfiles.dsp',
+				'artistContributorProfilesDsp',
+			)
+
 			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
 			.leftJoin('artistContributor.genre', 'genreContributor')
 			.leftJoin('artistContributor.country', 'countryContributor')
@@ -628,16 +639,12 @@ export class ReleaseQueryService {
 			relations: {
 				albumFormat: true,
 				releaseCoverArts: true,
-				// releaseArtists: {
-				// 	artistRole: true,
-				// },
+				releaseArtists: true,
 				releaseLanguage: true,
 				tracks: {
 					trackLanguage: true,
 					audioFile: true,
-					// trackArtists: {
-					// 	artistRole: true,
-					// },
+					trackArtists: true,
 				},
 				releaseTerritory: true,
 			},
