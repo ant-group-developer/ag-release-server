@@ -44,7 +44,9 @@ export class ReleaseContributor extends BaseUUIDEntity {
 	@JoinColumn({ name: 'artist_role_id' })
 	artistRole: ArtistRole;
 
-	@ManyToOne(() => Release)
+	@ManyToOne(() => Release, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 }

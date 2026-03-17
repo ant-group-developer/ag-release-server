@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtistRole } from '../artist-role/entities/artist-role.entity';
 import { Artist } from '../artist/entities/artist.entity';
 import { ReleaseArtist } from '../release-artist/entities/release-artist.entity';
+import { ReleaseContributor } from '../release-contributor/entities/release-contributor.entity';
+import { TrackContributor } from '../track-contributor/entities/track-contributor.entity';
 import { Track } from '../track/entities/track.entity';
 import { TrackArtist } from './entities/track-artist.entity';
 import { TrackArtistService } from './services/track-artist.service';
@@ -17,6 +19,9 @@ import { TrackArtistController } from './track-artist.controller';
 			Artist,
 			Track,
 			ReleaseArtist,
+
+			TrackContributor,
+			ReleaseContributor,
 		]),
 	],
 	controllers: [TrackArtistController],

@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FieldErrorDetails } from 'src/common/dtos/common.response.dto';
+import {
+	FieldErrorDetails,
+	PageDto,
+} from 'src/common/dtos/common.response.dto';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
@@ -37,6 +40,7 @@ import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
+import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { IReleaseDetail } from '../interfaces/release.interface';
@@ -105,6 +109,22 @@ export class ReleaseDraftService {
 
 		await this.releaseTerritoryService.create({
 			releaseId,
+		});
+	}
+
+	async getList(query: QueryGetListReleaseDto) {
+		const { page, pageSize } = query;
+
+		const { releases, totalItems } =
+			await this.releaseQueryService.getManyAndCount(query);
+
+		return new PageDto({
+			items: releases,
+			metadata: {
+				page,
+				pageSize,
+				totalItems,
+			},
 		});
 	}
 
@@ -188,13 +208,13 @@ export class ReleaseDraftService {
 	}
 
 	// delete
-	async deleteDb(id: string) {
-		await this.releaseRepo.delete(id);
-	}
-
-	async handleDelete(id: string): Promise<void> {
+	async handleDeleteById(id: string): Promise<void> {
 		await this.deleteRelatedRecords({ releaseId: id });
 		await this.deleteDb(id);
+	}
+
+	async deleteDb(id: string) {
+		await this.releaseRepo.delete(id);
 	}
 
 	private async deleteRelatedRecords({ releaseId }: { releaseId: string }) {
@@ -688,7 +708,7 @@ export class ReleaseDraftService {
 
 			if (schemaErrors.length > 0) {
 				try {
-					await this.handleDelete(releaseId);
+					await this.handleDeleteById(releaseId);
 
 					errors.push({
 						releaseId,
@@ -782,5 +802,19 @@ export class ReleaseDraftService {
 
 			artist: new Map(artists.map((r) => [r.name, r.id])),
 		};
+	}
+
+	async bulkDeleteRelease(query: QueryGetListReleaseDto) {
+		const result = await this.getList(query);
+
+		for (const item of result.items) {
+			await this.handleDeleteById(item.id);
+
+			this.logger.log(
+				`Deleted release: id=${item.id}, title="${item.title}"`,
+			);
+		}
+
+		return result;
 	}
 }

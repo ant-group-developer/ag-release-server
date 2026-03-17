@@ -535,6 +535,8 @@ export class TrackQueryService {
 			.leftJoin('track.trackArtists', 'trackArtist')
 			// .leftJoin('trackArtist.artistRole', 'artistRole')
 			.leftJoin('trackArtist.artist', 'artist')
+			.leftJoinAndSelect('artist.artistProfiles', 'artistProfile')
+			.leftJoinAndSelect('artistProfile.dsp', 'artistProfileDsp')
 			.leftJoin('artist.genre', 'genre')
 			.leftJoin('artist.country', 'country')
 
@@ -542,6 +544,14 @@ export class TrackQueryService {
 			.leftJoin('track.trackContributors', 'trackContributor')
 			.leftJoin('trackContributor.artistRole', 'artistRoleContributor')
 			.leftJoin('trackContributor.artist', 'artistContributor')
+			.leftJoinAndSelect(
+				'artistContributor.artistProfiles',
+				'artistContributorProfile',
+			)
+			.leftJoinAndSelect(
+				'artistContributorProfile.dsp',
+				'artistContributorProfileDsp',
+			)
 			.leftJoin('artistContributor.country', 'countryContributor')
 			.leftJoin('artistContributor.genre', 'artistContributorGenre')
 

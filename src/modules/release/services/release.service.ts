@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
@@ -180,7 +180,6 @@ export class ReleaseService {
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
-		release.status = ReleaseStatus.PROCESSING;
 
 		if (!release.upc) {
 			await this.genUpc(id);
@@ -224,7 +223,15 @@ export class ReleaseService {
 					},
 				});
 
-			if (dspDeliveryIsExist) {
+			if (!dspDeliveryIsExist) {
+				await this.releaseDspDeliveryRepo.save({
+					releaseId: id,
+					dspId: dspSpotify.id,
+					status: ReleaseDspStatus.PROCESSING,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				});
+			} else {
 				await this.releaseDspDeliveryRepo.update(
 					{ releaseId: id, dspId: dspSpotify.id },
 					{
@@ -233,18 +240,11 @@ export class ReleaseService {
 						lastDeliveredAt: null,
 					},
 				);
-			} else {
-				await this.releaseDspDeliveryRepo.save({
-					releaseId: id,
-					dspId: dspSpotify.id,
-					status: ReleaseDspStatus.PROCESSING,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: null,
-				});
-				await this.releaseRepo.update(id, {
-					status: ReleaseStatus.PROCESSING,
-				});
 			}
+
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.PROCESSING,
+			});
 
 			setImmediate(async () => {
 				try {
@@ -551,7 +551,7 @@ export class ReleaseService {
 			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
 		if (!prefixUpcId) {
-			throw new BadRequestException('Release chưa có prefixUpcId');
+			throw new ResponseError({ message: 'Release chưa có prefixUpcId' });
 		}
 
 		const payload: CreateUpc = {
@@ -579,7 +579,9 @@ export class ReleaseService {
 
 		const newUpc = res.data.gtin; // theo proto UpcItem
 		if (!newUpc) {
-			throw new BadRequestException('Service UPC không trả về GTIN');
+			throw new ResponseError({
+				message: 'Service UPC không trả về GTIN',
+			});
 		}
 
 		// -------- Update release --------

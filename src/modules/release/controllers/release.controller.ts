@@ -53,21 +53,6 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	// test module orm
-	@Get('v2')
-	async getList2(
-		@Query() query: QueryGetListReleaseDto,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
-		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId)) {
-			query.tenantIds = [tenantId];
-		}
-
-		const result = await this.releaseService.getList2(query);
-		return new ResponseSuccess({ data: result });
-	}
-
 	@SystemAdminOnly()
 	@Get('simple')
 	async getListSimple(
