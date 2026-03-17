@@ -146,9 +146,6 @@ export class ArtistRoleService implements OnModuleInit {
 
 	// delete
 	async delete(id: string): Promise<void> {
-		const artistRole = await this.findOneWithCountRelation(id);
-		this.artistRoleQueryService.validateDelete(artistRole);
-
 		await this.artistRoleRepo.delete(id);
 	}
 }

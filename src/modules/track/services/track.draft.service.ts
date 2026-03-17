@@ -114,8 +114,6 @@ export class TrackDraftService {
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
-		console.log('log:', data);
-
 		const { audioFile, trackLanguage, ...restOfTrack } = data;
 
 		const track = await this.trackQueryService.getDetailOne(id);

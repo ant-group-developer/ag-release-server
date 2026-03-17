@@ -32,25 +32,6 @@ export class ArtistRoleQueryService {
 		const queryBuilder =
 			this.artistRoleRepo.createQueryBuilder('artistRole');
 
-		queryBuilder
-			.leftJoin('artistRole.trackArtists', 'trackArtist')
-			.leftJoin('artistRole.releaseArtists', 'releaseArtist');
-
-		queryBuilder.addSelect([
-			'trackArtist.id',
-			'trackArtist.artistId',
-			'trackArtist.artistRoleId',
-			'trackArtist.trackId',
-		]);
-
-		queryBuilder.addSelect([
-			'releaseArtist.id',
-			'releaseArtist.artistId',
-			'releaseArtist.artistRoleId',
-			'releaseArtist.releaseId',
-			'releaseArtist.addArtistToTracks',
-		]);
-
 		if (keyword) {
 			queryBuilder.andWhere('artistRole.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
@@ -86,35 +67,12 @@ export class ArtistRoleQueryService {
 	async findOneWithCountRelation(id: string) {
 		const queryBuilder = this.artistRoleRepo
 			.createQueryBuilder('artistRole')
-			.where('artistRole.id = :id', { id })
-
-			.loadRelationCountAndMap(
-				'artistRole.releaseCount',
-				'artistRole.releaseArtists',
-			)
-			.loadRelationCountAndMap(
-				'artistRole.trackCount',
-				'artistRole.trackArtists',
-			);
+			.where('artistRole.id = :id', { id });
 
 		return await queryBuilder.getOne();
 	}
 
 	// validate
-	validateDelete(artistRole: ArtistRole) {
-		if ((artistRole.releaseCount ?? 0) > 0) {
-			throw new ResponseError(
-				ArtistRoleMessage.CANNOT_DELETE_BECAUSE_LINKED_RELEASES,
-			);
-		}
-
-		if ((artistRole.trackCount ?? 0) > 0) {
-			throw new ResponseError(
-				ArtistRoleMessage.CANNOT_DELETE_BECAUSE_LINKED_TRACKS,
-			);
-		}
-	}
-
 	async validate({ name, code }: { name?: string; code?: string }) {
 		if (name) {
 			const artistRole = await this.artistRoleRepo.findOne({
