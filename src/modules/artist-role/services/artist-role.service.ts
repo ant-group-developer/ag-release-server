@@ -27,7 +27,7 @@ export class ArtistRoleService implements OnModuleInit {
 
 	// init
 	async onModuleInit() {
-		await this.initMainArtistRole();
+		// await this.initMainArtistRole();
 	}
 
 	private async initMainArtistRole() {

@@ -27,7 +27,7 @@ export class CurrencyService implements OnModuleInit {
 
 	// init
 	async onModuleInit() {
-		await this.initCurrencies();
+		// await this.initCurrencies();
 	}
 
 	private async initCurrencies() {

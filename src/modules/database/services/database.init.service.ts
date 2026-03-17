@@ -43,11 +43,11 @@ export class DatabaseInitService implements OnModuleInit {
 
 	async onModuleInit() {
 		try {
-			await Promise.all([
-				this.initUser(),
-				this.initCountry(),
-				this.initTimeZones(),
-			]);
+			// await Promise.all([
+			// 	this.initUser(),
+			// 	this.initCountry(),
+			// 	this.initTimeZones(),
+			// ]);
 		} catch (error) {
 			this.logger.error('Error initializing database:', error);
 		}
