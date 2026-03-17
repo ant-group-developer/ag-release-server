@@ -16,6 +16,14 @@ export class BatchImportLog extends BaseUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 50,
+		nullable: true,
+		comment: 'Tenant code from folder name (e.g., antmusic)',
+	})
+	tenantCode: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
 		comment: 'Release folder name / UPC (e.g., 850080651003)',
 	})
 	releaseFolder: string;

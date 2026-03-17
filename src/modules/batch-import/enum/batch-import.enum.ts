@@ -4,5 +4,7 @@ export enum BatchImportStatus {
 	VALIDATION_FAILED = 'validation_failed',
 	UPLOADING = 'uploading',
 	UPLOADED = 'uploaded',
+	CREATING = 'creating',
+	COMPLETED = 'completed',
 	FAILED = 'failed',
 }

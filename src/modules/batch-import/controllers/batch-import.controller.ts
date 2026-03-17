@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
 	UploadCompleteDto,
@@ -25,6 +26,14 @@ export class BatchImportController {
 	@Post('upload-complete')
 	async uploadComplete(@Body() dto: UploadCompleteDto) {
 		const result = await this.batchImportService.uploadComplete(dto);
+
+		return { data: result };
+	}
+
+	@Post('create-release')
+	async createRelease(@Body() dto: CreateReleaseFromExcelDto) {
+		const result =
+			await this.batchImportService.createReleaseFromExcel(dto);
 
 		return { data: result };
 	}

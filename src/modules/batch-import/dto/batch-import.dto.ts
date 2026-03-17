@@ -30,6 +30,10 @@ export class GetBatchImportLogsDto {
 export class ValidateReleaseDto {
 	@IsString()
 	@IsNotEmpty()
+	tenantCode: string;
+
+	@IsString()
+	@IsNotEmpty()
 	batchId: string;
 
 	@IsString()
