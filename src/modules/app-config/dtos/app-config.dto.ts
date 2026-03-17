@@ -101,24 +101,24 @@ export class UpdateTrackConfigDto {
 }
 
 export class UpdateGeneratorDto {
-	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
+	// @IsNotEmpty()
 	prefixUpcDefaultId: string;
 
-	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
+	// @IsNotEmpty()
 	prefixIsrcDefaultId: string;
 
-	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
+	// @IsNotEmpty()
 	DDEX_PARTY_ID_SENDER: string;
 
-	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
+	// @IsNotEmpty()
 	DDEX_PARTY_NAME_SENDER: string;
 
-	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
+	// @IsNotEmpty()
 	API_KEY_GRPC_ISRC_UPC: string;
 }
 

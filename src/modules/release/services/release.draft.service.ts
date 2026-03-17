@@ -2,11 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FieldErrorDetails } from 'src/common/dtos/common.response.dto';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
+import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
+import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseArtistService } from 'src/modules/release-artist/services/release-artist.service';
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
@@ -233,7 +235,7 @@ export class ReleaseDraftService {
 	}
 
 	async getErrorsSchemaReleasesFromSftp(releases: any[]) {
-		console.log(releases);
+		console.log(JSON.stringify(releases));
 		const maps = await this.buildLookupMaps();
 
 		const success: string[] = [];
@@ -254,7 +256,10 @@ export class ReleaseDraftService {
 			}
 
 			const schemaErrors =
-				this.releaseValidateService.getErrorsSchemaRelease(fakeRelease);
+				this.releaseValidateService.getErrorsSchemaRelease(
+					fakeRelease,
+					true,
+				);
 
 			if (schemaErrors.length === 0) {
 				success.push(r.id);
@@ -271,319 +276,6 @@ export class ReleaseDraftService {
 		return { success, failed };
 	}
 
-	// sftp
-	// mapAndValidateExistence(
-	// 	r: any,
-	// 	maps: LookupMaps,
-	// ): {
-	// 	errors: string[];
-	// 	fakeRelease: any | null;
-	// } {
-	// 	const errors: string[] = [];
-
-	// 	const normalize = (value?: string | null) => value;
-
-	// 	const getId = (map: Map<string, string>, value?: string | null) => {
-	// 		const key = normalize(value);
-	// 		return key ? (map.get(key) ?? null) : null;
-	// 	};
-
-	// 	const getEntity = <T>(map: Map<string, T>, value?: string | null) => {
-	// 		const key = normalize(value);
-	// 		return key ? (map.get(key) ?? null) : null;
-	// 	};
-
-	// 	// ===== Resolve ids from Excel text =====
-	// 	const albumFormatId = getId(maps.albumFormat, r.albumFormat);
-	// 	const primaryGenreId = getId(maps.genre, r.primaryGenre);
-	// 	const subGenreId = getId(maps.genre, r.subGenre);
-	// 	const labelId = getId(maps.label, r.label);
-
-	// 	const releaseAudioLanguageId = getId(maps.language, r.audioLanguage);
-	// 	const releaseMetadataLanguageId = getId(
-	// 		maps.language,
-	// 		r.metadataLanguage,
-	// 	);
-	// 	const releaseMetadataLanguageCountryId = getId(
-	// 		maps.country,
-	// 		r.metadataLanguageCountry,
-	// 	);
-
-	// 	// ===== Existence validate release =====
-	// 	if (r.albumFormat && !albumFormatId) {
-	// 		errors.push(`Không tồn tại loại album: ${r.albumFormat}`);
-	// 	}
-
-	// 	if (r.primaryGenre && !primaryGenreId) {
-	// 		errors.push(`Không tồn tại thể loại: ${r.primaryGenre}`);
-	// 	}
-
-	// 	if (r.subGenre && !subGenreId) {
-	// 		errors.push(`Không tồn tại sub thể loại: ${r.subGenre}`);
-	// 	}
-
-	// 	if (r.label && !labelId) {
-	// 		errors.push(`Không tồn tại label: ${r.label}`);
-	// 	}
-
-	// 	if (r.audioLanguage && !releaseAudioLanguageId) {
-	// 		errors.push(
-	// 			`Không tồn tại audioLanguage của release: ${r.audioLanguage}`,
-	// 		);
-	// 	}
-
-	// 	if (r.metadataLanguage && !releaseMetadataLanguageId) {
-	// 		errors.push(
-	// 			`Không tồn tại metadataLanguage của release: ${r.metadataLanguage}`,
-	// 		);
-	// 	}
-
-	// 	if (r.metadataLanguageCountry && !releaseMetadataLanguageCountryId) {
-	// 		errors.push(
-	// 			`Không tồn tại metadataLanguageCountry: ${r.metadataLanguageCountry}`,
-	// 		);
-	// 	}
-
-	// 	if (Array.isArray(r.selectedCountries)) {
-	// 		for (const country of r.selectedCountries) {
-	// 			if (!getId(maps.country, country)) {
-	// 				errors.push(`Không tồn tại quốc gia: ${country}`);
-	// 			}
-	// 		}
-	// 	}
-
-	// 	// ===== Tracks validate =====
-	// 	const mappedTracks = (r.tracks ?? []).map((t: any, index: number) => {
-	// 		const trackPrimaryGenreId = getId(maps.genre, t.primaryGenre);
-	// 		const trackSubGenreId = getId(maps.genre, t.subGenre);
-	// 		const trackTypeId = getId(maps.trackType, t.trackType);
-	// 		const trackOriginTypeId = getId(
-	// 			maps.trackOriginType,
-	// 			t.trackOriginType,
-	// 		);
-	// 		const trackSensitiveId = getId(
-	// 			maps.trackSensitive,
-	// 			t.trackSensitive,
-	// 		);
-	// 		const trackPriceTierId = getId(maps.priceTier, t.priceTier);
-
-	// 		const trackAudioLanguageId = getId(maps.language, t.audioLanguage);
-	// 		const trackMetadataLanguageId = getId(
-	// 			maps.language,
-	// 			t.metadataLanguage,
-	// 		);
-	// 		const trackMetadataLanguageCountryId = getId(
-	// 			maps.country,
-	// 			t.metadataLanguageCountry,
-	// 		);
-	// 		const recordingCountryId = getId(maps.country, t.recordingCountry);
-
-	// 		if (t.trackType && !trackTypeId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại loại track: ${t.trackType}`,
-	// 			);
-	// 		}
-
-	// 		if (t.trackOriginType && !trackOriginTypeId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại trackOriginType: ${t.trackOriginType}`,
-	// 			);
-	// 		}
-
-	// 		if (t.trackSensitive && !trackSensitiveId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại trackSensitive: ${t.trackSensitive}`,
-	// 			);
-	// 		}
-
-	// 		if (t.primaryGenre && !trackPrimaryGenreId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại thể loại track: ${t.primaryGenre}`,
-	// 			);
-	// 		}
-
-	// 		if (t.subGenre && !trackSubGenreId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại subGenre track: ${t.subGenre}`,
-	// 			);
-	// 		}
-
-	// 		if (t.audioLanguage && !trackAudioLanguageId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại audioLanguage: ${t.audioLanguage}`,
-	// 			);
-	// 		}
-
-	// 		if (t.metadataLanguage && !trackMetadataLanguageId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại metadataLanguage: ${t.metadataLanguage}`,
-	// 			);
-	// 		}
-
-	// 		if (t.metadataLanguageCountry && !trackMetadataLanguageCountryId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại metadataLanguageCountry: ${t.metadataLanguageCountry}`,
-	// 			);
-	// 		}
-
-	// 		if (t.recordingCountry && !recordingCountryId) {
-	// 			errors.push(
-	// 				`Track #${index + 1}: Không tồn tại recordingCountry: ${t.recordingCountry}`,
-	// 			);
-	// 		}
-
-	// 		return {
-	// 			id: t.id ?? null,
-	// 			createdAt: t.createdAt ?? null,
-	// 			updatedAt: t.updatedAt ?? null,
-	// 			title: t.title ?? null,
-	// 			version: t.version ?? '',
-	// 			isrc: t.isrc ?? null,
-	// 			iswc: t.iswc ?? null,
-	// 			releaseId: t.releaseId ?? null,
-
-	// 			pLineYear: t.pLineYear ?? null,
-	// 			pLineOwner: t.pLineOwner ?? null,
-
-	// 			primaryGenreId: trackPrimaryGenreId,
-	// 			subGenreId: trackSubGenreId,
-
-	// 			order: t.order ?? index,
-
-	// 			trackTypeId,
-	// 			trackOriginTypeId,
-	// 			trackSensitiveId,
-
-	// 			isByAi: t.isByAi ?? false,
-	// 			lyric: t.lyric ?? null,
-	// 			scanCopyrightStatus: t.scanCopyrightStatus ?? 'un_scanned',
-	// 			copyArtistsFromRelease: t.copyArtistsFromRelease ?? false,
-	// 			copyContributorsFromRelease:
-	// 				t.copyContributorsFromRelease ?? false,
-	// 			priceTierId: trackPriceTierId,
-
-	// 			trackLanguage: {
-	// 				id: t.trackLanguage?.id ?? null,
-	// 				createdAt: t.trackLanguage?.createdAt ?? null,
-	// 				updatedAt: t.trackLanguage?.updatedAt ?? null,
-	// 				metadataLanguageCountryId: trackMetadataLanguageCountryId,
-	// 				audioLanguageId: trackAudioLanguageId,
-	// 				metadataLanguageId: trackMetadataLanguageId,
-	// 				trackId: t.trackLanguage?.trackId ?? null,
-	// 				recordingCountryId,
-	// 			},
-
-	// 			audioFile:
-	// 				t.previewStart != null
-	// 					? {
-	// 							id: t.audioFile?.id ?? null,
-	// 							createdAt: t.audioFile?.createdAt ?? null,
-	// 							updatedAt: t.audioFile?.updatedAt ?? null,
-	// 							sampleRate: t.audioFile?.sampleRate ?? null,
-	// 							bitrate: t.audioFile?.bitrate ?? null,
-	// 							bitDepth: t.audioFile?.bitDepth ?? null,
-	// 							duration: t.audioFile?.duration ?? null,
-	// 							sampleLength: t.audioFile?.sampleLength ?? null,
-	// 							preview: t.previewStart,
-	// 							trackId: t.audioFile?.trackId ?? null,
-	// 							fileId: t.audioFile?.fileId ?? null,
-	// 							peakId: t.audioFile?.peakId ?? null,
-	// 						}
-	// 					: null,
-
-	// 			trackArtists: t.trackArtists ?? [],
-	// 			trackContributors: t.trackContributors ?? [],
-	// 		};
-	// 	});
-
-	// 	if (errors.length > 0) {
-	// 		return { errors, fakeRelease: null };
-	// 	}
-
-	// 	const albumFormatEntity = getEntity(
-	// 		maps.albumFormatEntity,
-	// 		r.albumFormat,
-	// 	);
-
-	// 	const selectedCountries = Array.isArray(r.selectedCountries)
-	// 		? r.selectedCountries
-	// 				.map((country: string) => getId(maps.country, country))
-	// 				.filter(Boolean)
-	// 		: null;
-
-	// 	const fakeRelease = {
-	// 		id: r.id ?? 'null',
-
-	// 		upc: r.upc ?? '',
-	// 		albumFormatId,
-	// 		primaryGenreId,
-	// 		subGenreId,
-	// 		labelId,
-
-	// 		title: r.title ?? null,
-	// 		version: r.version ?? '',
-	// 		status: r.status ?? ReleaseStatus.DRAFT,
-
-	// 		cLineYear: r.cLineYear ?? null,
-	// 		cLineOwner: r.cLineOwner ?? null,
-	// 		pLineYear: r.pLineYear ?? null,
-	// 		pLineOwner: r.pLineOwner ?? null,
-
-	// 		catalogId: r.catalogId ?? '',
-	// 		isVariousArtist: r.isVariousArtist ?? false,
-	// 		releaseTimeMode:
-	// 			r.releaseTimeMode ?? ReleaseTimeMode.GLOBAL_MIDNIGHT,
-	// 		releaseTimezoneId: r.releaseTimezoneId ?? null,
-	// 		releaseDate: r.releaseDate ?? null,
-	// 		releaseTime: r.releaseTime ?? null,
-
-	// 		tenantId: r.tenantId ?? null,
-	// 		metadataCi: r.metadataCi ?? null,
-	// 		metadataSpotify: r.metadataSpotify ?? null,
-
-	// 		albumFormat: albumFormatEntity,
-
-	// 		releaseCoverArts: r.thumbnail
-	// 			? [
-	// 					{
-	// 						id: null,
-	// 						createdAt: null,
-	// 						updatedAt: null,
-	// 						fileId: null,
-	// 						releaseId: r.id ?? null,
-	// 						width: r.thumbnail.width,
-	// 						height: r.thumbnail.height,
-	// 						type: 'original',
-	// 					},
-	// 				]
-	// 			: [],
-
-	// 		releaseLanguage: {
-	// 			id: r.releaseLanguage?.id ?? null,
-	// 			createdAt: r.releaseLanguage?.createdAt ?? null,
-	// 			updatedAt: r.releaseLanguage?.updatedAt ?? null,
-	// 			metadataLanguageCountryId: releaseMetadataLanguageCountryId,
-	// 			audioLanguageId: releaseAudioLanguageId,
-	// 			metadataLanguageId: releaseMetadataLanguageId,
-	// 			releaseId: r.id ?? null,
-	// 		},
-
-	// 		tracks: mappedTracks,
-
-	// 		releaseTerritory: {
-	// 			id: r.releaseTerritory?.id ?? null,
-	// 			createdAt: r.releaseTerritory?.createdAt ?? null,
-	// 			updatedAt: r.releaseTerritory?.updatedAt ?? null,
-	// 			releaseId: r.id ?? null,
-	// 			distributeWorldwide: r.distributeWorldwide ?? true,
-	// 			distributionType: r.distributionType ?? null,
-	// 			selectedCountries,
-	// 		},
-	// 	};
-
-	// 	return { errors: [], fakeRelease };
-	// }
-
 	mapAndValidateExistence(
 		r: ReleaseRawSftp,
 		maps: LookupMaps,
@@ -592,8 +284,6 @@ export class ReleaseDraftService {
 		fakeRelease: Release | null;
 	} {
 		const errors: string[] = [];
-
-		console.log(r);
 
 		const normalize = (value?: string | null) => (value ?? '').trim();
 
@@ -675,7 +365,35 @@ export class ReleaseDraftService {
 			})
 			.filter(Boolean) as Country[];
 
+		const releaseArtists: ReleaseArtist[] = [];
+		const seenArtistIds = new Set<string>();
+
+		(r.artists ?? []).forEach((artistName, index) => {
+			const artistId = getId(
+				maps.artist,
+				artistName,
+				`artists[${index}]`,
+			);
+
+			if (!artistId) return;
+			if (seenArtistIds.has(artistId)) return;
+
+			seenArtistIds.add(artistId);
+
+			const releaseArtist = new ReleaseArtist();
+			releaseArtist.releaseId = r.id;
+			releaseArtist.artistId = artistId;
+			releaseArtist.addArtistToTracks = true;
+
+			const artistEntity = new Artist();
+			artistEntity.id = artistId;
+			releaseArtist.artist = artistEntity;
+
+			releaseArtists.push(releaseArtist);
+		});
+
 		const mappedTracks: Track[] = (r.tracks ?? []).map((trackRaw) => {
+			console.log(trackRaw);
 			const track = new Track();
 
 			const trackPrimaryGenreId = getId(
@@ -709,14 +427,13 @@ export class ReleaseDraftService {
 				`track.priceTier`,
 			);
 
-			if (!normalize(trackRaw.id)) {
-				errors.push(`track.id là bắt buộc`);
-			}
+			// if (!normalize(trackRaw.id)) {
+			// 	errors.push(`track.id là bắt buộc`);
+			// }
 			if (!normalize(trackRaw.title)) {
 				errors.push(`track.title là bắt buộc`);
 			}
 
-			track.id = trackRaw.id ?? '';
 			track.releaseId = r.id;
 			track.title = trackRaw.title ?? '';
 			track.version = trackRaw.version ?? null;
@@ -781,6 +498,7 @@ export class ReleaseDraftService {
 			tenantId: 'b4f924e8-d6e7-4b02-8bbe-5ae2b0f97b7a',
 			metadataCi: r.metadataCi ?? null,
 			metadataSpotify: r.metadataSpotify ?? null,
+			releaseArtists,
 		});
 
 		// relation: albumFormat
@@ -885,6 +603,10 @@ export class ReleaseDraftService {
 					releaseId: fakeRelease.id,
 					manager,
 				});
+			}
+
+			if (fakeRelease.releaseArtists) {
+				await manager.save(ReleaseArtist, fakeRelease.releaseArtists);
 			}
 
 			// 5. tracks
@@ -1011,6 +733,7 @@ export class ReleaseDraftService {
 		const priceTierRepo = this.dataSource.getRepository(PriceTier);
 		const languageRepo = this.dataSource.getRepository(Language);
 		const countryRepo = this.dataSource.getRepository(Country);
+		const artistRepo = this.dataSource.getRepository(Artist);
 
 		const [
 			albumFormats,
@@ -1022,6 +745,7 @@ export class ReleaseDraftService {
 			priceTiers,
 			languages,
 			countries,
+			artists,
 		] = await Promise.all([
 			albumFormatRepo.find(),
 			genreRepo.find(),
@@ -1032,6 +756,7 @@ export class ReleaseDraftService {
 			priceTierRepo.find(),
 			languageRepo.find(),
 			countryRepo.find(),
+			artistRepo.find(),
 		]);
 
 		return {
@@ -1054,6 +779,8 @@ export class ReleaseDraftService {
 
 			// chưa có bảng/nguồn thì để tạm
 			distributionType: new Map<string, DistributionType>(),
+
+			artist: new Map(artists.map((r) => [r.name, r.id])),
 		};
 	}
 }
