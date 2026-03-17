@@ -50,7 +50,7 @@ export class ArtistRoleService implements OnModuleInit {
 		});
 
 		if (!mainIsExist) {
-			throw new ResponseError({ message: 'Main artist is required' });
+			// throw new ResponseError({ message: 'Main artist is required' });
 		}
 	}
 

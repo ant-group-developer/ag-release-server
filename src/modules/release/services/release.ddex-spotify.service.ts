@@ -262,7 +262,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		await this.sftpConnectService.uploadFolderScp({
 			sftp,
 			localDir: release.metadataSpotify?.folderServer ?? '',
-			remoteDir: sftp.path ?? '',
+			remoteDir: sftp.path ?? '/',
 		});
 
 		await removeFolder(release.metadataSpotify?.folderServer ?? '');
