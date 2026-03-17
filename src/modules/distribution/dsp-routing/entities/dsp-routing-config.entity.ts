@@ -1,4 +1,5 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import {
 	Column,
 	Entity,
@@ -39,4 +40,8 @@ export class DspRoutingConfig extends BaseUserTrackedUUIDEntity {
 	@OneToOne(() => SftpConfig)
 	@JoinColumn({ name: 'sftp_config_id' })
 	sftpConfig: SftpConfig | null;
+
+	@ManyToOne(() => Dsp, { nullable: false, onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'dsp_id' })
+	dsp: Dsp;
 }

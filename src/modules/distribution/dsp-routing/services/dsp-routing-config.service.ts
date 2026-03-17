@@ -1,10 +1,12 @@
 // src/modules/dsp-routing-configs/services/dsp-routing-config.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { decryptSecretSafe } from 'src/utils/util.encrypt';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
 import { AggregatorsService } from '../../aggregator/services/aggregators.service';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
+import { SftpMetadata } from '../../sftp-configs/type/sftp-config.type';
 import { DspRoutingConfigException } from '../const/dsp-routing-config.const';
 import {
 	CreateDspRoutingConfigDto,
@@ -152,7 +154,12 @@ export class DspRoutingConfigsService {
 	}) {
 		const entity = await this.repo.findOne({
 			where: { dspId },
-			relations: { aggregator: true, sftpConfig: true },
+			relations: {
+				aggregator: {
+					sftpConfig: true,
+				},
+				sftpConfig: true,
+			},
 		});
 
 		if (!entity) {
@@ -183,5 +190,54 @@ export class DspRoutingConfigsService {
 		await this.repo.delete({ id });
 
 		return { id };
+	}
+
+	async resolveSftpMetadataByDspCode(code: string): Promise<SftpMetadata> {
+		const routing = await this.repo
+			.createQueryBuilder('routing')
+			.leftJoinAndSelect('routing.dsp', 'dsp')
+			.leftJoinAndSelect('routing.sftpConfig', 'sftpConfig')
+			.leftJoinAndSelect('routing.aggregator', 'aggregator')
+			.leftJoinAndSelect('aggregator.sftpConfig', 'aggregatorSftpConfig')
+			.where('dsp.code = :code', { code })
+			.andWhere('routing.isActive = true')
+			.getOne();
+
+		if (!routing) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		let metadata = null;
+
+		switch (routing.mode) {
+			case RoutingModeEnum.DIRECT:
+				metadata = routing.sftpConfig?.metadata ?? null;
+				break;
+
+			case RoutingModeEnum.AGGREGATOR:
+				metadata = routing.aggregator?.sftpConfig?.metadata ?? null;
+				break;
+
+			case RoutingModeEnum.SYSTEM:
+				metadata = null;
+				break;
+		}
+
+		if (!metadata) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		this.decryptSecretEntity(metadata);
+		return metadata;
+	}
+
+	private decryptSecretEntity(e: SftpMetadata) {
+		if (e.password) {
+			e.password = decryptSecretSafe(e.password);
+		}
+
+		if (e.privateKey) {
+			e.privateKey = decryptSecretSafe(e.privateKey);
+		}
 	}
 }
