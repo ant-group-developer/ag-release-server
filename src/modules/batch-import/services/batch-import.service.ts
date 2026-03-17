@@ -25,6 +25,7 @@ import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensi
 import { Track } from 'src/modules/track/entities/track.entity';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { EXCEL_COLUMNS } from '../constants/excel-columns.constant';
 import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
@@ -477,15 +478,11 @@ export class BatchImportService {
 		audioFileNames: string[],
 		errors: string[],
 	): void {
-		const isrcColumnNames = ['isrc', 'ISRC', 'Isrc'];
-		let isrcColumn: string | null = null;
-
-		for (const colName of isrcColumnNames) {
-			if (excelData[0] && colName in excelData[0]) {
-				isrcColumn = colName;
-				break;
-			}
-		}
+		// Use the centralized column constant
+		const isrcColumn =
+			excelData[0] && EXCEL_COLUMNS.ISRC in excelData[0]
+				? EXCEL_COLUMNS.ISRC
+				: null;
 
 		if (!isrcColumn) {
 			errors.push(
@@ -496,7 +493,7 @@ export class BatchImportService {
 
 		const isrcValues = excelData
 			.map((row) => {
-				const val = row[isrcColumn!];
+				const val = row[isrcColumn];
 				return typeof val === 'string' ? val.trim() : '';
 			})
 			.filter((v) => v.length > 0);
