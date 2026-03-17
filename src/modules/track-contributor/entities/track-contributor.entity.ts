@@ -60,7 +60,9 @@ export class TrackContributor extends BaseUUIDEntity {
 	@JoinColumn({ name: 'artist_id' })
 	artist: Artist;
 
-	@ManyToOne(() => Track)
+	@ManyToOne(() => Track, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
 }

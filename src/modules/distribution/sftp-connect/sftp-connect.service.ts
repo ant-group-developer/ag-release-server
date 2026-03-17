@@ -207,7 +207,7 @@ export class SftpConnectService {
 		if (!sftp.username) throw new Error('Missing sftp.username');
 		if (!sftp.password) throw new Error('Missing sftp.password');
 		if (!localDir) throw new Error('Missing localDir');
-		if (!remoteDir) throw new Error('Missing remoteDir');
+		// if (!remoteDir) throw new Error('Missing remoteDir');
 
 		return new Promise<string>((resolve, reject) => {
 			const args = [
@@ -224,7 +224,7 @@ export class SftpConnectService {
 				'-o',
 				'LogLevel=ERROR',
 				localDir,
-				`${sftp.username}@${sftp.host}:${remoteDir}`,
+				`${sftp.username}@${sftp.host}:${remoteDir || ''}`,
 			];
 
 			const scp = spawn('sshpass', args, {

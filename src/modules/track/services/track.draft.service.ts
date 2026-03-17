@@ -330,6 +330,11 @@ export class TrackDraftService {
 			trackId,
 		});
 
+		await this.trackArtistService.copyContributorFromReleaseSource2({
+			releaseId: track.releaseId,
+			trackId,
+		});
+
 		await this.trackPolicyService.createTrackPoliciesOfTrack({ trackId });
 	}
 

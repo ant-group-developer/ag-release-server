@@ -24,7 +24,7 @@ export class GenreService implements OnModuleInit {
 	) {}
 
 	async onModuleInit() {
-		await this.initGenre();
+		// await this.initGenre();
 	}
 
 	private async initGenre() {

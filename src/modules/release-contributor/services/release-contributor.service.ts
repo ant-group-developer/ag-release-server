@@ -147,10 +147,12 @@ export class ReleaseContributorService {
 		releaseContributor: ReleaseContributor;
 		createDto: CreateReleaseContributorDto;
 	}) {
+		// kéo artist sang những track đang bật lấy artist từ release
 		await this.syncTrackContributorsFromReleaseContributor(
 			releaseContributor,
 		);
 
+		// đẩy artist sang track nếu user chọn add artist to track
 		if (createDto.addContributorToTracks) {
 			await this.trackDraftService.addContributorToTracks(
 				releaseContributor,

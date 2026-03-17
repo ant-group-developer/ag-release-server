@@ -7,6 +7,7 @@ import {
 	ParseUUIDPipe,
 	Post,
 	Put,
+	Query,
 	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -29,6 +30,7 @@ import {
 	CreateReleaseDraftDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
+import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
@@ -153,11 +155,25 @@ export class ReleaseDraftController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Delete()
+	async bulkDelete(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	) {
+		// const tenantId = req.user!.tenantId;
+		// if (checkIsNotSystemTenant(tenantId)) {
+		// 	query.tenantIds = [tenantId];
+		// }
+
+		const result = await this.releaseDraftService.bulkDeleteRelease(query);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
 	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseDraftService.handleDelete(id);
+		await this.releaseDraftService.handleDeleteById(id);
 		return ReleaseSuccess.DELETE();
 	}
 }

@@ -27,7 +27,7 @@ export class ArtistRoleService implements OnModuleInit {
 
 	// init
 	async onModuleInit() {
-		await this.initMainArtistRole();
+		// await this.initMainArtistRole();
 	}
 
 	private async initMainArtistRole() {
@@ -50,7 +50,7 @@ export class ArtistRoleService implements OnModuleInit {
 		});
 
 		if (!mainIsExist) {
-			throw new ResponseError({ message: 'Main artist is required' });
+			// throw new ResponseError({ message: 'Main artist is required' });
 		}
 	}
 
@@ -146,9 +146,6 @@ export class ArtistRoleService implements OnModuleInit {
 
 	// delete
 	async delete(id: string): Promise<void> {
-		const artistRole = await this.findOneWithCountRelation(id);
-		this.artistRoleQueryService.validateDelete(artistRole);
-
 		await this.artistRoleRepo.delete(id);
 	}
 }

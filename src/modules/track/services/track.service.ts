@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
@@ -159,7 +159,7 @@ export class TrackService {
 
 		// -------- Map dữ liệu từ Track sang CreateIsrc --------
 		// Artist: lấy nghệ sĩ chính (tuỳ cấu trúc TrackArtist của bạn)
-		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? 'tesst';
+		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? '';
 
 		if (!mainArtistName) {
 			throw new ResponseError({
@@ -198,14 +198,18 @@ export class TrackService {
 		// Nếu audioFile không có duration, bạn cần thay bằng field đúng
 		const duration = track.audioFile?.duration ?? 0;
 		if (!duration || duration <= 0) {
-			throw new BadRequestException('Thiếu duration (giây) từ audioFile');
+			throw new ResponseError({
+				message: 'Thiếu duration (giây) từ audioFile',
+			});
 		}
 
 		const prefixIsrcId =
 			this.appConfigService.cache.config.generator.prefixIsrcDefaultId;
 
 		if (!prefixIsrcId) {
-			throw new BadRequestException('Chưa cấu hình prefixIsrcId');
+			throw new ResponseError({
+				message: 'Chưa cấu hình prefixIsrcId',
+			});
 		}
 
 		const payload = {
@@ -229,7 +233,9 @@ export class TrackService {
 		// created giả định có created.isrc (bạn sửa theo response thật)
 		const newIsrc = res.data.code;
 		if (!newIsrc) {
-			throw new BadRequestException('Service ISRC không trả về mã ISRC');
+			throw new ResponseError({
+				message: 'Service ISRC không trả về mã ISRC',
+			});
 		}
 
 		// -------- Update track --------

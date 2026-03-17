@@ -26,7 +26,7 @@ export class LanguageService implements OnModuleInit {
 	) {}
 
 	async onModuleInit() {
-		await this.initLanguage();
+		// await this.initLanguage();
 	}
 
 	private async initLanguage() {

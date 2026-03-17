@@ -18,6 +18,7 @@ import {
 } from 'src/common/dtos/common.response.dto';
 
 import { Request, Response } from 'express';
+import { AppResponseSuccess } from 'src/app.const';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import {
 	RequirePermissions,
@@ -50,21 +51,6 @@ export class ReleaseController {
 		}
 
 		const result = await this.releaseService.getList(query);
-		return new ResponseSuccess({ data: result });
-	}
-
-	// test module orm
-	@Get('v2')
-	async getList2(
-		@Query() query: QueryGetListReleaseDto,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
-		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId)) {
-			query.tenantIds = [tenantId];
-		}
-
-		const result = await this.releaseService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -170,7 +156,7 @@ export class ReleaseController {
 		const userId = req.user!.sub;
 		const result = await this.releaseService.submit(id, userId, dto);
 
-		return ReleaseSuccess.CREATE(result);
+		return AppResponseSuccess.COMMON(result);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
