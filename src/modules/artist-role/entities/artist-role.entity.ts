@@ -34,7 +34,4 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
 	modifier: User;
-
-	releaseCount?: number;
-	trackCount?: number;
 }
