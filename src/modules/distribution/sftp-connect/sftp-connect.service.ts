@@ -203,86 +203,13 @@ export class SftpConnectService {
 	}) {
 		const port = sftp.port ?? 22;
 
-		console.log(remoteDir);
-
 		if (!sftp.host) throw new Error('Missing sftp.host');
 		if (!sftp.username) throw new Error('Missing sftp.username');
 		if (!sftp.password) throw new Error('Missing sftp.password');
 		if (!localDir) throw new Error('Missing localDir');
 		// if (!remoteDir) throw new Error('Missing remoteDir');
 
-		// return new Promise<string>((resolve, reject) => {
-		// 	const args = [
-		// 		'-p',
-		// 		sftp.password!,
-		// 		'scp',
-		// 		'-P',
-		// 		String(port),
-		// 		'-r',
-		// 		'-o',
-		// 		'StrictHostKeyChecking=no',
-		// 		'-o',
-		// 		'UserKnownHostsFile=/dev/null',
-		// 		'-o',
-		// 		'LogLevel=ERROR',
-		// 		localDir,
-		// 		`${sftp.username}@${sftp.host}:${remoteDir}`,
-		// 	];
-
-		// 	const scp = spawn('sshpass', args, {
-		// 		stdio: ['ignore', 'pipe', 'pipe'],
-		// 	});
-
-		// 	let stdout = '';
-		// 	let stderr = '';
-		// 	let done = false;
-
-		// 	const finish = (error?: Error, result?: string) => {
-		// 		if (done) return;
-		// 		done = true;
-		// 		clearTimeout(timer);
-		// 		if (error) reject(error);
-		// 		else resolve(result ?? stdout);
-		// 	};
-
-		// 	// Timeout để tránh hang vô thời hạn
-		// 	const timer = setTimeout(() => {
-		// 		scp.kill('SIGKILL');
-		// 		finish(new Error(`scp timed out after ${timeoutMs}ms`));
-		// 	}, timeoutMs);
-
-		// 	scp.stdout.on('data', (data) => {
-		// 		stdout += data.toString();
-		// 	});
-
-		// 	scp.stderr.on('data', (data) => {
-		// 		stderr += data.toString();
-		// 	});
-
-		// 	scp.on('close', (code) => {
-		// 		if (code === 0) {
-		// 			finish(undefined, stdout);
-		// 		} else {
-		// 			finish(
-		// 				new Error(
-		// 					`scp failed with code ${code}\nstdout: ${stdout}\nstderr: ${stderr}`,
-		// 				),
-		// 			);
-		// 		}
-		// 	});
-
-		// 	scp.on('error', (err) => {
-		// 		finish(
-		// 			new Error(
-		// 				`Failed to start sshpass/scp: ${err.message}\nstdout: ${stdout}\nstderr: ${stderr}`,
-		// 			),
-		// 		);
-		// 	});
-		// });
-
 		return new Promise<string>((resolve, reject) => {
-			const remoteTarget = `${sftp.username}@${sftp.host}:${remoteDir || ''}`;
-
 			const args = [
 				'-p',
 				sftp.password!,
@@ -297,12 +224,8 @@ export class SftpConnectService {
 				'-o',
 				'LogLevel=ERROR',
 				localDir,
-				remoteTarget,
+				`${sftp.username}@${sftp.host}:${remoteDir || ''}`,
 			];
-
-			// 👉 LOG command để copy chạy tay
-			const fullCmd = `sshpass -p '${sftp.password}' scp -P ${port} -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "${localDir}" "${remoteTarget}"`;
-			console.log('SCP CMD:\n', fullCmd);
 
 			const scp = spawn('sshpass', args, {
 				stdio: ['ignore', 'pipe', 'pipe'],
@@ -320,22 +243,19 @@ export class SftpConnectService {
 				else resolve(result ?? stdout);
 			};
 
+			// Timeout để tránh hang vô thời hạn
 			const timer = setTimeout(() => {
 				scp.kill('SIGKILL');
 				finish(new Error(`scp timed out after ${timeoutMs}ms`));
 			}, timeoutMs);
 
-			if (scp.stdout) {
-				scp.stdout.on('data', (data) => {
-					stdout += data.toString();
-				});
-			}
+			scp.stdout.on('data', (data) => {
+				stdout += data.toString();
+			});
 
-			if (scp.stderr) {
-				scp.stderr.on('data', (data) => {
-					stderr += data.toString();
-				});
-			}
+			scp.stderr.on('data', (data) => {
+				stderr += data.toString();
+			});
 
 			scp.on('close', (code) => {
 				if (code === 0) {
@@ -343,7 +263,7 @@ export class SftpConnectService {
 				} else {
 					finish(
 						new Error(
-							`scp failed with code ${code}\nCMD: ${fullCmd}\nstdout: ${stdout}\nstderr: ${stderr}`,
+							`scp failed with code ${code}\nstdout: ${stdout}\nstderr: ${stderr}`,
 						),
 					);
 				}
@@ -352,7 +272,7 @@ export class SftpConnectService {
 			scp.on('error', (err) => {
 				finish(
 					new Error(
-						`Failed to start sshpass/scp: ${err.message}\nCMD: ${fullCmd}`,
+						`Failed to start sshpass/scp: ${err.message}\nstdout: ${stdout}\nstderr: ${stderr}`,
 					),
 				);
 			});
