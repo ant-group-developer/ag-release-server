@@ -2,6 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
 import { SftpMetadata } from '../sftp-configs/type/sftp-config.type';
@@ -124,7 +125,7 @@ export class SftpConnectService {
 				port: sftp.port ?? 22,
 				username: sftp.username,
 				password: sftp.password,
-				// privateKey: sftp.privateKey,
+				privateKey: sftp.privateKey,
 			});
 
 			try {
@@ -196,6 +197,7 @@ export class SftpConnectService {
 			port?: number;
 			username: string;
 			password?: string;
+			privateKey?: string | Buffer;
 		};
 		localDir: string;
 		remoteDir: string;
@@ -205,15 +207,17 @@ export class SftpConnectService {
 
 		if (!sftp.host) throw new Error('Missing sftp.host');
 		if (!sftp.username) throw new Error('Missing sftp.username');
-		if (!sftp.password) throw new Error('Missing sftp.password');
+		if (!sftp.password && !sftp.privateKey)
+			throw new Error('Missing sftp.password or sftp.privateKey');
 		if (!localDir) throw new Error('Missing localDir');
-		// if (!remoteDir) throw new Error('Missing remoteDir');
+
+		let tempKeyPath: string | null = null;
 
 		return new Promise<string>((resolve, reject) => {
-			const args = [
-				'-p',
-				sftp.password!,
-				'scp',
+			let command: string;
+			let args: string[];
+
+			const scpArgs = [
 				'-P',
 				String(port),
 				'-r',
@@ -227,7 +231,28 @@ export class SftpConnectService {
 				`${sftp.username}@${sftp.host}:${remoteDir || ''}`,
 			];
 
-			const scp = spawn('sshpass', args, {
+			if (sftp.privateKey) {
+				const cleanKey =
+					typeof sftp.privateKey === 'string'
+						? sftp.privateKey
+								.replace(/\\n/g, '\n')
+								.replace(/\r/g, '')
+								.trim() + '\n'
+						: sftp.privateKey;
+
+				tempKeyPath = path.join(os.tmpdir(), `sftp_key_${Date.now()}`);
+				fs.writeFileSync(tempKeyPath, cleanKey, {
+					mode: 0o600,
+				});
+
+				command = 'scp';
+				args = ['-i', tempKeyPath, ...scpArgs];
+			} else {
+				command = 'sshpass';
+				args = ['-p', sftp.password!, 'scp', ...scpArgs];
+			}
+
+			const scp = spawn(command, args, {
 				stdio: ['ignore', 'pipe', 'pipe'],
 			});
 
@@ -235,15 +260,21 @@ export class SftpConnectService {
 			let stderr = '';
 			let done = false;
 
+			const cleanup = () => {
+				if (tempKeyPath && fs.existsSync(tempKeyPath)) {
+					fs.unlinkSync(tempKeyPath);
+				}
+			};
+
 			const finish = (error?: Error, result?: string) => {
 				if (done) return;
 				done = true;
 				clearTimeout(timer);
+				cleanup();
 				if (error) reject(error);
 				else resolve(result ?? stdout);
 			};
 
-			// Timeout để tránh hang vô thời hạn
 			const timer = setTimeout(() => {
 				scp.kill('SIGKILL');
 				finish(new Error(`scp timed out after ${timeoutMs}ms`));
@@ -272,7 +303,7 @@ export class SftpConnectService {
 			scp.on('error', (err) => {
 				finish(
 					new Error(
-						`Failed to start sshpass/scp: ${err.message}\nstdout: ${stdout}\nstderr: ${stderr}`,
+						`Failed to start scp: ${err.message}\nstdout: ${stdout}\nstderr: ${stderr}`,
 					),
 				);
 			});
