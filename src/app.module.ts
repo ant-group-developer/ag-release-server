@@ -16,6 +16,7 @@ import { AudioFileModule } from './modules/audio-file/audio-file.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
+import { BatchImportModule } from './modules/batch-import/batch-import.module';
 import { BucketModule } from './modules/bucket/bucket.module';
 import { CacheModule } from './modules/cache/cache.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
@@ -160,6 +161,8 @@ import { UserModule } from './modules/user/user.module';
 		ExcelModule,
 
 		ErnModule,
+
+		BatchImportModule,
 	],
 	controllers: [AppController],
 	providers: [
