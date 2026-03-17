@@ -23,7 +23,7 @@ export class CountryService implements OnModuleInit {
 	) {}
 
 	async onModuleInit() {
-		await this.initData();
+		// await this.initData();
 	}
 
 	async initData() {

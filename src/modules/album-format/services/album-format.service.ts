@@ -27,7 +27,7 @@ export class AlbumFormatService implements OnModuleInit {
 
 	// init data
 	async onModuleInit() {
-		await this.initializeData();
+		// await this.initializeData();
 	}
 
 	private async initializeData() {
