@@ -255,7 +255,7 @@ export class ReleaseDraftService {
 	}
 
 	async getErrorsSchemaReleasesFromSftp(releases: any[]) {
-		console.log(JSON.stringify(releases));
+		// console.log(JSON.stringify(releases));
 		const maps = await this.buildLookupMaps();
 
 		const success: string[] = [];
@@ -413,7 +413,7 @@ export class ReleaseDraftService {
 		});
 
 		const mappedTracks: Track[] = (r.tracks ?? []).map((trackRaw) => {
-			console.log(trackRaw);
+			// console.log(trackRaw);
 			const track = new Track();
 
 			const trackPrimaryGenreId = getId(
@@ -670,7 +670,7 @@ export class ReleaseDraftService {
 	}
 
 	async importReleases(payloads: ReleaseRawSftp[]) {
-		console.log(JSON.stringify(payloads));
+		// console.log(JSON.stringify(payloads));
 
 		const maps = await this.buildLookupMaps();
 
@@ -737,7 +737,7 @@ export class ReleaseDraftService {
 			ids,
 		};
 
-		console.log(result);
+		// console.log(result);
 		return result;
 	}
 

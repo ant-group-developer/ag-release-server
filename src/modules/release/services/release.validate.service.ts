@@ -200,7 +200,7 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
-		console.log(release);
+		// console.log(release);
 
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
@@ -211,7 +211,7 @@ export class ReleaseValidateService {
 			result.push(...this.validateTracks(release.tracks));
 		}
 
-		console.log(result);
+		// console.log(result);
 
 		return result;
 	}
