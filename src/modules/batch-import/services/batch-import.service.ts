@@ -174,9 +174,7 @@ export class BatchImportService {
 				.findOne({ where: { name: tenantCode } });
 
 			if (!tenant) {
-				throw new Error(
-					`Tenant not found for code "${tenantCode}"`,
-				);
+				throw new Error(`Tenant not found for code "${tenantCode}"`);
 			}
 
 			const maps = await this.buildLookupMaps();
@@ -322,8 +320,7 @@ export class BatchImportService {
 
 					for (const tc of t.trackContributors) {
 						const artistId = artistIdMap.get(tc.artistName);
-						const artistRoleId =
-							maps.artistRole.get(tc.roleCode);
+						const artistRoleId = maps.artistRole.get(tc.roleCode);
 						if (!artistId || !artistRoleId) continue;
 						tc.entity.trackId = trackId;
 						tc.entity.artistId = artistId;
@@ -339,9 +336,7 @@ export class BatchImportService {
 							.extname(t.audioStorageKey)
 							.replace('.', '');
 						const fileEntity = new FileEntity();
-						fileEntity.fileName = path.basename(
-							t.audioStorageKey,
-						);
+						fileEntity.fileName = path.basename(t.audioStorageKey);
 						fileEntity.key = t.audioStorageKey;
 						fileEntity.contentType =
 							ext === 'wav'
