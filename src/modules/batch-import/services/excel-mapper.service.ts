@@ -16,26 +16,12 @@ import { TrackContributor } from 'src/modules/track-contributor/entities/track-c
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { DataSource, EntityManager } from 'typeorm';
-
-/** Columns in Excel that map to contributor roles (looked up by artist_roles.code) */
-const CONTRIBUTOR_ROLE_COLUMNS = [
-	'Track-Featured-Artist',
-	'Composer',
-	'Lyricist',
-	'Music-Producer',
-	'Remixer',
-	'Arranger',
-	'Actor',
-	'Playback-Singer',
-	'Film-Director',
-	'Music-Director',
-	'Conductor',
-	'Soloist',
-	'Orchestra',
-] as const;
-
-/** Release-level contributor columns */
-const RELEASE_CONTRIBUTOR_COLUMNS = ['Album-Featured-Artist'] as const;
+import {
+	EXCEL_COLUMNS as C,
+	COLUMN_TO_ROLE_CODE,
+	CONTRIBUTOR_ROLE_COLUMNS,
+	RELEASE_CONTRIBUTOR_COLUMNS,
+} from '../constants/excel-columns.constant';
 
 export interface ExcelLookupMaps {
 	albumFormat: Map<string, string>; // name → id
@@ -69,28 +55,28 @@ export class ExcelMapperService {
 
 		// --- Release ---
 		const release = new Release();
-		release.upc = this.str(firstRow['UPC']);
-		release.title = this.str(firstRow['Album-Title']) || releaseFolder;
-		release.version = this.str(firstRow['Album-SubTitle']) || null;
+		release.upc = this.str(firstRow[C.UPC]);
+		release.title = this.str(firstRow[C.ALBUM_TITLE]) || releaseFolder;
+		release.version = this.str(firstRow[C.ALBUM_SUBTITLE]) || null;
 		release.albumFormatId =
-			maps.albumFormat.get(this.str(firstRow['Release-Type']) || '') ||
+			maps.albumFormat.get(this.str(firstRow[C.RELEASE_TYPE]) || '') ||
 			'';
 		release.primaryGenreId =
-			maps.genre.get(this.str(firstRow['Genre']) || '') || null;
+			maps.genre.get(this.str(firstRow[C.GENRE]) || '') || null;
 		release.labelId =
-			maps.label.get(this.str(firstRow['Label']) || '') || null;
-		release.catalogId = this.str(firstRow['Catalog-Number']) || null;
+			maps.label.get(this.str(firstRow[C.LABEL]) || '') || null;
+		release.catalogId = this.str(firstRow[C.CATALOG_NUMBER]) || null;
 		release.status = ReleaseStatus.DRAFT;
 
 		// C-Line
-		const cLine = this.parseCPLine(this.str(firstRow['C-Line']));
+		const cLine = this.parseCPLine(this.str(firstRow[C.C_LINE]));
 		release.cLineYear = cLine.year;
 		release.cLineOwner = cLine.owner;
 
 		// Release date
-		const releaseDateStr = this.str(firstRow['Release-Date']);
+		const releaseDateStr = this.str(firstRow[C.RELEASE_DATE]);
 		release.releaseDate = releaseDateStr ? new Date(releaseDateStr) : null;
-		release.releaseTime = this.str(firstRow['Release-Date-Time']) || null;
+		release.releaseTime = this.str(firstRow[C.RELEASE_DATE_TIME]) || null;
 
 		// metadataCi
 		release.metadataCi = {
@@ -101,7 +87,7 @@ export class ExcelMapperService {
 
 		// --- Release Territory ---
 		const releaseTerritory = new ReleaseTerritory();
-		const territory = this.str(firstRow['Territory-Availability']);
+		const territory = this.str(firstRow[C.TERRITORY_AVAILABILITY]);
 		releaseTerritory.distributeWorldwide =
 			territory?.toUpperCase() === 'WW';
 
@@ -113,7 +99,7 @@ export class ExcelMapperService {
 			artistName: string;
 			entity: ReleaseArtist;
 		}[] = [];
-		const mainArtistName = this.str(firstRow['Album-Main-Artist']);
+		const mainArtistName = this.str(firstRow[C.ALBUM_MAIN_ARTIST]);
 		if (mainArtistName) {
 			const ra = new ReleaseArtist();
 			ra.addArtistToTracks = true;
@@ -132,8 +118,7 @@ export class ExcelMapperService {
 
 			const rc = new ReleaseContributor();
 			rc.addContributorToTracks = false;
-			// Map column name to artist_role code
-			const roleCode = this.columnToRoleCode(col);
+			const roleCode = COLUMN_TO_ROLE_CODE[col] || col;
 			releaseContributors.push({
 				artistName: name,
 				roleCode,
@@ -143,7 +128,7 @@ export class ExcelMapperService {
 
 		// --- Publisher → DSP Delivery ---
 		const dspDeliveries: ReleaseDspDelivery[] = [];
-		const publisherStr = this.str(firstRow['Publisher']);
+		const publisherStr = this.str(firstRow[C.PUBLISHER]);
 		if (publisherStr) {
 			const codes = publisherStr.split('|').map((s) => s.trim());
 			for (const code of codes) {
@@ -179,23 +164,23 @@ export class ExcelMapperService {
 
 			const track = new Track();
 			track.id = nanoid(10);
-			track.title = this.str(row['Track-Title']) || `Track ${i + 1}`;
-			track.version = this.str(row['Track-SubTitle']) || null;
-			track.isrc = this.str(row['ISRC']) || null;
-			track.iswc = this.str(row['ISWC']) || null;
-			track.order = Number(row['Track-Number']) || i + 1;
+			track.title = this.str(row[C.TRACK_TITLE]) || `Track ${i + 1}`;
+			track.version = this.str(row[C.TRACK_SUBTITLE]) || null;
+			track.isrc = this.str(row[C.ISRC]) || null;
+			track.iswc = this.str(row[C.ISWC]) || null;
+			track.order = Number(row[C.TRACK_NUMBER]) || i + 1;
 
 			// P-Line
-			const pLine = this.parseCPLine(this.str(row['P-Line']));
+			const pLine = this.parseCPLine(this.str(row[C.P_LINE]));
 			track.pLineYear = pLine.year;
 			track.pLineOwner = pLine.owner;
 
 			// Genre (same lookup as release)
 			track.primaryGenreId =
-				maps.genre.get(this.str(row['Genre']) || '') || null;
+				maps.genre.get(this.str(row[C.GENRE]) || '') || null;
 
 			// Parental-Warning → TrackSensitive
-			const parentalWarning = this.str(row['Parental-Warning']);
+			const parentalWarning = this.str(row[C.PARENTAL_WARNING]);
 			if (parentalWarning) {
 				track.trackSensitiveId =
 					maps.trackSensitive.get(parentalWarning) || null;
@@ -204,7 +189,7 @@ export class ExcelMapperService {
 			// --- Track Language ---
 			const trackLanguage = new TrackLanguage();
 			trackLanguage.trackId = track.id;
-			const langName = this.str(row['Language-Of-Performance']);
+			const langName = this.str(row[C.LANGUAGE_OF_PERFORMANCE]);
 			if (langName) {
 				trackLanguage.audioLanguageId =
 					maps.language.get(langName) || null;
@@ -215,7 +200,7 @@ export class ExcelMapperService {
 				artistName: string;
 				entity: TrackArtist;
 			}[] = [];
-			const trackMainArtist = this.str(row['Track-Main-Artist']);
+			const trackMainArtist = this.str(row[C.TRACK_MAIN_ARTIST]);
 			if (trackMainArtist) {
 				const ta = new TrackArtist();
 				ta.trackId = track.id;
@@ -239,7 +224,7 @@ export class ExcelMapperService {
 				const tc = new TrackContributor();
 				tc.trackId = track.id;
 				tc.isFromTrackAction = true;
-				const roleCode = this.columnToRoleCode(col);
+				const roleCode = COLUMN_TO_ROLE_CODE[col] || col;
 				trackContributors.push({
 					artistName: name,
 					roleCode,
@@ -249,7 +234,7 @@ export class ExcelMapperService {
 
 			// --- AudioFile (duration from Track-Length) ---
 			let audioFile: AudioFile | null = null;
-			const trackLength = this.str(row['Track-Length']);
+			const trackLength = this.str(row[C.TRACK_LENGTH]);
 			const isrc = track.isrc;
 
 			// Find matching storage key for this track's audio
@@ -358,29 +343,6 @@ export class ExcelMapperService {
 			);
 		}
 		return parseInt(value, 10) || 0;
-	}
-
-	/**
-	 * Map Excel column name to artist_roles.code
-	 */
-	private columnToRoleCode(column: string): string {
-		const mapping: Record<string, string> = {
-			'Album-Featured-Artist': 'Featured',
-			'Track-Featured-Artist': 'Featured',
-			Composer: 'Composer',
-			Lyricist: 'Lyricist',
-			'Music-Producer': 'Music Producer',
-			Remixer: 'Remixer',
-			Arranger: 'Arranger',
-			Actor: 'Actor',
-			'Playback-Singer': 'Playback Singer',
-			'Film-Director': 'Film Director',
-			'Music-Director': 'Music Director',
-			Conductor: 'Conductor',
-			Soloist: 'Soloist',
-			Orchestra: 'Orchestra',
-		};
-		return mapping[column] || column;
 	}
 
 	private str(value: unknown): string | null {
