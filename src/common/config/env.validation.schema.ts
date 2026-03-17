@@ -53,4 +53,16 @@ export const envValidationSchema = Joi.object({
 	// ===== GRPC =====
 	GRPC_UPC_URL: Joi.string().required(),
 	GRPC_ISRC_URL: Joi.string().required(),
+
+	// R2 Storage
+	R2_ENDPOINT: Joi.string().optional(),
+	R2_ACCESS_KEY_ID: Joi.string().optional(),
+	R2_SECRET_ACCESS_KEY: Joi.string().optional(),
+	R2_PUBLIC_BUCKET: Joi.string().optional(),
+	R2_PROTECTED_BUCKET: Joi.string().optional(),
+	R2_PUBLIC_BASE_URL: Joi.string().optional(),
+	R2_PRIVATE_BASE_URL: Joi.string().optional(),
+
+	// Internal API Key
+	INTERNAL_API_KEY: Joi.string().optional(),
 });
