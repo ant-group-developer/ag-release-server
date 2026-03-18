@@ -9,10 +9,11 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
+import { PartialTestConnectionDto } from '../distribution/sftp-configs/type/sftp-config.type';
 import { DspMessageCodeSuccess } from './constants/dsp.constant';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from './dto/dsp.dto';
 import { Dsp } from './entities/dsp.entity';
@@ -32,6 +33,17 @@ export class DspController {
 			...result,
 			messageCode: DspMessageCodeSuccess.CREATE,
 		});
+	}
+
+	@Post(':id/test-sftp')
+	@ApiOperation({ summary: 'test SFTP connection' })
+	async testConnectById(
+		@Param('id') id: string,
+		@Body() data: PartialTestConnectionDto,
+	) {
+		const result = await this.dspService.testConnectById({ id, data });
+
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()

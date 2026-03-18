@@ -9,6 +9,8 @@ import {
 } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
+import { PartialTestConnectionDto } from 'src/modules/distribution/sftp-configs/type/sftp-config.type';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { DspActionService } from 'src/modules/dsp-action/services/dsp-action.service';
 import { stringToCode } from 'src/utils/util';
@@ -30,6 +32,8 @@ export class DspService {
 
 		private readonly dspActionService: DspActionService,
 		private readonly eventEmitter: EventEmitter2,
+		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
+		// private readonly sftpConnectService: SftpConnectService,
 	) {}
 
 	private emitEventDdexParty() {
@@ -103,6 +107,23 @@ export class DspService {
 				messageWarning: undefined,
 			};
 		}
+	}
+
+	async testConnectById({
+		id,
+		data,
+	}: {
+		id: string;
+		data: PartialTestConnectionDto;
+	}): Promise<{
+		status: boolean;
+		latencyMs?: number;
+		error?: any;
+	}> {
+		return await this.dspRoutingConfigsService.testConnectByDspId({
+			id,
+			data,
+		});
 	}
 
 	// read

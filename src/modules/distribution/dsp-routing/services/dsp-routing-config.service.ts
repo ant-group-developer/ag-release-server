@@ -6,7 +6,10 @@ import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
 import { AggregatorsService } from '../../aggregator/services/aggregators.service';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
-import { SftpMetadata } from '../../sftp-configs/type/sftp-config.type';
+import {
+	PartialTestConnectionDto,
+	SftpMetadata,
+} from '../../sftp-configs/type/sftp-config.type';
 import { DspRoutingConfigException } from '../const/dsp-routing-config.const';
 import {
 	CreateDspRoutingConfigDto,
@@ -229,6 +232,69 @@ export class DspRoutingConfigsService {
 
 		this.decryptSecretEntity(metadata);
 		return metadata;
+	}
+
+	async resolveSftpMetadataByDspId(dspId: string): Promise<SftpMetadata> {
+		const routing = await this.repo
+			.createQueryBuilder('routing')
+			.leftJoinAndSelect('routing.sftpConfig', 'sftpConfig')
+			.leftJoinAndSelect('routing.aggregator', 'aggregator')
+			.leftJoinAndSelect('aggregator.sftpConfig', 'aggregatorSftpConfig')
+			.where('routing.dspId = :dspId', { dspId })
+			.andWhere('routing.isActive = true')
+			.getOne();
+
+		if (!routing) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		let metadata = null;
+
+		switch (routing.mode) {
+			case RoutingModeEnum.DIRECT:
+				metadata = routing.sftpConfig?.metadata ?? null;
+				break;
+
+			case RoutingModeEnum.AGGREGATOR:
+				metadata = routing.aggregator?.sftpConfig?.metadata ?? null;
+				break;
+
+			case RoutingModeEnum.SYSTEM:
+				metadata = null;
+				break;
+		}
+
+		if (!metadata) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		this.decryptSecretEntity(metadata);
+		return metadata;
+	}
+
+	async testConnectByDspId({
+		id,
+		data,
+	}: {
+		id: string;
+		data: PartialTestConnectionDto;
+	}): Promise<{
+		status: boolean;
+		latencyMs?: number;
+		error?: any;
+	}> {
+		const metadata = await this.resolveSftpMetadataByDspId(id);
+
+		const testConfig: SftpMetadata = {
+			host: data.host ?? metadata?.host ?? '',
+			port: data.port ?? metadata?.port ?? 22,
+			username: data.username ?? metadata?.username ?? '',
+			password: data.password ?? metadata?.password,
+			privateKey: metadata?.privateKey,
+			path: metadata?.path,
+		};
+
+		return this.sftpConfigsService.testConnect(testConfig);
 	}
 
 	private decryptSecretEntity(e: SftpMetadata) {

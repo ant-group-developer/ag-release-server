@@ -203,8 +203,6 @@ export class ReleaseQueryService {
 				'albumFormat.id',
 				'albumFormat.name',
 				'albumFormat.code',
-				'albumFormat.minTrackCount',
-				'albumFormat.maxTrackCount',
 			])
 			.addSelect([
 				'label.id',
@@ -537,8 +535,6 @@ export class ReleaseQueryService {
 				'albumFormat.id',
 				'albumFormat.name',
 				'albumFormat.code',
-				'albumFormat.minTrackCount',
-				'albumFormat.maxTrackCount',
 			])
 			.addSelect([
 				'releaseCoverArt.id',
