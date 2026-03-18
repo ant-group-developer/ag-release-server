@@ -396,7 +396,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				type: release.albumFormat?.code ?? 'ALBUM',
 
 				releaseDate: release.releaseDate
-					? this.formatDateYYYYMMDD(release.releaseDate)
+					? this.formatDateTime(release.releaseDate)
 					: '',
 
 				genre: release.primaryGenre?.name ?? 'Pop',
@@ -522,7 +522,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					territories,
 
 					startDate: release.releaseDate
-						? this.formatDateYYYYMMDD(release.releaseDate)
+						? this.formatDateTime(release.releaseDate)
 						: '',
 
 					commercialModels: [
@@ -561,7 +561,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					? selectedCountries
 					: ['Worldwide'];
 
-			case DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT:
+			case DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT: {
 				// Giả lập full list territories
 				const allCountries = this.countryService.getListSimpleCache();
 
@@ -573,6 +573,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				const excluded = new Set(selectedCountries);
 
 				return allTerritories.filter((code) => !excluded.has(code));
+			}
 
 			default:
 				return ['Worldwide'];
@@ -594,7 +595,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	/**
 	 * Format date to YYYY-MM-DD
 	 */
-	private formatDateYYYYMMDD(date: Date | null): string {
+	private formatDateTime(date: Date | null): string {
 		if (!date) {
 			return new Date().toISOString().split('T')[0];
 		}

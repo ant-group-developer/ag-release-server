@@ -506,9 +506,9 @@ export class Ern43Builder {
 				}
 
 				const validity = terms.ele('ValidityPeriod');
-				validity.ele('StartDateTime').txt(deal.startDate);
+				validity.ele('StartDateTime').txt(`${deal.startDate}T00:00:00`);
 				if (deal.endDate) {
-					validity.ele('EndDateTime').txt(deal.endDate);
+					validity.ele('EndDateTime').txt(`${deal.endDate}T00:00:00`);
 				}
 
 				for (const cm of deal.commercialModels) {
