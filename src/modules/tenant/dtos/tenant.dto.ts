@@ -52,6 +52,16 @@ export abstract class UpdateTenantDto {
 	name?: string;
 
 	@ApiPropertyOptional({
+		example: 'ant-music',
+		description:
+			'Unique slug code for tenant. Used as SFTP watch folder name.',
+	})
+	@IsOptional()
+	@IsString()
+	@Length(1, 50)
+	code?: string;
+
+	@ApiPropertyOptional({
 		description: 'The domain must be without http:// or https://',
 	})
 	@IsOptional()

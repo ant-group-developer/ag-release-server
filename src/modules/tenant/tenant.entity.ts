@@ -62,6 +62,15 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 	@Column({
 		length: 50,
 		nullable: true,
+		unique: true,
+		comment:
+			'Mã slug của tenant (VD: ant-music). Dùng làm tên thư mục SFTP watch.',
+	})
+	code: string;
+
+	@Column({
+		length: 50,
+		nullable: true,
 		comment: 'Domain của tenant (không bao gồm http/https)',
 	})
 	domain: string;
