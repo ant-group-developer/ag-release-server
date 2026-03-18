@@ -35,7 +35,7 @@ export const EXCEL_COLUMNS = {
 	TRACK_FEATURED_ARTIST: 'Track-Featured-Artist',
 	COMPOSER: 'Composer',
 	LYRICIST: 'Lyricist',
-	MUSIC_PRODUCER: 'Music-Producer',
+	MUSIC_PRODUCER: 'Producer',
 	REMIXER: 'Remixer',
 	ARRANGER: 'Arranger',
 	ACTOR: 'Actor',
@@ -71,11 +71,11 @@ export const RELEASE_CONTRIBUTOR_COLUMNS = [
 
 /** Column name → artist_roles.code mapping */
 export const COLUMN_TO_ROLE_CODE: Record<string, string> = {
-	[EXCEL_COLUMNS.ALBUM_FEATURED_ARTIST]: 'Featured',
-	[EXCEL_COLUMNS.TRACK_FEATURED_ARTIST]: 'Featured',
+	[EXCEL_COLUMNS.ALBUM_FEATURED_ARTIST]: 'Featured Artist',
+	[EXCEL_COLUMNS.TRACK_FEATURED_ARTIST]: 'Featured Artist',
 	[EXCEL_COLUMNS.COMPOSER]: 'Composer',
 	[EXCEL_COLUMNS.LYRICIST]: 'Lyricist',
-	[EXCEL_COLUMNS.MUSIC_PRODUCER]: 'Music Producer',
+	[EXCEL_COLUMNS.MUSIC_PRODUCER]: 'Producer',
 	[EXCEL_COLUMNS.REMIXER]: 'Remixer',
 	[EXCEL_COLUMNS.ARRANGER]: 'Arranger',
 	[EXCEL_COLUMNS.ACTOR]: 'Actor',
