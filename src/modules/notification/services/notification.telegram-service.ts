@@ -52,7 +52,7 @@ export class TelegramService implements OnModuleInit {
 			this.bot = new TelegramBot(token);
 
 			this.applyReplyPing();
-			this.sendHelloGroup();
+			// this.sendHelloGroup();
 		}
 	}
 
