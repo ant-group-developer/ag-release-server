@@ -1,4 +1,10 @@
-import { IsArray, IsNotEmpty, IsString } from 'class-validator';
+import {
+	IsArray,
+	IsNotEmpty,
+	IsObject,
+	IsOptional,
+	IsString,
+} from 'class-validator';
 
 export class CreateReleaseFromExcelDto {
 	@IsString()
@@ -24,4 +30,16 @@ export class CreateReleaseFromExcelDto {
 	@IsArray()
 	@IsNotEmpty()
 	storageKeys: string[];
+
+	@IsObject()
+	@IsOptional()
+	audioMetadata?: Record<
+		string,
+		{
+			sampleRate: number | null;
+			bitrate: number | null;
+			bitDepth: number | null;
+			duration: number | null;
+		}
+	>;
 }
