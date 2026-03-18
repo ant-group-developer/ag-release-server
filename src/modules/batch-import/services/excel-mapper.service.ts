@@ -73,6 +73,11 @@ export class ExcelMapperService {
 		release.cLineYear = cLine.year;
 		release.cLineOwner = cLine.owner;
 
+		// P-Line
+		const pLine = this.parseCPLine(this.str(firstRow[C.P_LINE]));
+		release.pLineYear = pLine.year;
+		release.pLineOwner = pLine.owner;
+
 		// Release date
 		const releaseDateStr = this.str(firstRow[C.RELEASE_DATE]);
 		release.releaseDate = releaseDateStr ? new Date(releaseDateStr) : null;
@@ -348,6 +353,6 @@ export class ExcelMapperService {
 	private str(value: unknown): string | null {
 		if (value === null || value === undefined) return null;
 		if (typeof value === 'object') return null;
-		return String(value).trim() || null;
+		return String(value as string | number | boolean).trim() || null;
 	}
 }
