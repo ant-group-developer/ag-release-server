@@ -83,7 +83,7 @@ export class BatchImportService {
 		// Validate tenant exists
 		const tenant = await this.dataSource
 			.getRepository(Tenant)
-			.findOne({ where: { name: tenantCode } });
+			.findOne({ where: { code: tenantCode } });
 
 		if (!tenant) {
 			errors.push(`Tenant not found for code "${tenantCode}"`);
@@ -172,7 +172,7 @@ export class BatchImportService {
 			// Resolve tenantCode → tenantId
 			const tenant = await this.dataSource
 				.getRepository(Tenant)
-				.findOne({ where: { name: tenantCode } });
+				.findOne({ where: { code: tenantCode } });
 
 			if (!tenant) {
 				throw new Error(`Tenant not found for code "${tenantCode}"`);
@@ -465,10 +465,10 @@ export class BatchImportService {
 			albumFormat: new Map(albumFormats.map((r) => [r.name, r.id])),
 			genre: new Map(genres.map((r) => [r.name, r.id])),
 			label: new Map(labels.map((r) => [r.name, r.id])),
-			trackSensitive: new Map(trackSensitives.map((r) => [r.code, r.id])),
-			artistRole: new Map(artistRoles.map((r) => [r.code, r.id])),
+			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
+			artistRole: new Map(artistRoles.map((r) => [r.name, r.id])),
 			language: new Map(languages.map((r) => [r.name, r.id])),
-			dsp: new Map(dsps.map((r) => [r.code, r.id])),
+			dsp: new Map(dsps.map((r) => [r.name, r.id])),
 			artist: new Map(artists.map((r) => [r.name, r.id])),
 		};
 	}
