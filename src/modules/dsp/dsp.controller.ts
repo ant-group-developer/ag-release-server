@@ -34,6 +34,17 @@ export class DspController {
 		});
 	}
 
+	// @Post(':id/test')
+	// @ApiOperation({ summary: 'test SFTP connection' })
+	// async testConnectById(
+	// 	@Param('id') id: string,
+	// 	@Body() data: PartialTestConnectionDto,
+	// ) {
+	// 	const result = await this.dspService.testConnect({ id, data });
+
+	// 	return ResponseSuccess.COMMON(result);
+	// }
+
 	@Get()
 	async getList(
 		@Query() query: QueryGetListDspDto,

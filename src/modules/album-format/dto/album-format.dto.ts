@@ -1,7 +1,6 @@
 import { PartialType } from '@nestjs/swagger';
 import {
 	IsEnum,
-	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -26,13 +25,13 @@ export class CreateAlbumFormatDto {
 	@IsNotEmpty()
 	code: string;
 
-	@IsInt()
-	@IsNotEmpty()
-	minTrackCount: number;
+	// @IsInt()
+	// @IsNotEmpty()
+	// minTrackCount: number;
 
-	@IsInt()
-	@IsNotEmpty()
-	maxTrackCount: number;
+	// @IsInt()
+	// @IsNotEmpty()
+	// maxTrackCount: number;
 }
 
 export class UpdateAlbumFormatDto extends PartialType(CreateAlbumFormatDto) {
