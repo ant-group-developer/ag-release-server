@@ -5,9 +5,9 @@ import * as fs from 'fs';
 import mime from 'mime-types';
 import pLimit from 'p-limit';
 import * as path from 'path';
-import { CreateBucketDto } from 'src/modules/bucket/dto/bucket.dto';
-import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { CreateBucketDto } from 'src/modules/bucket2/dto/bucket.dto';
+import { UploadPurpose } from 'src/modules/bucket2/enum/bucket.enum';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Country } from 'src/modules/country/entities/country.entity';
 import {
 	GENRE_MAPPING,
@@ -39,7 +39,7 @@ export class ReleaseDdexCiService {
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 
-		private readonly bucketSv: BucketService,
+		private readonly bucketSv: BucketService2,
 		private readonly sftpConfigsService: SftpConfigsService,
 		private readonly sftpConnectService: SftpConnectService,
 	) {}

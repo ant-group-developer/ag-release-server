@@ -18,12 +18,12 @@ import {
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
-import { BucketService } from '../services/bucket.service';
+import { BucketService2 } from '../services/bucket2.service';
 
 @ApiTags('GCS Upload')
-@Controller('bucket/gcs')
-export class BucketGcsController {
-	constructor(private readonly bucketService: BucketService) {}
+@Controller('bucket2')
+export class BucketController2 {
+	constructor(private readonly bucketService: BucketService2) {}
 
 	// create
 	@Post('private')
@@ -35,16 +35,6 @@ export class BucketGcsController {
 		});
 	}
 
-	@Post('private/template')
-	async createTemplate(@Body() data: CreateBucketDto) {
-		const result = await this.bucketService.createTemplate(data);
-
-		return new ResponseSuccess({
-			data: result,
-		});
-	}
-
-	// @PublicRoute()
 	@Post('private/bulk')
 	async bulkCreate(@Body() data: BulkCreateBucketDto) {
 		const result = await this.bucketService.bulkCreate(data);
@@ -94,14 +84,7 @@ export class BucketGcsController {
 			data: result,
 		});
 	}
-	@Get('private/download-template')
-	async getUrlDownTemplateFile() {
-		const result = await this.bucketService.getUrlDownTemplateFile();
 
-		return new ResponseSuccess({
-			data: result,
-		});
-	}
 	@Get('private/:id/download')
 	async getUrlDown(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.bucketService.getUrlDown(id);

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BucketModule } from '../bucket/bucket.module';
+import { BucketModule2 } from '../bucket2/bucket2.module';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
 import { DspActionModule } from '../dsp-action/dsp-action.module';
 import { DspAction } from '../dsp-action/entities/dsp-action.entities';
@@ -12,7 +12,7 @@ import { DspService } from './services/dsp.service';
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Dsp, DspAction]),
-		BucketModule,
+		BucketModule2,
 		DspActionModule,
 		DspRoutingConfigsModule,
 	],

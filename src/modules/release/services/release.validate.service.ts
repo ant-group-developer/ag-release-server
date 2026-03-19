@@ -326,6 +326,15 @@ export class ReleaseValidateService {
 			);
 		}
 
+		if (!release.releaseOriginalDate) {
+			result.push(
+				new FieldErrorDetails({
+					page: 'schedule',
+					field: 'releaseOriginalDate',
+				}),
+			);
+		}
+
 		// release territory validation
 		if (!release.releaseTerritory) {
 			result.push(

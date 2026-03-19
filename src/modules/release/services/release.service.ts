@@ -4,7 +4,7 @@ import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import {
 	CreateUpc,
@@ -52,7 +52,7 @@ export class ReleaseService {
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 
 		private readonly releaseDdexCiService: ReleaseDdexCiService,
 		private readonly releaseDdexSpotifyService: ReleaseDdexSpotifyService,

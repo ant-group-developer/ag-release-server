@@ -7,7 +7,7 @@ import { FileEntity } from '../entities/bucket.file.entity';
 import { ICreateFile } from '../interfaces/bucket.interface';
 
 @Injectable()
-export class BucketFileService {
+export class BucketFileService2 {
 	constructor(
 		@InjectRepository(FileEntity)
 		private readonly fileRepo: Repository<FileEntity>,

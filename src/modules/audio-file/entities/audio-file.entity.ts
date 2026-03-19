@@ -1,6 +1,6 @@
 import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 

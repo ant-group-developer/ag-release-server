@@ -1,13 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { pipeline } from 'stream/promises';
-import { Repository } from 'typeorm';
 import { FolderBucketMap } from '../constants/bucket.constant';
 import {
 	BulkCreateBucketDto,
@@ -17,23 +15,17 @@ import {
 } from '../dto/bucket.dto';
 import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
-import { ReleaseTemplateFile } from '../entities/release-template-file.entity';
-import { StorageProvider } from '../enum/bucket.enum';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
-import { BucketFileService } from './bucket-file.service';
-import { BucketGcsService } from './bucket-gcs.service';
+import { BucketFileService2 } from './bucket-file2.service';
 import { BucketR2Service } from './bucket-r2.service';
 
 @Injectable()
-export class BucketService {
-	private readonly logger = new Logger(BucketService.name);
+export class BucketService2 {
+	private readonly logger = new Logger(BucketService2.name);
 
 	constructor(
-		private readonly bucketGcsService: BucketGcsService,
 		private readonly bucketR2Service: BucketR2Service,
-		private readonly bucketFileService: BucketFileService,
-		@InjectRepository(ReleaseTemplateFile)
-		private readonly releaseTemplateFileRepo: Repository<ReleaseTemplateFile>,
+		private readonly bucketFileService: BucketFileService2,
 	) {}
 
 	@OnEvent(AppEvent.DELETE_LOGO)
@@ -52,7 +44,7 @@ export class BucketService {
 				fileName: generateFileNameWithTimestamp(file.fileName),
 			});
 
-		const bucket = this.bucketGcsService.getBucketName({ isPublic: false });
+		const bucket = this.bucketR2Service.getBucketName({ isPublic: false });
 
 		const newFile = await this.bucketFileService.create({
 			...file,
@@ -60,9 +52,7 @@ export class BucketService {
 			bucket,
 		});
 
-		const urlUpload = await this.getStorageService(
-			file.storageProvider!,
-		).getSignedUrlUpload({
+		const urlUpload = await this.bucketR2Service.getSignedUrlUpload({
 			contentType: newFile.contentType,
 			key: keyBucket,
 			isPublic: false,
@@ -75,24 +65,12 @@ export class BucketService {
 		};
 	}
 
-	async createTemplate(data: CreateBucketDto): Promise<IResCreateBucket> {
-		const bucket = await this.create(data);
-
-		await this.releaseTemplateFileRepo.save(
-			this.releaseTemplateFileRepo.create({
-				file_id: bucket.fileId,
-			}),
-		);
-		return bucket;
-	}
-
 	async bulkCreate(data: BulkCreateBucketDto): Promise<IResCreateBucket[]> {
 		return await Promise.all(
 			data.bucketDtos.map((item) => this.create(item)),
 		);
 	}
 
-	// folder
 	private getPreviousKey({
 		uploadPurpose,
 		releaseId,
@@ -118,7 +96,7 @@ export class BucketService {
 		const fileDb = await this.bucketFileService.findOne(id);
 		const { bucket, key, isSubmitted } = fileDb;
 
-		await this.bucketGcsService.findOne({
+		await this.bucketR2Service.findOne({
 			bucketName: bucket,
 			key,
 		});
@@ -150,7 +128,7 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key } = file;
 
-		return this.getStorageService(file.storageProvider).getSignedUrlRead({
+		return this.bucketR2Service.getSignedUrlRead({
 			key,
 			isPublic: false,
 		});
@@ -160,27 +138,11 @@ export class BucketService {
 		const file = await this.bucketFileService.findOne(id);
 		const { key, fileName } = file;
 
-		return this.getStorageService(file.storageProvider).getSignedUrlDown({
+		return this.bucketR2Service.getSignedUrlDown({
 			key,
 			isPublic: false,
 			fileName,
 		});
-	}
-
-	async getUrlDownTemplateFile() {
-		const [template] = await this.releaseTemplateFileRepo.find({
-			relations: ['file'],
-			order: {
-				createdAt: 'DESC',
-			},
-			take: 1,
-		});
-
-		if (!template || !template.file) {
-			throw new Error('Template file not found');
-		}
-
-		return await this.getUrlDown(template.file.id);
 	}
 
 	async getDetail(id: string) {
@@ -190,9 +152,7 @@ export class BucketService {
 			...file,
 			urlPublic: this.getUrlPublic(file.key),
 			urlPrivate: this.getUrlPrivate(file.key),
-			urlRead: await this.getStorageService(
-				file.storageProvider,
-			).getSignedUrlRead({
+			urlRead: await this.bucketR2Service.getSignedUrlRead({
 				key: file.key,
 				isPublic: false,
 			}),
@@ -200,11 +160,11 @@ export class BucketService {
 	}
 
 	private getUrlPublic(key: string) {
-		return `${this.bucketGcsService.getBaseUrlPublic()}/${key}`;
+		return `${this.bucketR2Service.getBaseUrlPublic()}/${key}`;
 	}
 
 	private getUrlPrivate(key: string) {
-		return `${this.bucketGcsService.getBaseUrlPrivate()}/${key}`;
+		return `${this.bucketR2Service.getBaseUrlPrivate()}/${key}`;
 	}
 
 	async getFileBuffer(fileId: string): Promise<{
@@ -213,14 +173,13 @@ export class BucketService {
 	}> {
 		const fileDb = await this.bucketFileService.findOne(fileId);
 
-		const fileGcs = await this.bucketGcsService.findOne({
+		const fileBuffer = await this.bucketR2Service.getObjectBuffer({
 			bucketName: fileDb.bucket,
 			key: fileDb.key,
 		});
 
-		const [contents] = await fileGcs.download();
 		return {
-			fileBuffer: contents,
+			fileBuffer,
 			fileDb,
 		};
 	}
@@ -239,36 +198,29 @@ export class BucketService {
 		destFolder: string;
 		errors: Array<{ key: string; error: string }>;
 	}> {
-		// 1. Lấy metadata từ DB
 		const filesDb = await this.bucketFileService.getFilesByPrefix({
 			prefix,
 		});
 
-		if (filesDb.length === 0) {
-			throw new Error(`No files found with prefix: ${prefix}`);
-		}
-
-		// 2. Map key -> FileEntity
 		const dbMap = new Map<string, FileEntity>();
 		filesDb.forEach((f) => {
 			dbMap.set(f.key, f);
 		});
 
-		// 3. Lấy files từ GCS
-		const filesGcs = await this.bucketGcsService.getFilesByPrefix({
+		const bucketName = this.bucketR2Service.getBucketName({ isPublic });
+
+		const filesBucket = await this.bucketR2Service.getFilesByPrefix({
 			prefix,
 			isPublic,
 		});
 
-		// 4. Tạo thư mục đích
 		await fs.promises.mkdir(destFolder, { recursive: true });
 
 		let downloadedCount = 0;
 		let failedCount = 0;
 		const errors: Array<{ key: string; error: string }> = [];
 
-		// 5. Download từng file
-		for (const { key, file } of filesGcs) {
+		for (const { key } of filesBucket) {
 			try {
 				const fileDb = dbMap.get(key);
 				if (!fileDb) {
@@ -277,7 +229,6 @@ export class BucketService {
 					continue;
 				}
 
-				// Tính relative path
 				let relativePath = key.startsWith(prefix)
 					? key.substring(prefix.length)
 					: key;
@@ -286,7 +237,6 @@ export class BucketService {
 					relativePath = relativePath.substring(1);
 				}
 
-				// Thay tên file gốc nếu có
 				if (fileDb.fileName) {
 					const pathParts = relativePath.split('/');
 					pathParts[pathParts.length - 1] = fileDb.fileName;
@@ -296,11 +246,13 @@ export class BucketService {
 				const fullPath = path.join(destFolder, relativePath);
 				const dir = path.dirname(fullPath);
 
-				// Tạo thư mục cha
 				await fs.promises.mkdir(dir, { recursive: true });
 
-				// Download file
-				const stream = file.createReadStream();
+				const stream = await this.bucketR2Service.getObjectStream({
+					bucketName,
+					key,
+				});
+
 				const writeStream = fs.createWriteStream(fullPath);
 				await pipeline(stream, writeStream);
 
@@ -341,7 +293,7 @@ export class BucketService {
 	// delete
 	async delete(id: string) {
 		const fileDb = await this.bucketFileService.findOne(id);
-		await this.bucketGcsService.deletePrivate(fileDb.key);
+		await this.bucketR2Service.deletePrivate(fileDb.key);
 
 		await this.bucketFileService.delete(id);
 	}
@@ -366,7 +318,7 @@ export class BucketService {
 			fileName,
 		});
 
-		const urlUpload = await this.bucketGcsService.getSignedUrlUpload({
+		const urlUpload = await this.bucketR2Service.getSignedUrlUpload({
 			contentType,
 			key,
 			isPublic: true,
@@ -384,12 +336,12 @@ export class BucketService {
 		const { url, isPublic, fileName } = payload;
 
 		const baseUrl = isPublic
-			? this.bucketGcsService.getBaseUrlPublic() + '/'
-			: this.bucketGcsService.getBaseUrlPrivate() + '/';
+			? this.bucketR2Service.getBaseUrlPublic() + '/'
+			: this.bucketR2Service.getBaseUrlPrivate() + '/';
 
 		const key = url.replace(baseUrl, '');
 
-		return await this.bucketGcsService.getSignedUrlDown({
+		return await this.bucketR2Service.getSignedUrlDown({
 			key,
 			isPublic,
 			fileName,
@@ -398,11 +350,11 @@ export class BucketService {
 
 	async deletePublicFile(urlPublic: string) {
 		const key = urlPublic.replace(
-			this.bucketGcsService.getBaseUrlPublic() + '/',
+			this.bucketR2Service.getBaseUrlPublic() + '/',
 			'',
 		);
 
-		return await this.bucketGcsService.getSignedUrlDown({
+		return await this.bucketR2Service.getSignedUrlDown({
 			fileName: 'backUp',
 			key,
 			isPublic: true,
@@ -415,16 +367,5 @@ export class BucketService {
 			this.logger.error(messageWarning);
 			return messageWarning ?? 'Unknown error';
 		});
-	}
-
-	private getStorageService(provider: StorageProvider) {
-		switch (provider) {
-			case StorageProvider.R2:
-				return this.bucketR2Service;
-
-			case StorageProvider.GCS:
-			default:
-				return this.bucketGcsService;
-		}
 	}
 }

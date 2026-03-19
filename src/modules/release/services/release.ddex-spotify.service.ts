@@ -6,6 +6,7 @@ import * as path from 'path';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
@@ -21,7 +22,6 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import { BucketService } from '../../bucket/services/bucket.service';
 import { Release } from '../entities/release.entity';
 import { ErnService } from './../../ern/ern.service';
 import { ReleaseQueryService } from './release.query.service';
@@ -50,7 +50,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseQuery: ReleaseQueryService,
-		private readonly bucketSv: BucketService,
+		private readonly bucket2Sv: BucketService2,
 		private readonly appConfigSv: AppConfigService,
 		private readonly dspSv: DspService,
 
@@ -103,7 +103,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		// 2. Fetch files from GCS
 		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromGCS(release);
+			await this.fetchAudioAndImageReleaseFromBucket(release);
 
 		// 3. Process and save cover image
 		await this.processCoverImageSpotify({
@@ -237,7 +237,9 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	/**
 	 * Fetch audio and image files from GCS
 	 */
-	private async fetchAudioAndImageReleaseFromGCS(release: Release): Promise<{
+	private async fetchAudioAndImageReleaseFromBucket(
+		release: Release,
+	): Promise<{
 		audioFiles: AudioFileInfo[];
 		coverImage: CoverImageInfo;
 	}> {
@@ -251,7 +253,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				continue;
 			}
 
-			const { fileBuffer, fileDb } = await this.bucketSv.getFileBuffer(
+			const { fileBuffer, fileDb } = await this.bucket2Sv.getFileBuffer(
 				track.audioFile.fileId,
 			);
 
@@ -277,7 +279,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
-			await this.bucketSv.getFileBuffer(coverArt.fileId);
+			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
 
 		this.logger.log(`[COVER_FETCHED] ${coverDb.extension}`);
 
@@ -393,7 +395,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				title: release.title ?? '',
 				version: release.version ?? undefined,
 
-				type: release.albumFormat?.code ?? 'ALBUM',
+				type: release.albumFormat?.code ?? 'Album',
 
 				releaseDate: release.releaseDate
 					? this.formatDateTime(release.releaseDate)

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Repository } from 'typeorm';
 import { Release } from '../../release/entities/release.entity';
 import { ReleaseCoverArtMessage } from '../constants/release-cover-art.constant';

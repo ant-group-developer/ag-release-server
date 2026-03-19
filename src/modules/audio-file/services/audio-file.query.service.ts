@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { AudioFile } from '../entities/audio-file.entity';

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { In, Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';
 import {
@@ -22,7 +22,7 @@ export class ArtistService {
 		@InjectRepository(Artist)
 		private readonly artistRepo: Repository<Artist>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
-import { BucketModule } from '../bucket/bucket.module';
+import { BucketModule2 } from '../bucket2/bucket2.module';
 import { CountryModule } from '../country/country.module';
 import { Country } from '../country/entities/country.entity';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
@@ -54,7 +54,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseTerritoryModule,
 
 		TrackModule,
-		BucketModule,
+		BucketModule2,
+		BucketModule2,
 		OrmModule,
 
 		SftpConnectModule,

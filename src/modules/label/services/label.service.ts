@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { Repository } from 'typeorm';
-
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { stringToCode } from 'src/utils/util';
+import { Repository } from 'typeorm';
 import { LabelMessage } from '../constants/label.constant';
 import {
 	CreateLabelDto,
@@ -20,7 +19,7 @@ export class LabelService {
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly labelQueryService: LabelQueryService,
 	) {}
 

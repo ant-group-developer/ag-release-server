@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -11,6 +10,7 @@ import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { GENRE_MAPPING, LANGUAGE_MAPPING } from './const';
 
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
 import { ImportReleaseCiDto } from './dto';
 import {
@@ -30,7 +30,7 @@ export class FileDistributionCiService {
 		@InjectRepository(DistributionCiHistory)
 		private readonly ciHistoryRepo: Repository<DistributionCiHistory>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly sftpConnectService: SftpConnectService,
 	) {}
 
