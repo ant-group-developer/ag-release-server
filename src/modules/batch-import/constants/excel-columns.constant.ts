@@ -27,9 +27,13 @@ export const EXCEL_COLUMNS = {
 	TRACK_NUMBER: 'Track-Number',
 	P_LINE: 'P-Line',
 	PARENTAL_WARNING: 'Parental-Warning',
-	LANGUAGE_OF_PERFORMANCE: 'Language-Of-Performance',
+	METADATA_LANGUAGE: 'Metadata language',
+	METADATA_LANGUAGE_COUNTRY: 'Metadata language country',
+	AUDIO_LANGUAGE: 'Audio language',
 	TRACK_MAIN_ARTIST: 'Track-Main-Artist',
 	TRACK_LENGTH: 'Track-Length',
+	TRACK_SAMPLE_LENGTH: 'Track Sample length',
+	TRACK_HOOK: 'Track Hook',
 
 	// ─── Contributor Columns (Track-Level) ───────────────────────────
 	TRACK_FEATURED_ARTIST: 'Track-Featured-Artist',
