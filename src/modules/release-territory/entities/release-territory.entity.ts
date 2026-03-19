@@ -34,7 +34,8 @@ export class ReleaseTerritory extends BaseUUIDEntity {
 		type: 'uuid',
 		array: true,
 		nullable: true,
-		comment: 'Danh sách quốc gia được chọn để phân phối',
+		comment:
+			'Danh sách quốc gia được chọn: phân phối tại (ONLY_IN) hoặc loại trừ (EVERYWHERE_EXCEPT)',
 	})
 	selectedCountries: string[] | null;
 

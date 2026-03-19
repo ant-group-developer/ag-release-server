@@ -9,6 +9,7 @@ import { ReleaseContributor } from 'src/modules/release-contributor/entities/rel
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
+import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -32,6 +33,10 @@ export interface ExcelLookupMaps {
 	language: Map<string, string>; // name → id
 	dsp: Map<string, string>; // code → id
 	artist: Map<string, string>; // name → id
+	country: Map<string, string>; // iso2 → id
+	countryByName: Map<string, string>; // name → id
+	defaultTrackTypeId: string | null;
+	defaultTrackOriginTypeId: string | null;
 }
 
 @Injectable()
@@ -50,6 +55,15 @@ export class ExcelMapperService {
 		maps: ExcelLookupMaps,
 		batchId: string,
 		releaseFolder: string,
+		audioMetadata?: Record<
+			string,
+			{
+				sampleRate: number | null;
+				bitrate: number | null;
+				bitDepth: number | null;
+				duration: number | null;
+			}
+		>,
 	) {
 		const firstRow = excelData[0];
 
@@ -93,22 +107,55 @@ export class ExcelMapperService {
 		// --- Release Territory ---
 		const releaseTerritory = new ReleaseTerritory();
 		const territory = this.str(firstRow[C.TERRITORY_AVAILABILITY]);
-		releaseTerritory.distributeWorldwide =
-			territory?.toUpperCase() === 'WW';
+		const isWorldwide = territory?.toUpperCase() === 'WW';
+		releaseTerritory.distributeWorldwide = isWorldwide;
+
+		if (!isWorldwide && territory) {
+			releaseTerritory.distributionType =
+				DistributionType.DISTRIBUTE_ONLY_IN;
+			const codes = territory
+				.split('|')
+				.map((c) => c.trim().toUpperCase());
+			releaseTerritory.selectedCountries = codes
+				.map((c) => maps.country.get(c))
+				.filter((id): id is string => !!id);
+		}
 
 		// --- Release Language ---
 		const releaseLanguage = new ReleaseLanguage();
+		const relMetaLang = this.str(firstRow[C.METADATA_LANGUAGE]);
+		if (relMetaLang) {
+			releaseLanguage.metadataLanguageId =
+				maps.language.get(relMetaLang) || null;
+		}
+		const relMetaCountry = this.str(firstRow[C.METADATA_LANGUAGE_COUNTRY]);
+
+		if (relMetaCountry) {
+			releaseLanguage.metadataLanguageCountryId =
+				maps.countryByName.get(relMetaCountry) || null;
+		}
+		const relAudioLang = this.str(firstRow[C.AUDIO_LANGUAGE]);
+		if (relAudioLang) {
+			releaseLanguage.audioLanguageId =
+				maps.language.get(relAudioLang) || null;
+		}
 
 		// --- Release Artists (Main) ---
 		const releaseArtists: {
 			artistName: string;
 			entity: ReleaseArtist;
 		}[] = [];
-		const mainArtistName = this.str(firstRow[C.ALBUM_MAIN_ARTIST]);
-		if (mainArtistName) {
-			const ra = new ReleaseArtist();
-			ra.addArtistToTracks = true;
-			releaseArtists.push({ artistName: mainArtistName, entity: ra });
+		const mainArtistRaw = this.str(firstRow[C.ALBUM_MAIN_ARTIST]);
+		if (mainArtistRaw) {
+			const names = mainArtistRaw
+				.split('|')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			for (const name of names) {
+				const ra = new ReleaseArtist();
+				ra.addArtistToTracks = true;
+				releaseArtists.push({ artistName: name, entity: ra });
+			}
 		}
 
 		// --- Release Contributors (Featured) ---
@@ -118,17 +165,23 @@ export class ExcelMapperService {
 			entity: ReleaseContributor;
 		}[] = [];
 		for (const col of RELEASE_CONTRIBUTOR_COLUMNS) {
-			const name = this.str(firstRow[col]);
-			if (!name) continue;
+			const raw = this.str(firstRow[col]);
+			if (!raw) continue;
 
-			const rc = new ReleaseContributor();
-			rc.addContributorToTracks = false;
 			const roleCode = COLUMN_TO_ROLE_CODE[col] || col;
-			releaseContributors.push({
-				artistName: name,
-				roleCode,
-				entity: rc,
-			});
+			const names = raw
+				.split('|')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			for (const name of names) {
+				const rc = new ReleaseContributor();
+				rc.addContributorToTracks = false;
+				releaseContributors.push({
+					artistName: name,
+					roleCode,
+					entity: rc,
+				});
+			}
 		}
 
 		// --- Publisher → DSP Delivery ---
@@ -174,6 +227,8 @@ export class ExcelMapperService {
 			track.isrc = this.str(row[C.ISRC]) || null;
 			track.iswc = this.str(row[C.ISWC]) || null;
 			track.order = Number(row[C.TRACK_NUMBER]) || i + 1;
+			track.trackTypeId = maps.defaultTrackTypeId;
+			track.trackOriginTypeId = maps.defaultTrackOriginTypeId;
 
 			// P-Line
 			const pLine = this.parseCPLine(this.str(row[C.P_LINE]));
@@ -194,10 +249,22 @@ export class ExcelMapperService {
 			// --- Track Language ---
 			const trackLanguage = new TrackLanguage();
 			trackLanguage.trackId = track.id;
-			const langName = this.str(row[C.LANGUAGE_OF_PERFORMANCE]);
-			if (langName) {
+			const trkMetaLang = this.str(row[C.METADATA_LANGUAGE]);
+			if (trkMetaLang) {
+				trackLanguage.metadataLanguageId =
+					maps.language.get(trkMetaLang) || null;
+			}
+			const trkMetaCountry = this.str(row[C.METADATA_LANGUAGE_COUNTRY]);
+			if (trkMetaCountry) {
+				const countryId =
+					maps.countryByName.get(trkMetaCountry) || null;
+				trackLanguage.metadataLanguageCountryId = countryId;
+				trackLanguage.recordingCountryId = countryId;
+			}
+			const trkAudioLang = this.str(row[C.AUDIO_LANGUAGE]);
+			if (trkAudioLang) {
 				trackLanguage.audioLanguageId =
-					maps.language.get(langName) || null;
+					maps.language.get(trkAudioLang) || null;
 			}
 
 			// --- Track Main Artist ---
@@ -205,15 +272,21 @@ export class ExcelMapperService {
 				artistName: string;
 				entity: TrackArtist;
 			}[] = [];
-			const trackMainArtist = this.str(row[C.TRACK_MAIN_ARTIST]);
-			if (trackMainArtist) {
-				const ta = new TrackArtist();
-				ta.trackId = track.id;
-				ta.isFromTrackAction = true;
-				trackArtists.push({
-					artistName: trackMainArtist,
-					entity: ta,
-				});
+			const trackMainRaw = this.str(row[C.TRACK_MAIN_ARTIST]);
+			if (trackMainRaw) {
+				const names = trackMainRaw
+					.split('|')
+					.map((s) => s.trim())
+					.filter(Boolean);
+				for (const name of names) {
+					const ta = new TrackArtist();
+					ta.trackId = track.id;
+					ta.isFromTrackAction = true;
+					trackArtists.push({
+						artistName: name,
+						entity: ta,
+					});
+				}
 			}
 
 			// --- Track Contributors ---
@@ -223,18 +296,24 @@ export class ExcelMapperService {
 				entity: TrackContributor;
 			}[] = [];
 			for (const col of CONTRIBUTOR_ROLE_COLUMNS) {
-				const name = this.str(row[col]);
-				if (!name) continue;
+				const raw = this.str(row[col]);
+				if (!raw) continue;
 
-				const tc = new TrackContributor();
-				tc.trackId = track.id;
-				tc.isFromTrackAction = true;
 				const roleCode = COLUMN_TO_ROLE_CODE[col] || col;
-				trackContributors.push({
-					artistName: name,
-					roleCode,
-					entity: tc,
-				});
+				const names = raw
+					.split('|')
+					.map((s) => s.trim())
+					.filter(Boolean);
+				for (const name of names) {
+					const tc = new TrackContributor();
+					tc.trackId = track.id;
+					tc.isFromTrackAction = true;
+					trackContributors.push({
+						artistName: name,
+						roleCode,
+						entity: tc,
+					});
+				}
 			}
 
 			// --- AudioFile (duration from Track-Length) ---
@@ -247,11 +326,30 @@ export class ExcelMapperService {
 				? storageKeys.find((k) => k.includes(isrc))
 				: null;
 
-			if (trackLength) {
+			if (trackLength || (isrc && audioMetadata?.[isrc])) {
 				audioFile = new AudioFile();
 				audioFile.trackId = track.id;
-				audioFile.duration = this.parseTrackLength(trackLength);
-				audioFile.sampleRate = '44100';
+
+				// Use extracted metadata if available, fallback to Excel
+				const meta = isrc ? audioMetadata?.[isrc] : null;
+				audioFile.duration =
+					meta?.duration ??
+					(trackLength ? this.parseTrackLength(trackLength) : 0);
+				audioFile.sampleRate = meta?.sampleRate
+					? String(meta.sampleRate)
+					: '44100';
+				audioFile.bitrate = meta?.bitrate ?? null;
+				audioFile.bitDepth = meta?.bitDepth ?? null;
+
+				const sampleLenStr = this.str(row[C.TRACK_SAMPLE_LENGTH]);
+				if (sampleLenStr) {
+					audioFile.sampleLength =
+						this.parseTrackLength(sampleLenStr);
+				}
+				const hookStr = this.str(row[C.TRACK_HOOK]);
+				if (hookStr) {
+					audioFile.preview = this.parseTrackLength(hookStr);
+				}
 			}
 
 			tracks.push({
@@ -262,6 +360,25 @@ export class ExcelMapperService {
 				audioFile,
 				audioStorageKey: _audioStorageKey || null,
 			});
+		}
+
+		// --- Merge unique track contributors into releaseContributors ---
+		const existingKeys = new Set(
+			releaseContributors.map((rc) => `${rc.artistName}|${rc.roleCode}`),
+		);
+		for (const t of tracks) {
+			for (const tc of t.trackContributors) {
+				const key = `${tc.artistName}|${tc.roleCode}`;
+				if (existingKeys.has(key)) continue;
+				existingKeys.add(key);
+				const rc = new ReleaseContributor();
+				rc.addContributorToTracks = false;
+				releaseContributors.push({
+					artistName: tc.artistName,
+					roleCode: tc.roleCode,
+					entity: rc,
+				});
+			}
 		}
 
 		return {
