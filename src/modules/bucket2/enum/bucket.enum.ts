@@ -32,7 +32,8 @@ export enum Type {
 	WRITE = 'write',
 }
 
-export enum StorageProvider {
-	GCS = 'gcs',
-	R2 = 'r2',
-}
+// export enum StorageProvider {
+// 	GCS = 'gcs',
+// 	// MINIO = 'minio',
+// 	R2 = 'r2',
+// }

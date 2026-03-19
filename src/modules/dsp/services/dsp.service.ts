@@ -8,7 +8,7 @@ import {
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { PartialTestConnectionDto } from 'src/modules/distribution/sftp-configs/type/sftp-config.type';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
@@ -27,7 +27,7 @@ export class DspService {
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly dspQueryService: DspQueryService,
 
 		private readonly dspActionService: DspActionService,

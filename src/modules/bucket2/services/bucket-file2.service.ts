@@ -1,17 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Bucket2Exception } from '../../const/bucket2.response';
-import { FileEntity2 } from '../../entities/bucket2.entity';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { Like, Repository } from 'typeorm';
+
+import { FileEntity } from '../entities/bucket.file.entity';
+import { ICreateFile } from '../interfaces/bucket.interface';
 
 @Injectable()
 export class BucketFileService2 {
 	constructor(
-		@InjectRepository(FileEntity2)
-		private readonly fileRepo: Repository<FileEntity2>,
+		@InjectRepository(FileEntity)
+		private readonly fileRepo: Repository<FileEntity>,
 	) {}
 
-	async create(data: any) {
+	async create(data: ICreateFile) {
 		const file = this.fileRepo.create(data);
 		return await this.fileRepo.save(file);
 	}
@@ -20,20 +22,33 @@ export class BucketFileService2 {
 		const file = await this.fileRepo.findOne({ where: { id } });
 
 		if (!file) {
-			throw Bucket2Exception.NOT_FOUND();
+			throw new ResponseError({ message: 'File not found' });
 		}
 
 		return file;
+	}
+
+	async getFilesByPrefix({ prefix }: { prefix: string; isPublic?: boolean }) {
+		return this.fileRepo.find({
+			where: {
+				key: Like(`${prefix}%`),
+			},
+			order: {
+				key: 'ASC',
+			},
+		});
 	}
 
 	async update(id: string, { fileName }: { fileName: string }) {
 		const file = await this.fileRepo.findOne({ where: { id } });
 
 		if (!file) {
-			throw Bucket2Exception.NOT_FOUND();
+			throw new ResponseError({ message: 'File not found' });
 		}
 
 		await this.fileRepo.update(id, { fileName });
+
+		// return this.findOne(id);
 	}
 
 	async submit(id: string) {

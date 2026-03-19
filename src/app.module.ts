@@ -17,7 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
-import { BucketModule } from './modules/bucket/bucket.module';
+import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
@@ -116,7 +116,8 @@ import { UserModule } from './modules/user/user.module';
 		ArtistRoleModule,
 		ArtistProfileModule,
 
-		BucketModule,
+		BucketModule2,
+
 		TimezoneModule,
 
 		AppConfigModule,

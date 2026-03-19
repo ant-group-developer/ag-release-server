@@ -14,12 +14,20 @@ export class Bucket2ResponseSuccess extends AppResponseSuccess {
 	}
 }
 
-export class Bucket2Exception {
-	static NOT_FOUND() {
+export class BucketException {
+	static FILE_NOT_FOUND_IN_DB() {
 		return new ResponseError({
 			statusCode: 404,
-			message: 'File not found',
-			messageCode: 'file.message.error.notFound',
+			message: 'File not found in database',
+			messageCode: 'file.error.notFoundDb',
+		});
+	}
+
+	static FILE_NOT_FOUND_IN_STORAGE() {
+		return new ResponseError({
+			statusCode: 404,
+			message: `File not found in bucket`,
+			messageCode: 'file.error.notFoundStorate',
 		});
 	}
 }

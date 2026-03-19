@@ -5,8 +5,7 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
-import { StorageProvider } from 'src/modules/bucket/enum/bucket.enum';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
@@ -348,7 +347,7 @@ export class BatchImportService {
 						fileEntity.extension = ext;
 						fileEntity.fileSize = 0;
 						fileEntity.bucket = 'ag-music';
-						fileEntity.storageProvider = StorageProvider.R2;
+
 						const savedFile = await manager.save(
 							FileEntity,
 							fileEntity,

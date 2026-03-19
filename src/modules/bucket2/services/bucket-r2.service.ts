@@ -10,6 +10,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { Readable } from 'stream';
+import { BucketException } from '../constants/bucket.response';
 import {
 	IGetSignedUrlDown,
 	IGetSignedUrlRead,
@@ -63,16 +65,11 @@ export class BucketR2Service {
 		return isPublic ? this.publicBucketName : this.privateBucketName;
 	}
 
-	// business logic
 	async getSignedUrlUpload(data: IGetSignedUrlUpload): Promise<string> {
-		const { contentType, key, isPublic = false } = data;
+		const { key, isPublic = false } = data;
 
 		if (!key) {
 			throw new Error('Key is required');
-		}
-
-		if (!contentType) {
-			throw new Error('ContentType is required');
 		}
 
 		const bucketName = this.getBucketName({ isPublic });
@@ -80,13 +77,10 @@ export class BucketR2Service {
 		const command = new PutObjectCommand({
 			Bucket: bucketName,
 			Key: key,
-			ContentType: contentType,
-			ChecksumAlgorithm: undefined,
 		});
 
-		return await getSignedUrl(this.client, command, {
-			expiresIn: 60 * 60, // tối đa <= 604800
-			unhoistableHeaders: new Set(['x-amz-content-sha256', 'x-amz-date']),
+		return getSignedUrl(this.client, command, {
+			expiresIn: 60 * 60,
 		});
 	}
 
@@ -117,38 +111,107 @@ export class BucketR2Service {
 		return getSignedUrl(this.client, command, { expiresIn: 4 * 3600 });
 	}
 
-	async findOne({ bucketName, key }: { bucketName: string; key: string }) {
+	async findOne({
+		bucketName,
+		key,
+	}: {
+		bucketName: string;
+		key: string;
+	}): Promise<{ bucketName: string; key: string }> {
 		try {
 			await this.client.send(
-				new HeadObjectCommand({ Bucket: bucketName, Key: key }),
+				new HeadObjectCommand({
+					Bucket: bucketName,
+					Key: key,
+				}),
 			);
-		} catch {
+
+			return { bucketName, key };
+		} catch (error) {
+			throw BucketException.FILE_NOT_FOUND_IN_STORAGE();
+		}
+	}
+
+	async getObjectBuffer({
+		bucketName,
+		key,
+	}: {
+		bucketName: string;
+		key: string;
+	}): Promise<Buffer> {
+		const result = await this.client.send(
+			new GetObjectCommand({
+				Bucket: bucketName,
+				Key: key,
+			}),
+		);
+
+		if (!result.Body) {
 			throw new ResponseError({
-				message: 'File not found on Cloudflare R2',
+				message: 'File not found on R2',
 			});
 		}
 
-		return { bucketName, key };
+		const stream = result.Body as Readable;
+		const chunks: Buffer[] = [];
+
+		return new Promise((resolve, reject) => {
+			stream.on('data', (chunk) =>
+				chunks.push(
+					Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
+				),
+			);
+			stream.on('end', () => resolve(Buffer.concat(chunks)));
+			stream.on('error', reject);
+		});
+	}
+
+	async getObjectStream({
+		bucketName,
+		key,
+	}: {
+		bucketName: string;
+		key: string;
+	}): Promise<Readable> {
+		const result = await this.client.send(
+			new GetObjectCommand({
+				Bucket: bucketName,
+				Key: key,
+			}),
+		);
+
+		if (!result.Body) {
+			throw BucketException.FILE_NOT_FOUND_IN_STORAGE();
+		}
+
+		return result.Body as Readable;
 	}
 
 	async getFilesByPrefix({
 		prefix,
-		isPublic = true,
+		isPublic = false,
 	}: {
 		prefix: string;
 		isPublic?: boolean;
 	}) {
 		const bucketName = this.getBucketName({ isPublic });
 
-		const response = await this.client.send(
-			new ListObjectsV2Command({ Bucket: bucketName, Prefix: prefix }),
+		const result = await this.client.send(
+			new ListObjectsV2Command({
+				Bucket: bucketName,
+				Prefix: prefix,
+			}),
 		);
 
-		return (response.Contents ?? [])
-			.filter((obj) => obj.Key && !obj.Key.endsWith('/'))
-			.map((obj) => ({ key: obj.Key! }));
-	}
+		const files = result.Contents || [];
 
+		return files
+			.filter((f) => f.Key && !f.Key.endsWith('/'))
+			.map((f) => ({
+				key: f.Key!,
+				file: f, // metadata object (size, lastModified,...)
+			}));
+	}
 	// delete
 	async deletePublicFile(key: string) {
 		await this.findOne({ bucketName: this.publicBucketName, key });
