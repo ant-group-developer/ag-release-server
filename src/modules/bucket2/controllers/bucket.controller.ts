@@ -17,7 +17,7 @@ import {
 	CreateBucketDto,
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
-import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
+import { GeneratePublicUploadUrlDto } from '../dto/bucket.r2.dto';
 import { BucketService2 } from '../services/bucket2.service';
 
 @ApiTags('GCS Upload')

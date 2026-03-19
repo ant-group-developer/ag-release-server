@@ -18,7 +18,6 @@ import {
 } from 'src/common/dtos/common.response.dto';
 
 import { Request, Response } from 'express';
-import { AppResponseSuccess } from 'src/app.const';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import {
 	RequirePermissions,
@@ -154,9 +153,11 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, userId, dto);
+		await this.releaseService.submit(id, userId, dto);
 
-		return AppResponseSuccess.COMMON(result);
+		return new ResponseSuccess({
+			messageCode: 'common.processing',
+		});
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

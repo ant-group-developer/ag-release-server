@@ -92,7 +92,7 @@ export class ReleaseDdexCiService {
 
 		// image
 		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromGCS(release);
+			await this.fetchAudioAndImageReleaseFromBucket(release);
 
 		await this.processCoverImageCi(coverImage, releaseDir, upc);
 
@@ -240,7 +240,9 @@ export class ReleaseDdexCiService {
 	}
 
 	// private
-	private async fetchAudioAndImageReleaseFromGCS(release: Release): Promise<{
+	private async fetchAudioAndImageReleaseFromBucket(
+		release: Release,
+	): Promise<{
 		audioFiles: { buffer: Buffer; extension: string }[];
 		coverImage: { buffer: Buffer; extension: string };
 	}> {
