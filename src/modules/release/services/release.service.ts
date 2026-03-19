@@ -69,236 +69,6 @@ export class ReleaseService {
 		private readonly releaseDspDeliveryLogService: ReleaseDspDeliveryLogService,
 	) {}
 
-	async getReleaseDspDelivery(
-		releaseId: string,
-		query: ReleaseQueryDspDeliveryDto,
-	) {
-		const { keyword, status, fieldOrder, orderBy, skip, limit } = query;
-		const dsps = await this.dspRepo.find({
-			where: { isActive: true },
-			select: ['id'],
-		});
-
-		const existDeliveries = await this.releaseDspDeliveryRepo.find({
-			where: { releaseId },
-			select: ['dspId'],
-		});
-
-		const existDspIds = new Set(existDeliveries.map((d) => d.dspId));
-
-		const newRecords = dsps
-			.filter((dsp) => !existDspIds.has(dsp.id))
-			.map((dsp) => ({
-				releaseId,
-				dspId: dsp.id,
-				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
-				lastEnqueuedAt: null,
-				lastDeliveredAt: null,
-			}));
-
-		if (newRecords.length) {
-			await this.releaseDspDeliveryRepo.insert(newRecords);
-		}
-
-		const qb = this.dspRepo
-			.createQueryBuilder('dsp')
-			.leftJoin(
-				ReleaseDspDelivery,
-				'delivery',
-				'delivery.dspId = dsp.id AND delivery.releaseId = :releaseId',
-				{ releaseId },
-			)
-			.where('dsp.isActive = true');
-
-		if (keyword) {
-			qb.andWhere(
-				'(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)',
-				{
-					keyword: `%${keyword}%`,
-				},
-			);
-		}
-
-		if (status) {
-			qb.andWhere('COALESCE(delivery.status, :defaultStatus) = :status', {
-				status,
-				defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
-			});
-		}
-
-		const sortableFields: Record<string, string> = {
-			dsp_name: 'dsp.name',
-			dsp_code: 'dsp.code',
-			status: 'delivery.status',
-			lastEnqueuedAt: 'delivery.lastEnqueuedAt',
-			lastDeliveredAt: 'delivery.lastDeliveredAt',
-			createdAt: 'dsp.createdAt',
-		};
-
-		const sortField = sortableFields[fieldOrder] ?? 'dsp.createdAt';
-
-		qb.orderBy(sortField, orderBy.toUpperCase() as 'ASC' | 'DESC');
-
-		const total = await qb.clone().getCount();
-
-		qb.skip(skip).take(limit);
-
-		const raw = await qb
-			.select([
-				'dsp.id as dsp_id',
-				'dsp.name as dsp_name',
-				'dsp.code as dsp_code',
-				'dsp.picture as dsp_picture',
-				'delivery.status as delivery_status',
-				'delivery.last_enqueued_at as delivery_last_enqueued_at',
-				'delivery.last_delivered_at as delivery_last_delivered_at',
-			])
-			.getRawMany();
-
-		const items = raw.map((row) => ({
-			dsp: {
-				id: row.dsp_id,
-				name: row.dsp_name,
-				code: row.dsp_code,
-				picture: row.dsp_picture,
-			},
-			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
-			lastEnqueuedAt: row.delivery_last_enqueued_at,
-			lastDeliveredAt: row.delivery_last_delivered_at,
-		}));
-
-		return {
-			items,
-			metadata: {
-				totalItems: total,
-				totalPages: Math.ceil(total / limit),
-				page: Math.floor(skip / limit) + 1,
-				pageSize: limit,
-			},
-		};
-	}
-	// nghiệp vụ
-	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		const release = await this.releaseQueryService.findOneWithRelation(id);
-
-		if (!release.upc) {
-			await this.genUpc(id);
-		}
-
-		for (const t of release.tracks) {
-			if (!t.isrc) {
-				await this.trackService.genISRC(t.id);
-			}
-		}
-
-		// validate nonDraft
-		const errors =
-			this.releaseValidateService.getErrorsSchemaRelease(release);
-
-		if (errors.length > 0) {
-			throw new ResponseError({
-				message:
-					'Release validation failed. Please check the input data.',
-				data: errors,
-			});
-		}
-
-		const codeArray = dto.code;
-
-		// spotify
-		if (codeArray.includes('SPOTIFY')) {
-			const dspSpotify = await this.dspRepo.findOne({
-				where: { code: 'SPOTIFY' },
-			});
-
-			if (!dspSpotify) {
-				throw new ResponseError({ message: 'DSP SPOTIFY not found' });
-			}
-
-			const dspDeliveryIsExist =
-				await this.releaseDspDeliveryRepo.findOne({
-					where: {
-						releaseId: id,
-						dspId: dspSpotify.id,
-					},
-				});
-
-			if (!dspDeliveryIsExist) {
-				await this.releaseDspDeliveryRepo.save({
-					releaseId: id,
-					dspId: dspSpotify.id,
-					status: ReleaseDspStatus.PROCESSING,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: null,
-				});
-			} else {
-				await this.releaseDspDeliveryRepo.update(
-					{ releaseId: id, dspId: dspSpotify.id },
-					{
-						status: ReleaseDspStatus.PROCESSING,
-						lastEnqueuedAt: new Date(),
-						lastDeliveredAt: null,
-					},
-				);
-			}
-
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.PROCESSING,
-			});
-
-			setImmediate(async () => {
-				try {
-					await this.createAndUploadMetadataSpotify(id);
-
-					await this.releaseDspDeliveryRepo.update(
-						{ releaseId: id, dspId: dspSpotify?.id },
-						{
-							status: ReleaseDspStatus.DISTRIBUTED,
-							lastEnqueuedAt: new Date(),
-							lastDeliveredAt: new Date(),
-						},
-					);
-				} catch (error) {
-					await this.releaseDspDeliveryRepo.update(
-						{ releaseId: id, dspId: dspSpotify?.id },
-						{
-							status: ReleaseDspStatus.ISSUES,
-							lastEnqueuedAt: new Date(),
-						},
-					);
-
-					await this.releaseDspDeliveryLogService.create({
-						releaseId: id,
-						dspId: dspSpotify.id,
-						title: 'Spotify metadata processing failed',
-						content: error?.message ?? 'Unknown error',
-						level: ReleaseDspDeliveryLogLevel.ERROR,
-						metadata: {
-							stack: error?.stack,
-							step: 'createAndUploadMetadataSpotify',
-						},
-					});
-
-					this.logger.error(
-						`Spotify metadata process failed for release ${id}`,
-						error.stack,
-					);
-				}
-			});
-		}
-
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.DISTRIBUTED,
-		});
-
-		const result = await this.releaseQueryService.findOne(id);
-
-		// convert to IReleaseNonDraft
-		// return this.releaseValidateService.ensureNonDraftRelease(result);
-
-		return result;
-	}
-
 	async getOne(id: string): Promise<IReleaseDetail> {
 		const release = await this.releaseQueryService.getOneDetail(id);
 
@@ -591,6 +361,293 @@ export class ReleaseService {
 	}
 
 	// distribution
+	async getReleaseDspDelivery(
+		releaseId: string,
+		query: ReleaseQueryDspDeliveryDto,
+	) {
+		const { keyword, status, fieldOrder, orderBy, skip, limit } = query;
+		const dsps = await this.dspRepo.find({
+			where: { isActive: true },
+			select: ['id'],
+		});
+
+		const existDeliveries = await this.releaseDspDeliveryRepo.find({
+			where: { releaseId },
+			select: ['dspId'],
+		});
+
+		const existDspIds = new Set(existDeliveries.map((d) => d.dspId));
+
+		const newRecords = dsps
+			.filter((dsp) => !existDspIds.has(dsp.id))
+			.map((dsp) => ({
+				releaseId,
+				dspId: dsp.id,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				lastEnqueuedAt: null,
+				lastDeliveredAt: null,
+			}));
+
+		if (newRecords.length) {
+			await this.releaseDspDeliveryRepo.insert(newRecords);
+		}
+
+		const qb = this.dspRepo
+			.createQueryBuilder('dsp')
+			.leftJoin(
+				ReleaseDspDelivery,
+				'delivery',
+				'delivery.dspId = dsp.id AND delivery.releaseId = :releaseId',
+				{ releaseId },
+			)
+			.where('dsp.isActive = true');
+
+		if (keyword) {
+			qb.andWhere(
+				'(dsp.name ILIKE :keyword OR dsp.code ILIKE :keyword)',
+				{
+					keyword: `%${keyword}%`,
+				},
+			);
+		}
+
+		if (status) {
+			qb.andWhere('COALESCE(delivery.status, :defaultStatus) = :status', {
+				status,
+				defaultStatus: ReleaseDspStatus.NEVER_DISTRIBUTED,
+			});
+		}
+
+		const sortableFields: Record<string, string> = {
+			dsp_name: 'dsp.name',
+			dsp_code: 'dsp.code',
+			status: 'delivery.status',
+			lastEnqueuedAt: 'delivery.lastEnqueuedAt',
+			lastDeliveredAt: 'delivery.lastDeliveredAt',
+			createdAt: 'dsp.createdAt',
+		};
+
+		const sortField = sortableFields[fieldOrder] ?? 'dsp.createdAt';
+
+		qb.orderBy(sortField, orderBy.toUpperCase() as 'ASC' | 'DESC');
+
+		const total = await qb.clone().getCount();
+
+		qb.skip(skip).take(limit);
+
+		const raw = await qb
+			.select([
+				'dsp.id as dsp_id',
+				'dsp.name as dsp_name',
+				'dsp.code as dsp_code',
+				'dsp.picture as dsp_picture',
+				'delivery.status as delivery_status',
+				'delivery.last_enqueued_at as delivery_last_enqueued_at',
+				'delivery.last_delivered_at as delivery_last_delivered_at',
+			])
+			.getRawMany();
+
+		const items = raw.map((row) => ({
+			dsp: {
+				id: row.dsp_id,
+				name: row.dsp_name,
+				code: row.dsp_code,
+				picture: row.dsp_picture,
+			},
+			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
+			lastEnqueuedAt: row.delivery_last_enqueued_at,
+			lastDeliveredAt: row.delivery_last_delivered_at,
+		}));
+
+		return {
+			items,
+			metadata: {
+				totalItems: total,
+				totalPages: Math.ceil(total / limit),
+				page: Math.floor(skip / limit) + 1,
+				pageSize: limit,
+			},
+		};
+	}
+
+	// nghiệp vụ
+	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.PROCESSING,
+		});
+
+		this.processingSubmit({ id, userId, dto }).catch((_e) => {});
+
+		return { message: 'Đang được xử lý' };
+	}
+
+	async processingSubmit({
+		id,
+		userId,
+		dto,
+	}: {
+		id: string;
+		userId: string;
+		dto: SubmitReleaseDto;
+	}) {
+		// upc, isrc
+		const release = await this.releaseQueryService.findOneWithRelation(id);
+
+		if (!release.upc) {
+			await this.genUpc(id);
+		}
+
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+
+		// validate
+		const errors =
+			this.releaseValidateService.getErrorsSchemaRelease(release);
+
+		if (errors.length > 0) {
+			throw new ResponseError({
+				message:
+					'Release validation failed. Please check the input data.',
+				data: errors,
+			});
+		}
+
+		// xử lý theo từng dsp
+		const hasIssues = await this.processDsps({
+			releaseId: id,
+			codes: dto.code,
+		});
+
+		// cập nhật kết quả
+		await this.releaseRepo.update(id, {
+			status: hasIssues
+				? ReleaseStatus.ISSUES
+				: ReleaseStatus.DISTRIBUTED,
+		});
+
+		return this.releaseQueryService.findOne(id);
+	}
+
+	private async processDsps({
+		releaseId,
+		codes,
+	}: {
+		releaseId: string;
+		codes: string[];
+	}): Promise<boolean> {
+		let hasIssues = false;
+
+		for (const code of codes) {
+			try {
+				switch (code) {
+					case 'SPOTIFY':
+						await this.processSpotifyDsp(releaseId);
+						break;
+
+					default:
+						hasIssues = true;
+						this.logger.error(
+							`DSP ${code} is not supported for release ${releaseId}`,
+						);
+						break;
+				}
+			} catch (error) {
+				hasIssues = true;
+
+				this.logger.error(
+					`DSP process failed for release ${releaseId}, code: ${code}`,
+					error?.stack,
+				);
+			}
+		}
+
+		return hasIssues;
+	}
+
+	private async processSpotifyDsp(releaseId: string): Promise<void> {
+		const dspSpotify = await this.dspRepo.findOne({
+			where: { code: 'SPOTIFY' },
+		});
+
+		if (!dspSpotify) {
+			throw new ResponseError({ message: 'DSP SPOTIFY not found' });
+		}
+
+		await this.upsertReleaseDspDeliveryProcessing(releaseId, dspSpotify.id);
+
+		try {
+			//
+			await this.createAndUploadMetadataSpotify(releaseId);
+
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspSpotify.id },
+				{
+					status: ReleaseDspStatus.DISTRIBUTED,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: new Date(),
+				},
+			);
+		} catch (error) {
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspSpotify.id },
+				{
+					status: ReleaseDspStatus.ISSUES,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				},
+			);
+
+			await this.releaseDspDeliveryLogService.create({
+				releaseId,
+				dspId: dspSpotify.id,
+				title: 'Spotify metadata processing failed',
+				content: error?.message ?? 'Unknown error',
+				level: ReleaseDspDeliveryLogLevel.ERROR,
+				metadata: {
+					stack: error?.stack,
+					step: 'createAndUploadMetadataSpotify',
+				},
+			});
+
+			throw error;
+		}
+	}
+
+	private async upsertReleaseDspDeliveryProcessing(
+		releaseId: string,
+		dspId: string,
+	): Promise<void> {
+		const existed = await this.releaseDspDeliveryRepo.findOne({
+			where: {
+				releaseId,
+				dspId,
+			},
+		});
+
+		if (!existed) {
+			await this.releaseDspDeliveryRepo.save({
+				releaseId,
+				dspId,
+				status: ReleaseDspStatus.PROCESSING,
+				lastEnqueuedAt: new Date(),
+				lastDeliveredAt: null,
+			});
+			return;
+		}
+
+		await this.releaseDspDeliveryRepo.update(
+			{ releaseId, dspId },
+			{
+				status: ReleaseDspStatus.PROCESSING,
+				lastEnqueuedAt: new Date(),
+				lastDeliveredAt: null,
+			},
+		);
+	}
+
 	async parseMetadata(id: string) {
 		return await this.releaseDdexCiService.parseMetadata(id);
 	}
@@ -642,11 +699,9 @@ export class ReleaseService {
 		);
 
 		await this.createMetadataSpotifyOnServer(id);
-
 		this.logger.log(`Metadata created on server - releaseId=${id}`);
 
 		await this.uploadMetadataSpotifyToSftp(id);
-
 		this.logger.log(`Metadata uploaded to SFTP - releaseId=${id}`);
 
 		this.logger.log(

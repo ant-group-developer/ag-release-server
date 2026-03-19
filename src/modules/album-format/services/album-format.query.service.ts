@@ -134,8 +134,6 @@ export class AlbumFormatQueryService {
 				'albumFormat.id',
 				'albumFormat.name',
 				'albumFormat.code',
-				'albumFormat.minTrackCount',
-				'albumFormat.maxTrackCount',
 			])
 			.getMany();
 	}

@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
@@ -32,6 +34,11 @@ export class BatchImportController {
 
 	@Post('create-release')
 	async createRelease(@Body() dto: CreateReleaseFromExcelDto) {
+		fs.writeFileSync(
+			path.join(process.cwd(), 'debug-create-release-dto.json'),
+			JSON.stringify(dto, null, 2),
+			'utf-8',
+		);
 		const result =
 			await this.batchImportService.createReleaseFromExcel(dto);
 

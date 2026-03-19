@@ -51,8 +51,8 @@ export class TelegramService implements OnModuleInit {
 		if (token) {
 			this.bot = new TelegramBot(token);
 
-			this.applyReplyPing();
-			this.sendHelloGroup();
+			// this.applyReplyPing();
+			// this.sendHelloGroup();
 		}
 	}
 

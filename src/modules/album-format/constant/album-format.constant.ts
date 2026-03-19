@@ -2,22 +2,16 @@
 const albumType = {
 	code: 'album',
 	name: 'Album',
-	minTrackCount: 1,
-	maxTrackCount: 20,
 };
 
 const epType = {
 	code: 'ep',
 	name: 'Ep',
-	minTrackCount: 1,
-	maxTrackCount: 10,
 };
 
 const singleType = {
 	code: 'single',
 	name: 'Single',
-	minTrackCount: 1,
-	maxTrackCount: 1,
 };
 
 export const AlbumFormatDefault = [albumType, epType, singleType];

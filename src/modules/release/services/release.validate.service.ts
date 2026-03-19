@@ -219,29 +219,6 @@ export class ReleaseValidateService {
 	private validateRelease(release: Release) {
 		const result: FieldErrorDetails[] = [];
 
-		// validate release.albumFormat
-		if (release.tracks.length > release.albumFormat.maxTrackCount) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: 'maxTrackCount',
-					message: `${release.albumFormat.maxTrackCount}`,
-					messageCode: 'track.message.error.maxCountTrack',
-				}),
-			);
-		}
-
-		if (release.tracks.length < release.albumFormat.minTrackCount) {
-			result.push(
-				new FieldErrorDetails({
-					page: 'tracks',
-					field: 'minTrackCount',
-					message: `${release.albumFormat.minTrackCount}`,
-					messageCode: 'track.message.error.minCountTrack',
-				}),
-			);
-		}
-
 		if (!release.primaryGenreId) {
 			result.push(
 				new FieldErrorDetails({

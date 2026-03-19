@@ -7,12 +7,14 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
 import { StorageProvider } from 'src/modules/bucket/enum/bucket.enum';
+import { Country } from 'src/modules/country/entities/country.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
+import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -21,7 +23,9 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
+import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
+import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
@@ -83,7 +87,7 @@ export class BatchImportService {
 		// Validate tenant exists
 		const tenant = await this.dataSource
 			.getRepository(Tenant)
-			.findOne({ where: { name: tenantCode } });
+			.findOne({ where: { code: tenantCode } });
 
 		if (!tenant) {
 			errors.push(`Tenant not found for code "${tenantCode}"`);
@@ -158,6 +162,7 @@ export class BatchImportService {
 			releaseFolder,
 			excelData,
 			storageKeys,
+			audioMetadata,
 		} = dto;
 
 		const log = await this.logRepo.findOneBy({ id: logId });
@@ -172,7 +177,7 @@ export class BatchImportService {
 			// Resolve tenantCode → tenantId
 			const tenant = await this.dataSource
 				.getRepository(Tenant)
-				.findOne({ where: { name: tenantCode } });
+				.findOne({ where: { code: tenantCode } });
 
 			if (!tenant) {
 				throw new Error(`Tenant not found for code "${tenantCode}"`);
@@ -186,7 +191,12 @@ export class BatchImportService {
 				maps,
 				batchId,
 				releaseFolder,
+				audioMetadata,
 			);
+
+			// return {
+			// 	mapped,
+			// };
 
 			// Collect all unique artist names
 			const allArtistNames = new Set<string>();
@@ -253,6 +263,8 @@ export class BatchImportService {
 						catalogId: mapped.release.catalogId,
 						cLineYear: mapped.release.cLineYear,
 						cLineOwner: mapped.release.cLineOwner,
+						pLineYear: mapped.release.pLineYear,
+						pLineOwner: mapped.release.pLineOwner,
 						releaseDate: mapped.release.releaseDate,
 						releaseTime: mapped.release.releaseTime,
 						metadataCi: mapped.release.metadataCi,
@@ -359,6 +371,35 @@ export class BatchImportService {
 					}
 				}
 
+				// Save CoverArt thumbnail (original)
+				const imageExts = ['.png', '.jpg', '.jpeg'];
+				const thumbnailKey = storageKeys.find((k) =>
+					imageExts.some((e) => k.toLowerCase().endsWith(e)),
+				);
+				if (thumbnailKey) {
+					const ext = path.extname(thumbnailKey).replace('.', '');
+					const fileEntity = new FileEntity();
+					fileEntity.fileName = path.basename(thumbnailKey);
+					fileEntity.key = thumbnailKey;
+					fileEntity.contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+					fileEntity.extension = ext;
+					fileEntity.fileSize = 0;
+					fileEntity.bucket = 'ag-music';
+					fileEntity.storageProvider = StorageProvider.R2;
+					const savedFile = await manager.save(
+						FileEntity,
+						fileEntity,
+					);
+
+					const coverArt = new ReleaseCoverArt();
+					coverArt.fileId = savedFile.id;
+					coverArt.releaseId = releaseId;
+					coverArt.width = 0;
+					coverArt.height = 0;
+					coverArt.type = 'original';
+					await manager.save(ReleaseCoverArt, coverArt);
+				}
+
 				await queryRunner.commitTransaction();
 
 				log.status = BatchImportStatus.COMPLETED;
@@ -374,6 +415,7 @@ export class BatchImportService {
 					releaseId,
 					trackCount: mapped.tracks.length,
 					isUpdate,
+					mapped,
 				};
 			} catch (error) {
 				await queryRunner.rollbackTransaction();
@@ -382,6 +424,10 @@ export class BatchImportService {
 				await queryRunner.release();
 			}
 		} catch (error) {
+			console.log(
+				'🚀 ~ BatchImportService ~ createReleaseFromExcel ~ error:',
+				error,
+			);
 			const message =
 				error instanceof Error ? error.message : String(error);
 			const stack = error instanceof Error ? error.stack : undefined;
@@ -394,7 +440,7 @@ export class BatchImportService {
 				`Failed to create release "${releaseFolder}": ${message}`,
 				stack,
 			);
-			return { success: false, error: message };
+			return { success: false, error: message, stack: error };
 		}
 	}
 
@@ -450,6 +496,9 @@ export class BatchImportService {
 			languages,
 			dsps,
 			artists,
+			countries,
+			defaultTrackType,
+			defaultTrackOriginType,
 		] = await Promise.all([
 			this.dataSource.getRepository(AlbumFormat).find(),
 			this.dataSource.getRepository(Genre).find(),
@@ -459,17 +508,28 @@ export class BatchImportService {
 			this.dataSource.getRepository(Language).find(),
 			this.dataSource.getRepository(Dsp).find(),
 			this.dataSource.getRepository(Artist).find(),
+			this.dataSource.getRepository(Country).find(),
+			this.dataSource
+				.getRepository(TrackType)
+				.findOne({ where: { isDefault: true } }),
+			this.dataSource
+				.getRepository(TrackOriginType)
+				.findOne({ where: { isDefault: true } }),
 		]);
 
 		return {
 			albumFormat: new Map(albumFormats.map((r) => [r.name, r.id])),
 			genre: new Map(genres.map((r) => [r.name, r.id])),
 			label: new Map(labels.map((r) => [r.name, r.id])),
-			trackSensitive: new Map(trackSensitives.map((r) => [r.code, r.id])),
-			artistRole: new Map(artistRoles.map((r) => [r.code, r.id])),
+			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
+			artistRole: new Map(artistRoles.map((r) => [r.name, r.id])),
 			language: new Map(languages.map((r) => [r.name, r.id])),
-			dsp: new Map(dsps.map((r) => [r.code, r.id])),
+			dsp: new Map(dsps.map((r) => [r.name, r.id])),
 			artist: new Map(artists.map((r) => [r.name, r.id])),
+			country: new Map(countries.map((r) => [r.iso2, r.id])),
+			countryByName: new Map(countries.map((r) => [r.name, r.id])),
+			defaultTrackTypeId: defaultTrackType?.id || null,
+			defaultTrackOriginTypeId: defaultTrackOriginType?.id || null,
 		};
 	}
 
