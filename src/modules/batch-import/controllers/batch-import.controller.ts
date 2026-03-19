@@ -4,6 +4,9 @@ import * as path from 'path';
 import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
+	GetBatchProgressDto,
+	LogSkippedReleaseDto,
+	ReleaseStatusDto,
 	UploadCompleteDto,
 	ValidateReleaseDto,
 } from '../dto/batch-import.dto';
@@ -41,6 +44,32 @@ export class BatchImportController {
 		);
 		const result =
 			await this.batchImportService.createReleaseFromExcel(dto);
+
+		return { data: result };
+	}
+
+	@Get('release-status')
+	async getReleaseStatus(@Query() dto: ReleaseStatusDto) {
+		const status = await this.batchImportService.getReleaseStatus(
+			dto.batchId,
+			dto.releaseFolder,
+		);
+
+		return { data: status };
+	}
+
+	@Get('batch-progress')
+	async getBatchProgress(@Query() dto: GetBatchProgressDto) {
+		const progress = await this.batchImportService.getBatchProgress(
+			dto.batchId,
+		);
+
+		return { data: progress };
+	}
+
+	@Post('log-skipped')
+	async logSkippedRelease(@Body() dto: LogSkippedReleaseDto) {
+		const result = await this.batchImportService.logSkippedRelease(dto);
 
 		return { data: result };
 	}

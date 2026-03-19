@@ -7,4 +7,5 @@ export enum BatchImportStatus {
 	CREATING = 'creating',
 	COMPLETED = 'completed',
 	FAILED = 'failed',
+	SKIPPED = 'skipped',
 }

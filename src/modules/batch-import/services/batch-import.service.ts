@@ -32,6 +32,7 @@ import { EXCEL_COLUMNS } from '../constants/excel-columns.constant';
 import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
+	LogSkippedReleaseDto,
 	UploadCompleteDto,
 	ValidateReleaseDto,
 } from '../dto/batch-import.dto';
@@ -69,6 +70,66 @@ export class BatchImportService {
 		const [data, total] = await qb.getManyAndCount();
 
 		return { data, total };
+	}
+
+	/**
+	 * Get the latest status of a specific release for idempotency checks.
+	 */
+	async getReleaseStatus(
+		batchId: string,
+		releaseFolder: string,
+	): Promise<string | null> {
+		const log = await this.logRepo.findOne({
+			where: { batchId, releaseFolder },
+			order: { createdAt: 'DESC' },
+			select: ['status'],
+		});
+
+		return log?.status ?? null;
+	}
+
+	/**
+	 * Get aggregate progress for a batch.
+	 */
+	async getBatchProgress(batchId: string) {
+		const logs = await this.logRepo.find({
+			where: { batchId },
+			select: ['status'],
+		});
+
+		const total = logs.length;
+		const completed = logs.filter(
+			(l) => l.status === BatchImportStatus.COMPLETED,
+		).length;
+		const failed = logs.filter(
+			(l) =>
+				l.status === BatchImportStatus.FAILED ||
+				l.status === BatchImportStatus.VALIDATION_FAILED,
+		).length;
+		const inProgress = total - completed - failed;
+
+		return { batchId, total, completed, failed, inProgress };
+	}
+
+	/**
+	 * Log a skipped release (missing or unreadable Excel file).
+	 */
+	async logSkippedRelease(dto: LogSkippedReleaseDto) {
+		const log = this.logRepo.create({
+			tenantCode: dto.tenantCode,
+			batchId: dto.batchId,
+			releaseFolder: dto.releaseFolder,
+			status: BatchImportStatus.SKIPPED,
+			errors: [dto.reason],
+		});
+
+		const saved = await this.logRepo.save(log);
+
+		this.logger.log(
+			`Logged skipped release "${dto.releaseFolder}" in batch "${dto.batchId}": ${dto.reason}`,
+		);
+
+		return { logId: saved.id };
 	}
 
 	async validateRelease(dto: ValidateReleaseDto) {
