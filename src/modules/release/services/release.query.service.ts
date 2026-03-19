@@ -760,8 +760,18 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.label', 'label')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
+
+			// release artist
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
 			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
+			.leftJoinAndSelect(
+				'releaseArtist.artistProfiles',
+				'releaseArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'releaseArtistProfile.dsp',
+				'releaseArtistProfileDsp',
+			)
 
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')

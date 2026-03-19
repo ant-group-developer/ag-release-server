@@ -13,7 +13,7 @@ import {
 	CreateBucketDto,
 	GetUrlDownNonFile,
 } from '../dto/bucket.dto';
-import { GeneratePublicUploadUrlDto } from '../dto/bucket.gcs.dto';
+import { GeneratePublicUploadUrlDto } from '../dto/bucket.r2.dto';
 import { FileEntity } from '../entities/bucket.file.entity';
 import { IResCreateBucket } from '../interfaces/bucket.interface';
 import { BucketFileService2 } from './bucket-file2.service';

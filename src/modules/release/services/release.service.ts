@@ -6,6 +6,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import {
 	CreateUpc,
 	UpcIndustry,
@@ -543,7 +544,7 @@ export class ReleaseService {
 		for (const code of codes) {
 			try {
 				switch (code) {
-					case 'SPOTIFY':
+					case String(DspCode.SPOTIFY):
 						await this.processSpotifyDsp(releaseId);
 						break;
 

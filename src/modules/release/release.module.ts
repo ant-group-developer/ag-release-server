@@ -55,7 +55,6 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 		TrackModule,
 		BucketModule2,
-		BucketModule2,
 		OrmModule,
 
 		SftpConnectModule,

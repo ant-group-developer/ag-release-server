@@ -18,6 +18,7 @@ import { ILike, In, Repository } from 'typeorm';
 import { DspMessages } from '../constants/dsp.message';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
+import { DspCode } from '../enum/dsp.enum';
 import { DspQueryService } from './dsp.query.service';
 
 @Injectable()
@@ -333,7 +334,7 @@ export class DspService {
 	async getDdexPartySpotify() {
 		const dsp = await this.dspRepo.findOne({
 			where: {
-				code: 'SPOTIFY',
+				code: DspCode.SPOTIFY,
 			},
 		});
 

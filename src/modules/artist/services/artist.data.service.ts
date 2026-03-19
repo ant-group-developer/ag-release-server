@@ -269,8 +269,6 @@ export class ArtistDataInit {
 						if (match && !processed.has(idSource)) {
 							updates.push({
 								id: match.id,
-								spotifyId: source?.spotifyId?.value || null,
-								appleMusicId: source?.appleId?.value || null,
 								primaryGenre: source?.primaryGenre || null,
 								originCountry: source?.originCountry || null,
 								isScanned: true,

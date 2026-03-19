@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import * as crypto from 'crypto';
+
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
@@ -10,6 +12,7 @@ import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
+import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import {
 	ErnInput,
@@ -61,22 +64,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly countryService: CountryService,
 	) {}
 
-	async createErnFile({
-		releaseId,
-		outputDir,
-	}: {
-		releaseId: string;
-		outputDir: string;
-	}) {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
-		const input: ErnInput = this.parseErnInputFromRelease(release);
-		const xmlContent = this.ernService.generate(input);
-
-		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
-		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
-		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
-	}
-
 	/**
 	 * Main entry point - tạo metadata Spotify trên server
 	 */
@@ -101,7 +88,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		fs.mkdirSync(resourcesDir, { recursive: true });
 		this.logger.log(`[FOLDER_CREATED] ${releaseDir}`);
 
-		// 2. Fetch files from GCS
+		// 2. Fetch files from bucket
 		const { audioFiles, coverImage } =
 			await this.fetchAudioAndImageReleaseFromBucket(release);
 
@@ -116,7 +103,6 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		this.processAudioFilesSpotify({ audioFiles, outputDir: resourcesDir });
 
 		// 5. DDEX file
-		// await this.createDdexFile({ releaseId, outputDir: releaseDir });
 		await this.createErnFile({ releaseId, outputDir: releaseDir });
 
 		this.createManifestFile({
@@ -142,6 +128,22 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		};
 	}
 
+	async createErnFile({
+		releaseId,
+		outputDir,
+	}: {
+		releaseId: string;
+		outputDir: string;
+	}) {
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const input: ErnInput = this.parseErnInputFromRelease(release);
+		const xmlContent = this.ernService.generate(input);
+
+		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
+		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
+		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
+	}
+
 	createManifestFile({
 		batchId,
 		upc,
@@ -151,6 +153,9 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		upc: string;
 		outputRoot: string;
 	}) {
+		const xmlFilePath = path.join(outputRoot, upc, `${upc}.xml`);
+		const hash = this.getSha1Base64(xmlFilePath);
+
 		const manifest: ManifestInput = {
 			sender: {
 				partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
@@ -164,7 +169,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 			messages: [
 				{
-					messageId: '00001',
+					messageId: batchId,
 
 					url: `./${upc}/${upc}.xml`,
 
@@ -180,7 +185,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					productType: 'AudioProduct',
 
 					hashSum: {
-						value: 'TEMP_HASH',
+						value: hash,
 						algorithm: 'SHA1',
 					},
 				},
@@ -201,19 +206,22 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 	async uploadMetadataSpotifyToSftp(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		try {
+			const sftp =
+				await this.dspRoutingConfigsService.resolveSftpMetadataByDspCode(
+					DspCode.SPOTIFY,
+				);
 
-		const sftp =
-			await this.dspRoutingConfigsService.resolveSftpMetadataByDspCode(
-				'SPOTIFY',
-			);
-
-		await this.sftpConnectService.uploadFolderScp({
-			sftp,
-			localDir: release.metadataSpotify?.folderServer ?? '',
-			remoteDir: sftp.path ?? '/',
-		});
-
-		await removeFolder(release.metadataSpotify?.folderServer ?? '');
+			await this.sftpConnectService.uploadFolderScp({
+				sftp,
+				localDir: release.metadataSpotify?.folderServer ?? '',
+				remoteDir: sftp.path ?? '/',
+			});
+		} catch (error) {
+			throw new Error(error);
+		} finally {
+			await removeFolder(release.metadataSpotify?.folderServer ?? '');
+		}
 	}
 
 	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
@@ -235,7 +243,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	// ==================== FILE PROCESSING ====================
 
 	/**
-	 * Fetch audio and image files from GCS
+	 * Fetch audio and image files from bucket
 	 */
 	private async fetchAudioAndImageReleaseFromBucket(
 		release: Release,
@@ -373,7 +381,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const territories = this.getTerritoriesFromRelease(release);
 
-		return {
+		const result: ErnInput = {
 			version: '4.3',
 
 			message: {
@@ -411,6 +419,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				artists: release.releaseArtists.map((ra) => ({
 					name: ra.artist?.name ?? '',
 					role: 'MainArtist',
+					spotifyId: ra.artist.spotifyId,
+					appleMusicId: ra.artist.appleMusicId,
 				})),
 
 				parentalWarning,
@@ -536,6 +546,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				},
 			],
 		};
+
+		return result;
 	}
 
 	/**
@@ -630,5 +642,11 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	private normalizeAudioExtension(ext: string): string {
 		const normalized = ext.toLowerCase().replace(/^\./, '');
 		return `.${normalized}`;
+	}
+
+	private getSha1Base64(filePath: string): string {
+		const buffer = fs.readFileSync(filePath);
+
+		return crypto.createHash('sha1').update(buffer).digest('base64');
 	}
 }

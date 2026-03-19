@@ -124,7 +124,7 @@ export class FileDistributionCiService {
 
 			// image
 			const { audioFiles, coverImage } =
-				await this.fetchFilesFromGCS(release);
+				await this.fetchFilesFromBucket(release);
 
 			const coverPath = await this.processCoverImage(
 				coverImage,
@@ -236,7 +236,7 @@ export class FileDistributionCiService {
 	}
 
 	// ===== fetch files =====
-	private async fetchFilesFromGCS(release: Release): Promise<{
+	private async fetchFilesFromBucket(release: Release): Promise<{
 		audioFiles: { buffer: Buffer; extension: string }[];
 		coverImage: { buffer: Buffer; extension: string };
 	}> {
