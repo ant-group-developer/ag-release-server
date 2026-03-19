@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
@@ -15,6 +15,9 @@ import { CountryQueryService } from './country.query.service';
 
 @Injectable()
 export class CountryService implements OnModuleInit {
+	private readonly logger = new Logger(CountryQueryService.name);
+	private listCountriesCache: Country[];
+
 	constructor(
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
@@ -24,6 +27,7 @@ export class CountryService implements OnModuleInit {
 
 	async onModuleInit() {
 		// await this.initData();
+		await this.reloadCache();
 	}
 
 	async initData() {
@@ -35,6 +39,17 @@ export class CountryService implements OnModuleInit {
 		// }
 	}
 
+	async reloadCache() {
+		this.listCountriesCache = await this.countryRepo
+			.createQueryBuilder('c')
+			.select(['c.id', 'c.name', 'c.iso2'])
+			.getMany();
+
+		this.logger.log(
+			`Country cache loaded: ${this.listCountriesCache.length} records`,
+		);
+	}
+
 	// create
 	async create(createCountryDto: CreateCountryDto): Promise<Country> {
 		await this.countryQueryService.validate({
@@ -42,7 +57,11 @@ export class CountryService implements OnModuleInit {
 		});
 
 		const country = this.countryRepo.create(createCountryDto);
-		return await this.countryRepo.save(country);
+
+		const result = await this.countryRepo.save(country);
+
+		this.reloadCache().catch((_e) => {});
+		return result;
 	}
 
 	// read
@@ -90,6 +109,10 @@ export class CountryService implements OnModuleInit {
 		return this.countryQueryService.getListSimple();
 	}
 
+	getListSimpleCache() {
+		return this.listCountriesCache;
+	}
+
 	// update
 	async update(
 		id: string,
@@ -103,7 +126,10 @@ export class CountryService implements OnModuleInit {
 		}
 
 		await this.countryRepo.update(id, updateCountryDto);
-		return await this.findOne(id);
+		const result = await this.findOne(id);
+
+		this.reloadCache().catch((_e) => {});
+		return result;
 	}
 
 	// delete
@@ -111,5 +137,7 @@ export class CountryService implements OnModuleInit {
 		const country = await this.findOneWithCountRelation(id);
 		this.countryQueryService.validateDelete(country);
 		await this.countryRepo.delete(id);
+
+		this.reloadCache().catch((_e) => {});
 	}
 }

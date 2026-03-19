@@ -27,18 +27,6 @@ export class AlbumFormat extends BaseUserTrackedCustomIDEntity {
 	})
 	code: string;
 
-	@Column({
-		type: 'int',
-		comment: 'Số lượng track tối thiểu cho định dạng album này',
-	})
-	minTrackCount: number;
-
-	@Column({
-		type: 'int',
-		comment: 'Số lượng track tối đa cho định dạng album này',
-	})
-	maxTrackCount: number;
-
 	@OneToMany(() => Release, (release) => release.albumFormat)
 	releases: Release[];
 
