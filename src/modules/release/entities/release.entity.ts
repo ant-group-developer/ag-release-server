@@ -9,7 +9,7 @@ import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -280,4 +280,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		folderBucket: string | null;
 		folderServer: string | null;
 	} | null;
+
+	@Column({
+		type: 'text',
+		nullable: true,
+		comment: 'Nội dung chi tiết của lỗi hoặc thông tin log',
+	})
+	logs: string | null;
 }

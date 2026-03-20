@@ -16,10 +16,9 @@ import {
 	UpcYesNo,
 } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
-import { ReleaseDspDeliveryLogLevel } from 'src/modules/release-dsp-delivery-log/enum/release-dsp-delivery-log.enum';
-import { ReleaseDspDeliveryLogService } from 'src/modules/release-dsp-delivery-log/release-dsp-delivery-log.service';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
-import { ReleaseDspStatus } from 'src/modules/release-dsp/enum/release-dsp.enum';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
+import { ReleaseDspDeliveryService } from 'src/modules/release-dsp-delivery/services/release-dsp-delivery.service';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
@@ -65,9 +64,10 @@ export class ReleaseService {
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
 
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
-		private readonly releaseDspDeliveryLogService: ReleaseDspDeliveryLogService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -445,6 +445,7 @@ export class ReleaseService {
 				'delivery.status as delivery_status',
 				'delivery.last_enqueued_at as delivery_last_enqueued_at',
 				'delivery.last_delivered_at as delivery_last_delivered_at',
+				'delivery.logs as logs',
 			])
 			.getRawMany();
 
@@ -458,6 +459,7 @@ export class ReleaseService {
 			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
 			lastEnqueuedAt: row.delivery_last_enqueued_at,
 			lastDeliveredAt: row.delivery_last_delivered_at,
+			logs: row.logs,
 		}));
 
 		return {
@@ -473,13 +475,31 @@ export class ReleaseService {
 
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.PROCESSING,
+		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+
+		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+				logs: this.buildErrorLog(error),
+			});
+			this.logger.error(`Release ${id} processing failed`, error?.stack);
 		});
 
-		this.processingSubmit({ id, userId, dto }).catch((_e) => {});
-
 		return { message: 'Đang được xử lý' };
+	}
+
+	private buildErrorLog(error: any) {
+		if (error instanceof ResponseError) {
+			return JSON.stringify({
+				message: error.message,
+				data: error?.data ?? null,
+			});
+		}
+
+		return JSON.stringify({
+			message: error?.message ?? 'Unknown error',
+			stack: error?.stack ?? null,
+		});
 	}
 
 	async processingSubmit({
@@ -491,9 +511,9 @@ export class ReleaseService {
 		userId: string;
 		dto: SubmitReleaseDto;
 	}) {
-		// upc, isrc
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 
+		// gen upc, isrc
 		if (!release.upc) {
 			await this.genUpc(id);
 		}
@@ -504,7 +524,6 @@ export class ReleaseService {
 			}
 		}
 
-		// validate
 		const errors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);
 
@@ -516,18 +535,21 @@ export class ReleaseService {
 			});
 		}
 
-		// xử lý theo từng dsp
-		const hasIssues = await this.processDsps({
+		const errorsDsp = await this.processDsps({
 			releaseId: id,
 			codes: dto.code,
 		});
 
-		// cập nhật kết quả
-		await this.releaseRepo.update(id, {
-			status: hasIssues
-				? ReleaseStatus.ISSUES
-				: ReleaseStatus.DISTRIBUTED,
-		});
+		if (!errorsDsp) {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.DISTRIBUTED,
+			});
+		} else {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+				logs: errorsDsp.join(', '),
+			});
+		}
 
 		return this.releaseQueryService.findOne(id);
 	}
@@ -538,8 +560,8 @@ export class ReleaseService {
 	}: {
 		releaseId: string;
 		codes: string[];
-	}): Promise<boolean> {
-		let hasIssues = false;
+	}) {
+		const errors: string[] = [];
 
 		for (const code of codes) {
 			try {
@@ -548,15 +570,20 @@ export class ReleaseService {
 						await this.processSpotifyDsp(releaseId);
 						break;
 
-					default:
-						hasIssues = true;
-						this.logger.error(
-							`DSP ${code} is not supported for release ${releaseId}`,
-						);
+					default: {
+						const message = `DSP ${code} is not supported for release ${releaseId}`;
+
+						errors.push(`${code}: ${message}`);
+						this.logger.error(message);
 						break;
+					}
 				}
 			} catch (error) {
-				hasIssues = true;
+				const message =
+					error?.message ||
+					`DSP process failed for release ${releaseId}, code: ${code}`;
+
+				errors.push(`${code}: ${message}`);
 
 				this.logger.error(
 					`DSP process failed for release ${releaseId}, code: ${code}`,
@@ -565,7 +592,7 @@ export class ReleaseService {
 			}
 		}
 
-		return hasIssues;
+		return errors;
 	}
 
 	private async processSpotifyDsp(releaseId: string): Promise<void> {
@@ -598,20 +625,9 @@ export class ReleaseService {
 					status: ReleaseDspStatus.ISSUES,
 					lastEnqueuedAt: new Date(),
 					lastDeliveredAt: null,
+					logs: error?.message ?? 'Unknown error',
 				},
 			);
-
-			await this.releaseDspDeliveryLogService.create({
-				releaseId,
-				dspId: dspSpotify.id,
-				title: 'Spotify metadata processing failed',
-				content: error?.message ?? 'Unknown error',
-				level: ReleaseDspDeliveryLogLevel.ERROR,
-				metadata: {
-					stack: error?.stack,
-					step: 'createAndUploadMetadataSpotify',
-				},
-			});
 
 			throw error;
 		}

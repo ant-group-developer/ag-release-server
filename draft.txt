@@ -1,0 +1,10 @@
+
+
+// release dsp delivery lưu trạng thái phát hành theo từng release, có thể phát hành lại, cập nhật lại trường log mỗi lần phân phối
+// khi tạo release, chạy luôn job tạo release dsp delivery cho các dsp đang active => api bulkCreate 
+// api get list release dsp delivery
+
+// 
+
+// log release, export ci
+// mount container

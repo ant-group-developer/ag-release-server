@@ -7,7 +7,7 @@ import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
