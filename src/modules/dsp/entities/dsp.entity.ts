@@ -6,11 +6,19 @@ import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.
 import { WithUserRelations } from 'src/common/mixins/user-relations.mixin';
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspRoutingConfig } from 'src/modules/distribution/dsp-routing/entities/dsp-routing-config.entity';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 
 @Entity('dsps', {
 	comment:
@@ -32,6 +40,14 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		comment: 'Mã DSP duy nhất trong hệ thống',
 	})
 	code: string;
+
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_CODE,
+		comment: 'Mã DSP ci trong hệ thống',
+		nullable: true,
+	})
+	codeCi: string | null;
 
 	@Column({
 		type: 'varchar',
@@ -87,10 +103,16 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	artistProfiles: ArtistProfile[];
 
 	@OneToMany(() => DspAction, (dspAction) => dspAction.dsp)
-	dspActions: DspAction[] | [];
+	dspActions: DspAction[];
 
 	@OneToMany(() => TrackPolicy, (trackPolicy) => trackPolicy.dsp)
 	trackPolicies?: TrackPolicy[];
+
+	@OneToOne(
+		() => DspRoutingConfig,
+		(dspRoutingConfig) => dspRoutingConfig.dsp,
+	)
+	dspRoutingConfig: DspRoutingConfig;
 
 	releaseDspsCount?: number;
 }

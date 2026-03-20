@@ -58,7 +58,7 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	})
 	logs: string | null;
 
-	@ManyToOne(() => Release, (release) => release.releaseDsp, {
+	@ManyToOne(() => Release, (release) => release.releaseDspDeliveries, {
 		onDelete: 'CASCADE',
 	})
 	@JoinColumn({ name: 'release_id' })

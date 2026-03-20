@@ -26,6 +26,7 @@ import {
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
+import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
@@ -51,6 +52,24 @@ export class ReleaseController {
 
 		const result = await this.releaseService.getList(query);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('list-file-export-ci')
+	async getListFileExportCi(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+		@Res() res: Response,
+	) {
+		const buffer = await this.releaseService.getListFileExportCi(query);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
 	}
 
 	@SystemAdminOnly()
@@ -88,6 +107,34 @@ export class ReleaseController {
 		const result = await this.releaseService.findOneFull(id);
 
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/list-code-export-ci')
+	async listCodeExportCi(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.listCodeExportCiById(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/record-export-ci')
+	async recordExportCi(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.recordExportCiById(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/file-export-ci')
+	async getFileExportCi(@Param('id') id: string, @Res() res: Response) {
+		const buffer = await this.releaseService.getFileExportCiById(id);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
 	}
 
 	@Get(':id/download/csv-metadata')

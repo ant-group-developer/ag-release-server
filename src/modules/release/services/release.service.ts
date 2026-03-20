@@ -16,6 +16,7 @@ import {
 	UpcYesNo,
 } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
+import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release-dsp-delivery/services/release-dsp-delivery.service';
@@ -66,6 +67,8 @@ export class ReleaseService {
 
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
+		private readonly fileExportCiService: FileExportCiService,
+
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
 	) {}
@@ -83,7 +86,7 @@ export class ReleaseService {
 		};
 	}
 
-	async findOneFull(id: string): Promise<IReleaseDetail> {
+	async findOneFull(id: string) {
 		const release = await this.releaseQueryService.findOneReleaseFull(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
@@ -111,6 +114,22 @@ export class ReleaseService {
 			metadata: {
 				page,
 				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getListFull(query: QueryGetListReleaseDto) {
+		const { items, totalItems } =
+			await this.releaseQueryService.getListFull(query);
+
+		// const enhancedRelease = this.enhanceReleasesDetails(items);
+
+		return new PageDto({
+			// items: enhancedRelease,
+			items,
+			metadata: {
+				...query,
 				totalItems,
 			},
 		});
@@ -154,6 +173,51 @@ export class ReleaseService {
 		});
 	}
 
+	// file export ci
+	async listCodeExportCiById(id: string) {
+		const release = await this.releaseQueryService.findOneReleaseFull(id);
+
+		return release.listCodeExportCi;
+	}
+
+	async recordExportCiById(id: string) {
+		const { listCodeExportCi: listCodeDspCi, upc } =
+			await this.releaseQueryService.findOneReleaseFull(id);
+
+		return {
+			listCodeDspCi,
+			upc,
+		};
+	}
+
+	recordExportCi(release: Release) {
+		return {
+			listCodeDspCi: release.listCodeExportCi,
+			upc: release.upc,
+		};
+	}
+
+	async getFileExportCiById(id: string) {
+		const record = await this.recordExportCiById(id);
+
+		return await this.fileExportCiService.createFileExportCi({
+			data: [record],
+		});
+	}
+
+	async getListFileExportCi(query: QueryGetListReleaseDto2) {
+		const res = await this.getListFull(query);
+
+		const records = res.items.map((r) => this.recordExportCi(r));
+
+		const result = await this.fileExportCiService.createFileExportCi({
+			data: records,
+		});
+
+		return result;
+	}
+
+	//
 	private enhanceReleasesDetails(releases: Release[]) {
 		return releases.map((release) => {
 			const { releaseCoverArts, ...restOfRelease } = release;

@@ -12,6 +12,7 @@ import { DspModule } from '../dsp/dsp.module';
 import { Dsp } from '../dsp/entities/dsp.entity';
 import { ErnModule } from '../ern/ern.module';
 import { UpcModule } from '../external/upc/upc.module';
+import { FileExportCiModule } from '../file-export-ci/file-export-ci.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
@@ -53,6 +54,8 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
 		ReleaseDspDeliveryModule,
+
+		FileExportCiModule,
 
 		TrackModule,
 		BucketModule2,

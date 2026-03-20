@@ -41,7 +41,7 @@ export class DspRoutingConfig extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'sftp_config_id' })
 	sftpConfig: SftpConfig | null;
 
-	@ManyToOne(() => Dsp, { nullable: false, onDelete: 'CASCADE' })
+	@OneToOne(() => Dsp, { nullable: false, onDelete: 'CASCADE' })
 	@JoinColumn({ name: 'dsp_id' })
 	dsp: Dsp;
 }

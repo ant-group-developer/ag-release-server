@@ -75,6 +75,10 @@ export interface IGenerator {
 	DDEX_PARTY_NAME_SENDER: string;
 }
 
+export interface OtherAppconfig {
+	fileCiTemplateId?: string | null;
+}
+
 export interface AppConfigShape {
 	auth0: Auth0Config; // Cấu hình xác thực và phân quyền bằng Auth0
 	website: WebsiteConfig; // Cấu hình website công khai (domain, branding, liên kết)
@@ -83,4 +87,6 @@ export interface AppConfigShape {
 	acrCloud: AcrCloud; // Cấu hình ACRCloud dùng cho nhận diện âm thanh
 	general: GeneralConfig; // Các cấu hình chung ở cấp độ toàn hệ thống
 	generator: IGenerator;
+
+	other: OtherAppconfig;
 }
