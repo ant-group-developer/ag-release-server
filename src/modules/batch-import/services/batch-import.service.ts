@@ -107,9 +107,12 @@ export class BatchImportService {
 				l.status === BatchImportStatus.FAILED ||
 				l.status === BatchImportStatus.VALIDATION_FAILED,
 		).length;
-		const inProgress = total - completed - failed;
+		const skipped = logs.filter(
+			(l) => l.status === BatchImportStatus.SKIPPED,
+		).length;
+		const inProgress = total - completed - failed - skipped;
 
-		return { batchId, total, completed, failed, inProgress };
+		return { batchId, total, completed, failed, skipped, inProgress };
 	}
 
 	/**
