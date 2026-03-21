@@ -6,6 +6,7 @@ import { CopyrightModule } from '../copyright/copyright.module';
 import { IsrcModule } from '../external/isrc/isrc.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
+import { ReleaseLog } from '../release/entities/release-log.entity';
 import { Release } from '../release/entities/release.entity';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackContributorModule } from '../track-contributor/track-contributor.module';
@@ -31,6 +32,7 @@ import { TrackService } from './services/track.service';
 			TrackOriginType,
 			PriceTier,
 			TrackSensitive,
+			ReleaseLog,
 		]),
 
 		AudioFileModule,

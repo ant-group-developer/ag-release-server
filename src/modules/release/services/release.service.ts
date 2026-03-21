@@ -37,6 +37,7 @@ import {
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
+import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
@@ -50,6 +51,10 @@ export class ReleaseService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(ReleaseLog)
+		private readonly releaseLogRepo: Repository<ReleaseLog>,
+
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
 
@@ -180,7 +185,7 @@ export class ReleaseService {
 		return release.listCodeExportCi;
 	}
 
-	async recordExportCiById(id: string) {
+	async dataExportCiById(id: string) {
 		const { listCodeExportCi: listCodeDspCi, upc } =
 			await this.releaseQueryService.findOneReleaseFull(id);
 
@@ -190,7 +195,14 @@ export class ReleaseService {
 		};
 	}
 
-	recordExportCi(release: Release) {
+	async listDataExportCi(query: QueryGetListReleaseDto2) {
+		const res = await this.getListFull(query);
+		const records = res.items.map((r) => this.dataExportCi(r));
+
+		return records;
+	}
+
+	dataExportCi(release: Release) {
 		return {
 			listCodeDspCi: release.listCodeExportCi,
 			upc: release.upc,
@@ -198,17 +210,17 @@ export class ReleaseService {
 	}
 
 	async getFileExportCiById(id: string) {
-		const record = await this.recordExportCiById(id);
+		const record = await this.dataExportCiById(id);
 
 		return await this.fileExportCiService.createFileExportCi({
 			data: [record],
 		});
 	}
 
-	async getListFileExportCi(query: QueryGetListReleaseDto2) {
+	async getFileExportListReleaseCi(query: QueryGetListReleaseDto2) {
 		const res = await this.getListFull(query);
 
-		const records = res.items.map((r) => this.recordExportCi(r));
+		const records = res.items.map((r) => this.dataExportCi(r));
 
 		const result = await this.fileExportCiService.createFileExportCi({
 			data: records,
@@ -375,54 +387,74 @@ export class ReleaseService {
 	}
 
 	async genUpc(releaseId: string) {
-		const release = await this.releaseQueryService.getOneDetail(releaseId);
+		try {
+			const release =
+				await this.releaseQueryService.getOneDetail(releaseId);
 
-		// Nếu release đã có UPC
-		if (release.upc) {
-			return { upc: release.upc, alreadyExists: true };
-		}
+			// Nếu release đã có UPC
+			if (release.upc) {
+				return { upc: release.upc, alreadyExists: true };
+			}
 
-		const prefixUpcId =
-			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
+			const prefixUpcId =
+				this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
-		if (!prefixUpcId) {
-			throw new ResponseError({ message: 'Release chưa có prefixUpcId' });
-		}
+			if (!prefixUpcId) {
+				throw new ResponseError({
+					message: 'Release chưa có prefixUpcId',
+				});
+			}
 
-		const payload: CreateUpc = {
-			prefixUpcId,
+			const payload: CreateUpc = {
+				prefixUpcId,
 
-			packagingLevel: UpcPackagingLevel.EACH,
+				packagingLevel: UpcPackagingLevel.EACH,
 
-			description: release.title,
-			desc1Language: UpcLanguage.EN,
+				description: release.title,
+				desc1Language: UpcLanguage.EN,
 
-			brandName: release.label?.name ?? '',
-			brand1Language: UpcLanguage.EN,
+				brandName: release.label?.name ?? '',
+				brand1Language: UpcLanguage.EN,
 
-			status: UpcStatus.IN_USE, // không có ACTIVE
-			industry: UpcIndustry.GENERAL, // không có MUSIC
+				status: UpcStatus.IN_USE, // không có ACTIVE
+				industry: UpcIndustry.GENERAL, // không có MUSIC
 
-			isVariable: UpcYesNo.NO,
-			isPurchasable: UpcYesNo.YES,
-			isAdded: UpcYesNo.NO,
+				isVariable: UpcYesNo.NO,
+				isPurchasable: UpcYesNo.YES,
+				isAdded: UpcYesNo.NO,
 
-			targetMarkets: ['VN'],
-		};
+				targetMarkets: ['VN'],
+			};
 
-		const res = await this.upcService.create(payload);
+			const res = await this.upcService.create(payload);
 
-		const newUpc = res.data.gtin; // theo proto UpcItem
-		if (!newUpc) {
-			throw new ResponseError({
-				message: 'Service UPC không trả về GTIN',
+			const newUpc = res.data.gtin; // theo proto UpcItem
+			if (!newUpc) {
+				throw new ResponseError({
+					message: 'Service UPC không trả về GTIN',
+				});
+			}
+
+			// -------- Update release --------
+			await this.releaseRepo.update(releaseId, { upc: newUpc });
+
+			await this.releaseLogRepo.insert({
+				status: ReleaseLogStatus.SUCCESS,
+				releaseId,
+				logs: 'Gen Upc Success',
+				step: 'Gen Upc',
 			});
+
+			return newUpc;
+		} catch (error) {
+			await this.releaseLogRepo.insert({
+				status: ReleaseLogStatus.FAILED,
+				releaseId,
+				logs: error?.message ?? 'Unknown error',
+				step: 'Gen Upc',
+			});
+			throw error;
 		}
-
-		// -------- Update release --------
-		await this.releaseRepo.update(releaseId, { upc: newUpc });
-
-		return newUpc;
 	}
 
 	// distribution
@@ -544,26 +576,10 @@ export class ReleaseService {
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
 			await this.releaseRepo.update(id, {
 				status: ReleaseStatus.ISSUES,
-				logs: this.buildErrorLog(error),
 			});
-			this.logger.error(`Release ${id} processing failed`, error?.stack);
 		});
 
 		return { message: 'Đang được xử lý' };
-	}
-
-	private buildErrorLog(error: any) {
-		if (error instanceof ResponseError) {
-			return JSON.stringify({
-				message: error.message,
-				data: error?.data ?? null,
-			});
-		}
-
-		return JSON.stringify({
-			message: error?.message ?? 'Unknown error',
-			stack: error?.stack ?? null,
-		});
 	}
 
 	async processingSubmit({
@@ -611,7 +627,6 @@ export class ReleaseService {
 		} else {
 			await this.releaseRepo.update(id, {
 				status: ReleaseStatus.ISSUES,
-				logs: errorsDsp.join(', '),
 			});
 		}
 

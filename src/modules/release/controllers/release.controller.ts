@@ -54,13 +54,24 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@Get('list-file-export-ci')
-	async getListFileExportCi(
+	@Get('list-data-export-ci')
+	async listDataExportCi(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.listDataExportCi(query);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('file-export-list-release-ci')
+	async getFileExportListReleaseCi(
 		@Query() query: QueryGetListReleaseDto,
 		@Req() req: Request,
 		@Res() res: Response,
 	) {
-		const buffer = await this.releaseService.getListFileExportCi(query);
+		const buffer =
+			await this.releaseService.getFileExportListReleaseCi(query);
 
 		const stream = Readable.from(buffer);
 
@@ -110,21 +121,21 @@ export class ReleaseController {
 	}
 
 	@Get(':id/list-code-export-ci')
-	async listCodeExportCi(@Param('id') id: string, @Req() req: Request) {
+	async listCodeExportCiById(@Param('id') id: string, @Req() req: Request) {
 		const result = await this.releaseService.listCodeExportCiById(id);
 
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id/record-export-ci')
-	async recordExportCi(@Param('id') id: string, @Req() req: Request) {
-		const result = await this.releaseService.recordExportCiById(id);
+	async dataExportCiById(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.dataExportCiById(id);
 
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id/file-export-ci')
-	async getFileExportCi(@Param('id') id: string, @Res() res: Response) {
+	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
 		const buffer = await this.releaseService.getFileExportCiById(id);
 
 		const stream = Readable.from(buffer);

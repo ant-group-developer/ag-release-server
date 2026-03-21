@@ -201,6 +201,18 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	)
 	@IsUUID('4', { each: true })
 	@IsArray()
+	ids?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
 	idInclude?: string[];
 
 	@IsOptional()
