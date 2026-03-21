@@ -29,7 +29,11 @@ import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
-import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import {
+	FileExportReleaseCiDto,
+	QueryGetListReleaseDto,
+	UpdateReleaseDto,
+} from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
@@ -185,6 +189,25 @@ export class ReleaseController {
 	): Promise<ResponseSuccess<PageDto<any>>> {
 		const data = await this.releaseService.getReleaseDspDelivery(id, query);
 		return new ResponseSuccess({ data });
+	}
+
+	@Post('file-export-release-ci')
+	async getFileExportListReleaseCiByDspCode(
+		@Body() data: FileExportReleaseCiDto,
+		@Req() req: Request,
+		@Res() res: Response,
+	) {
+		const buffer =
+			await this.releaseService.getFileExportListReleaseCiByDspCode(data);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

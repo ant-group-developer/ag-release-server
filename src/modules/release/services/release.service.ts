@@ -19,7 +19,6 @@ import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
-import { ReleaseDspDeliveryService } from 'src/modules/release-dsp-delivery/services/release-dsp-delivery.service';
 import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
@@ -32,6 +31,7 @@ import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import {
+	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
 	UpdateReleaseDto,
@@ -41,6 +41,7 @@ import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
@@ -54,6 +55,8 @@ export class ReleaseService {
 
 		@InjectRepository(ReleaseLog)
 		private readonly releaseLogRepo: Repository<ReleaseLog>,
+
+		private readonly releaseLogService: ReleaseLogService,
 
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
@@ -69,8 +72,6 @@ export class ReleaseService {
 
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
-
-		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
 		private readonly fileExportCiService: FileExportCiService,
 
@@ -221,6 +222,24 @@ export class ReleaseService {
 		const res = await this.getListFull(query);
 
 		const records = res.items.map((r) => this.dataExportCi(r));
+
+		const result = await this.fileExportCiService.createFileExportCi({
+			data: records,
+		});
+
+		return result;
+	}
+
+	async getFileExportListReleaseCiByDspCode(data: FileExportReleaseCiDto) {
+		const query = new QueryGetListReleaseDto();
+		query.ids = data.ids;
+
+		const res = await this.getListFull(query);
+
+		const records = res.items.map((r) => ({
+			listCodeDspCi: data.dspCodeCi,
+			upc: r.upc,
+		}));
 
 		const result = await this.fileExportCiService.createFileExportCi({
 			data: records,
@@ -387,74 +406,77 @@ export class ReleaseService {
 	}
 
 	async genUpc(releaseId: string) {
-		try {
-			const release =
-				await this.releaseQueryService.getOneDetail(releaseId);
+		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
-			// Nếu release đã có UPC
-			if (release.upc) {
-				return { upc: release.upc, alreadyExists: true };
-			}
-
-			const prefixUpcId =
-				this.appConfigService.cache.config.generator.prefixUpcDefaultId;
-
-			if (!prefixUpcId) {
-				throw new ResponseError({
-					message: 'Release chưa có prefixUpcId',
-				});
-			}
-
-			const payload: CreateUpc = {
-				prefixUpcId,
-
-				packagingLevel: UpcPackagingLevel.EACH,
-
-				description: release.title,
-				desc1Language: UpcLanguage.EN,
-
-				brandName: release.label?.name ?? '',
-				brand1Language: UpcLanguage.EN,
-
-				status: UpcStatus.IN_USE, // không có ACTIVE
-				industry: UpcIndustry.GENERAL, // không có MUSIC
-
-				isVariable: UpcYesNo.NO,
-				isPurchasable: UpcYesNo.YES,
-				isAdded: UpcYesNo.NO,
-
-				targetMarkets: ['VN'],
-			};
-
-			const res = await this.upcService.create(payload);
-
-			const newUpc = res.data.gtin; // theo proto UpcItem
-			if (!newUpc) {
-				throw new ResponseError({
-					message: 'Service UPC không trả về GTIN',
-				});
-			}
-
-			// -------- Update release --------
-			await this.releaseRepo.update(releaseId, { upc: newUpc });
-
-			await this.releaseLogRepo.insert({
-				status: ReleaseLogStatus.SUCCESS,
-				releaseId,
-				logs: 'Gen Upc Success',
-				step: 'Gen Upc',
-			});
-
-			return newUpc;
-		} catch (error) {
-			await this.releaseLogRepo.insert({
-				status: ReleaseLogStatus.FAILED,
-				releaseId,
-				logs: error?.message ?? 'Unknown error',
-				step: 'Gen Upc',
-			});
-			throw error;
+		// Nếu release đã có UPC
+		if (release.upc) {
+			return { upc: release.upc, alreadyExists: true };
 		}
+
+		const prefixUpcId =
+			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
+
+		if (!prefixUpcId) {
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'genUpc',
+				content: release,
+				message: 'Release chưa có prefixUpcId',
+			});
+
+			throw new ResponseError({
+				message: 'Release chưa có prefixUpcId',
+			});
+		}
+
+		const payload: CreateUpc = {
+			prefixUpcId,
+
+			packagingLevel: UpcPackagingLevel.EACH,
+
+			description: release.title,
+			desc1Language: UpcLanguage.EN,
+
+			brandName: release.label?.name ?? '',
+			brand1Language: UpcLanguage.EN,
+
+			status: UpcStatus.IN_USE, // không có ACTIVE
+			industry: UpcIndustry.GENERAL, // không có MUSIC
+
+			isVariable: UpcYesNo.NO,
+			isPurchasable: UpcYesNo.YES,
+			isAdded: UpcYesNo.NO,
+
+			targetMarkets: ['VN'],
+		};
+
+		const res = await this.upcService.create(payload);
+
+		const newUpc = res.data.gtin; // theo proto UpcItem
+		if (!newUpc) {
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'genUpc',
+				content: release,
+				message: 'Service UPC không trả về GTIN',
+			});
+
+			throw new ResponseError({
+				message: 'Service UPC không trả về GTIN',
+			});
+		}
+
+		// -------- Update release --------
+		await this.releaseRepo.update(releaseId, { upc: newUpc });
+
+		await this.releaseLogRepo.insert({
+			status: ReleaseLogStatus.SUCCESS,
+			releaseId,
+			logs: 'Generation succeeded',
+			step: 'Gen Upc',
+		});
+
+		return newUpc;
 	}
 
 	// distribution
@@ -572,10 +594,19 @@ export class ReleaseService {
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'submit',
+		});
 
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
 			await this.releaseRepo.update(id, {
 				status: ReleaseStatus.ISSUES,
+			});
+
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'catch processingSubmit',
 			});
 		});
 
@@ -608,6 +639,14 @@ export class ReleaseService {
 			this.releaseValidateService.getErrorsSchemaRelease(release);
 
 		if (errors.length > 0) {
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'validate schemaRelease',
+				message: errors
+					.map((e) => e?.message ?? 'Unknown error')
+					.join(', '),
+			});
+
 			throw new ResponseError({
 				message:
 					'Release validation failed. Please check the input data.',
@@ -663,11 +702,6 @@ export class ReleaseService {
 					`DSP process failed for release ${releaseId}, code: ${code}`;
 
 				errors.push(`${code}: ${message}`);
-
-				this.logger.error(
-					`DSP process failed for release ${releaseId}, code: ${code}`,
-					error?.stack,
-				);
 			}
 		}
 
@@ -676,10 +710,16 @@ export class ReleaseService {
 
 	private async processSpotifyDsp(releaseId: string): Promise<void> {
 		const dspSpotify = await this.dspRepo.findOne({
-			where: { code: 'SPOTIFY' },
+			where: { code: DspCode.SPOTIFY },
 		});
 
 		if (!dspSpotify) {
+			this.releaseLogService.failed({
+				releaseId,
+				codeDsp: DspCode.SPOTIFY,
+				message: 'DSP SPOTIFY not found',
+				step: 'processSpotifyDsp',
+			});
 			throw new ResponseError({ message: 'DSP SPOTIFY not found' });
 		}
 
@@ -697,6 +737,14 @@ export class ReleaseService {
 					lastDeliveredAt: new Date(),
 				},
 			);
+
+			await this.releaseLogRepo.insert({
+				releaseId,
+				dspId: 'id spotify',
+				step: 'SEND_METADATA',
+				status: ReleaseLogStatus.SUCCESS,
+				logs: 'Metadata sent to Spotify successfully',
+			});
 		} catch (error) {
 			await this.releaseDspDeliveryRepo.update(
 				{ releaseId, dspId: dspSpotify.id },

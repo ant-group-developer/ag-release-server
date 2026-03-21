@@ -8,6 +8,7 @@ import { Genre } from '../genre/entities/genre.entity';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { ReleaseLog } from '../release/entities/release-log.entity';
 import { Release } from '../release/entities/release.entity';
+import { ReleaseLogService } from '../release/services/release-log.service';
 import { TrackArtistModule } from '../track-artist/track-artist.module';
 import { TrackContributorModule } from '../track-contributor/track-contributor.module';
 import { TrackLanguageModule } from '../track-language/track-language.module';
@@ -46,7 +47,12 @@ import { TrackService } from './services/track.service';
 		IsrcModule,
 	],
 	controllers: [TrackController, TrackDraftController],
-	providers: [TrackService, TrackDraftService, TrackQueryService],
+	providers: [
+		TrackService,
+		TrackDraftService,
+		TrackQueryService,
+		ReleaseLogService,
+	],
 	exports: [TrackDraftService, TrackService],
 })
 export class TrackModule {}

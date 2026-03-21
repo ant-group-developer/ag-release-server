@@ -24,10 +24,12 @@ import { ReleaseLanguageModule } from '../release-language/release-language.modu
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
+import { ReleaseLogController } from './controllers/release-log.controller';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
+import { ReleaseLogService } from './services/release-log.service';
 import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 import { ReleaseDdexSpotifyService } from './services/release.ddex-spotify.service';
 import { ReleaseDraftService } from './services/release.draft.service';
@@ -73,7 +75,11 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 		CountryModule,
 	],
-	controllers: [ReleaseController, ReleaseDraftController],
+	controllers: [
+		ReleaseController,
+		ReleaseDraftController,
+		ReleaseLogController,
+	],
 	providers: [
 		ReleaseService,
 		ReleaseDraftService,
@@ -82,6 +88,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 
 		ReleaseDdexCiService,
 		ReleaseDdexSpotifyService,
+		ReleaseLogService,
 	],
 })
 export class ReleaseModule {}
