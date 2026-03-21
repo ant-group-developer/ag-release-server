@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Release } from './release.entity';
 
@@ -16,11 +17,26 @@ export class ReleaseLog extends BaseUUIDEntity {
 	@ManyToOne(() => Release, (release) => release.logs, {
 		onDelete: 'CASCADE',
 	})
-	@JoinColumn({ name: 'releaseId' })
+	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
+	@Column({ type: 'varchar', nullable: true })
+	dspCode: string | null;
+
+	@Column({ nullable: true })
+	dspId: string | null;
+
+	@ManyToOne(() => Dsp, {
+		onDelete: 'CASCADE',
+	})
+	@JoinColumn({ name: 'dsp_id' })
+	dsp?: Dsp | null;
+
 	@Column({ type: 'text', nullable: true })
-	logs: string;
+	logs?: string;
+
+	@Column({ type: 'jsonb', nullable: true })
+	content?: Record<string, any> | null;
 
 	@Column({
 		type: 'enum',

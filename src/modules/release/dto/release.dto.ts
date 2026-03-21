@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	ArrayNotEmpty,
 	IsArray,
 	IsBoolean,
 	IsDate,
@@ -428,4 +429,16 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	isVariousArtist?: boolean;
 
 	tenantIds?: string[];
+}
+
+export class FileExportReleaseCiDto {
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	ids: string[];
+
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	dspCodeCi: string[];
 }
