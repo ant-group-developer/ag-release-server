@@ -68,4 +68,8 @@ export const appConfigDefault: AppConfigShape = {
 		DDEX_PARTY_ID_SENDER: '',
 		DDEX_PARTY_NAME_SENDER: '',
 	},
+
+	other: {
+		fileCiTemplateId: '',
+	},
 };

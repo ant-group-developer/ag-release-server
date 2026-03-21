@@ -12,13 +12,14 @@ import { DspModule } from '../dsp/dsp.module';
 import { Dsp } from '../dsp/entities/dsp.entity';
 import { ErnModule } from '../ern/ern.module';
 import { UpcModule } from '../external/upc/upc.module';
+import { FileExportCiModule } from '../file-export-ci/file-export-ci.module';
 import { Genre } from '../genre/entities/genre.entity';
 import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
-import { ReleaseDspDeliveryLogModule } from '../release-dsp-delivery-log/release-dsp-delivery-log.module';
-import { ReleaseDspDelivery } from '../release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from '../release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspDeliveryModule } from '../release-dsp-delivery/release-dsp.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
@@ -52,6 +53,9 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseCoverArtModule,
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
+		ReleaseDspDeliveryModule,
+
+		FileExportCiModule,
 
 		TrackModule,
 		BucketModule2,
@@ -62,7 +66,6 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		UpcModule,
 		DspModule,
 
-		ReleaseDspDeliveryLogModule,
 		ErnModule,
 		DspRoutingConfigsModule,
 

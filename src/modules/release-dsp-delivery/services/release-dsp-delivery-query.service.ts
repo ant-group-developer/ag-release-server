@@ -6,7 +6,7 @@ import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GetListReleaseDspDeliveriesDto } from '../dto/release-dsp.dto';
-import { ReleaseDspDelivery } from '../entities/release-dsp.entity';
+import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 
 @Injectable()
 export class ReleaseDspDeliveryQueryService {

@@ -132,6 +132,7 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	releaseCount?: number;
 	trackCount?: number;
 
+	// nếu dùng thì nhớ phải join đủ
 	get spotifyId(): string | undefined {
 		const profileSpotify = this.artistProfiles.find(
 			(p) => p.dsp.code === String(DspCode.SPOTIFY),
@@ -140,6 +141,7 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 		return extractIdFromUrl(profileSpotify?.url);
 	}
 
+	// nếu dùng thì nhớ phải join đủ
 	get appleMusicId(): string | undefined {
 		const profileApple = this.artistProfiles.find(
 			(p) => p.dsp.code === String(DspCode.APPLE_MUSIC),

@@ -24,7 +24,7 @@ import {
 	GetListReleaseDspDeliveriesDto,
 	UpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
-import { ReleaseDspDelivery } from '../entities/release-dsp.entity';
+import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseDspDeliveryService } from '../services/release-dsp-delivery.service';
 
 @ApiTags('Release DSP Deliveries')

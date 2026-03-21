@@ -50,7 +50,15 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	})
 	lastDeliveredAt: Date | null;
 
-	@ManyToOne(() => Release, (release) => release.releaseDsp, {
+	// Nội dung chi tiết lỗi
+	@Column({
+		type: 'text',
+		nullable: true,
+		comment: 'Nội dung chi tiết của lỗi hoặc thông tin log',
+	})
+	logs: string | null;
+
+	@ManyToOne(() => Release, (release) => release.releaseDspDeliveries, {
 		onDelete: 'CASCADE',
 	})
 	@JoinColumn({ name: 'release_id' })

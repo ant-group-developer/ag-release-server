@@ -8,7 +8,7 @@ import {
 	GetListReleaseDspDeliveriesDto,
 	UpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
-import { ReleaseDspDelivery } from '../entities/release-dsp.entity';
+import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 @Injectable()
