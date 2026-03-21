@@ -21,14 +21,14 @@ export class FileExportCiService {
 	}
 
 	async createFileExportCi({
-		fileId,
+		fileTemplateId,
 		data,
 	}: {
-		fileId?: string;
+		fileTemplateId?: string;
 		data: ExportCiRecord[];
 	}): Promise<Buffer> {
 		const buffer = await this.getFileTemplateBuffer(
-			fileId ??
+			fileTemplateId ??
 				this.appConfigSv.cache.config.other.fileCiTemplateId ??
 				'',
 		);

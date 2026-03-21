@@ -26,6 +26,7 @@ import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
+import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 import { ReleaseDdexSpotifyService } from './services/release.ddex-spotify.service';
@@ -45,6 +46,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Dsp,
 			Country,
 			ReleaseDspDelivery,
+			ReleaseLog,
 		]),
 
 		AppConfigModule,

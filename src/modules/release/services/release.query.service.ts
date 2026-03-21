@@ -367,6 +367,7 @@ export class ReleaseQueryService {
 	) {
 		const {
 			keyword,
+			ids,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -391,6 +392,10 @@ export class ReleaseQueryService {
 			skip,
 			pageSize,
 		} = query;
+
+		if (ids && ids.length > 0) {
+			queryBuilder.andWhere(`release.id IN (:...ids)`, { ids });
+		}
 
 		if (keyword) {
 			queryBuilder.andWhere(
