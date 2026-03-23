@@ -191,6 +191,22 @@ export class ReleaseController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Put(':id')
+	async update(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() updateReleaseDto: UpdateReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<IRelease>> {
+		const userId = req.user!.sub;
+		const result = await this.releaseService.update(
+			id,
+			updateReleaseDto,
+			userId,
+		);
+		return ReleaseSuccess.UPDATE(result);
+	}
+
 	@Post('file-export-release-ci')
 	async getFileExportListReleaseCiByDspCode(
 		@Body() data: FileExportReleaseCiDto,
@@ -208,22 +224,6 @@ export class ReleaseController {
 				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 			fileName: `ci_export_${Date.now()}.xlsx`,
 		});
-	}
-
-	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Put(':id')
-	async update(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Body() updateReleaseDto: UpdateReleaseDto,
-		@Req() req: Request,
-	): Promise<ResponseSuccess<IRelease>> {
-		const userId = req.user!.sub;
-		const result = await this.releaseService.update(
-			id,
-			updateReleaseDto,
-			userId,
-		);
-		return ReleaseSuccess.UPDATE(result);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

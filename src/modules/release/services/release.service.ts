@@ -597,6 +597,7 @@ export class ReleaseService {
 		this.releaseLogService.pending({
 			releaseId: id,
 			step: 'submit',
+			message: 'Release đang được xử lý',
 		});
 
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
@@ -607,6 +608,7 @@ export class ReleaseService {
 			this.releaseLogService.failed({
 				releaseId: id,
 				step: 'catch processingSubmit',
+				message: error?.message ?? 'Unknow',
 			});
 		});
 
@@ -738,12 +740,12 @@ export class ReleaseService {
 				},
 			);
 
-			await this.releaseLogRepo.insert({
+			this.releaseLogService.success({
 				releaseId,
-				dspId: 'id spotify',
-				step: 'SEND_METADATA',
-				status: ReleaseLogStatus.SUCCESS,
-				logs: 'Metadata sent to Spotify successfully',
+				step: 'processSpotifyDsp',
+				message: `processSpotifyDsp SUCCESS`,
+				codeDsp: DspCode.SPOTIFY,
+				dspId: 'SMImv6mH7H',
 			});
 		} catch (error) {
 			await this.releaseDspDeliveryRepo.update(
@@ -752,9 +754,16 @@ export class ReleaseService {
 					status: ReleaseDspStatus.ISSUES,
 					lastEnqueuedAt: new Date(),
 					lastDeliveredAt: null,
-					logs: error?.message ?? 'Unknown error',
 				},
 			);
+
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'processSpotifyDsp',
+				message: `processSpotifyDsp failed ${error?.message ?? 'unknown'}`,
+				codeDsp: DspCode.SPOTIFY,
+				dspId: 'SMImv6mH7H',
+			});
 
 			throw error;
 		}
@@ -838,49 +847,73 @@ export class ReleaseService {
 
 	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
-		this.logger.log(
-			`Start create & upload metadata Spotify - releaseId=${id}`,
-		);
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Start create & upload metadata Spotify - releaseId=${id}`,
+		});
 
 		await this.createMetadataSpotifyOnServer(id);
-		this.logger.log(`Metadata created on server - releaseId=${id}`);
+
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Metadata created on server - releaseId=${id}`,
+		});
 
 		await this.uploadMetadataSpotifyToSftp(id);
-		this.logger.log(`Metadata uploaded to SFTP - releaseId=${id}`);
 
-		this.logger.log(
-			`Finish create & upload metadata Spotify - releaseId=${id}`,
-		);
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Metadata uploaded to SFTP - releaseId=${id}`,
+		});
+
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Finish create & upload metadata Spotify - releaseId=${id}`,
+		});
 	}
 
 	async createMetadataSpotifyOnServer(id: string) {
-		this.logger.log(
-			`Creating metadata Spotify on server - releaseId=${id}`,
-		);
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Creating metadata Spotify on server - releaseId=${id}`,
+		});
 
 		const result =
 			await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
 				id,
 			);
 
-		this.logger.log(
-			`Created metadata Spotify successfully - releaseId=${id}`,
-		);
+		this.releaseLogService.success({
+			releaseId: id,
+			step: 'createAndUploadMetadataSpotify',
+			message: `Created metadata Spotify successfully - releaseId=${id}`,
+		});
 
 		return result;
 	}
 
 	async uploadMetadataSpotifyToSftp(id: string) {
-		this.logger.log(`Uploading metadata Spotify to SFTP - releaseId=${id}`);
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'uploadMetadataSpotifyToSftp',
+			message: `Uploading metadata Spotify to SFTP - releaseId=${id}`,
+		});
 
 		const result =
 			await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
 				id,
 			);
 
-		this.logger.log(
-			`Uploaded metadata Spotify successfully - releaseId=${id}`,
-		);
+		this.releaseLogService.success({
+			releaseId: id,
+			step: 'uploadMetadataSpotifyToSftp',
+			message: `Uploaded metadata Spotify successfully - releaseId=${id}`,
+		});
 
 		return result;
 	}

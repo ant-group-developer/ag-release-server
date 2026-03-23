@@ -23,8 +23,8 @@ export class ReleaseLogService {
 	 * Muốn đổi rule thì sửa mỗi đây.
 	 */
 	private readonly dbLogStatuses: ReleaseLogStatus[] = [
-		// ReleaseLogStatus.PENDING,
-		// ReleaseLogStatus.SUCCESS,
+		ReleaseLogStatus.PENDING,
+		ReleaseLogStatus.SUCCESS,
 		ReleaseLogStatus.FAILED,
 	];
 
@@ -34,9 +34,36 @@ export class ReleaseLogService {
 	) {}
 
 	async findAll(query: GetListReleaseLogDto) {
-		const { releaseIds, page = 1, limit = 10 } = query;
+		const {
+			keyword,
+			releaseIds,
+			status,
+			fieldOrder,
+			orderBy,
+			skip,
+			pageSize,
+		} = query;
 
 		const qb = this.releaseLogRepo.createQueryBuilder('log');
+
+		qb.leftJoinAndSelect('log.release', 'release').leftJoinAndSelect(
+			'log.dsp',
+			'dsp',
+		);
+
+		if (keyword) {
+			qb.andWhere(
+				`(
+					log.dsp_code ILIKE :keyword
+					OR log.logs ILIKE :keyword
+					OR release.title ILIKE :keyword
+					OR release.upc ILIKE :keyword
+				)`,
+				{
+					keyword: `%${keyword[0]}%`,
+				},
+			);
+		}
 
 		if (releaseIds && releaseIds.length > 0) {
 			qb.andWhere('log.releaseId IN (:...releaseIds)', {
@@ -44,8 +71,14 @@ export class ReleaseLogService {
 			});
 		}
 
-		qb.orderBy('log.createdAt', 'DESC');
-		qb.skip((page - 1) * limit).take(limit);
+		if (status && status.length > 0) {
+			qb.andWhere('log.status IN (:...status)', {
+				status,
+			});
+		}
+
+		qb.orderBy(`${fieldOrder}`, orderBy);
+		qb.skip(skip).take(pageSize);
 
 		const [data, totalItems] = await qb.getManyAndCount();
 
@@ -85,22 +118,16 @@ export class ReleaseLogService {
 			status: ReleaseLogStatus;
 		},
 	) {
-		const {
-			releaseId,
-			step,
-			message,
-			dspId = null,
-			content,
-			status,
-		} = data;
+		const createdAt = new Date();
 
-		const logText = `[Release ${releaseId}]${
+		const { releaseId, step, message, dspId, content, status } = data;
+
+		const logText = `[${createdAt.toISOString()}] [Release ${releaseId}]${
 			dspId ? ` [DSP ${dspId}]` : ''
-		} [${step}] [${status}] ${message}${
+		} [${step}] [${status}] ${message ?? ''}${
 			content ? ` | content=${JSON.stringify(content)}` : ''
 		}`;
 
-		// 1. luôn log ra màn hình
 		switch (status) {
 			case ReleaseLogStatus.FAILED:
 				this.logger.error(logText);
@@ -114,22 +141,23 @@ export class ReleaseLogService {
 				break;
 		}
 
-		// 2. check config xem có lưu DB không
 		if (!this.shouldSaveToDb(status)) {
 			return;
 		}
 
-		// 3. lưu DB
 		const entity = this.releaseLogRepo.create({
 			releaseId,
-			dspId,
+			dspId: dspId ?? undefined,
 			status,
 			step,
-			logs: message,
+			logs: message ?? undefined,
 			content: content ?? null,
+			createdAt,
 		});
 
-		this.releaseLogRepo.save(entity).catch((_e) => {});
+		this.releaseLogRepo.save(entity).catch((_e) => {
+			this.logger.error(_e);
+		});
 	}
 
 	private shouldSaveToDb(status: ReleaseLogStatus): boolean {
