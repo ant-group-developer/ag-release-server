@@ -28,7 +28,7 @@ import {
 	getFileTxtFromRelease,
 } from 'src/utils/util.file';
 import { PassThrough } from 'stream';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import {
 	FileExportReleaseCiDto,
@@ -41,6 +41,7 @@ import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
 import { ReleaseQueryService } from './release.query.service';
@@ -113,7 +114,7 @@ export class ReleaseService {
 		const { releases, totalItems } =
 			await this.releaseQueryService.getManyAndCount(query);
 
-		const enhancedRelease = this.enhanceReleasesDetails(releases);
+		const enhancedRelease = enhanceReleasesDetails(releases);
 
 		return new PageDto({
 			items: enhancedRelease,
@@ -129,10 +130,7 @@ export class ReleaseService {
 		const { items, totalItems } =
 			await this.releaseQueryService.getListFull(query);
 
-		// const enhancedRelease = this.enhanceReleasesDetails(items);
-
 		return new PageDto({
-			// items: enhancedRelease,
 			items,
 			metadata: {
 				...query,
@@ -149,7 +147,7 @@ export class ReleaseService {
 		const { releases, totalItems } =
 			await this.releaseQueryService.getManyAndCount(query);
 
-		const enhancedRelease = this.enhanceReleasesDetails(releases);
+		const enhancedRelease = enhanceReleasesDetails(releases);
 
 		return new PageDto({
 			items: enhancedRelease,
@@ -249,18 +247,6 @@ export class ReleaseService {
 	}
 
 	//
-	private enhanceReleasesDetails(releases: Release[]) {
-		return releases.map((release) => {
-			const { releaseCoverArts, ...restOfRelease } = release;
-
-			const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
-
-			return {
-				...restOfRelease,
-				coverArtThumbnails,
-			};
-		});
-	}
 
 	async update(
 		id: string,
@@ -564,6 +550,7 @@ export class ReleaseService {
 				'delivery.last_enqueued_at as delivery_last_enqueued_at',
 				'delivery.last_delivered_at as delivery_last_delivered_at',
 				'delivery.logs as logs',
+				'delivery.is_selected as delivery_is_selected',
 			])
 			.getRawMany();
 
@@ -578,6 +565,7 @@ export class ReleaseService {
 			lastEnqueuedAt: row.delivery_last_enqueued_at,
 			lastDeliveredAt: row.delivery_last_delivered_at,
 			logs: row.logs,
+			isSelected: row.delivery_is_selected ?? true,
 		}));
 
 		return {
@@ -594,6 +582,8 @@ export class ReleaseService {
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+		await this.handleSelected(id, dto.code);
+
 		this.releaseLogService.pending({
 			releaseId: id,
 			step: 'submit',
@@ -613,6 +603,36 @@ export class ReleaseService {
 		});
 
 		return { message: 'Đang được xử lý' };
+	}
+
+	async handleSelected(releaseId: string, codes: string[]) {
+		const normalizedCodes = [
+			...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
+		];
+
+		const dsps = await this.dspRepo.find({
+			where: {
+				code: In(normalizedCodes),
+			},
+			select: ['id', 'code'],
+		});
+
+		const dspIdsSelected = dsps.map((dsp) => dsp.id);
+
+		await this.releaseDspDeliveryRepo.update(
+			{ releaseId },
+			{ isSelected: false },
+		);
+
+		if (dspIdsSelected.length > 0) {
+			await this.releaseDspDeliveryRepo.update(
+				{
+					releaseId,
+					dspId: In(dspIdsSelected),
+				},
+				{ isSelected: true },
+			);
+		}
 	}
 
 	async processingSubmit({
@@ -787,6 +807,7 @@ export class ReleaseService {
 				status: ReleaseDspStatus.PROCESSING,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: null,
+				isSelected: true,
 			});
 			return;
 		}
@@ -797,6 +818,7 @@ export class ReleaseService {
 				status: ReleaseDspStatus.PROCESSING,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: null,
+				isSelected: true,
 			},
 		);
 	}
@@ -855,7 +877,7 @@ export class ReleaseService {
 
 		await this.createMetadataSpotifyOnServer(id);
 
-		this.releaseLogService.pending({
+		this.releaseLogService.success({
 			releaseId: id,
 			step: 'createAndUploadMetadataSpotify',
 			message: `Metadata created on server - releaseId=${id}`,
@@ -863,13 +885,13 @@ export class ReleaseService {
 
 		await this.uploadMetadataSpotifyToSftp(id);
 
-		this.releaseLogService.pending({
+		this.releaseLogService.success({
 			releaseId: id,
 			step: 'createAndUploadMetadataSpotify',
 			message: `Metadata uploaded to SFTP - releaseId=${id}`,
 		});
 
-		this.releaseLogService.pending({
+		this.releaseLogService.success({
 			releaseId: id,
 			step: 'createAndUploadMetadataSpotify',
 			message: `Finish create & upload metadata Spotify - releaseId=${id}`,

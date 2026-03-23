@@ -95,7 +95,11 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		// 1. Setup folder structure
 		// release_parsed/20251120151606392/00850080651001/
-		const outputRoot = path.resolve('release_parsed', batchId);
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+
+		const outputRoot = path.join(baseDir, batchId);
+		// const outputRoot = path.resolve('release_parsed', batchId);
 		const releaseDir = path.join(outputRoot, upc);
 		const resourcesDir = path.join(releaseDir, 'resources');
 
@@ -131,6 +135,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			outputRoot,
 		});
 
+		// cập nhật dường dẫn
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
 				...release.metadataSpotify,

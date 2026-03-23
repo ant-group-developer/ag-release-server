@@ -8,6 +8,7 @@ import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 	comment: 'Bảng liên kết release với các DSP được phân phối',
 })
 export class ReleaseDspDelivery extends BaseUUIDEntity {
+	@Column({ type: 'boolean', default: true })
 	isSelected: boolean;
 
 	@Column({ name: 'release_id', type: 'uuid' })

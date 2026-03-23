@@ -40,7 +40,9 @@ export class ArtistProfile extends BaseUserTrackedUUIDEntity {
 	@JoinColumn({ name: 'dsp_id' })
 	dsp: Dsp;
 
-	@ManyToOne(() => Artist)
+	@ManyToOne(() => Artist, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'artist_id' })
 	artist: Artist;
 

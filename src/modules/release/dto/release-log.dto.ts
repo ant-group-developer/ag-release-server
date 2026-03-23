@@ -21,6 +21,18 @@ export class GetListReleaseLogDto extends BaseQueryDto2 {
 	releaseIds: string[];
 
 	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	@Transform(({ value }) =>
+		Array.isArray(value)
+			? value.map((v) => v?.trim())
+			: typeof value === 'string'
+				? [value.trim()]
+				: [],
+	)
+	dspIds: string[];
+
+	@IsOptional()
 	@IsEnum(FieldOrderGetListReleaseLogs)
 	fieldOrder: FieldOrderGetListReleaseLogs =
 		FieldOrderGetListReleaseLogs.createdAt;

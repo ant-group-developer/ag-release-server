@@ -4,6 +4,7 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import { GetListReleaseLogDto } from '../dto/release-log.dto';
 import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
+import { enhanceReleaseDetail } from '../utils/release.utils';
 
 type ReleaseLogInput = {
 	releaseId: string;
@@ -24,7 +25,7 @@ export class ReleaseLogService {
 	 */
 	private readonly dbLogStatuses: ReleaseLogStatus[] = [
 		ReleaseLogStatus.PENDING,
-		ReleaseLogStatus.SUCCESS,
+		// ReleaseLogStatus.SUCCESS,
 		ReleaseLogStatus.FAILED,
 	];
 
@@ -35,8 +36,11 @@ export class ReleaseLogService {
 
 	async findAll(query: GetListReleaseLogDto) {
 		const {
+			startCreatedAt,
+			endCreatedAt,
 			keyword,
 			releaseIds,
+			dspIds,
 			status,
 			fieldOrder,
 			orderBy,
@@ -46,10 +50,9 @@ export class ReleaseLogService {
 
 		const qb = this.releaseLogRepo.createQueryBuilder('log');
 
-		qb.leftJoinAndSelect('log.release', 'release').leftJoinAndSelect(
-			'log.dsp',
-			'dsp',
-		);
+		qb.leftJoinAndSelect('log.release', 'release')
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArt')
+			.leftJoinAndSelect('log.dsp', 'dsp');
 
 		if (keyword) {
 			qb.andWhere(
@@ -65,9 +68,22 @@ export class ReleaseLogService {
 			);
 		}
 
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere('log.createdAt BETWEEN :start AND :end', {
+				start: startCreatedAt,
+				end: endCreatedAt,
+			});
+		}
+
 		if (releaseIds && releaseIds.length > 0) {
 			qb.andWhere('log.releaseId IN (:...releaseIds)', {
 				releaseIds,
+			});
+		}
+
+		if (dspIds && dspIds.length > 0) {
+			qb.andWhere('log.dspId IN (:...dspIds)', {
+				dspIds,
 			});
 		}
 
@@ -81,9 +97,13 @@ export class ReleaseLogService {
 		qb.skip(skip).take(pageSize);
 
 		const [data, totalItems] = await qb.getManyAndCount();
+		const items = data.map((d) => ({
+			...d,
+			release: enhanceReleaseDetail(d.release),
+		}));
 
 		return new PageDto({
-			items: data,
+			items,
 			metadata: { ...query, totalItems },
 		});
 	}
