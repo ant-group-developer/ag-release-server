@@ -27,6 +27,7 @@ import {
 import { Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
 import { ErnService } from './../../ern/ern.service';
+import { ReleaseLogService } from './release-log.service';
 import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
@@ -62,6 +63,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 		private readonly countryService: CountryService,
+		private readonly releaseLogService: ReleaseLogService,
 	) {}
 
 	/**
@@ -72,21 +74,43 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const batchId = genBatchId();
 
-		this.logger.log(`[ERN_SPOTIFY] Starting batch: ${batchId}`);
+		this.releaseLogService.pending({
+			releaseId,
+			step: 'createMetadataSpotifyOnServer',
+			message: `[ERN_SPOTIFY] Starting batch: ${batchId}`,
+			content: release,
+		});
 
 		const upc = release.upc ?? 'new_upc';
 		if (!upc) {
+			this.releaseLogService.pending({
+				releaseId,
+				step: 'createMetadataSpotifyOnServer',
+				message: `Release missing UPC`,
+				content: release,
+			});
+
 			throw new Error('Release missing UPC');
 		}
 
 		// 1. Setup folder structure
 		// release_parsed/20251120151606392/00850080651001/
-		const outputRoot = path.resolve('release_parsed', batchId);
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+
+		const outputRoot = path.join(baseDir, batchId);
+		// const outputRoot = path.resolve('release_parsed', batchId);
 		const releaseDir = path.join(outputRoot, upc);
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
-		this.logger.log(`[FOLDER_CREATED] ${releaseDir}`);
+
+		this.releaseLogService.success({
+			releaseId,
+			step: 'createMetadataSpotifyOnServer',
+			message: `[FOLDER_CREATED] ${releaseDir}`,
+			content: release,
+		});
 
 		// 2. Fetch files from bucket
 		const { audioFiles, coverImage } =
@@ -110,8 +134,8 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			upc,
 			outputRoot,
 		});
-		// this.createBatchCompleteFile({ batchId, upc, outputDir: outputRoot });
 
+		// cập nhật dường dẫn
 		await this.releaseRepo.update(releaseId, {
 			metadataSpotify: {
 				...release.metadataSpotify,
@@ -120,7 +144,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			},
 		});
 
-		this.logger.log(`[COMPLETED] Batch ${batchId} - ${upc}`);
+		this.releaseLogService.success({
+			releaseId,
+			step: 'createMetadataSpotifyOnServer',
+			message: `[COMPLETED] Batch ${batchId} - ${upc}`,
+			content: release,
+		});
 
 		return {
 			outputDir: outputRoot,
@@ -141,7 +170,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
-		this.logger.log(`[XML_CREATED] ${mainXmlPath}`);
+
+		this.releaseLogService.success({
+			releaseId,
+			step: 'createErnFile',
+			message: `[XML_CREATED] ${mainXmlPath}`,
+		});
 	}
 
 	createManifestFile({
@@ -253,11 +287,17 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	}> {
 		const audioFiles: AudioFileInfo[] = [];
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
+		const releaseId = release.id;
 
 		// Fetch audio files
 		for (const [index, track] of tracks.entries()) {
 			if (!track.audioFile) {
-				this.logger.warn(`Track ${track.order} has no audio file`);
+				this.releaseLogService.pending({
+					releaseId,
+					step: 'fetchAudioAndImageReleaseFromBucket',
+					message: `Track ${track.order} has no audio file`,
+					content: release,
+				});
 				continue;
 			}
 
@@ -272,9 +312,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 				trackNo: index + 1,
 			});
 
-			this.logger.log(
-				`[AUDIO_FETCHED] Track ${index + 1}: ${track.isrc || 'NO_ISRC'}`,
-			);
+			this.releaseLogService.success({
+				releaseId,
+				step: 'fetchAudioAndImageReleaseFromBucket',
+				message: `[AUDIO_FETCHED] Track ${index + 1}: ${track.isrc || 'NO_ISRC'}`,
+				content: release,
+			});
 		}
 
 		// Fetch cover image
@@ -283,13 +326,25 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		);
 
 		if (!coverArt) {
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'fetchAudioAndImageReleaseFromBucket',
+				message: 'Release has no original cover image',
+				content: release,
+			});
+
 			throw new Error('Release has no original cover image');
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
 			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
 
-		this.logger.log(`[COVER_FETCHED] ${coverDb.extension}`);
+		this.releaseLogService.success({
+			releaseId,
+			step: 'fetchAudioAndImageReleaseFromBucket',
+			message: `[COVER_FETCHED] ${coverDb.extension}`,
+			content: release,
+		});
 
 		return {
 			audioFiles,
@@ -322,6 +377,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
+
 		this.logger.log(`[COVER_SAVED] ${fileName}`);
 	}
 
