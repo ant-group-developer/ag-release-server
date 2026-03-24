@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsOptional } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { ReleaseLogStatus } from '../entities/release-log.entity';
 
@@ -7,30 +7,31 @@ export enum FieldOrderGetListReleaseLogs {
 	createdAt = 'log.createdAt',
 }
 
+const toStringArray = ({ value }: { value: unknown }): string[] => {
+	if (Array.isArray(value)) {
+		return value
+			.flatMap((v) => String(v).split(','))
+			.map((v) => v.trim())
+			.filter(Boolean);
+	}
+
+	if (typeof value === 'string') {
+		return value
+			.split(',')
+			.map((v) => v.trim())
+			.filter(Boolean);
+	}
+
+	return [];
+};
 export class GetListReleaseLogDto extends BaseQueryDto2 {
 	@IsOptional()
-	@IsArray()
-	@IsString({ each: true })
-	@Transform(({ value }) =>
-		Array.isArray(value)
-			? value.map((v) => v?.trim())
-			: typeof value === 'string'
-				? [value.trim()]
-				: [],
-	)
-	releaseIds: string[];
+	@Transform(toStringArray)
+	releaseIds?: string[];
 
 	@IsOptional()
-	@IsArray()
-	@IsString({ each: true })
-	@Transform(({ value }) =>
-		Array.isArray(value)
-			? value.map((v) => v?.trim())
-			: typeof value === 'string'
-				? [value.trim()]
-				: [],
-	)
-	dspIds: string[];
+	@Transform(toStringArray)
+	dspIds?: string[];
 
 	@IsOptional()
 	@IsEnum(FieldOrderGetListReleaseLogs)
@@ -38,10 +39,8 @@ export class GetListReleaseLogDto extends BaseQueryDto2 {
 		FieldOrderGetListReleaseLogs.createdAt;
 
 	@IsOptional()
+	@Transform(toStringArray)
 	@IsArray()
 	@IsEnum(ReleaseLogStatus, { each: true })
-	@Transform(({ value }) =>
-		Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
-	)
 	status?: ReleaseLogStatus[];
 }

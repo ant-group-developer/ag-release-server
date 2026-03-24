@@ -219,7 +219,9 @@ export class ReleaseService {
 	async getFileExportListReleaseCi(query: QueryGetListReleaseDto2) {
 		const res = await this.getListFull(query);
 
-		const records = res.items.map((r) => this.dataExportCi(r));
+		const records = res.items
+			.filter((r) => r.upc != null)
+			.map((r) => this.dataExportCi(r));
 
 		const result = await this.fileExportCiService.createFileExportCi({
 			data: records,

@@ -10,7 +10,6 @@ services:
             - .env
         environment:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
-            - RELEASE_PARSED_DIR=/app/release_parsed
         command: yarn start:prod
         restart: unless-stopped
         volumes:
@@ -18,7 +17,7 @@ services:
             - ./credential.json:/app/credential.json:ro
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro
-            - ./release_parsed:/app/release_parsed
+            - ./release_parsed:${RELEASE_PARSED_DIR}
 
         mem_limit: 2g # Set max memory to 2 GB
         cpus: 2 # Set max CPU to 2 CPU core

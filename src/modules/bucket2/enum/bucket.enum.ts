@@ -25,6 +25,8 @@ export enum UploadPurpose {
 	release_metadata_ci = 'release_metadata_ci',
 	release_metadata_spotify = 'release_metadata_spotify',
 	release_template_file = 'release_template_file',
+
+	template_export_ci = 'template_export_ci',
 }
 
 export enum Type {

@@ -151,6 +151,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			content: release,
 		});
 
+		this.logger.log({
+			releaseId,
+			step: 'createMetadataSpotifyOnServer',
+			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
+		});
+
 		return {
 			outputDir: outputRoot,
 			outputRoot,

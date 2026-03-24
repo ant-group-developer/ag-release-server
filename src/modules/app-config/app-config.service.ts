@@ -106,6 +106,19 @@ export class AppConfigService implements OnModuleInit {
 			website.logo = websiteDb.logo;
 		}
 
+		// if (
+		// 	other?.fileCiTemplateId !== undefined &&
+		// 	other.fileCiTemplateId !== otherDb.fileCiTemplateId &&
+		// 	otherDb.fileCiTemplateId
+		// ) {
+		// 	this.eventEmitter.emit(
+		// 		AppEvent.DELETE_TEMPLDATE_EXPORT_CI,
+		// 		otherDb.fileCiTemplateId,
+		// 	);
+		// } else if (otherDb) {
+		// 	other?.fileCiTemplateId = otherDb.fileCiTemplateId;
+		// }
+
 		// const
 		const e = { ...dataDb, config: { ...dataDb.config, ...payload } };
 
