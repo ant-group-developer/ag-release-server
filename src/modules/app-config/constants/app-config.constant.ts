@@ -71,5 +71,6 @@ export const appConfigDefault: AppConfigShape = {
 
 	other: {
 		fileCiTemplateId: '',
+		excelDataStartRow: 16,
 	},
 };

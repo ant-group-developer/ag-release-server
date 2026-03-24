@@ -77,6 +77,7 @@ export interface IGenerator {
 
 export interface OtherAppconfig {
 	fileCiTemplateId?: string | null;
+	excelDataStartRow?: number | null;
 }
 
 export interface AppConfigShape {

@@ -142,4 +142,7 @@ export class QueryGetListDspDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderDsp)
 	fieldOrder: FieldOrderDsp = FieldOrderDsp.NAME;
+
+	@IsOptional()
+	aggregatorCode?: string;
 }

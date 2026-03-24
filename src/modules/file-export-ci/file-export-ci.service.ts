@@ -37,7 +37,8 @@ export class FileExportCiService {
 		await workbook.xlsx.load(buffer as any);
 
 		const worksheet = workbook.worksheets[0];
-		const startRow = 16;
+		const startRow =
+			this.appConfigSv.cache.config.other.excelDataStartRow ?? 16;
 
 		data.forEach((item, index) => {
 			const rowIndex = startRow + index;
