@@ -25,7 +25,7 @@ export class ReleaseLogService {
 	 */
 	private readonly dbLogStatuses: ReleaseLogStatus[] = [
 		ReleaseLogStatus.PENDING,
-		// ReleaseLogStatus.SUCCESS,
+		ReleaseLogStatus.SUCCESS,
 		ReleaseLogStatus.FAILED,
 	];
 
