@@ -2,6 +2,7 @@ import { create } from 'xmlbuilder2';
 import {
 	ErnArtistInput,
 	ErnContributorInput,
+	ErnDealInput,
 	ErnInput,
 	ErnTrackInput,
 } from '../interfaces/ern-input.interface';
@@ -518,6 +519,8 @@ export class Ern43Builder {
 					terms.ele('UseType').txt(ut);
 				}
 
+				this.appendPrices(terms, deal);
+
 				d.ele('DealTechnicalResourceDetailsReferenceList')
 					.ele('DealTechnicalResourceDetailsReference')
 					.txt(techRef);
@@ -589,5 +592,41 @@ export class Ern43Builder {
 			return `PT${hours}H${minutes}M${seconds}S`;
 		}
 		return duration;
+	}
+
+	private appendPrices(
+		terms: ReturnType<typeof create>,
+		deal: ErnDealInput,
+	): void {
+		if (!deal.prices?.length) return;
+
+		for (const price of deal.prices) {
+			const priceInfo = terms.ele('PriceInformation');
+
+			if (price.territories?.length) {
+				for (const territory of price.territories) {
+					priceInfo.ele('TerritoryCode').txt(territory);
+				}
+			}
+
+			priceInfo
+				.ele('PriceType', {
+					Namespace: price.priceTypeNamespace || 'DPID',
+				})
+				.txt(price.priceType);
+
+			priceInfo
+				.ele('Price', {
+					CurrencyCode: price.currencyCode,
+				})
+				.txt(this.normalizePriceValue(price.value));
+		}
+	}
+
+	private normalizePriceValue(value: number | string): string {
+		if (typeof value === 'number') return String(value);
+
+		const normalized = String(value).trim().replace(',', '.');
+		return normalized;
 	}
 }
