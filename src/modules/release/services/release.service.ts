@@ -683,7 +683,7 @@ export class ReleaseService {
 			codes: dto.code,
 		});
 
-		if (!errorsDsp) {
+		if (!errorsDsp || errorsDsp.length === 0) {
 			await this.releaseRepo.update(id, {
 				status: ReleaseStatus.DISTRIBUTED,
 			});
