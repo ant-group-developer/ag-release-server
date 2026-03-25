@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { Repository } from 'typeorm';
 import { DspMessage } from '../constants/dsp.constant';
 import { QueryGetListDspDto } from '../dto/dsp.dto';
@@ -92,6 +93,7 @@ export class DspQueryService {
 	private createQueryGetList(query: QueryGetListDspDto) {
 		const {
 			keyword,
+			aggregatorCode,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -131,6 +133,18 @@ export class DspQueryService {
 					endUpdatedAt,
 				},
 			);
+		}
+
+		if (aggregatorCode) {
+			queryBuilder
+				.innerJoin('dsp.dspRoutingConfig', 'dspRoutingConfig')
+				.innerJoin('dspRoutingConfig.aggregator', 'aggregator')
+				.andWhere('dspRoutingConfig.mode = :routingMode', {
+					routingMode: RoutingModeEnum.AGGREGATOR,
+				})
+				.andWhere('aggregator.code = :aggregatorCode', {
+					aggregatorCode,
+				});
 		}
 
 		queryBuilder.orderBy(`dsp.${fieldOrder}`, orderBy);

@@ -812,6 +812,9 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
 
+			.leftJoinAndSelect('track.priceTier', 'priceTier')
+			.leftJoinAndSelect('priceTier.currency', 'currency')
+
 			.leftJoinAndSelect('track.primaryGenre', 'trackPrimaryGenre')
 			.leftJoinAndSelect('track.subGenre', 'trackSubGenre')
 

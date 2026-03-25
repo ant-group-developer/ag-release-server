@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { GetListReleaseLogDto } from '../dto/release-log.dto';
 import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
 import { enhanceReleaseDetail } from '../utils/release.utils';
@@ -33,6 +34,20 @@ export class ReleaseLogService {
 		@InjectRepository(ReleaseLog)
 		private readonly releaseLogRepo: Repository<ReleaseLog>,
 	) {}
+
+	@Cron(CronExpression.EVERY_DAY_AT_1AM)
+	async deleteOldLogs() {
+		const cutoffDate = new Date();
+		cutoffDate.setMonth(cutoffDate.getMonth() - 1);
+
+		const result = await this.releaseLogRepo.delete({
+			createdAt: LessThan(cutoffDate),
+		});
+
+		this.logger.log(
+			`Deleted old release logs older than ${cutoffDate.toISOString()}, affected: ${result.affected ?? 0}`,
+		);
+	}
 
 	async findAll(query: GetListReleaseLogDto) {
 		const {

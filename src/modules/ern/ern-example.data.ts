@@ -88,6 +88,11 @@ export const albumExample: ErnInput = {
 				fileName: 'QT6KL2500010_T1S.wav',
 				filePath: 'resources/',
 			},
+			price: {
+				priceType: 'StandardRetailPrice',
+				value: 6.99,
+				currencyCode: 'USD',
+			},
 		},
 		{
 			isrc: 'QT6KL2500011',
@@ -100,6 +105,14 @@ export const albumExample: ErnInput = {
 				fileName: 'QT6KL2500011_T2S.wav',
 				filePath: 'resources/',
 			},
+		},
+	],
+	deals: [
+		{
+			territories: ['Worldwide'],
+			startDate: '2025-12-20T00:00:00Z',
+			commercialModels: ['PayAsYouGoModel'],
+			useTypes: ['PermanentDownload'],
 		},
 	],
 };

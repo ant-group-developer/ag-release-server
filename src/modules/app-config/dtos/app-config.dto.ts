@@ -125,6 +125,9 @@ export class UpdateGeneratorDto {
 export class UpdateOtherAppconfigDto {
 	@IsOptional()
 	fileCiTemplateId?: string | null;
+
+	@IsOptional()
+	excelDataStartRow?: number | null;
 }
 
 export class UpdateConfigDto {

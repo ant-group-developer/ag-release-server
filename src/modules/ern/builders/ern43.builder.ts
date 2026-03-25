@@ -2,7 +2,6 @@ import { create } from 'xmlbuilder2';
 import {
 	ErnArtistInput,
 	ErnContributorInput,
-	ErnDealInput,
 	ErnInput,
 	ErnTrackInput,
 } from '../interfaces/ern-input.interface';
@@ -493,6 +492,7 @@ export class Ern43Builder {
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Apply each deal to each track release
 		for (let i = 0; i < this.input.tracks.length; i++) {
+			const track = this.input.tracks[i];
 			const releaseRef = `R${i + 1}`;
 			const techRef = `T${i + 1}S`;
 
@@ -519,7 +519,9 @@ export class Ern43Builder {
 					terms.ele('UseType').txt(ut);
 				}
 
-				this.appendPrices(terms, deal);
+				this.appendPrice(terms, track);
+
+				console.log('appendPrice', terms, track);
 
 				d.ele('DealTechnicalResourceDetailsReferenceList')
 					.ele('DealTechnicalResourceDetailsReference')
@@ -594,33 +596,23 @@ export class Ern43Builder {
 		return duration;
 	}
 
-	private appendPrices(
+	private appendPrice(
 		terms: ReturnType<typeof create>,
-		deal: ErnDealInput,
+		track: ErnTrackInput,
 	): void {
-		if (!deal.prices?.length) return;
+		if (!track.price) return;
 
-		for (const price of deal.prices) {
-			const priceInfo = terms.ele('PriceInformation');
+		const amount = this.normalizePriceValue(track.price.value);
 
-			if (price.territories?.length) {
-				for (const territory of price.territories) {
-					priceInfo.ele('TerritoryCode').txt(territory);
-				}
-			}
+		const priceInfo = terms.ele('PriceInformation', {
+			PriceType: track.price.priceType,
+		});
 
-			priceInfo
-				.ele('PriceType', {
-					Namespace: price.priceTypeNamespace || 'DPID',
-				})
-				.txt(price.priceType);
-
-			priceInfo
-				.ele('Price', {
-					CurrencyCode: price.currencyCode,
-				})
-				.txt(this.normalizePriceValue(price.value));
-		}
+		priceInfo
+			.ele('SuggestedRetailPrice', {
+				CurrencyCode: track.price.currencyCode,
+			})
+			.txt(amount);
 	}
 
 	private normalizePriceValue(value: number | string): string {
