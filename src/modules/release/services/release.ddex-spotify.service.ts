@@ -531,6 +531,12 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 					order: track.order,
 
+					price: {
+						priceType: 'StandardRetailPrice',
+						value: track.priceTier?.amount ?? 0,
+						currencyCode: track.priceTier?.currency.code ?? '',
+					},
+
 					genre:
 						track.primaryGenre?.name ??
 						release.primaryGenre?.name ??

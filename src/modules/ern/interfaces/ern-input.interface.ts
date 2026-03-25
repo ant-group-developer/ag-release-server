@@ -138,6 +138,8 @@ export interface ErnTrackInput {
 	recordingMode?: string;
 	/** Audio file technical details */
 	audioFile?: ErnAudioFileInput;
+
+	price?: ErnPriceInput;
 }
 
 // ============================================================================
@@ -224,17 +226,13 @@ export interface ErnDealInput {
 	useTypes: string[];
 	/** Whether this is a takedown deal (ERN 3.8.2) */
 	takeDown?: boolean;
-
-	prices?: ErnPriceInput[];
 }
 
 // price
 export interface ErnPriceInput {
-	priceType: string;
-	priceTypeNamespace?: string;
-	value: number | string;
+	priceType: 'StandardRetailPrice';
+	value: number;
 	currencyCode: string;
-	territories?: string[];
 }
 
 // ============================================================================
