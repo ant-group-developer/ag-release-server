@@ -359,4 +359,14 @@ export class ReleaseController {
 
 		return new ResponseSuccess({ message: 'Đang được xử lý' });
 	}
+
+	// fb
+	@Post(':id/create-metadata-ddex-fb-on-server')
+	async createMetadataDdexFbOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.processFacebookDsp(id);
+		return result;
+	}
 }

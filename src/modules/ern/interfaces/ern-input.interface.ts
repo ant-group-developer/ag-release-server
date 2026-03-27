@@ -43,8 +43,12 @@ export interface ErnMessageInput {
 	id: string;
 	/** Message sender */
 	sender: ErnPartyInput;
+
+	sentOnBehalfOf?: ErnPartyInput;
+
 	/** Message recipient */
 	recipient: ErnPartyInput;
+
 	/** Thread ID for grouping related messages */
 	threadId?: string;
 	/** XML filename (ERN 3.8.2) */

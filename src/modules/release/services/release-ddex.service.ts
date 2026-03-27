@@ -1,21 +1,22 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import * as crypto from 'crypto';
 
-import { OnEvent } from '@nestjs/event-emitter';
-import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
+import { AggregatorCode } from 'src/modules/distribution/aggregator/enum/distribution.enum';
+import { AggregatorsService } from 'src/modules/distribution/aggregator/services/aggregators.service';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import {
 	ErnInput,
+	ErnVersion,
 	ManifestInput,
 } from 'src/modules/ern/interfaces/ern-input.interface';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
@@ -43,12 +44,12 @@ interface CoverImageInfo {
 }
 
 @Injectable()
-export class ReleaseDdexSpotifyService implements OnModuleInit {
-	private readonly logger = new Logger(ReleaseDdexSpotifyService.name);
+export class ReleaseDdexService {
+	private readonly logger = new Logger(ReleaseDdexService.name);
 
 	// Spotify DPID (Party ID)
-	private DDEX_PARTY_ID_SPOTIFY: string;
-	private DDEX_PARTY_NAME_SPOTIFY: string;
+	private DDEX_PARTY_ID_RECIPIENT: string;
+	private DDEX_PARTY_NAME_RECIPIENT: string;
 
 	constructor(
 		@InjectRepository(Release)
@@ -64,20 +65,37 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 		private readonly countryService: CountryService,
 		private readonly releaseLogService: ReleaseLogService,
+		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
 	/**
 	 * Main entry point - tạo metadata Spotify trên server
 	 */
-	async createMetadataSpotifyOnServer(releaseId: string) {
+	async createMetadataOnServer({
+		releaseId,
+		ernVersion,
+		recipient,
+		sender,
+	}: {
+		releaseId: string;
+		ernVersion: ErnVersion;
+		sender: {
+			partyId: string;
+			name: string;
+		};
+		recipient: {
+			partyId: string;
+			name: string;
+		};
+	}) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		const batchId = genBatchId();
 
 		this.releaseLogService.pending({
 			releaseId,
-			step: 'createMetadataSpotifyOnServer',
-			message: `[ERN_SPOTIFY] Starting batch: ${batchId}`,
+			step: 'createMetadataOnServer',
+			message: `[ERN] Starting batch: ${batchId}`,
 			content: release,
 		});
 
@@ -85,7 +103,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		if (!upc) {
 			this.releaseLogService.pending({
 				releaseId,
-				step: 'createMetadataSpotifyOnServer',
+				step: 'createMetadataOnServer',
 				message: `Release missing UPC`,
 				content: release,
 			});
@@ -107,7 +125,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 		this.releaseLogService.success({
 			releaseId,
-			step: 'createMetadataSpotifyOnServer',
+			step: 'createMetadataOnServer',
 			message: `[FOLDER_CREATED] ${releaseDir}`,
 			content: release,
 		});
@@ -117,43 +135,46 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 			await this.fetchAudioAndImageReleaseFromBucket(release);
 
 		// 3. Process and save cover image
-		await this.processCoverImageSpotify({
+		await this.processCoverImage({
 			coverImage,
 			outputDir: resourcesDir,
 			upc,
 		});
 
 		// 4. Process and save audio files
-		this.processAudioFilesSpotify({ audioFiles, outputDir: resourcesDir });
+		this.processAudioFiles({ audioFiles, outputDir: resourcesDir });
 
 		// 5. DDEX file
-		await this.createErnFile({ releaseId, outputDir: releaseDir });
+		await this.createErnFile({
+			releaseId,
+			outputDir: releaseDir,
+			ernVersion,
+			recipient,
+			sender,
+		});
 
 		this.createManifestFile({
 			batchId,
 			upc,
 			outputRoot,
+			recipient,
 		});
 
 		// cập nhật dường dẫn
 		await this.releaseRepo.update(releaseId, {
-			metadataSpotify: {
-				...release.metadataSpotify,
-				folderServer: outputRoot.replace(/\\/g, '/'),
-				// batchId,
-			},
+			directDdexOnServer: outputRoot.replace(/\\/g, '/'),
 		});
 
 		this.releaseLogService.success({
 			releaseId,
-			step: 'createMetadataSpotifyOnServer',
+			step: 'createMetadataOnServer',
 			message: `[COMPLETED] Batch ${batchId} - ${upc}`,
 			content: release,
 		});
 
 		this.logger.log({
 			releaseId,
-			step: 'createMetadataSpotifyOnServer',
+			step: 'createMetadataOnServer',
 			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
 		});
 
@@ -166,12 +187,29 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	async createErnFile({
 		releaseId,
 		outputDir,
+		ernVersion,
+		sender,
+		recipient,
 	}: {
 		releaseId: string;
 		outputDir: string;
+		ernVersion: ErnVersion;
+		sender: {
+			partyId: string;
+			name: string;
+		};
+		recipient: {
+			partyId: string;
+			name: string;
+		};
 	}) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
-		const input: ErnInput = this.parseErnInputFromRelease(release);
+		const input: ErnInput = this.parseErnInputFromRelease({
+			release,
+			ernVersion,
+			sender,
+			recipient,
+		});
 		const xmlContent = this.ernService.generate(input);
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
@@ -188,24 +226,27 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		batchId,
 		upc,
 		outputRoot,
+		recipient,
 	}: {
 		batchId: string;
 		upc: string;
 		outputRoot: string;
+
+		recipient: {
+			partyId: string;
+			name: string;
+		};
 	}) {
 		const xmlFilePath = path.join(outputRoot, upc, `${upc}.xml`);
 		const hash = this.getSha1Base64(xmlFilePath);
 
 		const manifest: ManifestInput = {
 			sender: {
-				partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
-				name: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
+				partyId: this.appConfigSv.DDEX_PARTY_ID_AMG(),
+				name: this.appConfigSv.DDEX_PARTY_NAME_AMG(),
 			},
 
-			recipient: {
-				partyId: this.DDEX_PARTY_ID_SPOTIFY,
-				name: this.DDEX_PARTY_NAME_SPOTIFY,
-			},
+			recipient,
 
 			messages: [
 				{
@@ -216,7 +257,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 					releaseId: {
 						icpn: upc,
 						proprietaryId: {
-							namespace: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
+							namespace: this.appConfigSv.DDEX_PARTY_ID_AMG(),
 							value: upc,
 						},
 					},
@@ -244,7 +285,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		this.logger.log(`[MANIFEST_CREATED] ${manifestPath}`);
 	}
 
-	async uploadMetadataSpotifyToSftp(releaseId: string) {
+	async uploadMetadataDdexSpotifyToSftp(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 		try {
 			const sftp =
@@ -254,31 +295,37 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 
 			await this.sftpConnectService.uploadFolderScp({
 				sftp,
-				localDir: release.metadataSpotify?.folderServer ?? '',
+				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
 			});
 		} catch (error) {
 			throw new Error(error);
 		} finally {
-			await removeFolder(release.metadataSpotify?.folderServer ?? '');
+			await removeFolder(release.directDdexOnServer ?? '');
 		}
 	}
 
-	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
-	async handleDdexPartyUpdated() {
-		await this.reloadConfig();
+	async uploadMetadataDdexCiToSftp(releaseId: string) {
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		try {
+			const sftp =
+				await this.aggregatorsService.resolveSftpAggregatorCode({
+					aggregatorCode: AggregatorCode.CI,
+				});
+
+			await this.sftpConnectService.uploadFolderScp({
+				sftp,
+				localDir: release.directDdexOnServer ?? '',
+				remoteDir: sftp.path ?? '/',
+			});
+		} catch (error) {
+			throw new Error(error);
+		} finally {
+			await removeFolder(release.directDdexOnServer ?? '');
+		}
 	}
 
-	async onModuleInit() {
-		await this.reloadConfig();
-	}
-
-	private async reloadConfig() {
-		const { ddexId, ddexName } = await this.dspSv.getDdexPartySpotify();
-
-		this.DDEX_PARTY_ID_SPOTIFY = ddexId;
-		this.DDEX_PARTY_NAME_SPOTIFY = ddexName;
-	}
+	// private
 
 	// ==================== FILE PROCESSING ====================
 
@@ -365,7 +412,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	 * Process cover image - resize and save to resources folder
 	 * Format: resources/{UPC}.jpg
 	 */
-	private async processCoverImageSpotify({
+	private async processCoverImage({
 		coverImage,
 		outputDir,
 		upc,
@@ -392,7 +439,7 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	 * Format: resources/{ISRC}_T{trackNo}S.{ext}
 	 * Example: resources/QT6KL2500010_T1S.wav
 	 */
-	private processAudioFilesSpotify({
+	private processAudioFiles({
 		audioFiles,
 		outputDir,
 	}: {
@@ -416,7 +463,23 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 	 * Parse Release entity sang DDEXData structure
 	 */
 
-	private parseErnInputFromRelease(release: Release): ErnInput {
+	private parseErnInputFromRelease({
+		release,
+		ernVersion,
+		sender,
+		recipient,
+	}: {
+		release: Release;
+		ernVersion: ErnVersion;
+		sender: {
+			partyId: string;
+			name: string;
+		};
+		recipient: {
+			partyId: string;
+			name: string;
+		};
+	}): ErnInput {
 		const normalizeParentalWarning = (code?: string) => {
 			switch (code) {
 				case 'Explicit':
@@ -444,20 +507,14 @@ export class ReleaseDdexSpotifyService implements OnModuleInit {
 		const territories = this.getTerritoriesFromRelease(release);
 
 		const result: ErnInput = {
-			version: '4.3',
+			version: ernVersion,
 
 			message: {
 				id: release.upc ?? release.id,
 
-				sender: {
-					partyId: this.appConfigSv.DDEX_PARTY_ID_SENDER(),
-					name: this.appConfigSv.DDEX_PARTY_NAME_SENDER(),
-				},
+				sender,
 
-				recipient: {
-					partyId: this.DDEX_PARTY_ID_SPOTIFY,
-					name: this.DDEX_PARTY_NAME_SPOTIFY,
-				},
+				recipient,
 			},
 
 			release: {
