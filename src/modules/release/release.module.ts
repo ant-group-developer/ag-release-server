@@ -5,6 +5,7 @@ import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { CountryModule } from '../country/country.module';
 import { Country } from '../country/entities/country.entity';
+import { AggregatorsModule } from '../distribution/aggregator/aggregator.module';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
@@ -29,9 +30,10 @@ import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
+import { ReleaseDdexService } from './services/release-ddex.service';
 import { ReleaseLogService } from './services/release-log.service';
 import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
-import { ReleaseDdexSpotifyService } from './services/release.ddex-spotify.service';
+import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
@@ -74,6 +76,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		DspRoutingConfigsModule,
 
 		CountryModule,
+		AggregatorsModule,
 	],
 	controllers: [
 		ReleaseController,
@@ -87,8 +90,9 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseQueryService,
 
 		ReleaseDdexCiService,
-		ReleaseDdexSpotifyService,
+		ReleaseSpotifyService2,
 		ReleaseLogService,
+		ReleaseDdexService,
 	],
 })
 export class ReleaseModule {}

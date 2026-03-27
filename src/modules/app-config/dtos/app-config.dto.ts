@@ -111,11 +111,11 @@ export class UpdateGeneratorDto {
 
 	@IsOptional()
 	// @IsNotEmpty()
-	DDEX_PARTY_ID_SENDER: string;
+	DDEX_PARTY_ID_AMG: string;
 
 	@IsOptional()
 	// @IsNotEmpty()
-	DDEX_PARTY_NAME_SENDER: string;
+	DDEX_PARTY_NAME_AMG: string;
 
 	@IsOptional()
 	// @IsNotEmpty()

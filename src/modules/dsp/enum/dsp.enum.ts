@@ -8,4 +8,5 @@ export enum FieldOrderDsp {
 export enum DspCode {
 	SPOTIFY = 'SPOTIFY',
 	APPLE_MUSIC = 'APPLE_MUSIC',
+	FACEBOOK = 'FACEBOOK',
 }

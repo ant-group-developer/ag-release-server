@@ -71,8 +71,8 @@ export interface IGenerator {
 
 	API_KEY_GRPC_ISRC_UPC: string;
 
-	DDEX_PARTY_ID_SENDER: string;
-	DDEX_PARTY_NAME_SENDER: string;
+	DDEX_PARTY_ID_AMG: string;
+	DDEX_PARTY_NAME_AMG: string;
 }
 
 export interface OtherAppconfig {

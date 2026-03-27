@@ -59,12 +59,12 @@ export class AppConfigService implements OnModuleInit {
 	}
 
 	// ddex
-	DDEX_PARTY_ID_SENDER() {
-		return this.getValue('config.generator.DDEX_PARTY_ID_SENDER') ?? '';
+	DDEX_PARTY_ID_AMG() {
+		return this.getValue('config.generator.DDEX_PARTY_ID_AMG') ?? '';
 	}
 
-	DDEX_PARTY_NAME_SENDER() {
-		return this.getValue('config.generator.DDEX_PARTY_NAME_SENDER') ?? '';
+	DDEX_PARTY_NAME_AMG() {
+		return this.getValue('config.generator.DDEX_PARTY_NAME_AMG') ?? '';
 	}
 
 	getPublic() {

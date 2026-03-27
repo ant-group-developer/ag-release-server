@@ -19,7 +19,6 @@ import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
-import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
@@ -44,6 +43,7 @@ import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
+import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -65,7 +65,7 @@ export class ReleaseService {
 		private readonly bucketService: BucketService2,
 
 		private readonly releaseDdexCiService: ReleaseDdexCiService,
-		private readonly releaseDdexSpotifyService: ReleaseDdexSpotifyService,
+		private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
@@ -705,11 +705,16 @@ export class ReleaseService {
 	}) {
 		const errors: string[] = [];
 
+		// chỗ này bắt buộc phải xử lý từng thằng dsp chứ ko đc xử lý song song
 		for (const code of codes) {
 			try {
 				switch (code) {
 					case String(DspCode.SPOTIFY):
 						await this.processSpotifyDsp(releaseId);
+						break;
+
+					case String(DspCode.FACEBOOK):
+						await this.processFacebookDsp(releaseId);
 						break;
 
 					default: {
@@ -791,6 +796,71 @@ export class ReleaseService {
 		}
 	}
 
+	async processFacebookDsp(releaseId: string): Promise<void> {
+		const dspFb = await this.dspRepo.findOne({
+			where: { code: DspCode.FACEBOOK },
+		});
+
+		if (!dspFb) {
+			this.releaseLogService.failed({
+				releaseId,
+				codeDsp: DspCode.FACEBOOK,
+				message: 'DSP FACEBOOK not found',
+				step: 'processFacebookDsp',
+			});
+			throw new ResponseError({ message: 'DSP FACEBOOK not found' });
+		}
+
+		await this.upsertReleaseDspDeliveryProcessing(releaseId, dspFb.id);
+
+		try {
+			//
+			await this.releaseDdexCiService.createAndUploadMetadataDdexCi({
+				releaseId,
+				recipient: {
+					name: dspFb.ddexName ?? '',
+					partyId: dspFb.ddexId ?? '',
+				},
+			});
+
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspFb.id },
+				{
+					status: ReleaseDspStatus.DISTRIBUTED,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: new Date(),
+				},
+			);
+
+			this.releaseLogService.success({
+				releaseId,
+				step: 'processFacebookDsp',
+				message: `processFacebookDsp SUCCESS`,
+				codeDsp: DspCode.FACEBOOK,
+				dspId: 'HyTE8Isu5o',
+			});
+		} catch (error) {
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspFb.id },
+				{
+					status: ReleaseDspStatus.ISSUES,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				},
+			);
+
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'processFacebookDsp',
+				message: `processFacebookDsp failed ${error?.message ?? 'unknown'}`,
+				codeDsp: DspCode.FACEBOOK,
+				dspId: 'HyTE8Isu5o',
+			});
+
+			throw error;
+		}
+	}
+
 	private async upsertReleaseDspDeliveryProcessing(
 		releaseId: string,
 		dspId: string,
@@ -837,7 +907,9 @@ export class ReleaseService {
 	}
 
 	async createMetadataCiOnServer(id: string) {
-		return await this.releaseDdexCiService.createMetadataCiOnServer(id);
+		return await this.releaseDdexCiService.createMetadataFolderCiOnServer(
+			id,
+		);
 	}
 
 	async uploadMetadataCiToBucket({
@@ -847,7 +919,7 @@ export class ReleaseService {
 		id: string;
 		// localDir: string;
 	}) {
-		return await this.releaseDdexCiService.uploadMetadataCiToBucket({
+		return await this.releaseDdexCiService.uploadMetadataFolderCiToBucket({
 			// localDir,
 			releaseId: id,
 		});
@@ -860,84 +932,36 @@ export class ReleaseService {
 	}
 
 	async uploadMetadataCiToSftp(id: string) {
-		return await this.releaseDdexCiService.uploadMetadataCiToSftp(id);
+		return await this.releaseDdexCiService.uploadMetadataFolderCiToSftp(id);
 	}
 
 	async createMetadataCiAndUploadToBucket(id: string) {
-		return await this.releaseDdexCiService.createMetadataCiAndUploadToBucket(
+		return await this.releaseDdexCiService.createMetadataFolderCiAndUploadToBucket(
 			id,
 		);
 	}
 
 	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
-		this.releaseLogService.pending({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Start create & upload metadata Spotify - releaseId=${id}`,
-		});
-
-		await this.createMetadataSpotifyOnServer(id);
-
-		this.releaseLogService.success({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Metadata created on server - releaseId=${id}`,
-		});
-
-		await this.uploadMetadataSpotifyToSftp(id);
-
-		this.releaseLogService.success({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Metadata uploaded to SFTP - releaseId=${id}`,
-		});
-
-		this.releaseLogService.success({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Finish create & upload metadata Spotify - releaseId=${id}`,
-		});
+		await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(id);
+		await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(id);
 	}
 
+	// test
 	async createMetadataSpotifyOnServer(id: string) {
-		this.releaseLogService.pending({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Creating metadata Spotify on server - releaseId=${id}`,
-		});
-
 		const result =
-			await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
+			await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(
 				id,
 			);
-
-		this.releaseLogService.success({
-			releaseId: id,
-			step: 'createAndUploadMetadataSpotify',
-			message: `Created metadata Spotify successfully - releaseId=${id}`,
-		});
 
 		return result;
 	}
 
 	async uploadMetadataSpotifyToSftp(id: string) {
-		this.releaseLogService.pending({
-			releaseId: id,
-			step: 'uploadMetadataSpotifyToSftp',
-			message: `Uploading metadata Spotify to SFTP - releaseId=${id}`,
-		});
-
 		const result =
-			await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
+			await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(
 				id,
 			);
-
-		this.releaseLogService.success({
-			releaseId: id,
-			step: 'uploadMetadataSpotifyToSftp',
-			message: `Uploaded metadata Spotify successfully - releaseId=${id}`,
-		});
 
 		return result;
 	}
