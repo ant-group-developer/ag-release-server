@@ -14,6 +14,7 @@ import {
 	UpdateAggregatorDto,
 } from '../dto/aggregator.dto';
 import { Aggregator } from '../entities/aggregator.entity';
+import { AggregatorCode } from '../enum/distribution.enum';
 import { AggregatorQueryService } from './aggregator.query.service';
 
 @Injectable()
@@ -244,6 +245,34 @@ export class AggregatorsService {
 			[RoutingModeEnum.AGGREGATOR], // 'aggregator'
 		);
 	}
+
+	async resolveSftpAggregatorCode({
+		aggregatorCode,
+	}: {
+		aggregatorCode: string;
+	}) {
+		const entity = await this.repo.findOne({
+			where: { code: aggregatorCode },
+			relations: { sftpConfig: { metadata: true } },
+		});
+
+		if (!entity || !entity.sftpConfig.metadata)
+			throw AggregatorException.NOT_FOUND();
+
+		return entity.sftpConfig.metadata;
+	}
+
+	async getDdexParty({ aggregatorCode }: { aggregatorCode: AggregatorCode }) {
+		const entity = await this.repo.findOne({
+			where: { code: aggregatorCode },
+		});
+
+		if (!entity || !entity.ddexId || !entity.ddexName)
+			throw AggregatorException.NOT_FOUND();
+		return { ddexId: entity.ddexId, ddexName: entity.ddexName };
+	}
+
+	async getDdexPartyCi() {}
 
 	private async increaseDspUsageCount({
 		manager,

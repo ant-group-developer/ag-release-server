@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	ArrayNotEmpty,
 	IsArray,
 	IsBoolean,
 	IsDate,
@@ -191,6 +192,18 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 }
 
 export class QueryGetListReleaseDto extends BaseQueryDto {
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	ids?: string[];
+
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -416,4 +429,16 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	isVariousArtist?: boolean;
 
 	tenantIds?: string[];
+}
+
+export class FileExportReleaseCiDto {
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	ids: string[];
+
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	dspCodeCi: string[];
 }

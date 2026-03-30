@@ -59,12 +59,12 @@ export class AppConfigService implements OnModuleInit {
 	}
 
 	// ddex
-	DDEX_PARTY_ID_SENDER() {
-		return this.getValue('config.generator.DDEX_PARTY_ID_SENDER') ?? '';
+	DDEX_PARTY_ID_AMG() {
+		return this.getValue('config.generator.DDEX_PARTY_ID_AMG') ?? '';
 	}
 
-	DDEX_PARTY_NAME_SENDER() {
-		return this.getValue('config.generator.DDEX_PARTY_NAME_SENDER') ?? '';
+	DDEX_PARTY_NAME_AMG() {
+		return this.getValue('config.generator.DDEX_PARTY_NAME_AMG') ?? '';
 	}
 
 	getPublic() {
@@ -105,6 +105,19 @@ export class AppConfigService implements OnModuleInit {
 		} else if (website) {
 			website.logo = websiteDb.logo;
 		}
+
+		// if (
+		// 	other?.fileCiTemplateId !== undefined &&
+		// 	other.fileCiTemplateId !== otherDb.fileCiTemplateId &&
+		// 	otherDb.fileCiTemplateId
+		// ) {
+		// 	this.eventEmitter.emit(
+		// 		AppEvent.DELETE_TEMPLDATE_EXPORT_CI,
+		// 		otherDb.fileCiTemplateId,
+		// 	);
+		// } else if (otherDb) {
+		// 	other?.fileCiTemplateId = otherDb.fileCiTemplateId;
+		// }
 
 		// const
 		const e = { ...dataDb, config: { ...dataDb.config, ...payload } };

@@ -71,8 +71,13 @@ export interface IGenerator {
 
 	API_KEY_GRPC_ISRC_UPC: string;
 
-	DDEX_PARTY_ID_SENDER: string;
-	DDEX_PARTY_NAME_SENDER: string;
+	DDEX_PARTY_ID_AMG: string;
+	DDEX_PARTY_NAME_AMG: string;
+}
+
+export interface OtherAppconfig {
+	fileCiTemplateId?: string | null;
+	excelDataStartRow?: number | null;
 }
 
 export interface AppConfigShape {
@@ -83,4 +88,6 @@ export interface AppConfigShape {
 	acrCloud: AcrCloud; // Cấu hình ACRCloud dùng cho nhận diện âm thanh
 	general: GeneralConfig; // Các cấu hình chung ở cấp độ toàn hệ thống
 	generator: IGenerator;
+
+	other: OtherAppconfig;
 }

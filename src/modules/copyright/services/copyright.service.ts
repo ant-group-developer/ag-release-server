@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { ScanCopyrightStatus } from 'src/modules/track/enum/track.enum';
 import {
 	CompareHistoryScanDto,
@@ -22,11 +22,8 @@ export class CopyrightService {
 	private readonly logger = new Logger(CopyrightService.name);
 	private scanControllers = new Map<string, AbortController>();
 
-	// private scoreWarning: number;
-	// private chunkDuration: number;
-
 	constructor(
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly appConfigService: AppConfigService,
 
 		private readonly copyrightAcrService: CopyrightAcrService,

@@ -43,8 +43,12 @@ export interface ErnMessageInput {
 	id: string;
 	/** Message sender */
 	sender: ErnPartyInput;
+
+	sentOnBehalfOf?: ErnPartyInput;
+
 	/** Message recipient */
 	recipient: ErnPartyInput;
+
 	/** Thread ID for grouping related messages */
 	threadId?: string;
 	/** XML filename (ERN 3.8.2) */
@@ -138,6 +142,8 @@ export interface ErnTrackInput {
 	recordingMode?: string;
 	/** Audio file technical details */
 	audioFile?: ErnAudioFileInput;
+
+	price?: ErnPriceInput;
 }
 
 // ============================================================================
@@ -224,6 +230,13 @@ export interface ErnDealInput {
 	useTypes: string[];
 	/** Whether this is a takedown deal (ERN 3.8.2) */
 	takeDown?: boolean;
+}
+
+// price
+export interface ErnPriceInput {
+	priceType: 'StandardRetailPrice';
+	value: number;
+	currencyCode: string;
 }
 
 // ============================================================================

@@ -5,11 +5,15 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 
-import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
+import {
+	COMMENT_FOR_NULLABLE_DRAFT,
+	DEFAULT_LENGTH_CODE,
+} from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
+import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -25,6 +29,7 @@ import {
 } from 'typeorm';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
+import { ReleaseLog } from './release-log.entity';
 
 @Entity('releases', {
 	comment:
@@ -164,6 +169,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	releaseDate: Date | null;
 
 	@Column({
+		type: 'date',
+		nullable: true,
+		comment: 'Ngày phát hành gốc ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	releaseOriginalDate: Date | null;
+
+	@Column({
 		type: 'varchar',
 		length: 10,
 		nullable: true,
@@ -230,7 +242,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	releaseCoverArts?: ReleaseCoverArt[];
 
 	@OneToMany(() => ReleaseDspDelivery, (releaseDsp) => releaseDsp.release)
-	releaseDsp: ReleaseDspDelivery[];
+	releaseDspDeliveries: ReleaseDspDelivery[];
 
 	@OneToOne(
 		() => ReleaseTerritory,
@@ -273,4 +285,32 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		folderBucket: string | null;
 		folderServer: string | null;
 	} | null;
+
+	@OneToMany(() => ReleaseLog, (rL) => rL.release)
+	logs: ReleaseLog[];
+
+	// nếu dùng thì nhớ phải join đủ
+	get listCodeExportCi() {
+		return this.releaseDspDeliveries
+			.map((r) => {
+				if (
+					r.dsp?.dspRoutingConfig?.mode ===
+						RoutingModeEnum.AGGREGATOR &&
+					r.dsp?.dspRoutingConfig?.aggregator?.code === 'CI'
+				) {
+					return r.dsp.codeCi;
+				}
+				return null;
+			})
+			.filter((code): code is string => Boolean(code?.trim()));
+	}
+
+	@Column({
+		type: 'varchar',
+		nullable: true,
+		length: DEFAULT_LENGTH_CODE,
+		// comment:
+		// 	'Đường dẫn cho nghiệp vụ lấy ddex theo ern version tương ứng, ví dụ baseDirectDdex/3_8',
+	})
+	directDdexOnServer: string | null;
 }

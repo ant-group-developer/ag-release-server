@@ -5,3 +5,7 @@ export enum FieldOrderAggregator {
 	createdAt = `${OrmAlias.aggregator}.createdAt`,
 	dspUsageCount = `${OrmAlias.aggregator}.dspUsageCount`,
 }
+
+export enum AggregatorCode {
+	CI = 'CI',
+}

@@ -4,8 +4,9 @@ import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import {
 	CreateUpc,
 	UpcIndustry,
@@ -15,11 +16,9 @@ import {
 	UpcYesNo,
 } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
-import { ReleaseDspDeliveryLogLevel } from 'src/modules/release-dsp-delivery-log/enum/release-dsp-delivery-log.enum';
-import { ReleaseDspDeliveryLogService } from 'src/modules/release-dsp-delivery-log/release-dsp-delivery-log.service';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
-import { ReleaseDspStatus } from 'src/modules/release-dsp/enum/release-dsp.enum';
-import { ReleaseDdexSpotifyService } from 'src/modules/release/services/release.ddex-spotify.service';
+import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
@@ -28,18 +27,23 @@ import {
 	getFileTxtFromRelease,
 } from 'src/utils/util.file';
 import { PassThrough } from 'stream';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
 import {
+	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
+import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { enhanceReleasesDetails } from '../utils/release.utils';
+import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexCiService } from './release.ddex-ci.service';
+import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -49,13 +53,19 @@ export class ReleaseService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(ReleaseLog)
+		private readonly releaseLogRepo: Repository<ReleaseLog>,
+
+		private readonly releaseLogService: ReleaseLogService,
+
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 
 		private readonly releaseDdexCiService: ReleaseDdexCiService,
-		private readonly releaseDdexSpotifyService: ReleaseDdexSpotifyService,
+		private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
@@ -64,9 +74,10 @@ export class ReleaseService {
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
 
+		private readonly fileExportCiService: FileExportCiService,
+
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
-		private readonly releaseDspDeliveryLogService: ReleaseDspDeliveryLogService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -82,7 +93,7 @@ export class ReleaseService {
 		};
 	}
 
-	async findOneFull(id: string): Promise<IReleaseDetail> {
+	async findOneFull(id: string) {
 		const release = await this.releaseQueryService.findOneReleaseFull(id);
 
 		const { releaseCoverArts, ...restOfRelease } = release;
@@ -103,13 +114,26 @@ export class ReleaseService {
 		const { releases, totalItems } =
 			await this.releaseQueryService.getManyAndCount(query);
 
-		const enhancedRelease = this.enhanceReleasesDetails(releases);
+		const enhancedRelease = enhanceReleasesDetails(releases);
 
 		return new PageDto({
 			items: enhancedRelease,
 			metadata: {
 				page,
 				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getListFull(query: QueryGetListReleaseDto) {
+		const { items, totalItems } =
+			await this.releaseQueryService.getListFull(query);
+
+		return new PageDto({
+			items,
+			metadata: {
+				...query,
 				totalItems,
 			},
 		});
@@ -123,7 +147,7 @@ export class ReleaseService {
 		const { releases, totalItems } =
 			await this.releaseQueryService.getManyAndCount(query);
 
-		const enhancedRelease = this.enhanceReleasesDetails(releases);
+		const enhancedRelease = enhanceReleasesDetails(releases);
 
 		return new PageDto({
 			items: enhancedRelease,
@@ -153,18 +177,78 @@ export class ReleaseService {
 		});
 	}
 
-	private enhanceReleasesDetails(releases: Release[]) {
-		return releases.map((release) => {
-			const { releaseCoverArts, ...restOfRelease } = release;
+	// file export ci
+	async listCodeExportCiById(id: string) {
+		const release = await this.releaseQueryService.findOneReleaseFull(id);
 
-			const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
+		return release.listCodeExportCi;
+	}
 
-			return {
-				...restOfRelease,
-				coverArtThumbnails,
-			};
+	async dataExportCiById(id: string) {
+		const { listCodeExportCi: listCodeDspCi, upc } =
+			await this.releaseQueryService.findOneReleaseFull(id);
+
+		return {
+			listCodeDspCi,
+			upc,
+		};
+	}
+
+	async listDataExportCi(query: QueryGetListReleaseDto2) {
+		const res = await this.getListFull(query);
+		const records = res.items.map((r) => this.dataExportCi(r));
+
+		return records;
+	}
+
+	dataExportCi(release: Release) {
+		return {
+			listCodeDspCi: release.listCodeExportCi,
+			upc: release.upc,
+		};
+	}
+
+	async getFileExportCiById(id: string) {
+		const record = await this.dataExportCiById(id);
+
+		return await this.fileExportCiService.createFileExportCi({
+			data: [record],
 		});
 	}
+
+	async getFileExportListReleaseCi(query: QueryGetListReleaseDto2) {
+		const res = await this.getListFull(query);
+
+		const records = res.items
+			.filter((r) => r.upc != null)
+			.map((r) => this.dataExportCi(r));
+
+		const result = await this.fileExportCiService.createFileExportCi({
+			data: records,
+		});
+
+		return result;
+	}
+
+	async getFileExportListReleaseCiByDspCode(data: FileExportReleaseCiDto) {
+		const query = new QueryGetListReleaseDto();
+		query.ids = data.ids;
+
+		const res = await this.getListFull(query);
+
+		const records = res.items.map((r) => ({
+			listCodeDspCi: data.dspCodeCi,
+			upc: r.upc,
+		}));
+
+		const result = await this.fileExportCiService.createFileExportCi({
+			data: records,
+		});
+
+		return result;
+	}
+
+	//
 
 	async update(
 		id: string,
@@ -321,7 +405,16 @@ export class ReleaseService {
 			this.appConfigService.cache.config.generator.prefixUpcDefaultId;
 
 		if (!prefixUpcId) {
-			throw new ResponseError({ message: 'Release chưa có prefixUpcId' });
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'genUpc',
+				content: release,
+				message: 'Release chưa có prefixUpcId',
+			});
+
+			throw new ResponseError({
+				message: 'Release chưa có prefixUpcId',
+			});
 		}
 
 		const payload: CreateUpc = {
@@ -349,6 +442,13 @@ export class ReleaseService {
 
 		const newUpc = res.data.gtin; // theo proto UpcItem
 		if (!newUpc) {
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'genUpc',
+				content: release,
+				message: 'Service UPC không trả về GTIN',
+			});
+
 			throw new ResponseError({
 				message: 'Service UPC không trả về GTIN',
 			});
@@ -356,6 +456,13 @@ export class ReleaseService {
 
 		// -------- Update release --------
 		await this.releaseRepo.update(releaseId, { upc: newUpc });
+
+		await this.releaseLogRepo.insert({
+			status: ReleaseLogStatus.SUCCESS,
+			releaseId,
+			logs: 'Generation succeeded',
+			step: 'Gen Upc',
+		});
 
 		return newUpc;
 	}
@@ -444,6 +551,8 @@ export class ReleaseService {
 				'delivery.status as delivery_status',
 				'delivery.last_enqueued_at as delivery_last_enqueued_at',
 				'delivery.last_delivered_at as delivery_last_delivered_at',
+				'delivery.logs as logs',
+				'delivery.is_selected as delivery_is_selected',
 			])
 			.getRawMany();
 
@@ -457,6 +566,8 @@ export class ReleaseService {
 			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
 			lastEnqueuedAt: row.delivery_last_enqueued_at,
 			lastDeliveredAt: row.delivery_last_delivered_at,
+			logs: row.logs,
+			isSelected: row.delivery_is_selected ?? true,
 		}));
 
 		return {
@@ -472,13 +583,58 @@ export class ReleaseService {
 
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.PROCESSING,
+		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+		await this.handleSelected(id, dto.code);
+
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'submit',
+			message: 'Release đang được xử lý',
 		});
 
-		this.processingSubmit({ id, userId, dto }).catch((_e) => {});
+		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+			});
+
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'catch processingSubmit',
+				message: error?.message ?? 'Unknow',
+			});
+		});
 
 		return { message: 'Đang được xử lý' };
+	}
+
+	async handleSelected(releaseId: string, codes: string[]) {
+		const normalizedCodes = [
+			...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
+		];
+
+		const dsps = await this.dspRepo.find({
+			where: {
+				code: In(normalizedCodes),
+			},
+			select: ['id', 'code'],
+		});
+
+		const dspIdsSelected = dsps.map((dsp) => dsp.id);
+
+		await this.releaseDspDeliveryRepo.update(
+			{ releaseId },
+			{ isSelected: false },
+		);
+
+		if (dspIdsSelected.length > 0) {
+			await this.releaseDspDeliveryRepo.update(
+				{
+					releaseId,
+					dspId: In(dspIdsSelected),
+				},
+				{ isSelected: true },
+			);
+		}
 	}
 
 	async processingSubmit({
@@ -490,9 +646,9 @@ export class ReleaseService {
 		userId: string;
 		dto: SubmitReleaseDto;
 	}) {
-		// upc, isrc
 		const release = await this.releaseQueryService.findOneWithRelation(id);
 
+		// gen upc, isrc
 		if (!release.upc) {
 			await this.genUpc(id);
 		}
@@ -503,11 +659,18 @@ export class ReleaseService {
 			}
 		}
 
-		// validate
 		const errors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);
 
 		if (errors.length > 0) {
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'validate schemaRelease',
+				message: errors
+					.map((e) => e?.message ?? 'Unknown error')
+					.join(', '),
+			});
+
 			throw new ResponseError({
 				message:
 					'Release validation failed. Please check the input data.',
@@ -515,18 +678,20 @@ export class ReleaseService {
 			});
 		}
 
-		// xử lý theo từng dsp
-		const hasIssues = await this.processDsps({
+		const errorsDsp = await this.processDsps({
 			releaseId: id,
 			codes: dto.code,
 		});
 
-		// cập nhật kết quả
-		await this.releaseRepo.update(id, {
-			status: hasIssues
-				? ReleaseStatus.ISSUES
-				: ReleaseStatus.DISTRIBUTED,
-		});
+		if (!errorsDsp || errorsDsp.length === 0) {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.DISTRIBUTED,
+			});
+		} else {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+			});
+		}
 
 		return this.releaseQueryService.findOne(id);
 	}
@@ -537,42 +702,53 @@ export class ReleaseService {
 	}: {
 		releaseId: string;
 		codes: string[];
-	}): Promise<boolean> {
-		let hasIssues = false;
+	}) {
+		const errors: string[] = [];
 
+		// chỗ này bắt buộc phải xử lý từng thằng dsp chứ ko đc xử lý song song
 		for (const code of codes) {
 			try {
 				switch (code) {
-					case 'SPOTIFY':
+					case String(DspCode.SPOTIFY):
 						await this.processSpotifyDsp(releaseId);
 						break;
 
-					default:
-						hasIssues = true;
-						this.logger.error(
-							`DSP ${code} is not supported for release ${releaseId}`,
-						);
+					case String(DspCode.FACEBOOK):
+						await this.processFacebookDsp(releaseId);
 						break;
+
+					default: {
+						const message = `DSP ${code} is not supported for release ${releaseId}`;
+
+						errors.push(`${code}: ${message}`);
+						this.logger.error(message);
+						break;
+					}
 				}
 			} catch (error) {
-				hasIssues = true;
+				const message =
+					error?.message ||
+					`DSP process failed for release ${releaseId}, code: ${code}`;
 
-				this.logger.error(
-					`DSP process failed for release ${releaseId}, code: ${code}`,
-					error?.stack,
-				);
+				errors.push(`${code}: ${message}`);
 			}
 		}
 
-		return hasIssues;
+		return errors;
 	}
 
 	private async processSpotifyDsp(releaseId: string): Promise<void> {
 		const dspSpotify = await this.dspRepo.findOne({
-			where: { code: 'SPOTIFY' },
+			where: { code: DspCode.SPOTIFY },
 		});
 
 		if (!dspSpotify) {
+			this.releaseLogService.failed({
+				releaseId,
+				codeDsp: DspCode.SPOTIFY,
+				message: 'DSP SPOTIFY not found',
+				step: 'processSpotifyDsp',
+			});
 			throw new ResponseError({ message: 'DSP SPOTIFY not found' });
 		}
 
@@ -590,6 +766,14 @@ export class ReleaseService {
 					lastDeliveredAt: new Date(),
 				},
 			);
+
+			this.releaseLogService.success({
+				releaseId,
+				step: 'processSpotifyDsp',
+				message: `processSpotifyDsp SUCCESS`,
+				codeDsp: DspCode.SPOTIFY,
+				dspId: 'SMImv6mH7H',
+			});
 		} catch (error) {
 			await this.releaseDspDeliveryRepo.update(
 				{ releaseId, dspId: dspSpotify.id },
@@ -600,16 +784,77 @@ export class ReleaseService {
 				},
 			);
 
-			await this.releaseDspDeliveryLogService.create({
+			this.releaseLogService.failed({
 				releaseId,
-				dspId: dspSpotify.id,
-				title: 'Spotify metadata processing failed',
-				content: error?.message ?? 'Unknown error',
-				level: ReleaseDspDeliveryLogLevel.ERROR,
-				metadata: {
-					stack: error?.stack,
-					step: 'createAndUploadMetadataSpotify',
+				step: 'processSpotifyDsp',
+				message: `processSpotifyDsp failed ${error?.message ?? 'unknown'}`,
+				codeDsp: DspCode.SPOTIFY,
+				dspId: 'SMImv6mH7H',
+			});
+
+			throw error;
+		}
+	}
+
+	async processFacebookDsp(releaseId: string): Promise<void> {
+		const dspFb = await this.dspRepo.findOne({
+			where: { code: DspCode.FACEBOOK },
+		});
+
+		if (!dspFb) {
+			this.releaseLogService.failed({
+				releaseId,
+				codeDsp: DspCode.FACEBOOK,
+				message: 'DSP FACEBOOK not found',
+				step: 'processFacebookDsp',
+			});
+			throw new ResponseError({ message: 'DSP FACEBOOK not found' });
+		}
+
+		await this.upsertReleaseDspDeliveryProcessing(releaseId, dspFb.id);
+
+		try {
+			//
+			await this.releaseDdexCiService.createAndUploadMetadataDdexCi({
+				releaseId,
+				recipient: {
+					name: dspFb.ddexName ?? '',
+					partyId: dspFb.ddexId ?? '',
 				},
+			});
+
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspFb.id },
+				{
+					status: ReleaseDspStatus.DISTRIBUTED,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: new Date(),
+				},
+			);
+
+			this.releaseLogService.success({
+				releaseId,
+				step: 'processFacebookDsp',
+				message: `processFacebookDsp SUCCESS`,
+				codeDsp: DspCode.FACEBOOK,
+				dspId: 'HyTE8Isu5o',
+			});
+		} catch (error) {
+			await this.releaseDspDeliveryRepo.update(
+				{ releaseId, dspId: dspFb.id },
+				{
+					status: ReleaseDspStatus.ISSUES,
+					lastEnqueuedAt: new Date(),
+					lastDeliveredAt: null,
+				},
+			);
+
+			this.releaseLogService.failed({
+				releaseId,
+				step: 'processFacebookDsp',
+				message: `processFacebookDsp failed ${error?.message ?? 'unknown'}`,
+				codeDsp: DspCode.FACEBOOK,
+				dspId: 'HyTE8Isu5o',
 			});
 
 			throw error;
@@ -634,6 +879,7 @@ export class ReleaseService {
 				status: ReleaseDspStatus.PROCESSING,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: null,
+				isSelected: true,
 			});
 			return;
 		}
@@ -644,6 +890,7 @@ export class ReleaseService {
 				status: ReleaseDspStatus.PROCESSING,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: null,
+				isSelected: true,
 			},
 		);
 	}
@@ -660,7 +907,9 @@ export class ReleaseService {
 	}
 
 	async createMetadataCiOnServer(id: string) {
-		return await this.releaseDdexCiService.createMetadataCiOnServer(id);
+		return await this.releaseDdexCiService.createMetadataFolderCiOnServer(
+			id,
+		);
 	}
 
 	async uploadMetadataCiToBucket({
@@ -670,7 +919,7 @@ export class ReleaseService {
 		id: string;
 		// localDir: string;
 	}) {
-		return await this.releaseDdexCiService.uploadMetadataCiToBucket({
+		return await this.releaseDdexCiService.uploadMetadataFolderCiToBucket({
 			// localDir,
 			releaseId: id,
 		});
@@ -683,60 +932,36 @@ export class ReleaseService {
 	}
 
 	async uploadMetadataCiToSftp(id: string) {
-		return await this.releaseDdexCiService.uploadMetadataCiToSftp(id);
+		return await this.releaseDdexCiService.uploadMetadataFolderCiToSftp(id);
 	}
 
 	async createMetadataCiAndUploadToBucket(id: string) {
-		return await this.releaseDdexCiService.createMetadataCiAndUploadToBucket(
+		return await this.releaseDdexCiService.createMetadataFolderCiAndUploadToBucket(
 			id,
 		);
 	}
 
 	// spotify
 	async createAndUploadMetadataSpotify(id: string) {
-		this.logger.log(
-			`Start create & upload metadata Spotify - releaseId=${id}`,
-		);
-
-		await this.createMetadataSpotifyOnServer(id);
-		this.logger.log(`Metadata created on server - releaseId=${id}`);
-
-		await this.uploadMetadataSpotifyToSftp(id);
-		this.logger.log(`Metadata uploaded to SFTP - releaseId=${id}`);
-
-		this.logger.log(
-			`Finish create & upload metadata Spotify - releaseId=${id}`,
-		);
+		await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(id);
+		await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(id);
 	}
 
+	// test
 	async createMetadataSpotifyOnServer(id: string) {
-		this.logger.log(
-			`Creating metadata Spotify on server - releaseId=${id}`,
-		);
-
 		const result =
-			await this.releaseDdexSpotifyService.createMetadataSpotifyOnServer(
+			await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(
 				id,
 			);
-
-		this.logger.log(
-			`Created metadata Spotify successfully - releaseId=${id}`,
-		);
 
 		return result;
 	}
 
 	async uploadMetadataSpotifyToSftp(id: string) {
-		this.logger.log(`Uploading metadata Spotify to SFTP - releaseId=${id}`);
-
 		const result =
-			await this.releaseDdexSpotifyService.uploadMetadataSpotifyToSftp(
+			await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(
 				id,
 			);
-
-		this.logger.log(
-			`Uploaded metadata Spotify successfully - releaseId=${id}`,
-		);
 
 		return result;
 	}

@@ -1,5 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 

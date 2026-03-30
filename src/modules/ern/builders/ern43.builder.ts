@@ -492,6 +492,7 @@ export class Ern43Builder {
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Apply each deal to each track release
 		for (let i = 0; i < this.input.tracks.length; i++) {
+			const track = this.input.tracks[i];
 			const releaseRef = `R${i + 1}`;
 			const techRef = `T${i + 1}S`;
 
@@ -517,6 +518,10 @@ export class Ern43Builder {
 				for (const ut of deal.useTypes) {
 					terms.ele('UseType').txt(ut);
 				}
+
+				this.appendPrice(terms, track);
+
+				console.log('appendPrice', terms, track);
 
 				d.ele('DealTechnicalResourceDetailsReferenceList')
 					.ele('DealTechnicalResourceDetailsReference')
@@ -589,5 +594,31 @@ export class Ern43Builder {
 			return `PT${hours}H${minutes}M${seconds}S`;
 		}
 		return duration;
+	}
+
+	private appendPrice(
+		terms: ReturnType<typeof create>,
+		track: ErnTrackInput,
+	): void {
+		if (!track.price) return;
+
+		const amount = this.normalizePriceValue(track.price.value);
+
+		const priceInfo = terms.ele('PriceInformation', {
+			PriceType: track.price.priceType,
+		});
+
+		priceInfo
+			.ele('SuggestedRetailPrice', {
+				CurrencyCode: track.price.currencyCode,
+			})
+			.txt(amount);
+	}
+
+	private normalizePriceValue(value: number | string): string {
+		if (typeof value === 'number') return String(value);
+
+		const normalized = String(value).trim().replace(',', '.');
+		return normalized;
 	}
 }

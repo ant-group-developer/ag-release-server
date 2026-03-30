@@ -22,6 +22,9 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	isDefault: boolean;
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
+	ddexVersion: string | null;
+
+	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
 	ddexId: string | null;
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })

@@ -8,7 +8,7 @@ import {
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { PartialTestConnectionDto } from 'src/modules/distribution/sftp-configs/type/sftp-config.type';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
@@ -18,6 +18,7 @@ import { ILike, In, Repository } from 'typeorm';
 import { DspMessages } from '../constants/dsp.message';
 import { CreateDspDto, QueryGetListDspDto, UpdateDspDto } from '../dto/dsp.dto';
 import { Dsp } from '../entities/dsp.entity';
+import { DspCode } from '../enum/dsp.enum';
 import { DspQueryService } from './dsp.query.service';
 
 @Injectable()
@@ -27,7 +28,7 @@ export class DspService {
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly dspQueryService: DspQueryService,
 
 		private readonly dspActionService: DspActionService,
@@ -333,7 +334,7 @@ export class DspService {
 	async getDdexPartySpotify() {
 		const dsp = await this.dspRepo.findOne({
 			where: {
-				code: 'SPOTIFY',
+				code: DspCode.SPOTIFY,
 			},
 		});
 

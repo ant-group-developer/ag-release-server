@@ -6,6 +6,7 @@ import { BaseUserTrackedCustomIDEntity } from 'src/common/entities/user-tracked.
 import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profile.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
@@ -84,22 +85,6 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 		type: 'varchar',
 		length: 255,
 		nullable: true,
-		comment: 'ID nghệ sĩ trên Spotify',
-	})
-	spotifyId: string | null;
-
-	@Column({
-		type: 'varchar',
-		length: 255,
-		nullable: true,
-		comment: 'ID nghệ sĩ trên Apple Music',
-	})
-	appleMusicId: string | null;
-
-	@Column({
-		type: 'varchar',
-		length: 255,
-		nullable: true,
 		comment: 'Thể loại chính theo DSP',
 	})
 	primaryGenre: string | null;
@@ -134,7 +119,7 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	modifier: User;
 
 	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.artist)
-	artistProfiles: ArtistProfile[] | [];
+	artistProfiles: ArtistProfile[];
 
 	@ManyToOne(() => Genre, (genre) => genre.artists)
 	@JoinColumn({ name: 'genre_id' })
@@ -146,4 +131,45 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 
 	releaseCount?: number;
 	trackCount?: number;
+
+	// nếu dùng thì nhớ phải join đủ
+	get spotifyId(): string | undefined {
+		const profileSpotify = this.artistProfiles.find(
+			(p) => p.dsp.code === String(DspCode.SPOTIFY),
+		);
+
+		return extractIdFromUrl(profileSpotify?.url);
+	}
+
+	// nếu dùng thì nhớ phải join đủ
+	get appleMusicId(): string | undefined {
+		const profileApple = this.artistProfiles.find(
+			(p) => p.dsp.code === String(DspCode.APPLE_MUSIC),
+		);
+
+		return extractIdFromUrl(profileApple?.url);
+	}
+}
+
+function extractIdFromUrl(url?: string, type?: 'artist'): string | undefined {
+	if (!url) return;
+
+	try {
+		const parsed = new URL(url);
+		const parts = parsed.pathname.split('/').filter(Boolean);
+
+		// Spotify: /artist/{id}
+		if (parsed.hostname.includes('spotify')) {
+			return parts[1]; // ["artist", "id"]
+		}
+
+		// Apple Music: /us/artist/name/{id}
+		if (parsed.hostname.includes('apple')) {
+			return parts[parts.length - 1];
+		}
+
+		return;
+	} catch {
+		return;
+	}
 }

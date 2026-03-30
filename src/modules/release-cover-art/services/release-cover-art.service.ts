@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import sharp from 'sharp';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { UploadPurpose } from 'src/modules/bucket2/enum/bucket.enum';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { EntityManager, Repository } from 'typeorm';
 import { CreateReleaseCoverArtDto } from '../dto/release-cover-art.dto';
 import { ReleaseCoverArt } from '../entities/release-cover-art.entity';
@@ -24,7 +24,7 @@ export class ReleaseCoverArtService {
 		private readonly releaseCoverArtRepo: Repository<ReleaseCoverArt>,
 
 		private readonly releaseCoverArtValidateService: ReleaseCoverArtValidateService,
-		private readonly bucketService: BucketService,
+		private readonly bucketService2: BucketService2,
 	) {}
 
 	/**
@@ -116,7 +116,7 @@ export class ReleaseCoverArtService {
 		const {
 			fileBuffer: originalBuffer,
 			fileDb: { fileName, contentType, extension },
-		} = await this.bucketService.getFileBuffer(originalCoverArt.fileId);
+		} = await this.bucketService2.getFileBuffer(originalCoverArt.fileId);
 
 		const extensionValidated = this.validateSharpFormat(extension);
 
@@ -135,7 +135,7 @@ export class ReleaseCoverArtService {
 			}),
 		);
 
-		const resCreateBuckets = await this.bucketService.bulkCreate({
+		const resCreateBuckets = await this.bucketService2.bulkCreate({
 			bucketDtos: missingSizes.map((size) => ({
 				folderBucket: {
 					releaseId,
@@ -162,7 +162,7 @@ export class ReleaseCoverArtService {
 					},
 				});
 
-				await this.bucketService.submit(item.fileId);
+				await this.bucketService2.submit(item.fileId);
 
 				const [width, height] = item.key!.split('x').map(Number);
 
@@ -309,7 +309,7 @@ export class ReleaseCoverArtService {
 		const {
 			fileBuffer: originalBuffer,
 			fileDb: { fileName, contentType, extension },
-		} = await this.bucketService.getFileBuffer(fileId);
+		} = await this.bucketService2.getFileBuffer(fileId);
 
 		// validate format ảnh
 		const extensionValidated = this.validateSharpFormat(extension);
@@ -340,7 +340,7 @@ export class ReleaseCoverArtService {
 		);
 
 		// tạo upload url
-		const resCreateBuckets = await this.bucketService.bulkCreate({
+		const resCreateBuckets = await this.bucketService2.bulkCreate({
 			bucketDtos: resizeSizes.map((size) => ({
 				folderBucket: {
 					releaseId,
@@ -371,7 +371,7 @@ export class ReleaseCoverArtService {
 				});
 
 				// confirm upload
-				await this.bucketService.submit(item.fileId);
+				await this.bucketService2.submit(item.fileId);
 
 				result[item.key as ReleaseCoverArtSize] = item.fileId;
 			}),
@@ -425,7 +425,7 @@ export class ReleaseCoverArtService {
 
 		await Promise.all(
 			releaseCoverArts.map((item) =>
-				this.bucketService.deleteSafe(item.fileId),
+				this.bucketService2.deleteSafe(item.fileId),
 			),
 		);
 	}

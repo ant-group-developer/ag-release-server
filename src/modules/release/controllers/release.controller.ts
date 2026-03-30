@@ -18,7 +18,6 @@ import {
 } from 'src/common/dtos/common.response.dto';
 
 import { Request, Response } from 'express';
-import { AppResponseSuccess } from 'src/app.const';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import {
 	RequirePermissions,
@@ -27,9 +26,14 @@ import {
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
+import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
 import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
-import { QueryGetListReleaseDto, UpdateReleaseDto } from '../dto/release.dto';
+import {
+	FileExportReleaseCiDto,
+	QueryGetListReleaseDto,
+	UpdateReleaseDto,
+} from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
@@ -52,6 +56,35 @@ export class ReleaseController {
 
 		const result = await this.releaseService.getList(query);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('list-data-export-ci')
+	async listDataExportCi(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.listDataExportCi(query);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('file-export-list-release-ci')
+	async getFileExportListReleaseCi(
+		@Query() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+		@Res() res: Response,
+	) {
+		const buffer =
+			await this.releaseService.getFileExportListReleaseCi(query);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
 	}
 
 	@SystemAdminOnly()
@@ -89,6 +122,34 @@ export class ReleaseController {
 		const result = await this.releaseService.findOneFull(id);
 
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/list-code-export-ci')
+	async listCodeExportCiById(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.listCodeExportCiById(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/record-export-ci')
+	async dataExportCiById(@Param('id') id: string, @Req() req: Request) {
+		const result = await this.releaseService.dataExportCiById(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/file-export-ci')
+	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
+		const buffer = await this.releaseService.getFileExportCiById(id);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
 	}
 
 	@Get(':id/download/csv-metadata')
@@ -146,6 +207,25 @@ export class ReleaseController {
 		return ReleaseSuccess.UPDATE(result);
 	}
 
+	@Post('file-export-release-ci')
+	async getFileExportListReleaseCiByDspCode(
+		@Body() data: FileExportReleaseCiDto,
+		@Req() req: Request,
+		@Res() res: Response,
+	) {
+		const buffer =
+			await this.releaseService.getFileExportListReleaseCiByDspCode(data);
+
+		const stream = Readable.from(buffer);
+
+		return streamDownload(res, {
+			stream,
+			contentType:
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			fileName: `ci_export_${Date.now()}.xlsx`,
+		});
+	}
+
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/submit')
 	async submit(
@@ -154,9 +234,11 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		const result = await this.releaseService.submit(id, userId, dto);
+		await this.releaseService.submit(id, userId, dto);
 
-		return AppResponseSuccess.COMMON(result);
+		return new ResponseSuccess({
+			messageCode: 'common.processing',
+		});
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
@@ -266,29 +348,6 @@ export class ReleaseController {
 		return result;
 	}
 
-	// @Post(':id/create-and-upload-metadata-spotify')
-	// async createAndUploadMetadataSpotify(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	// await this.releaseService.createMetadataSpotifyOnServer(id);
-	// 	// const result =
-	// 	// 	await this.releaseService.uploadMetadataSpotifyToSftp(id);
-	// 	// return result;
-
-	// 	this.uploadSafe(id);
-	// }
-
-	// async uploadSafe(id: string) {
-	// 	try {
-	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
-	// 		const result =
-	// 			await this.releaseService.uploadMetadataSpotifyToSftp(id);
-	// 	} catch (error) {
-	// 		console.log(error);
-	// 	}
-	// }
-
 	@Post(':id/create-and-upload-metadata-spotify')
 	createAndUploadMetadataSpotify(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -299,5 +358,15 @@ export class ReleaseController {
 		});
 
 		return new ResponseSuccess({ message: 'Đang được xử lý' });
+	}
+
+	// fb
+	@Post(':id/create-metadata-ddex-fb-on-server')
+	async createMetadataDdexFbOnServer(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+	) {
+		const result = await this.releaseService.processFacebookDsp(id);
+		return result;
 	}
 }

@@ -62,3 +62,37 @@ export class UploadCompleteDto {
 	@IsNotEmpty()
 	storageKeys: string[];
 }
+
+export class ReleaseStatusDto {
+	@IsString()
+	@IsNotEmpty()
+	batchId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	releaseFolder: string;
+}
+
+export class GetBatchProgressDto {
+	@IsString()
+	@IsNotEmpty()
+	batchId: string;
+}
+
+export class LogSkippedReleaseDto {
+	@IsString()
+	@IsNotEmpty()
+	tenantCode: string;
+
+	@IsString()
+	@IsNotEmpty()
+	batchId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	releaseFolder: string;
+
+	@IsString()
+	@IsNotEmpty()
+	reason: string;
+}

@@ -112,6 +112,14 @@ export class CreateReleaseDraftDto {
 	@IsDate()
 	releaseDate?: Date | null;
 
+	@ApiProperty({ example: '2025-07-01' })
+	@IsOptional()
+	@Transform(({ value }: { value: string | undefined }) =>
+		value ? new Date(value) : undefined,
+	)
+	@IsDate()
+	releaseOriginalDate?: Date | null;
+
 	@ApiProperty({ example: '18:00' })
 	@IsOptional()
 	@IsString()

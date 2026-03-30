@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
+import { ReleaseLogService } from 'src/modules/release/services/release-log.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
@@ -23,6 +24,8 @@ export class TrackService {
 
 		private readonly isrcService: IsrcService,
 		private readonly appConfigService: AppConfigService,
+
+		private readonly releaseLogService: ReleaseLogService,
 	) {}
 
 	async submit(
@@ -162,6 +165,12 @@ export class TrackService {
 		const mainArtistName = track.trackArtists?.[0]?.artist?.name ?? '';
 
 		if (!mainArtistName) {
+			this.releaseLogService.failed({
+				releaseId: track.releaseId,
+				step: 'genISRC',
+				message: 'Bài hát thiếu thông tin nghệ sĩ',
+			});
+
 			throw new ResponseError({
 				message: 'Bài hát thiếu thông tin nghệ sĩ',
 				data: track.title,
@@ -171,6 +180,12 @@ export class TrackService {
 		// Registrant: lấy từ P-Line owner hoặc release label (tuỳ domain)
 		const registrantName = track.release?.label?.name ?? '';
 		if (!registrantName) {
+			this.releaseLogService.failed({
+				releaseId: track.releaseId,
+				step: 'genISRC',
+				message: 'Thiếu thông tin registrantName (P-Line owner/label)',
+			});
+
 			throw new ResponseError({
 				message: 'Thiếu thông tin registrantName (P-Line owner/label)',
 			});
@@ -198,6 +213,12 @@ export class TrackService {
 		// Nếu audioFile không có duration, bạn cần thay bằng field đúng
 		const duration = track.audioFile?.duration ?? 0;
 		if (!duration || duration <= 0) {
+			this.releaseLogService.failed({
+				releaseId: track.releaseId,
+				step: 'genISRC',
+				message: 'Thiếu duration (giây) từ audioFile',
+			});
+
 			throw new ResponseError({
 				message: 'Thiếu duration (giây) từ audioFile',
 			});
@@ -207,6 +228,12 @@ export class TrackService {
 			this.appConfigService.cache.config.generator.prefixIsrcDefaultId;
 
 		if (!prefixIsrcId) {
+			this.releaseLogService.failed({
+				releaseId: track.releaseId,
+				step: 'genISRC',
+				message: 'Chưa cấu hình prefixIsrcId',
+			});
+
 			throw new ResponseError({
 				message: 'Chưa cấu hình prefixIsrcId',
 			});
@@ -233,6 +260,12 @@ export class TrackService {
 		// created giả định có created.isrc (bạn sửa theo response thật)
 		const newIsrc = res.data.code;
 		if (!newIsrc) {
+			this.releaseLogService.failed({
+				releaseId: track.releaseId,
+				step: 'genISRC',
+				message: 'Service ISRC không trả về mã ISRC',
+			});
+
 			throw new ResponseError({
 				message: 'Service ISRC không trả về mã ISRC',
 			});

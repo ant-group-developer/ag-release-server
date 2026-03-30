@@ -367,6 +367,7 @@ export class ReleaseQueryService {
 	) {
 		const {
 			keyword,
+			ids,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -391,6 +392,10 @@ export class ReleaseQueryService {
 			skip,
 			pageSize,
 		} = query;
+
+		if (ids && ids.length > 0) {
+			queryBuilder.andWhere(`release.id IN (:...ids)`, { ids });
+		}
 
 		if (keyword) {
 			queryBuilder.andWhere(
@@ -754,14 +759,50 @@ export class ReleaseQueryService {
 	async findOneReleaseFull(releaseId: string): Promise<Release> {
 		const qb = this.releaseRepo
 			.createQueryBuilder('release')
-			.where('release.id = :releaseId', { releaseId })
+			.where('release.id = :releaseId', { releaseId });
 
-			// ===== release level =====
-			.leftJoinAndSelect('release.label', 'label')
+		this.joinFull(qb);
+
+		const release = await qb.getOne();
+
+		if (!release) {
+			throw ReleaseException.NOT_FOUND();
+		}
+
+		release.tracks = release.tracks ?? [];
+		release.releaseArtists = release.releaseArtists ?? [];
+		release.releaseCoverArts = release.releaseCoverArts ?? [];
+
+		return release;
+	}
+
+	async getListFull(query: QueryGetListReleaseDto) {
+		const qb = this.releaseRepo.createQueryBuilder('release');
+		this.joinFull(qb);
+		this.filterByQuery(qb, query);
+
+		const [items, totalItems] = await qb.getManyAndCount();
+
+		return { items, totalItems };
+	}
+
+	private joinFull(qb: SelectQueryBuilder<Release>) {
+		// ===== release level =====
+		qb.leftJoinAndSelect('release.label', 'label')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
+
+			// release artist
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
 			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
+			.leftJoinAndSelect(
+				'releaseArtist.artistProfiles',
+				'releaseArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'releaseArtistProfile.dsp',
+				'releaseArtistProfileDsp',
+			)
 
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
@@ -770,6 +811,9 @@ export class ReleaseQueryService {
 			// ===== tracks =====
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
+
+			.leftJoinAndSelect('track.priceTier', 'priceTier')
+			.leftJoinAndSelect('priceTier.currency', 'currency')
 
 			.leftJoinAndSelect('track.primaryGenre', 'trackPrimaryGenre')
 			.leftJoinAndSelect('track.subGenre', 'trackSubGenre')
@@ -793,18 +837,21 @@ export class ReleaseQueryService {
 			)
 			.leftJoinAndSelect('trackContributors.artist', 'contributorArtist')
 
+			// dsp delivery
+			.leftJoinAndSelect(
+				'release.releaseDspDeliveries',
+				'releaseDspDelivery',
+			)
+			.leftJoinAndSelect(
+				'releaseDspDelivery.dsp',
+				'releaseDspDeliveryDsp',
+			)
+			.leftJoinAndSelect(
+				'releaseDspDeliveryDsp.dspRoutingConfig',
+				'dspRoutingConfig',
+			)
+			.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator')
+
 			.orderBy('track.order', 'ASC');
-
-		const release = await qb.getOne();
-
-		if (!release) {
-			throw ReleaseException.NOT_FOUND();
-		}
-
-		release.tracks = release.tracks ?? [];
-		release.releaseArtists = release.releaseArtists ?? [];
-		release.releaseCoverArts = release.releaseCoverArts ?? [];
-
-		return release;
 	}
 }

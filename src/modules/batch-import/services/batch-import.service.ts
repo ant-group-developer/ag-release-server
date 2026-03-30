@@ -5,8 +5,7 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
-import { FileEntity } from 'src/modules/bucket/entities/bucket.file.entity';
-import { StorageProvider } from 'src/modules/bucket/enum/bucket.enum';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -15,7 +14,7 @@ import { Language } from 'src/modules/language/entities/language.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp/entities/release-dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -33,6 +32,7 @@ import { EXCEL_COLUMNS } from '../constants/excel-columns.constant';
 import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
+	LogSkippedReleaseDto,
 	UploadCompleteDto,
 	ValidateReleaseDto,
 } from '../dto/batch-import.dto';
@@ -70,6 +70,69 @@ export class BatchImportService {
 		const [data, total] = await qb.getManyAndCount();
 
 		return { data, total };
+	}
+
+	/**
+	 * Get the latest status of a specific release for idempotency checks.
+	 */
+	async getReleaseStatus(
+		batchId: string,
+		releaseFolder: string,
+	): Promise<string | null> {
+		const log = await this.logRepo.findOne({
+			where: { batchId, releaseFolder },
+			order: { createdAt: 'DESC' },
+			select: ['status'],
+		});
+
+		return log?.status ?? null;
+	}
+
+	/**
+	 * Get aggregate progress for a batch.
+	 */
+	async getBatchProgress(batchId: string) {
+		const logs = await this.logRepo.find({
+			where: { batchId },
+			select: ['status'],
+		});
+
+		const total = logs.length;
+		const completed = logs.filter(
+			(l) => l.status === BatchImportStatus.COMPLETED,
+		).length;
+		const failed = logs.filter(
+			(l) =>
+				l.status === BatchImportStatus.FAILED ||
+				l.status === BatchImportStatus.VALIDATION_FAILED,
+		).length;
+		const skipped = logs.filter(
+			(l) => l.status === BatchImportStatus.SKIPPED,
+		).length;
+		const inProgress = total - completed - failed - skipped;
+
+		return { batchId, total, completed, failed, skipped, inProgress };
+	}
+
+	/**
+	 * Log a skipped release (missing or unreadable Excel file).
+	 */
+	async logSkippedRelease(dto: LogSkippedReleaseDto) {
+		const log = this.logRepo.create({
+			tenantCode: dto.tenantCode,
+			batchId: dto.batchId,
+			releaseFolder: dto.releaseFolder,
+			status: BatchImportStatus.SKIPPED,
+			errors: [dto.reason],
+		});
+
+		const saved = await this.logRepo.save(log);
+
+		this.logger.log(
+			`Logged skipped release "${dto.releaseFolder}" in batch "${dto.batchId}": ${dto.reason}`,
+		);
+
+		return { logId: saved.id };
 	}
 
 	async validateRelease(dto: ValidateReleaseDto) {
@@ -360,7 +423,7 @@ export class BatchImportService {
 						fileEntity.extension = ext;
 						fileEntity.fileSize = 0;
 						fileEntity.bucket = 'ag-music';
-						fileEntity.storageProvider = StorageProvider.R2;
+
 						const savedFile = await manager.save(
 							FileEntity,
 							fileEntity,
@@ -385,7 +448,7 @@ export class BatchImportService {
 					fileEntity.extension = ext;
 					fileEntity.fileSize = 0;
 					fileEntity.bucket = 'ag-music';
-					fileEntity.storageProvider = StorageProvider.R2;
+
 					const savedFile = await manager.save(
 						FileEntity,
 						fileEntity,

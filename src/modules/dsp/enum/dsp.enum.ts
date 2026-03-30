@@ -4,3 +4,9 @@ export enum FieldOrderDsp {
 	CREATED_AT = 'createdAt',
 	UPDATED_AT = 'updatedAt',
 }
+
+export enum DspCode {
+	SPOTIFY = 'SPOTIFY',
+	APPLE_MUSIC = 'APPLE_MUSIC',
+	FACEBOOK = 'FACEBOOK',
+}

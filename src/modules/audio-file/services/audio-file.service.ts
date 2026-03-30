@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { AudioFile } from '../entities/audio-file.entity';
 
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import {
 	IAudioFileDraft,
 	ICreateAudioFile,
@@ -20,7 +20,7 @@ export class AudioFileService {
 		@InjectRepository(AudioFile)
 		private readonly audioFileRepo: Repository<AudioFile>,
 
-		private readonly bucketService: BucketService,
+		private readonly bucketService: BucketService2,
 		private readonly audioFileQueryService: AudioFileQueryService,
 	) {}
 

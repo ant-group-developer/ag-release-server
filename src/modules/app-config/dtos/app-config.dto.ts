@@ -111,15 +111,23 @@ export class UpdateGeneratorDto {
 
 	@IsOptional()
 	// @IsNotEmpty()
-	DDEX_PARTY_ID_SENDER: string;
+	DDEX_PARTY_ID_AMG: string;
 
 	@IsOptional()
 	// @IsNotEmpty()
-	DDEX_PARTY_NAME_SENDER: string;
+	DDEX_PARTY_NAME_AMG: string;
 
 	@IsOptional()
 	// @IsNotEmpty()
 	API_KEY_GRPC_ISRC_UPC: string;
+}
+
+export class UpdateOtherAppconfigDto {
+	@IsOptional()
+	fileCiTemplateId?: string | null;
+
+	@IsOptional()
+	excelDataStartRow?: number | null;
 }
 
 export class UpdateConfigDto {
@@ -157,4 +165,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateGeneratorDto)
 	generator?: UpdateGeneratorDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateOtherAppconfigDto)
+	other?: UpdateOtherAppconfigDto;
 }

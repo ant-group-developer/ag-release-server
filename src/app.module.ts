@@ -17,7 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
-import { BucketModule } from './modules/bucket/bucket.module';
+import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
@@ -43,7 +43,7 @@ import { PermissionModule } from './modules/permission/permission.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
-import { ReleaseDspDeliveryModule } from './modules/release-dsp/release-dsp.module';
+import { ReleaseDspDeliveryModule } from './modules/release-dsp-delivery/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
@@ -116,7 +116,8 @@ import { UserModule } from './modules/user/user.module';
 		ArtistRoleModule,
 		ArtistProfileModule,
 
-		BucketModule,
+		BucketModule2,
+
 		TimezoneModule,
 
 		AppConfigModule,

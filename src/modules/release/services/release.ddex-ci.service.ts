@@ -1,14 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import * as fs from 'fs';
 import mime from 'mime-types';
 import pLimit from 'p-limit';
 import * as path from 'path';
-import { CreateBucketDto } from 'src/modules/bucket/dto/bucket.dto';
-import { UploadPurpose } from 'src/modules/bucket/enum/bucket.enum';
-import { BucketService } from 'src/modules/bucket/services/bucket.service';
+import { AppEvent } from 'src/common/enums/common';
+import { CreateBucketDto } from 'src/modules/bucket2/dto/bucket.dto';
+import { UploadPurpose } from 'src/modules/bucket2/enum/bucket.enum';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Country } from 'src/modules/country/entities/country.entity';
+import { AggregatorCode } from 'src/modules/distribution/aggregator/enum/distribution.enum';
+import { AggregatorsService } from 'src/modules/distribution/aggregator/services/aggregators.service';
 import {
 	GENRE_MAPPING,
 	LANGUAGE_MAPPING,
@@ -25,11 +29,16 @@ import { In, Repository } from 'typeorm';
 import XlsxPopulate from 'xlsx-populate';
 import { ReleaseException } from '../constants/release.constant';
 import { Release } from '../entities/release.entity';
+import { ReleaseDdexService } from './release-ddex.service';
 import { ReleaseQueryService } from './release.query.service';
 
 @Injectable()
 export class ReleaseDdexCiService {
 	private readonly logger = new Logger(ReleaseDdexCiService.name);
+
+	// CI DPID (Party ID)
+	private DDEX_PARTY_ID_CI: string;
+	private DDEX_PARTY_NAME_CI: string;
 
 	constructor(
 		@InjectRepository(Release)
@@ -39,9 +48,13 @@ export class ReleaseDdexCiService {
 		@InjectRepository(Country)
 		private readonly countryRepo: Repository<Country>,
 
-		private readonly bucketSv: BucketService,
+		private readonly bucketSv: BucketService2,
 		private readonly sftpConfigsService: SftpConfigsService,
 		private readonly sftpConnectService: SftpConnectService,
+
+		private readonly releaseDdexService: ReleaseDdexService,
+
+		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
 	async parseMetadata(releaseId: string) {
@@ -53,26 +66,30 @@ export class ReleaseDdexCiService {
 
 	// ci
 	async parseMetadataCi(releaseId: string) {
-		await this.createMetadataCiAndUploadToBucket(releaseId);
-		await this.uploadMetadataCiToSftp(releaseId);
+		await this.createMetadataFolderCiAndUploadToBucket(releaseId);
+		await this.uploadMetadataFolderCiToSftp(releaseId);
 	}
 
 	async createMetadataCiAndUploadToSftp(releaseId: string) {
-		await this.createMetadataCiAndUploadToBucket(releaseId);
-		await this.uploadMetadataCiToSftp(releaseId);
+		await this.createMetadataFolderCiAndUploadToBucket(releaseId);
+		await this.uploadMetadataFolderCiToSftp(releaseId);
 	}
 
-	async createMetadataCiAndUploadToBucket(releaseId: string) {
+	async createMetadataFolderCiAndUploadToBucket(releaseId: string) {
 		// b1
-		await this.createMetadataCiOnServer(releaseId);
+		await this.createMetadataFolderCiOnServer(releaseId);
 
 		// b2
-		await this.uploadMetadataCiToBucket({
+		await this.uploadMetadataFolderCiToBucket({
 			releaseId,
 		});
 	}
 
-	async createMetadataCiOnServer(releaseId: string) {
+	// async createMetadataDdexCi(releaseId: string) {
+	// 	const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+	// }
+
+	async createMetadataFolderCiOnServer(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 		const batchId = Date.now().toString();
 		this.logger.log(batchId);
@@ -92,7 +109,7 @@ export class ReleaseDdexCiService {
 
 		// image
 		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromGCS(release);
+			await this.fetchAudioAndImageReleaseFromBucket(release);
 
 		await this.processCoverImageCi(coverImage, releaseDir, upc);
 
@@ -119,7 +136,7 @@ export class ReleaseDdexCiService {
 		return { outputDir, batchId };
 	}
 
-	async uploadMetadataCiToBucket({
+	async uploadMetadataFolderCiToBucket({
 		// localDir,
 		releaseId,
 	}: {
@@ -223,7 +240,7 @@ export class ReleaseDdexCiService {
 		});
 	}
 
-	async uploadMetadataCiToSftp(releaseId: string) {
+	async uploadMetadataFolderCiToSftp(releaseId: string) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 
 		const sftp = await this.sftpConfigsService.getSftpCi();
@@ -240,7 +257,9 @@ export class ReleaseDdexCiService {
 	}
 
 	// private
-	private async fetchAudioAndImageReleaseFromGCS(release: Release): Promise<{
+	private async fetchAudioAndImageReleaseFromBucket(
+		release: Release,
+	): Promise<{
 		audioFiles: { buffer: Buffer; extension: string }[];
 		coverImage: { buffer: Buffer; extension: string };
 	}> {
@@ -604,5 +623,63 @@ export class ReleaseDdexCiService {
 			fs.writeFileSync(filePath, audio.buffer);
 			console.log(`[TRACK_COPY] ${fileName}`);
 		});
+	}
+
+	async createMetadataDdexCiOnServer({
+		releaseId,
+		recipient,
+	}: {
+		releaseId: string;
+		recipient: {
+			partyId: string;
+			name: string;
+		};
+	}) {
+		await this.releaseDdexService.createMetadataOnServer({
+			releaseId,
+			ernVersion: '3.8.2',
+			sender: {
+				partyId: this.DDEX_PARTY_ID_CI,
+				name: this.DDEX_PARTY_NAME_CI,
+			},
+			recipient,
+		});
+	}
+
+	async uploadMetadataDdexCiToSftp(releaseId: string) {
+		await this.releaseDdexService.uploadMetadataDdexSpotifyToSftp(
+			releaseId,
+		);
+	}
+
+	// /
+	async createAndUploadMetadataDdexCi({
+		recipient,
+		releaseId,
+	}: {
+		releaseId: string;
+		recipient: { partyId: string; name: string };
+	}) {
+		await this.createMetadataDdexCiOnServer({ releaseId, recipient });
+		await this.uploadMetadataDdexCiToSftp(releaseId);
+	}
+
+	// private
+	@OnEvent(AppEvent.UPDATE_DDEX_PARTY)
+	async handleDdexPartyUpdated() {
+		await this.reloadConfig();
+	}
+
+	async onModuleInit() {
+		await this.reloadConfig();
+	}
+
+	private async reloadConfig() {
+		const { ddexId, ddexName } = await this.aggregatorsService.getDdexParty(
+			{ aggregatorCode: AggregatorCode.CI },
+		);
+
+		this.DDEX_PARTY_ID_CI = ddexId;
+		this.DDEX_PARTY_NAME_CI = ddexName;
 	}
 }
