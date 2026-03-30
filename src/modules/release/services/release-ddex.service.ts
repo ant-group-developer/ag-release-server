@@ -25,10 +25,10 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import { Release } from '../entities/release.entity';
-import { ErnService } from '../../ern/services/ern.service';
-import { ReleaseQueryService } from './release.query.service';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
+import { ErnService } from '../../ern/services/ern.service';
+import { Release } from '../entities/release.entity';
+import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -291,7 +291,10 @@ export class ReleaseDdexService {
 	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
 		const client = await this.sftpConnectService.connect(sftp);
 		try {
-			const donePath = path.posix.join(sftp.path ?? '/', `${batchId}.done`);
+			const donePath = path.posix.join(
+				sftp.path ?? '/',
+				`${batchId}.done`,
+			);
 			await client.mkdir(donePath, true);
 			this.logger.log(`[CI_DONE_FOLDER_CREATED] ${donePath}`);
 		} catch (err: any) {
@@ -340,7 +343,9 @@ export class ReleaseDdexService {
 		);
 
 		if (!coverArt) {
-			throw new Error('Bản phát hành không có ảnh bìa gốc (original cover)');
+			throw new Error(
+				'Bản phát hành không có ảnh bìa gốc (original cover)',
+			);
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
@@ -450,7 +455,9 @@ export class ReleaseDdexService {
 			: 'NotExplicit';
 
 		const cover = release.releaseCoverArts?.[0];
-		const coverExt = cover ? this.normalizeImageExtension(cover.file?.extension ?? 'jpg') : '.jpg';
+		const coverExt = cover
+			? this.normalizeImageExtension(cover.file?.extension ?? 'jpg')
+			: '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
 
