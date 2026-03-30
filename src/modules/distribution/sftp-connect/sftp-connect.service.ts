@@ -34,7 +34,7 @@ export class SftpConnectService {
 				username: config.username,
 				password: config.password,
 				privateKey: config.privateKey,
-				readyTimeout: 10_000,
+				readyTimeout: 10_000 * 6,
 			});
 
 			// test nhẹ
@@ -67,7 +67,7 @@ export class SftpConnectService {
 			username: config.username,
 			password: config.password,
 			privateKey: config.privateKey,
-			readyTimeout: 10_000,
+			readyTimeout: 60_000, // Increased from 10s to 60s
 		});
 
 		return client;
@@ -89,7 +89,7 @@ export class SftpConnectService {
 				username: config.username,
 				password: config.password,
 				privateKey: config.privateKey,
-				readyTimeout: 10_000,
+				readyTimeout: 60_000, // Increased from 10s to 60s
 			});
 
 			return await client.list(remotePath);
@@ -126,6 +126,7 @@ export class SftpConnectService {
 				username: sftp.username,
 				password: sftp.password,
 				privateKey: sftp.privateKey,
+				readyTimeout: 60_000,
 			});
 
 			try {
@@ -173,6 +174,7 @@ export class SftpConnectService {
 				username: sftp.username,
 				password: sftp.password,
 				privateKey: sftp.privateKey,
+				readyTimeout: 60_000,
 			});
 
 			// Lấy tên thư mục cần upload
@@ -204,6 +206,19 @@ export class SftpConnectService {
 		timeoutMs?: number;
 	}) {
 		const port = sftp.port ?? 22;
+
+		
+		console.log('🚀 ~ SftpConnectService ~ uploadFolderScp ~ sftp:', sftp);
+
+		const res = await this.testConnect({
+			host: sftp.host,
+			port,
+			username: sftp.username,
+			password: sftp.password,
+		});
+
+		console.log('🚀 ~ SftpConnectService ~ uploadFolderScp ~ res:', res);
+
 
 		if (!sftp.host) throw new Error('Missing sftp.host');
 		if (!sftp.username) throw new Error('Missing sftp.username');

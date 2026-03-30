@@ -28,6 +28,7 @@ import { Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
 import { ErnService } from '../../ern/services/ern.service';
 import { ReleaseQueryService } from './release.query.service';
+import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -449,6 +450,7 @@ export class ReleaseDdexService {
 			: 'NotExplicit';
 
 		const cover = release.releaseCoverArts?.[0];
+		const coverExt = cover ? this.normalizeImageExtension(cover.file?.extension ?? 'jpg') : '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
 
@@ -474,8 +476,18 @@ export class ReleaseDdexService {
 					? this.formatDateTime(release.releaseDate)
 					: '',
 
-				genre: release.primaryGenre?.name ?? 'Pop',
-				subGenre: release.subGenre?.name ?? undefined,
+				genre:
+					(release.primaryGenre?.name
+						? GENRE_MAPPING[release.primaryGenre.name]
+						: undefined) ??
+					release.primaryGenre?.name ??
+					'Pop',
+				subGenre:
+					(release.subGenre?.name
+						? GENRE_MAPPING[release.subGenre.name]
+						: undefined) ??
+					release.subGenre?.name ??
+					undefined,
 
 				labelName: release.label?.name ?? '',
 
@@ -510,8 +522,8 @@ export class ReleaseDdexService {
 
 				coverArt: cover
 					? {
-							fileName: cover.file?.fileName ?? '',
-							filePath: cover.file?.key ?? '',
+							fileName: `${release.upc}${coverExt}`,
+							filePath: 'resources',
 							codecType: 'image/jpeg',
 							width: cover.width,
 							height: cover.height,
@@ -541,11 +553,22 @@ export class ReleaseDdexService {
 					},
 
 					genre:
+						(track.primaryGenre?.name
+							? GENRE_MAPPING[track.primaryGenre.name]
+							: undefined) ??
 						track.primaryGenre?.name ??
+						(release.primaryGenre?.name
+							? GENRE_MAPPING[release.primaryGenre.name]
+							: undefined) ??
 						release.primaryGenre?.name ??
 						undefined,
 
-					subGenre: track.subGenre?.name ?? undefined,
+					subGenre:
+						(track.subGenre?.name
+							? GENRE_MAPPING[track.subGenre.name]
+							: undefined) ??
+						track.subGenre?.name ??
+						undefined,
 
 					languageOfPerformance:
 						track.trackLanguage?.audioLanguage?.code ?? undefined,
@@ -576,9 +599,9 @@ export class ReleaseDdexService {
 
 					audioFile: track.audioFile
 						? {
-								fileName: track.audioFile.file?.fileName,
+								fileName: `${track.isrc}_T${track.order}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
 
-								filePath: track.audioFile.file?.key,
+								filePath: 'resources',
 
 								codecType:
 									track.audioFile.file?.extension.toUpperCase() ??

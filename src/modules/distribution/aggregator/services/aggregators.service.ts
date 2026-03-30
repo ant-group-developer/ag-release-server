@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AppEvent } from 'src/common/enums/common';
+import { decryptSecretSafe } from 'src/utils/util.encrypt';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { RoutingModeEnum } from '../../dsp-routing/enum/dsp-routing.enum';
@@ -253,13 +254,23 @@ export class AggregatorsService {
 	}) {
 		const entity = await this.repo.findOne({
 			where: { code: aggregatorCode },
-			relations: { sftpConfig: { metadata: true } },
+			relations: { sftpConfig: true },
 		});
 
-		if (!entity || !entity.sftpConfig.metadata)
+		if (!entity || !entity.sftpConfig || !entity.sftpConfig.metadata)
 			throw AggregatorException.NOT_FOUND();
 
-		return entity.sftpConfig.metadata;
+		const metadata = entity.sftpConfig.metadata;
+
+		if (metadata.password) {
+			metadata.password = decryptSecretSafe(metadata.password);
+		}
+
+		if (metadata.privateKey) {
+			metadata.privateKey = decryptSecretSafe(metadata.privateKey);
+		}
+
+		return metadata;
 	}
 
 	async getDdexParty({ aggregatorCode }: { aggregatorCode: AggregatorCode }) {

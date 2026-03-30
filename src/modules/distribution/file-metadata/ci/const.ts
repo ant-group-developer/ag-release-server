@@ -134,6 +134,7 @@ export const GENRE_MAPPING: Record<string, string> = {
 	'Adult Contemporary': 'Pop',
 	'Indie Pop': 'Pop',
 	Oldies: 'Vocal/Nostalgia',
+	Standards: 'Vocal/Nostalgia',
 
 	// ===== Hip Hop / Rap =====
 	'Hip-Hop': 'Hip-Hop/Rap',

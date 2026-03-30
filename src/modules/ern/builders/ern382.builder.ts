@@ -599,6 +599,11 @@ export class Ern382Builder {
 				terms.ele('TerritoryCode').txt(t);
 			}
 
+			const pi = terms.ele('PriceInformation');
+			pi.ele('PriceRangeType', {
+				Namespace: `DPID:${this.input.message.recipient.partyId}`,
+			}).txt('mid');
+
 			const validity = terms.ele('ValidityPeriod');
 			validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
 			if (deal.endDate) {
@@ -630,6 +635,11 @@ export class Ern382Builder {
 					terms.ele('TerritoryCode').txt(t);
 				}
 
+				const pi = terms.ele('PriceInformation');
+				pi.ele('PriceRangeType', {
+					Namespace: `DPID:${this.input.message.recipient.partyId}`,
+				}).txt('mid');
+
 				const validity = terms.ele('ValidityPeriod');
 				validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
 				if (deal.endDate) {
@@ -654,6 +664,10 @@ export class Ern382Builder {
 		for (const t of territories) {
 			t0.ele('TerritoryCode').txt(t);
 		}
+		const pi0 = t0.ele('PriceInformation');
+		pi0.ele('PriceRangeType', {
+			Namespace: `DPID:${this.input.message.recipient.partyId}`,
+		}).txt('mid');
 		t0.ele('ValidityPeriod').ele('StartDate').txt(startDate);
 		rd0.ele('EffectiveDate').txt(startDate);
 
@@ -667,6 +681,10 @@ export class Ern382Builder {
 			for (const t of territories) {
 				terms.ele('TerritoryCode').txt(t);
 			}
+			const pi = terms.ele('PriceInformation');
+			pi.ele('PriceRangeType', {
+				Namespace: `DPID:${this.input.message.recipient.partyId}`,
+			}).txt('mid');
 			terms.ele('ValidityPeriod').ele('StartDate').txt(startDate);
 			rd.ele('EffectiveDate').txt(startDate);
 		}
