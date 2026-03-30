@@ -13,6 +13,7 @@ import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.enti
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { ArtistSource } from '../enum/artist.enum';
+import { MediaUrlTransformer } from 'src/utils/util';
 
 @Entity('artists', {
 	comment:
@@ -39,6 +40,7 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện của nghệ sĩ',
+		transformer: MediaUrlTransformer
 	})
 	picture: string | null;
 

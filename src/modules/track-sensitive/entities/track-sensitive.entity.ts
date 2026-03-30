@@ -6,6 +6,7 @@ import {
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('track_sensitives', {
@@ -34,6 +35,7 @@ export class TrackSensitive extends BaseUserTrackedUUIDEntity {
 		length: DEFAULT_LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Icon đại diện cho mức độ nhạy cảm',
+		transformer: MediaUrlTransformer
 	})
 	icon: string | null;
 

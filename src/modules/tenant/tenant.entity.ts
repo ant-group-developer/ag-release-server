@@ -17,6 +17,7 @@ import { TenantTier } from '../tenant-tiers/entities/tenant-tiers.entity';
 import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
 import { TenantType } from './tenant.enum';
+import { MediaUrlTransformer } from 'src/utils/util';
 
 @Entity('tenants', {
 	comment:
@@ -28,6 +29,7 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Logo của tenant (URL ảnh)',
+		transformer: MediaUrlTransformer
 	})
 	logo: string;
 
@@ -42,6 +44,7 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Icon đại diện của tenant (URL ảnh)',
+		transformer: MediaUrlTransformer
 	})
 	icon: string;
 

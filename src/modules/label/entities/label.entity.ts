@@ -7,6 +7,7 @@ import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constant
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('labels', {
@@ -34,6 +35,7 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện hoặc logo của label',
+		transformer: MediaUrlTransformer
 	})
 	picture: string | null;
 
