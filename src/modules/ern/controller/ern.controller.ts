@@ -1,13 +1,13 @@
 import { Controller, Get, Header } from '@nestjs/common';
-import { PublicRoute } from '../auth/decorators/auth.decorator';
+import { PublicRoute } from '../../auth/decorators/auth.decorator';
 import {
 	albumExample,
 	ern382Example,
 	manifestEcho11Example,
 	manifestExample,
 	singleExample,
-} from './ern-example.data';
-import { ErnService } from './ern.service';
+} from '../ern-example.data';
+import { ErnService } from '../services/ern.service';
 
 @PublicRoute()
 @Controller('ern')

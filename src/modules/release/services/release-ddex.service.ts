@@ -13,7 +13,6 @@ import { AggregatorsService } from 'src/modules/distribution/aggregator/services
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
-import { DspService } from 'src/modules/dsp/services/dsp.service';
 import {
 	ErnInput,
 	ErnVersion,
@@ -27,8 +26,7 @@ import {
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
-import { ErnService } from './../../ern/ern.service';
-import { ReleaseLogService } from './release-log.service';
+import { ErnService } from '../../ern/services/ern.service';
 import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
@@ -47,24 +45,18 @@ interface CoverImageInfo {
 export class ReleaseDdexService {
 	private readonly logger = new Logger(ReleaseDdexService.name);
 
-	// Spotify DPID (Party ID)
-	private DDEX_PARTY_ID_RECIPIENT: string;
-	private DDEX_PARTY_NAME_RECIPIENT: string;
-
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucket2Sv: BucketService2,
 		private readonly appConfigSv: AppConfigService,
-		private readonly dspSv: DspService,
 
 		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 		private readonly countryService: CountryService,
-		private readonly releaseLogService: ReleaseLogService,
 		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
@@ -283,14 +275,30 @@ export class ReleaseDdexService {
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
 			});
-		} catch (error) {
-			throw new Error(error);
+
+			if (release.directDdexOnServer) {
+				const batchId = path.basename(release.directDdexOnServer);
+				await this.createDoneFolderOnSftp(sftp, batchId);
+			}
+		} catch (error: any) {
+			throw new Error(error.message || String(error));
 		} finally {
-			await removeFolder(release.directDdexOnServer ?? '');
+			// await removeFolder(release.directDdexOnServer ?? '');
 		}
 	}
 
-	// private
+	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
+		const client = await this.sftpConnectService.connect(sftp);
+		try {
+			const donePath = path.posix.join(sftp.path ?? '/', `${batchId}.done`);
+			await client.mkdir(donePath, true);
+			this.logger.log(`[CI_DONE_FOLDER_CREATED] ${donePath}`);
+		} catch (err: any) {
+			this.logger.error(`Failed to create .done folder: ${err.message}`);
+		} finally {
+			await client.end();
+		}
+	}
 
 	// ==================== FILE PROCESSING ====================
 

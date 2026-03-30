@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { ValidateErnDto } from './validate-ern.dto';
+import { ValidateErnDto } from '../validate-ern.dto';
 
 @Injectable()
 export class ErnValidateService {

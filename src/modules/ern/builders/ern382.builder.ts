@@ -212,7 +212,14 @@ export class Ern382Builder {
 
 		if (track.audioFile) {
 			if (track.audioFile.codecType) {
-				tech.ele('AudioCodecType').txt(track.audioFile.codecType);
+				let codec = track.audioFile.codecType.toUpperCase();
+				if (codec === 'WAV') {
+					tech.ele('AudioCodecType', { UserDefinedValue: codec }).txt(
+						'UserDefined',
+					);
+				} else {
+					tech.ele('AudioCodecType').txt(codec);
+				}
 			}
 			if (track.audioFile.bitRate) {
 				tech.ele('BitRate', { UnitOfMeasure: 'kbps' }).txt(
@@ -303,7 +310,11 @@ export class Ern382Builder {
 		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 
 		if (coverArt.codecType) {
-			tech.ele('ImageCodecType').txt(coverArt.codecType);
+			let c = coverArt.codecType.toUpperCase();
+			if (c === 'IMAGE/JPEG' || c === 'JPG') c = 'JPEG';
+			else if (c === 'IMAGE/PNG') c = 'PNG';
+			else if (c === 'IMAGE/GIF') c = 'GIF';
+			tech.ele('ImageCodecType').txt(c);
 		}
 		if (coverArt.height) {
 			tech.ele('ImageHeight').txt(String(coverArt.height));
@@ -574,18 +585,18 @@ export class Ern382Builder {
 			rd.ele('DealReleaseReference').txt('R0');
 			const d = rd.ele('Deal');
 			const terms = d.ele('DealTerms');
-			const usage = terms.ele('Usage');
 
+			for (const cm of deal.commercialModels) {
+				terms.ele('CommercialModelType').txt(cm);
+			}
+
+			const usage = terms.ele('Usage');
 			for (const ut of deal.useTypes) {
 				usage.ele('UseType').txt(ut);
 			}
 
 			for (const t of deal.territories) {
 				terms.ele('TerritoryCode').txt(t);
-			}
-
-			for (const cm of deal.commercialModels) {
-				terms.ele('CommercialModelType').txt(cm);
 			}
 
 			const validity = terms.ele('ValidityPeriod');
@@ -605,18 +616,18 @@ export class Ern382Builder {
 				rd.ele('DealReleaseReference').txt(releaseRef);
 				const d = rd.ele('Deal');
 				const terms = d.ele('DealTerms');
-				const usage = terms.ele('Usage');
 
+				for (const cm of deal.commercialModels) {
+					terms.ele('CommercialModelType').txt(cm);
+				}
+
+				const usage = terms.ele('Usage');
 				for (const ut of deal.useTypes) {
 					usage.ele('UseType').txt(ut);
 				}
 
 				for (const t of deal.territories) {
 					terms.ele('TerritoryCode').txt(t);
-				}
-
-				for (const cm of deal.commercialModels) {
-					terms.ele('CommercialModelType').txt(cm);
 				}
 
 				const validity = terms.ele('ValidityPeriod');
