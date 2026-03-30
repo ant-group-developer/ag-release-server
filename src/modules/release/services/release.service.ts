@@ -407,13 +407,13 @@ export class ReleaseService {
 		if (!prefixUpcId) {
 			this.releaseLogService.failed({
 				releaseId,
-				step: 'genUpc',
+				step: 'Khởi tạo UPC',
 				content: release,
-				message: 'Release chưa có prefixUpcId',
+				message: 'Bản phát hành chưa được gắn mã Prefix UPC',
 			});
 
 			throw new ResponseError({
-				message: 'Release chưa có prefixUpcId',
+				message: 'Bản phát hành chưa được gắn mã Prefix UPC',
 			});
 		}
 
@@ -444,9 +444,9 @@ export class ReleaseService {
 		if (!newUpc) {
 			this.releaseLogService.failed({
 				releaseId,
-				step: 'genUpc',
+				step: 'Khởi tạo UPC',
 				content: release,
-				message: 'Service UPC không trả về GTIN',
+				message: 'Dịch vụ cấp UPC không phản hồi mã GTIN',
 			});
 
 			throw new ResponseError({
@@ -457,12 +457,12 @@ export class ReleaseService {
 		// -------- Update release --------
 		await this.releaseRepo.update(releaseId, { upc: newUpc });
 
-		await this.releaseLogRepo.insert({
-			status: ReleaseLogStatus.SUCCESS,
-			releaseId,
-			logs: 'Generation succeeded',
-			step: 'Gen Upc',
-		});
+		// await this.releaseLogRepo.insert({
+		// 	status: ReleaseLogStatus.SUCCESS,
+		// 	releaseId,
+		// 	logs: 'Cấp mã UPC thành công',
+		// 	step: 'Khởi tạo UPC',
+		// });
 
 		return newUpc;
 	}
@@ -588,8 +588,8 @@ export class ReleaseService {
 
 		this.releaseLogService.pending({
 			releaseId: id,
-			step: 'submit',
-			message: 'Release đang được xử lý',
+			step: 'Bắt đầu xử lý phát hành',
+			message: 'Bản phát hành đang được đưa vào hàng đợi xử lý',
 		});
 
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
@@ -599,8 +599,8 @@ export class ReleaseService {
 
 			this.releaseLogService.failed({
 				releaseId: id,
-				step: 'catch processingSubmit',
-				message: error?.message ?? 'Unknow',
+				step: 'Lỗi phát hành',
+				message: `Lỗi bất ngờ: ${error?.message ?? 'Không xác định'}`,
 			});
 		});
 
@@ -665,9 +665,9 @@ export class ReleaseService {
 		if (errors.length > 0) {
 			this.releaseLogService.failed({
 				releaseId: id,
-				step: 'validate schemaRelease',
+				step: 'Kiểm tra dữ liệu phát hành (Validation)',
 				message: errors
-					.map((e) => e?.message ?? 'Unknown error')
+					.map((e) => e?.message ?? 'Lỗi không xác định')
 					.join(', '),
 			});
 
@@ -746,8 +746,8 @@ export class ReleaseService {
 			this.releaseLogService.failed({
 				releaseId,
 				codeDsp: DspCode.SPOTIFY,
-				message: 'DSP SPOTIFY not found',
-				step: 'processSpotifyDsp',
+				message: 'Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP Spotify',
+				step: 'Ghi nhận DSP Spotify',
 			});
 			throw new ResponseError({ message: 'DSP SPOTIFY not found' });
 		}
@@ -769,8 +769,8 @@ export class ReleaseService {
 
 			this.releaseLogService.success({
 				releaseId,
-				step: 'processSpotifyDsp',
-				message: `processSpotifyDsp SUCCESS`,
+				step: 'Ghi nhận DSP Spotify',
+				message: `Tạo dữ liệu và đóng gói gửi DSP Spotify thành công`,
 				codeDsp: DspCode.SPOTIFY,
 				dspId: 'SMImv6mH7H',
 			});
@@ -786,8 +786,8 @@ export class ReleaseService {
 
 			this.releaseLogService.failed({
 				releaseId,
-				step: 'processSpotifyDsp',
-				message: `processSpotifyDsp failed ${error?.message ?? 'unknown'}`,
+				step: 'Ghi nhận DSP Spotify',
+				message: `Quá trình xử lý DSP Spotify thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
 				codeDsp: DspCode.SPOTIFY,
 				dspId: 'SMImv6mH7H',
 			});
@@ -805,8 +805,8 @@ export class ReleaseService {
 			this.releaseLogService.failed({
 				releaseId,
 				codeDsp: DspCode.FACEBOOK,
-				message: 'DSP FACEBOOK not found',
-				step: 'processFacebookDsp',
+				message: 'Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP Facebook',
+				step: 'Ghi nhận DSP Facebook',
 			});
 			throw new ResponseError({ message: 'DSP FACEBOOK not found' });
 		}
@@ -834,8 +834,8 @@ export class ReleaseService {
 
 			this.releaseLogService.success({
 				releaseId,
-				step: 'processFacebookDsp',
-				message: `processFacebookDsp SUCCESS`,
+				step: 'Ghi nhận DSP Facebook',
+				message: `Tạo dữ liệu và đóng gói gửi DSP Facebook thành công`,
 				codeDsp: DspCode.FACEBOOK,
 				dspId: 'HyTE8Isu5o',
 			});
@@ -851,8 +851,8 @@ export class ReleaseService {
 
 			this.releaseLogService.failed({
 				releaseId,
-				step: 'processFacebookDsp',
-				message: `processFacebookDsp failed ${error?.message ?? 'unknown'}`,
+				step: 'Ghi nhận DSP Facebook',
+				message: `Quá trình xử lý DSP Facebook thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
 				codeDsp: DspCode.FACEBOOK,
 				dspId: 'HyTE8Isu5o',
 			});

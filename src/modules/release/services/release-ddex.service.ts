@@ -92,23 +92,9 @@ export class ReleaseDdexService {
 
 		const batchId = genBatchId();
 
-		this.releaseLogService.pending({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[ERN] Starting batch: ${batchId}`,
-			content: release,
-		});
-
 		const upc = release.upc ?? 'new_upc';
 		if (!upc) {
-			this.releaseLogService.pending({
-				releaseId,
-				step: 'createMetadataOnServer',
-				message: `Release missing UPC`,
-				content: release,
-			});
-
-			throw new Error('Release missing UPC');
+			throw new Error('Không tìm thấy mã UPC của release');
 		}
 
 		// 1. Setup folder structure
@@ -122,13 +108,6 @@ export class ReleaseDdexService {
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[FOLDER_CREATED] ${releaseDir}`,
-			content: release,
-		});
 
 		// 2. Fetch files from bucket
 		const { audioFiles, coverImage } =
@@ -160,16 +139,8 @@ export class ReleaseDdexService {
 			recipient,
 		});
 
-		// cập nhật dường dẫn
 		await this.releaseRepo.update(releaseId, {
 			directDdexOnServer: outputRoot.replace(/\\/g, '/'),
-		});
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[COMPLETED] Batch ${batchId} - ${upc}`,
-			content: release,
 		});
 
 		this.logger.log({
@@ -214,12 +185,6 @@ export class ReleaseDdexService {
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createErnFile',
-			message: `[XML_CREATED] ${mainXmlPath}`,
-		});
 	}
 
 	createManifestFile({
@@ -345,12 +310,6 @@ export class ReleaseDdexService {
 		// Fetch audio files
 		for (const [index, track] of tracks.entries()) {
 			if (!track.audioFile) {
-				this.releaseLogService.pending({
-					releaseId,
-					step: 'fetchAudioAndImageReleaseFromBucket',
-					message: `Track ${track.order} has no audio file`,
-					content: release,
-				});
 				continue;
 			}
 
@@ -364,13 +323,6 @@ export class ReleaseDdexService {
 				isrc: track.isrc || `TEMP${String(index + 1).padStart(4, '0')}`,
 				trackNo: index + 1,
 			});
-
-			this.releaseLogService.success({
-				releaseId,
-				step: 'fetchAudioAndImageReleaseFromBucket',
-				message: `[AUDIO_FETCHED] Track ${index + 1}: ${track.isrc || 'NO_ISRC'}`,
-				content: release,
-			});
 		}
 
 		// Fetch cover image
@@ -379,25 +331,11 @@ export class ReleaseDdexService {
 		);
 
 		if (!coverArt) {
-			this.releaseLogService.failed({
-				releaseId,
-				step: 'fetchAudioAndImageReleaseFromBucket',
-				message: 'Release has no original cover image',
-				content: release,
-			});
-
-			throw new Error('Release has no original cover image');
+			throw new Error('Bản phát hành không có ảnh bìa gốc (original cover)');
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
 			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'fetchAudioAndImageReleaseFromBucket',
-			message: `[COVER_FETCHED] ${coverDb.extension}`,
-			content: release,
-		});
 
 		return {
 			audioFiles,
@@ -431,7 +369,7 @@ export class ReleaseDdexService {
 
 		await img.toFile(outputPath);
 
-		this.logger.log(`[COVER_SAVED] ${fileName}`);
+		// this.logger.log(`[COVER_SAVED] ${fileName}`);
 	}
 
 	/**
