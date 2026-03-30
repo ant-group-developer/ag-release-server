@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Ern382Builder } from './builders/ern382.builder';
-import { Ern43Builder } from './builders/ern43.builder';
-import { ManifestBuilder } from './builders/manifest.builder';
-import { ErnInput, ManifestInput } from './interfaces/ern-input.interface';
+import { Ern382Builder } from '../builders/ern382.builder';
+import { Ern43Builder } from '../builders/ern43.builder';
+import { ManifestBuilder } from '../builders/manifest.builder';
+import { ErnInput, ManifestInput } from '../interfaces/ern-input.interface';
 
 @Injectable()
 export class ErnService {

@@ -13,7 +13,6 @@ import { AggregatorsService } from 'src/modules/distribution/aggregator/services
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
-import { DspService } from 'src/modules/dsp/services/dsp.service';
 import {
 	ErnInput,
 	ErnVersion,
@@ -27,9 +26,9 @@ import {
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
-import { ErnService } from './../../ern/ern.service';
-import { ReleaseLogService } from './release-log.service';
+import { ErnService } from '../../ern/services/ern.service';
 import { ReleaseQueryService } from './release.query.service';
+import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -47,24 +46,18 @@ interface CoverImageInfo {
 export class ReleaseDdexService {
 	private readonly logger = new Logger(ReleaseDdexService.name);
 
-	// Spotify DPID (Party ID)
-	private DDEX_PARTY_ID_RECIPIENT: string;
-	private DDEX_PARTY_NAME_RECIPIENT: string;
-
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucket2Sv: BucketService2,
 		private readonly appConfigSv: AppConfigService,
-		private readonly dspSv: DspService,
 
 		private readonly ernService: ErnService,
 
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 		private readonly countryService: CountryService,
-		private readonly releaseLogService: ReleaseLogService,
 		private readonly aggregatorsService: AggregatorsService,
 	) {}
 
@@ -92,23 +85,9 @@ export class ReleaseDdexService {
 
 		const batchId = genBatchId();
 
-		this.releaseLogService.pending({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[ERN] Starting batch: ${batchId}`,
-			content: release,
-		});
-
 		const upc = release.upc ?? 'new_upc';
 		if (!upc) {
-			this.releaseLogService.pending({
-				releaseId,
-				step: 'createMetadataOnServer',
-				message: `Release missing UPC`,
-				content: release,
-			});
-
-			throw new Error('Release missing UPC');
+			throw new Error('Không tìm thấy mã UPC của release');
 		}
 
 		// 1. Setup folder structure
@@ -122,13 +101,6 @@ export class ReleaseDdexService {
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[FOLDER_CREATED] ${releaseDir}`,
-			content: release,
-		});
 
 		// 2. Fetch files from bucket
 		const { audioFiles, coverImage } =
@@ -160,16 +132,8 @@ export class ReleaseDdexService {
 			recipient,
 		});
 
-		// cập nhật dường dẫn
 		await this.releaseRepo.update(releaseId, {
 			directDdexOnServer: outputRoot.replace(/\\/g, '/'),
-		});
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createMetadataOnServer',
-			message: `[COMPLETED] Batch ${batchId} - ${upc}`,
-			content: release,
 		});
 
 		this.logger.log({
@@ -214,12 +178,6 @@ export class ReleaseDdexService {
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'createErnFile',
-			message: `[XML_CREATED] ${mainXmlPath}`,
-		});
 	}
 
 	createManifestFile({
@@ -318,14 +276,30 @@ export class ReleaseDdexService {
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
 			});
-		} catch (error) {
-			throw new Error(error);
+
+			if (release.directDdexOnServer) {
+				const batchId = path.basename(release.directDdexOnServer);
+				await this.createDoneFolderOnSftp(sftp, batchId);
+			}
+		} catch (error: any) {
+			throw new Error(error.message || String(error));
 		} finally {
-			await removeFolder(release.directDdexOnServer ?? '');
+			// await removeFolder(release.directDdexOnServer ?? '');
 		}
 	}
 
-	// private
+	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
+		const client = await this.sftpConnectService.connect(sftp);
+		try {
+			const donePath = path.posix.join(sftp.path ?? '/', `${batchId}.done`);
+			await client.mkdir(donePath, true);
+			this.logger.log(`[CI_DONE_FOLDER_CREATED] ${donePath}`);
+		} catch (err: any) {
+			this.logger.error(`Failed to create .done folder: ${err.message}`);
+		} finally {
+			await client.end();
+		}
+	}
 
 	// ==================== FILE PROCESSING ====================
 
@@ -345,12 +319,6 @@ export class ReleaseDdexService {
 		// Fetch audio files
 		for (const [index, track] of tracks.entries()) {
 			if (!track.audioFile) {
-				this.releaseLogService.pending({
-					releaseId,
-					step: 'fetchAudioAndImageReleaseFromBucket',
-					message: `Track ${track.order} has no audio file`,
-					content: release,
-				});
 				continue;
 			}
 
@@ -364,13 +332,6 @@ export class ReleaseDdexService {
 				isrc: track.isrc || `TEMP${String(index + 1).padStart(4, '0')}`,
 				trackNo: index + 1,
 			});
-
-			this.releaseLogService.success({
-				releaseId,
-				step: 'fetchAudioAndImageReleaseFromBucket',
-				message: `[AUDIO_FETCHED] Track ${index + 1}: ${track.isrc || 'NO_ISRC'}`,
-				content: release,
-			});
 		}
 
 		// Fetch cover image
@@ -379,25 +340,11 @@ export class ReleaseDdexService {
 		);
 
 		if (!coverArt) {
-			this.releaseLogService.failed({
-				releaseId,
-				step: 'fetchAudioAndImageReleaseFromBucket',
-				message: 'Release has no original cover image',
-				content: release,
-			});
-
-			throw new Error('Release has no original cover image');
+			throw new Error('Bản phát hành không có ảnh bìa gốc (original cover)');
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
 			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
-
-		this.releaseLogService.success({
-			releaseId,
-			step: 'fetchAudioAndImageReleaseFromBucket',
-			message: `[COVER_FETCHED] ${coverDb.extension}`,
-			content: release,
-		});
 
 		return {
 			audioFiles,
@@ -431,7 +378,7 @@ export class ReleaseDdexService {
 
 		await img.toFile(outputPath);
 
-		this.logger.log(`[COVER_SAVED] ${fileName}`);
+		// this.logger.log(`[COVER_SAVED] ${fileName}`);
 	}
 
 	/**
@@ -503,6 +450,7 @@ export class ReleaseDdexService {
 			: 'NotExplicit';
 
 		const cover = release.releaseCoverArts?.[0];
+		const coverExt = cover ? this.normalizeImageExtension(cover.file?.extension ?? 'jpg') : '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
 
@@ -528,8 +476,18 @@ export class ReleaseDdexService {
 					? this.formatDateTime(release.releaseDate)
 					: '',
 
-				genre: release.primaryGenre?.name ?? 'Pop',
-				subGenre: release.subGenre?.name ?? undefined,
+				genre:
+					(release.primaryGenre?.name
+						? GENRE_MAPPING[release.primaryGenre.name]
+						: undefined) ??
+					release.primaryGenre?.name ??
+					'Pop',
+				subGenre:
+					(release.subGenre?.name
+						? GENRE_MAPPING[release.subGenre.name]
+						: undefined) ??
+					release.subGenre?.name ??
+					undefined,
 
 				labelName: release.label?.name ?? '',
 
@@ -564,8 +522,8 @@ export class ReleaseDdexService {
 
 				coverArt: cover
 					? {
-							fileName: cover.file?.fileName ?? '',
-							filePath: cover.file?.key ?? '',
+							fileName: `${release.upc}${coverExt}`,
+							filePath: 'resources',
 							codecType: 'image/jpeg',
 							width: cover.width,
 							height: cover.height,
@@ -595,11 +553,22 @@ export class ReleaseDdexService {
 					},
 
 					genre:
+						(track.primaryGenre?.name
+							? GENRE_MAPPING[track.primaryGenre.name]
+							: undefined) ??
 						track.primaryGenre?.name ??
+						(release.primaryGenre?.name
+							? GENRE_MAPPING[release.primaryGenre.name]
+							: undefined) ??
 						release.primaryGenre?.name ??
 						undefined,
 
-					subGenre: track.subGenre?.name ?? undefined,
+					subGenre:
+						(track.subGenre?.name
+							? GENRE_MAPPING[track.subGenre.name]
+							: undefined) ??
+						track.subGenre?.name ??
+						undefined,
 
 					languageOfPerformance:
 						track.trackLanguage?.audioLanguage?.code ?? undefined,
@@ -630,9 +599,9 @@ export class ReleaseDdexService {
 
 					audioFile: track.audioFile
 						? {
-								fileName: track.audioFile.file?.fileName,
+								fileName: `${track.isrc}_T${track.order}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
 
-								filePath: track.audioFile.file?.key,
+								filePath: 'resources',
 
 								codecType:
 									track.audioFile.file?.extension.toUpperCase() ??

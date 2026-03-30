@@ -11,6 +11,7 @@ import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 import {
 	Column,
 	Entity,
@@ -54,6 +55,7 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện hoặc logo của DSP',
+		transformer: MediaUrlTransformer
 	})
 	picture: string | null;
 

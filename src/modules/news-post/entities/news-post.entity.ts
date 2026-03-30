@@ -6,6 +6,7 @@ import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
 import { NewsPostTranslation } from './news-post-translation.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 
 @Entity('news_posts', {
 	comment: 'Bài viết tin tức, hỗ trợ đa ngôn ngữ thông qua bảng translation',
@@ -22,6 +23,7 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh thumbnail của bài viết',
+		transformer: MediaUrlTransformer
 	})
 	thumbnail: string | null;
 

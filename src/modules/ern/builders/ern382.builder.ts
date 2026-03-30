@@ -212,7 +212,14 @@ export class Ern382Builder {
 
 		if (track.audioFile) {
 			if (track.audioFile.codecType) {
-				tech.ele('AudioCodecType').txt(track.audioFile.codecType);
+				let codec = track.audioFile.codecType.toUpperCase();
+				if (codec === 'WAV') {
+					tech.ele('AudioCodecType', { UserDefinedValue: codec }).txt(
+						'UserDefined',
+					);
+				} else {
+					tech.ele('AudioCodecType').txt(codec);
+				}
 			}
 			if (track.audioFile.bitRate) {
 				tech.ele('BitRate', { UnitOfMeasure: 'kbps' }).txt(
@@ -303,7 +310,11 @@ export class Ern382Builder {
 		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 
 		if (coverArt.codecType) {
-			tech.ele('ImageCodecType').txt(coverArt.codecType);
+			let c = coverArt.codecType.toUpperCase();
+			if (c === 'IMAGE/JPEG' || c === 'JPG') c = 'JPEG';
+			else if (c === 'IMAGE/PNG') c = 'PNG';
+			else if (c === 'IMAGE/GIF') c = 'GIF';
+			tech.ele('ImageCodecType').txt(c);
 		}
 		if (coverArt.height) {
 			tech.ele('ImageHeight').txt(String(coverArt.height));
@@ -574,8 +585,12 @@ export class Ern382Builder {
 			rd.ele('DealReleaseReference').txt('R0');
 			const d = rd.ele('Deal');
 			const terms = d.ele('DealTerms');
-			const usage = terms.ele('Usage');
 
+			for (const cm of deal.commercialModels) {
+				terms.ele('CommercialModelType').txt(cm);
+			}
+
+			const usage = terms.ele('Usage');
 			for (const ut of deal.useTypes) {
 				usage.ele('UseType').txt(ut);
 			}
@@ -584,9 +599,10 @@ export class Ern382Builder {
 				terms.ele('TerritoryCode').txt(t);
 			}
 
-			for (const cm of deal.commercialModels) {
-				terms.ele('CommercialModelType').txt(cm);
-			}
+			const pi = terms.ele('PriceInformation');
+			pi.ele('PriceRangeType', {
+				Namespace: `DPID:${this.input.message.recipient.partyId}`,
+			}).txt('mid');
 
 			const validity = terms.ele('ValidityPeriod');
 			validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
@@ -605,8 +621,12 @@ export class Ern382Builder {
 				rd.ele('DealReleaseReference').txt(releaseRef);
 				const d = rd.ele('Deal');
 				const terms = d.ele('DealTerms');
-				const usage = terms.ele('Usage');
 
+				for (const cm of deal.commercialModels) {
+					terms.ele('CommercialModelType').txt(cm);
+				}
+
+				const usage = terms.ele('Usage');
 				for (const ut of deal.useTypes) {
 					usage.ele('UseType').txt(ut);
 				}
@@ -615,9 +635,10 @@ export class Ern382Builder {
 					terms.ele('TerritoryCode').txt(t);
 				}
 
-				for (const cm of deal.commercialModels) {
-					terms.ele('CommercialModelType').txt(cm);
-				}
+				const pi = terms.ele('PriceInformation');
+				pi.ele('PriceRangeType', {
+					Namespace: `DPID:${this.input.message.recipient.partyId}`,
+				}).txt('mid');
 
 				const validity = terms.ele('ValidityPeriod');
 				validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
@@ -643,6 +664,10 @@ export class Ern382Builder {
 		for (const t of territories) {
 			t0.ele('TerritoryCode').txt(t);
 		}
+		const pi0 = t0.ele('PriceInformation');
+		pi0.ele('PriceRangeType', {
+			Namespace: `DPID:${this.input.message.recipient.partyId}`,
+		}).txt('mid');
 		t0.ele('ValidityPeriod').ele('StartDate').txt(startDate);
 		rd0.ele('EffectiveDate').txt(startDate);
 
@@ -656,6 +681,10 @@ export class Ern382Builder {
 			for (const t of territories) {
 				terms.ele('TerritoryCode').txt(t);
 			}
+			const pi = terms.ele('PriceInformation');
+			pi.ele('PriceRangeType', {
+				Namespace: `DPID:${this.input.message.recipient.partyId}`,
+			}).txt('mid');
 			terms.ele('ValidityPeriod').ele('StartDate').txt(startDate);
 			rd.ele('EffectiveDate').txt(startDate);
 		}

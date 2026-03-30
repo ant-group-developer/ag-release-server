@@ -220,6 +220,7 @@ export function zipFolder(sourceDir: string, zipPath: string): Promise<void> {
 
 import * as path from 'path';
 import SftpClient from 'ssh2-sftp-client';
+import { ValueTransformer } from 'typeorm';
 
 export async function uploadFileToSftp({
 	sftp,
@@ -272,3 +273,19 @@ export async function uploadFileToSftp({
 		await client.end();
 	}
 }
+
+
+export const MediaUrlTransformer: ValueTransformer = {
+    to: (value: string) => {
+        // GHI XUỐNG DB: Bóc Base Domain ra (nếu có), chỉ lưu "my-bucket/pic.jpg"
+        if (!value) return value;
+        const domain = process.env.R2_PUBLIC_BASE_URL || '';
+        return value.replace(`${domain}/`, ''); 
+    },
+    from: (value: string) => {
+        // ĐỌC LÊN TỪ DB: Tự động ghép Base Domain vào
+        if (!value) return value;
+        const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
+        return value.startsWith('http') ? value : `https://${domain}/${value}`;
+    }
+};
