@@ -8,6 +8,7 @@ import { Language } from 'src/modules/language/entities/language.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { NewsPost } from './news-post.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 
 @Entity('news_posts_translation', {
 	comment: 'Bảng lưu nội dung dịch đa ngôn ngữ cho bài viết tin tức',
@@ -45,6 +46,7 @@ export class NewsPostTranslation extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'text',
 		comment: 'Nội dung đầy đủ của bài viết theo ngôn ngữ',
+		transformer: MediaUrlTransformer
 	})
 	content: string;
 

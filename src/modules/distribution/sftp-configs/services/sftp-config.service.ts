@@ -91,8 +91,14 @@ export class SftpConfigsService {
 			data.metadata.privateKey = encryptSecret(data.metadata.privateKey);
 		}
 
+		const dataDb = await repo.findOne({where: {id: data.id}})
+
 		const entity = repo.create({
 			...data,
+			metadata: {
+				...dataDb?.metadata,
+				...data.metadata
+			},
 			creatorId: userId,
 			modifierId: userId,
 		});

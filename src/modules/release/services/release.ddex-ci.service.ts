@@ -647,7 +647,7 @@ export class ReleaseDdexCiService {
 	}
 
 	async uploadMetadataDdexCiToSftp(releaseId: string) {
-		await this.releaseDdexService.uploadMetadataDdexSpotifyToSftp(
+		await this.releaseDdexService.uploadMetadataDdexCiToSftp(
 			releaseId,
 		);
 	}

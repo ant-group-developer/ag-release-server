@@ -8,6 +8,7 @@ import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constant
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity('genres', {
@@ -35,6 +36,7 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện của thể loại',
+		transformer: MediaUrlTransformer
 	})
 	picture: string | null;
 
