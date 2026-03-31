@@ -85,10 +85,16 @@ export class SftpConfigsService {
 
 		if (data.metadata?.password) {
 			data.metadata.password = encryptSecret(data.metadata.password);
+			if (data.metadata.privateKey === undefined) {
+				data.metadata.privateKey = undefined;
+			}
 		}
 
 		if (data.metadata?.privateKey) {
 			data.metadata.privateKey = encryptSecret(data.metadata.privateKey);
+			if (data.metadata.password === undefined) {
+				data.metadata.password = undefined;
+			}
 		}
 
 		const dataDb = await repo.findOne({where: {id: data.id}})
