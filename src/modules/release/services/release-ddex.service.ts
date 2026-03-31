@@ -251,7 +251,7 @@ export class ReleaseDdexService {
 					DspCode.SPOTIFY,
 				);
 
-			await this.sftpConnectService.uploadFolderScp({
+			await this.sftpConnectService.uploadFolder({
 				sftp,
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
@@ -271,7 +271,7 @@ export class ReleaseDdexService {
 					aggregatorCode: AggregatorCode.CI,
 				});
 
-			await this.sftpConnectService.uploadFolderScp({
+			await this.sftpConnectService.uploadFolder({
 				sftp,
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
@@ -398,9 +398,19 @@ export class ReleaseDdexService {
 		audioFiles: AudioFileInfo[];
 		outputDir: string;
 	}) {
-		for (const audio of audioFiles) {
+		// for (const audio of audioFiles) {
+		// 	const ext = this.normalizeAudioExtension(audio.extension);
+		// 	const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
+		// 	const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
+		// 	const filePath = path.join(outputDir, fileName);
+		// 
+		// 	fs.writeFileSync(filePath, audio.buffer);
+		// 	this.logger.log(`[AUDIO_SAVED] ${fileName}`);
+		// }
+
+		for (const [index, audio] of audioFiles.entries()) {
 			const ext = this.normalizeAudioExtension(audio.extension);
-			const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
+			const trackNoStr = String(index).padStart(1, '0'); // T0S, T1S, ...
 			const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
 			const filePath = path.join(outputDir, fileName);
 
@@ -540,7 +550,7 @@ export class ReleaseDdexService {
 
 			tracks: [...release.tracks]
 				.sort((a, b) => a.order - b.order)
-				.map((track) => ({
+				.map((track, index) => ({
 					isrc: track.isrc ?? '',
 
 					title: track.title ?? '',
@@ -606,7 +616,7 @@ export class ReleaseDdexService {
 
 					audioFile: track.audioFile
 						? {
-								fileName: `${track.isrc}_T${track.order}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
+								fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
 
 								filePath: 'resources',
 
