@@ -186,7 +186,8 @@ export class Ern43Builder {
 
 		if (track.audioFile) {
 			const file = deliveryFile.ele('File');
-			file.ele('URI').txt(track.audioFile.fileName);
+			const uri = track.audioFile.filePath ? `${track.audioFile.filePath}/${track.audioFile.fileName}` : track.audioFile.fileName;
+			file.ele('URI').txt(uri);
 			if (track.audioFile.hashSum) {
 				const hash = file.ele('HashSum');
 				hash.ele('HashSum').txt(track.audioFile.hashSum);
@@ -195,10 +196,11 @@ export class Ern43Builder {
 				);
 			}
 		} else {
+			const defaultPath = this.input.release.coverArt?.filePath ? `${this.input.release.coverArt.filePath}/` : '';
 			deliveryFile
 				.ele('File')
 				.ele('URI')
-				.txt(`${track.isrc}_${techRef}.wav`);
+				.txt(`${defaultPath}${track.isrc}_${techRef}.wav`);
 		}
 
 		deliveryFile.ele('IsProvidedInDelivery').txt('true');
@@ -317,7 +319,9 @@ export class Ern43Builder {
 		const tech = image.ele('TechnicalDetails');
 		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 		const file = tech.ele('File');
-		file.ele('URI').txt(coverArt.fileName);
+		
+		const uri = coverArt.filePath ? `${coverArt.filePath}/${coverArt.fileName}` : coverArt.fileName;
+		file.ele('URI').txt(uri);
 		if (coverArt.hashSum) {
 			const hash = file.ele('HashSum');
 			hash.ele('HashSum').txt(coverArt.hashSum);
@@ -521,7 +525,7 @@ export class Ern43Builder {
 
 				this.appendPrice(terms, track);
 
-				console.log('appendPrice', terms, track);
+				// console.log('appendPrice', terms, track);
 
 				d.ele('DealTechnicalResourceDetailsReferenceList')
 					.ele('DealTechnicalResourceDetailsReference')

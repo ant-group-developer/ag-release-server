@@ -16,6 +16,7 @@ import {
 	SftpMetadata,
 } from '../type/sftp-config.type';
 import { SftpConfigQueryService } from './sftp-config.query.service';
+import { decryptSecretSftpConfig, decryptSecretSftpConfigList } from '../utils/sftp-config.util';
 
 @Injectable()
 export class SftpConfigsService {
@@ -40,7 +41,7 @@ export class SftpConfigsService {
 
 		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
 
-		this.decryptSecretEntity(e);
+		decryptSecretSftpConfig(e);
 
 		return e.metadata;
 	}
@@ -57,7 +58,7 @@ export class SftpConfigsService {
 
 		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
 
-		this.decryptSecretEntity(e);
+		decryptSecretSftpConfig(e);
 
 		return e.metadata;
 	}
@@ -114,7 +115,7 @@ export class SftpConfigsService {
 
 	async getList(filter: GetListSftpConfigsDto) {
 		const result = await this.queryService.getList(filter);
-		this.decryptSecretEntityList(result.items);
+		decryptSecretSftpConfigList(result.items);
 		return result;
 	}
 
@@ -125,7 +126,7 @@ export class SftpConfigsService {
 		});
 		if (!entity) throw SftpConfigException.NOT_FOUND();
 
-		this.decryptSecretEntity(entity);
+		decryptSecretSftpConfig(entity);
 		return entity;
 	}
 
@@ -209,21 +210,5 @@ export class SftpConfigsService {
 
 	protected getDeliverySftpConfigRepo(manager?: EntityManager) {
 		return manager ? manager.getRepository(SftpConfig) : this.repo;
-	}
-
-	// ===== PRIVATE =====
-
-	private decryptSecretEntity(e: SftpConfig) {
-		if (e.metadata?.password) {
-			e.metadata.password = decryptSecretSafe(e.metadata.password);
-		}
-
-		if (e.metadata?.privateKey) {
-			e.metadata.privateKey = decryptSecretSafe(e.metadata.privateKey);
-		}
-	}
-
-	private decryptSecretEntityList(listE: SftpConfig[]) {
-		listE.forEach((e) => this.decryptSecretEntity(e));
 	}
 }
