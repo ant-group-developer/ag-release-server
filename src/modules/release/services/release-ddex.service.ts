@@ -284,7 +284,7 @@ export class ReleaseDdexService {
 		} catch (error: any) {
 			throw new Error(error.message || String(error));
 		} finally {
-			// await removeFolder(release.directDdexOnServer ?? '');
+			await removeFolder(release.directDdexOnServer ?? '');
 		}
 	}
 
