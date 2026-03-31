@@ -5,6 +5,7 @@ import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { DspService } from 'src/modules/dsp/services/dsp.service';
 import { ReleaseDdexService } from './release-ddex.service';
+import { ReleaseException } from '../constants/release.constant';
 
 @Injectable()
 export class ReleaseSpotifyService2 implements OnModuleInit {
@@ -34,12 +35,18 @@ export class ReleaseSpotifyService2 implements OnModuleInit {
 	}
 
 	async createMetadataSpotifyOnServer(releaseId: string) {
+		const partyId = this.appConfigSv.DDEX_PARTY_ID_AMG();
+		const partyName = this.appConfigSv.DDEX_PARTY_NAME_AMG();	
+
+		if(!partyId) throw ReleaseException.MISSING_DDEX_PARTY_ID_AMG();
+		if(!partyName) throw ReleaseException.MISSING_DDEX_PARTY_NAME_AMG();
+
 		await this.releaseDdexService.createMetadataOnServer({
 			releaseId,
 			ernVersion: '4.3',
 			sender: {
-				partyId: this.appConfigSv.DDEX_PARTY_ID_AMG(),
-				name: this.appConfigSv.DDEX_PARTY_NAME_AMG(),
+				partyId,
+				name: partyName,
 			},
 			recipient: {
 				partyId: this.DDEX_PARTY_ID_SPOTIFY,

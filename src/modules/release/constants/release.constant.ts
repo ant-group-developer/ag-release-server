@@ -121,4 +121,20 @@ export class ReleaseException {
 			data,
 		});
 	}
+
+	static MISSING_DDEX_PARTY_ID_AMG(data?: any) {
+		return new ResponseError({
+			message: 'Missing DDEX_PARTY_ID_AMG',
+			messageCode: 'release.message.error.missingDdexPartyIdAmg',
+			data,
+		});
+	}
+
+	static MISSING_DDEX_PARTY_NAME_AMG(data?: any) {
+		return new ResponseError({
+			message: 'Missing DDEX_PARTY_NAME_AMG',
+			messageCode: 'release.message.error.missingDdexPartyNameAmg',
+			data,
+		});
+	}
 }
