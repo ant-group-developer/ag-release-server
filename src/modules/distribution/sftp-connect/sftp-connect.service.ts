@@ -206,20 +206,7 @@ export class SftpConnectService {
 		timeoutMs?: number;
 	}) {
 		const port = sftp.port ?? 22;
-
 		
-		console.log('🚀 ~ SftpConnectService ~ uploadFolderScp ~ sftp:', sftp);
-
-		const res = await this.testConnect({
-			host: sftp.host,
-			port,
-			username: sftp.username,
-			password: sftp.password,
-		});
-
-		console.log('🚀 ~ SftpConnectService ~ uploadFolderScp ~ res:', res);
-
-
 		if (!sftp.host) throw new Error('Missing sftp.host');
 		if (!sftp.username) throw new Error('Missing sftp.username');
 		if (!sftp.password && !sftp.privateKey)

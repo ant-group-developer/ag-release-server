@@ -247,7 +247,7 @@ export class ReleaseDdexCiService {
 
 		await this.downloadMetadataCiFromBucket(releaseId);
 
-		await this.sftpConnectService.uploadFolderScp({
+		await this.sftpConnectService.uploadFolder({
 			sftp,
 			localDir: release.metadataCi?.folderServer ?? '',
 			remoteDir: sftp.path ?? '',
@@ -647,9 +647,7 @@ export class ReleaseDdexCiService {
 	}
 
 	async uploadMetadataDdexCiToSftp(releaseId: string) {
-		await this.releaseDdexService.uploadMetadataDdexCiToSftp(
-			releaseId,
-		);
+		await this.releaseDdexService.uploadMetadataDdexCiToSftp(releaseId);
 	}
 
 	// /
