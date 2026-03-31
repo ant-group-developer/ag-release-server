@@ -25,10 +25,10 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { Repository } from 'typeorm';
-import { Release } from '../entities/release.entity';
-import { ErnService } from '../../ern/services/ern.service';
-import { ReleaseQueryService } from './release.query.service';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
+import { ErnService } from '../../ern/services/ern.service';
+import { Release } from '../entities/release.entity';
+import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -251,7 +251,7 @@ export class ReleaseDdexService {
 					DspCode.SPOTIFY,
 				);
 
-			await this.sftpConnectService.uploadFolderScp({
+			await this.sftpConnectService.uploadFolder({
 				sftp,
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
@@ -271,7 +271,7 @@ export class ReleaseDdexService {
 					aggregatorCode: AggregatorCode.CI,
 				});
 
-			await this.sftpConnectService.uploadFolderScp({
+			await this.sftpConnectService.uploadFolder({
 				sftp,
 				localDir: release.directDdexOnServer ?? '',
 				remoteDir: sftp.path ?? '/',
@@ -284,14 +284,17 @@ export class ReleaseDdexService {
 		} catch (error: any) {
 			throw new Error(error.message || String(error));
 		} finally {
-			// await removeFolder(release.directDdexOnServer ?? '');
+			await removeFolder(release.directDdexOnServer ?? '');
 		}
 	}
 
 	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
 		const client = await this.sftpConnectService.connect(sftp);
 		try {
-			const donePath = path.posix.join(sftp.path ?? '/', `${batchId}.done`);
+			const donePath = path.posix.join(
+				sftp.path ?? '/',
+				`${batchId}.done`,
+			);
 			await client.mkdir(donePath, true);
 			this.logger.log(`[CI_DONE_FOLDER_CREATED] ${donePath}`);
 		} catch (err: any) {
@@ -340,7 +343,9 @@ export class ReleaseDdexService {
 		);
 
 		if (!coverArt) {
-			throw new Error('Bản phát hành không có ảnh bìa gốc (original cover)');
+			throw new Error(
+				'Bản phát hành không có ảnh bìa gốc (original cover)',
+			);
 		}
 
 		const { fileBuffer: coverBuffer, fileDb: coverDb } =
@@ -393,9 +398,19 @@ export class ReleaseDdexService {
 		audioFiles: AudioFileInfo[];
 		outputDir: string;
 	}) {
-		for (const audio of audioFiles) {
+		// for (const audio of audioFiles) {
+		// 	const ext = this.normalizeAudioExtension(audio.extension);
+		// 	const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
+		// 	const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
+		// 	const filePath = path.join(outputDir, fileName);
+		// 
+		// 	fs.writeFileSync(filePath, audio.buffer);
+		// 	this.logger.log(`[AUDIO_SAVED] ${fileName}`);
+		// }
+
+		for (const [index, audio] of audioFiles.entries()) {
 			const ext = this.normalizeAudioExtension(audio.extension);
-			const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
+			const trackNoStr = String(index).padStart(1, '0'); // T0S, T1S, ...
 			const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
 			const filePath = path.join(outputDir, fileName);
 
@@ -450,7 +465,9 @@ export class ReleaseDdexService {
 			: 'NotExplicit';
 
 		const cover = release.releaseCoverArts?.[0];
-		const coverExt = cover ? this.normalizeImageExtension(cover.file?.extension ?? 'jpg') : '.jpg';
+		const coverExt = cover
+			? this.normalizeImageExtension(cover.file?.extension ?? 'jpg')
+			: '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
 
@@ -533,7 +550,7 @@ export class ReleaseDdexService {
 
 			tracks: [...release.tracks]
 				.sort((a, b) => a.order - b.order)
-				.map((track) => ({
+				.map((track, index) => ({
 					isrc: track.isrc ?? '',
 
 					title: track.title ?? '',
@@ -599,7 +616,7 @@ export class ReleaseDdexService {
 
 					audioFile: track.audioFile
 						? {
-								fileName: `${track.isrc}_T${track.order}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
+								fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
 
 								filePath: 'resources',
 
