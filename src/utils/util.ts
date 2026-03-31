@@ -286,6 +286,6 @@ export const MediaUrlTransformer: ValueTransformer = {
         // ĐỌC LÊN TỪ DB: Tự động ghép Base Domain vào
         if (!value) return value;
         const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
-        return value.startsWith('http') ? value : `https://${domain}/${value}`;
+        return value.startsWith('http') ? value : `${domain}/${value}`;
     }
 };
