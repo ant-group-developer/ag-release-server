@@ -10,6 +10,7 @@ import { UPC_CLIENT_NAME, UPC_SERVICE_NAME } from './upc.const';
 import { ListPrefixUpcDto } from './upc.dto';
 import {
 	CreateUpc,
+	GetUpcRequest,
 	QueryUpcRequest,
 	UpcGrpcService,
 } from './upc.grpc.interface';
@@ -31,7 +32,7 @@ export class UpcService implements OnModuleInit {
 	}
 
 	private buildMetadata() {
-		const x_api_key =
+		const x_api_key = 
 			this.appConfigSv.cache.config.generator.API_KEY_GRPC_ISRC_UPC;
 
 		const md = new Metadata();
@@ -51,6 +52,16 @@ export class UpcService implements OnModuleInit {
 		return firstValueFrom(
 			this.grpcService
 				.createUpc(payload, this.buildMetadata())
+				.pipe(timeout(10_000)),
+		);
+	}
+
+	async getUpc(payload: GetUpcRequest) {
+		console.log(payload)
+
+		return firstValueFrom(
+			this.grpcService
+				.getUpc(payload, this.buildMetadata())
 				.pipe(timeout(10_000)),
 		);
 	}

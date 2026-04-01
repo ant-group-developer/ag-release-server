@@ -11,6 +11,7 @@ import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.modu
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { DspModule } from '../dsp/dsp.module';
 import { Dsp } from '../dsp/entities/dsp.entity';
+import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { ErnModule } from '../ern/ern.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { FileExportCiModule } from '../file-export-ci/file-export-ci.module';
@@ -49,6 +50,7 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 			Label,
 			Timezone,
 			Dsp,
+			PriceTier,
 			Country,
 			ReleaseDspDelivery,
 			ReleaseLog,

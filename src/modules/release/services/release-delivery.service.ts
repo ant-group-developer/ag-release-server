@@ -19,14 +19,7 @@ import { ReleaseValidateService } from './release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import {
-	CreateUpc,
-	UpcIndustry,
-	UpcLanguage,
-	UpcPackagingLevel,
-	UpcStatus,
-	UpcYesNo,
-} from 'src/modules/external/upc/upc.grpc.interface';
+import { GetUpcRequest } from 'src/modules/external/upc/upc.grpc.interface';
 
 @Injectable()
 export class ReleaseDeliveryService {
@@ -306,24 +299,9 @@ export class ReleaseDeliveryService {
 			});
 		}
 
-		const payload: CreateUpc = {
-			prefixUpcId,
-			packagingLevel: UpcPackagingLevel.EACH,
-			description: release.title,
-			desc1Language: UpcLanguage.EN,
-			brandName: release.label?.name ?? '',
-			brand1Language: UpcLanguage.EN,
-			status: UpcStatus.IN_USE,
-			industry: UpcIndustry.GENERAL,
-			isVariable: UpcYesNo.NO,
-			isPurchasable: UpcYesNo.YES,
-			isAdded: UpcYesNo.NO,
-			targetMarkets: ['VN'],
-		};
+		const res = await this.upcService.getUpc({ prefixUpcId });
 
-		const res = await this.upcService.create(payload);
-
-		const newUpc = res.data.gtin;
+		const newUpc = res.upc;
 		if (!newUpc) {
 			this.releaseLogService.failed({
 				releaseId,

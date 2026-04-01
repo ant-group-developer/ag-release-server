@@ -11,6 +11,7 @@ import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
 
 import { ReleaseException } from '../constants/release.constant';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
@@ -34,6 +35,9 @@ export class ReleaseValidateService {
 
 		@InjectRepository(Timezone)
 		private readonly timezoneRepo: Repository<Timezone>,
+
+		@InjectRepository(PriceTier)
+		private readonly priceTierRepo: Repository<PriceTier>,
 	) {}
 
 	async validate({
@@ -42,12 +46,14 @@ export class ReleaseValidateService {
 		subGenreId,
 		labelId,
 		releaseTimezoneId,
+		priceTierId,
 	}: {
 		albumFormatId?: string | null;
 		primaryGenreId?: string | null;
 		subGenreId?: string | null;
 		labelId?: string | null;
 		releaseTimezoneId?: string | null;
+		priceTierId?: string | null;
 	}) {
 		if (albumFormatId) {
 			const albumFormat = await this.albumFormatRepo.findOne({
@@ -94,6 +100,16 @@ export class ReleaseValidateService {
 
 			if (!timezone) {
 				throw ReleaseException.TIMEZONE_NOT_FOUND();
+			}
+		}
+
+		if (priceTierId) {
+			const priceTier = await this.priceTierRepo.findOne({
+				where: { id: priceTierId },
+			});
+
+			if (!priceTier) {
+				throw ReleaseException.PRICE_TIER_NOT_FOUND();
 			}
 		}
 	}
@@ -159,6 +175,7 @@ export class ReleaseValidateService {
 			primaryGenreId,
 			subGenreId,
 			releaseTimezoneId,
+			priceTierId,
 		} = dataUpdate;
 
 		if (albumFormatId && albumFormatId !== release.albumFormatId) {
@@ -191,6 +208,12 @@ export class ReleaseValidateService {
 		) {
 			await this.validate({
 				releaseTimezoneId,
+			});
+		}
+
+		if (priceTierId && priceTierId !== release.priceTierId) {
+			await this.validate({
+				priceTierId,
 			});
 		}
 	}

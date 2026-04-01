@@ -1,4 +1,5 @@
 import { Metadata } from '@grpc/grpc-js';
+import { IsNotEmpty, IsOptional } from 'class-validator';
 import { Observable } from 'rxjs';
 
 /* ===== REQUEST TYPES ===== */
@@ -345,6 +346,16 @@ export interface ListPrefixUpcResponse {
 	message: string;
 }
 
+export class GetUpcRequest {
+	@IsNotEmpty()
+	prefixUpcId: string;
+}
+
+export interface GetUpcResponse {
+	upc: string;
+	message: string;
+}
+
 /* ===== gRPC CONTRACT ===== */
 
 export interface UpcGrpcService {
@@ -356,6 +367,10 @@ export interface UpcGrpcService {
 		data: CreateUpcRequest,
 		metadata?: Metadata,
 	): Observable<CreateUpcResponse>;
+	getUpc(
+		data: GetUpcRequest,
+		metadata?: Metadata,
+	): Observable<GetUpcResponse>;
 	listPrefixUpc(
 		data: ListPrefixUpcRequest,
 		metadata?: Metadata,

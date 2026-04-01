@@ -140,6 +140,13 @@ export class CreateReleaseDto {
 		value === undefined ? null : value,
 	)
 	releaseTimezoneId: string | null;
+
+	@IsOptional()
+	@IsUUID()
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	priceTierId?: string | null;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
@@ -189,6 +196,11 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	)
 	@IsDate()
 	releaseDate?: Date;
+
+	@IsOptional()
+	@IsUUID()
+	@ValidateIf((_, value) => value !== undefined)
+	priceTierId?: string | null;
 }
 
 export class QueryGetListReleaseDto extends BaseQueryDto {

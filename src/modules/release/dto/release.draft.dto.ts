@@ -133,6 +133,10 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	@IsUUID()
 	releaseTimezoneId?: string | null;
+
+	@IsOptional()
+	@IsUUID()
+	priceTierId?: string | null;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
@@ -171,4 +175,9 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@ValidateNested()
 	@Type(() => UpdateReleaseTerritoryDto)
 	releaseTerritory?: UpdateReleaseTerritoryDto;
+
+	@IsOptional()
+	@IsUUID()
+	@ValidateIf((_, value) => value !== undefined)
+	priceTierId?: string | null;
 }
