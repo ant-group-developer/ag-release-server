@@ -7,14 +7,7 @@ import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
-import {
-	CreateUpc,
-	UpcIndustry,
-	UpcLanguage,
-	UpcPackagingLevel,
-	UpcStatus,
-	UpcYesNo,
-} from 'src/modules/external/upc/upc.grpc.interface';
+import { GetUpcRequest } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
@@ -419,30 +412,9 @@ export class ReleaseService {
 			});
 		}
 
-		const payload: CreateUpc = {
-			prefixUpcId,
+		const res = await this.upcService.getUpc({ prefixUpcId });
 
-			packagingLevel: UpcPackagingLevel.EACH,
-
-			description: release.title,
-			desc1Language: UpcLanguage.EN,
-
-			brandName: release.label?.name ?? '',
-			brand1Language: UpcLanguage.EN,
-
-			status: UpcStatus.IN_USE, // không có ACTIVE
-			industry: UpcIndustry.GENERAL, // không có MUSIC
-
-			isVariable: UpcYesNo.NO,
-			isPurchasable: UpcYesNo.YES,
-			isAdded: UpcYesNo.NO,
-
-			targetMarkets: ['VN'],
-		};
-
-		const res = await this.upcService.create(payload);
-
-		const newUpc = res.data.gtin; // theo proto UpcItem
+		const newUpc = res.upc;
 		if (!newUpc) {
 			this.releaseLogService.failed({
 				releaseId,

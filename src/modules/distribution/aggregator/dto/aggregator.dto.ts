@@ -60,6 +60,9 @@ export class CreateAggregatorDto {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	ddexName?: string | null;
+
+	@IsOptional()
+	createsDoneFolder?: boolean;
 }
 
 export class UpdateAggregatorDto extends PartialType(CreateAggregatorDto) {}

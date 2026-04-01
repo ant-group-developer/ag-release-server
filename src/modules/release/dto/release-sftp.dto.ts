@@ -165,6 +165,9 @@ export interface ReleaseRawSftp {
 	/** Dùng trực tiếp: lưu vào releases.tenantId */
 	tenantId?: string;
 
+	/** Cần tìm trong DB: price_tier name/code -> lấy id gán vào releases.priceTierId */
+	priceTier?: string;
+
 	/** Dùng trực tiếp: lưu vào releases.metadataCi */
 	metadataCi?: string;
 

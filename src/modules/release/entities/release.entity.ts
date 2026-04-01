@@ -1,4 +1,5 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
@@ -82,6 +83,17 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		comment: 'Tiêu đề release ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	title: string;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'Price tier áp dụng cho release ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	priceTierId: string | null;
+
+	@ManyToOne(() => PriceTier)
+	@JoinColumn({ name: 'price_tier_id' })
+	priceTier: PriceTier | null;
 
 	@Column({
 		type: 'varchar',

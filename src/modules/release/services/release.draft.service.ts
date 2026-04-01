@@ -78,6 +78,7 @@ export class ReleaseDraftService {
 			primaryGenreId,
 			subGenreId,
 			releaseTimezoneId,
+			priceTierId,
 		} = data;
 
 		await this.releaseValidateService.validate({
@@ -86,6 +87,7 @@ export class ReleaseDraftService {
 			primaryGenreId,
 			subGenreId,
 			releaseTimezoneId,
+			priceTierId,
 		});
 
 		const release = this.releaseRepo.create({
@@ -358,6 +360,12 @@ export class ReleaseDraftService {
 			'metadataLanguageCountry',
 		);
 
+		const releasePriceTierId = getId(
+			maps.priceTier,
+			r.priceTier,
+			'priceTier',
+		);
+
 		// const releaseTimezoneId = getId(
 		// 	maps.timezone,
 		// 	r.releaseTimezoneId,
@@ -513,6 +521,7 @@ export class ReleaseDraftService {
 				? new Date(r.releaseDate.split('/').reverse().join('-'))
 				: null,
 			releaseTime: r.releaseTime ?? null,
+			priceTierId: releasePriceTierId,
 
 			// tenantId: r.tenantId ?? null,
 			tenantId: 'b4f924e8-d6e7-4b02-8bbe-5ae2b0f97b7a',

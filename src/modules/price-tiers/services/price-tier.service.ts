@@ -4,6 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import { PriceTierMessage } from '../constants/price-tiers.constant';
 import {
+	BulkUpdatePriceTierOrderDto,
 	CreatePriceTierDto,
 	QueryGetListPriceTier,
 	UpdatePriceTierDto,
@@ -94,5 +95,25 @@ export class PriceTierService {
 		const priceTier = await this.findOneWithCountRelation(id);
 		this.priceTierQueryService.validateDelete(priceTier);
 		await this.priceTierRepo.delete(id);
+	}
+
+	async bulkUpdateOrder(
+		data: BulkUpdatePriceTierOrderDto,
+		userId: string,
+	): Promise<PriceTier[]> {
+		const { priceTiers } = data;
+
+		// validate all exist
+		await Promise.all(
+			priceTiers.map((pt) => this.findOne(pt.id)),
+		);
+
+		const priceTiersToUpdate = priceTiers.map((pt) => ({
+			id: pt.id,
+			order: pt.order,
+			modifierId: userId,
+		}));
+
+		return await this.priceTierRepo.save(priceTiersToUpdate);
 	}
 }

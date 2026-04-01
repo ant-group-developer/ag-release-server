@@ -20,7 +20,7 @@ export class PriceTierQueryService {
 
 	// private
 	private createQueryGetList(query: QueryGetListPriceTier) {
-		const { skip, pageSize, fieldOrder, orderBy, keyword } = query;
+		const { skip, pageSize, fieldOrder, orderBy, keyword, type } = query;
 
 		const qb = this.priceTierRepo
 			.createQueryBuilder('priceTier')
@@ -33,6 +33,9 @@ export class PriceTierQueryService {
 				'priceTier.currencyId',
 				'priceTier.isDefault',
 				'priceTier.isActive',
+				'priceTier.order',
+				'priceTier.ciCode',
+				'priceTier.type',
 				'priceTier.createdAt',
 				'priceTier.updatedAt',
 			])
@@ -45,6 +48,9 @@ export class PriceTierQueryService {
 					keyword: `%${keyword}%`,
 				},
 			);
+		}
+		if (type) {
+			qb.andWhere('priceTier.type = :type', { type });
 		}
 		if (fieldOrder === FieldOrderCurrency.CURRENCY_NAME) {
 			qb.orderBy('currency.name', orderBy);

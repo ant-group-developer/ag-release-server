@@ -2,6 +2,7 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { Currency } from 'src/modules/currency/entities/currency.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { PriceTierType } from '../enum/price-tier.enum';
 
 @Entity('price_tiers', {
 	comment:
@@ -43,6 +44,30 @@ export class PriceTier extends BaseUserTrackedUUIDEntity {
 		comment: 'Trạng thái kích hoạt của price tier',
 	})
 	isActive: boolean;
+
+	@Column({
+		type: 'int',
+		default: 0,
+		comment: 'Thứ tự hiển thị',
+	})
+	order: number;
+
+	@Column({
+		name: 'ci_code',
+		type: 'varchar',
+		length: 200,
+		default: 'mid',
+		comment: 'Mã CI',
+	})
+	ciCode: string;
+
+	@Column({
+		type: 'enum',
+		enum: PriceTierType,
+		default: PriceTierType.TRACK,
+		comment: 'Loại price tier (album/track)',
+	})
+	type: PriceTierType;
 
 	@ManyToOne(() => Currency)
 	@JoinColumn({ name: 'currency_id' })

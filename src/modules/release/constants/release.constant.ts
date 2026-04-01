@@ -97,6 +97,14 @@ export class ReleaseException {
 		});
 	}
 
+	static PRICE_TIER_NOT_FOUND(data?: any) {
+		return new ResponseError({
+			message: 'Price tier not found',
+			messageCode: 'release.message.error.priceTierNotFound',
+			data,
+		});
+	}
+
 	static ERROR_MAX_COUNT_TRACKS(data?: any) {
 		return new ResponseError({
 			message: 'Error max count tracks',
