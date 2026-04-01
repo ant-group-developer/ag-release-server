@@ -1,7 +1,7 @@
 // services/release-dsp-delivery.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../constants/release-dsp.constant';
 import {
 	CreateReleaseDspDeliveryDto,
@@ -9,6 +9,7 @@ import {
 	UpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 @Injectable()
@@ -75,6 +76,102 @@ export class ReleaseDspDeliveryService {
 	async delete(id: string) {
 		await this.findOne(id);
 		await this.repo.delete(id);
+	}
+
+	// ==================== Delivery orchestration ====================
+
+	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {
+		const existed = await this.repo.findOne({
+			where: { releaseId, dspId },
+		});
+
+		const data = {
+			status: ReleaseDspStatus.PROCESSING,
+			lastEnqueuedAt: new Date(),
+			lastDeliveredAt: null as Date | null,
+			isSelected: true,
+		};
+
+		if (!existed) {
+			await this.repo.save({ releaseId, dspId, ...data });
+		} else {
+			await this.repo.update({ releaseId, dspId }, data);
+		}
+	}
+
+	async markDistributed(releaseId: string, dspId: string): Promise<void> {
+		await this.repo.update(
+			{ releaseId, dspId },
+			{
+				status: ReleaseDspStatus.DISTRIBUTED,
+				lastEnqueuedAt: new Date(),
+				lastDeliveredAt: new Date(),
+			},
+		);
+	}
+
+	async markIssues(releaseId: string, dspId: string): Promise<void> {
+		await this.repo.update(
+			{ releaseId, dspId },
+			{
+				status: ReleaseDspStatus.ISSUES,
+				lastEnqueuedAt: new Date(),
+				lastDeliveredAt: null,
+			},
+		);
+	}
+
+	async updateMetadataInfo(
+		releaseId: string,
+		dspId: string,
+		info: { metadataPath?: string; batchId?: string },
+	): Promise<void> {
+		await this.repo.update({ releaseId, dspId }, info);
+	}
+
+	async updateSelected(releaseId: string, dspIds: string[]): Promise<void> {
+		await this.repo.update({ releaseId }, { isSelected: false });
+
+		if (dspIds.length > 0) {
+			await this.repo.update(
+				{ releaseId, dspId: In(dspIds) },
+				{ isSelected: true },
+			);
+		}
+	}
+
+	async ensureDeliveriesExist(
+		releaseId: string,
+		activeDspIds: string[],
+	): Promise<void> {
+		const existing = await this.repo.find({
+			where: { releaseId },
+			select: ['dspId'],
+		});
+
+		const existIds = new Set(existing.map((d) => d.dspId));
+
+		const newRecords = activeDspIds
+			.filter((id) => !existIds.has(id))
+			.map((dspId) => ({
+				releaseId,
+				dspId,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				lastEnqueuedAt: null as Date | null,
+				lastDeliveredAt: null as Date | null,
+			}));
+
+		if (newRecords.length) {
+			await this.repo.insert(newRecords);
+		}
+	}
+
+	async findDeliveryId(releaseId: string, dspId: string): Promise<string | null> {
+		const record = await this.repo.findOne({
+			where: { releaseId, dspId },
+			select: ['id'],
+		});
+		return record?.id ?? null;
 	}
 
 	private async validateUnique(

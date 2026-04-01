@@ -32,12 +32,13 @@ import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseDdexService } from './services/release-ddex.service';
 import { ReleaseLogService } from './services/release-log.service';
-import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
-import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
+// import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
+// import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
+import { ReleaseDeliveryService } from './services/release-delivery.service';
 
 @Module({
 	imports: [
@@ -89,10 +90,11 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseValidateService,
 		ReleaseQueryService,
 
-		ReleaseDdexCiService,
-		ReleaseSpotifyService2,
+		// ReleaseDdexCiService,
+		// ReleaseSpotifyService2,
 		ReleaseLogService,
 		ReleaseDdexService,
+		ReleaseDeliveryService,
 	],
 })
 export class ReleaseModule {}

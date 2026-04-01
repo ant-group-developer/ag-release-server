@@ -17,7 +17,7 @@ import {
 import { Aggregator } from '../entities/aggregator.entity';
 import { AggregatorCode } from '../enum/distribution.enum';
 import { AggregatorQueryService } from './aggregator.query.service';
-import { decryptSecretSftpConfig } from '../../sftp-configs/utils/sftp-config.util';
+import { decryptSecretSftpConfigSafe } from '../../sftp-configs/utils/sftp-config.util';
 
 @Injectable()
 export class AggregatorsService {
@@ -95,7 +95,7 @@ export class AggregatorsService {
 			relations: { sftpConfig: true },
 		});
 		if (!entity) throw AggregatorException.NOT_FOUND();
-		decryptSecretSftpConfig(entity.sftpConfig)
+		decryptSecretSftpConfigSafe(entity.sftpConfig)
 
 		return entity;
 	}

@@ -1,5 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Release } from './release.entity';
 
@@ -27,10 +28,20 @@ export class ReleaseLog extends BaseUUIDEntity {
 	dspId: string | null;
 
 	@ManyToOne(() => Dsp, {
-		onDelete: 'CASCADE',
+		createForeignKeyConstraints: false,
 	})
 	@JoinColumn({ name: 'dsp_id' })
 	dsp?: Dsp | null;
+
+	@Column({ type: 'uuid', nullable: true })
+	deliveryId: string | null;
+
+	@ManyToOne(() => ReleaseDspDelivery, {
+		onDelete: 'SET NULL',
+		nullable: true,
+	})
+	@JoinColumn({ name: 'delivery_id' })
+	delivery?: ReleaseDspDelivery | null;
 
 	@Column({ type: 'text', nullable: true })
 	logs?: string;

@@ -133,10 +133,6 @@ export class ReleaseDdexService {
 			recipient,
 		});
 
-		await this.releaseRepo.update(releaseId, {
-			directDdexOnServer: outputRoot.replace(/\\/g, '/'),
-		});
-
 		this.logger.log({
 			releaseId,
 			step: 'createMetadataOnServer',
@@ -146,6 +142,7 @@ export class ReleaseDdexService {
 		return {
 			outputDir: outputRoot,
 			outputRoot,
+			batchId,
 		};
 	}
 
