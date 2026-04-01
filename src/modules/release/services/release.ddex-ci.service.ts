@@ -635,6 +635,12 @@ export class ReleaseDdexCiService {
 			name: string;
 		};
 	}) {
+		if (!this.DDEX_PARTY_ID_CI || !this.DDEX_PARTY_NAME_CI) {
+			throw new Error(
+				'CI Aggregator DDEX Party chưa được cấu hình (DDEX_PARTY_ID_CI hoặc DDEX_PARTY_NAME_CI bị trống)',
+			);
+		}
+
 		await this.releaseDdexService.createMetadataOnServer({
 			releaseId,
 			ernVersion: '3.8.2',

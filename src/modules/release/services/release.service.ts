@@ -760,7 +760,7 @@ export class ReleaseService {
 				step: 'Ghi nhận DSP Spotify',
 				message: `Tạo dữ liệu và đóng gói gửi DSP Spotify thành công`,
 				codeDsp: DspCode.SPOTIFY,
-				dspId: 'SMImv6mH7H',
+				dspId: dspSpotify.id,
 			});
 		} catch (error) {
 			await this.releaseDspDeliveryRepo.update(
@@ -777,7 +777,7 @@ export class ReleaseService {
 				step: 'Ghi nhận DSP Spotify',
 				message: `Quá trình xử lý DSP Spotify thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
 				codeDsp: DspCode.SPOTIFY,
-				dspId: 'SMImv6mH7H',
+				dspId: dspSpotify.id,
 			});
 
 			throw error;
@@ -803,14 +803,27 @@ export class ReleaseService {
 			throw new ResponseError({ message: `DSP ${code} not found` });
 		}
 
+		if (!dsp.ddexId || !dsp.ddexName) {
+			this.releaseLogService.failed({
+				releaseId,
+				codeDsp: code,
+				message: `DSP ${dsp.name} chưa được cấu hình DDEX Party (ddexId hoặc ddexName bị trống)`,
+				step: `Ghi nhận DSP ${dsp.name}`,
+				dspId: dsp.id,
+			});
+			throw new ResponseError({
+				message: `DSP ${code} is missing DDEX Party configuration (ddexId or ddexName)`,
+			});
+		}
+
 		await this.upsertReleaseDspDeliveryProcessing(releaseId, dsp.id);
 
 		try {
 			await this.releaseDdexCiService.createAndUploadMetadataDdexCi({
 				releaseId,
 				recipient: {
-					name: dsp.ddexName ?? '',
-					partyId: dsp.ddexId ?? '',
+					name: dsp.ddexName,
+					partyId: dsp.ddexId,
 				},
 			});
 
