@@ -129,11 +129,8 @@ export class ReleaseDdexService {
 			batchId,
 			upc,
 			outputRoot,
+			sender,
 			recipient,
-		});
-
-		await this.releaseRepo.update(releaseId, {
-			directDdexOnServer: outputRoot.replace(/\\/g, '/'),
 		});
 
 		this.logger.log({
@@ -145,6 +142,7 @@ export class ReleaseDdexService {
 		return {
 			outputDir: outputRoot,
 			outputRoot,
+			batchId,
 		};
 	}
 
@@ -184,12 +182,17 @@ export class ReleaseDdexService {
 		batchId,
 		upc,
 		outputRoot,
+		sender,
 		recipient,
 	}: {
 		batchId: string;
 		upc: string;
 		outputRoot: string;
 
+		sender: {
+			partyId: string;
+			name: string;
+		};
 		recipient: {
 			partyId: string;
 			name: string;
@@ -199,10 +202,7 @@ export class ReleaseDdexService {
 		const hash = this.getSha1Base64(xmlFilePath);
 
 		const manifest: ManifestInput = {
-			sender: {
-				partyId: this.appConfigSv.DDEX_PARTY_ID_AMG(),
-				name: this.appConfigSv.DDEX_PARTY_NAME_AMG(),
-			},
+			sender,
 
 			recipient,
 
@@ -215,7 +215,7 @@ export class ReleaseDdexService {
 					releaseId: {
 						icpn: upc,
 						proprietaryId: {
-							namespace: this.appConfigSv.DDEX_PARTY_ID_AMG(),
+							namespace: sender.partyId,
 							value: upc,
 						},
 					},

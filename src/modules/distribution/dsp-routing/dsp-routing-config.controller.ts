@@ -60,6 +60,20 @@ export class DspRoutingConfigsController {
 		return DspRoutingConfigSuccess.COMMON(result);
 	}
 
+	@Get('test-resolve-full/:code')
+	async testResolveFullDeliveryConfig(@Param('code') code: string) {
+		const result = await this.svc.resolveFullDeliveryConfig(code);
+
+		return DspRoutingConfigSuccess.COMMON(result);
+	}
+
+	@Get('test-resolve-raw/:code')
+	async testResolveRawDeliveryConfig(@Param('code') code: string) {
+		const result = await this.svc.resolveRawDeliveryConfig(code);
+
+		return DspRoutingConfigSuccess.COMMON(result);
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get dsp routing config detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })

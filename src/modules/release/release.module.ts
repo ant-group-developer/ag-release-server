@@ -11,6 +11,7 @@ import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.modu
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { DspModule } from '../dsp/dsp.module';
 import { Dsp } from '../dsp/entities/dsp.entity';
+import { PriceTier } from '../price-tiers/entities/price-tier.entity';
 import { ErnModule } from '../ern/ern.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { FileExportCiModule } from '../file-export-ci/file-export-ci.module';
@@ -32,12 +33,13 @@ import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseDdexService } from './services/release-ddex.service';
 import { ReleaseLogService } from './services/release-log.service';
-import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
-import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
+// import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
+// import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
+import { ReleaseDeliveryService } from './services/release-delivery.service';
 
 @Module({
 	imports: [
@@ -48,6 +50,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 			Label,
 			Timezone,
 			Dsp,
+			PriceTier,
 			Country,
 			ReleaseDspDelivery,
 			ReleaseLog,
@@ -89,10 +92,11 @@ import { ReleaseValidateService } from './services/release.validate.service';
 		ReleaseValidateService,
 		ReleaseQueryService,
 
-		ReleaseDdexCiService,
-		ReleaseSpotifyService2,
+		// ReleaseDdexCiService,
+		// ReleaseSpotifyService2,
 		ReleaseLogService,
 		ReleaseDdexService,
+		ReleaseDeliveryService,
 	],
 })
 export class ReleaseModule {}

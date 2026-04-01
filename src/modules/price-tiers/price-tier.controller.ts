@@ -19,6 +19,7 @@ import {
 	PriceTierMessageSuccess,
 } from './constants/price-tiers.constant';
 import {
+	BulkUpdatePriceTierOrderDto,
 	CreatePriceTierDto,
 	QueryGetListPriceTier,
 	UpdatePriceTierDto,
@@ -50,6 +51,21 @@ export class PriceTierController {
 			data,
 			message: PriceTierMessageSuccess.CREATE,
 			messageCode: PriceTierMessageCodeSuccess.CREATE,
+		});
+	}
+
+	@SystemAdminOnly()
+	@Put('bulk')
+	async bulkUpdateOrder(
+		@Body() dto: BulkUpdatePriceTierOrderDto,
+		@Req() req: Request,
+	) {
+		const userId = req.user!.sub;
+		const data = await this.priceTierService.bulkUpdateOrder(dto, userId);
+		return new ResponseSuccess({
+			data,
+			message: PriceTierMessageSuccess.UPDATE,
+			messageCode: PriceTierMessageCodeSuccess.UPDATE,
 		});
 	}
 

@@ -6,6 +6,7 @@ service UpcService {
   rpc ListUpc (QueryUpcRequest) returns (QueryUpcResponse);
   rpc CreateUpc (CreateUpcRequest) returns (CreateUpcResponse);
   rpc ListPrefixUpc (ListPrefixUpcRequest) returns (ListPrefixUpcResponse); 
+  rpc GetUpc (GetUpcRequest) returns (GetUpcResponse);
 }
 
 message QueryUpcRequest {
@@ -40,7 +41,7 @@ message UpcItem {
   bool isVariable = 12;
   bool isPurchasable = 13;
   bool isAdded = 14;
-  repeated string targetMarkets = 15;
+  reserved 15;
   string createdAt = 16;
   string updatedAt = 17;
 }
@@ -74,8 +75,7 @@ message CreateUpcRequest {
   bool isVariable = 9;
   bool isPurchasable = 10;
   bool isAdded = 11;
-
-  repeated string targetMarkets = 12;
+  reserved 12;
 }
 
 message CreateUpcResponse {
@@ -105,4 +105,13 @@ message ListPrefixUpcResponse {
   repeated PrefixUpcItem data = 1;
   Pagination metadata = 2;
   string message = 3;
+}
+
+message GetUpcRequest {
+  string prefixUpcId = 1;
+}
+
+message GetUpcResponse {
+  string upc = 1;
+  string message = 2;
 }

@@ -10,9 +10,12 @@ import {
 	MaxLength,
 	Min,
 	ValidateIf,
+	ArrayMinSize,
+	ValidateNested,
+	IsInt,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
-import { FieldOrderCurrency } from '../enum/price-tier.enum';
+import { FieldOrderCurrency, PriceTierType } from '../enum/price-tier.enum';
 
 export class CreatePriceTierDto {
 	@Type(() => Number)
@@ -39,6 +42,21 @@ export class CreatePriceTierDto {
 	@IsNotEmpty()
 	@IsBoolean()
 	isActive: boolean = true;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@Type(() => Number)
+	@IsNumber()
+	@Min(0)
+	order?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(200)
+	ciCode?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(PriceTierType)
+	type?: PriceTierType;
 }
 
 export class UpdatePriceTierDto {
@@ -69,9 +87,48 @@ export class UpdatePriceTierDto {
 	@IsNotEmpty()
 	@IsBoolean()
 	isActive?: boolean;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@Type(() => Number)
+	@IsNumber()
+	@Min(0)
+	order?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@MaxLength(200)
+	ciCode?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(PriceTierType)
+	type?: PriceTierType;
 }
 
 export class QueryGetListPriceTier extends BaseQueryDto {
 	@IsEnum(FieldOrderCurrency)
 	fieldOrder: FieldOrderCurrency = FieldOrderCurrency.CREATED_AT;
+
+	@IsOptional()
+	@IsEnum(PriceTierType)
+	type?: PriceTierType;
 }
+
+export class UpdateOrderPriceTierDto {
+	@IsUUID()
+	@IsNotEmpty()
+	id: string;
+
+	@IsInt()
+	@IsNotEmpty()
+	@Min(0)
+	order: number;
+}
+
+export class BulkUpdatePriceTierOrderDto {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => UpdateOrderPriceTierDto)
+	priceTiers: UpdateOrderPriceTierDto[];
+}
+

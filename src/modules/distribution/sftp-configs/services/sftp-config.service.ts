@@ -16,7 +16,7 @@ import {
 	SftpMetadata,
 } from '../type/sftp-config.type';
 import { SftpConfigQueryService } from './sftp-config.query.service';
-import { decryptSecretSftpConfig, decryptSecretSftpConfigList } from '../utils/sftp-config.util';
+import { decryptSecretSftpConfigSafe, decryptSecretSftpConfigListSafe } from '../utils/sftp-config.util';
 
 @Injectable()
 export class SftpConfigsService {
@@ -41,7 +41,7 @@ export class SftpConfigsService {
 
 		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
 
-		decryptSecretSftpConfig(e);
+		decryptSecretSftpConfigSafe(e);
 
 		return e.metadata;
 	}
@@ -58,7 +58,7 @@ export class SftpConfigsService {
 
 		if (!e || !e.metadata) throw SftpConfigException.NOT_FOUND();
 
-		decryptSecretSftpConfig(e);
+		decryptSecretSftpConfigSafe(e);
 
 		return e.metadata;
 	}
@@ -115,7 +115,7 @@ export class SftpConfigsService {
 
 	async getList(filter: GetListSftpConfigsDto) {
 		const result = await this.queryService.getList(filter);
-		decryptSecretSftpConfigList(result.items);
+		decryptSecretSftpConfigListSafe(result.items);
 		return result;
 	}
 
@@ -126,7 +126,7 @@ export class SftpConfigsService {
 		});
 		if (!entity) throw SftpConfigException.NOT_FOUND();
 
-		decryptSecretSftpConfig(entity);
+		decryptSecretSftpConfigSafe(entity);
 		return entity;
 	}
 

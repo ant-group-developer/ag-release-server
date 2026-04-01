@@ -24,6 +24,11 @@ export class CreateSftpConfigDto {
 	@IsOptional()
 	aggregatorId?: string | null;
 
+	@ApiPropertyOptional({ example: '3.8.2' })
+	@IsOptional()
+	@MaxLength(10)
+	ernVersion?: string | null;
+
 	@ApiPropertyOptional({
 		type: Object,
 		example: { host: 'sftp.example.com', port: 22 },
