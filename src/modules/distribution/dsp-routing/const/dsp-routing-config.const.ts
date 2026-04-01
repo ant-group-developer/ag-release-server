@@ -10,7 +10,7 @@ export class DspRoutingConfigSuccess extends AppResponseSuccess {
 	static COMMON<DspRoutingConfig>(data?: DspRoutingConfig) {
 		return new ResponseSuccess({
 			data,
-			isRemoveSensitiveFields: false,
+			isRemoveSensitiveFields: true,
 			sensitiveKeys: ['password', 'privateKey'],
 		});
 	}
