@@ -4,6 +4,7 @@ import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { Aggregator } from '../../aggregator/entities/aggregator.entity';
 import { DspRoutingConfig } from '../../dsp-routing/entities/dsp-routing-config.entity';
 import { SftpMetadata } from '../type/sftp-config.type';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 
 @Entity({ name: 'sftp_configs' })
 export class SftpConfig extends BaseUserTrackedUUIDEntity {
@@ -17,10 +18,10 @@ export class SftpConfig extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		nullable: true,
-		default: '3.8.2',
+		default: ErnVersion.ERN_382,
 		comment: 'DDEX ERN version (e.g. 3.8.2, 4.3)',
 	})
-	ernVersion: string | null;
+	ernVersion: ErnVersion | null;
 
 	@OneToOne(() => Aggregator, (a) => a.sftpConfig, {
 		onDelete: 'CASCADE',

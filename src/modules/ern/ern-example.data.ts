@@ -1,7 +1,7 @@
-import { ErnInput, ManifestInput } from './interfaces/ern-input.interface';
+import { ErnInput, ManifestInput, ErnVersion } from './interfaces/ern-input.interface';
 
 export const singleExample: ErnInput = {
-	version: '4.3',
+	version: ErnVersion.ERN_43,
 	message: {
 		id: '00001',
 		sender: { partyId: 'PADPIDA20250804056', name: 'ANT MUSIC LLC' },
@@ -49,7 +49,7 @@ export const singleExample: ErnInput = {
 };
 
 export const albumExample: ErnInput = {
-	version: '4.3',
+	version: ErnVersion.ERN_43,
 	message: {
 		id: '00002',
 		sender: { partyId: 'PADPIDA20250804056', name: 'ANT MUSIC LLC' },
@@ -118,7 +118,7 @@ export const albumExample: ErnInput = {
 };
 
 export const ern382Example: ErnInput = {
-	version: '3.8.2',
+	version: ErnVersion.ERN_382,
 	message: {
 		id: '1111',
 		threadId: 'R1000001',

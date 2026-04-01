@@ -7,6 +7,7 @@
 
 import { DDEXService } from '../ddex.service';
 import { DDEXData } from '../interfaces/ddex-input.interface';
+import { ErnVersion } from '../../ern/interfaces/ern-input.interface';
 
 // ==================== Single Example ====================
 export const singleExample: DDEXData = {
@@ -260,19 +261,19 @@ export function generateExample() {
 
 	// Generate Single
 	const singleXml = ddexService.generate({
-		version: '4.3',
+		version: ErnVersion.ERN_43,
 		data: singleExample,
 	});
 
 	// Generate Album
 	const albumXml = ddexService.generate({
-		version: '4.3',
+		version: ErnVersion.ERN_43,
 		data: albumExample,
 	});
 
 	// Generate ERN 3.8.2 Add
 	const ern382Xml = ddexService.generate({
-		version: '3.8.2',
+		version: ErnVersion.ERN_382,
 		data: ern382AddExample,
 	});
 

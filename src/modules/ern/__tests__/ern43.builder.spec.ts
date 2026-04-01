@@ -1,9 +1,11 @@
 import { Ern43Builder } from '../builders/ern43.builder';
 import { ErnInput } from '../interfaces/ern-input.interface';
 
+import { ErnVersion } from '../interfaces/ern-input.interface';
+
 describe('Ern43Builder', () => {
 	const singleInput: ErnInput = {
-		version: '4.3',
+		version: ErnVersion.ERN_43,
 		message: {
 			id: 'MSG001',
 			sender: { partyId: 'PADPIDA20250804056', name: 'ANT MUSIC LLC' },
@@ -45,7 +47,7 @@ describe('Ern43Builder', () => {
 	};
 
 	const albumInput: ErnInput = {
-		version: '4.3',
+		version: ErnVersion.ERN_43,
 		message: {
 			id: 'MSG002',
 			sender: { partyId: 'PADPIDA20250804056', name: 'ANT MUSIC LLC' },

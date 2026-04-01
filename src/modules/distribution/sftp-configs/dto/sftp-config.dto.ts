@@ -1,7 +1,8 @@
 // src/modules/sftp-configs/dto/sftp-config.dto.ts
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsUUID, MaxLength } from 'class-validator';
+import { IsEnum, IsObject, IsOptional, IsUUID, MaxLength } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { FieldOrderSftpConfig } from '../const/sftp-config.const';
 import { SftpMetadata } from '../type/sftp-config.type';
 
@@ -24,10 +25,10 @@ export class CreateSftpConfigDto {
 	@IsOptional()
 	aggregatorId?: string | null;
 
-	@ApiPropertyOptional({ example: '3.8.2' })
+	@ApiPropertyOptional({ enum: ErnVersion, example: ErnVersion.ERN_382 })
 	@IsOptional()
-	@MaxLength(10)
-	ernVersion?: string | null;
+	@IsEnum(ErnVersion)
+	ernVersion?: ErnVersion | null;
 
 	@ApiPropertyOptional({
 		type: Object,

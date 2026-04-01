@@ -1,9 +1,11 @@
 import { Ern382Builder } from '../builders/ern382.builder';
 import { ErnInput } from '../interfaces/ern-input.interface';
 
+import { ErnVersion } from '../interfaces/ern-input.interface';
+
 describe('Ern382Builder', () => {
 	const singleInput: ErnInput = {
-		version: '3.8.2',
+		version: ErnVersion.ERN_382,
 		message: {
 			id: '1111',
 			threadId: 'R1000001',
