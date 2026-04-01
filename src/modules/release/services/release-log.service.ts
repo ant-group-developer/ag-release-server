@@ -13,6 +13,7 @@ type ReleaseLogInput = {
 	message?: string;
 	dspId?: string | null;
 	codeDsp?: string | null;
+	deliveryId?: string | null;
 	content?: unknown;
 };
 
@@ -155,7 +156,7 @@ export class ReleaseLogService {
 	) {
 		const createdAt = new Date();
 
-		const { releaseId, step, message, dspId, content, status } = data;
+		const { releaseId, step, message, dspId, deliveryId, content, status } = data;
 
 		const logText = `[${createdAt.toISOString()}] [Release ${releaseId}]${
 			dspId ? ` [DSP ${dspId}]` : ''
@@ -183,6 +184,7 @@ export class ReleaseLogService {
 		const entity = this.releaseLogRepo.create({
 			releaseId,
 			dspId: dspId ?? undefined,
+			deliveryId: deliveryId ?? undefined,
 			status,
 			step,
 			logs: message ?? undefined,

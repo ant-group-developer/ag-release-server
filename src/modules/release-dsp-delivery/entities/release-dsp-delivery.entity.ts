@@ -61,6 +61,21 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	})
 	logs: string | null;
 
+	@Column({
+		type: 'text',
+		nullable: true,
+		comment: 'Đường dẫn folder metadata trên server cho lần delivery này',
+	})
+	metadataPath: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Batch ID của lần delivery này',
+	})
+	batchId: string | null;
+
 	@ManyToOne(() => Release, (release) => release.releaseDspDeliveries, {
 		onDelete: 'CASCADE',
 	})

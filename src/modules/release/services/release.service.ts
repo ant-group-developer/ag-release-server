@@ -42,10 +42,11 @@ import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseLogService } from './release-log.service';
-import { ReleaseDdexCiService } from './release.ddex-ci.service';
-import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
+// import { ReleaseDdexCiService } from './release.ddex-ci.service';
+// import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
+import { ReleaseDeliveryService } from './release-delivery.service';
 
 @Injectable()
 export class ReleaseService {
@@ -64,8 +65,8 @@ export class ReleaseService {
 
 		private readonly bucketService: BucketService2,
 
-		private readonly releaseDdexCiService: ReleaseDdexCiService,
-		private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
+		// private readonly releaseDdexCiService: ReleaseDdexCiService,
+		// private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
 
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
@@ -74,10 +75,11 @@ export class ReleaseService {
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
 
-		private readonly fileExportCiService: FileExportCiService,
-
 		@InjectRepository(Dsp)
 		private readonly dspRepo: Repository<Dsp>,
+
+		private readonly fileExportCiService: FileExportCiService,
+		private readonly releaseDeliveryService: ReleaseDeliveryService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -583,377 +585,79 @@ export class ReleaseService {
 
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
-		await this.handleSelected(id, dto.code);
-
-		this.releaseLogService.pending({
-			releaseId: id,
-			step: 'Bắt đầu xử lý phát hành',
-			message: 'Bản phát hành đang được đưa vào hàng đợi xử lý',
-		});
-
-		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
-			});
-
-			this.releaseLogService.failed({
-				releaseId: id,
-				step: 'Lỗi phát hành',
-				message: `Lỗi bất ngờ: ${error?.message ?? 'Không xác định'}`,
-			});
-		});
-
-		return { message: 'Đang được xử lý' };
+		return this.releaseDeliveryService.submit(id, userId, dto);
 	}
 
-	async handleSelected(releaseId: string, codes: string[]) {
-		const normalizedCodes = [
-			...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
-		];
+	// ==================== Test / Debug endpoints (delegate) ====================
 
-		const dsps = await this.dspRepo.find({
-			where: {
-				code: In(normalizedCodes),
-			},
-			select: ['id', 'code'],
-		});
+	// async parseMetadata(id: string) {
+	// 	return await this.releaseDdexCiService.parseMetadata(id);
+	// }
 
-		const dspIdsSelected = dsps.map((dsp) => dsp.id);
+	// // ci
+	// async createMetadataCiAndUploadToSftp(id: string) {
+	// 	return await this.releaseDdexCiService.createMetadataCiAndUploadToSftp(
+	// 		id,
+	// 	);
+	// }
 
-		await this.releaseDspDeliveryRepo.update(
-			{ releaseId },
-			{ isSelected: false },
-		);
+	// async createMetadataCiOnServer(id: string) {
+	// 	return await this.releaseDdexCiService.createMetadataFolderCiOnServer(
+	// 		id,
+	// 	);
+	// }
 
-		if (dspIdsSelected.length > 0) {
-			await this.releaseDspDeliveryRepo.update(
-				{
-					releaseId,
-					dspId: In(dspIdsSelected),
-				},
-				{ isSelected: true },
-			);
-		}
-	}
+	// async uploadMetadataCiToBucket({
+	// 	id,
+	// 	// localDir,
+	// }: {
+	// 	id: string;
+	// 	// localDir: string;
+	// }) {
+	// 	return await this.releaseDdexCiService.uploadMetadataFolderCiToBucket({
+	// 		// localDir,
+	// 		releaseId: id,
+	// 	});
+	// }
 
-	async processingSubmit({
-		id,
-		userId,
-		dto,
-	}: {
-		id: string;
-		userId: string;
-		dto: SubmitReleaseDto;
-	}) {
-		const release = await this.releaseQueryService.findOneWithRelation(id);
+	// async downloadMetadataCiFromBucket(releaseId: string) {
+	// 	return await this.releaseDdexCiService.downloadMetadataCiFromBucket(
+	// 		releaseId,
+	// 	);
+	// }
 
-		// gen upc, isrc
-		if (!release.upc) {
-			await this.genUpc(id);
-		}
+	// async uploadMetadataCiToSftp(id: string) {
+	// 	return await this.releaseDdexCiService.uploadMetadataFolderCiToSftp(id);
+	// }
 
-		for (const track of release.tracks) {
-			if (!track.isrc) {
-				await this.trackService.genISRC(track.id);
-			}
-		}
+	// async createMetadataCiAndUploadToBucket(id: string) {
+	// 	return await this.releaseDdexCiService.createMetadataFolderCiAndUploadToBucket(
+	// 		id,
+	// 	);
+	// }
 
-		const errors =
-			this.releaseValidateService.getErrorsSchemaRelease(release);
+	// // spotify
+	// async createAndUploadMetadataSpotify(id: string) {
+	// 	await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(id);
+	// 	await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(id);
+	// }
 
-		if (errors.length > 0) {
-			this.releaseLogService.failed({
-				releaseId: id,
-				step: 'Kiểm tra dữ liệu phát hành (Validation)',
-				message: errors
-					.map((e) => e?.message ?? 'Lỗi không xác định')
-					.join(', '),
-			});
+	// // test
+	// async createMetadataSpotifyOnServer(id: string) {
+	// 	const result =
+	// 		await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(
+	// 			id,
+	// 		);
 
-			throw new ResponseError({
-				message:
-					'Release validation failed. Please check the input data.',
-				data: errors,
-			});
-		}
+	// 	return result;
+	// }
 
-		const errorsDsp = await this.processDsps({
-			releaseId: id,
-			codes: dto.code,
-		});
+	// async uploadMetadataSpotifyToSftp(id: string) {
+	// 	const result =
+	// 		await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(
+	// 			id,
+	// 		);
 
-		if (!errorsDsp || errorsDsp.length === 0) {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.DISTRIBUTED,
-			});
-		} else {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
-			});
-		}
-
-		return this.releaseQueryService.findOne(id);
-	}
-
-	private async processDsps({
-		releaseId,
-		codes,
-	}: {
-		releaseId: string;
-		codes: string[];
-	}) {
-		const errors: string[] = [];
-
-		// chỗ này bắt buộc phải xử lý từng dsp chứ ko đc xử lý song song
-		for (const code of codes) {
-			try {
-				if (code === String(DspCode.SPOTIFY)) {
-					await this.processSpotifyDsp(releaseId);
-				} else {
-					await this.processCiDsp(releaseId, code);
-				}
-			} catch (error) {
-				const message =
-					error?.message ||
-					`DSP process failed for release ${releaseId}, code: ${code}`;
-
-				errors.push(`${code}: ${message}`);
-			}
-		}
-
-		return errors;
-	}
-
-	private async processSpotifyDsp(releaseId: string): Promise<void> {
-		const dspSpotify = await this.dspRepo.findOne({
-			where: { code: DspCode.SPOTIFY },
-		});
-
-		if (!dspSpotify) {
-			this.releaseLogService.failed({
-				releaseId,
-				codeDsp: DspCode.SPOTIFY,
-				message: 'Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP Spotify',
-				step: 'Ghi nhận DSP Spotify',
-			});
-			throw new ResponseError({ message: 'DSP SPOTIFY not found' });
-		}
-
-		await this.upsertReleaseDspDeliveryProcessing(releaseId, dspSpotify.id);
-
-		try {
-			//
-			await this.createAndUploadMetadataSpotify(releaseId);
-
-			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dspSpotify.id },
-				{
-					status: ReleaseDspStatus.DISTRIBUTED,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: new Date(),
-				},
-			);
-
-			this.releaseLogService.success({
-				releaseId,
-				step: 'Ghi nhận DSP Spotify',
-				message: `Tạo dữ liệu và đóng gói gửi DSP Spotify thành công`,
-				codeDsp: DspCode.SPOTIFY,
-				dspId: 'SMImv6mH7H',
-			});
-		} catch (error) {
-			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dspSpotify.id },
-				{
-					status: ReleaseDspStatus.ISSUES,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: null,
-				},
-			);
-
-			this.releaseLogService.failed({
-				releaseId,
-				step: 'Ghi nhận DSP Spotify',
-				message: `Quá trình xử lý DSP Spotify thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
-				codeDsp: DspCode.SPOTIFY,
-				dspId: 'SMImv6mH7H',
-			});
-
-			throw error;
-		}
-	}
-
-	async processFacebookDsp(releaseId: string): Promise<void> {
-		await this.processCiDsp(releaseId, DspCode.FACEBOOK);
-	}
-
-	private async processCiDsp(releaseId: string, code: string): Promise<void> {
-		const dsp = await this.dspRepo.findOne({
-			where: { code },
-		});
-
-		if (!dsp) {
-			this.releaseLogService.failed({
-				releaseId,
-				codeDsp: code,
-				message: `Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP ${code}`,
-				step: `Ghi nhận DSP ${code}`,
-			});
-			throw new ResponseError({ message: `DSP ${code} not found` });
-		}
-
-		await this.upsertReleaseDspDeliveryProcessing(releaseId, dsp.id);
-
-		try {
-			await this.releaseDdexCiService.createAndUploadMetadataDdexCi({
-				releaseId,
-				recipient: {
-					name: dsp.ddexName ?? '',
-					partyId: dsp.ddexId ?? '',
-				},
-			});
-
-			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dsp.id },
-				{
-					status: ReleaseDspStatus.DISTRIBUTED,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: new Date(),
-				},
-			);
-
-			this.releaseLogService.success({
-				releaseId,
-				step: `Ghi nhận DSP ${dsp.name}`,
-				message: `Tạo dữ liệu và đóng gói gửi DSP ${dsp.name} thành công`,
-				codeDsp: code,
-				dspId: dsp.id,
-			});
-		} catch (error) {
-			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dsp.id },
-				{
-					status: ReleaseDspStatus.ISSUES,
-					lastEnqueuedAt: new Date(),
-					lastDeliveredAt: null,
-				},
-			);
-
-			this.releaseLogService.failed({
-				releaseId,
-				step: `Ghi nhận DSP ${dsp.name}`,
-				message: `Quá trình xử lý DSP ${dsp.name} thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
-				codeDsp: code,
-				dspId: dsp.id,
-			});
-
-			throw error;
-		}
-	}
-
-	private async upsertReleaseDspDeliveryProcessing(
-		releaseId: string,
-		dspId: string,
-	): Promise<void> {
-		const existed = await this.releaseDspDeliveryRepo.findOne({
-			where: {
-				releaseId,
-				dspId,
-			},
-		});
-
-		if (!existed) {
-			await this.releaseDspDeliveryRepo.save({
-				releaseId,
-				dspId,
-				status: ReleaseDspStatus.PROCESSING,
-				lastEnqueuedAt: new Date(),
-				lastDeliveredAt: null,
-				isSelected: true,
-			});
-			return;
-		}
-
-		await this.releaseDspDeliveryRepo.update(
-			{ releaseId, dspId },
-			{
-				status: ReleaseDspStatus.PROCESSING,
-				lastEnqueuedAt: new Date(),
-				lastDeliveredAt: null,
-				isSelected: true,
-			},
-		);
-	}
-
-	async parseMetadata(id: string) {
-		return await this.releaseDdexCiService.parseMetadata(id);
-	}
-
-	// ci
-	async createMetadataCiAndUploadToSftp(id: string) {
-		return await this.releaseDdexCiService.createMetadataCiAndUploadToSftp(
-			id,
-		);
-	}
-
-	async createMetadataCiOnServer(id: string) {
-		return await this.releaseDdexCiService.createMetadataFolderCiOnServer(
-			id,
-		);
-	}
-
-	async uploadMetadataCiToBucket({
-		id,
-		// localDir,
-	}: {
-		id: string;
-		// localDir: string;
-	}) {
-		return await this.releaseDdexCiService.uploadMetadataFolderCiToBucket({
-			// localDir,
-			releaseId: id,
-		});
-	}
-
-	async downloadMetadataCiFromBucket(releaseId: string) {
-		return await this.releaseDdexCiService.downloadMetadataCiFromBucket(
-			releaseId,
-		);
-	}
-
-	async uploadMetadataCiToSftp(id: string) {
-		return await this.releaseDdexCiService.uploadMetadataFolderCiToSftp(id);
-	}
-
-	async createMetadataCiAndUploadToBucket(id: string) {
-		return await this.releaseDdexCiService.createMetadataFolderCiAndUploadToBucket(
-			id,
-		);
-	}
-
-	// spotify
-	async createAndUploadMetadataSpotify(id: string) {
-		await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(id);
-		await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(id);
-	}
-
-	// test
-	async createMetadataSpotifyOnServer(id: string) {
-		const result =
-			await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(
-				id,
-			);
-
-		return result;
-	}
-
-	async uploadMetadataSpotifyToSftp(id: string) {
-		const result =
-			await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(
-				id,
-			);
-
-		return result;
-	}
+	// 	return result;
+	// }
 }

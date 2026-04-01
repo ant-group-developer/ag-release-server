@@ -256,117 +256,107 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/parse-release')
-	async parseMetadata(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result = await this.releaseService.parseMetadata(id);
-	}
-
-	@RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/create-and-upload-metadata-ci')
-	createMetadataCiAndUploadToSftp(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		this.releaseService
-			.createMetadataCiAndUploadToSftp(id)
-			.catch((_e) => {});
-		return new ResponseSuccess({ message: 'Đang được xử lý' });
-	}
+	// @RequirePermissions(Permission.RELEASE.UPDATE)
+	// @Post(':id/parse-release')
+	// async parseMetadata(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result = await this.releaseService.parseMetadata(id);
+	// }
 
 	// @RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/create-metadata-ci-on-server')
-	async createMetadataCiOnServer(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result = await this.releaseService.createMetadataCiOnServer(id);
-		return result;
-	}
+	// @Post(':id/create-and-upload-metadata-ci')
+	// createMetadataCiAndUploadToSftp(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	this.releaseService
+	// 		.createMetadataCiAndUploadToSftp(id)
+	// 		.catch((_e) => {});
+	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
+	// }
 
-	@Post(':id/upload-metadata-ci-to-bucket')
-	async uploadMetadataCiToBucket(
-		@Param('id', ParseUUIDPipe) id: string,
-		// @Body('localDir') localDir: string,
-	) {
-		const result = await this.releaseService.uploadMetadataCiToBucket({
-			id,
-			// localDir,
-		});
-		return result;
-	}
+	// // @RequirePermissions(Permission.RELEASE.UPDATE)
+	// @Post(':id/create-metadata-ci-on-server')
+	// async createMetadataCiOnServer(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result = await this.releaseService.createMetadataCiOnServer(id);
+	// 	return result;
+	// }
 
-	@Post(':id/download-metadata-ci-to-bucket')
-	async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
-		const result =
-			await this.releaseService.downloadMetadataCiFromBucket(id);
-		return result;
-	}
+	// @Post(':id/upload-metadata-ci-to-bucket')
+	// async uploadMetadataCiToBucket(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	// @Body('localDir') localDir: string,
+	// ) {
+	// 	const result = await this.releaseService.uploadMetadataCiToBucket({
+	// 		id,
+	// 		// localDir,
+	// 	});
+	// 	return result;
+	// }
 
-	// @RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/upload-metadata-ci-to-sftp')
-	async uploadMetadataCiToSftp(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result = await this.releaseService.uploadMetadataCiToSftp(id);
-		return result;
-	}
+	// @Post(':id/download-metadata-ci-to-bucket')
+	// async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
+	// 	const result =
+	// 		await this.releaseService.downloadMetadataCiFromBucket(id);
+	// 	return result;
+	// }
 
-	// @RequirePermissions(Permission.RELEASE.UPDATE)
-	@Post(':id/create-metadata-ci-and-upload-to-bucket')
-	async createMetadataCiAndUploadToBucket(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result =
-			await this.releaseService.createMetadataCiAndUploadToBucket(id);
-		return result;
-	}
+	// // @RequirePermissions(Permission.RELEASE.UPDATE)
+	// @Post(':id/upload-metadata-ci-to-sftp')
+	// async uploadMetadataCiToSftp(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result = await this.releaseService.uploadMetadataCiToSftp(id);
+	// 	return result;
+	// }
 
-	// spotify
-	@Post(':id/create-metadata-spotify-on-server')
-	async createMetadataSpotifyOnServer(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result =
-			await this.releaseService.createMetadataSpotifyOnServer(id);
-		return result;
-	}
+	// // @RequirePermissions(Permission.RELEASE.UPDATE)
+	// @Post(':id/create-metadata-ci-and-upload-to-bucket')
+	// async createMetadataCiAndUploadToBucket(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result =
+	// 		await this.releaseService.createMetadataCiAndUploadToBucket(id);
+	// 	return result;
+	// }
 
-	@Post(':id/upload-metadata-spotify-to-sftp')
-	async uploadMetadataSpotifyToSftp(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result =
-			await this.releaseService.uploadMetadataSpotifyToSftp(id);
-		return result;
-	}
+	// // spotify
+	// @Post(':id/create-metadata-spotify-on-server')
+	// async createMetadataSpotifyOnServer(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result =
+	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
+	// 	return result;
+	// }
 
-	@Post(':id/create-and-upload-metadata-spotify')
-	createAndUploadMetadataSpotify(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		this.releaseService.createAndUploadMetadataSpotify(id).catch((_e) => {
-			console.log(_e);
-		});
+	// @Post(':id/upload-metadata-spotify-to-sftp')
+	// async uploadMetadataSpotifyToSftp(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	const result =
+	// 		await this.releaseService.uploadMetadataSpotifyToSftp(id);
+	// 	return result;
+	// }
 
-		return new ResponseSuccess({ message: 'Đang được xử lý' });
-	}
+	// @Post(':id/create-and-upload-metadata-spotify')
+	// createAndUploadMetadataSpotify(
+	// 	@Param('id', ParseUUIDPipe) id: string,
+	// 	@Req() req: Request,
+	// ) {
+	// 	this.releaseService.createAndUploadMetadataSpotify(id).catch((_e) => {
+	// 		console.log(_e);
+	// 	});
 
-	// fb
-	@Post(':id/create-metadata-ddex-fb-on-server')
-	async createMetadataDdexFbOnServer(
-		@Param('id', ParseUUIDPipe) id: string,
-		@Req() req: Request,
-	) {
-		const result = await this.releaseService.processFacebookDsp(id);
-		return result;
-	}
+	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
+	// }
 }

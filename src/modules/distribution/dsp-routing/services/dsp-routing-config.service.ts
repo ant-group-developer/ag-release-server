@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { decryptSecretSafe } from 'src/utils/util.encrypt';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { AggregatorsService } from '../../aggregator/services/aggregators.service';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
 import {
@@ -30,6 +31,7 @@ export class DspRoutingConfigsService {
 
 		private readonly sftpConfigsService: SftpConfigsService,
 		private readonly aggregatorsService: AggregatorsService,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	async createSystemDefault({
@@ -305,5 +307,117 @@ export class DspRoutingConfigsService {
 		if (e.privateKey) {
 			e.privateKey = decryptSecretSafe(e.privateKey);
 		}
+	}
+
+	/**
+	 * Resolve full delivery config for a DSP code.
+	 * Returns ernVersion, sender, recipient, sftp — everything needed to process.
+	 */
+	async resolveFullDeliveryConfig(code: string): Promise<{
+		ernVersion: string;
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
+		sftp: SftpMetadata;
+		createsDoneFolder: boolean;
+	}> {
+		const routing = await this.repo
+			.createQueryBuilder('routing')
+			.leftJoinAndSelect('routing.dsp', 'dsp')
+			.leftJoinAndSelect('routing.sftpConfig', 'sftpConfig')
+			.leftJoinAndSelect('routing.aggregator', 'aggregator')
+			.leftJoinAndSelect('aggregator.sftpConfig', 'aggregatorSftpConfig')
+			.where('dsp.code = :code', { code })
+			.andWhere('routing.isActive = true')
+			.getOne();
+
+		if (!routing) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		const dsp = routing.dsp;
+
+		// Recipient: always from DSP entity
+		if (!dsp?.ddexId || !dsp?.ddexName) {
+			throw DspRoutingConfigException.DSP_MISSING_DDEX_PARTY(code);
+		}
+
+		const recipient = { partyId: dsp.ddexId, name: dsp.ddexName };
+
+		// Sender + SFTP: depends on routing mode
+		let sender: { partyId: string; name: string };
+		let sftpMetadata: SftpMetadata | null = null;
+		let createsDoneFolder = false;
+		let ernVersion = '3.8.2';
+
+		switch (routing.mode) {
+			case RoutingModeEnum.DIRECT: {
+				const partyId = this.appConfigService.DDEX_PARTY_ID_AMG();
+				const partyName = this.appConfigService.DDEX_PARTY_NAME_AMG();
+				if (!partyId || !partyName) {
+					throw DspRoutingConfigException.MISSING_APP_CONFIG_DDEX_PARTY();
+				}
+				sender = { partyId, name: partyName };
+				sftpMetadata = routing.sftpConfig?.metadata ?? null;
+				ernVersion = routing.sftpConfig?.ernVersion ?? '3.8.2';
+				break;
+			}
+
+			case RoutingModeEnum.AGGREGATOR: {
+				const agg = routing.aggregator;
+				if (!agg?.ddexId || !agg?.ddexName) {
+					throw DspRoutingConfigException.AGGREGATOR_MISSING_DDEX_PARTY(code);
+				}
+				sender = { partyId: agg.ddexId, name: agg.ddexName };
+				sftpMetadata = agg.sftpConfig?.metadata ?? null;
+				createsDoneFolder = agg.createsDoneFolder ?? false;
+				ernVersion = agg.sftpConfig?.ernVersion ?? '3.8.2';
+				break;
+			}
+
+			case RoutingModeEnum.SYSTEM: {
+				const partyId = this.appConfigService.DDEX_PARTY_ID_AMG();
+				const partyName = this.appConfigService.DDEX_PARTY_NAME_AMG();
+				if (!partyId || !partyName) {
+					throw DspRoutingConfigException.MISSING_APP_CONFIG_DDEX_PARTY();
+				}
+				sender = { partyId, name: partyName };
+				break;
+			}
+
+			default:
+				throw DspRoutingConfigException.UNKNOWN_ROUTING_MODE(routing.mode);
+		}
+
+		if (!sftpMetadata) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		this.decryptSecretEntity(sftpMetadata);
+
+		return {
+			ernVersion,
+			sender,
+			recipient,
+			sftp: sftpMetadata,
+			createsDoneFolder,
+		};
+	}
+
+	async resolveRawDeliveryConfig(code: string) {
+		const routing = await this.repo
+			.createQueryBuilder('routing')
+			.leftJoinAndSelect('routing.dsp', 'dsp')
+			.leftJoinAndSelect('routing.sftpConfig', 'sftpConfig')
+			.leftJoinAndSelect('routing.aggregator', 'aggregator')
+			.leftJoinAndSelect('aggregator.sftpConfig', 'aggregatorSftpConfig')
+			.where('dsp.code = :code', { code })
+			.andWhere('routing.isActive = true')
+			.getOne();
+
+		if (!routing) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		return routing
 	}
 }

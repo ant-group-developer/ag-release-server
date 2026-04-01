@@ -13,6 +13,15 @@ export class SftpConfig extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'uuid', name: 'aggregator_id', nullable: true })
 	aggregatorId: string | null;
 
+	@Column({
+		type: 'varchar',
+		length: 10,
+		nullable: true,
+		default: '3.8.2',
+		comment: 'DDEX ERN version (e.g. 3.8.2, 4.3)',
+	})
+	ernVersion: string | null;
+
 	@OneToOne(() => Aggregator, (a) => a.sftpConfig, {
 		onDelete: 'CASCADE',
 	})

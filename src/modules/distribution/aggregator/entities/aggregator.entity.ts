@@ -22,9 +22,6 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	isDefault: boolean;
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
-	ddexVersion: string | null;
-
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
 	ddexId: string | null;
 
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
@@ -35,6 +32,13 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => DspRoutingConfig, (d) => d.aggregator)
 	dspRoutingConfigs: DspRoutingConfig[];
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Tạo folder .done trên SFTP sau khi upload xong (CI aggregator cần)',
+	})
+	createsDoneFolder: boolean;
 
 	@Column({
 		type: 'int',
