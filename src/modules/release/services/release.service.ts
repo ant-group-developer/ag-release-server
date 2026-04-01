@@ -20,7 +20,7 @@ import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.s
 import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { TrackService } from 'src/modules/track/services/track.service';
-import { getCoverArtThumbnails } from 'src/utils/util';
+import { getCoverArtThumbnails, MediaUrlTransformer } from 'src/utils/util';
 import {
 	getFileCsvFromRaw,
 	getFileExcelFromRaw,
@@ -561,7 +561,7 @@ export class ReleaseService {
 				id: row.dsp_id,
 				name: row.dsp_name,
 				code: row.dsp_code,
-				picture: row.dsp_picture,
+				picture: MediaUrlTransformer.from(row.dsp_picture),
 			},
 			status: row.delivery_status ?? ReleaseDspStatus.NEVER_DISTRIBUTED,
 			lastEnqueuedAt: row.delivery_last_enqueued_at,
@@ -705,25 +705,13 @@ export class ReleaseService {
 	}) {
 		const errors: string[] = [];
 
-		// chỗ này bắt buộc phải xử lý từng thằng dsp chứ ko đc xử lý song song
+		// chỗ này bắt buộc phải xử lý từng dsp chứ ko đc xử lý song song
 		for (const code of codes) {
 			try {
-				switch (code) {
-					case String(DspCode.SPOTIFY):
-						await this.processSpotifyDsp(releaseId);
-						break;
-
-					case String(DspCode.FACEBOOK):
-						await this.processFacebookDsp(releaseId);
-						break;
-
-					default: {
-						const message = `DSP ${code} is not supported for release ${releaseId}`;
-
-						errors.push(`${code}: ${message}`);
-						this.logger.error(message);
-						break;
-					}
+				if (code === String(DspCode.SPOTIFY)) {
+					await this.processSpotifyDsp(releaseId);
+				} else {
+					await this.processCiDsp(releaseId, code);
 				}
 			} catch (error) {
 				const message =
@@ -797,34 +785,37 @@ export class ReleaseService {
 	}
 
 	async processFacebookDsp(releaseId: string): Promise<void> {
-		const dspFb = await this.dspRepo.findOne({
-			where: { code: DspCode.FACEBOOK },
+		await this.processCiDsp(releaseId, DspCode.FACEBOOK);
+	}
+
+	private async processCiDsp(releaseId: string, code: string): Promise<void> {
+		const dsp = await this.dspRepo.findOne({
+			where: { code },
 		});
 
-		if (!dspFb) {
+		if (!dsp) {
 			this.releaseLogService.failed({
 				releaseId,
-				codeDsp: DspCode.FACEBOOK,
-				message: 'Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP Facebook',
-				step: 'Ghi nhận DSP Facebook',
+				codeDsp: code,
+				message: `Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP ${code}`,
+				step: `Ghi nhận DSP ${code}`,
 			});
-			throw new ResponseError({ message: 'DSP FACEBOOK not found' });
+			throw new ResponseError({ message: `DSP ${code} not found` });
 		}
 
-		await this.upsertReleaseDspDeliveryProcessing(releaseId, dspFb.id);
+		await this.upsertReleaseDspDeliveryProcessing(releaseId, dsp.id);
 
 		try {
-			//
 			await this.releaseDdexCiService.createAndUploadMetadataDdexCi({
 				releaseId,
 				recipient: {
-					name: dspFb.ddexName ?? '',
-					partyId: dspFb.ddexId ?? '',
+					name: dsp.ddexName ?? '',
+					partyId: dsp.ddexId ?? '',
 				},
 			});
 
 			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dspFb.id },
+				{ releaseId, dspId: dsp.id },
 				{
 					status: ReleaseDspStatus.DISTRIBUTED,
 					lastEnqueuedAt: new Date(),
@@ -834,14 +825,14 @@ export class ReleaseService {
 
 			this.releaseLogService.success({
 				releaseId,
-				step: 'Ghi nhận DSP Facebook',
-				message: `Tạo dữ liệu và đóng gói gửi DSP Facebook thành công`,
-				codeDsp: DspCode.FACEBOOK,
-				dspId: 'HyTE8Isu5o',
+				step: `Ghi nhận DSP ${dsp.name}`,
+				message: `Tạo dữ liệu và đóng gói gửi DSP ${dsp.name} thành công`,
+				codeDsp: code,
+				dspId: dsp.id,
 			});
 		} catch (error) {
 			await this.releaseDspDeliveryRepo.update(
-				{ releaseId, dspId: dspFb.id },
+				{ releaseId, dspId: dsp.id },
 				{
 					status: ReleaseDspStatus.ISSUES,
 					lastEnqueuedAt: new Date(),
@@ -851,10 +842,10 @@ export class ReleaseService {
 
 			this.releaseLogService.failed({
 				releaseId,
-				step: 'Ghi nhận DSP Facebook',
-				message: `Quá trình xử lý DSP Facebook thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
-				codeDsp: DspCode.FACEBOOK,
-				dspId: 'HyTE8Isu5o',
+				step: `Ghi nhận DSP ${dsp.name}`,
+				message: `Quá trình xử lý DSP ${dsp.name} thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
+				codeDsp: code,
+				dspId: dsp.id,
 			});
 
 			throw error;
