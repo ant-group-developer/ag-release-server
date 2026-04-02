@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { stringToCode } from 'src/utils/util';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { LabelMessage } from '../constants/label.constant';
 import {
 	CreateLabelDto,
@@ -29,11 +29,14 @@ export class LabelService {
 		tenantId: string,
 		userId: string,
 	): Promise<Label> {
-		await this.labelQueryService.validate({
-			where: { name: data.name, tenantId },
+		const code = stringToCode(data.name);
+
+		await this.validateUnique({
+			name: data.name,
+			code,
+			tenantId,
 		});
 
-		const code = stringToCode(data.name);
 		const label = this.labelRepo.create({
 			...data,
 			code,
@@ -94,8 +97,12 @@ export class LabelService {
 		const label = await this.findOne(id);
 
 		if (name && name !== label.name) {
-			await this.labelQueryService.validate({
-				where: { name: data.name, tenantId: label.tenantId },
+			const code = stringToCode(name);
+			await this.validateUnique({
+				idExclude: id,
+				name,
+				code,
+				tenantId: label.tenantId,
 			});
 		}
 
@@ -141,6 +148,40 @@ export class LabelService {
 		const { label_count, max_label_count } = data;
 		if (Number(label_count) >= Number(max_label_count)) {
 			throw new ResponseError(LabelMessage.LIMIT_EXCEEDED);
+		}
+	}
+
+	private async validateUnique({
+		idExclude,
+		code,
+		name,
+		tenantId,
+	}: {
+		idExclude?: string;
+		code?: string;
+		name?: string;
+		tenantId: string;
+	}) {
+		if (name) {
+			const existName = await this.labelRepo.findOne({
+				where: {
+					name,
+					tenantId,
+					...(idExclude ? { id: Not(idExclude) } : {}),
+				},
+			});
+			if (existName) throw new ResponseError(LabelMessage.DUPLICATE_NAME_LABEL);
+		}
+
+		if (code) {
+			const existCode = await this.labelRepo.findOne({
+				where: {
+					code,
+					tenantId,
+					...(idExclude ? { id: Not(idExclude) } : {}),
+				},
+			});
+			if (existCode) throw new ResponseError(LabelMessage.DUPLICATE_CODE_LABEL);
 		}
 	}
 }

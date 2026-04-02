@@ -8,16 +8,17 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { MediaUrlTransformer } from 'src/utils/util';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, Unique } from 'typeorm';
 
 @Entity('labels', {
 	comment: 'Danh mục label / hãng phát hành nhạc thuộc từng tenant',
 })
+@Unique(['name', 'tenantId'])
+@Unique(['code', 'tenantId'])
 export class Label extends BaseUserTrackedCustomIDEntity {
 	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_NAME,
-		unique: true,
 		comment: 'Tên label / hãng phát hành',
 	})
 	name: string;
@@ -25,8 +26,7 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_CODE,
-		unique: true,
-		comment: 'Mã label duy nhất trong hệ thống',
+		comment: 'Mã label duy nhất trong cùng tenant',
 	})
 	code: string;
 

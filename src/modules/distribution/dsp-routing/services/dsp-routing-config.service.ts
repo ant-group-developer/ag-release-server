@@ -390,7 +390,20 @@ export class DspRoutingConfigsService {
 		}
 
 		if (!sftpMetadata) {
-			throw DspRoutingConfigException.NOT_FOUND();
+			const aggDefault = await this.aggregatorsService.getDefault()
+
+			if(!aggDefault.sftpConfig?.metadata){
+				throw DspRoutingConfigException.NOT_FOUND();
+			}
+				
+			return {
+				ernVersion,
+				sender,
+				recipient,
+				sftp: aggDefault.sftpConfig?.metadata,
+				createsDoneFolder,
+			}
+		
 		}
 
 		this.decryptSecretEntity(sftpMetadata);

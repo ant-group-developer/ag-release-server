@@ -23,6 +23,7 @@ import {
 	CreateReleaseDspDeliveryDto,
 	GetListReleaseDspDeliveriesDto,
 	UpdateReleaseDspDeliveryDto,
+	BulkUpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseDspDeliveryService } from '../services/release-dsp-delivery.service';
@@ -37,6 +38,13 @@ export class ReleaseDspDeliveryController {
 	async create(@Body() data: CreateReleaseDspDeliveryDto) {
 		const result = await this.service.create({ data });
 		return ReleaseDspDeliverySuccess.CREATE(result);
+	}
+
+	@Put('bulk')
+	@ApiOperation({ summary: 'Bulk update release dsp deliveries' })
+	async bulkUpdate(@Body() data: BulkUpdateReleaseDspDeliveryDto) {
+		const result = await this.service.bulkUpdate({ data });
+		return ReleaseDspDeliverySuccess.BULK_UPDATE(result);
 	}
 
 	@Put(':id')

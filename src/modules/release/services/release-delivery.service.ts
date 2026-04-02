@@ -19,7 +19,6 @@ import { ReleaseValidateService } from './release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { GetUpcRequest } from 'src/modules/external/upc/upc.grpc.interface';
 
 @Injectable()
 export class ReleaseDeliveryService {
