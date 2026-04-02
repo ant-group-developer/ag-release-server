@@ -23,14 +23,19 @@ import {
 	CreateReleaseDspDeliveryDto,
 	GetListReleaseDspDeliveriesDto,
 	UpdateReleaseDspDeliveryDto,
+	BulkUpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseDspDeliveryService } from '../services/release-dsp-delivery.service';
+import { ReleaseDspDeliveryQueryService } from '../services/release-dsp-delivery-query.service';
 
 @ApiTags('Release DSP Deliveries')
 @Controller('release-dsp-deliveries')
 export class ReleaseDspDeliveryController {
-	constructor(private readonly service: ReleaseDspDeliveryService) {}
+	constructor(
+		private readonly service: ReleaseDspDeliveryService,
+		private readonly queryService: ReleaseDspDeliveryQueryService,
+	) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Tạo release dsp delivery' })
@@ -39,6 +44,30 @@ export class ReleaseDspDeliveryController {
 		return ReleaseDspDeliverySuccess.CREATE(result);
 	}
 
+	@Post('sync-and-get/release/:releaseId')
+	@ApiOperation({
+		summary:
+			'Đồng bộ DSP mới (nếu có) và lấy danh sách phân phối theo releaseId',
+	})
+	async syncAndGetDeliveriesByRelease(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Query() query: GetListReleaseDspDeliveriesDto,
+	) {
+		const data = await this.queryService.getAndSyncReleaseDspDeliveries(
+			releaseId,
+			query,
+		);
+		return AppResponseSuccess.COMMON(data);
+	}
+
+	@Put('bulk')
+	@ApiOperation({ summary: 'Bulk update release dsp deliveries' })
+	async bulkUpdate(@Body() data: BulkUpdateReleaseDspDeliveryDto) {
+		const result = await this.service.bulkUpdate({ data });
+		return ReleaseDspDeliverySuccess.BULK_UPDATE(result);
+	}
+
+	
 	@Put(':id')
 	@ApiOperation({ summary: 'Cập nhật release dsp delivery' })
 	@ApiParam({ name: 'id', format: 'uuid' })

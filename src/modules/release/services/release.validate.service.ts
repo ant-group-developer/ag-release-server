@@ -398,6 +398,42 @@ export class ReleaseValidateService {
 			);
 		}
 
+		// release contributors validation (Producer & Mixer)
+		const hasProducer = release.releaseContributors?.some(
+			(c) => c.artistRole?.code === 'PRODUCER',
+		);
+		const hasMixer = release.releaseContributors?.some(
+			(c) => c.artistRole?.code === 'MIXER',
+		);
+
+		if (!hasProducer || !hasMixer) {
+			const missing = [];
+			if (!hasProducer) missing.push('Producer');
+			if (!hasMixer) missing.push('Mixer');
+
+			result.push(
+				new FieldErrorDetails({
+					message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+					page: 'core-detail',
+					field: 'releaseContributors',
+				}),
+			);
+		}
+
+		// single format title validation
+		if (release.albumFormat?.code === 'single' && release.tracks?.length > 0) {
+			const hasMatchingTitle = release.tracks.some((t) => t.title === release.title);
+			if (!hasMatchingTitle) {
+				result.push(
+					new FieldErrorDetails({
+						message: 'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
+						page: 'core-detail',
+						field: 'title',
+					}),
+				);
+			}
+		}
+
 		return result;
 	}
 
@@ -504,6 +540,29 @@ export class ReleaseValidateService {
 					new FieldErrorDetails({
 						page: 'tracks',
 						field: `tracks.${index}.trackArtists`,
+						trackId: track.id,
+					}),
+				);
+			}
+
+			// track contributors validation (Producer & Mixer)
+			const hasTrackProducer = track.trackContributors?.some(
+				(c) => c.artistRole?.code === 'PRODUCER',
+			);
+			const hasTrackMixer = track.trackContributors?.some(
+				(c) => c.artistRole?.code === 'MIXER',
+			);
+
+			if (!hasTrackProducer || !hasTrackMixer) {
+				const missing = [];
+				if (!hasTrackProducer) missing.push('Producer');
+				if (!hasTrackMixer) missing.push('Mixer');
+
+				result.push(
+					new FieldErrorDetails({
+						message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+						page: 'tracks',
+						field: `tracks.${index}.trackContributors`,
 						trackId: track.id,
 					}),
 				);

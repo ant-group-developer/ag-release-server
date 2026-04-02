@@ -103,8 +103,12 @@ export class AggregatorsService {
 	async getDefault() {
 		const entity = await this.repo.findOne({
 			where: { isActive: true, isDefault: true },
+			relations: { sftpConfig: true },
 		});
+		
 		if (!entity) throw AggregatorException.NOT_FOUND_DEFAULT();
+
+		decryptSecretSftpConfigSafe(entity.sftpConfig)
 		return entity;
 	}
 

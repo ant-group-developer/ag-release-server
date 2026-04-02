@@ -113,22 +113,17 @@ export class QueryGetListPriceTier extends BaseQueryDto {
 	type?: PriceTierType;
 }
 
-export class UpdateOrderPriceTierDto {
+export class BulkUpdateItemDto extends UpdatePriceTierDto {
 	@IsUUID()
 	@IsNotEmpty()
 	id: string;
-
-	@IsInt()
-	@IsNotEmpty()
-	@Min(0)
-	order: number;
 }
 
-export class BulkUpdatePriceTierOrderDto {
+export class BulkUpdatePriceTierDto {
 	@IsNotEmpty()
 	@ArrayMinSize(1)
 	@ValidateNested({ each: true })
-	@Type(() => UpdateOrderPriceTierDto)
-	priceTiers: UpdateOrderPriceTierDto[];
+	@Type(() => BulkUpdateItemDto)
+	priceTiers: BulkUpdateItemDto[];
 }
 
