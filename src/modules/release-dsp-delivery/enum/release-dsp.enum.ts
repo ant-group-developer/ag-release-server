@@ -7,8 +7,13 @@ export enum ReleaseDspStatus {
 	TAKEN_DOWN = 'taken_down',
 }
 
-// export enum ReleaseType {
-// 	ALBUM = 'album',
-// 	SINGLE = 'single',
-// 	EP = 'ep',
-// }
+export enum OrderFieldReleaseDspDelivery {
+	releaseDspDelivery_createdAt = 'releaseDspDelivery.createdAt',
+	releaseDspDelivery_updatedAt = 'releaseDspDelivery.updatedAt',
+	releaseDspDelivery_releaseId = 'releaseDspDelivery.releaseId',
+	releaseDspDelivery_dspId = 'releaseDspDelivery.dspId',
+	releaseDspDelivery_status = 'releaseDspDelivery.status',
+	releaseDspDelivery_lastEnqueuedAt = 'releaseDspDelivery.lastEnqueuedAt',
+	releaseDspDelivery_lastDeliveredAt = 'releaseDspDelivery.lastDeliveredAt',
+	dsp_name = 'dsp.name',
+}

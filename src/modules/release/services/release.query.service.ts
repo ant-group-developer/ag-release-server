@@ -642,10 +642,16 @@ export class ReleaseQueryService {
 				releaseCoverArts: true,
 				releaseArtists: true,
 				releaseLanguage: true,
+				releaseContributors: {
+					artistRole: true,
+				},
 				tracks: {
 					trackLanguage: true,
 					audioFile: true,
 					trackArtists: true,
+					trackContributors: {
+						artistRole: true,
+					},
 				},
 				releaseTerritory: true,
 			},

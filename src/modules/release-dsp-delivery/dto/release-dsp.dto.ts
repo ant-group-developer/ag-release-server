@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { ReleaseDspStatus } from '../enum/release-dsp.enum';
+import { OrderFieldReleaseDspDelivery, ReleaseDspStatus } from '../enum/release-dsp.enum';
 
 export class CreateReleaseDspDeliveryDto {
 	@ApiProperty({ type: 'string', format: 'uuid' })
@@ -38,14 +38,6 @@ export class BulkUpdateReleaseDspDeliveryDto {
 	items: BulkUpdateReleaseDspDeliveryItemDto[];
 }
 
-export enum OrderFieldReleaseDspDelivery {
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
-	RELEASE_ID = 'releaseId',
-	DSP_ID = 'dspId',
-	STATUS = 'status',
-}
-
 export class GetListReleaseDspDeliveriesDto extends BaseQueryDto2 {
 	@ApiPropertyOptional({ type: 'string', format: 'uuid' })
 	@IsUUID()
@@ -65,5 +57,5 @@ export class GetListReleaseDspDeliveriesDto extends BaseQueryDto2 {
 	@ApiPropertyOptional({ enum: OrderFieldReleaseDspDelivery })
 	@IsOptional()
 	fieldOrder: OrderFieldReleaseDspDelivery =
-		OrderFieldReleaseDspDelivery.UPDATED_AT;
+		OrderFieldReleaseDspDelivery.releaseDspDelivery_updatedAt;
 }

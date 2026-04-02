@@ -49,7 +49,7 @@ export class ReleaseDeliveryService {
 
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
-		await this.handleSelected(id, dto.code);
+		// await this.handleSelected(id, dto.code);
 
 		this.releaseLogService.pending({
 			releaseId: id,
@@ -196,12 +196,30 @@ export class ReleaseDeliveryService {
 				{ metadataPath: outputDir, batchId },
 			);
 
-			// 5. Upload to SFTP
-			await this.sftpConnectService.uploadFolder({
-				sftp: config.sftp,
-				localDir: outputDir,
-				remoteDir: config.sftp.path ?? '/',
-			});
+			// 5. Upload to SFTP (Retry 3 times)
+			let uploadSuccess = false;
+			let lastUploadErr: any = null;
+			for (let i = 1; i <= 3; i++) {
+				try {
+					await this.sftpConnectService.uploadFolder({
+						sftp: config.sftp,
+						localDir: outputDir,
+						remoteDir: config.sftp.path ?? '/',
+					});
+					uploadSuccess = true;
+					break;
+				} catch (err: any) {
+					lastUploadErr = err;
+					this.logger.warn(`[SFTP_UPLOAD] Upload metadata DSP ${code} thất bại lần ${i}/3: ${err.message}`);
+					if (i < 3) {
+						await new Promise((res) => setTimeout(res, 3000)); // Đợi 3s trước khi thử lại
+					}
+				}
+			}
+
+			if (!uploadSuccess) {
+				throw new Error(`Upload SFTP thất bại sau 3 lần thử nghiệm: ${lastUploadErr?.message}`);
+			}
 
 			// 6. Post-upload hooks (e.g. CI aggregator .done folder)
 			if (config.createsDoneFolder) {
@@ -245,19 +263,19 @@ export class ReleaseDeliveryService {
 
 	// ==================== Helpers ====================
 
-	private async handleSelected(releaseId: string, codes: string[]) {
-		const normalizedCodes = [
-			...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
-		];
+	// private async handleSelected(releaseId: string, codes: string[]) {
+	// 	const normalizedCodes = [
+	// 		...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
+	// 	];
 
-		const dsps = await this.dspRepo.find({
-			where: { code: In(normalizedCodes) },
-			select: ['id', 'code'],
-		});
+	// 	const dsps = await this.dspRepo.find({
+	// 		where: { code: In(normalizedCodes) },
+	// 		select: ['id', 'code'],
+	// 	});
 
-		const dspIds = dsps.map((dsp) => dsp.id);
-		await this.deliveryService.updateSelected(releaseId, dspIds);
-	}
+	// 	const dspIds = dsps.map((dsp) => dsp.id);
+	// 	await this.deliveryService.updateSelected(releaseId, dspIds);
+	// }
 
 	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
 		const client = await this.sftpConnectService.connect(sftp);
