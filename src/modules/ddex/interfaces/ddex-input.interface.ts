@@ -10,7 +10,8 @@ type LiteralUnion<T extends U, U = string> = T | (U & Record<never, never>);
 // ============================================================================
 // VERSION
 // ============================================================================
-export type DDEXVersion = '4.3' | '3.8.2';
+import { ErnVersion } from '../../ern/interfaces/ern-input.interface';
+export type DDEXVersion = ErnVersion;
 
 // ============================================================================
 // ALLOWED VALUE TYPES (from avs:AllowedValueSets)

@@ -1,0 +1,14 @@
+﻿src/modules/delivery/delivery.service.spec.ts(81,32): error TS2551: Property 'buildMetadata' does not exist on type 'DeliveryService'. Did you mean 'buildMetadataXml'?
+src/modules/delivery/delivery.service.spec.ts(93,24): error TS2551: Property 'buildMetadata' does not exist on type 'DeliveryService'. Did you mean 'buildMetadataXml'?
+src/modules/ern/__tests__/ern382.builder.spec.ts(6,3): error TS2322: Type '"3.8.2"' is not assignable to type 'ErnVersion'.
+src/modules/ern/__tests__/ern43.builder.spec.ts(6,3): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/__tests__/ern43.builder.spec.ts(48,3): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/controller/ern.controller.ts(22,55): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/controller/ern.controller.ts(28,54): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/controller/ern.controller.ts(36,55): error TS2322: Type '"3.8.2"' is not assignable to type 'ErnVersion'.
+src/modules/ern/controller/ern.controller.ts(42,54): error TS2322: Type '"3.8.2"' is not assignable to type 'ErnVersion'.
+src/modules/ern/ern-example.data.ts(4,2): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/ern-example.data.ts(52,2): error TS2322: Type '"4.3"' is not assignable to type 'ErnVersion'.
+src/modules/ern/ern-example.data.ts(121,2): error TS2322: Type '"3.8.2"' is not assignable to type 'ErnVersion'.
+test/app.e2e-spec.ts(20,10): error TS2349: This expression is not callable.
+  Type '{ default: SuperTestStatic; Test: typeof Test; agent: typeof TestAgent & ((app?: App | undefined, options?: AgentOptions | undefined) => TestAgent<...>); }' has no call signatures.

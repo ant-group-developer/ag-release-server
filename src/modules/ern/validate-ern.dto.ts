@@ -1,11 +1,12 @@
 // src/modules/ern/dto/validate-ern.dto.ts
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { ErnVersion } from './interfaces/ern-input.interface';
 
 export class ValidateErnDto {
 	@IsString()
 	filePath: string;
 
 	@IsOptional()
-	@IsString()
-	version?: string = '4.3';
+	@IsEnum(ErnVersion)
+	version?: ErnVersion = ErnVersion.ERN_43;
 }

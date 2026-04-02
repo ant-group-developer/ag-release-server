@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReleaseCodeConst } from 'src/modules/release/enum/release.enum';
 import { decryptSecretSafe, encryptSecret } from 'src/utils/util.encrypt';
-import { EntityManager, Not, Repository } from 'typeorm';
+import { DeepPartial, EntityManager, Not, Repository } from 'typeorm';
 import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
 import { SftpConfigException } from '../const/sftp-config.const';
 import {
@@ -71,7 +71,7 @@ export class SftpConfigsService {
 		data: CreateSftpConfigDto;
 		userId: string;
 		manager?: EntityManager;
-	}) {
+	}): Promise<SftpConfig> {
 		const repo = this.getDeliverySftpConfigRepo(manager);
 
 		if (data.aggregatorId) {
@@ -108,7 +108,7 @@ export class SftpConfigsService {
 			},
 			creatorId: userId,
 			modifierId: userId,
-		});
+		} as unknown as DeepPartial<SftpConfig>);
 
 		return repo.save(entity);
 	}
