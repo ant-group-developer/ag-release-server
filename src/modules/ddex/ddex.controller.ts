@@ -2,6 +2,7 @@ import { Controller, Get, Header } from '@nestjs/common';
 import { PublicRoute } from '../auth/decorators/auth.decorator';
 import { DDEXService } from './ddex.service';
 import { albumExample, singleExample } from './examples/ddex.example';
+import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 
 @PublicRoute()
 @Controller('ddex')
@@ -12,7 +13,7 @@ export class DdexController {
 	@Header('Content-Type', 'application/xml')
 	exampleSingle43() {
 		return this.ddexService.generate({
-			version: '4.3',
+			version: ErnVersion.ERN_43,
 			data: singleExample,
 		});
 	}
@@ -21,7 +22,7 @@ export class DdexController {
 	@Header('Content-Type', 'application/xml')
 	exampleAlbum43() {
 		return this.ddexService.generate({
-			version: '4.3',
+			version: ErnVersion.ERN_43,
 			data: albumExample,
 		});
 	}
@@ -30,7 +31,7 @@ export class DdexController {
 	@Header('Content-Type', 'application/xml')
 	exampleSingle382() {
 		return this.ddexService.generate({
-			version: '3.8.2',
+			version: ErnVersion.ERN_382,
 			data: singleExample,
 		});
 	}
@@ -39,7 +40,7 @@ export class DdexController {
 	@Header('Content-Type', 'application/xml')
 	exampleAlbum382() {
 		return this.ddexService.generate({
-			version: '3.8.2',
+			version: ErnVersion.ERN_382,
 			data: albumExample,
 		});
 	}

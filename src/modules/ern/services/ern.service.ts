@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Ern382Builder } from '../builders/ern382.builder';
 import { Ern43Builder } from '../builders/ern43.builder';
 import { ManifestBuilder } from '../builders/manifest.builder';
-import { ErnInput, ManifestInput } from '../interfaces/ern-input.interface';
+import { ErnInput, ErnVersion, ManifestInput } from '../interfaces/ern-input.interface';
 
 @Injectable()
 export class ErnService {
@@ -12,9 +12,9 @@ export class ErnService {
 	 */
 	generate(input: ErnInput): string {
 		switch (input.version) {
-			case '4.3':
+			case ErnVersion.ERN_43:
 				return new Ern43Builder(input).build();
-			case '3.8.2':
+			case ErnVersion.ERN_382:
 				return new Ern382Builder(input).build();
 			default:
 				throw new Error(

@@ -5,6 +5,7 @@ import {
 	DDEXGenerateInput,
 	DDEXVersion,
 } from './interfaces/ddex-input.interface';
+import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 
 @Injectable()
 export class DDEXService {
@@ -23,9 +24,9 @@ export class DDEXService {
 	 */
 	private getGenerator(version: DDEXVersion) {
 		switch (version) {
-			case '4.3':
+			case ErnVersion.ERN_43:
 				return new ERN43Generator();
-			case '3.8.2':
+			case ErnVersion.ERN_382:
 				return new ERN382Generator();
 			default:
 				// eslint-disable-next-line @typescript-eslint/restrict-template-expressions

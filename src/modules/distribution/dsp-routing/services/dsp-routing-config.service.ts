@@ -18,6 +18,7 @@ import {
 } from '../dto/dsp-routing-config.dto';
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
 import { RoutingModeEnum } from '../enum/dsp-routing.enum';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { DspRoutingConfigQueryService } from './dsp-routing-config.query.service';
 
 @Injectable()
@@ -314,7 +315,7 @@ export class DspRoutingConfigsService {
 	 * Returns ernVersion, sender, recipient, sftp — everything needed to process.
 	 */
 	async resolveFullDeliveryConfig(code: string): Promise<{
-		ernVersion: string;
+		ernVersion: ErnVersion;
 		sender: { partyId: string; name: string };
 		recipient: { partyId: string; name: string };
 		sftp: SftpMetadata;
@@ -347,7 +348,7 @@ export class DspRoutingConfigsService {
 		let sender: { partyId: string; name: string };
 		let sftpMetadata: SftpMetadata | null = null;
 		let createsDoneFolder = false;
-		let ernVersion = '3.8.2';
+		let ernVersion: ErnVersion = ErnVersion.ERN_382;
 
 		switch (routing.mode) {
 			case RoutingModeEnum.DIRECT: {
@@ -358,7 +359,7 @@ export class DspRoutingConfigsService {
 				}
 				sender = { partyId, name: partyName };
 				sftpMetadata = routing.sftpConfig?.metadata ?? null;
-				ernVersion = routing.sftpConfig?.ernVersion ?? '3.8.2';
+				ernVersion = (routing.sftpConfig?.ernVersion as ErnVersion) ?? ErnVersion.ERN_382;
 				break;
 			}
 
@@ -370,7 +371,7 @@ export class DspRoutingConfigsService {
 				sender = { partyId: agg.ddexId, name: agg.ddexName };
 				sftpMetadata = agg.sftpConfig?.metadata ?? null;
 				createsDoneFolder = agg.createsDoneFolder ?? false;
-				ernVersion = agg.sftpConfig?.ernVersion ?? '3.8.2';
+				ernVersion = (agg.sftpConfig?.ernVersion as ErnVersion) ?? ErnVersion.ERN_382;
 				break;
 			}
 
