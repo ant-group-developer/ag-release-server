@@ -12,6 +12,7 @@ import { In, Repository } from 'typeorm';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { ReleaseException } from '../constants/release.constant';
 import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexService } from './release-ddex.service';
@@ -50,12 +51,12 @@ export class ReleaseDeliveryService {
 
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		const release = await this.releaseQueryService.findOne(id);
-		if (
-			release.status !== ReleaseStatus.DRAFT &&
-			release.status !== ReleaseStatus.ISSUES
-		) {
-			throw ReleaseException.CANNOT_SUBMIT_INVALID_STATUS();
-		}
+		// if (
+		// 	release.status !== ReleaseStatus.DRAFT &&
+		// 	release.status !== ReleaseStatus.ISSUES
+		// ) {
+		// 	throw ReleaseException.CANNOT_SUBMIT_INVALID_STATUS();
+		// }
 
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
 
@@ -177,6 +178,21 @@ export class ReleaseDeliveryService {
 				throw new ResponseError({ message: `Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP ${code}` });
 			}
 
+			deliveryId = await this.deliveryService.findDeliveryId(
+				releaseId,
+				dsp.id,
+			);
+			if (deliveryId) {
+				const delivery = await this.deliveryService.findOne(deliveryId);
+				if (
+					delivery.status !== ReleaseDspStatus.DRAFT &&
+					delivery.status !== ReleaseDspStatus.ISSUES &&
+					delivery.status !== ReleaseDspStatus.NEVER_DISTRIBUTED
+				) {
+					throw ReleaseException.CANNOT_SUBMIT_INVALID_STATUS();
+				}
+			}
+
 			// 1. Resolve config from DB
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(code);
@@ -249,8 +265,13 @@ export class ReleaseDeliveryService {
 				dspId: dsp.id,
 				deliveryId,
 			});
-		} catch (error) {
-			if (dsp) {
+		} catch (error: any) {
+			const isInvalidStatusError =
+				error instanceof ResponseError &&
+				(error.getResponse() as any)?.messageCode ===
+					'release.message.error.cannotSubmitInvalidStatus';
+
+			if (dsp && !isInvalidStatusError) {
 				await this.deliveryService.markIssues(releaseId, dsp.id);
 			}
 
@@ -259,7 +280,9 @@ export class ReleaseDeliveryService {
 			this.releaseLogService.failed({
 				releaseId,
 				step: `Ghi nhận DSP ${dspName}`,
-				message: `Quá trình xử lý DSP ${dspName} thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
+				message: isInvalidStatusError
+					? (error.getResponse() as any)?.message
+					: `Quá trình xử lý DSP ${dspName} thất bại: ${error?.message ?? 'Lỗi không xác định'}`,
 				codeDsp: code,
 				dspId: dsp?.id,
 				deliveryId,

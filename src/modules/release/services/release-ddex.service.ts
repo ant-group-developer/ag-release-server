@@ -178,6 +178,26 @@ export class ReleaseDdexService {
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
 	}
 
+	async generateReleaseXml(releaseId: string, dspCode: string): Promise<string> {
+		console.log('AGDAG')
+
+		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+			console.log('2')
+		const config = await this.dspRoutingConfigsService.resolveFullDeliveryConfig(dspCode);
+
+			console.log('3')
+		const input: ErnInput = this.parseErnInputFromRelease({
+			release,
+			ernVersion: config.ernVersion as ErnVersion,
+			sender: config.sender,
+			recipient: config.recipient,
+		});
+
+			console.log('4')
+
+		return this.ernService.generate(input);
+	}
+
 	createManifestFile({
 		batchId,
 		upc,

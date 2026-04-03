@@ -418,8 +418,6 @@ export class ReleaseValidateService {
 			(c) => c.artistRole?.code === 'Mixer',
 		);
 
-		console.log(release.releaseContributors)
-
 		if (!hasProducer || !hasMixer) {
 			const missing = [];
 			if (!hasProducer) missing.push('Producer');

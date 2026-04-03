@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 
 import { ReleaseContributorException } from '../constants/release-contributor.exception';
 import {
+	BulkCreateReleaseContributorDto,
 	CreateReleaseContributorDto,
 	QueryGetListReleaseContributorDto,
 	UpdateReleaseContributorDto,
@@ -43,6 +44,26 @@ export class ReleaseContributorService {
 		});
 
 		return releaseContributorDb;
+	}
+
+	async createSafe(
+		data: CreateReleaseContributorDto,
+	): Promise<ReleaseContributor | null> {
+		try {
+			return await this.create(data);
+		} catch (error: any) {
+			this.logger.warn(
+				`Skip create release contributor, reason: ${error.message}`,
+			);
+			return null;
+		}
+	}
+
+	async bulkCreate(data: BulkCreateReleaseContributorDto): Promise<ReleaseContributor[]> {
+		const results = await Promise.all(
+			data.items.map((item) => this.createSafe(item)),
+		);
+		return results.filter((item): item is ReleaseContributor => item !== null);
 	}
 
 	async findOne(id: string): Promise<ReleaseContributor> {

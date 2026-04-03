@@ -2,6 +2,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Header,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -10,7 +11,7 @@ import {
 	Req,
 	Res,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
 	PageDto,
 	ResponseError,
@@ -38,12 +39,14 @@ import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseService } from '../services/release.service';
+import { ReleaseDdexService } from '../services/release-ddex.service';
 
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
 	constructor(
 		private readonly releaseService: ReleaseService,
+		private readonly releaseDdexService: ReleaseDdexService,
 	) {}
 
 	@Get()
@@ -124,6 +127,18 @@ export class ReleaseController {
 		const result = await this.releaseService.findOneFull(id);
 
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/xml')
+	@ApiOperation({ summary: 'Get DDEX XML for release by DSP code (Default is Spotify)' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiQuery({ name: 'code', type: 'string', description: 'DSP Code (e.g., spotify)' })
+	@Header('Content-Type', 'application/xml')
+	async getReleaseXml(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Query('code') code: string,
+	) {
+		return this.releaseDdexService.generateReleaseXml(id, code || 'spotify');
 	}
 
 	@Get(':id/list-code-export-ci')
