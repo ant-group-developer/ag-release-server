@@ -18,6 +18,7 @@ import {
 
 import { ReleaseContributorSuccess } from './constants/release-contributor.res';
 import {
+	BulkCreateReleaseContributorDto,
 	CreateReleaseContributorDto,
 	QueryGetListReleaseContributorDto,
 	UpdateReleaseContributorDto,
@@ -36,6 +37,14 @@ export class ReleaseContributorController {
 	@ApiResponse({ status: 201, description: 'Created' })
 	async create(@Body() dto: CreateReleaseContributorDto) {
 		const result = await this.releaseContributorService.create(dto);
+		return ReleaseContributorSuccess.CREATE(result);
+	}
+
+	@Post('bulk')
+	@ApiOperation({ summary: 'Bulk create release contributors' })
+	@ApiResponse({ status: 201, description: 'Created' })
+	async bulkCreate(@Body() dto: BulkCreateReleaseContributorDto) {
+		const result = await this.releaseContributorService.bulkCreate(dto);
 		return ReleaseContributorSuccess.CREATE(result);
 	}
 

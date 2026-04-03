@@ -154,26 +154,34 @@ export class Ern382Builder {
 			da.ele('ArtistRole').txt(artist.role);
 		}
 
-		// Resource contributors (inline)
-		if (track.artists.length > 0) {
-			for (const artist of track.artists) {
-				const rc = details.ele('ResourceContributor');
-				const pn = rc.ele('PartyName');
-				if (artist.languageAndScriptCode) {
-					pn.att(
-						'LanguageAndScriptCode',
-						artist.languageAndScriptCode,
-					);
+
+		// Role mapping
+		const resourceRoles = ['Producer', 'Mixer'];
+
+		// Resource contributors (from track.contributors)
+		if (track.contributors && track.contributors.length > 0) {
+			for (const contributor of track.contributors) {
+				if (resourceRoles.includes(contributor.role)) {
+					const rc = details.ele('ResourceContributor');
+					const pn = rc.ele('PartyName');
+					if (contributor.languageAndScriptCode) {
+						pn.att(
+							'LanguageAndScriptCode',
+							contributor.languageAndScriptCode,
+						);
+					}
+					pn.ele('FullName').txt(contributor.name);
+					rc.ele('ResourceContributorRole').txt(contributor.role);
 				}
-				pn.ele('FullName').txt(artist.name);
-				rc.ele('ResourceContributorRole').txt(artist.role);
 			}
 		}
 
 		// Indirect resource contributors (composers, lyricists, etc.)
 		if (track.contributors && track.contributors.length > 0) {
 			for (const contributor of track.contributors) {
-				this.buildIndirectContributor(details, contributor);
+				if (!resourceRoles.includes(contributor.role)) {
+					this.buildIndirectContributor(details, contributor);
+				}
 			}
 		}
 

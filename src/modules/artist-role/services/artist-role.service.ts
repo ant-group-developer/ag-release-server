@@ -13,6 +13,7 @@ import {
 } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
 import { ArtistRoleQueryService } from './artist-role.query.service';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 
 @Injectable()
 export class ArtistRoleService implements OnModuleInit {
@@ -23,6 +24,7 @@ export class ArtistRoleService implements OnModuleInit {
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 
 		private readonly artistRoleQueryService: ArtistRoleQueryService,
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	// init
@@ -68,7 +70,9 @@ export class ArtistRoleService implements OnModuleInit {
 			creatorId: userId,
 			modifierId: userId,
 		});
-		return await this.artistRoleRepo.save(artist);
+		const result = await this.artistRoleRepo.save(artist);
+		await this.appConfigService.refreshRequiredArtistRoles();
+		return result;
 	}
 
 	// read
@@ -141,11 +145,13 @@ export class ArtistRoleService implements OnModuleInit {
 		}
 
 		await this.artistRoleRepo.update(id, { ...data, modifierId: userId });
+		await this.appConfigService.refreshRequiredArtistRoles();
 		return await this.findOne(id);
 	}
 
 	// delete
 	async delete(id: string): Promise<void> {
 		await this.artistRoleRepo.delete(id);
+		await this.appConfigService.refreshRequiredArtistRoles();
 	}
 }
