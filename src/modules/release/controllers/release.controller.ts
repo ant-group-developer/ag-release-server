@@ -28,7 +28,7 @@ import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
-import { ReleaseQueryDspDeliveryDto } from '../dto/release-query-dsp-delivey.dto';
+import { AppResponseSuccess } from 'src/app.const';
 import {
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
@@ -42,7 +42,9 @@ import { ReleaseService } from '../services/release.service';
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
-	constructor(private readonly releaseService: ReleaseService) {}
+	constructor(
+		private readonly releaseService: ReleaseService,
+	) {}
 
 	@Get()
 	async getList(
@@ -180,15 +182,6 @@ export class ReleaseController {
 	async downloadCoverArt(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getCoverArtStream(id);
 		streamDownload(res, data);
-	}
-
-	@Get(':id/dsp/delivery')
-	async getReleaseDspDelivery(
-		@Param('id') id: string,
-		@Query() query: ReleaseQueryDspDeliveryDto,
-	): Promise<ResponseSuccess<PageDto<any>>> {
-		const data = await this.releaseService.getReleaseDspDelivery(id, query);
-		return new ResponseSuccess({ data });
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

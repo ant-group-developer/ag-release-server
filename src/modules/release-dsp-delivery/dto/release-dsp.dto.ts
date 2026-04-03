@@ -1,8 +1,9 @@
 // dto/release-dsp-delivery.dto.ts
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { ReleaseDspStatus } from '../enum/release-dsp.enum';
+import { OrderFieldReleaseDspDelivery, ReleaseDspStatus } from '../enum/release-dsp.enum';
 
 export class CreateReleaseDspDeliveryDto {
 	@ApiProperty({ type: 'string', format: 'uuid' })
@@ -17,18 +18,28 @@ export class CreateReleaseDspDeliveryDto {
 	@IsEnum(ReleaseDspStatus)
 	@IsOptional()
 	status?: ReleaseDspStatus;
+
+	@ApiPropertyOptional({ type: 'boolean' })
+	@IsOptional()
+	isSelected?: boolean;
 }
 
 export class UpdateReleaseDspDeliveryDto extends PartialType(
 	CreateReleaseDspDeliveryDto,
 ) {}
 
-export enum OrderFieldReleaseDspDelivery {
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
-	RELEASE_ID = 'releaseId',
-	DSP_ID = 'dspId',
-	STATUS = 'status',
+export class BulkUpdateReleaseDspDeliveryItemDto extends UpdateReleaseDspDeliveryDto {
+	@ApiProperty({ type: 'string', format: 'uuid' })
+	@IsUUID()
+	id: string;
+}
+
+export class BulkUpdateReleaseDspDeliveryDto {
+	@ApiProperty({ type: [BulkUpdateReleaseDspDeliveryItemDto] })
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => BulkUpdateReleaseDspDeliveryItemDto)
+	items: BulkUpdateReleaseDspDeliveryItemDto[];
 }
 
 export class GetListReleaseDspDeliveriesDto extends BaseQueryDto2 {
@@ -50,5 +61,5 @@ export class GetListReleaseDspDeliveriesDto extends BaseQueryDto2 {
 	@ApiPropertyOptional({ enum: OrderFieldReleaseDspDelivery })
 	@IsOptional()
 	fieldOrder: OrderFieldReleaseDspDelivery =
-		OrderFieldReleaseDspDelivery.UPDATED_AT;
+		OrderFieldReleaseDspDelivery.releaseDspDelivery_updatedAt;
 }

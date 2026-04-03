@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { Repository } from 'typeorm';
 import { PriceTierMessage } from '../constants/price-tiers.constant';
 import {
-	BulkUpdatePriceTierOrderDto,
+	BulkUpdatePriceTierDto,
 	CreatePriceTierDto,
 	QueryGetListPriceTier,
 	UpdatePriceTierDto,
@@ -97,22 +97,45 @@ export class PriceTierService {
 		await this.priceTierRepo.delete(id);
 	}
 
-	async bulkUpdateOrder(
-		data: BulkUpdatePriceTierOrderDto,
+	async bulkUpdate(
+		data: BulkUpdatePriceTierDto,
 		userId: string,
 	): Promise<PriceTier[]> {
 		const { priceTiers } = data;
 
 		// validate all exist
-		await Promise.all(
+		const existingTiers = await Promise.all(
 			priceTiers.map((pt) => this.findOne(pt.id)),
 		);
 
-		const priceTiersToUpdate = priceTiers.map((pt) => ({
-			id: pt.id,
-			order: pt.order,
-			modifierId: userId,
-		}));
+		let hasNewDefault = false;
+
+		const priceTiersToUpdate = [];
+
+		for (let i = 0; i < priceTiers.length; i++) {
+			const pt = priceTiers[i];
+			const entity = existingTiers[i];
+
+			if (pt.currencyId) {
+				await this.priceTierQueryService.validateForeignKey({
+					currencyId: pt.currencyId,
+				});
+			}
+
+			if (pt.isDefault === true && pt.isDefault !== entity.isDefault) {
+				hasNewDefault = true;
+			}
+
+			priceTiersToUpdate.push({
+				...entity,
+				...pt,
+				modifierId: userId,
+			});
+		}
+
+		if (hasNewDefault) {
+			await this.priceTierQueryService.resetDefaultPriceTier();
+		}
 
 		return await this.priceTierRepo.save(priceTiersToUpdate);
 	}

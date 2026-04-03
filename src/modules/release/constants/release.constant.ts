@@ -145,4 +145,22 @@ export class ReleaseException {
 			data,
 		});
 	}
+
+	static CANNOT_DELETE_NON_DRAFT(data?: any) {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Chỉ được phép xoá bản phát hành ở trạng thái nháp',
+			messageCode: 'release.message.error.cannotDeleteNonDraft',
+			data,
+		});
+	}
+
+	static CANNOT_SUBMIT_INVALID_STATUS(data?: any) {
+		return new ResponseError({
+			statusCode: 400,
+			message: 'Chỉ được phép phát hành các bản ghi ở trạng thái nháp (draft) hoặc có lỗi (issues)',
+			messageCode: 'release.message.error.cannotSubmitInvalidStatus',
+			data,
+		});
+	}
 }

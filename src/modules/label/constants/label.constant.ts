@@ -12,6 +12,7 @@ export const LabelMessageSuccess = {
 
 const LabelMessageCodeError = {
 	DUPLICATE_NAME_LABEL: 'label.message.error.duplicateNameLabel',
+	DUPLICATE_CODE_LABEL: 'label.message.error.duplicateCodeLabel',
 	NOT_FOUND: 'label.message.error.notFound',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'label.message.error.cannotDeleteBecauseLinkedReleases',
@@ -19,6 +20,7 @@ const LabelMessageCodeError = {
 
 const LabelMessageError = {
 	DUPLICATE_NAME_LABEL: 'Duplicate label name',
+	DUPLICATE_CODE_LABEL: 'Duplicate label code',
 	NOT_FOUND: 'Not found',
 	CANNOT_DELETE_BECAUSE_LINKED_RELEASES:
 		'Cannot delete this label because it is linked to release(s).',
@@ -32,6 +34,12 @@ export const LabelMessage = {
 	DUPLICATE_NAME_LABEL: {
 		message: LabelMessageError.DUPLICATE_NAME_LABEL,
 		messageCode: LabelMessageCodeError.DUPLICATE_NAME_LABEL,
+		statusCode: 409,
+	},
+
+	DUPLICATE_CODE_LABEL: {
+		message: LabelMessageError.DUPLICATE_CODE_LABEL,
+		messageCode: LabelMessageCodeError.DUPLICATE_CODE_LABEL,
 		statusCode: 409,
 	},
 

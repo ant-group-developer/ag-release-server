@@ -20,6 +20,24 @@ export class ReleaseDspDeliveryService {
 		private readonly queryService: ReleaseDspDeliveryQueryService,
 	) {}
 
+	async bulkUpdate(input: {
+		data: {
+			items: {
+				id: string;
+				[key: string]: any;
+			}[];
+		};
+		manager?: EntityManager;
+	}) {
+
+		const { data, manager } = input;
+		const repo = this.getRepo(manager);
+
+		await repo.save(data.items);
+
+		return true;
+	}
+
 	async create(input: {
 		data: CreateReleaseDspDeliveryDto;
 

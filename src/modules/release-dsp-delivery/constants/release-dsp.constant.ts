@@ -21,6 +21,14 @@ export class ReleaseDspDeliverySuccess {
 		});
 	}
 
+	static BULK_UPDATE<T>(data?: T) {
+		return new ResponseSuccess({
+			message: 'Bulk update release dsp delivery success',
+			messageCode: 'releaseDspDelivery.message.success.bulkUpdate',
+			data,
+		});
+	}
+
 	static DELETE() {
 		return new ResponseSuccess({
 			message: 'Delete release dsp delivery success',

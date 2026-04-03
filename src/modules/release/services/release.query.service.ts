@@ -17,6 +17,7 @@ import {
 } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import {
+	ReleaseStatus,
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
@@ -55,6 +56,16 @@ export class ReleaseQueryService {
 
 		if (!release) {
 			throw ReleaseException.NOT_FOUND();
+		}
+
+		return release;
+	}
+
+	async validateDelete(id: string): Promise<Release> {
+		const release = await this.findOne(id);
+
+		if (release.status !== ReleaseStatus.DRAFT) {
+			throw ReleaseException.CANNOT_DELETE_NON_DRAFT();
 		}
 
 		return release;
@@ -403,7 +414,9 @@ export class ReleaseQueryService {
 					qb.where('release.title ILIKE :keyword')
 						.orWhere('albumFormat.name ILIKE :keyword')
 						.orWhere('artist.name ILIKE :keyword')
-						.orWhere('label.name ILIKE :keyword');
+						.orWhere('label.name ILIKE :keyword')
+						.orWhere('release.upc ILIKE :keyword')
+						.orWhere('CAST(release.status AS VARCHAR) ILIKE :keyword');
 				}),
 				{ keyword: `%${keyword}%` },
 			);
@@ -642,10 +655,16 @@ export class ReleaseQueryService {
 				releaseCoverArts: true,
 				releaseArtists: true,
 				releaseLanguage: true,
+				releaseContributors: {
+					artistRole: true,
+				},
 				tracks: {
 					trackLanguage: true,
 					audioFile: true,
 					trackArtists: true,
+					trackContributors: {
+						artistRole: true,
+					},
 				},
 				releaseTerritory: true,
 			},
