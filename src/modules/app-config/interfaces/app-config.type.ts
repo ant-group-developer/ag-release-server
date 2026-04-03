@@ -21,6 +21,7 @@ export interface WebsiteConfig {
 }
 
 export interface BackupDatabase {
+	autoBackup: boolean;
 	cronValue: string;
 
 	// config

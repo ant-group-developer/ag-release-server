@@ -12,6 +12,7 @@ import { In, Repository } from 'typeorm';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
+import { ReleaseException } from '../constants/release.constant';
 import { ReleaseLogService } from './release-log.service';
 import { ReleaseDdexService } from './release-ddex.service';
 import { ReleaseQueryService } from './release.query.service';
@@ -48,8 +49,15 @@ export class ReleaseDeliveryService {
 	// ==================== Public API ====================
 
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
+		const release = await this.releaseQueryService.findOne(id);
+		if (
+			release.status !== ReleaseStatus.DRAFT &&
+			release.status !== ReleaseStatus.ISSUES
+		) {
+			throw ReleaseException.CANNOT_SUBMIT_INVALID_STATUS();
+		}
+
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
-		// await this.handleSelected(id, dto.code);
 
 		this.releaseLogService.pending({
 			releaseId: id,
@@ -262,20 +270,6 @@ export class ReleaseDeliveryService {
 	}
 
 	// ==================== Helpers ====================
-
-	// private async handleSelected(releaseId: string, codes: string[]) {
-	// 	const normalizedCodes = [
-	// 		...new Set((codes || []).map((i) => i?.trim()).filter(Boolean)),
-	// 	];
-
-	// 	const dsps = await this.dspRepo.find({
-	// 		where: { code: In(normalizedCodes) },
-	// 		select: ['id', 'code'],
-	// 	});
-
-	// 	const dspIds = dsps.map((dsp) => dsp.id);
-	// 	await this.deliveryService.updateSelected(releaseId, dspIds);
-	// }
 
 	private async createDoneFolderOnSftp(sftp: any, batchId: string) {
 		const client = await this.sftpConnectService.connect(sftp);
