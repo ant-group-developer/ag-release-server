@@ -18,6 +18,10 @@ export class CreateReleaseDspDeliveryDto {
 	@IsEnum(ReleaseDspStatus)
 	@IsOptional()
 	status?: ReleaseDspStatus;
+
+	@ApiPropertyOptional({ type: 'boolean' })
+	@IsOptional()
+	isSelected?: boolean;
 }
 
 export class UpdateReleaseDspDeliveryDto extends PartialType(

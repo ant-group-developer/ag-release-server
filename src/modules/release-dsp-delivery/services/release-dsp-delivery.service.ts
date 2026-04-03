@@ -29,6 +29,7 @@ export class ReleaseDspDeliveryService {
 		};
 		manager?: EntityManager;
 	}) {
+
 		const { data, manager } = input;
 		const repo = this.getRepo(manager);
 

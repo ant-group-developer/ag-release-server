@@ -269,6 +269,18 @@ export class ReleaseValidateService {
 			);
 		}
 
+		// title validation
+		const hasMatchingTitle = release.tracks.some((t) => t.title === release.title);
+		if (!hasMatchingTitle) {
+			result.push(
+				new FieldErrorDetails({
+					message: 'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
+					page: 'core-detail',
+					field: 'title',
+				}),
+			);
+		}
+
 		if (!release.cLineYear) {
 			result.push(
 				new FieldErrorDetails({
@@ -418,20 +430,6 @@ export class ReleaseValidateService {
 					field: 'releaseContributors',
 				}),
 			);
-		}
-
-		// single format title validation
-		if (release.albumFormat?.code === 'single' && release.tracks?.length > 0) {
-			const hasMatchingTitle = release.tracks.some((t) => t.title === release.title);
-			if (!hasMatchingTitle) {
-				result.push(
-					new FieldErrorDetails({
-						message: 'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
-						page: 'core-detail',
-						field: 'title',
-					}),
-				);
-			}
 		}
 
 		return result;
