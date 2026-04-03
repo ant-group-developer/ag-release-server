@@ -8,8 +8,10 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Repository } from 'typeorm';
 
+import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { ReleaseException } from '../constants/release.constant';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
@@ -38,6 +40,8 @@ export class ReleaseValidateService {
 
 		@InjectRepository(PriceTier)
 		private readonly priceTierRepo: Repository<PriceTier>,
+
+		private readonly appConfigService: AppConfigService,
 	) {}
 
 	async validate({
@@ -223,8 +227,6 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
-		// console.log(release);
-
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
 
@@ -234,12 +236,11 @@ export class ReleaseValidateService {
 			result.push(...this.validateTracks(release.tracks));
 		}
 
-		// console.log(result);
-
 		return result;
 	}
 
 	private validateRelease(release: Release) {
+		const requiredRoles = this.appConfigService.requiredArtistRoles;
 		const result: FieldErrorDetails[] = [];
 
 		if (!release.primaryGenreId) {
@@ -410,28 +411,26 @@ export class ReleaseValidateService {
 			);
 		}
 
-		// release contributors validation (Producer & Mixer)
-		const hasProducer = release.releaseContributors?.some(
-			(c) => c.artistRole?.code === 'Composer',
-		);
-		const hasMixer = release.releaseContributors?.some(
-			(c) => c.artistRole?.code === 'Mixer',
-		);
-
-		console.log(release.releaseContributors)
-
-		if (!hasProducer || !hasMixer) {
-			const missing = [];
-			if (!hasProducer) missing.push('Producer');
-			if (!hasMixer) missing.push('Mixer');
-
-			result.push(
-				new FieldErrorDetails({
-					message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
-					page: 'core-detail',
-					field: 'releaseContributors',
-				}),
+		// release contributors validation (Dynamic isRequired)
+		if (requiredRoles.length > 0) {
+			console.log(requiredRoles)
+			const missingRoles = requiredRoles.filter(
+				(role) =>
+					!release.releaseContributors?.some(
+						(c) => c.artistRole?.code === role.code,
+					),
 			);
+
+			if (missingRoles.length > 0) {
+				const missing = missingRoles.map((r) => r.name);
+				result.push(
+					new FieldErrorDetails({
+						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+						page: 'core-detail',
+						field: 'releaseContributors',
+					}),
+				);
+			}
 		}
 
 		return result;
@@ -470,6 +469,7 @@ export class ReleaseValidateService {
 	}
 
 	private validateTracks(tracks: Release['tracks']) {
+		const requiredRoles = this.appConfigService.requiredArtistRoles;
 		const result: FieldErrorDetails[] = [];
 
 		tracks.forEach((track, index) => {
@@ -545,27 +545,26 @@ export class ReleaseValidateService {
 				);
 			}
 
-			// track contributors validation (Producer & Mixer)
-			const hasTrackProducer = track.trackContributors?.some(
-				(c) => c.artistRole?.code === 'Composer',
-			);
-			const hasTrackMixer = track.trackContributors?.some(
-				(c) => c.artistRole?.code === 'Mixer',
-			);
-
-			if (!hasTrackProducer || !hasTrackMixer) {
-				const missing = [];
-				if (!hasTrackProducer) missing.push('Producer');
-				if (!hasTrackMixer) missing.push('Mixer');
-
-				result.push(
-					new FieldErrorDetails({
-						message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
-						page: 'tracks',
-						field: `tracks.${index}.trackContributors`,
-						trackId: track.id,
-					}),
+			// track contributors validation (Dynamic isRequired)
+			if (requiredRoles.length > 0) {
+				const missingRoles = requiredRoles.filter(
+					(role) =>
+						!track.trackContributors?.some(
+							(c) => c.artistRole?.code === role.code,
+						),
 				);
+
+				if (missingRoles.length > 0) {
+					const missing = missingRoles.map((r) => r.name);
+					result.push(
+						new FieldErrorDetails({
+							message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+							page: 'tracks',
+							field: `tracks.${index}.trackContributors`,
+							trackId: track.id,
+						}),
+					);
+				}
 			}
 
 			//

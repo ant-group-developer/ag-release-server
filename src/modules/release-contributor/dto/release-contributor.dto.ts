@@ -1,5 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+	IsArray,
 	IsBoolean,
 	IsNotEmpty,
 	IsOptional,
@@ -7,6 +9,7 @@ import {
 	IsUUID,
 	Length,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
@@ -61,3 +64,12 @@ export class UpdateReleaseContributorDto extends PartialType(
 }
 
 export class QueryGetListReleaseContributorDto extends BaseQueryDto {}
+
+export class BulkCreateReleaseContributorDto {
+	@ApiProperty({ type: [CreateReleaseContributorDto] })
+	@IsArray()
+	@IsNotEmpty()
+	@ValidateNested({ each: true })
+	@Type(() => CreateReleaseContributorDto)
+	items: CreateReleaseContributorDto[];
+}
