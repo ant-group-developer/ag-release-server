@@ -27,6 +27,14 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 	})
 	code: string;
 
+	@Column({
+		name: 'is_required',
+		type: 'boolean',
+		default: false,
+		comment: 'Xác định bắt buộc phải có vai trò này ở trong release hoặc track hay không',
+	})
+	isRequired: boolean;
+
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
 	creator: User;

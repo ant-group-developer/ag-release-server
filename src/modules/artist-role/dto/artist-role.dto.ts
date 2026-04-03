@@ -4,6 +4,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsBoolean,
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
@@ -24,6 +25,10 @@ export class CreateArtistRoleDto {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_CODE)
 	code: string;
+
+	@IsOptional()
+	@IsBoolean()
+	isRequired?: boolean;
 }
 
 export class UpdateArtistRoleDto extends PartialType(CreateArtistRoleDto) {

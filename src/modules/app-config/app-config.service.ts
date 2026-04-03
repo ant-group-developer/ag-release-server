@@ -6,16 +6,20 @@ import { Repository } from 'typeorm';
 import { appConfigDefault } from './constants/app-config.constant';
 import { UpdateConfigDto } from './dtos/app-config.dto';
 import { AppConfig } from './entities/app-config.entity';
+import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 
 @Injectable()
 export class AppConfigService implements OnModuleInit {
 	private readonly logger = new Logger(AppConfigService.name);
 
 	cache: AppConfig;
+	requiredArtistRoles: ArtistRole[] = [];
 
 	constructor(
 		@InjectRepository(AppConfig)
 		private readonly appConfigRepo: Repository<AppConfig>,
+		@InjectRepository(ArtistRole)
+		private readonly artistRoleRepo: Repository<ArtistRole>,
 		private readonly eventEmitter: EventEmitter2,
 	) {}
 
@@ -150,9 +154,17 @@ export class AppConfigService implements OnModuleInit {
 			appConfig = await this.appConfigRepo.save(entity);
 		}
 
+		await this.refreshRequiredArtistRoles();
+
 		this.setCache(appConfig);
 
 		return appConfig;
+	}
+
+	public async refreshRequiredArtistRoles() {
+		this.requiredArtistRoles = await this.artistRoleRepo.find({
+			where: { isRequired: true },
+		});
 	}
 
 	private async findOneDb() {
