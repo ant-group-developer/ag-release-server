@@ -412,11 +412,13 @@ export class ReleaseValidateService {
 
 		// release contributors validation (Producer & Mixer)
 		const hasProducer = release.releaseContributors?.some(
-			(c) => c.artistRole?.code === 'PRODUCER',
+			(c) => c.artistRole?.code === 'Composer',
 		);
 		const hasMixer = release.releaseContributors?.some(
-			(c) => c.artistRole?.code === 'MIXER',
+			(c) => c.artistRole?.code === 'Mixer',
 		);
+
+		console.log(release.releaseContributors)
 
 		if (!hasProducer || !hasMixer) {
 			const missing = [];
@@ -545,10 +547,10 @@ export class ReleaseValidateService {
 
 			// track contributors validation (Producer & Mixer)
 			const hasTrackProducer = track.trackContributors?.some(
-				(c) => c.artistRole?.code === 'PRODUCER',
+				(c) => c.artistRole?.code === 'Composer',
 			);
 			const hasTrackMixer = track.trackContributors?.some(
-				(c) => c.artistRole?.code === 'MIXER',
+				(c) => c.artistRole?.code === 'Mixer',
 			);
 
 			if (!hasTrackProducer || !hasTrackMixer) {
