@@ -67,6 +67,9 @@ export class UpdateAcrCloudDto {
 }
 
 export class UpdateBackupDatabaseDto {
+	@IsBoolean()
+	autoBackup: boolean;
+
 	@IsNotEmpty()
 	@IsString()
 	cronValue: string;
