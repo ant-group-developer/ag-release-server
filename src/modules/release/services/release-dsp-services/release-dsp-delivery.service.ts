@@ -77,6 +77,7 @@ export class ReleaseDspDeliveryService {
 				releaseId,
 				dsp.id,
 			);
+			
 			if (releaseDspDeliveryId) {
 				const delivery = await this.findOne(releaseDspDeliveryId);
 				if (
@@ -84,7 +85,16 @@ export class ReleaseDspDeliveryService {
 					delivery.status !== ReleaseDspStatus.ISSUES &&
 					delivery.status !== ReleaseDspStatus.NEVER_DISTRIBUTED
 				) {
-					throw ReleaseException.CANNOT_SUBMIT_INVALID_STATUS();
+					this.logger.warn(`Bỏ qua DSP ${dsp.name} do trạng thái hiện tại (${delivery.status}) không hợp lệ để gửi lại.`);
+					this.releaseLogService.pending({
+						releaseId,
+						step: `Kiểm tra gửi DSP ${dsp.name}`,
+						message: `Bỏ qua DSP ${dsp.name} do trạng thái hiện tại (${delivery.status}) không hợp lệ để gửi lại.`,
+						codeDsp: code,
+						dspId: dsp.id,
+						deliveryId: releaseDspDeliveryId,
+					});
+					return;
 				}
 			}
 
