@@ -413,7 +413,6 @@ export class ReleaseValidateService {
 
 		// release contributors validation (Dynamic isRequired)
 		if (requiredRoles.length > 0) {
-			console.log(requiredRoles)
 			const missingRoles = requiredRoles.filter(
 				(role) =>
 					!release.releaseContributors?.some(

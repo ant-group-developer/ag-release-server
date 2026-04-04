@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
@@ -20,8 +20,7 @@ import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
-import { ReleaseDspDelivery } from './modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryModule } from './modules/release-dsp-delivery/release-dsp.module';
+import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
@@ -38,7 +37,9 @@ import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
-import { ReleaseDeliveryService } from './services/release-delivery.service';
+import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
+
 
 @Module({
 	imports: [
@@ -61,7 +62,6 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 		ReleaseCoverArtModule,
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
-		ReleaseDspDeliveryModule,
 		ReleaseLogModule,
 
 		FileExportCiModule,
@@ -92,9 +92,14 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 		ReleaseQueryService,
 
 		// ReleaseDdexCiService,
-		// ReleaseSpotifyService2,
 		ReleaseDdexService,
-		ReleaseDeliveryService,
+		ReleaseDspDeliveryService, 
+		ReleaseDspDeliveryQueryService
 	],
+	exports: [
+		ReleaseDdexService,
+		ReleaseQueryService,
+		ReleaseValidateService,
+	]
 })
 export class ReleaseModule {}

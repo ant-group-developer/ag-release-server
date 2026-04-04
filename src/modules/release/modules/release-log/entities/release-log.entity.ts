@@ -1,6 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { ReleaseDspDelivery } from 'src/modules/release/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Release } from '../../../entities/release.entity';
 

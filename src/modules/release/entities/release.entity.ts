@@ -14,7 +14,7 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDspDelivery } from 'src/modules/release/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
@@ -156,6 +156,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		comment: 'Đánh dấu release nhiều nghệ sĩ (Various Artists)',
 	})
 	isVariousArtist: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu metadata đã được gửi sang CI Aggregator chung một mẻ chưa',
+	})
+	isSentMetadataCi: boolean;
 
 	@Column({
 		type: 'enum',

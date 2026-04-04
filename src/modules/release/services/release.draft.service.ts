@@ -166,6 +166,7 @@ export class ReleaseDraftService {
 
 		await this.releaseRepo.update(id, {
 			...restOfData,
+			isSentMetadataCi: false,
 			modifierId: userId,
 		});
 		const releaseDb = await this.releaseQueryService.getOneDetail(id);
