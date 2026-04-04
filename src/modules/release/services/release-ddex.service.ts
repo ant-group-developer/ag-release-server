@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import * as crypto from 'crypto';
-
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
 import { AggregatorCode } from 'src/modules/distribution/aggregator/enum/distribution.enum';
@@ -24,7 +21,6 @@ import {
 	removeFolder,
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
-import { Repository } from 'typeorm';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 import { ErnService } from '../../ern/services/ern.service';
 import { Release } from '../entities/release.entity';
@@ -47,11 +43,8 @@ export class ReleaseDdexService {
 	private readonly logger = new Logger(ReleaseDdexService.name);
 
 	constructor(
-		@InjectRepository(Release)
-		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucket2Sv: BucketService2,
-		private readonly appConfigSv: AppConfigService,
 
 		private readonly ernService: ErnService,
 

@@ -20,84 +20,7 @@ export class ReleaseDspDeliveryService {
 		private readonly queryService: ReleaseDspDeliveryQueryService,
 	) {}
 
-	async bulkUpdate(input: {
-		data: {
-			items: {
-				id: string;
-				[key: string]: any;
-			}[];
-		};
-		manager?: EntityManager;
-	}) {
-
-		const { data, manager } = input;
-		const repo = this.getRepo(manager);
-
-		await repo.save(data.items);
-
-		return true;
-	}
-
-	async create(input: {
-		data: CreateReleaseDspDeliveryDto;
-
-		manager?: EntityManager;
-	}) {
-		const { data, manager } = input;
-		const repo = this.getRepo(manager);
-
-		await this.validateUnique(data, manager);
-
-		const entity = repo.create({
-			...data,
-		});
-
-		return repo.save(entity);
-	}
-
-	async findOne(id: string) {
-		const entity = await this.repo.findOneBy({ id });
-		if (!entity) throw ReleaseDspDeliveryException.NOT_FOUND();
-		return entity;
-	}
-
-	async update(input: {
-		id: string;
-		data: UpdateReleaseDspDeliveryDto;
-		manager?: EntityManager;
-	}) {
-		const { id, data, manager } = input;
-		const repo = this.getRepo(manager);
-
-		await this.findOne(id);
-
-		// unique check only when releaseId + dspId both provided in update
-		if (data.releaseId && data.dspId) {
-			await this.validateUnique(
-				{ releaseId: data.releaseId, dspId: data.dspId },
-				manager,
-				id,
-			);
-		}
-
-		await repo.update(id, {
-			...data,
-		});
-
-		return this.findOne(id);
-	}
-
-	async getList(filter: GetListReleaseDspDeliveriesDto) {
-		return this.queryService.getList(filter);
-	}
-
-	async delete(id: string) {
-		await this.findOne(id);
-		await this.repo.delete(id);
-	}
-
 	// ==================== Delivery orchestration ====================
-
 	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {
 		const existed = await this.repo.findOne({
 			where: { releaseId, dspId },
@@ -192,6 +115,84 @@ export class ReleaseDspDeliveryService {
 		return record?.id ?? null;
 	}
 
+	// crud
+	async bulkUpdate(input: {
+		data: {
+			items: {
+				id: string;
+				[key: string]: any;
+			}[];
+		};
+		manager?: EntityManager;
+	}) {
+
+		const { data, manager } = input;
+		const repo = this.getRepo(manager);
+
+		await repo.save(data.items);
+
+		return true;
+	}
+
+	async create(input: {
+		data: CreateReleaseDspDeliveryDto;
+
+		manager?: EntityManager;
+	}) {
+		const { data, manager } = input;
+		const repo = this.getRepo(manager);
+
+		await this.validateUnique(data, manager);
+
+		const entity = repo.create({
+			...data,
+		});
+
+		return repo.save(entity);
+	}
+
+	async findOne(id: string) {
+		const entity = await this.repo.findOneBy({ id });
+		if (!entity) throw ReleaseDspDeliveryException.NOT_FOUND();
+		return entity;
+	}
+
+	async update(input: {
+		id: string;
+		data: UpdateReleaseDspDeliveryDto;
+		manager?: EntityManager;
+	}) {
+		const { id, data, manager } = input;
+		const repo = this.getRepo(manager);
+
+		await this.findOne(id);
+
+		// unique check only when releaseId + dspId both provided in update
+		if (data.releaseId && data.dspId) {
+			await this.validateUnique(
+				{ releaseId: data.releaseId, dspId: data.dspId },
+				manager,
+				id,
+			);
+		}
+
+		await repo.update(id, {
+			...data,
+		});
+
+		return this.findOne(id);
+	}
+
+	async getList(filter: GetListReleaseDspDeliveriesDto) {
+		return this.queryService.getList(filter);
+	}
+
+	async delete(id: string) {
+		await this.findOne(id);
+		await this.repo.delete(id);
+	}
+
+	// private
 	private async validateUnique(
 		data: Pick<CreateReleaseDspDeliveryDto, 'releaseId' | 'dspId'>,
 		manager?: EntityManager,

@@ -20,19 +20,18 @@ import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
-import { ReleaseDspDelivery } from '../release-dsp-delivery/entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryModule } from '../release-dsp-delivery/release-dsp.module';
+import { ReleaseDspDelivery } from './modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspDeliveryModule } from './modules/release-dsp-delivery/release-dsp.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
-import { ReleaseLogController } from './controllers/release-log.controller';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
-import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseDdexService } from './services/release-ddex.service';
-import { ReleaseLogService } from './services/release-log.service';
+import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
+import { ReleaseLogModule } from './modules/release-log/release-log.module';
 // import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
 import { ReleaseDraftService } from './services/release.draft.service';
@@ -63,6 +62,7 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
 		ReleaseDspDeliveryModule,
+		ReleaseLogModule,
 
 		FileExportCiModule,
 
@@ -84,7 +84,6 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 	controllers: [
 		ReleaseController,
 		ReleaseDraftController,
-		ReleaseLogController,
 	],
 	providers: [
 		ReleaseService,
@@ -94,7 +93,6 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 
 		// ReleaseDdexCiService,
 		// ReleaseSpotifyService2,
-		ReleaseLogService,
 		ReleaseDdexService,
 		ReleaseDeliveryService,
 	],

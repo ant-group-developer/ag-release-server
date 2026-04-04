@@ -10,8 +10,8 @@ import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import { GetUpcRequest } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
-import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
+import { ReleaseDspDelivery } from 'src/modules/release/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails, MediaUrlTransformer } from 'src/utils/util';
 import {
@@ -29,12 +29,12 @@ import {
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
-import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
+import { ReleaseLog, ReleaseLogStatus } from '../modules/release-log/entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { enhanceReleasesDetails } from '../utils/release.utils';
-import { ReleaseLogService } from './release-log.service';
+import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 // import { ReleaseDdexCiService } from './release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
 import { ReleaseQueryService } from './release.query.service';

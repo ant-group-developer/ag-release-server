@@ -5,7 +5,7 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { LessThan, Repository } from 'typeorm';
 import { GetListReleaseLogDto } from '../dto/release-log.dto';
 import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
-import { enhanceReleaseDetail } from '../utils/release.utils';
+import { enhanceReleaseDetail } from '../../../utils/release.utils';
 
 type ReleaseLogInput = {
 	releaseId: string;

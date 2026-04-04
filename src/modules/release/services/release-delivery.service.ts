@@ -6,15 +6,15 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
-import { ReleaseDspDeliveryService } from 'src/modules/release-dsp-delivery/services/release-dsp-delivery.service';
+import { ReleaseDspDeliveryService } from 'src/modules/release/modules/release-dsp-delivery/services/release-dsp-delivery.service';
 import { removeFolder } from 'src/utils/util';
 import { In, Repository } from 'typeorm';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
-import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
+import { ReleaseDspStatus } from 'src/modules/release/modules/release-dsp-delivery/enum/release-dsp.enum';
 import { ReleaseException } from '../constants/release.constant';
-import { ReleaseLogService } from './release-log.service';
+import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 import { ReleaseDdexService } from './release-ddex.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
