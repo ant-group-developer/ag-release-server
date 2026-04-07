@@ -40,6 +40,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery.controller';
+import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
 
 
 @Module({
@@ -81,6 +82,7 @@ import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery
 
 		CountryModule,
 		AggregatorsModule,
+		ReleaseExecutionsModule
 	],
 	controllers: [
 		ReleaseController,

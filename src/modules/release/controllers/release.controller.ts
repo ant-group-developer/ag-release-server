@@ -29,7 +29,6 @@ import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
-import { AppResponseSuccess } from 'src/app.const';
 import {
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,

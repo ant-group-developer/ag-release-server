@@ -275,6 +275,7 @@ export class ReleaseValidateService {
 		if (!hasMatchingTitle) {
 			result.push(
 				new FieldErrorDetails({
+					messageCode: 'formFields.releaseNameMustMatchTrackName',
 					message: 'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
 					page: 'core-detail',
 					field: 'title',
