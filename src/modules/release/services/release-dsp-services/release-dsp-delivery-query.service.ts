@@ -5,10 +5,10 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { GetListReleaseDspDeliveriesDto } from '../dto/release-dsp.dto';
-import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
+import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { ReleaseDspStatus } from '../enum/release-dsp.enum';
+import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { GetListReleaseDspDeliveriesDto } from '../../dto/release-dsp.dto';
 
 @Injectable()
 export class ReleaseDspDeliveryQueryService {

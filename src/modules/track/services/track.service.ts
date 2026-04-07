@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
-import { ReleaseLogService } from 'src/modules/release/services/release-log.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
@@ -14,6 +13,7 @@ import {
 import { Track } from '../entities/track.entity';
 import { ITrack, ITrackNonDraft } from '../interfaces/track.interface';
 import { TrackQueryService } from './track.query.service';
+import { ReleaseLogService } from 'src/modules/release/modules/release-log/services/release-log.service';
 
 @Injectable()
 export class TrackService {

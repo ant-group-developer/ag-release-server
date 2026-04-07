@@ -19,15 +19,11 @@ import {
 } from '@nestjs/swagger';
 import { AppResponseSuccess } from 'src/app.const';
 import { ReleaseDspDeliverySuccess } from '../constants/release-dsp.constant';
-import {
-	CreateReleaseDspDeliveryDto,
-	GetListReleaseDspDeliveriesDto,
-	UpdateReleaseDspDeliveryDto,
-	BulkUpdateReleaseDspDeliveryDto,
-} from '../dto/release-dsp.dto';
+
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryService } from '../services/release-dsp-delivery.service';
-import { ReleaseDspDeliveryQueryService } from '../services/release-dsp-delivery-query.service';
+import { ReleaseDspDeliveryService } from '../services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseDspDeliveryQueryService } from '../services/release-dsp-services/release-dsp-delivery-query.service';
+import { BulkUpdateReleaseDspDeliveryDto, CreateReleaseDspDeliveryDto, GetListReleaseDspDeliveriesDto, UpdateReleaseDspDeliveryDto } from '../dto/release-dsp.dto';
 
 @ApiTags('Release DSP Deliveries')
 @Controller('release-dsp-deliveries')
