@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
@@ -20,26 +20,26 @@ import { Label } from '../label/entities/label.entity';
 import { OrmModule } from '../orm/orm.module';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
-import { ReleaseDspDelivery } from '../release-dsp-delivery/entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryModule } from '../release-dsp-delivery/release-dsp.module';
+import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
 import { ReleaseTerritoryModule } from '../release-territory/release-territory.module';
 import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
-import { ReleaseLogController } from './controllers/release-log.controller';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
-import { ReleaseLog } from './entities/release-log.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseDdexService } from './services/release-ddex.service';
-import { ReleaseLogService } from './services/release-log.service';
+import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
+import { ReleaseLogModule } from './modules/release-log/release-log.module';
 // import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
-import { ReleaseDeliveryService } from './services/release-delivery.service';
+import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
+
 
 @Module({
 	imports: [
@@ -62,7 +62,7 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 		ReleaseCoverArtModule,
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
-		ReleaseDspDeliveryModule,
+		ReleaseLogModule,
 
 		FileExportCiModule,
 
@@ -84,7 +84,6 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 	controllers: [
 		ReleaseController,
 		ReleaseDraftController,
-		ReleaseLogController,
 	],
 	providers: [
 		ReleaseService,
@@ -93,10 +92,14 @@ import { ReleaseDeliveryService } from './services/release-delivery.service';
 		ReleaseQueryService,
 
 		// ReleaseDdexCiService,
-		// ReleaseSpotifyService2,
-		ReleaseLogService,
 		ReleaseDdexService,
-		ReleaseDeliveryService,
+		ReleaseDspDeliveryService, 
+		ReleaseDspDeliveryQueryService
 	],
+	exports: [
+		ReleaseDdexService,
+		ReleaseQueryService,
+		ReleaseValidateService,
+	]
 })
 export class ReleaseModule {}

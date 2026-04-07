@@ -320,6 +320,7 @@ export class DspRoutingConfigsService {
 		recipient: { partyId: string; name: string };
 		sftp: SftpMetadata;
 		createsDoneFolder: boolean;
+		isCI: boolean;
 	}> {
 		const routing = await this.repo
 			.createQueryBuilder('routing')
@@ -349,6 +350,7 @@ export class DspRoutingConfigsService {
 		let sftpMetadata: SftpMetadata | null = null;
 		let createsDoneFolder = false;
 		let ernVersion: ErnVersion = ErnVersion.ERN_382;
+		let isCI = false;
 
 		switch (routing.mode) {
 			case RoutingModeEnum.DIRECT: {
@@ -372,6 +374,9 @@ export class DspRoutingConfigsService {
 				sftpMetadata = agg.sftpConfig?.metadata ?? null;
 				createsDoneFolder = agg.createsDoneFolder ?? false;
 				ernVersion = (agg.sftpConfig?.ernVersion as ErnVersion) ?? ErnVersion.ERN_382;
+				if (agg.code === 'CI') {
+					isCI = true;
+				}
 				break;
 			}
 
@@ -402,6 +407,7 @@ export class DspRoutingConfigsService {
 				recipient,
 				sftp: aggDefault.sftpConfig?.metadata,
 				createsDoneFolder,
+				isCI,
 			}
 		
 		}
@@ -414,6 +420,7 @@ export class DspRoutingConfigsService {
 			recipient,
 			sftp: sftpMetadata,
 			createsDoneFolder,
+			isCI,
 		};
 	}
 
@@ -432,6 +439,6 @@ export class DspRoutingConfigsService {
 			throw DspRoutingConfigException.NOT_FOUND();
 		}
 
-		return routing
+		return routing;
 	}
 }

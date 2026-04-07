@@ -43,7 +43,6 @@ import { PermissionModule } from './modules/permission/permission.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
-import { ReleaseDspDeliveryModule } from './modules/release-dsp-delivery/release-dsp.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { RoleModule } from './modules/role/role.module';
@@ -101,7 +100,6 @@ import { UserModule } from './modules/user/user.module';
 		// ReleaseLanguageModule,
 		// ReleaseCoverArtModule,
 		ReleaseLocalizeModule,
-		ReleaseDspDeliveryModule,
 
 		TrackModule,
 		TrackArtistModule,

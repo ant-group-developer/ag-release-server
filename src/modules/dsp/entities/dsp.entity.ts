@@ -8,7 +8,7 @@ import { ArtistProfile } from 'src/modules/artist-profile/entities/artist-profil
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { DspRoutingConfig } from 'src/modules/distribution/dsp-routing/entities/dsp-routing-config.entity';
 import { DspAction } from 'src/modules/dsp-action/entities/dsp-action.entities';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { MediaUrlTransformer } from 'src/utils/util';

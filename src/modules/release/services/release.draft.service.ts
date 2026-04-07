@@ -166,6 +166,7 @@ export class ReleaseDraftService {
 
 		await this.releaseRepo.update(id, {
 			...restOfData,
+			isSentMetadataCi: false,
 			modifierId: userId,
 		});
 		const releaseDb = await this.releaseQueryService.getOneDetail(id);
@@ -254,6 +255,7 @@ export class ReleaseDraftService {
 
 	async getErrorsSchemaReleaseById(id: string) {
 		const release = await this.releaseQueryService.findOneWithRelation(id);
+
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
 

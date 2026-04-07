@@ -132,6 +132,9 @@ export class TrackQueryService {
 		this.addSelectRecordingCountry(qb);
 		this.addSelectAudioLanguage(qb);
 
+		qb.addOrderBy('trackArtist.createdAt', 'ASC');
+		qb.addOrderBy('trackContributor.createdAt', 'ASC');
+
 		const track = await qb.getOne();
 
 		if (!track) {
@@ -513,6 +516,9 @@ export class TrackQueryService {
 		this.addSelectTrackType(qb);
 		this.addSelectTrackOriginType(qb);
 		this.addSelectTrackSensitive(qb);
+
+		qb.addOrderBy('trackArtist.createdAt', 'ASC');
+		qb.addOrderBy('trackContributor.createdAt', 'ASC');
 
 		return qb;
 	}

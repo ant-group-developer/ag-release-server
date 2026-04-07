@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
@@ -10,8 +10,8 @@ import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 import { GetUpcRequest } from 'src/modules/external/upc/upc.grpc.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
-import { ReleaseDspDelivery } from 'src/modules/release-dsp-delivery/entities/release-dsp-delivery.entity';
-import { ReleaseDspStatus } from 'src/modules/release-dsp-delivery/enum/release-dsp.enum';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails, MediaUrlTransformer } from 'src/utils/util';
 import {
@@ -29,17 +29,17 @@ import {
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
-import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
+import { ReleaseLog, ReleaseLogStatus } from '../modules/release-log/entities/release-log.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { enhanceReleasesDetails } from '../utils/release.utils';
-import { ReleaseLogService } from './release-log.service';
+import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 // import { ReleaseDdexCiService } from './release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
-import { ReleaseDeliveryService } from './release-delivery.service';
+import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 
 @Injectable()
 export class ReleaseService {
@@ -72,7 +72,8 @@ export class ReleaseService {
 		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly fileExportCiService: FileExportCiService,
-		private readonly releaseDeliveryService: ReleaseDeliveryService,
+		@Inject(forwardRef(() => ReleaseDspDeliveryService))
+		private readonly deliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -287,7 +288,7 @@ export class ReleaseService {
 			});
 		}
 
-		await this.releaseRepo.update(id, { ...data, modifierId: userId });
+		await this.releaseRepo.update(id, { ...data, isSentMetadataCi: false, modifierId: userId });
 		return await this.releaseQueryService.findOne(id);
 	}
 
@@ -443,7 +444,85 @@ export class ReleaseService {
 
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		return this.releaseDeliveryService.submit(id, userId, dto);
+		await this.releaseQueryService.findOne(id);
+
+		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+
+		this.releaseLogService.pending({
+			releaseId: id,
+			step: 'Bắt đầu xử lý phát hành',
+			message: 'Bản phát hành đang được đưa vào hàng đợi xử lý',
+		});
+
+		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+			});
+
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'Lỗi phát hành',
+				message: `Lỗi bất ngờ: ${error?.message ?? 'Không xác định'}`,
+			});
+		});
+
+		return { message: 'Đang được xử lý' };
+	}
+
+	private async processingSubmit({
+		id,
+		userId,
+		dto,
+	}: {
+		id: string;
+		userId: string;
+		dto: SubmitReleaseDto;
+	}) {
+		const release = await this.releaseQueryService.findOneWithRelation(id);
+
+		// Gen UPC / ISRC if needed
+		if (!release.upc) {
+			await this.genUpc(id);
+		}
+
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+
+		// Validate
+		const errors =
+			this.releaseValidateService.getErrorsSchemaRelease(release);
+
+		if (errors.length > 0) {
+			this.releaseLogService.failed({
+				releaseId: id,
+				step: 'Kiểm tra dữ liệu phát hành (Validation)',
+				message: errors
+					.map((e) => e?.message ?? 'Lỗi không xác định')
+					.join(', '),
+			});
+
+			throw new ResponseError({
+				message:
+					'Release validation failed. Please check the input data.',
+				data: errors,
+			});
+		}
+
+		// Distribute to all DSPs
+		const dspErrors = await this.deliveryService.executeDistribution(id, dto.code);
+
+		if (!dspErrors || dspErrors.length === 0) {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.DISTRIBUTED,
+			});
+		} else {
+			await this.releaseRepo.update(id, {
+				status: ReleaseStatus.ISSUES,
+			});
+		}
 	}
 
 	// ==================== Test / Debug endpoints (delegate) ====================

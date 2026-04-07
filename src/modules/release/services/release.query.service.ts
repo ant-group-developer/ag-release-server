@@ -159,7 +159,6 @@ export class ReleaseQueryService {
 	}
 
 	// findOneFull;
-
 	private createQbGetOneDetail(id: string) {
 		const query = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
@@ -278,6 +277,7 @@ export class ReleaseQueryService {
 				'releaseContributor.artistId',
 				'releaseContributor.releaseId',
 				'releaseContributor.addContributorToTracks',
+				'releaseContributor.createdAt',
 			])
 			.addSelect([
 				'artistContributor.id',
@@ -345,6 +345,9 @@ export class ReleaseQueryService {
 		query.where('release.id = :id', {
 			id,
 		});
+
+		query.addOrderBy('releaseArtist.createdAt', 'ASC');
+		query.addOrderBy('releaseContributor.createdAt', 'ASC');
 
 		return query;
 	}
