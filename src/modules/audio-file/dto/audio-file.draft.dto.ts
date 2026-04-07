@@ -42,6 +42,7 @@ export class CreateAudioFileDraftDto {
 	@IsUUID()
 	fileId: string;
 
-	@IsUUID()
-	peakId: string;
+	@IsOptional()
+	// @IsUUID()
+	peakId?: string;
 }
