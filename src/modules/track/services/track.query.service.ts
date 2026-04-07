@@ -124,8 +124,10 @@ export class TrackQueryService {
 		this.addSelectLabel(qb);
 		this.addSelectAudioFile(qb);
 		this.addSelectFileAndPeak(qb);
+
 		this.addSelectTrackArtist(qb);
 		this.addSelectTrackContributor(qb);
+
 		this.addSelectTrackLanguage(qb);
 		this.addSelectMetadataLanguage(qb);
 		this.addSelectMetadataLanguageCountry(qb);
@@ -505,7 +507,10 @@ export class TrackQueryService {
 		this.addSelectLabel(qb);
 		this.addSelectAudioFile(qb);
 		this.addSelectFileAndPeak(qb);
+
 		this.addSelectTrackArtist(qb);
+		this.addSelectTrackContributor(qb);
+
 		this.addSelectTrackLanguage(qb);
 		this.addSelectMetadataLanguage(qb);
 		this.addSelectAudioLanguage(qb);
@@ -828,7 +833,7 @@ export class TrackQueryService {
 				.addSelect([
 					'trackArtist.id',
 					'trackArtist.artistId',
-					'trackArtist.artistId',
+					'trackArtist.createdAt',
 					// 'trackArtist.artistRoleId',
 				])
 
@@ -864,6 +869,7 @@ export class TrackQueryService {
 					'trackContributor.id',
 					'trackContributor.artistId',
 					'trackContributor.artistRoleId',
+					'trackContributor.createdAt',
 				])
 
 				// role
