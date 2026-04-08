@@ -244,7 +244,7 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		await this.releaseService.submit(id, userId, dto);
+		await this.releaseService.submit2(id, userId, dto);
 
 		return new ResponseSuccess({
 			messageCode: 'common.processing',

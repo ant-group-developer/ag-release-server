@@ -21,7 +21,7 @@ export class ReleaseExecutionStep extends BaseUUIDEntity {
     status: StepStatus;
 
     @Column({ type: 'int', default: 0 })
-    sortOrder: number;
+    order: number;
 
     // Phục vụ tracking, nếu step này lấy metadata chung của Aggregator (ví dụ CI)
     @Column({ name: 'aggregator_id', type: 'uuid', nullable: true })

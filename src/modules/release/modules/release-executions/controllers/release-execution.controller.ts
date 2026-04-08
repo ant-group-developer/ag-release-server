@@ -26,9 +26,29 @@ export class ReleaseExecutionController {
         return new ResponseSuccess({ message: 'Execution processed successfully' });
     }
 
+    @Post(':id/prepareExecutionPlan')
+    async prepareExecutionPlan(@Param('id', ParseUUIDPipe) id: string) {
+        // Thực tế hàm này sẽ được BullMQ gọi ngầm, nhưng ta viết endpoint tạm để test
+        await this.processorService.prepareExecutionPlan(id);
+        return new ResponseSuccess({ message: 'Execution processed successfully' });
+    }
+
+    @Post(':id/runExecutionPlan')
+    async runExecutionPlan(@Param('id', ParseUUIDPipe) id: string) {
+        // Thực tế hàm này sẽ được BullMQ gọi ngầm, nhưng ta viết endpoint tạm để test
+        await this.processorService.runExecutionPlan(id);
+        return new ResponseSuccess({ message: 'Execution processed successfully' });
+    }
+
     @Get()
     async getList(@Query() query: QueryGetListReleaseExecutionDto) {
         const result = await this.executionsService.getList(query);
+        return new ResponseSuccess({ data: result });
+    }
+
+    @Get(':id/release-execution-dsp')
+    async getExecutionDsps(@Param('id', ParseUUIDPipe) id: string) {
+        const result = await this.executionsService.getExecutionDsps(id);
         return new ResponseSuccess({ data: result });
     }
 
