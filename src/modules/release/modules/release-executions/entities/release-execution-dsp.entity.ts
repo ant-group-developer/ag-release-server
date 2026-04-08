@@ -14,12 +14,12 @@ export class ReleaseExecutionDsp extends BaseUUIDEntity {
     @JoinColumn({ name: 'execution_id' })
     execution: ReleaseExecution;
 
-    @Column({ name: 'dsp_id', type: 'varchar', length: 10 })
-    dspId: string;
+    @Column({ name: 'dsp_id', type: 'varchar', length: 10, nullable: true })
+    dspId: string | null;
 
-    @ManyToOne(() => Dsp, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Dsp, { onDelete: 'CASCADE', nullable: true })
     @JoinColumn({ name: 'dsp_id' })
-    dsp: Dsp;
+    dsp: Dsp | null;
 
     @Column({ type: 'enum', enum: ExecutionStatus, default: ExecutionStatus.QUEUED })
     status: ExecutionStatus;

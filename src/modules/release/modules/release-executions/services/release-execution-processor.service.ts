@@ -44,9 +44,6 @@ export class ReleaseExecutionProcessorService {
         await this.runExecutionPlan(executionId);
     }
 
-    /**
-     * Hàm 1: Chuẩn bị Execution Plan (Dựng tất cả trạng thái và checklist vào DB)
-     */
     async prepareExecutionPlan(executionId: string) {
         const execution = await this.manager.findOne(ReleaseExecution, { where: { id: executionId } });
         if (!execution || execution.status !== ExecutionStatus.QUEUED || !execution.originalDspCodes) return;
@@ -62,52 +59,109 @@ export class ReleaseExecutionProcessorService {
             relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
         });
 
+
+
+        // ExecDsp cho các step tổng (general steps) với dspId = null
+        const generalExecDspDoc = this.manager.create(ReleaseExecutionDsp, {
+            executionId,
+            dspId: null as any,
+            status: ExecutionStatus.QUEUED
+        });
+
         // ==========================================
-        // BƯỚC 1: TẠO SẴN TOÀN BỘ CÁC TRẠNG THÁI CON (DSP) TRÊN DATABASE VỚI STATUS QUEUED
+        // TẠO SẴN TOÀN BỘ CÁC TRẠNG THÁI CON (DSP) TRÊN DATABASE VỚI STATUS QUEUED
         // ==========================================
         const execDspsDocs = dsps.map(dsp => this.manager.create(ReleaseExecutionDsp, {
             executionId,
             dspId: dsp.id,
             status: ExecutionStatus.QUEUED
         }));
-        const insertedDsps = await this.manager.save(ReleaseExecutionDsp, execDspsDocs);
-        const execDsps = insertedDsps.map((doc, index) => ({ execDsp: doc, dspOrig: dsps[index] }));
+        
+        const insertedDsps = await this.manager.save(ReleaseExecutionDsp, [...execDspsDocs, generalExecDspDoc]);
+        
+        const generalExecDsp = insertedDsps.find(d => !d.dspId)!;
+        const execDsps = insertedDsps.filter(d => Boolean(d.dspId)).map(doc => ({
+            execDsp: doc,
+            dspOrig: dsps.find(d => d.id === doc.dspId)!
+        }));
 
         // ==========================================
         // BƯỚC 2: DỰNG TRƯỚC TOÀN BỘ CHECKLIST (STEPS) VÀO DB VỚI TRẠNG THÁI PENDING
-        // Tính độc lập: Mỗi DSP tự build full luồng của riêng mình
         // ==========================================
-        let order = 1;
         const stepsToInsert: ReleaseExecutionStep[] = [];
+        let generalOrder = 1;
 
-        const pushStep = (params: { execDspId: string, aggregatorId: string | null, stepType: StepType, order: number, status?: StepStatus }) => {
+        const pushGeneralStep = (stepType: StepType, aggregatorId: string | null = null) => {
             stepsToInsert.push(this.manager.create(ReleaseExecutionStep, {
-                executionDspId: params.execDspId,
-                aggregatorId: params.aggregatorId,
-                stepType: params.stepType,
-                order: params.order,
-                status: params.status || StepStatus.PENDING
+                executionDspId: generalExecDsp.id,
+                aggregatorId,
+                stepType,
+                order: generalOrder++,
+                status: StepStatus.PENDING
             }));
         };
 
+        let hasErn43 = false;
+        let hasErn383 = false;
+        let hasCi = false;
+        let hasSftp = false;
+        let hasSftpCi = false;
+
+        for (const item of execDsps) {
+            try {
+                const fullConfig = await this.dspRoutingService.resolveFullDeliveryConfig(item.dspOrig.code);
+                
+                if (fullConfig.ernVersion === ErnVersion.ERN_43) hasErn43 = true;
+                if (String(fullConfig.ernVersion) === '3.8.3' || fullConfig.ernVersion === ErnVersion.ERN_382) hasErn383 = true;
+
+                if (fullConfig.isCI) {
+                    hasCi = true;
+                    hasSftpCi = true;
+                } else if (fullConfig.sftp) {
+                    // Nếu là sftp thường
+                    hasSftp = true;
+                }
+            } catch (e) {
+                this.logger.warn(`Could not resolve full config for DSP ${item.dspOrig.code}`);
+            }
+        }
+
+        // Đẩy các step tổng
+        pushGeneralStep(StepType.GENERATE_UPC);
+        pushGeneralStep(StepType.GENERATE_ISRC);
+
+        if (hasErn43) pushGeneralStep(StepType.CREATE_METADATA_ERN_4_3);
+        if (hasErn383) pushGeneralStep(StepType.CREATE_METADATA_ERN_3_8_3);
+        if (hasCi) pushGeneralStep(StepType.CREATE_METADATA_CI);
+        
+        if (hasSftp) pushGeneralStep(StepType.UPLOAD_SFTP);
+        if (hasSftpCi) pushGeneralStep(StepType.UPLOAD_SFTP_CI);
+        if (hasCi) pushGeneralStep(StepType.CREATE_DONE_FOLDER);
+
+        // Đẩy các step riêng biệt cho từng DSP
         for (const item of execDsps) {
             const config = item.dspOrig.dspRoutingConfig;
             const aggregatorId = config?.mode === RoutingModeEnum.AGGREGATOR && config.aggregator ? config.aggregator.id : null;
             const aggCode = config?.aggregator?.code;
 
-            // Mọi DSP đều cần sinh metadata và upload
-            pushStep({ execDspId: item.execDsp.id, aggregatorId, stepType: StepType.CREATE_METADATA, order: order++ });
-            pushStep({ execDspId: item.execDsp.id, aggregatorId, stepType: StepType.UPLOAD_SFTP, order: order++ });
+            let dspOrder = 1;
+            const pushDspStep = (stepType: StepType) => {
+                stepsToInsert.push(this.manager.create(ReleaseExecutionStep, {
+                    executionDspId: item.execDsp.id,
+                    aggregatorId,
+                    stepType,
+                    order: dspOrder++,
+                    status: StepStatus.PENDING
+                }));
+            };
 
             // Nếu phân phối qua CI -> Tùy theo hasDeal mà nảy sinh các step thủ công
             if (config?.mode === RoutingModeEnum.AGGREGATOR && aggCode === 'CI') {
-                pushStep({ execDspId: item.execDsp.id, aggregatorId: null, stepType: StepType.POST_UPLOAD_HOOK, order: order++ });
-
                 if (!item.dspOrig.hasDeal) {
-                    pushStep({ execDspId: item.execDsp.id, aggregatorId: null, stepType: StepType.EXPORT_EXCEL, order: order++ });
-                    pushStep({ execDspId: item.execDsp.id, aggregatorId: null, stepType: StepType.SEND_EMAIL, order: order++ });
+                    pushDspStep(StepType.EXPORT_EXCEL);
+                    pushDspStep(StepType.SEND_EMAIL_EXPORT);
                 } else {
-                    pushStep({ execDspId: item.execDsp.id, aggregatorId: null, stepType: StepType.WAITING_EXPORT, order: order++ });
+                    pushDspStep(StepType.WAITING_EXPORT);
                 }
             }
         }
@@ -127,6 +181,13 @@ export class ReleaseExecutionProcessorService {
         const execDsps = await this.manager.find(ReleaseExecutionDsp, {
             where: { executionId },
             relations: ['steps'],
+        });
+
+        // Đảm bảo step tổng (dspId === null) chạy đầu tiên
+        execDsps.sort((a, b) => {
+            if (a.dspId === null) return -1;
+            if (b.dspId === null) return 1;
+            return 0;
         });
 
         let failedCount = 0;
@@ -224,83 +285,34 @@ export class ReleaseExecutionProcessorService {
         if (!execDsp) throw new Error(`Không tìm thấy ExecutionDsp ${step.executionDspId}`);
 
         const releaseId = execDsp.execution.releaseId;
-        const dspCode = execDsp.dsp.code;
+        const dspCode = execDsp.dsp?.code;
 
         switch (step.stepType) {
-            case StepType.CREATE_METADATA: {
-                // Resolve config của DSP này từ DB
-                const config = await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
-
-                // Tạo metadata (XML + audio + image) trên server
-                const { outputDir, batchId } = await this.releaseDdexService.createMetadataOnServer({
-                    releaseId,
-                    ernVersion: config.ernVersion as ErnVersion,
-                    sender: config.sender,
-                    recipient: config.recipient,
-                });
-
-                // Lưu lại context vào step metadata (KHÔNG lưu thông tin nhạy cảm như SFTP credentials)
-                await this.manager.update(ReleaseExecutionStep, step.id, {
-                    metadata: {
-                        releaseId,
-                        dspCode,
-                        outputDir,
-                        batchId,
-                        createsDoneFolder: config.createsDoneFolder ?? false,
-                    } as Record<string, any>,
-                });
-
-                this.logger.log(`[CREATE_METADATA] DSP: ${dspCode} | outputDir: ${outputDir}`);
+            case StepType.GENERATE_UPC:
+            case StepType.GENERATE_ISRC: {
+                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
+                // TODO: Triển khai logic gen UPC/ISRC
                 break;
             }
 
-            case StepType.UPLOAD_SFTP: {
-                // Lấy metadata từ step CREATE_METADATA cùng DSP
-                const metaStep = await this.manager.findOne(ReleaseExecutionStep, {
-                    where: { executionDspId: step.executionDspId, stepType: StepType.CREATE_METADATA },
-                });
-                const meta = metaStep?.metadata;
-                if (!meta?.outputDir || !meta?.dspCode) {
-                    throw new Error(`Thiếu metadata từ step CREATE_METADATA của DSP ${dspCode}`);
-                }
-
-                // Resolve SFTP config tươi từ DB (không lưu credentials vào metadata)
-                const config = await this.dspRoutingService.resolveFullDeliveryConfig(meta.dspCode);
-
-                // Upload lên SFTP (retry đã được xử lý bởi runStepLogic)
-                await this.sftpConnectService.uploadFolder({
-                    sftp: config.sftp,
-                    localDir: meta.outputDir,
-                    remoteDir: config.sftp.path ?? '/',
-                });
-
-                this.logger.log(`[UPLOAD_SFTP] DSP: ${dspCode} | Upload thành công`);
+            case StepType.CREATE_METADATA_ERN_4_3:
+            case StepType.CREATE_METADATA_ERN_3_8_3:
+            case StepType.CREATE_METADATA_CI: {
+                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
+                // TODO: Triển khai logic tạo metadata chung
                 break;
             }
 
-            case StepType.POST_UPLOAD_HOOK: {
-                // Lấy metadata từ step CREATE_METADATA cùng DSP
-                const metaStep = await this.manager.findOne(ReleaseExecutionStep, {
-                    where: { executionDspId: step.executionDspId, stepType: StepType.CREATE_METADATA },
-                });
-                const meta = metaStep?.metadata;
+            case StepType.UPLOAD_SFTP:
+            case StepType.UPLOAD_SFTP_CI: {
+                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
+                // TODO: Triển khai logic upload sftp
+                break;
+            }
 
-                // Tạo thư mục .done trên SFTP (dành cho CI aggregator)
-                if (meta?.createsDoneFolder && meta?.batchId && meta?.dspCode) {
-                    const config = await this.dspRoutingService.resolveFullDeliveryConfig(meta.dspCode);
-                    const client = await this.sftpConnectService.connect(config.sftp);
-                    try {
-                        const donePath = path.posix.join(config.sftp.path ?? '/', `${meta.batchId}.done`);
-                        await client.mkdir(donePath, true);
-                        this.logger.log(`[POST_UPLOAD_HOOK] Created .done folder: ${donePath}`);
-                    } finally {
-                        await client.end();
-                    }
-                }
-
-                // Cleanup local files
-                if (meta?.outputDir) await removeFolder(meta.outputDir);
-
+            case StepType.CREATE_DONE_FOLDER: {
+                this.logger.log(`[CREATE_DONE_FOLDER] Release: ${releaseId}`);
+                // TODO: Triển khai logic tạo thư mục .done
                 break;
             }
 
@@ -309,9 +321,9 @@ export class ReleaseExecutionProcessorService {
                 this.logger.log(`[EXPORT_EXCEL] DSP: ${dspCode} - Chưa implement`);
                 break;
 
-            case StepType.SEND_EMAIL:
+            case StepType.SEND_EMAIL_EXPORT:
                 // TODO: Implement email sending
-                this.logger.log(`[SEND_EMAIL] DSP: ${dspCode} - Chưa implement`);
+                this.logger.log(`[SEND_EMAIL_EXPORT] DSP: ${dspCode} - Chưa implement`);
                 break;
 
             case StepType.WAITING_EXPORT:
