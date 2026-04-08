@@ -123,89 +123,32 @@ export class ReleaseExecutionProcessorService {
      * Khi step cuối cùng của 1 DSP xong → DSP đó chuyển COMPLETED
      */
     async runExecutionPlan(executionId: string) {
-        // Kéo flat toàn bộ steps của execution này, sort theo đúng thứ tự đã lên kế hoạch
-        const allSteps = await this.manager.find(ReleaseExecutionStep, {
-            where: { executionDsp: { executionId } },
-            relations: ['executionDsp', 'executionDsp.dsp'],
-            order: { order: 'ASC' },
+        // Kéo toàn bộ DSPs thuộc execution này cùng với list steps của nó
+        const execDsps = await this.manager.find(ReleaseExecutionDsp, {
+            where: { executionId },
+            relations: ['steps'],
         });
 
-        // Đếm tổng số step của từng DSP để biết khi nào nó xong
-        const dspTotalSteps = new Map<string, number>();
-        const dspCompletedSteps = new Map<string, number>();
-        const dspStarted = new Set<string>();
-        const dspFailed = new Set<string>(); // Theo dõi DSP bị lỗi
+        let failedCount = 0;
+        let awaitingCount = 0;
 
-        for (const step of allSteps) {
-            const dspId = step.executionDspId;
-            dspTotalSteps.set(dspId, (dspTotalSteps.get(dspId) || 0) + 1);
-            dspCompletedSteps.set(dspId, 0);
-        }
+        for (const execDsp of execDsps) {
+            // Đảm bảo step chạy đúng order
+            const steps = execDsp.steps.sort((a, b) => a.order - b.order);
+            const status = await this.processDspExecution(execDsp.id, steps);
 
-        // Duyệt tuần tự từng step theo order
-        for (const step of allSteps) {
-            const dspId = step.executionDspId;
-
-            // Bỏ qua nếu DSP này đã bị lỗi ở một step trước đó
-            if (dspFailed.has(dspId)) {
-                continue;
-            }
-
-            const keepPending = step.stepType === StepType.WAITING_EXPORT;
-
-            // Nếu DSP này chưa RUNNING → đẩy lên RUNNING
-            if (!dspStarted.has(dspId)) {
-                dspStarted.add(dspId);
-                await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.RUNNING });
-            }
-
-            try {
-                // Chạy step
-                await this.runStepLogic({
-                    step,
-                    keepPending,
-                    task: () => this.dispatchStepTask(step),
-                });
-            } catch (error) {
-                // Gặp lỗi → Đánh dấu DSP này FAILED và lập tức nhảy qua vòng lặp tiếp theo
-                dspFailed.add(dspId);
-                await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.FAILED });
-                continue;
-            }
-
-            // Đếm step đã xong của DSP này
-            if (!keepPending) {
-                dspCompletedSteps.set(dspId, dspCompletedSteps.get(dspId)! + 1);
-            }
-
-            // Nếu DSP này đã duyệt hết tất cả steps → cập nhật trạng thái cha
-            if (dspCompletedSteps.get(dspId)! + (keepPending ? 1 : 0) === dspTotalSteps.get(dspId)) {
-                if (keepPending) {
-                    // Còn step WAITING → DSP chờ hành động thủ công
-                    await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.AWAITING_ACTION });
-                } else {
-                    // Tất cả step đã xong → DSP hoàn thành
-                    await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.COMPLETED });
-                }
+            if (status === ExecutionStatus.FAILED) {
+                failedCount++;
+            } else if (status === ExecutionStatus.AWAITING_ACTION) {
+                awaitingCount++;
             }
         }
-
-        // Kiểm tra trạng thái cuối để chốt Execution cha
-        const totalDSPs = dspTotalSteps.size;
-        const failedCount = dspFailed.size;
-
-        const awaitingCount = await this.manager.count(ReleaseExecutionDsp, {
-            where: { executionId, status: ExecutionStatus.AWAITING_ACTION }
-        });
 
         let finalStatus = ExecutionStatus.COMPLETED;
-        if (failedCount === totalDSPs && totalDSPs > 0) {
+
+        if (failedCount > 0) {
             finalStatus = ExecutionStatus.FAILED;
-        } else if (failedCount > 0) {
-            finalStatus = ExecutionStatus.PARTIALLY_COMPLETED;
-        }
-        
-        if (awaitingCount > 0) {
+        } else if (awaitingCount > 0) {
             finalStatus = ExecutionStatus.AWAITING_ACTION;
         }
 
@@ -214,6 +157,58 @@ export class ReleaseExecutionProcessorService {
             status: finalStatus,
             completedAt: finalStatus !== ExecutionStatus.AWAITING_ACTION ? new Date() : undefined 
         });
+    }
+
+    /** 
+     * Xử lý trọn gói toàn bộ bước của 1 DSP 
+     */
+    private async processDspExecution(dspId: string, steps: ReleaseExecutionStep[]): Promise<ExecutionStatus> {
+        // Bật DSP sang RUNNING
+        await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.RUNNING });
+
+        let keepPendingCount = 0;
+
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const keepPending = step.stepType === StepType.WAITING_EXPORT;
+
+            try {
+                // Chạy step
+                await this.runStepLogic({
+                    step,
+                    keepPending,
+                    task: () => this.dispatchStepTask(step),
+                });
+
+                if (keepPending) {
+                    keepPendingCount++;
+                }
+            } catch (error) {
+                // Nếu 1 step bị lỗi -> DSP cha báo lỗi
+                await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.FAILED });
+                
+                // SKIPPED toàn bộ các step còn sót lại chưa chạy của DSP này
+                const remainingStepsIds = steps.slice(i + 1).map(s => s.id);
+                if (remainingStepsIds.length > 0) {
+                    await this.manager.createQueryBuilder()
+                        .update(ReleaseExecutionStep)
+                        .set({ status: StepStatus.SKIPPED })
+                        .whereInIds(remainingStepsIds)
+                        .execute();
+                }
+
+                return ExecutionStatus.FAILED;
+            }
+        }
+
+        // Kiểm tra sau khi chạy xong step để báo COMPLETED hay AWAITING_ACTION
+        if (keepPendingCount > 0) {
+            await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.AWAITING_ACTION });
+            return ExecutionStatus.AWAITING_ACTION;
+        } else {
+            await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.COMPLETED });
+            return ExecutionStatus.COMPLETED;
+        }
     }
 
     /** 
@@ -326,30 +321,6 @@ export class ReleaseExecutionProcessorService {
 
     // --- CÁC HÀM TIỆN ÍCH DƯỚI ĐÂY LÀ ĐỂ VỪA CHẠY VỪA NHÉT LOG VÀO DB --- //
 
-    private async saveDspTracking(params: { executionId: string, dsp: Dsp, status: ExecutionStatus }) {
-        const doc = this.manager.create(ReleaseExecutionDsp, {
-            executionId: params.executionId,
-            dspId: params.dsp.id,
-            status: params.status, 
-        });
-        return this.manager.save(ReleaseExecutionDsp, doc);
-    }
-
-    private async updateDspStatus(params: { dspId: string, status: ExecutionStatus }) {
-        await this.manager.update(ReleaseExecutionDsp, params.dspId, { status: params.status });
-    }
-
-    private async saveStepTracking(params: { execDspId: string, aggregatorId: string | null, stepType: StepType, order: number, status?: StepStatus }) {
-        const step = this.manager.create(ReleaseExecutionStep, {
-            executionDspId: params.execDspId, 
-            aggregatorId: params.aggregatorId, 
-            stepType: params.stepType, 
-            order: params.order,
-            status: params.status || StepStatus.PENDING 
-        });
-        return this.manager.save(ReleaseExecutionStep, step);
-    }
-
     private async runStepLogic(params: {
         step: ReleaseExecutionStep, 
         task: () => Promise<void>,
@@ -408,36 +379,4 @@ export class ReleaseExecutionProcessorService {
         throw lastError; 
     }
 
-    /** Cập nhật DB và Chạy Code Logic cho 1 Nhóm Step (CI) */
-    private async runGroupStepLogic(params: {
-        steps: ReleaseExecutionStep[], 
-        task: () => Promise<void>
-    }) {
-        const { steps, task } = params;
-        await Promise.all(steps.map(step => {
-            return this.manager.update(ReleaseExecutionStep, step.id, {
-                status: StepStatus.RUNNING,
-                startedAt: new Date(),
-            });
-        }));
-
-        try {
-            await task(); 
-            await Promise.all(steps.map(step => {
-                return this.manager.update(ReleaseExecutionStep, step.id, {
-                    status: StepStatus.SUCCESS,
-                    completedAt: new Date(),
-                });
-            }));
-        } catch (error) {
-            await Promise.all(steps.map(step => {
-                return this.manager.update(ReleaseExecutionStep, step.id, {
-                    status: StepStatus.FAILED,
-                    logs: String(error),
-                    completedAt: new Date(),
-                });
-            }));
-            throw error;
-        }
-    }
 }
