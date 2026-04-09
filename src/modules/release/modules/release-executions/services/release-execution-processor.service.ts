@@ -18,6 +18,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { removeFolder } from 'src/utils/util';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
+import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
+import { Release } from 'src/modules/release/entities/release.entity';
 
 @Injectable()
 export class ReleaseExecutionProcessorService {
@@ -58,12 +60,18 @@ export class ReleaseExecutionProcessorService {
         const execution = await this.manager.findOne(ReleaseExecution, { where: { id: executionId } });
         if (!execution || execution.status !== ExecutionStatus.QUEUED || !execution.originalDspCodes) return;
 
-        // Báo hiệu đang chạy
+        // Bật Execution sang RUNNING
         await this.manager.update(ReleaseExecution, executionId, { 
-            status: ExecutionStatus.RUNNING, 
+            status: ExecutionStatus.RUNNING,
             startedAt: new Date() 
         });
-        
+
+        // SYNC: Cập nhật Release sang PROCESSING
+        const initialExec = await this.manager.findOne(ReleaseExecution, { where: { id: executionId } });
+        if (initialExec?.releaseId) {
+            await this.manager.update(Release, initialExec.releaseId, { status: ReleaseStatus.PROCESSING });
+        }
+
         const dsps = await this.manager.find(Dsp, {
             where: { code: In(execution.originalDspCodes) },
             relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
@@ -231,6 +239,25 @@ export class ReleaseExecutionProcessorService {
             status: finalStatus,
             completedAt: finalStatus !== ExecutionStatus.AWAITING_ACTION ? new Date() : undefined 
         });
+
+        // SYNC: Cập nhật Release status cuối cùng
+        const finalExec = await this.manager.findOne(ReleaseExecution, { where: { id: executionId } });
+        if (finalExec?.releaseId) {
+            let releaseStatus = ReleaseStatus.DISTRIBUTED;
+            const totalDsps = execDsps.filter(d => d.dspId !== null).length;
+            
+            if (failedCount > 0) {
+                if (failedCount >= totalDsps) {
+                    releaseStatus = ReleaseStatus.FAILED;
+                } else {
+                    releaseStatus = ReleaseStatus.PARTIALLY_FAILED;
+                }
+            } else if (awaitingCount > 0) {
+                releaseStatus = ReleaseStatus.AWAITING_ACTION;
+            }
+
+            await this.manager.update(Release, finalExec.releaseId, { status: releaseStatus });
+        }
     }
 
     /** 
@@ -669,7 +696,7 @@ export class ReleaseExecutionProcessorService {
         // Hết số lần retry → FAILED
         await this.manager.update(ReleaseExecutionStep, step.id, {
             status: StepStatus.FAILED,
-            logs: String(lastError),
+            logs: lastError?.stack || lastError?.message || String(lastError),
             completedAt: new Date(),
         });
         throw lastError; 

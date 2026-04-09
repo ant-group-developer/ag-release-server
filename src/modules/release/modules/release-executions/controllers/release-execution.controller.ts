@@ -21,6 +21,22 @@ export class ReleaseExecutionController {
         return new ResponseSuccess({ data: result });
     }
 
+    @Post('manual-export/bulk-download')
+    async bulkDownload(
+        @Body() body: { ids: string[] },
+        @Res() res: Response
+    ) {
+        const { buffer, fileName } = await this.executionsService.getBulkManualExportBuffer(body.ids);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Length': buffer.length,
+        });
+
+        res.send(buffer);
+    }
+
     @Post('manual-export/bulk-download-and-mark-completed')
     async bulkDownloadAndMarkCompleted(
         @Body() body: { ids: string[] },

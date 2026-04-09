@@ -477,7 +477,7 @@ export class ReleaseService {
 
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
 			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
+				status: ReleaseStatus.FAILED,
 			});
 
 			this.releaseLogService.failed({
@@ -492,7 +492,7 @@ export class ReleaseService {
 
 	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
+		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED });
 		this.releaseExecutionsService.createAndProcess({releaseId: id, type: ExecutionType.INITIAL_RELEASE, originalDspCodes: dto.code, triggeredById: userId}).catch((_e) => {this.logger.error(_e)})
 	}
 
@@ -543,7 +543,7 @@ export class ReleaseService {
 			});
 		} else {
 			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
+				status: ReleaseStatus.FAILED,
 			});
 		}
 	}

@@ -13,6 +13,8 @@ import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
+import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
+import { Release } from 'src/modules/release/entities/release.entity';
 
 @Injectable()
 export class ReleaseExecutionsService {
@@ -36,6 +38,12 @@ export class ReleaseExecutionsService {
     // Lưu ý: Việc Create phức tạp kèm các Step nên được uỷ quyền cho 1 Class riêng là ExecutionPlanner xử lý
     async createAndProcess(data: Partial<ReleaseExecution>) {
         const newExecution = await this.create(data)
+
+        // SYNC: Cập nhật Release sang PROCESSING
+        if (newExecution.releaseId) {
+            await this.manager.update(Release, newExecution.releaseId, { status: ReleaseStatus.PROCESSING });
+        }
+
         await this.releaseExecutionProcessorService.processQueueItem(newExecution.id)
         return newExecution
     }
