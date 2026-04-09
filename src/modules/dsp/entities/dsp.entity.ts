@@ -66,6 +66,14 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	isActive: boolean;
 
+	@Column({
+		name: 'has_deal',
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu có deal với CI hay chưa',
+	})
+	hasDeal: boolean;
+
 	@Column('varchar', {
 		array: true,
 		nullable: false,

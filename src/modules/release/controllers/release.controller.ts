@@ -29,7 +29,6 @@ import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
-import { AppResponseSuccess } from 'src/app.const';
 import {
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
@@ -245,7 +244,7 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		await this.releaseService.submit(id, userId, dto);
+		await this.releaseService.submit2(id, userId, dto);
 
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
@@ -260,7 +259,7 @@ export class ReleaseController {
 	): Promise<ResponseSuccess<any>> {
 		const userId = req.user!.sub;
 
-		const result = await this.releaseService.genUpc(id);
+		const result = await this.releaseService.genUpcById(id);
 
 		return new ResponseSuccess({
 			data: result,
