@@ -53,6 +53,12 @@ export class ReleaseExecutionController {
         res.send(buffer);
     }
 
+    @Post('manual-export/bulk-mark-completed')
+    async bulkMarkCompleted(@Body() body: { ids: string[] }) {
+        await this.executionsService.bulkMarkManualExportAsCompleted(body.ids);
+        return new ResponseSuccess({ message: 'Marked as completed' });
+    }
+
     @Post(':id/process')
     async triggerProcess(@Param('id', ParseUUIDPipe) id: string) {
         // Thực tế hàm này sẽ được BullMQ gọi ngầm, nhưng ta viết endpoint tạm để test
