@@ -1,18 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
-import { EntityManager, In } from 'typeorm';
+import { ReleaseService } from 'src/modules/release/services/release.service';
+import { ReleaseQueryService } from 'src/modules/release/services/release.query.service';
+import { EntityManager, In, IsNull } from 'typeorm';
 import { ReleaseExecutionDsp } from '../entities/release-execution-dsp.entity';
 import { ReleaseExecutionStep } from '../entities/release-execution-step.entity';
 import { ReleaseExecution } from '../entities/release-execution.entity';
 import { ExecutionStatus, StepStatus, StepType } from '../enum/release-execution.enum';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import * as path from 'path';
+import * as fs from 'fs';
 import { removeFolder } from 'src/utils/util';
+import { NotificationService } from 'src/modules/notification/services/notification.service';
 
 @Injectable()
 export class ReleaseExecutionProcessorService {
@@ -22,8 +27,13 @@ export class ReleaseExecutionProcessorService {
         @InjectEntityManager()
         private readonly manager: EntityManager,
         private readonly releaseDdexService: ReleaseDdexService,
+
+        @Inject(forwardRef(() => ReleaseService))
+        private readonly releaseService: ReleaseService,
+
         private readonly dspRoutingService: DspRoutingConfigsService,
         private readonly sftpConnectService: SftpConnectService,
+        private readonly notificationService: NotificationService,
     ) {}
 
     /**
@@ -59,25 +69,27 @@ export class ReleaseExecutionProcessorService {
             relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
         });
 
-
-
         // ExecDsp cho các step tổng (general steps) với dspId = null
+        const now = new Date();
         const generalExecDspDoc = this.manager.create(ReleaseExecutionDsp, {
             executionId,
-            dspId: null as any,
-            status: ExecutionStatus.QUEUED
+            dspId: null,
+            status: ExecutionStatus.QUEUED,
+            createdAt: now,
         });
 
         // ==========================================
         // TẠO SẴN TOÀN BỘ CÁC TRẠNG THÁI CON (DSP) TRÊN DATABASE VỚI STATUS QUEUED
         // ==========================================
+        const dspCreatedAt = new Date(now.getTime() + 1); // +1ms để đảm bảo thứ tự
         const execDspsDocs = dsps.map(dsp => this.manager.create(ReleaseExecutionDsp, {
             executionId,
             dspId: dsp.id,
-            status: ExecutionStatus.QUEUED
+            status: ExecutionStatus.QUEUED,
+            createdAt: dspCreatedAt,
         }));
         
-        const insertedDsps = await this.manager.save(ReleaseExecutionDsp, [...execDspsDocs, generalExecDspDoc]);
+        const insertedDsps = await this.manager.save(ReleaseExecutionDsp, [generalExecDspDoc, ...execDspsDocs]);
         
         const generalExecDsp = insertedDsps.find(d => !d.dspId)!;
         const execDsps = insertedDsps.filter(d => Boolean(d.dspId)).map(doc => ({
@@ -101,48 +113,18 @@ export class ReleaseExecutionProcessorService {
             }));
         };
 
-        let hasErn43 = false;
-        let hasErn383 = false;
-        let hasCi = false;
-        let hasSftp = false;
-        let hasSftpCi = false;
-
-        for (const item of execDsps) {
-            try {
-                const fullConfig = await this.dspRoutingService.resolveFullDeliveryConfig(item.dspOrig.code);
-                
-                if (fullConfig.ernVersion === ErnVersion.ERN_43) hasErn43 = true;
-                if (String(fullConfig.ernVersion) === '3.8.3' || fullConfig.ernVersion === ErnVersion.ERN_382) hasErn383 = true;
-
-                if (fullConfig.isCI) {
-                    hasCi = true;
-                    hasSftpCi = true;
-                } else if (fullConfig.sftp) {
-                    // Nếu là sftp thường
-                    hasSftp = true;
-                }
-            } catch (e) {
-                this.logger.warn(`Could not resolve full config for DSP ${item.dspOrig.code}`);
-            }
-        }
-
-        // Đẩy các step tổng
+        // Đẩy các step tổng (chung cho cả release)
         pushGeneralStep(StepType.GENERATE_UPC);
         pushGeneralStep(StepType.GENERATE_ISRC);
 
-        if (hasErn43) pushGeneralStep(StepType.CREATE_METADATA_ERN_4_3);
-        if (hasErn383) pushGeneralStep(StepType.CREATE_METADATA_ERN_3_8_3);
-        if (hasCi) pushGeneralStep(StepType.CREATE_METADATA_CI);
-        
-        if (hasSftp) pushGeneralStep(StepType.UPLOAD_SFTP);
-        if (hasSftpCi) pushGeneralStep(StepType.UPLOAD_SFTP_CI);
-        if (hasCi) pushGeneralStep(StepType.CREATE_DONE_FOLDER);
+        // Đẩy các step riêng biệt cho từng DSP + step tổng CI (nếu có)
+        let ciGeneralStepsPushed = false;
 
-        // Đẩy các step riêng biệt cho từng DSP
         for (const item of execDsps) {
             const config = item.dspOrig.dspRoutingConfig;
             const aggregatorId = config?.mode === RoutingModeEnum.AGGREGATOR && config.aggregator ? config.aggregator.id : null;
             const aggCode = config?.aggregator?.code;
+            const isCI = config?.mode === RoutingModeEnum.AGGREGATOR && aggCode === 'CI';
 
             let dspOrder = 1;
             const pushDspStep = (stepType: StepType) => {
@@ -155,14 +137,26 @@ export class ReleaseExecutionProcessorService {
                 }));
             };
 
-            // Nếu phân phối qua CI -> Tùy theo hasDeal mà nảy sinh các step thủ công
-            if (config?.mode === RoutingModeEnum.AGGREGATOR && aggCode === 'CI') {
+            if (isCI) {
+                // Push các step tổng CI 1 lần duy nhất
+                if (!ciGeneralStepsPushed) {
+                    pushGeneralStep(StepType.CREATE_METADATA_CI);
+                    pushGeneralStep(StepType.UPLOAD_SFTP_CI);
+                    pushGeneralStep(StepType.CREATE_DONE_FOLDER);
+                    ciGeneralStepsPushed = true;
+                }
+
+                // === Luồng CI ===
                 if (!item.dspOrig.hasDeal) {
                     pushDspStep(StepType.EXPORT_EXCEL);
                     pushDspStep(StepType.SEND_EMAIL_EXPORT);
                 } else {
                     pushDspStep(StepType.WAITING_EXPORT);
                 }
+            } else {
+                // === Luồng Direct ===
+                pushDspStep(StepType.CREATE_METADATA_ERN);
+                pushDspStep(StepType.UPLOAD_SFTP);
             }
         }
 
@@ -194,12 +188,31 @@ export class ReleaseExecutionProcessorService {
         let awaitingCount = 0;
 
         for (const execDsp of execDsps) {
-            // Đảm bảo step chạy đúng order
+            const isGeneral = execDsp.dspId === null;
             const steps = execDsp.steps.sort((a, b) => a.order - b.order);
             const status = await this.processDspExecution(execDsp.id, steps);
 
             if (status === ExecutionStatus.FAILED) {
                 failedCount++;
+
+                // Nếu bước tổng fail → dừng toàn bộ, skip tất cả DSP còn lại
+                if (isGeneral) {
+                    const remainingExecDsps = execDsps.filter(d => d.dspId !== null);
+                    for (const remaining of remainingExecDsps) {
+                        await this.manager.update(ReleaseExecutionDsp, remaining.id, { status: ExecutionStatus.FAILED });
+                        const pendingStepIds = remaining.steps
+                            .filter(s => s.status === StepStatus.PENDING)
+                            .map(s => s.id);
+                        if (pendingStepIds.length > 0) {
+                            await this.manager.createQueryBuilder()
+                                .update(ReleaseExecutionStep)
+                                .set({ status: StepStatus.SKIPPED })
+                                .whereInIds(pendingStepIds)
+                                .execute();
+                        }
+                    }
+                    break;
+                }
             } else if (status === ExecutionStatus.AWAITING_ACTION) {
                 awaitingCount++;
             }
@@ -221,11 +234,52 @@ export class ReleaseExecutionProcessorService {
     }
 
     /** 
-     * Xử lý trọn gói toàn bộ bước của 1 DSP 
+     * Xử lý trọn gói toàn bộ bước của 1 ExecDsp (chung hoặc riêng DSP)
      */
-    private async processDspExecution(dspId: string, steps: ReleaseExecutionStep[]): Promise<ExecutionStatus> {
-        // Bật DSP sang RUNNING
-        await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.RUNNING });
+    private async processDspExecution(execDspId: string, steps: ReleaseExecutionStep[]): Promise<ExecutionStatus> {
+        // Nếu tất cả step đã xong (SUCCESS/SKIPPED) thì không chạy lại logic, chỉ trả về trạng thái
+        const allDone = steps.every(s => s.status === StepStatus.SUCCESS || s.status === StepStatus.SKIPPED);
+        if (allDone) {
+            return ExecutionStatus.COMPLETED;
+        }
+
+        // Nếu có ít nhất 1 step đang WAITING_ACTION, báo hiệu DSP này vẫn đang chờ
+        const hasAwaiting = steps.some(s => s.status === StepStatus.WAITING_ACTION);
+        if (hasAwaiting) {
+            return ExecutionStatus.AWAITING_ACTION;
+        }
+
+        // Bật ExecDsp sang RUNNING
+        await this.manager.update(ReleaseExecutionDsp, execDspId, { status: ExecutionStatus.RUNNING });
+
+        // SYNC LEGACY: Cập nhật sang PROCESSING
+        const initialExecDsp = await this.manager.findOne(ReleaseExecutionDsp, { 
+            where: { id: execDspId },
+            relations: ['execution']
+        });
+        if (initialExecDsp && initialExecDsp.dspId) {
+            const data = {
+                status: ReleaseDspStatus.PROCESSING,
+                lastEnqueuedAt: new Date(),
+                lastDeliveredAt: null as Date | null,
+                isSelected: true,
+            };
+            const existed = await this.manager.findOne(ReleaseDspDelivery, { 
+                where: { releaseId: initialExecDsp.execution.releaseId, dspId: initialExecDsp.dspId } 
+            });
+            if (!existed) {
+                await this.manager.save(ReleaseDspDelivery, { 
+                    releaseId: initialExecDsp.execution.releaseId, 
+                    dspId: initialExecDsp.dspId, 
+                    ...data 
+                });
+            } else {
+                await this.manager.update(ReleaseDspDelivery, 
+                    { releaseId: initialExecDsp.execution.releaseId, dspId: initialExecDsp.dspId }, 
+                    data
+                );
+            }
+        }
 
         let keepPendingCount = 0;
 
@@ -245,10 +299,21 @@ export class ReleaseExecutionProcessorService {
                     keepPendingCount++;
                 }
             } catch (error) {
-                // Nếu 1 step bị lỗi -> DSP cha báo lỗi
-                await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.FAILED });
+                // Nếu 1 step bị lỗi -> ExecDsp cha báo lỗi
+                await this.manager.update(ReleaseExecutionDsp, execDspId, { status: ExecutionStatus.FAILED });
+
+                // SYNC LEGACY: Cập nhật sang ISSUES
+                if (initialExecDsp && initialExecDsp.dspId) {
+                    await this.manager.update(ReleaseDspDelivery, 
+                        { releaseId: initialExecDsp.execution.releaseId, dspId: initialExecDsp.dspId },
+                        { 
+                            status: ReleaseDspStatus.ISSUES,
+                            lastEnqueuedAt: new Date()
+                        }
+                    );
+                }
                 
-                // SKIPPED toàn bộ các step còn sót lại chưa chạy của DSP này
+                // SKIPPED toàn bộ các step còn sót lại chưa chạy
                 const remainingStepsIds = steps.slice(i + 1).map(s => s.id);
                 if (remainingStepsIds.length > 0) {
                     await this.manager.createQueryBuilder()
@@ -264,10 +329,26 @@ export class ReleaseExecutionProcessorService {
 
         // Kiểm tra sau khi chạy xong step để báo COMPLETED hay AWAITING_ACTION
         if (keepPendingCount > 0) {
-            await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.AWAITING_ACTION });
+            await this.manager.update(ReleaseExecutionDsp, execDspId, { status: ExecutionStatus.AWAITING_ACTION });
             return ExecutionStatus.AWAITING_ACTION;
         } else {
-            await this.manager.update(ReleaseExecutionDsp, dspId, { status: ExecutionStatus.COMPLETED });
+            await this.manager.update(ReleaseExecutionDsp, execDspId, { status: ExecutionStatus.COMPLETED });
+
+            // SYNC LEGACY: Cập nhật bảng release_dsp_delivery
+            const execDsp = await this.manager.findOne(ReleaseExecutionDsp, { 
+                where: { id: execDspId },
+                relations: ['execution']
+            });
+            if (execDsp && execDsp.dspId) {
+                await this.manager.update(ReleaseDspDelivery, 
+                    { releaseId: execDsp.execution.releaseId, dspId: execDsp.dspId },
+                    { 
+                        status: ReleaseDspStatus.DISTRIBUTED,
+                        lastDeliveredAt: new Date()
+                    }
+                );
+            }
+
             return ExecutionStatus.COMPLETED;
         }
     }
@@ -280,55 +361,254 @@ export class ReleaseExecutionProcessorService {
         // Load context cần thiết
         const execDsp = await this.manager.findOne(ReleaseExecutionDsp, {
             where: { id: step.executionDspId },
-            relations: ['execution', 'dsp'],
+            relations: ['execution', 'dsp', 'dsp.dspRoutingConfig', 'dsp.dspRoutingConfig.aggregator'],
         });
+        
         if (!execDsp) throw new Error(`Không tìm thấy ExecutionDsp ${step.executionDspId}`);
 
         const releaseId = execDsp.execution.releaseId;
         const dspCode = execDsp.dsp?.code;
 
         switch (step.stepType) {
-            case StepType.GENERATE_UPC:
+            case StepType.GENERATE_UPC: {
+                this.logger.log(`[GENERATE_UPC] Release: ${releaseId}`);
+                await this.releaseService.genUpcById(releaseId);
+                break;
+            }
+
             case StepType.GENERATE_ISRC: {
-                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
-                // TODO: Triển khai logic gen UPC/ISRC
+                this.logger.log(`[GENERATE_ISRC] Release: ${releaseId}`);
+                await this.releaseService.genListIsrcByReleaseId(releaseId);
                 break;
             }
 
-            case StepType.CREATE_METADATA_ERN_4_3:
-            case StepType.CREATE_METADATA_ERN_3_8_3:
+            case StepType.CREATE_METADATA_ERN: {
+                // Resolve config của DSP này (sender, recipient, ernVersion)
+                const config = await this.dspRoutingService.resolveFullDeliveryConfig(dspCode!);
+
+                // Tạo metadata (XML + audio + image) trên server
+                const { outputDir, batchId } = await this.releaseDdexService.createMetadataOnServer({
+                    releaseId,
+                    ernVersion: config.ernVersion,
+                    sender: config.sender,
+                    recipient: config.recipient,
+                });
+
+                // Lưu outputDir + batchId vào step metadata để UPLOAD_SFTP đọc lại
+                await this.manager.update(ReleaseExecutionStep, step.id, {
+                    metadata: { outputDir, batchId, dspCode } as Record<string, any>,
+                });
+
+                this.logger.log(`[CREATE_METADATA_ERN] Release: ${releaseId} | DSP: ${dspCode} | outputDir: ${outputDir}`);
+                break;
+            }
+
             case StepType.CREATE_METADATA_CI: {
-                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
-                // TODO: Triển khai logic tạo metadata chung
+                // Resolve config CI từ 1 DSP bất kỳ thuộc CI (lấy sender/recipient CI)
+                // Tìm 1 execDsp thuộc CI trong cùng execution để lấy dspCode
+                const execution = execDsp.execution;
+                const allExecDsps = await this.manager.find(ReleaseExecutionDsp, {
+                    where: { executionId: execution.id },
+                    relations: ['dsp', 'dsp.dspRoutingConfig', 'dsp.dspRoutingConfig.aggregator'],
+                });
+                const ciDspCode = allExecDsps.find(d => 
+                    d.dsp?.dspRoutingConfig?.mode === RoutingModeEnum.AGGREGATOR && 
+                    d.dsp?.dspRoutingConfig?.aggregator?.code === 'CI'
+                )?.dsp?.code;
+
+                const ciConfig = ciDspCode
+                    ? await this.dspRoutingService.resolveFullDeliveryConfig(ciDspCode)
+                    : null;
+
+                if (!ciConfig) {
+                    throw new Error('Không tìm thấy config CI để tạo metadata');
+                }
+
+                const { outputDir, batchId } = await this.releaseDdexService.createMetadataOnServer({
+                    releaseId,
+                    ernVersion: ciConfig.ernVersion,
+                    sender: ciConfig.sender,
+                    recipient: ciConfig.recipient,
+                });
+
+                await this.manager.update(ReleaseExecutionStep, step.id, {
+                    metadata: { outputDir, batchId, dspCode: ciDspCode } as Record<string, any>,
+                });
+
+                this.logger.log(`[CREATE_METADATA_CI] Release: ${releaseId} | outputDir: ${outputDir}`);
                 break;
             }
 
-            case StepType.UPLOAD_SFTP:
+            case StepType.UPLOAD_SFTP: {
+                // Lấy metadata từ step CREATE_METADATA_ERN cùng DSP
+                const metaStep = await this.manager.findOne(ReleaseExecutionStep, {
+                    where: { executionDspId: step.executionDspId, stepType: StepType.CREATE_METADATA_ERN },
+                });
+                const meta = metaStep?.metadata;
+                if (!meta?.outputDir || !meta?.dspCode) {
+                    throw new Error(`Thiếu metadata từ step CREATE_METADATA_ERN của DSP ${dspCode}`);
+                }
+
+                // Resolve SFTP config từ DB
+                const config = await this.dspRoutingService.resolveFullDeliveryConfig(meta.dspCode);
+
+                await this.sftpConnectService.uploadFolder({
+                    sftp: config.sftp,
+                    localDir: meta.outputDir,
+                    remoteDir: config.sftp.path ?? '/',
+                });
+
+                // Cleanup local
+                await removeFolder(meta.outputDir);
+
+                this.logger.log(`[UPLOAD_SFTP] Release: ${releaseId} | DSP: ${dspCode} | Upload thành công`);
+                break;
+            }
+
             case StepType.UPLOAD_SFTP_CI: {
-                this.logger.log(`[${step.stepType}] Release: ${releaseId}`);
-                // TODO: Triển khai logic upload sftp
+                // Lấy metadata từ step CREATE_METADATA_CI (cùng executionDspId)
+                const metaStep = await this.manager.findOne(ReleaseExecutionStep, {
+                    where: { executionDspId: step.executionDspId, stepType: StepType.CREATE_METADATA_CI },
+                });
+                const meta = metaStep?.metadata;
+                if (!meta?.outputDir || !meta?.dspCode) {
+                    throw new Error('Thiếu metadata từ step CREATE_METADATA_CI');
+                }
+
+                // Resolve config CI từ dspCode đã lưu
+                const config = await this.dspRoutingService.resolveFullDeliveryConfig(meta.dspCode);
+
+                await this.sftpConnectService.uploadFolder({
+                    sftp: config.sftp,
+                    localDir: meta.outputDir,
+                    remoteDir: config.sftp.path ?? '/',
+                });
+
+                // Cleanup local
+                await removeFolder(meta.outputDir);
+
+                this.logger.log(`[UPLOAD_SFTP_CI] Release: ${releaseId} | Upload CI thành công`);
                 break;
             }
 
             case StepType.CREATE_DONE_FOLDER: {
-                this.logger.log(`[CREATE_DONE_FOLDER] Release: ${releaseId}`);
-                // TODO: Triển khai logic tạo thư mục .done
+                // Lấy batchId từ step CREATE_METADATA_CI (cùng executionDspId)
+                const metaStep = await this.manager.findOne(ReleaseExecutionStep, {
+                    where: { executionDspId: step.executionDspId, stepType: StepType.CREATE_METADATA_CI },
+                });
+                const meta = metaStep?.metadata;
+                if (!meta?.batchId) {
+                    throw new Error('Thiếu batchId từ step CREATE_METADATA_CI');
+                }
+
+                // Tạo .done folder trên SFTP CI
+                const ciDsp = await this.findAnyCiDspCode(execDsp.execution.id);
+                if (ciDsp) {
+                    const config = await this.dspRoutingService.resolveFullDeliveryConfig(ciDsp);
+                    const client = await this.sftpConnectService.connect(config.sftp);
+                    try {
+                        const donePath = path.posix.join(config.sftp.path ?? '/', `${meta.batchId}.done`);
+                        await client.mkdir(donePath, true);
+                        this.logger.log(`[CREATE_DONE_FOLDER] Created: ${donePath}`);
+                    } finally {
+                        await client.end();
+                    }
+                }
                 break;
             }
 
-            case StepType.EXPORT_EXCEL:
-                // TODO: Implement CI Excel export
-                this.logger.log(`[EXPORT_EXCEL] DSP: ${dspCode} - Chưa implement`);
-                break;
+            case StepType.EXPORT_EXCEL: {
+                this.logger.log(`[EXPORT_EXCEL] DSP: ${dspCode} | Release: ${releaseId}`);
+                const buffer = await this.releaseService.getFileExportListReleaseCiByDspCode({
+                    ids: [releaseId],
+                    dspCodeCi: [dspCode!],
+                });
 
-            case StepType.SEND_EMAIL_EXPORT:
-                // TODO: Implement email sending
-                this.logger.log(`[SEND_EMAIL_EXPORT] DSP: ${dspCode} - Chưa implement`);
+                const baseDir = process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+                const tempDir = path.join(baseDir, 'temp_exports', releaseId);
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+                const fileName = `Release_${releaseId}_${dspCode}.xlsx`;
+                const filePath = path.join(tempDir, fileName);
+                fs.writeFileSync(filePath, buffer);
+
+                this.logger.log(`[EXPORT_EXCEL] File saved at: ${path.resolve(filePath)}`);
+
+                await this.manager.update(ReleaseExecutionStep, step.id, {
+                    metadata: { filePath, fileName } as Record<string, any>,
+                });
                 break;
+            }
+
+            case StepType.SEND_EMAIL_EXPORT: {
+                // Lấy file path từ step EXPORT_EXCEL trước đó của cùng DSP
+                const exportStep = await this.manager.findOne(ReleaseExecutionStep, {
+                    where: { executionDspId: step.executionDspId, stepType: StepType.EXPORT_EXCEL },
+                });
+                const meta = exportStep?.metadata;
+                if (!meta?.filePath) throw new Error('Không tìm thấy file export để gửi email');
+
+                const aggregator = execDsp.dsp?.dspRoutingConfig?.aggregator;
+                if (!aggregator?.deliveryEmail) {
+                    this.logger.warn(`[SEND_EMAIL_EXPORT] Bỏ qua gửi email cho ${dspCode} vì thiếu deliveryEmail`);
+                    break;
+                }
+
+                const subject = aggregator.deliveryEmailSubject || `[Distribution] Release: ${releaseId} | DSP: ${dspCode}`;
+                const html = `
+                    <p>Dear ${aggregator.name},</p>
+                    <p>A new release has been prepared for distribution to ${dspCode}.</p>
+                    <p>Please find the attached Excel file for your reference.</p>
+                    ${aggregator.manualUploadUrl ? `<p>Manual Upload URL: <a href="${aggregator.manualUploadUrl}">${aggregator.manualUploadUrl}</a></p>` : ''}
+                    <p>Best regards,</p>
+                    <p>Antigravity Music Server</p>
+                `;
+
+                await this.notificationService.sendCustomEmail({
+                    to: [aggregator.deliveryEmail],
+                    subject,
+                    html,
+                    attachments: [
+                        {
+                            filename: meta.fileName || 'distribution_export.xlsx',
+                            path: meta.filePath,
+                        }
+                    ],
+                });
+
+                // Xoá file sau khi gửi xong để tránh rác server
+                if (fs.existsSync(meta.filePath)) {
+                    fs.unlinkSync(meta.filePath);
+                    
+                    // Thử xoá folder release nếu rỗng
+                    const releaseTempDir = path.dirname(meta.filePath);
+                    const files = fs.readdirSync(releaseTempDir);
+                    if (files.length === 0) {
+                        fs.rmdirSync(releaseTempDir);
+                    }
+                }
+
+                this.logger.log(`[SEND_EMAIL_EXPORT] Gửi email thành công tới ${aggregator.deliveryEmail} cho DSP ${dspCode}`);
+                break;
+            }
 
             case StepType.WAITING_EXPORT:
                 break; // Không làm gì, chờ manual action
         }
+    }
+
+    /** Tìm dspCode thuộc CI trong 1 execution */
+    private async findAnyCiDspCode(executionId: string): Promise<string | null> {
+        const allExecDsps = await this.manager.find(ReleaseExecutionDsp, {
+            where: { executionId },
+            relations: ['dsp', 'dsp.dspRoutingConfig', 'dsp.dspRoutingConfig.aggregator'],
+        });
+        for (const d of allExecDsps) {
+            if (d.dsp?.dspRoutingConfig?.mode === RoutingModeEnum.AGGREGATOR && d.dsp?.dspRoutingConfig?.aggregator?.code === 'CI') {
+                return d.dsp.code;
+            }
+        }
+        return null;
     }
 
     // --- CÁC HÀM TIỆN ÍCH DƯỚI ĐÂY LÀ ĐỂ VỪA CHẠY VỪA NHÉT LOG VÀO DB --- //
@@ -340,7 +620,11 @@ export class ReleaseExecutionProcessorService {
         maxRetries?: number,
     }) {
         const { step, task, keepPending, maxRetries = 3 } = params;
-        if (step.status === StepStatus.SKIPPED) return;
+        if (
+            step.status === StepStatus.SKIPPED || 
+            step.status === StepStatus.SUCCESS || 
+            step.status === StepStatus.WAITING_ACTION
+        ) return;
 
         await this.manager.update(ReleaseExecutionStep, step.id, {
             status: StepStatus.RUNNING,

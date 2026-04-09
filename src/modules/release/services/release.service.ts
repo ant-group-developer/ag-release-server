@@ -392,7 +392,7 @@ export class ReleaseService {
 		};
 	}
 
-	async genUpc(releaseId: string) {
+	async genUpcById(releaseId: string) {
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -445,6 +445,24 @@ export class ReleaseService {
 		return newUpc;
 	}
 
+	async genListIsrcByReleaseId(releaseId: string){
+		const release = await this.releaseQueryService.findOneWithRelation(releaseId);
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+	}
+
+	async genListIsrc(release: Release){
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+	}
+	
+
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
@@ -474,10 +492,8 @@ export class ReleaseService {
 
 	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
-
 		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
-
-		this.releaseExecutionsService.createAndProcess({releaseId: id, type: ExecutionType.INITIAL_RELEASE, originalDspCodes: dto.code, triggeredById: userId}).catch((_e) => {})
+		this.releaseExecutionsService.createAndProcess({releaseId: id, type: ExecutionType.INITIAL_RELEASE, originalDspCodes: dto.code, triggeredById: userId}).catch((_e) => {this.logger.error(_e)})
 	}
 
 	private async processingSubmit({
@@ -493,14 +509,10 @@ export class ReleaseService {
 
 		// Gen UPC / ISRC if needed
 		if (!release.upc) {
-			await this.genUpc(id);
+			await this.genUpcById(id);
 		}
 
-		for (const track of release.tracks) {
-			if (!track.isrc) {
-				await this.trackService.genISRC(track.id);
-			}
-		}
+		await this.genListIsrc(release);
 
 		// Validate
 		const errors =

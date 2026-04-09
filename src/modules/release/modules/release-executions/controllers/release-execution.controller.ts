@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
+import { UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { QueryGetListReleaseExecutionDto } from '../dto/release-execution.dto';
 import { ReleaseExecutionProcessorService } from '../services/release-execution-processor.service';
@@ -17,6 +19,22 @@ export class ReleaseExecutionController {
     async create(@Body() body: Record<string, any>) {
         const result = await this.executionsService.create(body);
         return new ResponseSuccess({ data: result });
+    }
+
+    @Post('manual-export/bulk-download-and-mark-completed')
+    async bulkDownloadAndMarkCompleted(
+        @Body() body: { ids: string[] },
+        @Res() res: Response
+    ) {
+        const { buffer, fileName } = await this.executionsService.bulkDownloadAndMarkCompleted(body.ids);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Length': buffer.length,
+        });
+
+        res.send(buffer);
     }
 
     @Post(':id/process')
@@ -40,6 +58,37 @@ export class ReleaseExecutionController {
         return new ResponseSuccess({ message: 'Execution processed successfully' });
     }
 
+    @Post(':id/manual-export/mark-completed')
+    async markManualExportCompleted(@Param('id', ParseUUIDPipe) id: string) {
+        await this.executionsService.markManualExportAsCompleted(id);
+        return new ResponseSuccess({ message: 'Marked as completed' });
+    }
+
+    @Post(':id/manual-export/download-and-mark-completed')
+    async downloadAndMarkCompleted(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Res() res: Response
+    ) {
+        const { buffer, fileName } = await this.executionsService.downloadAndMarkCompleted(id);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Length': buffer.length,
+        });
+
+        res.send(buffer);
+    }
+
+    @Post(':id/retry')
+    async retry(
+        @Param('id', ParseUUIDPipe) id: string,
+        @UserId() userId: string
+    ) {
+        this.executionsService.retryExecution(id, userId).catch((_e) => {_e})
+        return new ResponseSuccess();
+    }
+
     @Get()
     async getList(@Query() query: QueryGetListReleaseExecutionDto) {
         const result = await this.executionsService.getList(query);
@@ -50,6 +99,22 @@ export class ReleaseExecutionController {
     async getExecutionDsps(@Param('id', ParseUUIDPipe) id: string) {
         const result = await this.executionsService.getExecutionDsps(id);
         return new ResponseSuccess({ data: result });
+    }
+
+    @Get(':id/manual-export/download')
+    async downloadManualExport(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Res() res: Response
+    ) {
+        const { buffer, fileName } = await this.executionsService.getManualExportBuffer(id);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Length': buffer.length,
+        });
+
+        res.send(buffer);
     }
 
     @Get(':id')

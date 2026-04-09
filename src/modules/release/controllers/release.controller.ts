@@ -259,7 +259,7 @@ export class ReleaseController {
 	): Promise<ResponseSuccess<any>> {
 		const userId = req.user!.sub;
 
-		const result = await this.releaseService.genUpc(id);
+		const result = await this.releaseService.genUpcById(id);
 
 		return new ResponseSuccess({
 			data: result,

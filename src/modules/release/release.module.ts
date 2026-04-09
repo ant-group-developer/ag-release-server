@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { NotificationModule } from '../notification/notification.module';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule2 } from '../bucket2/bucket2.module';
@@ -93,6 +94,7 @@ import { ReleaseExecutionController } from './modules/release-executions/control
 
 		CountryModule,
 		AggregatorsModule,
+		NotificationModule,
 		// ReleaseExecutionsModule
 	],
 	controllers: [
