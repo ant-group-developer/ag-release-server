@@ -123,11 +123,6 @@ export class UpdateOrderTrackDraft {
 	order: number;
 }
 
-class File {
-	// @MaxLength(100)
-	// fileName: string;
-}
-
 class AudioFile {
 	@IsOptional()
 	@IsInt()

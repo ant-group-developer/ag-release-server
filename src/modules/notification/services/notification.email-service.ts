@@ -17,13 +17,14 @@ export class EmailService {
 		});
 	}
 
-	async sendMessage(data: { to: string[]; subject: string; html: string }) {
-		const { to, subject, html } = data;
+	async sendMessage(data: { to: string[]; subject: string; html: string; attachments?: any[] }) {
+		const { to, subject, html, attachments } = data;
 
 		await this.transporter.sendMail({
 			to,
 			subject,
 			html,
+			attachments,
 		});
 	}
 }

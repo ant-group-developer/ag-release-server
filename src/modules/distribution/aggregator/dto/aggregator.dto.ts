@@ -12,7 +12,10 @@ import {
 } from 'class-validator';
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_EMAIL,
+	DEFAULT_LENGTH_EMAIL_SUBJECT,
 	DEFAULT_LENGTH_NAME,
+	DEFAULT_LENGTH_UPLOAD_URL,
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
@@ -63,6 +66,21 @@ export class CreateAggregatorDto {
 
 	@IsOptional()
 	createsDoneFolder?: boolean;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_EMAIL)
+	deliveryEmail?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_EMAIL_SUBJECT)
+	deliveryEmailSubject?: string | null;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(DEFAULT_LENGTH_UPLOAD_URL)
+	manualUploadUrl?: string | null;
 }
 
 export class UpdateAggregatorDto extends PartialType(CreateAggregatorDto) {}
