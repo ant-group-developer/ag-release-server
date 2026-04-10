@@ -1,5 +1,6 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { NotificationModule } from '../notification/notification.module';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { BucketModule2 } from '../bucket2/bucket2.module';
@@ -40,6 +41,14 @@ import { ReleaseValidateService } from './services/release.validate.service';
 import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery.controller';
+// import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
+import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
+import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
+import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
+import { ReleaseExecution } from './modules/release-executions/entities/release-execution.entity';
+import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';
+import { ReleaseExecutionStep } from './modules/release-executions/entities/release-execution-step.entity';
+import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 
 
 @Module({
@@ -55,6 +64,10 @@ import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery
 			Country,
 			ReleaseDspDelivery,
 			ReleaseLog,
+
+			ReleaseExecution,
+            ReleaseExecutionDsp,
+            ReleaseExecutionStep,
 		]),
 
 		AppConfigModule,
@@ -81,11 +94,15 @@ import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery
 
 		CountryModule,
 		AggregatorsModule,
+		NotificationModule,
+		// ReleaseExecutionsModule
 	],
 	controllers: [
 		ReleaseController,
 		ReleaseDraftController,
-		ReleaseDspDeliveryController
+		ReleaseDspDeliveryController,
+
+		ReleaseExecutionController
 	],
 	providers: [
 		ReleaseService,
@@ -96,7 +113,11 @@ import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery
 		// ReleaseDdexCiService,
 		ReleaseDdexService,
 		ReleaseDspDeliveryService, 
-		ReleaseDspDeliveryQueryService
+		ReleaseDspDeliveryQueryService,
+
+		ReleaseExecutionsService, 
+		ReleaseExecutionsQueryService,
+		ReleaseExecutionProcessorService
 	],
 	exports: [
 		ReleaseDdexService,

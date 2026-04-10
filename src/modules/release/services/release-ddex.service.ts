@@ -175,8 +175,6 @@ export class ReleaseDdexService {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
 		const config = await this.dspRoutingConfigsService.resolveFullDeliveryConfig(dspCode);
 
-		console.log(ernVersion)
-
 		const input: ErnInput = this.parseErnInputFromRelease({
 			release,
 			ernVersion: ernVersion || (config.ernVersion as ErnVersion),
