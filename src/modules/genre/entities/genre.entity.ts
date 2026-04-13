@@ -36,7 +36,7 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện của thể loại',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	picture: string | null;
 

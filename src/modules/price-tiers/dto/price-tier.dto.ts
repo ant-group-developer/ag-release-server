@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+	ArrayMinSize,
 	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
@@ -10,9 +11,7 @@ import {
 	MaxLength,
 	Min,
 	ValidateIf,
-	ArrayMinSize,
 	ValidateNested,
-	IsInt,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderCurrency, PriceTierType } from '../enum/price-tier.enum';
@@ -126,4 +125,3 @@ export class BulkUpdatePriceTierDto {
 	@Type(() => BulkUpdateItemDto)
 	priceTiers: BulkUpdateItemDto[];
 }
-

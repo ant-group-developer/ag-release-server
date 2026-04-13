@@ -3,7 +3,11 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { AppResponseSuccess } from 'src/app.const';
 import { ListPrefixUpcDto } from './upc.dto';
-import { CreateUpc, GetUpcRequest, QueryUpcRequest } from './upc.grpc.interface';
+import {
+	CreateUpc,
+	GetUpcRequest,
+	QueryUpcRequest,
+} from './upc.grpc.interface';
 import { UpcService } from './upc.service';
 
 @Controller('upc')
@@ -27,7 +31,7 @@ export class UpcController {
 	@Get('detail')
 	async getUpc(@Query() query: GetUpcRequest) {
 		const data = await this.upcService.getUpc(query);
-		return new ResponseSuccess({data: data.upc});
+		return new ResponseSuccess({ data: data.upc });
 	}
 
 	// GET /upc/prefix

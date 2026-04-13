@@ -1,24 +1,25 @@
 // services/release-dsp-delivery.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
-import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
-import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
-import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
-import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
-import { Logger } from '@nestjs/common';
 import * as path from 'path';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { Release } from '../../entities/release.entity';
-import { ReleaseException } from '../../constants/release.constant';
-import { ReleaseDdexService } from '../release-ddex.service';
-import { ReleaseLogService } from '../../modules/release-log/services/release-log.service';
 import { removeFolder } from 'src/utils/util';
-import { CreateReleaseDspDeliveryDto, GetListReleaseDspDeliveriesDto, UpdateReleaseDspDeliveryDto } from '../../dto/release-dsp.dto';
+import { EntityManager, In, Repository } from 'typeorm';
+import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
+import {
+	CreateReleaseDspDeliveryDto,
+	GetListReleaseDspDeliveriesDto,
+	UpdateReleaseDspDeliveryDto,
+} from '../../dto/release-dsp.dto';
+import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
+import { Release } from '../../entities/release.entity';
+import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { ReleaseLogService } from '../../modules/release-log/services/release-log.service';
+import { ReleaseDdexService } from '../release-ddex.service';
+import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 @Injectable()
 export class ReleaseDspDeliveryService {
@@ -49,35 +50,34 @@ export class ReleaseDspDeliveryService {
 		);
 
 		return results
-			.filter(
-				(r): r is PromiseRejectedResult => r.status === 'rejected',
-			)
+			.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
 			.map(
 				(r, i) =>
 					`${codes[results.indexOf(r)]}: ${r.reason?.message ?? 'Unknown error'}`,
 			);
 	}
 
-	private async processDsp(
-		releaseId: string,
-		code: string,
-	): Promise<void> {
+	private async processDsp(releaseId: string, code: string): Promise<void> {
 		let dsp: Dsp | null = null;
 		let releaseDspDeliveryId: string | null = null;
 
 		try {
 			dsp = await this.dspRepo.findOne({ where: { code } });
 			if (!dsp) {
-				throw new ResponseError({ message: `Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP ${code}` });
+				throw new ResponseError({
+					message: `Hệ thống chưa hỗ trợ hoặc thiếu cấu hình DSP ${code}`,
+				});
 			}
 
-			const release = await this.releaseRepo.findOne({ where: { id: releaseId }});
+			const release = await this.releaseRepo.findOne({
+				where: { id: releaseId },
+			});
 
 			releaseDspDeliveryId = await this.findReleaseDspDeliveryId(
 				releaseId,
 				dsp.id,
 			);
-			
+
 			if (releaseDspDeliveryId) {
 				const delivery = await this.findOne(releaseDspDeliveryId);
 				if (
@@ -85,7 +85,9 @@ export class ReleaseDspDeliveryService {
 					delivery.status !== ReleaseDspStatus.ISSUES &&
 					delivery.status !== ReleaseDspStatus.NEVER_DISTRIBUTED
 				) {
-					this.logger.warn(`Bỏ qua DSP ${dsp.name} do trạng thái hiện tại (${delivery.status}) không hợp lệ để gửi lại.`);
+					this.logger.warn(
+						`Bỏ qua DSP ${dsp.name} do trạng thái hiện tại (${delivery.status}) không hợp lệ để gửi lại.`,
+					);
 					this.releaseLogService.pending({
 						releaseId,
 						step: `Kiểm tra gửi DSP ${dsp.name}`,
@@ -108,7 +110,7 @@ export class ReleaseDspDeliveryService {
 				releaseId,
 				dsp.id,
 			);
-			
+
 			const isCI = config.isCI;
 
 			if (isCI && release?.isSentMetadataCi) {
@@ -129,17 +131,16 @@ export class ReleaseDspDeliveryService {
 			const { outputDir, batchId } =
 				await this.releaseDdexService.createMetadataOnServer({
 					releaseId,
-					ernVersion: config.ernVersion as ErnVersion,
+					ernVersion: config.ernVersion,
 					sender: config.sender,
 					recipient: config.recipient,
 				});
 
 			// 4. Save metadata path to delivery record
-			await this.updateMetadataInfo(
-				releaseId,
-				dsp.id,
-				{ metadataPath: outputDir, batchId },
-			);
+			await this.updateMetadataInfo(releaseId, dsp.id, {
+				metadataPath: outputDir,
+				batchId,
+			});
 
 			// 5. Upload to SFTP (Retry 3 times)
 			let uploadSuccess = false;
@@ -155,7 +156,9 @@ export class ReleaseDspDeliveryService {
 					break;
 				} catch (err: any) {
 					lastUploadErr = err;
-					this.logger.warn(`[SFTP_UPLOAD] Upload metadata DSP ${code} thất bại lần ${i}/3: ${err.message}`);
+					this.logger.warn(
+						`[SFTP_UPLOAD] Upload metadata DSP ${code} thất bại lần ${i}/3: ${err.message}`,
+					);
 					if (i < 3) {
 						await new Promise((res) => setTimeout(res, 3000)); // Đợi 3s trước khi thử lại
 					}
@@ -163,7 +166,9 @@ export class ReleaseDspDeliveryService {
 			}
 
 			if (!uploadSuccess) {
-				throw new Error(`Upload SFTP thất bại sau 3 lần thử: ${lastUploadErr?.message}`);
+				throw new Error(
+					`Upload SFTP thất bại sau 3 lần thử: ${lastUploadErr?.message}`,
+				);
 			}
 
 			// 6. Post-upload hooks (e.g. CI aggregator .done folder)
@@ -177,7 +182,9 @@ export class ReleaseDspDeliveryService {
 
 			// 8. Update CI flag
 			if (isCI && !release?.isSentMetadataCi) {
-				await this.releaseRepo.update(releaseId, { isSentMetadataCi: true });
+				await this.releaseRepo.update(releaseId, {
+					isSentMetadataCi: true,
+				});
 			}
 
 			// 9. Mark success
@@ -321,7 +328,10 @@ export class ReleaseDspDeliveryService {
 		}
 	}
 
-	async findReleaseDspDeliveryId(releaseId: string, dspId: string): Promise<string | null> {
+	async findReleaseDspDeliveryId(
+		releaseId: string,
+		dspId: string,
+	): Promise<string | null> {
 		const record = await this.repo.findOne({
 			where: { releaseId, dspId },
 			select: ['id'],
@@ -339,7 +349,6 @@ export class ReleaseDspDeliveryService {
 		};
 		manager?: EntityManager;
 	}) {
-
 		const { data, manager } = input;
 		const repo = this.getRepo(manager);
 

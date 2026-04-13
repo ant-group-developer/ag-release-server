@@ -186,7 +186,9 @@ export class Ern43Builder {
 
 		if (track.audioFile) {
 			const file = deliveryFile.ele('File');
-			const uri = track.audioFile.filePath ? `${track.audioFile.filePath}/${track.audioFile.fileName}` : track.audioFile.fileName;
+			const uri = track.audioFile.filePath
+				? `${track.audioFile.filePath}/${track.audioFile.fileName}`
+				: track.audioFile.fileName;
 			file.ele('URI').txt(uri);
 			if (track.audioFile.hashSum) {
 				const hash = file.ele('HashSum');
@@ -196,7 +198,9 @@ export class Ern43Builder {
 				);
 			}
 		} else {
-			const defaultPath = this.input.release.coverArt?.filePath ? `${this.input.release.coverArt.filePath}/` : '';
+			const defaultPath = this.input.release.coverArt?.filePath
+				? `${this.input.release.coverArt.filePath}/`
+				: '';
 			deliveryFile
 				.ele('File')
 				.ele('URI')
@@ -319,8 +323,10 @@ export class Ern43Builder {
 		const tech = image.ele('TechnicalDetails');
 		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
 		const file = tech.ele('File');
-		
-		const uri = coverArt.filePath ? `${coverArt.filePath}/${coverArt.fileName}` : coverArt.fileName;
+
+		const uri = coverArt.filePath
+			? `${coverArt.filePath}/${coverArt.fileName}`
+			: coverArt.fileName;
 		file.ele('URI').txt(uri);
 		if (coverArt.hashSum) {
 			const hash = file.ele('HashSum');

@@ -8,7 +8,10 @@ DB_PASSWORD=$DB_PASSWORD
 
 RCLONE_CONFIG=$RCLONE_CONFIG
 BUCKET_NAME=$BUCKET_NAME
+R2_BUCKET_NAME=$R2_BUCKET_NAME
 BACKUP_PATH=$BACKUP_PATH
+TO_GCS=$TO_GCS
+TO_R2=$TO_R2
 
 # validate env
 if [ -z "$DB_USER" ] || [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME" ] || [ -z "$DB_PASSWORD" ]; then
@@ -16,8 +19,18 @@ if [ -z "$DB_USER" ] || [ -z "$DB_HOST" ] || [ -z "$DB_PORT" ] || [ -z "$DB_NAME
   exit 1
 fi
 
-if [ -z "$RCLONE_CONFIG" ] || [ -z "$BUCKET_NAME" ] || [ -z "$BACKUP_PATH" ]; then
+if [ -z "$RCLONE_CONFIG" ] || [ -z "$BACKUP_PATH" ]; then
   echo "Missing storage environment variables" >&2
+  exit 1
+fi
+
+if [ "$TO_GCS" = "1" ] && [ -z "$BUCKET_NAME" ]; then
+  echo "Missing GCS bucket name" >&2
+  exit 1
+fi
+
+if [ "$TO_R2" = "1" ] && [ -z "$R2_BUCKET_NAME" ]; then
+  echo "Missing R2 bucket name" >&2
   exit 1
 fi
 
@@ -45,11 +58,23 @@ else
 fi
 
 # to gcs
-if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress >/dev/null; then
-  echo "Uploaded $BACKUP_PATH to GCS bucket: $BUCKET_NAME"
-else
-  echo "Failed when push to GCS" >&2
-  exit 1
+if [ -n "$TO_GCS" ] && [ "$TO_GCS" = "1" ]; then
+  if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "gcs:/$BUCKET_NAME/backups/" --progress >/dev/null; then
+    echo "Uploaded $BACKUP_PATH to GCS bucket: $BUCKET_NAME"
+  else
+    echo "Failed when push to GCS" >&2
+    exit 1
+  fi
+fi
+
+# to r2
+if [ -n "$TO_R2" ] && [ "$TO_R2" = "1" ]; then
+  if rclone copy "$BACKUP_PATH" --config="$RCLONE_CONFIG" "r2:/$R2_BUCKET_NAME/backups/" --progress >/dev/null; then
+    echo "Uploaded $BACKUP_PATH to R2 bucket: $R2_BUCKET_NAME"
+  else
+    echo "Failed when push to R2" >&2
+    exit 1
+  fi
 fi
 
 # delete

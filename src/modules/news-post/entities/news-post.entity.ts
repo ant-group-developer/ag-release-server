@@ -3,10 +3,10 @@ import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.enti
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { NewsCategory } from 'src/modules/news-category/entities/news-category.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { NewsPostStatus } from '../enum/news-post.enum';
 import { NewsPostTranslation } from './news-post-translation.entity';
-import { MediaUrlTransformer } from 'src/utils/util';
 
 @Entity('news_posts', {
 	comment: 'Bài viết tin tức, hỗ trợ đa ngôn ngữ thông qua bảng translation',
@@ -23,7 +23,7 @@ export class NewsPost extends BaseUserTrackedUUIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh thumbnail của bài viết',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	thumbnail: string | null;
 

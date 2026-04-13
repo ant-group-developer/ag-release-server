@@ -21,6 +21,7 @@ export interface WebsiteConfig {
 }
 
 export interface BackupDatabase {
+	enable: boolean;
 	autoBackup: boolean;
 	cronValue: string;
 
@@ -35,6 +36,7 @@ export interface BackupDatabase {
 	// Đích lưu trữ
 	toDrive: boolean; // lưu Google Drive
 	toGcs: boolean; // lưu Google Cloud Storage
+	toR2: boolean; // lưu Cloudflare R2
 }
 
 export interface Telegram {

@@ -8,7 +8,14 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { User } from 'src/modules/user/entities/user.entity';
 import { MediaUrlTransformer } from 'src/utils/util';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, Unique } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	Unique,
+} from 'typeorm';
 
 @Entity('labels', {
 	comment: 'Danh mục label / hãng phát hành nhạc thuộc từng tenant',
@@ -35,7 +42,7 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện hoặc logo của label',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	picture: string | null;
 

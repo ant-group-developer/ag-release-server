@@ -56,10 +56,7 @@ export class PriceTierController {
 
 	@SystemAdminOnly()
 	@Put('bulk')
-	async bulkUpdate(
-		@Body() dto: BulkUpdatePriceTierDto,
-		@Req() req: Request,
-	) {
+	async bulkUpdate(@Body() dto: BulkUpdatePriceTierDto, @Req() req: Request) {
 		const userId = req.user!.sub;
 		const data = await this.priceTierService.bulkUpdate(dto, userId);
 		return new ResponseSuccess({

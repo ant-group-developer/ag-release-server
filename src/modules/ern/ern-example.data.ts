@@ -1,4 +1,8 @@
-import { ErnInput, ManifestInput, ErnVersion } from './interfaces/ern-input.interface';
+import {
+	ErnInput,
+	ErnVersion,
+	ManifestInput,
+} from './interfaces/ern-input.interface';
 
 export const singleExample: ErnInput = {
 	version: ErnVersion.ERN_43,

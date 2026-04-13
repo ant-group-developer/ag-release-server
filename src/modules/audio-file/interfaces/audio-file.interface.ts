@@ -7,7 +7,7 @@ export interface ICreateAudioFile {
 	preview?: number | null;
 	trackId: string;
 	fileId: string;
-	peakId: string;
+	peakId?: string;
 }
 
 export interface IUpdateAudioFile {

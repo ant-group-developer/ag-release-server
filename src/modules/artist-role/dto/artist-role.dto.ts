@@ -1,10 +1,10 @@
 import { PartialType } from '@nestjs/swagger';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
-	IsBoolean,
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';

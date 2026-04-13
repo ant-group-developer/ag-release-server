@@ -55,7 +55,7 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện hoặc logo của DSP',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	picture: string | null;
 
@@ -65,6 +65,14 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		comment: 'Đánh dấu DSP đang được kích hoạt hay không',
 	})
 	isActive: boolean;
+
+	@Column({
+		name: 'has_deal',
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu có deal với CI hay chưa',
+	})
+	hasDeal: boolean;
 
 	@Column('varchar', {
 		array: true,

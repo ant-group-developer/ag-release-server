@@ -35,7 +35,7 @@ export class TrackSensitive extends BaseUserTrackedUUIDEntity {
 		length: DEFAULT_LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Icon đại diện cho mức độ nhạy cảm',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	icon: string | null;
 

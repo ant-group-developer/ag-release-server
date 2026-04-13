@@ -1,10 +1,11 @@
 // src/modules/dsp-routing-configs/services/dsp-routing-config.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { decryptSecretSafe } from 'src/utils/util.encrypt';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { AggregatorsService } from '../../aggregator/services/aggregators.service';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
 import {
@@ -18,7 +19,6 @@ import {
 } from '../dto/dsp-routing-config.dto';
 import { DspRoutingConfig } from '../entities/dsp-routing-config.entity';
 import { RoutingModeEnum } from '../enum/dsp-routing.enum';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { DspRoutingConfigQueryService } from './dsp-routing-config.query.service';
 
 @Injectable()
@@ -361,19 +361,25 @@ export class DspRoutingConfigsService {
 				}
 				sender = { partyId, name: partyName };
 				sftpMetadata = routing.sftpConfig?.metadata ?? null;
-				ernVersion = (routing.sftpConfig?.ernVersion as ErnVersion) ?? ErnVersion.ERN_382;
+				ernVersion =
+					(routing.sftpConfig?.ernVersion as ErnVersion) ??
+					ErnVersion.ERN_382;
 				break;
 			}
 
 			case RoutingModeEnum.AGGREGATOR: {
 				const agg = routing.aggregator;
 				if (!agg?.ddexId || !agg?.ddexName) {
-					throw DspRoutingConfigException.AGGREGATOR_MISSING_DDEX_PARTY(code);
+					throw DspRoutingConfigException.AGGREGATOR_MISSING_DDEX_PARTY(
+						code,
+					);
 				}
 				sender = { partyId: agg.ddexId, name: agg.ddexName };
 				sftpMetadata = agg.sftpConfig?.metadata ?? null;
 				createsDoneFolder = agg.createsDoneFolder ?? false;
-				ernVersion = (agg.sftpConfig?.ernVersion as ErnVersion) ?? ErnVersion.ERN_382;
+				ernVersion =
+					(agg.sftpConfig?.ernVersion as ErnVersion) ??
+					ErnVersion.ERN_382;
 				if (agg.code === 'CI') {
 					isCI = true;
 				}
@@ -391,16 +397,18 @@ export class DspRoutingConfigsService {
 			}
 
 			default:
-				throw DspRoutingConfigException.UNKNOWN_ROUTING_MODE(routing.mode);
+				throw DspRoutingConfigException.UNKNOWN_ROUTING_MODE(
+					routing.mode,
+				);
 		}
 
 		if (!sftpMetadata) {
-			const aggDefault = await this.aggregatorsService.getDefault()
+			const aggDefault = await this.aggregatorsService.getDefault();
 
-			if(!aggDefault.sftpConfig?.metadata){
+			if (!aggDefault.sftpConfig?.metadata) {
 				throw DspRoutingConfigException.NOT_FOUND();
 			}
-				
+
 			return {
 				ernVersion,
 				sender,
@@ -408,8 +416,7 @@ export class DspRoutingConfigsService {
 				sftp: aggDefault.sftpConfig?.metadata,
 				createsDoneFolder,
 				isCI,
-			}
-		
+			};
 		}
 
 		this.decryptSecretEntity(sftpMetadata);

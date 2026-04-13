@@ -20,13 +20,19 @@ export class ErnController {
 	@Get('example/43/single')
 	@Header('Content-Type', 'application/xml')
 	exampleSingle43() {
-		return this.ernService.generate({ ...singleExample, version: ErnVersion.ERN_43 });
+		return this.ernService.generate({
+			...singleExample,
+			version: ErnVersion.ERN_43,
+		});
 	}
 
 	@Get('example/43/album')
 	@Header('Content-Type', 'application/xml')
 	exampleAlbum43() {
-		return this.ernService.generate({ ...albumExample, version: ErnVersion.ERN_43 });
+		return this.ernService.generate({
+			...albumExample,
+			version: ErnVersion.ERN_43,
+		});
 	}
 
 	// --- ERN 3.8.2 ---
@@ -34,13 +40,19 @@ export class ErnController {
 	@Get('example/382/single')
 	@Header('Content-Type', 'application/xml')
 	exampleSingle382() {
-		return this.ernService.generate({ ...singleExample, version: ErnVersion.ERN_382 });
+		return this.ernService.generate({
+			...singleExample,
+			version: ErnVersion.ERN_382,
+		});
 	}
 
 	@Get('example/382/album')
 	@Header('Content-Type', 'application/xml')
 	exampleAlbum382() {
-		return this.ernService.generate({ ...albumExample, version: ErnVersion.ERN_382 });
+		return this.ernService.generate({
+			...albumExample,
+			version: ErnVersion.ERN_382,
+		});
 	}
 
 	@Get('example/382/full')

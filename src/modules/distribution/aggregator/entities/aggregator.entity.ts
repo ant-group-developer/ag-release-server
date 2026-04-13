@@ -1,6 +1,9 @@
 import {
 	DEFAULT_LENGTH_CODE,
+	DEFAULT_LENGTH_EMAIL,
+	DEFAULT_LENGTH_EMAIL_SUBJECT,
 	DEFAULT_LENGTH_NAME,
+	DEFAULT_LENGTH_UPLOAD_URL,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
@@ -36,7 +39,8 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: false,
-		comment: 'Tạo folder .done trên SFTP sau khi upload xong (CI aggregator cần)',
+		comment:
+			'Tạo folder .done trên SFTP sau khi upload xong (CI aggregator cần)',
 	})
 	createsDoneFolder: boolean;
 
@@ -47,4 +51,28 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 		comment: 'Số lần sử dụng DSP',
 	})
 	dspUsageCount: number;
+
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_EMAIL,
+		name: 'delivery_email',
+		nullable: true,
+	})
+	deliveryEmail?: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_EMAIL_SUBJECT,
+		name: 'delivery_email_subject',
+		nullable: true,
+	})
+	deliveryEmailSubject?: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_UPLOAD_URL,
+		name: 'manual_upload_url',
+		nullable: true,
+	})
+	manualUploadUrl?: string | null;
 }

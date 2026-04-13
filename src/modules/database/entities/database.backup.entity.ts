@@ -42,6 +42,22 @@ export class Backup extends BaseUUIDEntity {
 		type: 'varchar',
 		length: 255,
 		nullable: true,
+		comment: 'URL file backup trên Cloudflare R2',
+	})
+	urlR2: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'Thư mục lưu backup trên Cloudflare R2',
+	})
+	urlFolderR2: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
 		comment: 'Thư mục lưu backup trên Google Drive',
 	})
 	urlFolderDrive: string | null;

@@ -8,6 +8,7 @@ import {
 	MaxLength,
 	Min,
 } from 'class-validator';
+
 export class CreateAudioFileDraftDto {
 	@IsNotEmpty()
 	@IsString()
@@ -42,6 +43,7 @@ export class CreateAudioFileDraftDto {
 	@IsUUID()
 	fileId: string;
 
-	@IsUUID()
-	peakId: string;
+	@IsOptional()
+	// @IsUUID()
+	peakId?: string;
 }

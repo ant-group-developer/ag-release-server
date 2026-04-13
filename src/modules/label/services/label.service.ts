@@ -170,7 +170,8 @@ export class LabelService {
 					...(idExclude ? { id: Not(idExclude) } : {}),
 				},
 			});
-			if (existName) throw new ResponseError(LabelMessage.DUPLICATE_NAME_LABEL);
+			if (existName)
+				throw new ResponseError(LabelMessage.DUPLICATE_NAME_LABEL);
 		}
 
 		if (code) {
@@ -181,7 +182,8 @@ export class LabelService {
 					...(idExclude ? { id: Not(idExclude) } : {}),
 				},
 			});
-			if (existCode) throw new ResponseError(LabelMessage.DUPLICATE_CODE_LABEL);
+			if (existCode)
+				throw new ResponseError(LabelMessage.DUPLICATE_CODE_LABEL);
 		}
 	}
 }

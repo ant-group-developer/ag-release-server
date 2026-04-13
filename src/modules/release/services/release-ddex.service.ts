@@ -171,15 +171,20 @@ export class ReleaseDdexService {
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
 	}
 
-	async generateReleaseXml(releaseId: string, dspCode: string, ernVersion?: ErnVersion): Promise<string> {
+	async generateReleaseXml(
+		releaseId: string,
+		dspCode: string,
+		ernVersion?: ErnVersion,
+	): Promise<string> {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
-		const config = await this.dspRoutingConfigsService.resolveFullDeliveryConfig(dspCode);
-
-		console.log(ernVersion)
+		const config =
+			await this.dspRoutingConfigsService.resolveFullDeliveryConfig(
+				dspCode,
+			);
 
 		const input: ErnInput = this.parseErnInputFromRelease({
 			release,
-			ernVersion: ernVersion || (config.ernVersion as ErnVersion),
+			ernVersion: ernVersion || config.ernVersion,
 			sender: config.sender,
 			recipient: config.recipient,
 		});
@@ -412,7 +417,7 @@ export class ReleaseDdexService {
 		// 	const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
 		// 	const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
 		// 	const filePath = path.join(outputDir, fileName);
-		// 
+		//
 		// 	fs.writeFileSync(filePath, audio.buffer);
 		// 	this.logger.log(`[AUDIO_SAVED] ${fileName}`);
 		// }

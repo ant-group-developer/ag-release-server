@@ -158,7 +158,8 @@ export class ReleaseException {
 	static CANNOT_SUBMIT_INVALID_STATUS(data?: any) {
 		return new ResponseError({
 			statusCode: 400,
-			message: 'Chỉ được phép phát hành các bản ghi ở trạng thái nháp (draft) hoặc có lỗi (issues)',
+			message:
+				'Chỉ được phép phát hành các bản ghi ở trạng thái nháp (draft) hoặc có lỗi (issues)',
 			messageCode: 'release.message.error.cannotSubmitInvalidStatus',
 			data,
 		});

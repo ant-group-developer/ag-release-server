@@ -136,7 +136,7 @@ export class GenreQueryService {
 		return this.genreRepo
 			.createQueryBuilder('g')
 			.select(['g.id', 'g.name', 'g.code'])
-			.orderBy('g.name', 'ASC')	
+			.orderBy('g.name', 'ASC')
 			.getMany();
 	}
 }
