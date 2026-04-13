@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Repository } from 'typeorm';
 import {
 	dataInitArtistRole,
@@ -13,7 +14,6 @@ import {
 } from '../dto/artist-role.dto';
 import { ArtistRole } from '../entities/artist-role.entity';
 import { ArtistRoleQueryService } from './artist-role.query.service';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 
 @Injectable()
 export class ArtistRoleService implements OnModuleInit {

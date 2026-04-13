@@ -36,7 +36,7 @@
 
 // 	async createMetadataSpotifyOnServer(releaseId: string) {
 // 		const partyId = this.appConfigSv.DDEX_PARTY_ID_AMG();
-// 		const partyName = this.appConfigSv.DDEX_PARTY_NAME_AMG();	
+// 		const partyName = this.appConfigSv.DDEX_PARTY_NAME_AMG();
 
 // 		if(!partyId) throw ReleaseException.MISSING_DDEX_PARTY_ID_AMG();
 // 		if(!partyName) throw ReleaseException.MISSING_DDEX_PARTY_NAME_AMG();

@@ -27,6 +27,7 @@ export const appConfigDefault: AppConfigShape = {
 	},
 
 	backupDatabase: {
+		enable: true,
 		autoBackup: false,
 		cronValue: DEFAULT_CRON_VALUE,
 
@@ -38,6 +39,7 @@ export const appConfigDefault: AppConfigShape = {
 
 		toDrive: false,
 		toGcs: true,
+		toR2: false,
 	},
 
 	telegram: {

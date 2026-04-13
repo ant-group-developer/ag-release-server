@@ -1,7 +1,7 @@
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
-import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
@@ -14,8 +14,8 @@ import { AlbumFormat } from 'src/modules/album-format/entities/album-format.enti
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
-import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -160,7 +160,8 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: false,
-		comment: 'Đánh dấu metadata đã được gửi sang CI Aggregator chung một mẻ chưa',
+		comment:
+			'Đánh dấu metadata đã được gửi sang CI Aggregator chung một mẻ chưa',
 	})
 	isSentMetadataCi: boolean;
 

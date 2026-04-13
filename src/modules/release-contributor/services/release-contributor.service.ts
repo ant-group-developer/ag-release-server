@@ -59,11 +59,15 @@ export class ReleaseContributorService {
 		}
 	}
 
-	async bulkCreate(data: BulkCreateReleaseContributorDto): Promise<ReleaseContributor[]> {
+	async bulkCreate(
+		data: BulkCreateReleaseContributorDto,
+	): Promise<ReleaseContributor[]> {
 		const results = await Promise.all(
 			data.items.map((item) => this.createSafe(item)),
 		);
-		return results.filter((item): item is ReleaseContributor => item !== null);
+		return results.filter(
+			(item): item is ReleaseContributor => item !== null,
+		);
 	}
 
 	async findOne(id: string): Promise<ReleaseContributor> {

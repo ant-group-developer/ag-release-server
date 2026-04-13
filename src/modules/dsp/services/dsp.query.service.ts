@@ -110,8 +110,8 @@ export class DspQueryService {
 		const queryBuilder = this.dspRepo.createQueryBuilder('dsp');
 
 		queryBuilder
-				.leftJoinAndSelect('dsp.dspRoutingConfig', 'dspRoutingConfig')
-				.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator')
+			.leftJoinAndSelect('dsp.dspRoutingConfig', 'dspRoutingConfig')
+			.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator');
 
 		if (keyword) {
 			queryBuilder.andWhere('dsp.name ILIKE :keyword', {
@@ -140,12 +140,13 @@ export class DspQueryService {
 		}
 
 		if (aggregatorCode) {
-			queryBuilder.andWhere('dspRoutingConfig.mode = :routingMode', {
-				routingMode: RoutingModeEnum.AGGREGATOR,
-			})
-			.andWhere('aggregator.code = :aggregatorCode', {
-				aggregatorCode,
-			});
+			queryBuilder
+				.andWhere('dspRoutingConfig.mode = :routingMode', {
+					routingMode: RoutingModeEnum.AGGREGATOR,
+				})
+				.andWhere('aggregator.code = :aggregatorCode', {
+					aggregatorCode,
+				});
 		}
 
 		queryBuilder.orderBy(`dsp.${fieldOrder}`, orderBy);

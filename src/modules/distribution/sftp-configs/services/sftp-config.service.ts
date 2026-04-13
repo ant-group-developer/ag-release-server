@@ -2,7 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReleaseCodeConst } from 'src/modules/release/enum/release.enum';
-import { decryptSecretSafe, encryptSecret } from 'src/utils/util.encrypt';
+import { encryptSecret } from 'src/utils/util.encrypt';
 import { DeepPartial, EntityManager, Not, Repository } from 'typeorm';
 import { SftpConnectService } from '../../sftp-connect/sftp-connect.service';
 import { SftpConfigException } from '../const/sftp-config.const';
@@ -15,8 +15,11 @@ import {
 	PartialTestConnectionDto,
 	SftpMetadata,
 } from '../type/sftp-config.type';
+import {
+	decryptSecretSftpConfigListSafe,
+	decryptSecretSftpConfigSafe,
+} from '../utils/sftp-config.util';
 import { SftpConfigQueryService } from './sftp-config.query.service';
-import { decryptSecretSftpConfigSafe, decryptSecretSftpConfigListSafe } from '../utils/sftp-config.util';
 
 @Injectable()
 export class SftpConfigsService {
@@ -98,13 +101,13 @@ export class SftpConfigsService {
 			}
 		}
 
-		const dataDb = await repo.findOne({where: {id: data.id}})
+		const dataDb = await repo.findOne({ where: { id: data.id } });
 
 		const entity = repo.create({
 			...data,
 			metadata: {
 				...dataDb?.metadata,
-				...data.metadata
+				...data.metadata,
 			},
 			creatorId: userId,
 			modifierId: userId,

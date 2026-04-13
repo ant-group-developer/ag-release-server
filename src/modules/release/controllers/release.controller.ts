@@ -24,6 +24,7 @@ import {
 	RequirePermissions,
 	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
@@ -37,9 +38,8 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { ReleaseService } from '../services/release.service';
 import { ReleaseDdexService } from '../services/release-ddex.service';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -130,17 +130,33 @@ export class ReleaseController {
 	}
 
 	@Get(':id/xml')
-	@ApiOperation({ summary: 'Get DDEX XML for release by DSP code (Default is Spotify)' })
+	@ApiOperation({
+		summary: 'Get DDEX XML for release by DSP code (Default is Spotify)',
+	})
 	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-	@ApiQuery({ name: 'code', type: 'string', description: 'DSP Code (e.g., spotify)', required: false })
-	@ApiQuery({ name: 'ernVersion', enum: ErnVersion, description: 'ERN Version (override config)', required: false })
+	@ApiQuery({
+		name: 'code',
+		type: 'string',
+		description: 'DSP Code (e.g., spotify)',
+		required: false,
+	})
+	@ApiQuery({
+		name: 'ernVersion',
+		enum: ErnVersion,
+		description: 'ERN Version (override config)',
+		required: false,
+	})
 	@Header('Content-Type', 'application/xml')
 	async getReleaseXml(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Query('code') code: string,
 		@Query('ernVersion') ernVersion?: ErnVersion,
 	) {
-		return this.releaseDdexService.generateReleaseXml(id, code || 'spotify', ernVersion);
+		return this.releaseDdexService.generateReleaseXml(
+			id,
+			code || 'spotify',
+			ernVersion,
+		);
 	}
 
 	@Get(':id/list-code-export-ci')

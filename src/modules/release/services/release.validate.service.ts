@@ -5,15 +5,14 @@ import {
 	ResponseError,
 } from 'src/common/dtos/common.response.dto';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Repository } from 'typeorm';
 
-import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
-import { ReleaseException } from '../constants/release.constant';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
+import { ReleaseException } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
@@ -271,12 +270,18 @@ export class ReleaseValidateService {
 		}
 
 		// title validation
-		const hasMatchingTitle = release.tracks.some((t) => t.title === release.title);
-		if (!hasMatchingTitle) {
+		const hasMatchingTitle = release.tracks.some(
+			(t) => t.title === release.title,
+		);
+
+		const isSingle = release.albumFormat?.code === 'Single';
+
+		if (isSingle && !hasMatchingTitle) {
 			result.push(
 				new FieldErrorDetails({
 					messageCode: 'formFields.releaseNameMustMatchTrackName',
-					message: 'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
+					message:
+						'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
 					page: 'core-detail',
 					field: 'title',
 				}),

@@ -55,7 +55,7 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện hoặc logo của DSP',
-		transformer: MediaUrlTransformer
+		transformer: MediaUrlTransformer,
 	})
 	picture: string | null;
 

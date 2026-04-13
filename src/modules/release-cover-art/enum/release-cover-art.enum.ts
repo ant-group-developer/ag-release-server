@@ -12,5 +12,5 @@ export enum ValidFormatCoverArt {
 	WEBP = 'webp',
 	AVIF = 'avif',
 	SVG = 'svg',
-	tif = 'tif'
+	tif = 'tif',
 }

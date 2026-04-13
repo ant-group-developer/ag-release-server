@@ -29,6 +29,10 @@ export class DatabaseBackupService {
 	) {}
 
 	async eventBackup() {
+		if (!this.appConfigService.cache.config.backupDatabase.enable) {
+			throw new Error('Tính năng Backup Database đang bị tắt');
+		}
+
 		const data = await this.newJobBackup();
 		this.processTaskBackup(data).catch((_e) => {
 			this.logger.error(_e);
@@ -101,6 +105,12 @@ export class DatabaseBackupService {
 			'BACKUP_BASE_URL_CONSOLE_GCS',
 		)!;
 
+		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
+		const baseUrlR2 = this.configService.get<string>('BACKUP_BASE_URL_R2')!;
+		const baseUrlConsoleR2Backup = this.configService.get<string>(
+			'BACKUP_BASE_URL_CONSOLE_R2',
+		)!;
+
 		return {
 			urlDrive: cfg.toDrive
 				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
@@ -111,6 +121,12 @@ export class DatabaseBackupService {
 				: null,
 
 			urlFolderGcs: baseUrlConsoleGcsBackup + `/${fileName}`,
+
+			urlR2: cfg.toR2
+				? `${baseUrlR2}/${r2BucketName}/backups/${fileName}`
+				: null,
+
+			urlFolderR2: baseUrlConsoleR2Backup + `/${fileName}`,
 		};
 	}
 
@@ -131,6 +147,7 @@ export class DatabaseBackupService {
 		const bucketName = this.configService.get<string>(
 			'GCS_PROTECTED_BUCKET',
 		)!;
+		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
 		const rcloneConfigPath = this.configService.get<string>(
 			'BACKUP_RCLONE_CONFIG_PATH',
 		)!;
@@ -146,7 +163,11 @@ export class DatabaseBackupService {
 
 					RCLONE_CONFIG: rcloneConfigPath,
 					BUCKET_NAME: bucketName,
+					R2_BUCKET_NAME: r2BucketName,
 					BACKUP_PATH: backupPath,
+
+					TO_GCS: cfg.toGcs ? '1' : '',
+					TO_R2: cfg.toR2 ? '1' : '',
 				},
 				shell: cfg.shell,
 			});

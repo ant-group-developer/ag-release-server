@@ -5,9 +5,9 @@
  * DDEX ERN 4.3 XML for both Single and Album releases.
  */
 
+import { ErnVersion } from '../../ern/interfaces/ern-input.interface';
 import { DDEXService } from '../ddex.service';
 import { DDEXData } from '../interfaces/ddex-input.interface';
-import { ErnVersion } from '../../ern/interfaces/ern-input.interface';
 
 // ==================== Single Example ====================
 export const singleExample: DDEXData = {

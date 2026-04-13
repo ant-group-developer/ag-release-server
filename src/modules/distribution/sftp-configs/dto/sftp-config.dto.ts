@@ -1,6 +1,12 @@
 // src/modules/sftp-configs/dto/sftp-config.dto.ts
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsObject, IsOptional, IsUUID, MaxLength } from 'class-validator';
+import {
+	IsEnum,
+	IsObject,
+	IsOptional,
+	IsUUID,
+	MaxLength,
+} from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { FieldOrderSftpConfig } from '../const/sftp-config.const';

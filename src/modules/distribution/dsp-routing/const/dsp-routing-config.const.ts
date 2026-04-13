@@ -85,15 +85,18 @@ export class DspRoutingConfigException {
 		return new ResponseError({
 			statusCode: 400,
 			message: `Aggregator for DSP ${code} is missing DDEX Party (ddexId or ddexName)`,
-			messageCode: 'dspRoutingConfig.message.error.aggregatorMissingDdexParty',
+			messageCode:
+				'dspRoutingConfig.message.error.aggregatorMissingDdexParty',
 		});
 	}
 
 	static MISSING_APP_CONFIG_DDEX_PARTY() {
 		return new ResponseError({
 			statusCode: 500,
-			message: 'Missing DDEX_PARTY_ID_AMG or DDEX_PARTY_NAME_AMG in AppConfig',
-			messageCode: 'dspRoutingConfig.message.error.missingAppConfigDdexParty',
+			message:
+				'Missing DDEX_PARTY_ID_AMG or DDEX_PARTY_NAME_AMG in AppConfig',
+			messageCode:
+				'dspRoutingConfig.message.error.missingAppConfigDdexParty',
 		});
 	}
 

@@ -3,9 +3,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { LessThan, Repository } from 'typeorm';
+import { enhanceReleaseDetail } from '../../../utils/release.utils';
 import { GetListReleaseLogDto } from '../dto/release-log.dto';
 import { ReleaseLog, ReleaseLogStatus } from '../entities/release-log.entity';
-import { enhanceReleaseDetail } from '../../../utils/release.utils';
 
 type ReleaseLogInput = {
 	releaseId: string;
@@ -156,7 +156,8 @@ export class ReleaseLogService {
 	) {
 		const createdAt = new Date();
 
-		const { releaseId, step, message, dspId, deliveryId, content, status } = data;
+		const { releaseId, step, message, dspId, deliveryId, content, status } =
+			data;
 
 		const logText = `[${createdAt.toISOString()}] [Release ${releaseId}]${
 			dspId ? ` [DSP ${dspId}]` : ''

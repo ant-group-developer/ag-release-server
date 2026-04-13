@@ -1,8 +1,8 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { PublicRoute } from '../auth/decorators/auth.decorator';
+import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 import { DDEXService } from './ddex.service';
 import { albumExample, singleExample } from './examples/ddex.example';
-import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 
 @PublicRoute()
 @Controller('ddex')

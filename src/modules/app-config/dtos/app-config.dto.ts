@@ -68,6 +68,9 @@ export class UpdateAcrCloudDto {
 
 export class UpdateBackupDatabaseDto {
 	@IsBoolean()
+	enable: boolean;
+
+	@IsBoolean()
 	autoBackup: boolean;
 
 	@IsNotEmpty()
@@ -93,6 +96,9 @@ export class UpdateBackupDatabaseDto {
 
 	@IsBoolean()
 	toGcs: boolean;
+
+	@IsBoolean()
+	toR2: boolean;
 }
 
 export class UpdateTrackConfigDto {

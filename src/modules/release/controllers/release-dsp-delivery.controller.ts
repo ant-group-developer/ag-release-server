@@ -20,10 +20,15 @@ import {
 import { AppResponseSuccess } from 'src/app.const';
 import { ReleaseDspDeliverySuccess } from '../constants/release-dsp.constant';
 
+import {
+	BulkUpdateReleaseDspDeliveryDto,
+	CreateReleaseDspDeliveryDto,
+	GetListReleaseDspDeliveriesDto,
+	UpdateReleaseDspDeliveryDto,
+} from '../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryService } from '../services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseDspDeliveryQueryService } from '../services/release-dsp-services/release-dsp-delivery-query.service';
-import { BulkUpdateReleaseDspDeliveryDto, CreateReleaseDspDeliveryDto, GetListReleaseDspDeliveriesDto, UpdateReleaseDspDeliveryDto } from '../dto/release-dsp.dto';
+import { ReleaseDspDeliveryService } from '../services/release-dsp-services/release-dsp-delivery.service';
 
 @ApiTags('Release DSP Deliveries')
 @Controller('release-dsp-deliveries')
@@ -63,7 +68,6 @@ export class ReleaseDspDeliveryController {
 		return ReleaseDspDeliverySuccess.BULK_UPDATE(result);
 	}
 
-	
 	@Put(':id')
 	@ApiOperation({ summary: 'Cập nhật release dsp delivery' })
 	@ApiParam({ name: 'id', format: 'uuid' })

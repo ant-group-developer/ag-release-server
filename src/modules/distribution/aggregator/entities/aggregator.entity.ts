@@ -39,7 +39,8 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: false,
-		comment: 'Tạo folder .done trên SFTP sau khi upload xong (CI aggregator cần)',
+		comment:
+			'Tạo folder .done trên SFTP sau khi upload xong (CI aggregator cần)',
 	})
 	createsDoneFolder: boolean;
 
@@ -51,12 +52,27 @@ export class Aggregator extends BaseUserTrackedUUIDEntity {
 	})
 	dspUsageCount: number;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_EMAIL, name: 'delivery_email', nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_EMAIL,
+		name: 'delivery_email',
+		nullable: true,
+	})
 	deliveryEmail?: string | null;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_EMAIL_SUBJECT, name: 'delivery_email_subject', nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_EMAIL_SUBJECT,
+		name: 'delivery_email_subject',
+		nullable: true,
+	})
 	deliveryEmailSubject?: string | null;
 
-	@Column({ type: 'varchar', length: DEFAULT_LENGTH_UPLOAD_URL, name: 'manual_upload_url', nullable: true })
+	@Column({
+		type: 'varchar',
+		length: DEFAULT_LENGTH_UPLOAD_URL,
+		name: 'manual_upload_url',
+		nullable: true,
+	})
 	manualUploadUrl?: string | null;
 }
