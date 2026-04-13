@@ -105,7 +105,7 @@ export class DatabaseBackupService {
 			'BACKUP_BASE_URL_CONSOLE_GCS',
 		)!;
 
-		const r2BucketName = this.configService.get<string>('R2_BUCKET_NAME')!;
+		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
 		const baseUrlR2 = this.configService.get<string>('BACKUP_BASE_URL_R2')!;
 		const baseUrlConsoleR2Backup = this.configService.get<string>(
 			'BACKUP_BASE_URL_CONSOLE_R2',
@@ -147,7 +147,7 @@ export class DatabaseBackupService {
 		const bucketName = this.configService.get<string>(
 			'GCS_PROTECTED_BUCKET',
 		)!;
-		const r2BucketName = this.configService.get<string>('R2_BUCKET_NAME')!;
+		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
 		const rcloneConfigPath = this.configService.get<string>(
 			'BACKUP_RCLONE_CONFIG_PATH',
 		)!;
