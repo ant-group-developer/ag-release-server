@@ -19,6 +19,8 @@ export const DEFAULT_LENGTH_NAME = 200;
 export const DEFAULT_LENGTH_CODE = 200;
 export const DEFAULT_LENGTH_EMAIL = 50;
 export const DEFAULT_LENGTH_NOTE = 500;
+export const DEFAULT_LENGTH_EMAIL_SUBJECT = 500;
+export const DEFAULT_LENGTH_UPLOAD_URL = 500;
 export const DEFAULT_LENGTH_COLOR = 10;
 export const DEFAULT_LENGTH_PICTURE = 200;
 

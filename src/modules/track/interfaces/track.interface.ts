@@ -71,5 +71,5 @@ interface IAudioFileDraft {
 	sampleLength?: number | null;
 	preview?: number | null;
 	fileId: string;
-	peakId: string;
+	peakId?: string;
 }

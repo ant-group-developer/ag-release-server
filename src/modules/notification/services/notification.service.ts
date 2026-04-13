@@ -104,4 +104,13 @@ export class NotificationService {
 
 		await this.telegramService.sendToDev(message);
 	}
+
+	async sendCustomEmail(data: {
+		to: string[];
+		subject: string;
+		html: string;
+		attachments?: any[];
+	}) {
+		await this.emailService.sendMessage(data);
+	}
 }
