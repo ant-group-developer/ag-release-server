@@ -28,7 +28,6 @@ export const appConfigDefault: AppConfigShape = {
 
 	backupDatabase: {
 		enable: true,
-		autoBackup: false,
 		cronValue: DEFAULT_CRON_VALUE,
 
 		fileName: DEFAULT_FILE_NAME_BACKUP,
