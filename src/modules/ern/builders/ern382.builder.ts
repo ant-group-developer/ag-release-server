@@ -154,7 +154,6 @@ export class Ern382Builder {
 			da.ele('ArtistRole').txt(artist.role);
 		}
 
-
 		// Role mapping
 		const resourceRoles = ['Producer', 'Mixer'];
 
@@ -220,7 +219,7 @@ export class Ern382Builder {
 
 		if (track.audioFile) {
 			if (track.audioFile.codecType) {
-				let codec = track.audioFile.codecType.toUpperCase();
+				const codec = track.audioFile.codecType.toUpperCase();
 				if (codec === 'WAV') {
 					tech.ele('AudioCodecType', { UserDefinedValue: codec }).txt(
 						'UserDefined',

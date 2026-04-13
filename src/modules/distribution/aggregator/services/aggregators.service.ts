@@ -8,6 +8,7 @@ import { newTransaction } from 'src/utils/utils.transaction';
 import { EntityManager, Not, Repository } from 'typeorm';
 import { RoutingModeEnum } from '../../dsp-routing/enum/dsp-routing.enum';
 import { SftpConfigsService } from '../../sftp-configs/services/sftp-config.service';
+import { decryptSecretSftpConfigSafe } from '../../sftp-configs/utils/sftp-config.util';
 import { AggregatorException } from '../const/aggregator.const';
 import {
 	CreateAggregatorDto,
@@ -17,7 +18,6 @@ import {
 import { Aggregator } from '../entities/aggregator.entity';
 import { AggregatorCode } from '../enum/distribution.enum';
 import { AggregatorQueryService } from './aggregator.query.service';
-import { decryptSecretSftpConfigSafe } from '../../sftp-configs/utils/sftp-config.util';
 
 @Injectable()
 export class AggregatorsService {
@@ -95,7 +95,7 @@ export class AggregatorsService {
 			relations: { sftpConfig: true },
 		});
 		if (!entity) throw AggregatorException.NOT_FOUND();
-		decryptSecretSftpConfigSafe(entity.sftpConfig)
+		decryptSecretSftpConfigSafe(entity.sftpConfig);
 
 		return entity;
 	}
@@ -105,10 +105,10 @@ export class AggregatorsService {
 			where: { isActive: true, isDefault: true },
 			relations: { sftpConfig: true },
 		});
-		
+
 		if (!entity) throw AggregatorException.NOT_FOUND_DEFAULT();
 
-		decryptSecretSftpConfigSafe(entity.sftpConfig)
+		decryptSecretSftpConfigSafe(entity.sftpConfig);
 		return entity;
 	}
 

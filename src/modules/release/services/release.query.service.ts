@@ -419,7 +419,9 @@ export class ReleaseQueryService {
 						.orWhere('artist.name ILIKE :keyword')
 						.orWhere('label.name ILIKE :keyword')
 						.orWhere('release.upc ILIKE :keyword')
-						.orWhere('CAST(release.status AS VARCHAR) ILIKE :keyword');
+						.orWhere(
+							'CAST(release.status AS VARCHAR) ILIKE :keyword',
+						);
 				}),
 				{ keyword: `%${keyword}%` },
 			);

@@ -1,5 +1,5 @@
 import { Metadata } from '@grpc/grpc-js';
-import { IsNotEmpty, IsOptional } from 'class-validator';
+import { IsNotEmpty } from 'class-validator';
 import { Observable } from 'rxjs';
 
 /* ===== REQUEST TYPES ===== */

@@ -671,7 +671,7 @@ export class ReleaseDraftService {
 			return {
 				success: true,
 				releaseId: fakeRelease.id,
-				release: fakeRelease as Release,
+				release: fakeRelease,
 			};
 		} catch (e) {
 			await queryRunner.rollbackTransaction();

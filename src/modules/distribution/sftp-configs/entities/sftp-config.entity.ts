@@ -1,10 +1,10 @@
 // src/modules/sftp-configs/entities/sftp-config.entity.ts
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { Aggregator } from '../../aggregator/entities/aggregator.entity';
 import { DspRoutingConfig } from '../../dsp-routing/entities/dsp-routing-config.entity';
 import { SftpMetadata } from '../type/sftp-config.type';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
 
 @Entity({ name: 'sftp_configs' })
 export class SftpConfig extends BaseUserTrackedUUIDEntity {

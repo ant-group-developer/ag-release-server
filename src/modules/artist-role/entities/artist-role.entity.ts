@@ -31,7 +31,8 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 		name: 'is_required',
 		type: 'boolean',
 		default: false,
-		comment: 'Xác định bắt buộc phải có vai trò này ở trong release hoặc track hay không',
+		comment:
+			'Xác định bắt buộc phải có vai trò này ở trong release hoặc track hay không',
 	})
 	isRequired: boolean;
 

@@ -2,11 +2,11 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AppEvent } from 'src/common/enums/common';
+import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Repository } from 'typeorm';
 import { appConfigDefault } from './constants/app-config.constant';
 import { UpdateConfigDto } from './dtos/app-config.dto';
 import { AppConfig } from './entities/app-config.entity';
-import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 
 @Injectable()
 export class AppConfigService implements OnModuleInit {

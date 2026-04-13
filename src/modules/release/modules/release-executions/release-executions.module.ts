@@ -18,7 +18,7 @@
 //     ],
 //     controllers: [ReleaseExecutionController],
 //     providers: [
-//         ReleaseExecutionsService, 
+//         ReleaseExecutionsService,
 //         ReleaseExecutionsQueryService,
 //         ReleaseExecutionProcessorService
 //     ],

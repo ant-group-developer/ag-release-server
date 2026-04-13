@@ -32,7 +32,7 @@ export class UpcService implements OnModuleInit {
 	}
 
 	private buildMetadata() {
-		const x_api_key = 
+		const x_api_key =
 			this.appConfigSv.cache.config.generator.API_KEY_GRPC_ISRC_UPC;
 
 		const md = new Metadata();
@@ -57,7 +57,7 @@ export class UpcService implements OnModuleInit {
 	}
 
 	async getUpc(payload: GetUpcRequest) {
-		console.log(payload)
+		console.log(payload);
 
 		return firstValueFrom(
 			this.grpcService

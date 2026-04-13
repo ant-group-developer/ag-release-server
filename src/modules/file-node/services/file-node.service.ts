@@ -210,7 +210,7 @@ export class FileNodeService {
 		for (const n of byId.values()) {
 			if (n.parentId) {
 				const p = byId.get(n.parentId);
-				if (p) p.children!.push(n);
+				if (p) p.children.push(n);
 				else roots.push(n);
 			} else roots.push(n);
 		}

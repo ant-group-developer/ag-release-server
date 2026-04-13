@@ -206,7 +206,7 @@ export class SftpConnectService {
 		timeoutMs?: number;
 	}) {
 		const port = sftp.port ?? 22;
-		
+
 		if (!sftp.host) throw new Error('Missing sftp.host');
 		if (!sftp.username) throw new Error('Missing sftp.username');
 		if (!sftp.password && !sftp.privateKey)

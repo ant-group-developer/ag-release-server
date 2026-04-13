@@ -9,4 +9,3 @@ export enum PriceTierType {
 	ALBUM = 'album',
 	TRACK = 'track',
 }
-

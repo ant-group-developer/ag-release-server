@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 import { ERN382Generator } from './generators/ern382.generator';
 import { ERN43Generator } from './generators/ern43.generator';
 import {
 	DDEXGenerateInput,
 	DDEXVersion,
 } from './interfaces/ddex-input.interface';
-import { ErnVersion } from '../ern/interfaces/ern-input.interface';
 
 @Injectable()
 export class DDEXService {

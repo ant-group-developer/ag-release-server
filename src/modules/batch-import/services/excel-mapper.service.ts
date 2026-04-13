@@ -6,10 +6,10 @@ import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
-import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
