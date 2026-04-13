@@ -534,8 +534,15 @@ export class ReleaseDraftService {
 		});
 
 		// relation: albumFormat
+		const albumFormatEntityOrigin = r.albumFormat
+			? maps.albumFormatEntity.get((r.albumFormat ?? '').trim())
+			: null;
 		const albumFormatEntity = new AlbumFormat();
-		albumFormatEntity.id = albumFormatId ?? '';
+		if (albumFormatEntityOrigin) {
+			Object.assign(albumFormatEntity, albumFormatEntityOrigin);
+		} else {
+			albumFormatEntity.id = albumFormatId ?? '';
+		}
 		fakeRelease.albumFormat = albumFormatEntity;
 
 		// relation: releaseCoverArts

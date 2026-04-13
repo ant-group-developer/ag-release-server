@@ -273,7 +273,10 @@ export class ReleaseValidateService {
 		const hasMatchingTitle = release.tracks.some(
 			(t) => t.title === release.title,
 		);
-		if (!hasMatchingTitle) {
+
+		const isSingle = release.albumFormat?.code === 'Single';
+
+		if (isSingle && !hasMatchingTitle) {
 			result.push(
 				new FieldErrorDetails({
 					messageCode: 'formFields.releaseNameMustMatchTrackName',
