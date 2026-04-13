@@ -35,12 +35,10 @@ export class ScheduleService implements OnModuleInit {
 		this.deleteIfExists({ jobName });
 
 		try {
-			const { enable, autoBackup, cronValue } =
+			const { enable, cronValue } =
 				this.appConfigService.cache.config.backupDatabase;
-			if (!enable || !autoBackup) {
-				this.logger.log(
-					'Backup database is disabled or auto backup is disabled',
-				);
+			if (!enable) {
+				this.logger.log('Backup database is disabled');
 				return;
 			}
 			const jobBackup = new CronJob(cronValue, () => {

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
 import * as path from 'path';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { DateFormat } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
@@ -30,7 +30,7 @@ export class DatabaseBackupService {
 
 	async eventBackup() {
 		if (!this.appConfigService.cache.config.backupDatabase.enable) {
-			throw new Error('Tính năng Backup Database đang bị tắt');
+			throw new ResponseError({ message: 'Tính năng Backup Database đang bị tắt' });
 		}
 
 		const data = await this.newJobBackup();
@@ -152,6 +152,11 @@ export class DatabaseBackupService {
 			'BACKUP_RCLONE_CONFIG_PATH',
 		)!;
 
+		// Inject R2 credentials from env directly to rclone
+		const r2AccessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || '';
+		const r2SecretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || '';
+		const r2Endpoint = this.configService.get<string>('R2_ENDPOINT') || '';
+
 		try {
 			const { stdout } = await execFileAsync(scriptBackupPath, {
 				env: {
@@ -168,6 +173,13 @@ export class DatabaseBackupService {
 
 					TO_GCS: cfg.toGcs ? '1' : '',
 					TO_R2: cfg.toR2 ? '1' : '',
+
+					// Rclone remote "r2" configuration
+					RCLONE_CONFIG_R2_TYPE: 's3',
+					RCLONE_CONFIG_R2_PROVIDER: 'Ceph', // Or 'Cloudflare'
+					RCLONE_CONFIG_R2_ACCESS_KEY_ID: r2AccessKeyId,
+					RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: r2SecretAccessKey,
+					RCLONE_CONFIG_R2_ENDPOINT: r2Endpoint,
 				},
 				shell: cfg.shell,
 			});
