@@ -40,6 +40,8 @@ import { ReleaseLogService } from '../modules/release-log/services/release-log.s
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
+import { ReleaseExecutionsService } from '../modules/release-executions/services/release-executions.service';
+import { ExecutionStatus, ExecutionType } from '../modules/release-executions/enum/release-execution.enum';
 
 @Injectable()
 export class ReleaseService {
@@ -72,8 +74,9 @@ export class ReleaseService {
 		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly fileExportCiService: FileExportCiService,
-		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly deliveryService: ReleaseDspDeliveryService,
+		private readonly releaseExecutionsService: ReleaseExecutionsService
+
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -389,7 +392,7 @@ export class ReleaseService {
 		};
 	}
 
-	async genUpc(releaseId: string) {
+	async genUpcById(releaseId: string) {
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -442,6 +445,24 @@ export class ReleaseService {
 		return newUpc;
 	}
 
+	async genListIsrcByReleaseId(releaseId: string){
+		const release = await this.releaseQueryService.findOneWithRelation(releaseId);
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+	}
+
+	async genListIsrc(release: Release){
+		for (const track of release.tracks) {
+			if (!track.isrc) {
+				await this.trackService.genISRC(track.id);
+			}
+		}
+	}
+	
+
 	// nghiệp vụ
 	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
@@ -456,7 +477,7 @@ export class ReleaseService {
 
 		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
 			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
+				status: ReleaseStatus.FAILED,
 			});
 
 			this.releaseLogService.failed({
@@ -467,6 +488,12 @@ export class ReleaseService {
 		});
 
 		return { message: 'Đang được xử lý' };
+	}
+
+	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
+		await this.releaseQueryService.findOne(id);
+		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED });
+		this.releaseExecutionsService.createAndProcess({releaseId: id, type: ExecutionType.INITIAL_RELEASE, originalDspCodes: dto.code, triggeredById: userId}).catch((_e) => {this.logger.error(_e)})
 	}
 
 	private async processingSubmit({
@@ -482,14 +509,10 @@ export class ReleaseService {
 
 		// Gen UPC / ISRC if needed
 		if (!release.upc) {
-			await this.genUpc(id);
+			await this.genUpcById(id);
 		}
 
-		for (const track of release.tracks) {
-			if (!track.isrc) {
-				await this.trackService.genISRC(track.id);
-			}
-		}
+		await this.genListIsrc(release);
 
 		// Validate
 		const errors =
@@ -520,7 +543,7 @@ export class ReleaseService {
 			});
 		} else {
 			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.ISSUES,
+				status: ReleaseStatus.FAILED,
 			});
 		}
 	}
