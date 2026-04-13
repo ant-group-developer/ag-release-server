@@ -70,9 +70,6 @@ export class UpdateBackupDatabaseDto {
 	@IsBoolean()
 	enable: boolean;
 
-	@IsBoolean()
-	autoBackup: boolean;
-
 	@IsNotEmpty()
 	@IsString()
 	cronValue: string;
