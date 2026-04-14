@@ -124,7 +124,9 @@ export class ArtistRoleService implements OnModuleInit {
 	async getListSimple() {
 		return this.artistRoleRepo
 			.createQueryBuilder('ar')
-			.select(['ar.id', 'ar.code', 'ar.name'])
+			.select(['ar.id', 'ar.code', 'ar.name', 'ar.isRequired'])
+			.orderBy('ar.isRequired', 'DESC')
+			.addOrderBy('ar.name', 'ASC')
 			.getMany();
 	}
 
