@@ -162,6 +162,7 @@ export class ReleaseDraftService {
 			releaseLanguage,
 			releaseCoverArt,
 			releaseTerritory,
+			priceTierId: data.priceTierId,
 		});
 
 		await this.releaseRepo.update(id, {
@@ -186,11 +187,13 @@ export class ReleaseDraftService {
 		releaseLanguage,
 		releaseCoverArt,
 		releaseTerritory,
+		priceTierId,
 	}: {
 		release: Release;
 		releaseLanguage?: UpdateReleaseLanguageDraftDto;
 		releaseCoverArt?: CreateReleaseCoverArtDto | null;
 		releaseTerritory?: UpdateReleaseTerritoryDto;
+		priceTierId?: string | null;
 	}) {
 		const releaseId = release.id;
 
@@ -208,6 +211,10 @@ export class ReleaseDraftService {
 			releaseId,
 			releaseCoverArt,
 		});
+
+		if (release.albumFormat?.code === 'Single') {
+			await this.trackDraftService.updateTracksOfRelease({ releaseId, data: { priceTierId }});
+		}
 	}
 
 	// delete

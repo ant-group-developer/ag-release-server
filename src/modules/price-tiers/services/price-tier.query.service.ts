@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { orderAndPaging, orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Currency } from 'src/modules/currency/entities/currency.entity';
@@ -20,7 +21,7 @@ export class PriceTierQueryService {
 
 	// private
 	private createQueryGetList(query: QueryGetListPriceTier) {
-		const { skip, pageSize, fieldOrder, orderBy, keyword, type } = query;
+		const { keyword, type } = query;
 
 		const qb = this.priceTierRepo
 			.createQueryBuilder('priceTier')
@@ -41,24 +42,18 @@ export class PriceTierQueryService {
 			])
 			.addSelect(['currency.id', 'currency.name', 'currency.code']);
 
-		if (keyword?.trim()) {
+		if (keyword && keyword.length > 0 && keyword[0]) {
 			qb.andWhere(
 				'(priceTier.code ILIKE :keyword OR CAST(priceTier.amount AS TEXT) ILIKE :keyword)',
 				{
-					keyword: `%${keyword}%`,
+					keyword: `%${keyword[0]}%`,
 				},
 			);
 		}
 		if (type) {
 			qb.andWhere('priceTier.type = :type', { type });
 		}
-		if (fieldOrder === FieldOrderCurrency.CURRENCY_NAME) {
-			qb.orderBy('currency.name', orderBy);
-		} else {
-			qb.orderBy(`priceTier.${fieldOrder}`, orderBy);
-		}
-
-		qb.skip(skip).take(pageSize);
+		orderAndPaging2({ qb, filter: query });
 
 		return qb;
 	}
