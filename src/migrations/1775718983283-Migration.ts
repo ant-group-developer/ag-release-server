@@ -135,6 +135,31 @@ export class Migration1775718983283 implements MigrationInterface {
         `);
 
         await queryRunner.query(`
+
+        await queryRunner.query(`
+            UPDATE "releases"
+            SET "status" = 'draft'
+            WHERE "status" IN ('submitted', 'awaiting_action')
+        `);
+
+        await queryRunner.query(`
+            UPDATE "releases"
+            SET "status" = 'issues'
+            WHERE "status" IN ('partially_failed')
+        `);
+
+        await queryRunner.query(`
+            CREATE TYPE "public"."releases_status_enum_old" AS ENUM(
+                'distributed',
+                'draft',
+                'issues',
+                'never_distributed',
+                'processing',
+                'taken_down'
+            )
+        `);
+
+        await queryRunner.query(`
             ALTER TABLE "releases" ALTER COLUMN "status" DROP DEFAULT
         `);
 
