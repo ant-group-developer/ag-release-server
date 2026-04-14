@@ -348,6 +348,8 @@ export class ReleaseQueryService {
 
 		query.addOrderBy('releaseArtist.createdAt', 'ASC');
 		query.addOrderBy('releaseContributor.createdAt', 'ASC');
+		query.addOrderBy('artistProfileDsp.name', 'ASC');
+		query.addOrderBy('artistContributorProfilesDsp.name', 'ASC');
 
 		return query;
 	}
