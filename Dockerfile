@@ -28,11 +28,15 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/scripts ./scripts
 # COPY --from=builder /app/keys ./keys
 
+# 3. Copy & fix entrypoint script
+COPY scripts/entrypoint.sh /app/entrypoint.sh
+RUN dos2unix /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 # Fix script xuống dòng & cấp quyền chạy
 RUN dos2unix /app/scripts/script.backup.sh && chmod +x /app/scripts/script.backup.sh
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# 3. Chạy ứng dụng
-CMD ["node", "dist/main.js"]
+# 4. Chạy ứng dụng qua entrypoint (migration + app)
+ENTRYPOINT ["/app/entrypoint.sh"]
