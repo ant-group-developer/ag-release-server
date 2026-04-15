@@ -13,7 +13,7 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
-import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { BaseQueryDto, BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderCurrency, PriceTierType } from '../enum/price-tier.enum';
 
 export class CreatePriceTierDto {
@@ -103,9 +103,9 @@ export class UpdatePriceTierDto {
 	type?: PriceTierType;
 }
 
-export class QueryGetListPriceTier extends BaseQueryDto {
+export class QueryGetListPriceTier extends BaseQueryDto2 {
 	@IsEnum(FieldOrderCurrency)
-	fieldOrder: FieldOrderCurrency = FieldOrderCurrency.CREATED_AT;
+	fieldOrder: FieldOrderCurrency = FieldOrderCurrency.priceTier_createdAt;
 
 	@IsOptional()
 	@IsEnum(PriceTierType)

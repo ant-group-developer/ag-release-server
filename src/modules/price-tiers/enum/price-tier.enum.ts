@@ -1,8 +1,9 @@
 export enum FieldOrderCurrency {
-	CURRENCY_NAME = 'currencyName',
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
-	ORDER = 'order',
+	currency_name = 'currency.name',
+	priceTier_createdAt = 'priceTier.createdAt',
+	priceTier_updatedAt = 'priceTier.updatedAt',
+	priceTier_order = 'priceTier.order',
+	priceTier_code = 'priceTier.code',
 }
 
 export enum PriceTierType {

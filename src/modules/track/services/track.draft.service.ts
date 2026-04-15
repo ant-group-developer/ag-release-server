@@ -146,6 +146,20 @@ export class TrackDraftService {
 		return await this.trackPolicyService.update({ trackPolicyId, data });
 	}
 
+	async updateTracksOfRelease({
+		releaseId,
+		data,
+	}: {
+		releaseId: string;
+		data: UpdateTrackDraftDto;
+	}) {
+		const tracks = await this.trackQueryService.getTracksOfRelease({
+			releaseId,
+		});
+
+		await Promise.all(tracks.map((track) => this.update(track.id, data)));
+	}
+
 	//delete
 	async bulkDelete(data: BulkDeleteTracksDto) {
 		const { ids } = data;
