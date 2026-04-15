@@ -46,9 +46,6 @@ export class ReleaseService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 
-		@InjectRepository(ReleaseLog)
-		private readonly releaseLogRepo: Repository<ReleaseLog>,
-
 		private readonly releaseLogService: ReleaseLogService,
 
 		private readonly releaseValidateService: ReleaseValidateService,
@@ -56,18 +53,9 @@ export class ReleaseService {
 
 		private readonly bucketService: BucketService2,
 
-		// private readonly releaseDdexCiService: ReleaseDdexCiService,
-		// private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
-
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
 		private readonly appConfigService: AppConfigService,
-
-		@InjectRepository(ReleaseDspDelivery)
-		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
-
-		@InjectRepository(Dsp)
-		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly deliveryService: ReleaseDspDeliveryService,

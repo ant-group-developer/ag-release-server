@@ -15,14 +15,14 @@ export class FileEntity extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
-		length: 100 + 'YYYYMMDDHHmmss_'.length,
+		length: 500 + 'YYYYMMDDHHmmss_'.length,
 		comment: 'Tên file gốc, có thể kèm prefix timestamp',
 	})
 	fileName: string;
 
 	@Column({
 		type: 'varchar',
-		length: 200,
+		length: 500,
 		comment: 'Key lưu trữ file trong bucket (đường dẫn nội bộ)',
 	})
 	key: string;

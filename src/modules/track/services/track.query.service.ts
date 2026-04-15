@@ -29,6 +29,7 @@ import {
 	ITrackDraft,
 	ITrackNonDraft,
 } from '../interfaces/track.interface';
+import { PriceTierType } from 'src/modules/price-tiers/enum/price-tier.enum';
 
 @Injectable()
 export class TrackQueryService {
@@ -428,6 +429,16 @@ export class TrackQueryService {
 			await this.validateForeignKey({
 				priceTierId,
 			});
+
+			const priceTier = await this.priceTierRepo.findOneOrFail({
+				where: { id: priceTierId }
+			});
+
+			if (priceTier.type !== PriceTierType.TRACK) {
+				throw new ResponseError({
+					message: 'Invalid priceTier.type'
+				})
+			}
 		}
 
 		if (trackSensitiveId && trackSensitiveId !== trackDb.trackSensitiveId) {
