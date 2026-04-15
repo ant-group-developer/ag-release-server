@@ -136,6 +136,8 @@ export class TrackQueryService {
 
 		qb.addOrderBy('trackArtist.createdAt', 'ASC');
 		qb.addOrderBy('trackContributor.createdAt', 'ASC');
+		qb.addOrderBy('artistProfileDsp.name', 'ASC');
+		qb.addOrderBy('artistContributorProfileDsp.name', 'ASC');
 
 		const track = await qb.getOne();
 
@@ -524,6 +526,8 @@ export class TrackQueryService {
 
 		qb.addOrderBy('trackArtist.createdAt', 'ASC');
 		qb.addOrderBy('trackContributor.createdAt', 'ASC');
+		qb.addOrderBy('artistProfileDsp.name', 'ASC');
+		qb.addOrderBy('artistContributorProfileDsp.name', 'ASC');
 
 		return qb;
 	}

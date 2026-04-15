@@ -171,7 +171,7 @@ export class UpdateTrackDraftDto extends PartialType(CreateTrackDraftDto) {
 
 	@IsOptional()
 	@IsUUID()
-	priceTierId?: string;
+	priceTierId?: string | null;
 
 	//
 	@IsOptional()

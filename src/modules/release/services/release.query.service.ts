@@ -51,7 +51,7 @@ export class ReleaseQueryService {
 	async findOne(id: string): Promise<Release> {
 		const release = await this.releaseRepo.findOne({
 			where: { id },
-			relations: ['releaseLanguage', 'releaseTerritory'],
+			relations: ['releaseLanguage', 'releaseTerritory', 'albumFormat'],
 		});
 
 		if (!release) {
