@@ -18,7 +18,7 @@ import { UploadPurpose } from '../enum/bucket.enum';
 class CreateFileDto {
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(100)
+	@MaxLength(500)
 	fileName: string;
 
 	@IsString()

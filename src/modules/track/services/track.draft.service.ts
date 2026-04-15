@@ -136,6 +136,14 @@ export class TrackDraftService {
 		return this.trackQueryService.ensureDraftTrack(result);
 	}
 
+	async updateSafe(id: string, data: UpdateTrackDraftDto){
+		try {
+			await this.update(id, data)
+		} catch (error) {
+			this.logger.error(error)
+		}
+	}
+
 	async updateTrackPolicy({
 		trackPolicyId,
 		data,
@@ -157,7 +165,7 @@ export class TrackDraftService {
 			releaseId,
 		});
 
-		await Promise.all(tracks.map((track) => this.update(track.id, data)));
+		await Promise.all(tracks.map((track) => this.updateSafe(track.id, data)));
 	}
 
 	//delete
