@@ -146,6 +146,9 @@ export interface ErnTrackInput {
 	/** Audio file technical details */
 	audioFile?: ErnAudioFileInput;
 
+	// is_instrumental
+	isInstrumental?: boolean;
+
 	price?: ErnPriceInput;
 }
 
