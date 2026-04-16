@@ -681,8 +681,7 @@ export class ReleaseQueryService {
 			throw ReleaseException.NOT_FOUND();
 		}
 
-		release.tracks.sort((a, b) => a.order - b.order);
-
+		release.sortTracksByOrderAsc();
 		return release;
 	}
 

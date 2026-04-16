@@ -340,4 +340,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		// 	'Đường dẫn cho nghiệp vụ lấy ddex theo ern version tương ứng, ví dụ baseDirectDdex/3_8',
 	})
 	directDdexOnServer: string | null;
+
+	sortTracksByOrderAsc() {
+		if (this.tracks && Array.isArray(this.tracks)) {
+			this.tracks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+		}
+		return this;
+	}
 }
