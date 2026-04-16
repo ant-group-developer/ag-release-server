@@ -191,6 +191,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'date',
 		nullable: true,
+		comment: 'Ngày kết thúc phát hành ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	releaseEndDate: Date | null;
+
+	@Column({
+		type: 'date',
+		nullable: true,
 		comment: 'Ngày phát hành gốc ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	releaseOriginalDate: Date | null;

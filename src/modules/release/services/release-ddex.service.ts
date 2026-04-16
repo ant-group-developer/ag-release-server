@@ -602,7 +602,9 @@ export class ReleaseDdexService {
 						undefined,
 
 					languageOfPerformance:
-						track.trackLanguage?.audioLanguage?.code ?? undefined,
+						track.trackLanguage?.audioLanguage?.code === 'NoLanguage'
+							? undefined
+							: track.trackLanguage?.audioLanguage?.code,
 
 					parentalWarning: normalizeParentalWarning(
 						track.trackSensitive?.code,
@@ -660,6 +662,10 @@ export class ReleaseDdexService {
 
 					startDate: release.releaseDate
 						? this.formatDateTime(release.releaseDate)
+						: '',
+
+					endDate: release.releaseEndDate
+						? this.formatDateTime(release.releaseEndDate)
 						: '',
 
 					commercialModels: [
