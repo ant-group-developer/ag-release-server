@@ -36,6 +36,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 			done: (err: any, secretOrPublicKey?: string | Buffer) => void,
 		) => {
 			try {
+				if (!rawJwt || !rawJwt.includes('.')) {
+					return done(null, ''); // Invalid token format, trigger 401
+				}
+				
 				const header = JSON.parse(
 					Buffer.from(rawJwt.split('.')[0], 'base64url').toString(
 						'utf8',
@@ -50,13 +54,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 						'fallback kid =',
 						kid,
 					);
-					return done(new Error(`Unknown key id: ${kid}`));
+					return done(new Error(`Unknown key id: ${kid}`)); // Internal error configuration
 				}
 				// console.log('Using kid:', kid); // uncomment for debugging
 				return done(null, key);
 			} catch (e) {
-				console.error('JWT header parse error:', e);
-				return done(e);
+				// JWT header parse error (e.g., token is literal string "undefined")
+				return done(null, ''); // Trigger 401 Unauthorized instead of 500
 			}
 		};
 
