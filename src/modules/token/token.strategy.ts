@@ -39,7 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 				if (!rawJwt || !rawJwt.includes('.')) {
 					return done(null, ''); // Invalid token format, trigger 401
 				}
-				
+
 				const header = JSON.parse(
 					Buffer.from(rawJwt.split('.')[0], 'base64url').toString(
 						'utf8',

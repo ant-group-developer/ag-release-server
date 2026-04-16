@@ -7,6 +7,7 @@ import { Role } from '../role/entities/role.entity';
 import { RoleService } from '../role/services/role.service';
 import { TenantRolesService } from '../tenant-roles/tenant-roles.service';
 import { UserTypeService } from '../user/services/user-type.service';
+import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import { UpdateUserRoleDto } from './user-role.dto';
 import { UserRole } from './user-role.entity';
 
@@ -57,6 +58,10 @@ export class UserRoleService {
 	}
 
 	async getRole(tenantId: string, userId: string): Promise<Role[]> {
+		if (checkIsSystemTenant(tenantId)) {
+			return [];
+		}
+
 		const enabledRoleIds =
 			await this.tenantRolesService.getEnabledRoleIds(tenantId);
 
@@ -97,6 +102,10 @@ export class UserRoleService {
 		tenantId: string,
 		userId: string,
 	): Promise<Permission[]> {
+		if (checkIsSystemTenant(tenantId)) {
+			return [];
+		}
+
 		const enabledRoleIds =
 			await this.tenantRolesService.getEnabledRoleIds(tenantId);
 
