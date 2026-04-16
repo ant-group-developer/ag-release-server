@@ -479,13 +479,35 @@ export class ReleaseService {
 
 	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED });
+		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
 		this.releaseExecutionsService
 			.createAndProcess({
 				releaseId: id,
 				type: ExecutionType.INITIAL_RELEASE,
 				originalDspCodes: dto.code,
 				triggeredById: userId,
+			})
+			.catch((_e) => {
+				this.logger.error(_e);
+			});
+	}
+
+	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
+		await this.releaseQueryService.findOne(id);
+		await this.releaseRepo.update(id, {
+			releaseEndDate: new Date(),
+		});
+		this.releaseExecutionsService
+			.createAndProcess({
+				releaseId: id,
+				type: ExecutionType.TAKEDOWN,
+				originalDspCodes: dto.code,
+				triggeredById: userId,
+			})
+			.then(async () => {
+				await this.releaseRepo.update(id, {
+					status: ReleaseStatus.TAKEN_DOWN,
+				});
 			})
 			.catch((_e) => {
 				this.logger.error(_e);

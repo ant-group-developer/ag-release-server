@@ -180,7 +180,7 @@ export function resizeCoverImage({
 }
 
 export async function removeFolder(path: string) {
-	return;
+	// return;
 	await fs.promises.rm(path, {
 		recursive: true,
 		force: true,
