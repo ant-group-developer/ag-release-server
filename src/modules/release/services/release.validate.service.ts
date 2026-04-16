@@ -242,6 +242,17 @@ export class ReleaseValidateService {
 		const requiredRoles = this.appConfigService.requiredArtistRoles;
 		const result: FieldErrorDetails[] = [];
 
+		const upc = release.upc?.trim();
+		if (upc && (upc.length < 10 || upc.length > 14)) {
+			result.push(
+				new FieldErrorDetails({
+					message: 'Mã UPC phải có từ 10 đến 14 ký tự',
+					page: 'core-detail',
+					field: 'upc',
+				}),
+			);
+		}
+
 		if (!release.primaryGenreId) {
 			result.push(
 				new FieldErrorDetails({
@@ -419,7 +430,14 @@ export class ReleaseValidateService {
 
 		// release contributors validation (Dynamic isRequired)
 		if (requiredRoles.length > 0) {
-			const missingRoles = requiredRoles.filter(
+			let applicableRoles = requiredRoles;
+			if (release.releaseLanguage?.audioLanguage?.code === 'NoLanguage') {
+				applicableRoles = applicableRoles.filter(
+					(r) => r.code !== 'Lyricist',
+				);
+			}
+
+			const missingRoles = applicableRoles.filter(
 				(role) =>
 					!release.releaseContributors?.some(
 						(c) => c.artistRole?.code === role.code,
@@ -479,6 +497,19 @@ export class ReleaseValidateService {
 
 		tracks.forEach((track, index) => {
 			const { trackLanguage } = track;
+
+			const isrc = track.isrc?.trim();
+			if (isrc && isrc.length !== 12) {
+				result.push(
+					new FieldErrorDetails({
+						message: 'Mã ISRC phải có chính xác 12 ký tự',
+						page: 'tracks',
+						field: `tracks.${index}.isrc`,
+						trackId: track.id,
+					}),
+				);
+			}
+
 			if (!track.trackOriginTypeId) {
 				result.push(
 					new FieldErrorDetails({
@@ -552,7 +583,14 @@ export class ReleaseValidateService {
 
 			// track contributors validation (Dynamic isRequired)
 			if (requiredRoles.length > 0) {
-				const missingRoles = requiredRoles.filter(
+				let applicableRoles = requiredRoles;
+				if (track.trackLanguage?.audioLanguage?.code === 'NoLanguage') {
+					applicableRoles = applicableRoles.filter(
+						(r) => r.code !== 'Lyricist',
+					);
+				}
+
+				const missingRoles = applicableRoles.filter(
 					(role) =>
 						!track.trackContributors?.some(
 							(c) => c.artistRole?.code === role.code,
