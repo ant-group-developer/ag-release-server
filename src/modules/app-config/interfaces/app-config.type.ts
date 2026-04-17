@@ -82,6 +82,11 @@ export interface OtherAppconfig {
 	excelDataStartRow?: number | null;
 }
 
+export interface ResendConfig {
+	apiKey: string;
+	email: string;
+}
+
 export interface AppConfigShape {
 	auth0: Auth0Config; // Cấu hình xác thực và phân quyền bằng Auth0
 	website: WebsiteConfig; // Cấu hình website công khai (domain, branding, liên kết)
@@ -92,4 +97,5 @@ export interface AppConfigShape {
 	generator: IGenerator;
 
 	other: OtherAppconfig;
+	resend: ResendConfig;
 }

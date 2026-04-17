@@ -128,6 +128,14 @@ export class UpdateGeneratorDto {
 	API_KEY_GRPC_ISRC_UPC: string;
 }
 
+export class UpdateResendConfigDto {
+	@IsString()
+	apiKey: string;
+
+	@IsString()
+	email: string;
+}
+
 export class UpdateOtherAppconfigDto {
 	@IsOptional()
 	fileCiTemplateId?: string | null;
@@ -176,4 +184,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateOtherAppconfigDto)
 	other?: UpdateOtherAppconfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateResendConfigDto)
+	resend?: UpdateResendConfigDto;
 }
