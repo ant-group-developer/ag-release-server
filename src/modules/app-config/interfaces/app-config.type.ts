@@ -36,6 +36,9 @@ export interface BackupDatabase {
 	toDrive: boolean; // lưu Google Drive
 	toGcs: boolean; // lưu Google Cloud Storage
 	toR2: boolean; // lưu Cloudflare R2
+
+	baseUrlR2: string;
+	baseUrlConsoleR2: string;
 }
 
 export interface Telegram {

@@ -95,38 +95,13 @@ export class DatabaseBackupService {
 	private buildBackupRecord(fileName: string) {
 		const cfg = this.appConfigService.cache.config.backupDatabase;
 
-		const bucketName = this.configService.get<string>(
-			'GCS_PROTECTED_BUCKET',
-		)!;
-		const baseUrlGcs = this.configService.get<string>(
-			'BACKUP_BASE_URL_GCS',
-		)!;
-		const baseUrlConsoleGcsBackup = this.configService.get<string>(
-			'BACKUP_BASE_URL_CONSOLE_GCS',
-		)!;
-
-		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
-		const baseUrlR2 = this.configService.get<string>('BACKUP_BASE_URL_R2')!;
-		const baseUrlConsoleR2Backup = this.configService.get<string>(
-			'BACKUP_BASE_URL_CONSOLE_R2',
-		)!;
-
 		return {
 			urlDrive: cfg.toDrive
 				? '1pAzFumXPHykhMdkqehEOabwmVNJg8kAx/view?usp=drive_link'
 				: null,
 
-			urlGcs: cfg.toGcs
-				? `${baseUrlGcs}/${bucketName}/backups/${fileName}`
-				: null,
-
-			urlFolderGcs: baseUrlConsoleGcsBackup + `/${fileName}`,
-
-			urlR2: cfg.toR2
-				? `${baseUrlR2}/${r2BucketName}/backups/${fileName}`
-				: null,
-
-			urlFolderR2: baseUrlConsoleR2Backup + `/${fileName}`,
+			urlR2: cfg.baseUrlR2 + `/${fileName}`,
+			urlFolderR2: cfg.baseUrlConsoleR2 + `/${fileName}`,
 		};
 	}
 

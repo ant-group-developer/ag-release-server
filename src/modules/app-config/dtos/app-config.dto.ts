@@ -96,6 +96,14 @@ export class UpdateBackupDatabaseDto {
 
 	@IsBoolean()
 	toR2: boolean;
+
+	@IsString()
+	@IsNotEmpty()
+	baseUrlR2: string;
+
+	@IsString()
+	@IsNotEmpty()
+	baseUrlConsoleR2: string;
 }
 
 export class UpdateTrackConfigDto {

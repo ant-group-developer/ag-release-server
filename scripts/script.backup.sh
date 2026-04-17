@@ -47,7 +47,7 @@ fi
 
 # export db
 mkdir -p "$(dirname "$BACKUP_PATH")"
-if PGPASSWORD=$DB_PASSWORD pg_dump -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" > "$BACKUP_PATH"; then
+if PGPASSWORD=$DB_PASSWORD pg_dump -F c -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" -f "$BACKUP_PATH"; then
   # Sử dụng wc -c để lấy kích thước tệp trên Alpine
   FILE_SIZE=$(wc -c < "$BACKUP_PATH")
   echo "FILE_SIZE: $FILE_SIZE"

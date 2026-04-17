@@ -43,6 +43,9 @@ export const appConfigDefault: AppConfigShape = {
 		toDrive: false,
 		toGcs: true,
 		toR2: false,
+
+		baseUrlR2: '',
+		baseUrlConsoleR2: '',
 	},
 
 	telegram: {
