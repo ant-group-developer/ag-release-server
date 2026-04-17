@@ -10,6 +10,10 @@ import { ReleaseStatus } from '../../release/enum/release.enum';
 import { AppConfigShape } from '../interfaces/app-config.type';
 
 export const appConfigDefault: AppConfigShape = {
+	resend: {
+		apiKey: '',
+		email: '',
+	},
 	auth0: {
 		clientId: '',
 		clientSecret: '',
@@ -39,6 +43,9 @@ export const appConfigDefault: AppConfigShape = {
 		toDrive: false,
 		toGcs: true,
 		toR2: false,
+
+		baseUrlR2: '',
+		baseUrlConsoleR2: '',
 	},
 
 	telegram: {

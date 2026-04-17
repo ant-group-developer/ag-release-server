@@ -14,6 +14,7 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TrackArtistMessageCodeSuccess } from './constants/track-artist.constant';
 
 import {
+	BulkCreateTrackArtistDto,
 	CreateTrackArtistDto,
 	QueryGetListTrackArtistDto,
 	UpdateTrackArtistDto,
@@ -29,9 +30,21 @@ export class TrackArtistController {
 	@Post()
 	async create(
 		@Body() createTrackArtistDto: CreateTrackArtistDto,
-	): Promise<ResponseSuccess<TrackArtist>> {
+	): Promise<ResponseSuccess<TrackArtist | TrackArtist[]>> {
 		const result =
 			await this.trackArtistService.create(createTrackArtistDto);
+		return new ResponseSuccess({
+			data: result,
+			messageCode: TrackArtistMessageCodeSuccess.CREATE,
+		});
+	}
+
+	@Post('bulk')
+	async bulkCreate(
+		@Body() dto: BulkCreateTrackArtistDto,
+	): Promise<ResponseSuccess<TrackArtist | TrackArtist[]>> {
+		const result =
+			await this.trackArtistService.bulkCreate(dto);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: TrackArtistMessageCodeSuccess.CREATE,

@@ -96,6 +96,14 @@ export class UpdateBackupDatabaseDto {
 
 	@IsBoolean()
 	toR2: boolean;
+
+	@IsString()
+	@IsNotEmpty()
+	baseUrlR2: string;
+
+	@IsString()
+	@IsNotEmpty()
+	baseUrlConsoleR2: string;
 }
 
 export class UpdateTrackConfigDto {
@@ -126,6 +134,14 @@ export class UpdateGeneratorDto {
 	@IsOptional()
 	// @IsNotEmpty()
 	API_KEY_GRPC_ISRC_UPC: string;
+}
+
+export class UpdateResendConfigDto {
+	@IsString()
+	apiKey: string;
+
+	@IsString()
+	email: string;
 }
 
 export class UpdateOtherAppconfigDto {
@@ -176,4 +192,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateOtherAppconfigDto)
 	other?: UpdateOtherAppconfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdateResendConfigDto)
+	resend?: UpdateResendConfigDto;
 }

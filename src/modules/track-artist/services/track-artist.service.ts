@@ -8,6 +8,7 @@ import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { TrackArtistMessages } from '../constants/track-artist.constant';
 import {
+	BulkCreateTrackArtistDto,
 	CreateTrackArtistDto,
 	QueryGetListTrackArtistDto,
 	UpdateTrackArtistDto,
@@ -40,6 +41,30 @@ export class TrackArtistService {
 		const trackArtist = this.trackArtistRepo.create(data);
 		await this.trackArtistValidateService.handleValidateCreate(trackArtist);
 		return await this.trackArtistRepo.save(trackArtist);
+	}
+
+	async createSafe(
+		data: CreateTrackArtistDto,
+	): Promise<TrackArtist | null> {
+		try {
+			return await this.create(data);
+		} catch (error: any) {
+			this.logger.warn(
+				`Skip create track artist, reason: ${error.message}`,
+			);
+			return null;
+		}
+	}
+
+	async bulkCreate(
+		data: BulkCreateTrackArtistDto,
+	): Promise<TrackArtist[]> {
+		const results = await Promise.all(
+			data.items.map((item) => this.createSafe(item)),
+		);
+		return results.filter(
+			(item): item is TrackArtist => item !== null,
+		);
 	}
 
 	async copyArtistFromReleaseSource1({

@@ -1,12 +1,16 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import {
+	ArrayMinSize,
+	IsArray,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
 	Length,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 export class CreateTrackContributorDto {
@@ -25,6 +29,15 @@ export class CreateTrackContributorDto {
 	@IsNotEmpty()
 	@Length(10, 10)
 	trackId: string;
+}
+
+export class BulkCreateTrackContributorDto {
+	@ApiProperty({ type: [CreateTrackContributorDto] })
+	@IsArray()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => CreateTrackContributorDto)
+	items: CreateTrackContributorDto[];
 }
 
 export class UpdateTrackContributorDto extends PartialType(

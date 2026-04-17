@@ -2,7 +2,7 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TrackContributor } from '../entities/track-contributor.entity';
 
 export class TrackContributorResponseSuccess {
-	static CREATE(data: TrackContributor) {
+	static CREATE(data: TrackContributor | TrackContributor[]) {
 		return new ResponseSuccess({
 			data,
 			messageCode: 'trackContributor.message.success.create',
