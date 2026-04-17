@@ -46,9 +46,6 @@ export class ReleaseService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 
-		@InjectRepository(ReleaseLog)
-		private readonly releaseLogRepo: Repository<ReleaseLog>,
-
 		private readonly releaseLogService: ReleaseLogService,
 
 		private readonly releaseValidateService: ReleaseValidateService,
@@ -56,18 +53,9 @@ export class ReleaseService {
 
 		private readonly bucketService: BucketService2,
 
-		// private readonly releaseDdexCiService: ReleaseDdexCiService,
-		// private readonly releaseDdexSpotifyService2: ReleaseSpotifyService2,
-
 		private readonly upcService: UpcService,
 		private readonly trackService: TrackService,
 		private readonly appConfigService: AppConfigService,
-
-		@InjectRepository(ReleaseDspDelivery)
-		private readonly releaseDspDeliveryRepo: Repository<ReleaseDspDelivery>,
-
-		@InjectRepository(Dsp)
-		private readonly dspRepo: Repository<Dsp>,
 
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly deliveryService: ReleaseDspDeliveryService,
@@ -491,13 +479,35 @@ export class ReleaseService {
 
 	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED });
+		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
 		this.releaseExecutionsService
 			.createAndProcess({
 				releaseId: id,
 				type: ExecutionType.INITIAL_RELEASE,
 				originalDspCodes: dto.code,
 				triggeredById: userId,
+			})
+			.catch((_e) => {
+				this.logger.error(_e);
+			});
+	}
+
+	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
+		await this.releaseQueryService.findOne(id);
+		await this.releaseRepo.update(id, {
+			releaseEndDate: new Date(),
+		});
+		this.releaseExecutionsService
+			.createAndProcess({
+				releaseId: id,
+				type: ExecutionType.TAKEDOWN,
+				originalDspCodes: dto.code,
+				triggeredById: userId,
+			})
+			.then(async () => {
+				await this.releaseRepo.update(id, {
+					status: ReleaseStatus.TAKEN_DOWN,
+				});
 			})
 			.catch((_e) => {
 				this.logger.error(_e);

@@ -16,7 +16,6 @@ export class ErnController {
 	constructor(private readonly ernService: ErnService) {}
 
 	// --- ERN 4.3 ---
-
 	@Get('example/43/single')
 	@Header('Content-Type', 'application/xml')
 	exampleSingle43() {

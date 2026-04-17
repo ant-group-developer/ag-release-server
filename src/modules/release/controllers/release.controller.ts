@@ -268,6 +268,21 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post(':id/takedown')
+	async takedown(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Req() req: Request,
+		@Body() dto: SubmitReleaseDto,
+	) {
+		const userId = req.user!.sub;
+		await this.releaseService.takedown(id, userId, dto);
+
+		return new ResponseSuccess({
+			messageCode: 'common.processing',
+		});
+	}
+
+	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Post(':id/gen-upc')
 	async genUpc(
 		@Param('id', ParseUUIDPipe) id: string,

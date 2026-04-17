@@ -191,6 +191,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'date',
 		nullable: true,
+		comment: 'Ngày kết thúc phát hành ' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	releaseEndDate: Date | null;
+
+	@Column({
+		type: 'date',
+		nullable: true,
 		comment: 'Ngày phát hành gốc ' + COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	releaseOriginalDate: Date | null;
@@ -333,4 +340,11 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		// 	'Đường dẫn cho nghiệp vụ lấy ddex theo ern version tương ứng, ví dụ baseDirectDdex/3_8',
 	})
 	directDdexOnServer: string | null;
+
+	sortTracksByOrderAsc() {
+		if (this.tracks && Array.isArray(this.tracks)) {
+			this.tracks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+		}
+		return this;
+	}
 }

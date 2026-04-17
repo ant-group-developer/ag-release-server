@@ -121,6 +121,14 @@ export class CreateReleaseDto {
 	@IsDate()
 	releaseDate: Date;
 
+	@ApiProperty({ example: '2025-12-31', required: false })
+	@IsOptional()
+	@Transform(({ value }: { value: string | null | undefined }) =>
+		value ? new Date(value) : value,
+	)
+	@IsDate()
+	releaseEndDate?: Date | null;
+
 	@ApiProperty({ example: '18:00' })
 	@IsOptional()
 	@IsString()
@@ -196,6 +204,14 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	)
 	@IsDate()
 	releaseDate?: Date;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsOptional()
+	@Transform(({ value }: { value: string | null | undefined }) =>
+		value ? new Date(value) : value,
+	)
+	@IsDate()
+	releaseEndDate?: Date | null;
 
 	@IsOptional()
 	@IsUUID()
