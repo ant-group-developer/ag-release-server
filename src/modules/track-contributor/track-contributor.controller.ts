@@ -19,6 +19,7 @@ import {
 
 import { TrackContributorResponseSuccess } from './constants/track-contributor.response';
 import {
+	BulkCreateTrackContributorDto,
 	CreateTrackContributorDto,
 	QueryGetListTrackContributorDto,
 	UpdateTrackContributorDto,
@@ -37,6 +38,14 @@ export class TrackContributorController {
 	@ApiResponse({ status: 201 })
 	async create(@Body() dto: CreateTrackContributorDto) {
 		const result = await this.trackContributorService.create(dto);
+		return TrackContributorResponseSuccess.CREATE(result);
+	}
+
+	@Post('bulk')
+	@ApiOperation({ summary: 'Bulk create track contributors' })
+	@ApiResponse({ status: 201, description: 'Created' })
+	async bulkCreate(@Body() dto: BulkCreateTrackContributorDto) {
+		const result = await this.trackContributorService.bulkCreate(dto);
 		return TrackContributorResponseSuccess.CREATE(result);
 	}
 

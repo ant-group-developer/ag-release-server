@@ -6,6 +6,7 @@ import { Track } from 'src/modules/track/entities/track.entity';
 import { Repository } from 'typeorm';
 import { TrackContributorException } from '../constants/track-contributor.exception';
 import {
+	BulkCreateTrackContributorDto,
 	CreateTrackContributorDto,
 	QueryGetListTrackContributorDto,
 	UpdateTrackContributorDto,
@@ -36,6 +37,30 @@ export class TrackContributorService {
 		);
 
 		return this.trackContributorRepo.save(trackContributor);
+	}
+
+	async createSafe(
+		data: CreateTrackContributorDto,
+	): Promise<TrackContributor | null> {
+		try {
+			return await this.create(data);
+		} catch (error: any) {
+			this.logger.warn(
+				`Skip create track contributor, reason: ${error.message}`,
+			);
+			return null;
+		}
+	}
+
+	async bulkCreate(
+		data: BulkCreateTrackContributorDto,
+	): Promise<TrackContributor[]> {
+		const results = await Promise.all(
+			data.items.map((item) => this.createSafe(item)),
+		);
+		return results.filter(
+			(item): item is TrackContributor => item !== null,
+		);
 	}
 
 	async findOne(id: string): Promise<TrackContributor> {
