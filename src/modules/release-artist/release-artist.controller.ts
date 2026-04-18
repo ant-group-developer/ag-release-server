@@ -13,6 +13,7 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { ReleaseArtistMessageCodeSuccess } from './constants/release-artist.constant';
 
 import {
+	BulkCreateReleaseArtistDto,
 	CreateReleaseArtistDto,
 	QueryGetListReleaseArtistDto,
 	UpdateReleaseArtistDto,
@@ -28,10 +29,21 @@ export class ReleaseArtistController {
 	@Post()
 	async create(
 		@Body() createReleaseArtistDto: CreateReleaseArtistDto,
-	): Promise<ResponseSuccess<ReleaseArtist>> {
+	): Promise<ResponseSuccess<ReleaseArtist | ReleaseArtist[]>> {
 		const result = await this.releaseArtistService.create(
 			createReleaseArtistDto,
 		);
+		return new ResponseSuccess({
+			data: result,
+			messageCode: ReleaseArtistMessageCodeSuccess.CREATE,
+		});
+	}
+
+	@Post('bulk')
+	async bulkCreate(
+		@Body() dto: BulkCreateReleaseArtistDto,
+	): Promise<ResponseSuccess<ReleaseArtist | ReleaseArtist[]>> {
+		const result = await this.releaseArtistService.bulkCreate(dto);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: ReleaseArtistMessageCodeSuccess.CREATE,

@@ -1,5 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
 import {
+	ArrayMinSize,
+	IsArray,
 	IsBoolean,
 	IsNotEmpty,
 	IsOptional,
@@ -7,7 +9,9 @@ import {
 	IsUUID,
 	Length,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 export class CreateReleaseArtistDto {
@@ -27,6 +31,14 @@ export class CreateReleaseArtistDto {
 	@IsBoolean()
 	@IsNotEmpty()
 	addArtistToTracks: boolean;
+}
+
+export class BulkCreateReleaseArtistDto {
+	@IsArray()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => CreateReleaseArtistDto)
+	items: CreateReleaseArtistDto[];
 }
 
 export class UpdateReleaseArtistDto extends PartialType(

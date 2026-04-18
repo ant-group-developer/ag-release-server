@@ -26,7 +26,7 @@ export const DEFAULT_LENGTH_PICTURE = 200;
 
 // app config
 export const DEFAULT_CRON_VALUE = '0 1 * * *';
-export const DEFAULT_FILE_NAME_BACKUP = 'backup_ant_release.sql';
+export const DEFAULT_FILE_NAME_BACKUP = 'backup_ant_release.backup';
 
 const SHELL_WINDOWS = 'C:\\Program Files\\Git\\bin\\bash.exe';
 // const SHELL_LINUX = '/bin/bash';

@@ -6,6 +6,7 @@ import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-r
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -39,6 +40,7 @@ export class ReleaseExecutionProcessorService {
 		private readonly dspRoutingService: DspRoutingConfigsService,
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly notificationService: NotificationService,
+		private readonly notificationResendService: NotificationResendService,
 	) {}
 
 	/**
@@ -759,23 +761,15 @@ export class ReleaseExecutionProcessorService {
 				const subject =
 					aggregator.deliveryEmailSubject ||
 					`[Distribution] Release: ${releaseId} | DSP: ${dspCode}`;
-				const html = `
-                    <p>Dear ${aggregator.name},</p>
-                    <p>A new release has been prepared for distribution to ${dspCode}.</p>
-                    <p>Please find the attached Excel file for your reference.</p>
-                    ${aggregator.manualUploadUrl ? `<p>Manual Upload URL: <a href="${aggregator.manualUploadUrl}">${aggregator.manualUploadUrl}</a></p>` : ''}
-                    <p>Best regards,</p>
-                    <p>Antigravity Music Server</p>
-                `;
+				const html = ` `;
 
-				await this.notificationService.sendCustomEmail({
+				await this.notificationResendService.sendEmail({
 					to: [aggregator.deliveryEmail],
 					subject,
 					html,
 					attachments: [
 						{
-							filename:
-								meta.fileName || 'distribution_export.xlsx',
+							filename: meta.fileName || 'distribution_export.xlsx',
 							path: meta.filePath,
 						},
 					],

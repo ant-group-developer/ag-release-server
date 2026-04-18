@@ -5,6 +5,7 @@ import { TrackDraftService } from 'src/modules/track/services/track.draft.servic
 import { Repository } from 'typeorm';
 import { ReleaseArtistMessage } from '../constants/release-artist.constant';
 import {
+	BulkCreateReleaseArtistDto,
 	CreateReleaseArtistDto,
 	QueryGetListReleaseArtistDto,
 	UpdateReleaseArtistDto,
@@ -41,6 +42,30 @@ export class ReleaseArtistService {
 		});
 
 		return releaseArtistDb;
+	}
+
+	async createSafe(
+		data: CreateReleaseArtistDto,
+	): Promise<ReleaseArtist | null> {
+		try {
+			return await this.create(data);
+		} catch (error: any) {
+			this.logger.warn(
+				`Skip create release artist, reason: ${error.message}`,
+			);
+			return null;
+		}
+	}
+
+	async bulkCreate(
+		data: BulkCreateReleaseArtistDto,
+	): Promise<ReleaseArtist[]> {
+		const results = await Promise.all(
+			data.items.map((item) => this.createSafe(item)),
+		);
+		return results.filter(
+			(item): item is ReleaseArtist => item !== null,
+		);
 	}
 
 	// read

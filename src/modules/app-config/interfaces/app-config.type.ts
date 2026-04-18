@@ -36,6 +36,9 @@ export interface BackupDatabase {
 	toDrive: boolean; // lưu Google Drive
 	toGcs: boolean; // lưu Google Cloud Storage
 	toR2: boolean; // lưu Cloudflare R2
+
+	baseUrlR2: string;
+	baseUrlConsoleR2: string;
 }
 
 export interface Telegram {
@@ -82,6 +85,11 @@ export interface OtherAppconfig {
 	excelDataStartRow?: number | null;
 }
 
+export interface ResendConfig {
+	apiKey: string;
+	email: string;
+}
+
 export interface AppConfigShape {
 	auth0: Auth0Config; // Cấu hình xác thực và phân quyền bằng Auth0
 	website: WebsiteConfig; // Cấu hình website công khai (domain, branding, liên kết)
@@ -92,4 +100,5 @@ export interface AppConfigShape {
 	generator: IGenerator;
 
 	other: OtherAppconfig;
+	resend: ResendConfig;
 }
