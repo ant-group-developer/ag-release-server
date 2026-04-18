@@ -13,10 +13,6 @@ export class RoleStatusDto {
 }
 
 export class UpdateTenantRolesDto {
-	@ApiProperty({ format: 'uuid' })
-	@IsUUID('4')
-	tenantId: string;
-
 	@ApiProperty({ type: [RoleStatusDto] })
 	@ValidateNested({ each: true })
 	@Type(() => RoleStatusDto)

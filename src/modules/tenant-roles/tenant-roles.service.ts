@@ -15,7 +15,7 @@ export class TenantRolesService {
 		private readonly tenantService: TenantService,
 	) {}
 
-	async update({ tenantId, data }: UpdateTenantRolesDto) {
+	async update(tenantId: string, { data }: UpdateTenantRolesDto) {
 		await this.roleService.validateExisted(
 			data.map((item) => item.roleId),
 		);

@@ -64,7 +64,6 @@ import { TrackRevenueModule } from './modules/track-revenue/track-revenue.module
 import { TrackSensitiveModule } from './modules/track-sensitive/track-sensitive.module';
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
-import { UserRoleModule } from './modules/user-role/user-role.module';
 import { UserModule } from './modules/user/user.module';
 
 @Module({
@@ -127,7 +126,6 @@ import { UserModule } from './modules/user/user.module';
 		AuthModule,
 		TokenModule,
 
-		UserRoleModule,
 		PermissionModule,
 		RoleModule,
 
