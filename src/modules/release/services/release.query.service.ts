@@ -661,12 +661,16 @@ export class ReleaseQueryService {
 				albumFormat: true,
 				releaseCoverArts: true,
 				releaseArtists: true,
-				releaseLanguage: true,
+				releaseLanguage: {
+					audioLanguage: true,
+				},
 				releaseContributors: {
 					artistRole: true,
 				},
 				tracks: {
-					trackLanguage: true,
+					trackLanguage: {
+						audioLanguage: true,
+					},
 					audioFile: true,
 					trackArtists: true,
 					trackContributors: {
