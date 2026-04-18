@@ -46,10 +46,10 @@ export class User extends BaseUUIDEntity {
 	tenantUser: TenantUser[];
 
 	@Column({ type: 'uuid', nullable: true })
-	creatorId: string;
+	creatorId: string | null;
 
 	@Column({ type: 'uuid', nullable: true })
-	modifierId: string;
+	modifierId: string | null;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })

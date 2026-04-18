@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { AccessControlService } from '../access-control/access-control.service';
 import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { UpdateUserRoleDto } from './user-role.dto';
+import { UserId } from 'src/common/decorators/req.decorators';
 
 @TenantOwnerOrAdminOnly()
 @ApiTags('User Roles')
@@ -49,11 +50,13 @@ export class UserRoleController {
 		@Param('userId', ParseUUIDPipe) userId: string,
 		@Body() payload: UpdateUserRoleDto,
 		@Req() req: Request,
+		@UserId() userReqId: string
 	) {
 		const data = await this.accessControlService.updateUserRoles(
 			req.user!.tenantId,
 			userId,
 			payload.roleIds,
+			userReqId
 		);
 		return new ResponseSuccess({ data });
 	}

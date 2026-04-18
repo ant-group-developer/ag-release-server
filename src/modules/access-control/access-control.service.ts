@@ -153,6 +153,7 @@ export class AccessControlService {
 		tenantId: string,
 		userId: string,
 		roleIds: string[],
+		userReqId: string
 	) {
 		if (tenantId === SYSTEM_TENANT_ID) return [];
 
@@ -184,6 +185,8 @@ export class AccessControlService {
 				tenantId,
 				userId,
 				roleId,
+				creatorId: userReqId,
+				modifierId: userReqId
 			})),
 		);
 		const result = await this.userRoleRepository.save(newData);
