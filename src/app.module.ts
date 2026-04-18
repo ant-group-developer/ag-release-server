@@ -65,7 +65,6 @@ import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserRoleModule } from './modules/user-role/user-role.module';
 import { UserModule } from './modules/user/user.module';
-import { TrackDetailRawModule } from './modules/track-detail-raw/track-detail-raw.module';
 
 @Module({
 	imports: [
@@ -163,7 +162,6 @@ import { TrackDetailRawModule } from './modules/track-detail-raw/track-detail-ra
 		ErnModule,
 
 		BatchImportModule,
-		TrackDetailRawModule,
 	],
 	controllers: [AppController],
 	providers: [
