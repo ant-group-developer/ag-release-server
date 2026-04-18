@@ -1,7 +1,7 @@
 export enum FieldOrderTrack {
-	CREATED_AT = 'createdAt',
-	ORDER = 'order',
-	TITLE = 'title',
+	track_createdAt = 'track.createdAt',
+	track_order = 'track.order',
+	track_title = 'track.title',
 }
 
 export enum ScanCopyrightStatus {

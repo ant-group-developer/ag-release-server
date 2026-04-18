@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -77,7 +78,7 @@ export class TrackQueryService {
 		const [items, totalItems] = await this.trackRepo.findAndCount({
 			select: { id: true, title: true },
 			where: {
-				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+				...(keyword && keyword.length > 0 && keyword[0] ? { title: ILike(`%${keyword[0]}%`) } : {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
@@ -620,23 +621,20 @@ export class TrackQueryService {
 			endCreatedAt,
 			startUpdatedAt,
 			endUpdatedAt,
-
-			fieldOrder,
-			orderBy,
-
-			skip,
-			pageSize,
 		} = filter;
 
-		if (keyword) {
-			qb.andWhere(
-				new Brackets((qb) => {
-					qb.where('track.title ILIKE :keyword')
-						.orWhere('track.lyric ILIKE :keyword')
-						.orWhere('track.version ILIKE :keyword');
-				}),
-				{ keyword: `%${keyword}%` },
-			);
+		if (keyword && keyword.length) {
+			keyword.forEach((kw, index) => {
+				if (!kw) return;
+				qb.andWhere(
+					new Brackets((qbInner) => {
+						qbInner.where(`track.title ILIKE :kw_${index}`)
+							.orWhere(`track.lyric ILIKE :kw_${index}`)
+							.orWhere(`track.version ILIKE :kw_${index}`);
+					}),
+					{ [`kw_${index}`]: `%${kw}%` },
+				);
+			});
 		}
 
 		if (releaseId?.length) {
@@ -698,8 +696,7 @@ export class TrackQueryService {
 			);
 		}
 
-		qb.orderBy(`track.${fieldOrder}`, orderBy);
-		qb.skip(skip).take(pageSize);
+		orderAndPaging2({ qb, filter });
 
 		return qb;
 	}
