@@ -12,7 +12,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
-import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { FieldOrderTrack, ScanCopyrightStatus } from '../enum/track.enum';
 
@@ -104,7 +104,7 @@ export class UpdateTrackDto extends PartialType(CreateTrackDto) {
 	pLineOwner?: string;
 }
 
-export class QueryGetListTrackDto extends BaseQueryDto {
+export class QueryGetListTrackDto extends BaseQueryDto2 {
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -177,7 +177,7 @@ export class QueryGetListTrackDto extends BaseQueryDto {
 	primaryGenreId?: string[];
 
 	@IsEnum(FieldOrderTrack)
-	fieldOrder: string = FieldOrderTrack.CREATED_AT;
+	fieldOrder: string = FieldOrderTrack.track_createdAt;
 
 	@ApiPropertyOptional({
 		description: 'Tenant IDs to filter tracks (comma-separated)',
