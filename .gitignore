@@ -71,8 +71,3 @@ credential.json
 secrets
 
 .agent
-src/modules/track-detail-raw/track-detail-raw.controller.ts
-src/modules/track-detail-raw/track-detail-raw.module.ts
-src/modules/track-detail-raw/track-detail-raw.service.ts
-src/modules/track-detail-raw/dto/track-detail-raw.dto.ts
-src/modules/track-detail-raw/entities/track-detail-raw.entity.ts
