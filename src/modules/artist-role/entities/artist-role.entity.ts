@@ -38,9 +38,9 @@ export class ArtistRole extends BaseUserTrackedUUIDEntity {
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
-	creator: User;
+	creator: User | null;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
-	modifier: User;
+	modifier: User | null;
 }

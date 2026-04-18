@@ -41,6 +41,7 @@ import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
 import { checkIsSystemTenant } from './utils/user-type.util';
+import { UserId } from 'src/common/decorators/req.decorators';
 
 @TenantOwnerOrAdminOnly()
 @ApiTags('Users')
@@ -160,6 +161,7 @@ export class UserController {
 		@Param('userId', ParseUUIDPipe) userId: string,
 		@Body() payload: UpdateUserRoleDto,
 		@Req() req: Request,
+		@UserId() userReqId: string
 	) {
 		const targetTenantId =
 			req.user!.tenantId === SYSTEM_TENANT_ID && payload.tenantId
@@ -170,6 +172,7 @@ export class UserController {
 			targetTenantId,
 			userId,
 			payload.roleIds,
+			userReqId
 		);
 		return new ResponseSuccess({ data });
 	}

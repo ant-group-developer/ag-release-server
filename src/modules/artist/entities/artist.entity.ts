@@ -114,11 +114,11 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
-	creator: User;
+	creator: User | null;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
-	modifier: User;
+	modifier: User | null;
 
 	@OneToMany(() => ArtistProfile, (artistProfile) => artistProfile.artist)
 	artistProfiles: ArtistProfile[];
