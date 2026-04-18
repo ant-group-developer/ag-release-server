@@ -4,6 +4,7 @@ import {
 	DEFAULT_LENGTH_NOTE,
 } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
+import { TenantRole } from 'src/modules/tenant-roles/tenant-role.entity';
 import { UserRole } from 'src/modules/user-role/user-role.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { RolePermission } from './role-permission.entity';
@@ -57,4 +58,7 @@ export class Role extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => UserRole, (userRole) => userRole.role)
 	userRoles: UserRole[];
+
+	@OneToMany(() => TenantRole, (tenantRole) => tenantRole.role)
+	tenantRoles: TenantRole[];
 }
