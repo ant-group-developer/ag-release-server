@@ -2,14 +2,17 @@ import {
 	Body,
 	Controller,
 	Delete,
+	forwardRef,
 	Get,
+	Inject,
 	Param,
+	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import {
 	PageDto,
@@ -22,6 +25,9 @@ import {
 	SystemAdminOnly,
 	TenantOwnerOrAdminOnly,
 } from '../auth/decorators/auth.decorator';
+import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
+import { AccessControlService } from '../access-control/access-control.service';
+import { UpdateUserRoleDto } from '../user-role/user-role.dto';
 import { UserMessages } from './constants/messages';
 import {
 	BulkUpdateTenantUserDto,
@@ -35,6 +41,7 @@ import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
 import { checkIsSystemTenant } from './utils/user-type.util';
+import { UserId } from 'src/common/decorators/req.decorators';
 
 @TenantOwnerOrAdminOnly()
 @ApiTags('Users')
@@ -43,6 +50,8 @@ export class UserController {
 	constructor(
 		private readonly userService: UserService,
 		private readonly tenantUserService: TenantUserService,
+		@Inject(forwardRef(() => AccessControlService))
+		private readonly accessControlService: AccessControlService,
 	) {}
 
 	@Post()
@@ -88,8 +97,88 @@ export class UserController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Get roles available for assignment in the current tenant' })
+	@Get('assignable-roles')
+	async getAssignableRoles(
+		@Req() req: Request,
+		@Query('tenantId') queryTenantId?: string,
+	) {
+		const targetTenantId =
+			req.user!.tenantId === SYSTEM_TENANT_ID && queryTenantId
+				? queryTenantId
+				: req.user!.tenantId;
+
+		const data = await this.accessControlService.getAssignableRoles(
+			targetTenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@ApiOperation({ summary: 'Get roles assigned to a user in the current tenant' })
+	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
+	@Get(':userId/roles')
+	async getUserRoles(
+		@Param('userId', ParseUUIDPipe) userId: string,
+		@Req() req: Request,
+		@Query('tenantId') queryTenantId?: string,
+	) {
+		const targetTenantId =
+			req.user!.tenantId === SYSTEM_TENANT_ID && queryTenantId
+				? queryTenantId
+				: req.user!.tenantId;
+
+		const data = await this.accessControlService.getUserRoles(
+			targetTenantId,
+			userId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@ApiOperation({ summary: 'Get resolved permissions of a user in the current tenant' })
+	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
+	@Get(':userId/permissions')
+	async getUserPermissions(
+		@Param('userId', ParseUUIDPipe) userId: string,
+		@Req() req: Request,
+		@Query('tenantId') queryTenantId?: string,
+	) {
+		const targetTenantId =
+			req.user!.tenantId === SYSTEM_TENANT_ID && queryTenantId
+				? queryTenantId
+				: req.user!.tenantId;
+
+		const data = await this.accessControlService.getUserPermissions(
+			targetTenantId,
+			userId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@ApiOperation({ summary: 'Update roles assigned to a user in the current tenant' })
+	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
+	@Post(':userId/roles')
+	async updateUserRoles(
+		@Param('userId', ParseUUIDPipe) userId: string,
+		@Body() payload: UpdateUserRoleDto,
+		@Req() req: Request,
+		@UserId() userReqId: string
+	) {
+		const targetTenantId =
+			req.user!.tenantId === SYSTEM_TENANT_ID && payload.tenantId
+				? payload.tenantId
+				: req.user!.tenantId;
+
+		const data = await this.accessControlService.updateUserRoles(
+			targetTenantId,
+			userId,
+			payload.roleIds,
+			userReqId
+		);
+		return new ResponseSuccess({ data });
+	}
+
 	@Get(':id')
-	async findOne(@Param('id') id: string): Promise<ResponseSuccess<User>> {
+	async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<User>> {
 		const result = await this.userService.findOne(id, {
 			relations: {
 				tenantUser: {

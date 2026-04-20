@@ -65,11 +65,11 @@ export class Genre extends BaseUserTrackedCustomIDEntity {
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
-	creator: User;
+	creator: User | null;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
-	modifier: User;
+	modifier: User | null;
 
 	primaryGenreReleasesCount?: number;
 	subGenreReleasesCount?: number;

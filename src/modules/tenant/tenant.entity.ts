@@ -14,6 +14,7 @@ import {
 import { LENGTH_PICTURE } from '../database/constants/database.constants';
 import { TenantDsp } from '../tenant-dsp/tenant-dsp.entity';
 import { TenantIssue } from '../tenant-issue/entities/tenant-issue.entity';
+import { TenantRole } from '../tenant-roles/tenant-role.entity';
 import { TenantTier } from '../tenant-tiers/entities/tenant-tiers.entity';
 import { TenantUser } from '../user/entities/tenant-user.entity';
 import { User } from '../user/entities/user.entity';
@@ -144,6 +145,9 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => TenantIssue, (tenantIssue) => tenantIssue.tenant)
 	tenantIssues: TenantIssue[];
+
+	@OneToMany(() => TenantRole, (tenantRole) => tenantRole.tenant)
+	tenantRoles: TenantRole[];
 
 	@ManyToOne(() => TenantTier, (tenantTier) => tenantTier.tenants, {
 		onDelete: 'SET NULL',

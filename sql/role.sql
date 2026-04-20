@@ -1,41 +1,82 @@
 INSERT INTO roles (name, note, color, creator_id, modifier_id, code)
 VALUES
+  -- Analytics
+  ('Analytics Admin','Full control over analytics.','#84CC16', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'analytics.admin'),
+  ('Analytics Creator','Create analytics.','#84CC16', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'analytics.creator'),
+  ('Analytics Editor','Edit analytics.','#84CC16', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'analytics.editor'),
+  ('Analytics Viewer','Read-only access to analytics.','#84CC16', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'analytics.viewer'),
+
   -- Artist
   ('Artist Admin','Full control over artists.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.admin'),
-  ('Artist Manager','Manage artists, members, payouts, social links, and label links.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.manager'),
-  ('Artist Verifier','Verify artists'' identity/ownership.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.verifier'),
+  ('Artist Creator','Create artists.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.creator'),
+  ('Artist Editor','Edit artists.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.editor'),
   ('Artist Viewer','Read-only access to artists.','#8B5CF6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'artist.viewer'),
 
-  -- DSP
-  ('DSP Admin','Configure and control DSP integrations.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.admin'),
-  ('DSP Operator','Operate catalog syncs and retries; view deliveries/reports.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.operator'),
-  ('DSP Viewer','View DSP integrations, deliveries, and reports.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.viewer'),
+  -- Dashboard
+  ('Dashboard Admin','Full control over dashboard.','#F43F5E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dashboard.admin'),
+  ('Dashboard Creator','Create dashboard.','#F43F5E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dashboard.creator'),
+  ('Dashboard Editor','Edit dashboard.','#F43F5E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dashboard.editor'),
+  ('Dashboard Viewer','Read-only access to dashboard.','#F43F5E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dashboard.viewer'),
 
-  -- Genre
-  ('Genre Admin','Full control over genres.','#F59E0B', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'genre.admin'),
-  ('Genre Editor','Create and edit genres; assign to tracks/releases.','#F59E0B', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'genre.editor'),
-  ('Genre Viewer','Read-only access to genres.','#F59E0B', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'genre.viewer'),
+  -- DSP
+  ('DSP Admin','Full control over DSPs.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.admin'),
+  ('DSP Creator','Create DSPs.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.creator'),
+  ('DSP Editor','Edit DSPs.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.editor'),
+  ('DSP Viewer','Read-only access to DSPs.','#06B6D4', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'dsp.viewer'),
+
+  -- Issue
+  ('Issue Admin','Full control over issues.','#EAB308', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'issue.admin'),
+  ('Issue Creator','Create issues.','#EAB308', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'issue.creator'),
+  ('Issue Editor','Edit issues.','#EAB308', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'issue.editor'),
+  ('Issue Viewer','Read-only access to issues.','#EAB308', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'issue.viewer'),
 
   -- Label
   ('Label Admin','Full control over labels.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.admin'),
-  ('Label Manager','Manage labels, members, payouts, and contracts.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.manager'),
-  ('Label Verifier','Verify labels and agreements.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.verifier'),
+  ('Label Creator','Create labels.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.creator'),
+  ('Label Editor','Edit labels.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.editor'),
   ('Label Viewer','Read-only access to labels.','#EC4899', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'label.viewer'),
 
   -- Release
   ('Release Admin','Full control over releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.admin'),
-  ('Release Approver','Approve or reject releases during QA.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.approver'),
-  ('Release Editor','Create and edit releases and schedules.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.editor'),
-  ('Release Publisher','Publish/unpublish releases and submit to DSPs.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.publisher'),
-  ('Release Viewer','Read-only access to releases, including status and history.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.viewer'),
+  ('Release Creator','Create releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.creator'),
+  ('Release Editor','Edit releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.editor'),
+  ('Release Viewer','Read-only access to releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.viewer'),
+
+  -- Revenue
+  ('Revenue Admin','Full control over revenue.','#22C55E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'revenue.admin'),
+  ('Revenue Creator','Create revenue.','#22C55E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'revenue.creator'),
+  ('Revenue Editor','Edit revenue.','#22C55E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'revenue.editor'),
+  ('Revenue Viewer','Read-only access to revenue.','#22C55E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'revenue.viewer'),
+
+  -- Tenant Issue
+  ('Tenant Issue Admin','Full control over tenant issues.','#F97316', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_issue.admin'),
+  ('Tenant Issue Creator','Create tenant issues.','#F97316', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_issue.creator'),
+  ('Tenant Issue Editor','Edit tenant issues.','#F97316', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_issue.editor'),
+  ('Tenant Issue Viewer','Read-only access to tenant issues.','#F97316', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_issue.viewer'),
+
+  -- Tenant Tier
+  ('Tenant Tier Admin','Full control over tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.admin'),
+  ('Tenant Tier Creator','Create tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.creator'),
+  ('Tenant Tier Editor','Edit tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.editor'),
+  ('Tenant Tier Viewer','Read-only access to tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.viewer'),
 
   -- Track
   ('Track Admin','Full control over tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.admin'),
-  ('Track Approver','Approve or reject tracks during QA.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.approver'),
-  ('Track Audio Editor','Upload and manage audio assets for tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.audioEditor'),
-  ('Track Editor','Create and edit tracks, ISRCs, lyrics; attach to releases.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.editor'),
-  ('Track Metadata Editor','Edit track metadata like ISRCs and lyrics.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.metadataEditor'),
-  ('Track Viewer','Read-only access to tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.viewer')
+  ('Track Creator','Create tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.creator'),
+  ('Track Editor','Edit tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.editor'),
+  ('Track Viewer','Read-only access to tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.viewer'),
+
+  -- User
+  ('User Admin','Full control over users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.admin'),
+  ('User Creator','Create users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.creator'),
+  ('User Editor','Edit users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.editor'),
+  ('User Viewer','Read-only access to users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.viewer'),
+
+  -- Workspace
+  ('Workspace Admin','Full control over workspaces.','#14B8A6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'workspace.admin'),
+  ('Workspace Creator','Create workspaces.','#14B8A6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'workspace.creator'),
+  ('Workspace Editor','Edit workspaces.','#14B8A6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'workspace.editor'),
+  ('Workspace Viewer','Read-only access to workspaces.','#14B8A6', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'workspace.viewer')
 ON CONFLICT (name) DO UPDATE SET
   note  = EXCLUDED.note,
   color = EXCLUDED.color;

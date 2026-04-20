@@ -69,11 +69,11 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'creator_id' })
-	creator: User;
+	creator: User | null;
 
 	@ManyToOne(() => User)
 	@JoinColumn({ name: 'modifier_id' })
-	modifier: User;
+	modifier: User | null;
 
 	releaseCount?: number;
 	trackCount?: number;

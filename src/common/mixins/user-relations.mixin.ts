@@ -7,11 +7,11 @@ export function WithUserRelations<T extends Constructor>(Base: T) {
 	abstract class UserRelationsMixin extends Base {
 		@ManyToOne(() => User)
 		@JoinColumn({ name: 'creator_id' })
-		creator: User;
+		creator: User | null;
 
 		@ManyToOne(() => User)
 		@JoinColumn({ name: 'modifier_id' })
-		modifier: User;
+		modifier: User | null;
 	}
 
 	return UserRelationsMixin;

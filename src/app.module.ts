@@ -50,6 +50,7 @@ import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
 import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
+import { TenantRolesModule } from './modules/tenant-roles/tenant-roles.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
@@ -63,7 +64,6 @@ import { TrackRevenueModule } from './modules/track-revenue/track-revenue.module
 import { TrackSensitiveModule } from './modules/track-sensitive/track-sensitive.module';
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
-import { UserRoleModule } from './modules/user-role/user-role.module';
 import { UserModule } from './modules/user/user.module';
 
 @Module({
@@ -121,11 +121,11 @@ import { UserModule } from './modules/user/user.module';
 		AppConfigModule,
 		TenantModule,
 		TenantDspModule,
+		TenantRolesModule,
 		UserModule,
 		AuthModule,
 		TokenModule,
 
-		UserRoleModule,
 		PermissionModule,
 		RoleModule,
 
