@@ -44,6 +44,14 @@ export class Role extends BaseUserTrackedUUIDEntity {
 	isActive: boolean;
 
 	@Column({
+		name: 'is_default',
+		type: 'boolean',
+		default: false,
+		comment: 'Vai trò mặc định cho tenant chưa cấu hình',
+	})
+	isDefault: boolean;
+
+	@Column({
 		type: 'varchar',
 		length: DEFAULT_LENGTH_NOTE,
 		nullable: true,
