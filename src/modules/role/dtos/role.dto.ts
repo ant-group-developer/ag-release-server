@@ -42,6 +42,10 @@ export class CreateRoleDto {
 	@IsBoolean()
 	isActive?: boolean;
 
+	@IsOptional()
+	@IsBoolean()
+	isDefault?: boolean;
+
 	@IsNotEmpty()
 	@IsArray()
 	@IsUUID('4', { each: true })
@@ -76,6 +80,10 @@ export class UpdateRoleDto {
 	@IsOptional()
 	@IsBoolean()
 	isActive?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	isDefault?: boolean;
 
 	@ValidateIf((_, value) => value !== undefined)
 	@IsArray()

@@ -122,6 +122,14 @@ export class RoleService {
 		});
 	}
 
+	async getDefaultRoleIds(): Promise<string[]> {
+		const roles = await this.roleRepo.find({
+			where: { isDefault: true, isActive: true },
+			select: ['id'],
+		});
+		return roles.map((r) => r.id);
+	}
+
 	// update
 	async handleUpdate(id: string, data: UpdateRoleDto, userId: string) {
 		const { permissionIds, ...rest } = data;

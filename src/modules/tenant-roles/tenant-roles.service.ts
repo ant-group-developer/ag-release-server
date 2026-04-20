@@ -53,8 +53,8 @@ export class TenantRolesService {
 
 	/**
 	 * Returns the IDs of roles enabled for a tenant.
-	 * If no tenant_roles records exist (unconfigured), returns null
-	 * to indicate "all roles are permitted" (permissive default).
+	 * If no tenant_roles records exist (unconfigured), returns
+	 * only roles marked as `isDefault` (restrictive default).
 	 */
 	async getEnabledRoleIds(tenantId: string): Promise<string[] | null> {
 		const records = await this.tenantRoleRepository.find({
@@ -62,8 +62,11 @@ export class TenantRolesService {
 			select: ['roleId', 'isActive'],
 		});
 
-		// Permissive default: no records = all roles allowed
-		if (records.length === 0) return null;
+		// Restrictive default: no records = only default roles allowed
+		if (records.length === 0) {
+			const defaultRoles = await this.roleService.getDefaultRoleIds();
+			return defaultRoles;
+		}
 
 		return records
 			.filter((record) => record.isActive)
