@@ -173,6 +173,13 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/qa-flag-ci')
+	async getQaFlagCi(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.getQaFlagCi(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id/file-export-ci')
 	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
 		const buffer = await this.releaseService.getFileExportCiById(id);

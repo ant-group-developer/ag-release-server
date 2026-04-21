@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { ActionModule } from './modules/action/action.module';
+import { CiModule } from './modules/partners-api/ci/ci.module';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistProfileModule } from './modules/artist-profile/artist-profile.module';
@@ -162,6 +163,7 @@ import { UserModule } from './modules/user/user.module';
 		ErnModule,
 
 		BatchImportModule,
+		CiModule,
 	],
 	controllers: [AppController],
 	providers: [

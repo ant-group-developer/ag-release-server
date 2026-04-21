@@ -49,6 +49,7 @@ import { ReleaseExecution } from './modules/release-executions/entities/release-
 import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
+import { CiModule } from '../partners-api/ci/ci.module';
 
 @Module({
 	imports: [
@@ -95,6 +96,7 @@ import { ReleaseExecutionsService } from './modules/release-executions/services/
 		AggregatorsModule,
 		NotificationModule,
 		// ReleaseExecutionsModule
+		CiModule
 	],
 	controllers: [
 		ReleaseController,

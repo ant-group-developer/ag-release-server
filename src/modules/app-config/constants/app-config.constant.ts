@@ -82,4 +82,11 @@ export const appConfigDefault: AppConfigShape = {
 		fileCiTemplateId: '',
 		excelDataStartRow: 16,
 	},
+	partners: {
+		ci: {
+			token: '',
+			organisationId: '',
+			baseUrl: '',
+		},
+	},
 };
