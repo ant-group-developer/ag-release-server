@@ -243,7 +243,7 @@ export class ReleaseValidateService {
 		const result: FieldErrorDetails[] = [];
 
 		const upc = release.upc?.trim();
-		if (upc && (upc.length <= 10 || upc.length >= 14)) {
+		if (upc && (upc.length < 10 || upc.length > 14)) {
 			result.push(
 				new FieldErrorDetails({
 					message: 'Mã UPC phải có từ 10 đến 14 ký tự',

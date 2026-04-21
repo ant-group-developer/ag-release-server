@@ -47,6 +47,7 @@ export class ReleaseDspDeliveryQueryService {
 			.map((dsp) => ({
 				releaseId,
 				dspId: dsp.id,
+				isSelected: false,
 				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
 				lastEnqueuedAt: null,
 				lastDeliveredAt: null,
