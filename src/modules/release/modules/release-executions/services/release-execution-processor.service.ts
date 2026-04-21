@@ -752,10 +752,9 @@ export class ReleaseExecutionProcessorService {
 
 				const aggregator = execDsp.dsp?.dspRoutingConfig?.aggregator;
 				if (!aggregator?.deliveryEmail) {
-					this.logger.warn(
+					throw new Error(
 						`[SEND_EMAIL_EXPORT] Bỏ qua gửi email cho ${dspCode} vì thiếu deliveryEmail`,
 					);
-					break;
 				}
 
 				const subject =
