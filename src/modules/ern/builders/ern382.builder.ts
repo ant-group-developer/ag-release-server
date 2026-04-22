@@ -591,6 +591,9 @@ export class Ern382Builder {
 
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Main release deal
+
+		console.log('this.input.deals', this.input.deals);
+
 		for (const deal of this.input.deals!) {
 			const rd = dealList.ele('ReleaseDeal');
 			rd.ele('DealReleaseReference').txt('R0');

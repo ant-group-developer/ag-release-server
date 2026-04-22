@@ -498,7 +498,7 @@ export class Ern43Builder {
 		// Release visibility
 		this.buildVisibility(dealList);
 	}
-
+	
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Apply each deal to each track release
 		for (let i = 0; i < this.input.tracks.length; i++) {
@@ -530,8 +530,6 @@ export class Ern43Builder {
 				}
 
 				this.appendPrice(terms, track);
-
-				// console.log('appendPrice', terms, track);
 
 				d.ele('DealTechnicalResourceDetailsReferenceList')
 					.ele('DealTechnicalResourceDetailsReference')
