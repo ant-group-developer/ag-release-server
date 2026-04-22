@@ -38,6 +38,7 @@ import { ReleaseExecutionsService } from '../modules/release-executions/services
 import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
+import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 
 @Injectable()
 export class ReleaseService {
@@ -60,6 +61,9 @@ export class ReleaseService {
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly deliveryService: ReleaseDspDeliveryService,
 		private readonly releaseExecutionsService: ReleaseExecutionsService,
+
+		// partners api
+		private readonly ciService: CiService,	
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -569,76 +573,15 @@ export class ReleaseService {
 		}
 	}
 
-	// ==================== Test / Debug endpoints (delegate) ====================
+	// get qa flag ci
+	async getQaFlagCi(id: string) {
+		const release = await this.releaseQueryService.findOne(id);
+		const res = await this.ciService.getReleases({
+			gtin: release.upc ? [release.upc] : [],
+		});
+		const idCi = res._embedded.find((item: any) => item.barcode === release.upc)?.id;
+		const res2 = await this.ciService.getReleaseQaFlags(idCi);
+		return res2._embedded;
+	}
 
-	// async parseMetadata(id: string) {
-	// 	return await this.releaseDdexCiService.parseMetadata(id);
-	// }
-
-	// // ci
-	// async createMetadataCiAndUploadToSftp(id: string) {
-	// 	return await this.releaseDdexCiService.createMetadataCiAndUploadToSftp(
-	// 		id,
-	// 	);
-	// }
-
-	// async createMetadataCiOnServer(id: string) {
-	// 	return await this.releaseDdexCiService.createMetadataFolderCiOnServer(
-	// 		id,
-	// 	);
-	// }
-
-	// async uploadMetadataCiToBucket({
-	// 	id,
-	// 	// localDir,
-	// }: {
-	// 	id: string;
-	// 	// localDir: string;
-	// }) {
-	// 	return await this.releaseDdexCiService.uploadMetadataFolderCiToBucket({
-	// 		// localDir,
-	// 		releaseId: id,
-	// 	});
-	// }
-
-	// async downloadMetadataCiFromBucket(releaseId: string) {
-	// 	return await this.releaseDdexCiService.downloadMetadataCiFromBucket(
-	// 		releaseId,
-	// 	);
-	// }
-
-	// async uploadMetadataCiToSftp(id: string) {
-	// 	return await this.releaseDdexCiService.uploadMetadataFolderCiToSftp(id);
-	// }
-
-	// async createMetadataCiAndUploadToBucket(id: string) {
-	// 	return await this.releaseDdexCiService.createMetadataFolderCiAndUploadToBucket(
-	// 		id,
-	// 	);
-	// }
-
-	// // spotify
-	// async createAndUploadMetadataSpotify(id: string) {
-	// 	await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(id);
-	// 	await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(id);
-	// }
-
-	// // test
-	// async createMetadataSpotifyOnServer(id: string) {
-	// 	const result =
-	// 		await this.releaseDdexSpotifyService2.createMetadataSpotifyOnServer(
-	// 			id,
-	// 		);
-
-	// 	return result;
-	// }
-
-	// async uploadMetadataSpotifyToSftp(id: string) {
-	// 	const result =
-	// 		await this.releaseDdexSpotifyService2.uploadMetadataSpotifyToSftp(
-	// 			id,
-	// 		);
-
-	// 	return result;
-	// }
 }

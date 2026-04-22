@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { GetEmailsDto } from '../dtos/get-emails.dto';
 
 @Injectable()
 export class NotificationResendService {
@@ -72,6 +73,51 @@ export class NotificationResendService {
 		} catch (error) {
 			this.logger.error('Failed to send email via Resend', error);
 			return false;
+		}
+	}
+
+	async getEmails(params?: GetEmailsDto) {
+		const { apiKey } = this.config || {};
+		if (!apiKey) {
+			this.logger.warn('Resend apiKey is not configured.');
+			return [];
+		}
+
+		try {
+			let url = 'https://api.resend.com/emails';
+			if (params && Object.keys(params).length > 0) {
+				const searchParams = new URLSearchParams();
+				const p = params as Record<string, any>;
+				for (const key of Object.keys(p)) {
+					if (p[key] !== undefined && p[key] !== null && p[key] !== '') {
+						searchParams.append(key, String(p[key]));
+					}
+				}
+				const queryString = searchParams.toString();
+				if (queryString) {
+					url += `?${queryString}`;
+				}
+			}
+
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${apiKey}`,
+					'Content-Type': 'application/json',
+				},
+			});
+
+			if (!response.ok) {
+				const errorDetails = await response.text();
+				this.logger.error(`Resend API Error (getEmails): ${errorDetails}`);
+				return [];
+			}
+			
+			const data = await response.json();
+			return data.data || [];
+		} catch (error) {
+			this.logger.error('Failed to get emails via Resend', error);
+			return [];
 		}
 	}
 }

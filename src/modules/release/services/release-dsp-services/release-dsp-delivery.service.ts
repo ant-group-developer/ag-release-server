@@ -20,6 +20,7 @@ import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
 import { ReleaseLogService } from '../../modules/release-log/services/release-log.service';
 import { ReleaseDdexService } from '../release-ddex.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @Injectable()
 export class ReleaseDspDeliveryService {
@@ -131,7 +132,7 @@ export class ReleaseDspDeliveryService {
 			const { outputDir, batchId } =
 				await this.releaseDdexService.createMetadataOnServer({
 					releaseId,
-					ernVersion: config.ernVersion,
+					ernVersion: config.ernVersion as unknown as ErnVersion2,
 					sender: config.sender,
 					recipient: config.recipient,
 				});

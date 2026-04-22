@@ -10,11 +10,7 @@ import { AggregatorsService } from 'src/modules/distribution/aggregator/services
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
-import {
-	ErnInput,
-	ErnVersion,
-	ManifestInput,
-} from 'src/modules/ern/interfaces/ern-input.interface';
+
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import {
 	genBatchId,
@@ -22,9 +18,10 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
-import { ErnService } from '../../ern/services/ern.service';
 import { Release } from '../entities/release.entity';
 import { ReleaseQueryService } from './release.query.service';
+import { ErnService2 } from 'src/modules/ern2/services/ern.service';
+import { ErnInput2, ErnVersion2, ManifestInput2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -46,7 +43,7 @@ export class ReleaseDdexService {
 		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucket2Sv: BucketService2,
 
-		private readonly ernService: ErnService,
+		private readonly ernService2: ErnService2,
 
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
@@ -64,7 +61,7 @@ export class ReleaseDdexService {
 		sender,
 	}: {
 		releaseId: string;
-		ernVersion: ErnVersion;
+		ernVersion: ErnVersion2;
 		sender: {
 			partyId: string;
 			name: string;
@@ -148,7 +145,7 @@ export class ReleaseDdexService {
 	}: {
 		releaseId: string;
 		outputDir: string;
-		ernVersion: ErnVersion;
+		ernVersion: ErnVersion2;
 		sender: {
 			partyId: string;
 			name: string;
@@ -159,13 +156,13 @@ export class ReleaseDdexService {
 		};
 	}) {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
-		const input: ErnInput = this.parseErnInputFromRelease({
+		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
 			ernVersion,
 			sender,
 			recipient,
 		});
-		const xmlContent = this.ernService.generate(input);
+		const xmlContent = this.ernService2.generate(input);
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
@@ -174,22 +171,23 @@ export class ReleaseDdexService {
 	async generateReleaseXml(
 		releaseId: string,
 		dspCode: string,
-		ernVersion?: ErnVersion,
+		ernVersion?: ErnVersion2,
 	): Promise<string> {
 		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+
 		const config =
 			await this.dspRoutingConfigsService.resolveFullDeliveryConfig(
 				dspCode,
 			);
 
-		const input: ErnInput = this.parseErnInputFromRelease({
+		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
-			ernVersion: ernVersion || config.ernVersion,
+			ernVersion: ernVersion || (config.ernVersion as unknown as ErnVersion2),
 			sender: config.sender,
 			recipient: config.recipient,
 		});
 
-		return this.ernService.generate(input);
+		return this.ernService2.generate(input);
 	}
 
 	createManifestFile({
@@ -215,7 +213,7 @@ export class ReleaseDdexService {
 		const xmlFilePath = path.join(outputRoot, upc, `${upc}.xml`);
 		const hash = this.getSha1Base64(xmlFilePath);
 
-		const manifest: ManifestInput = {
+		const manifest: ManifestInput2 = {
 			sender,
 
 			recipient,
@@ -245,7 +243,7 @@ export class ReleaseDdexService {
 			],
 		};
 
-		const xml = this.ernService.generateManifest(manifest);
+		const xml = this.ernService2.generateManifest(manifest);
 
 		const manifestPath = path.join(
 			outputRoot,
@@ -446,7 +444,7 @@ export class ReleaseDdexService {
 		recipient,
 	}: {
 		release: Release;
-		ernVersion: ErnVersion;
+		ernVersion: ErnVersion2;
 		sender: {
 			partyId: string;
 			name: string;
@@ -455,7 +453,7 @@ export class ReleaseDdexService {
 			partyId: string;
 			name: string;
 		};
-	}): ErnInput {
+	}): ErnInput2 {
 		const normalizeParentalWarning = (code?: string) => {
 			switch (code) {
 				case 'Explicit':
@@ -485,7 +483,7 @@ export class ReleaseDdexService {
 
 		const territories = this.getTerritoriesFromRelease(release);
 
-		const result: ErnInput = {
+		const result: ErnInput2 = {
 			version: ernVersion,
 
 			message: {
@@ -656,26 +654,81 @@ export class ReleaseDdexService {
 						: undefined,
 				})),
 
-			deals: [
-				{
-					territories,
+			deals: {
+				release: [
+					{
+						territories,
 
-					startDate: release.releaseDate
-						? this.formatDateTime(release.releaseDate)
-						: '',
+						startDate: release.releaseDate
+							? this.formatDateTime(release.releaseDate)
+							: '',
 
-					endDate: release.releaseEndDate
-						? this.formatDateTime(release.releaseEndDate)
-						: '',
+						endDate: release.releaseEndDate
+							? this.formatDateTime(release.releaseEndDate)
+							: '',
 
-					commercialModels: [
-						'SubscriptionModel',
-						'AdvertisementSupportedModel',
-					],
+						commercialModels: ['PayAsYouGoModel'],
 
-					useTypes: ['OnDemandStream', 'ConditionalDownload'],
-				},
-			],
+						useTypes: ['PermanentDownload'],
+
+						price: {
+							priceType: 'StandardRetailPrice',
+							value: release.priceTier?.amount ?? 0,
+							currencyCode: release.priceTier?.currency?.code ?? '',
+						},
+					},
+				],
+				tracks: [
+					{
+						territories,
+						startDate: release.releaseDate
+							? this.formatDateTime(release.releaseDate)
+							: '',
+						endDate: release.releaseEndDate
+							? this.formatDateTime(release.releaseEndDate)
+							: '',
+						commercialModels: ['PayAsYouGoModel'],
+						useTypes: ['PermanentDownload'],
+						price: {
+							priceType: 'StandardRetailPrice',
+							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
+							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+						},
+					},
+					{
+						territories,
+						startDate: release.releaseDate
+							? this.formatDateTime(release.releaseDate)
+							: '',
+						endDate: release.releaseEndDate
+							? this.formatDateTime(release.releaseEndDate)
+							: '',
+						commercialModels: ['AdvertisementSupportedModel'],
+						useTypes: ['Stream'],
+						price: {
+							priceType: 'StandardRetailPrice',
+							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
+							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+						},
+					},
+					{
+						territories,
+						startDate: release.releaseDate
+							? this.formatDateTime(release.releaseDate)
+							: '',
+						endDate: release.releaseEndDate
+							? this.formatDateTime(release.releaseEndDate)
+							: '',
+						commercialModels: ['SubscriptionModel'],
+						useTypes: ['Stream'],
+						price: {
+							priceType: 'StandardRetailPrice',
+							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
+							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+						},
+					},
+				],
+			},
 		};
 
 		return result;

@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { GetEmailsDto } from './dtos/get-emails.dto';
 import { ResponseError, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { NotificationResendService } from './services/notification.resend-service';
 
@@ -9,6 +10,12 @@ export class NotificationController {
 	constructor(
 		private readonly notificationResendService: NotificationResendService,
 	) {}
+
+	@Get('emails')
+	async getEmails(@Query() query: GetEmailsDto) {
+		const emails = await this.notificationResendService.getEmails(query);
+		return new ResponseSuccess({ message: 'Thành công', data: emails });
+	}
 
 	@Post('test-resend')
 	async testResend(@Body('email') email: string) {

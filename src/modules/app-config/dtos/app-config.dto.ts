@@ -152,6 +152,27 @@ export class UpdateOtherAppconfigDto {
 	excelDataStartRow?: number | null;
 }
 
+export class UpdatePartnerCiConfigDto {
+	@IsOptional()
+	@IsString()
+	token: string;
+
+	@IsOptional()
+	@IsString()
+	organisationId: string;
+
+	@IsOptional()
+	@IsString()
+	baseUrl: string;
+}
+
+export class UpdatePartnersConfigDto {
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdatePartnerCiConfigDto)
+	ci?: UpdatePartnerCiConfigDto;
+}
+
 export class UpdateConfigDto {
 	@IsOptional()
 	@ValidateNested()
@@ -197,4 +218,9 @@ export class UpdateConfigDto {
 	@ValidateNested()
 	@Type(() => UpdateResendConfigDto)
 	resend?: UpdateResendConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdatePartnersConfigDto)
+	partners?: UpdatePartnersConfigDto;
 }

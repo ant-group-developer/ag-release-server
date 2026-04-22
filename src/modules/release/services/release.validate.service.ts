@@ -290,7 +290,7 @@ export class ReleaseValidateService {
 		if (isSingle && !hasMatchingTitle) {
 			result.push(
 				new FieldErrorDetails({
-					messageCode: 'formFields.releaseNameMustMatchTrackName',
+					messageCode: 'formFields.validate.releaseNameMustMatchTrackName',
 					message:
 						'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
 					page: 'core-detail',
@@ -343,6 +343,7 @@ export class ReleaseValidateService {
 		if (release.releaseCoverArts?.length === 0) {
 			result.push(
 				new FieldErrorDetails({
+					messageCode: 'formFields.validate.coverArtIsRequired',
 					page: 'core-detail',
 					field: 'releaseCoverArts',
 				}),
@@ -422,6 +423,7 @@ export class ReleaseValidateService {
 		if (!release?.releaseArtists.length) {
 			result.push(
 				new FieldErrorDetails({
+					messageCode: 'formFields.validate.atLeastOneMainArtist',
 					page: 'core-detail',
 					field: 'releaseArtists',
 				}),
@@ -448,6 +450,7 @@ export class ReleaseValidateService {
 				const missing = missingRoles.map((r) => r.name);
 				result.push(
 					new FieldErrorDetails({
+						messageCode: 'formFields.validate.missingRequiredContributorsRoles',
 						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 						page: 'core-detail',
 						field: 'releaseContributors',
@@ -495,6 +498,17 @@ export class ReleaseValidateService {
 		const requiredRoles = this.appConfigService.requiredArtistRoles;
 		const result: FieldErrorDetails[] = [];
 
+		if (!tracks?.length) {
+			result.push(
+				new FieldErrorDetails({
+					messageCode: 'formFields.validate.atLeastOneTrack',
+					page: 'tracks',
+					field: 'tracks',
+				}),
+			);
+			return result;
+		}
+
 		tracks.forEach((track, index) => {
 			const { trackLanguage } = track;
 
@@ -502,6 +516,7 @@ export class ReleaseValidateService {
 			if (isrc && isrc.length !== 12) {
 				result.push(
 					new FieldErrorDetails({
+						messageCode: 'formFields.validate.isrcMustBe12Characters',
 						message: 'Mã ISRC phải có chính xác 12 ký tự',
 						page: 'tracks',
 						field: `tracks.${index}.isrc`,
@@ -574,6 +589,7 @@ export class ReleaseValidateService {
 			if (!track.trackArtists.length) {
 				result.push(
 					new FieldErrorDetails({
+						messageCode: 'formFields.validate.atLeastOneMainArtist',
 						page: 'tracks',
 						field: `tracks.${index}.trackArtists`,
 						trackId: track.id,
