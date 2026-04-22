@@ -50,6 +50,7 @@ import { ReleaseExecutionProcessorService } from './modules/release-executions/s
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { ErnModule2 } from '../ern2/ern.module';
 
 @Module({
 	imports: [
@@ -90,6 +91,7 @@ import { CiModule } from '../partners-api/ci/ci.module';
 		DspModule,
 
 		ErnModule,
+		ErnModule2,
 		DspRoutingConfigsModule,
 
 		CountryModule,
