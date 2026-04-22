@@ -101,4 +101,15 @@ export interface AppConfigShape {
 
 	other: OtherAppconfig;
 	resend: ResendConfig;
+	partners: PartnersConfig;
+}
+
+export interface PartnerCiConfig {
+	token: string;
+	organisationId: string;
+	baseUrl: string;
+}
+
+export interface PartnersConfig {
+	ci: PartnerCiConfig;
 }

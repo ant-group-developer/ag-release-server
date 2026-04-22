@@ -6,3 +6,235 @@ premium
 mid 
 low 
 bundle
+
+
+
+
+
+
+
+
+
+
+
+
+release_submit: {
+    id: 'string',
+    release_id: 'string',
+    status: new | processing | done | failed,
+    release: {
+        id: 'string',
+        title: 'string',
+        upc: 'string',
+    },
+
+    steps: [
+        {
+            id: 'string',
+            release_submit_id: 'string',
+            step_type: {
+                id: string,
+                type: 'genUpc' | 'genIsrc' | 'validate' | 'processDirect' | 'processAggCi',
+                step_child: [
+                    {
+                        id: 'string',
+                        type: createMetadataDirect | uploadToSftpDirect | createMetadataAggCi | uploadToSftpAggCi,
+                        status: new | processing | done | failed, 
+                        order: number,
+                        dsp_id: string,
+                        dsp: {
+                            id: 'string',
+                            name: 'string',
+                        }
+                    }
+                ]
+            },
+            status: new | processing | done | failed,
+            order: number,
+        },
+    ],
+}
+
+release_submit_step: {
+    id: 'string',
+    release_submit_id: 'string',
+    step_type: 'genUpc' | 'genIsrc' | 'validate' | 'createMetadataCi',
+    status: 'string',
+    order: number,
+    step: {
+        id: 'string',
+        name: 'string',
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+data
+
+
+price 
+giá các bài hát trong cùng album nên trùng nhau
+giá của album phải bằng tổng các bài hát  
+
+premium
+mid 
+low 
+bundle
+
+
+
+
+
+
+
+
+
+
+
+
+release_submit: {
+    id: 'string',
+    release_id: 'string',
+    status: new | processing | done | failed,
+    release: {
+        id: 'string',
+        title: 'string',
+        upc: 'string',
+    },
+
+    release_snapshot: {
+        id: 'string',
+        title: 'string',
+        upc: 'string',
+    },
+
+    steps: [
+        {
+            id: 'string',
+            release_submit_id: 'string',
+            step_type: {
+                id: string,
+                type: 'genUpc' | 'genIsrc' | 'validate',
+                dsp_id: null,
+                metadata: {
+                    input: any,
+                    output: any,
+                }
+                steps: []
+            },
+            status: new | processing | done | failed,
+            order: number,
+        },
+        {
+            id: 'string',
+            release_submit_id: 'string',
+            step_type: {
+                id: string,
+                type: processDirect,
+                dsp_id: string,
+                dsp: {
+                    id: 'string',
+                    name: 'string',
+                },
+                metadata: {
+                    input: any,
+                    output: any,
+                },
+                steps: [
+                    {
+                        id: 'string',
+                        type: createMetadataDirect | uploadToSftpDirect | syncDataFromDsp, 
+                        status: new | processing | done | failed,
+                        order: number,
+                        metadata: {
+                            input: any,
+                            output: any,
+                        },
+                    }
+                ]
+            },
+            status: new | processing | done | failed,
+            order: number,
+        },
+        {
+            id: 'string',
+            release_submit_id: 'string',
+            step_type: {
+                id: string,
+                type: processAggCi,
+                metadata: {
+                    input: any,
+                    output: any,
+                },
+                dsps: [
+                    {
+                        id: 'string',
+                        name: 'string',
+                    },
+                    {
+                        id: 'string',
+                        name: 'string',
+                    },
+                ], 
+                steps: [
+                    {
+                        id: 'string',
+                        type: createMetadataAggCi | uploadToSftpAggCi | 
+                            getQaFlagCi | sendEmailToState | waitingAdminExport | syncDataDspCi,
+                        status: new | processing | waiting_admin_export | done | failed,
+                        order: number,
+                        metadata: {
+                            input: any,
+                            output: any,
+                        },
+                    },
+                    {
+                        id: 'string',
+                        type: getQaFlagCi,
+                        status: new | processing | waiting_admin_export | done | failed,
+                        order: number,
+                        metadata: {
+                            input: {
+                                
+                            },
+                            output: any,
+                        },
+                    }
+                ]
+            },
+            status: new | processing | waiting_admin_export | done | failed,
+            order: number,
+        },
+    ],
+}
+
+release_submit_step: {
+    id: 'string',
+    release_submit_id: 'string',
+    step_type: 'genUpc' | 'genIsrc' | 'validate' | 'createMetadataCi',
+    status: 'string',
+    order: number,
+    step: {
+        id: 'string',
+        name: 'string',
+    }
+}
+
+agg_step_ci_dsp: {
+
+}
+
+
+// job sync data from partners
+lấy data từ ci
+upc -> id từ ci -> call api get list qa flag -> cập nhật vào hệ thống 
+lấy data từ spotify

@@ -40,6 +40,7 @@ import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDdexService } from '../services/release-ddex.service';
 import { ReleaseService } from '../services/release.service';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -150,7 +151,7 @@ export class ReleaseController {
 	async getReleaseXml(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Query('code') code: string,
-		@Query('ernVersion') ernVersion?: ErnVersion,
+		@Query('ernVersion') ernVersion?: ErnVersion2,
 	) {
 		return this.releaseDdexService.generateReleaseXml(
 			id,
@@ -169,6 +170,13 @@ export class ReleaseController {
 	@Get(':id/record-export-ci')
 	async dataExportCiById(@Param('id') id: string, @Req() req: Request) {
 		const result = await this.releaseService.dataExportCiById(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/qa-flag-ci')
+	async getQaFlagCi(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.getQaFlagCi(id);
 
 		return new ResponseSuccess({ data: result });
 	}

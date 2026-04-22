@@ -836,6 +836,8 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
+			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
+			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 
 			// ===== tracks =====
 			.leftJoinAndSelect('release.tracks', 'track')

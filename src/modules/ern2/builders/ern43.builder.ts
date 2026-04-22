@@ -2,8 +2,9 @@ import { create } from 'xmlbuilder2';
 import {
 	ErnArtistInput,
 	ErnContributorInput,
-	ErnInput,
-	ErnTrackInput,
+	ErnDealInput2,
+	ErnInput2,
+	ErnTrackInput2,
 } from '../interfaces/ern-input.interface';
 
 /**
@@ -12,11 +13,11 @@ import {
  *
  * Structure: MessageHeader → PartyList → ResourceList → ReleaseList → DealList
  */
-export class Ern43Builder {
+export class Ern43Builder2 {
 	private partyIndex = 0;
 	private readonly partyMap = new Map<string, string>();
 
-	constructor(private readonly input: ErnInput) {}
+	constructor(private readonly input: ErnInput2) {}
 
 	build(): string {
 		this.partyIndex = 0;
@@ -38,6 +39,7 @@ export class Ern43Builder {
 
 		this.buildMessageHeader(root);
 		this.buildPartyList(root);
+		
 		this.buildResourceList(root);
 		this.buildReleaseList(root);
 		this.buildDealList(root);
@@ -150,7 +152,7 @@ export class Ern43Builder {
 
 	private buildSoundRecording(
 		parent: ReturnType<typeof create>,
-		track: ErnTrackInput,
+		track: ErnTrackInput2,
 		index: number,
 	): void {
 		const ref = `A${index + 1}`;
@@ -489,7 +491,12 @@ export class Ern43Builder {
 	private buildDealList(root: ReturnType<typeof create>): void {
 		const dealList = root.ele('DealList');
 
-		if (this.input.deals && this.input.deals.length > 0) {
+		const hasDeals =
+			this.input.deals &&
+			((this.input.deals.release && this.input.deals.release.length > 0) ||
+				(this.input.deals.tracks && this.input.deals.tracks.length > 0));
+
+		if (hasDeals) {
 			this.buildExplicitDeals(dealList);
 		} else {
 			this.buildDefaultDeals(dealList);
@@ -500,15 +507,12 @@ export class Ern43Builder {
 	}
 	
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
-		// Apply each deal to each track release
-		for (let i = 0; i < this.input.tracks.length; i++) {
-			const track = this.input.tracks[i];
-			const releaseRef = `R${i + 1}`;
-			const techRef = `T${i + 1}S`;
+		// Main release deal
+		if (this.input.deals?.release && this.input.deals.release.length > 0) {
+			const rd = dealList.ele('ReleaseDeal');
+			rd.ele('DealReleaseReference').txt('R0');
 
-			for (const deal of this.input.deals!) {
-				const rd = dealList.ele('ReleaseDeal');
-				rd.ele('DealReleaseReference').txt(releaseRef);
+			for (const deal of this.input.deals.release) {
 				const d = rd.ele('Deal');
 				const terms = d.ele('DealTerms');
 
@@ -529,11 +533,47 @@ export class Ern43Builder {
 					terms.ele('UseType').txt(ut);
 				}
 
-				this.appendPrice(terms, track);
+				this.appendPrice(terms, deal);
+			}
+		}
 
-				d.ele('DealTechnicalResourceDetailsReferenceList')
-					.ele('DealTechnicalResourceDetailsReference')
-					.txt(techRef);
+		// Track release deals
+		if (this.input.deals?.tracks && this.input.deals.tracks.length > 0) {
+			for (let i = 0; i < this.input.tracks.length; i++) {
+				const track = this.input.tracks[i];
+				const releaseRef = `R${i + 1}`;
+				const techRef = `T${i + 1}S`;
+
+				const rd = dealList.ele('ReleaseDeal');
+				rd.ele('DealReleaseReference').txt(releaseRef);
+
+				for (const deal of this.input.deals.tracks) {
+					const d = rd.ele('Deal');
+					const terms = d.ele('DealTerms');
+
+					for (const t of deal.territories) {
+						terms.ele('TerritoryCode').txt(t);
+					}
+
+					const validity = terms.ele('ValidityPeriod');
+					validity.ele('StartDateTime').txt(`${deal.startDate}T00:00:00`);
+					if (deal.endDate) {
+						validity.ele('EndDateTime').txt(`${deal.endDate}T00:00:00`);
+					}
+
+					for (const cm of deal.commercialModels) {
+						terms.ele('CommercialModelType').txt(cm);
+					}
+					for (const ut of deal.useTypes) {
+						terms.ele('UseType').txt(ut);
+					}
+
+					this.appendPrice(terms, deal);
+
+					d.ele('DealTechnicalResourceDetailsReferenceList')
+						.ele('DealTechnicalResourceDetailsReference')
+						.txt(techRef);
+				}
 			}
 		}
 	}
@@ -606,22 +646,24 @@ export class Ern43Builder {
 
 	private appendPrice(
 		terms: ReturnType<typeof create>,
-		track: ErnTrackInput,
+		deal: ErnDealInput2,
 	): void {
-		if (!track.price) return;
+		if (!deal.price) return;
 
-		const amount = this.normalizePriceValue(track.price.value);
+		const amount = this.normalizePriceValue(deal.price.value);
 
 		const priceInfo = terms.ele('PriceInformation', {
-			PriceType: track.price.priceType,
+			PriceType: deal.price.priceType,
 		});
 
 		priceInfo
 			.ele('SuggestedRetailPrice', {
-				CurrencyCode: track.price.currencyCode,
+				CurrencyCode: deal.price.currencyCode,
 			})
 			.txt(amount);
 	}
+
+
 
 	private normalizePriceValue(value: number | string): string {
 		if (typeof value === 'number') return String(value);

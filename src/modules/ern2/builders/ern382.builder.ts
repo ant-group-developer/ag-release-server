@@ -1,8 +1,8 @@
 import { create } from 'xmlbuilder2';
 import {
 	ErnContributorInput,
-	ErnInput,
-	ErnTrackInput,
+	ErnInput2,
+	ErnTrackInput2,
 } from '../interfaces/ern-input.interface';
 
 /**
@@ -18,8 +18,8 @@ import {
  * - ReleaseDetailsByTerritory with ResourceGroup
  * - All releases use <Release> (no separate <TrackRelease> element)
  */
-export class Ern382Builder {
-	constructor(private readonly input: ErnInput) {}
+export class Ern382Builder2 {
+	constructor(private readonly input: ErnInput2) {}
 
 	build(): string {
 		const doc = create({ version: '1.0', encoding: 'UTF-8' });
@@ -96,7 +96,7 @@ export class Ern382Builder {
 
 	private buildSoundRecording(
 		parent: ReturnType<typeof create>,
-		track: ErnTrackInput,
+		track: ErnTrackInput2,
 		index: number,
 	): void {
 		const ref = `A${index + 1}`;
@@ -364,7 +364,7 @@ export class Ern382Builder {
 
 	private buildTrackRelease(
 		parent: ReturnType<typeof create>,
-		track: ErnTrackInput,
+		track: ErnTrackInput2,
 		index: number,
 	): void {
 		const ref = `R${index + 1}`;
@@ -582,7 +582,12 @@ export class Ern382Builder {
 	private buildDealList(root: ReturnType<typeof create>): void {
 		const dealList = root.ele('DealList');
 
-		if (this.input.deals && this.input.deals.length > 0) {
+		const hasDeals =
+			this.input.deals &&
+			((this.input.deals.release && this.input.deals.release.length > 0) ||
+				(this.input.deals.tracks && this.input.deals.tracks.length > 0));
+
+		if (hasDeals) {
 			this.buildExplicitDeals(dealList);
 		} else {
 			this.buildDefaultDeals(dealList);
@@ -591,48 +596,11 @@ export class Ern382Builder {
 
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Main release deal
-
-		console.log('this.input.deals', this.input.deals);
-
-		for (const deal of this.input.deals!) {
+		if (this.input.deals?.release && this.input.deals.release.length > 0) {
 			const rd = dealList.ele('ReleaseDeal');
 			rd.ele('DealReleaseReference').txt('R0');
-			const d = rd.ele('Deal');
-			const terms = d.ele('DealTerms');
 
-			for (const cm of deal.commercialModels) {
-				terms.ele('CommercialModelType').txt(cm);
-			}
-
-			const usage = terms.ele('Usage');
-			for (const ut of deal.useTypes) {
-				usage.ele('UseType').txt(ut);
-			}
-
-			for (const t of deal.territories) {
-				terms.ele('TerritoryCode').txt(t);
-			}
-
-			const pi = terms.ele('PriceInformation');
-			pi.ele('PriceRangeType', {
-				Namespace: `DPID:${this.input.message.sender.partyId}`,
-			}).txt('mid');
-
-			const validity = terms.ele('ValidityPeriod');
-			validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
-			if (deal.endDate) {
-				validity.ele('EndDate').txt(deal.endDate.split('T')[0]);
-			}
-
-			rd.ele('EffectiveDate').txt(deal.startDate.split('T')[0]);
-		}
-
-		// Track release deals
-		for (let i = 0; i < this.input.tracks.length; i++) {
-			const releaseRef = `R${i + 1}`;
-			for (const deal of this.input.deals!) {
-				const rd = dealList.ele('ReleaseDeal');
-				rd.ele('DealReleaseReference').txt(releaseRef);
+			for (const deal of this.input.deals.release) {
 				const d = rd.ele('Deal');
 				const terms = d.ele('DealTerms');
 
@@ -649,18 +617,64 @@ export class Ern382Builder {
 					terms.ele('TerritoryCode').txt(t);
 				}
 
-				const pi = terms.ele('PriceInformation');
-				pi.ele('PriceRangeType', {
-					Namespace: `DPID:${this.input.message.sender.partyId}`,
-				}).txt('mid');
+				if (deal.price) {
+					const pi = terms.ele('PriceInformation');
+					pi.ele('PriceRangeType', {
+						Namespace: `DPID:${this.input.message.sender.partyId}`,
+					}).txt('mid');
+				}
 
 				const validity = terms.ele('ValidityPeriod');
 				validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
 				if (deal.endDate) {
 					validity.ele('EndDate').txt(deal.endDate.split('T')[0]);
 				}
+			}
 
-				rd.ele('EffectiveDate').txt(deal.startDate.split('T')[0]);
+			// Add EffectiveDate once per ReleaseDeal using the first deal's start date
+			rd.ele('EffectiveDate').txt(this.input.deals.release[0].startDate.split('T')[0]);
+		}
+
+		// Track release deals
+		if (this.input.deals?.tracks && this.input.deals.tracks.length > 0) {
+			for (let i = 0; i < this.input.tracks.length; i++) {
+				const releaseRef = `R${i + 1}`;
+				const rd = dealList.ele('ReleaseDeal');
+				rd.ele('DealReleaseReference').txt(releaseRef);
+
+				for (const deal of this.input.deals.tracks) {
+					const d = rd.ele('Deal');
+					const terms = d.ele('DealTerms');
+
+					for (const cm of deal.commercialModels) {
+						terms.ele('CommercialModelType').txt(cm);
+					}
+
+					const usage = terms.ele('Usage');
+					for (const ut of deal.useTypes) {
+						usage.ele('UseType').txt(ut);
+					}
+
+					for (const t of deal.territories) {
+						terms.ele('TerritoryCode').txt(t);
+					}
+
+					if (deal.price) {
+						const pi = terms.ele('PriceInformation');
+						pi.ele('PriceRangeType', {
+							Namespace: `DPID:${this.input.message.sender.partyId}`,
+						}).txt('mid');
+					}
+
+					const validity = terms.ele('ValidityPeriod');
+					validity.ele('StartDate').txt(deal.startDate.split('T')[0]);
+					if (deal.endDate) {
+						validity.ele('EndDate').txt(deal.endDate.split('T')[0]);
+					}
+				}
+
+				// Add EffectiveDate once per ReleaseDeal
+				rd.ele('EffectiveDate').txt(this.input.deals.tracks[0].startDate.split('T')[0]);
 			}
 		}
 	}

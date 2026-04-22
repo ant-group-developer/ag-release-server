@@ -24,6 +24,7 @@ import {
 	StepStatus,
 	StepType,
 } from '../enum/release-execution.enum';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @Injectable()
 export class ReleaseExecutionProcessorService {
@@ -509,7 +510,7 @@ export class ReleaseExecutionProcessorService {
 				const { outputDir, batchId } =
 					await this.releaseDdexService.createMetadataOnServer({
 						releaseId,
-						ernVersion: config.ernVersion,
+						ernVersion: config.ernVersion as unknown as ErnVersion2,
 						sender: config.sender,
 						recipient: config.recipient,
 					});
@@ -563,7 +564,7 @@ export class ReleaseExecutionProcessorService {
 				const { outputDir, batchId } =
 					await this.releaseDdexService.createMetadataOnServer({
 						releaseId,
-						ernVersion: ciConfig.ernVersion,
+						ernVersion: ciConfig.ernVersion as unknown as ErnVersion2,
 						sender: ciConfig.sender,
 						recipient: ciConfig.recipient,
 					});
