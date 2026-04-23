@@ -1,0 +1,327 @@
+{
+  "id": "submit-001",
+  "releaseId": "release-abc",
+  "status": "processing",
+  "createdAt": "2026-04-23T08:00:00Z",
+  "updatedAt": "2026-04-23T08:15:00Z",
+  "completedAt": null,
+  "summary": null,
+  "metadata": {
+    "input": {
+      "releaseSnapshot": {
+        "id": "release-abc",
+        "title": "Đêm Nay",
+        "upc": null,
+        "labelName": "AG Music",
+        "releaseDate": "2026-05-01",
+        "tracks": [
+          { "id": "track-1", "title": "Đêm Nay", "isrc": null, "order": 1 },
+          { "id": "track-2", "title": "Bình Minh", "isrc": "VNA012345678", "order": 2 }
+        ]
+      }
+    }
+  },
+  "release": {
+    "id": "release-abc",
+    "title": "Đêm Nay"
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "releaseSubmitId": "submit-001",
+      "parentStepId": null,
+      "type": "GEN_UPC",
+      "status": "DONE",
+      "order": 1,
+      "dspId": null,
+      "dsp": null,
+      "dspIds": null,
+      "metadata": {
+        "input": { "prefixUpcId": "prefix-001" },
+        "output": { "upc": "196012345678" }
+      },
+      "errorMessage": null,
+      "startedAt": "2026-04-23T08:01:00Z",
+      "completedAt": "2026-04-23T08:01:02Z",
+      "retryCount": 0,
+      "childSteps": []
+    },
+    {
+      "id": "step-2",
+      "releaseSubmitId": "submit-001",
+      "parentStepId": null,
+      "type": "GEN_ISRCS",
+      "status": "DONE",
+      "order": 2,
+      "dspId": null,
+      "dsp": null,
+      "dspIds": null,
+      "metadata": {
+        "input": { "trackIds": ["track-1"] },
+        "output": { "isrcs": ["VNA012399999"] }
+      },
+      "errorMessage": null,
+      "startedAt": "2026-04-23T08:01:03Z",
+      "completedAt": "2026-04-23T08:01:05Z",
+      "retryCount": 0,
+      "childSteps": [
+        {
+          "id": "step-2a",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-2",
+          "type": "GEN_ISRC",
+          "status": "DONE",
+          "order": 1,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "trackId": "track-1" },
+            "output": { "isrc": "VNA012399999" }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:01:03Z",
+          "completedAt": "2026-04-23T08:01:04Z",
+          "retryCount": 0,
+          "childSteps": []
+        }
+      ]
+    },
+    {
+      "id": "step-3",
+      "releaseSubmitId": "submit-001",
+      "parentStepId": null,
+      "type": "VALIDATE",
+      "status": "DONE",
+      "order": 3,
+      "dspId": null,
+      "dsp": null,
+      "dspIds": null,
+      "metadata": {
+        "input": {},
+        "output": { "errors": [], "valid": true }
+      },
+      "errorMessage": null,
+      "startedAt": "2026-04-23T08:02:00Z",
+      "completedAt": "2026-04-23T08:02:01Z",
+      "retryCount": 0,
+      "childSteps": []
+    },
+    {
+      "id": "step-4",
+      "releaseSubmitId": "submit-001",
+      "parentStepId": null,
+      "type": "PROCESS_DIRECT",
+      "status": "DONE",
+      "order": 4,
+      "dspId": "spotify",
+      "dsp": { "id": "spotify", "name": "Spotify" },
+      "dspIds": null,
+      "metadata": {
+        "input": { "ernVersion": "4.3" },
+        "output": {}
+      },
+      "errorMessage": null,
+      "startedAt": "2026-04-23T08:03:00Z",
+      "completedAt": "2026-04-23T08:05:00Z",
+      "retryCount": 0,
+      "childSteps": [
+        {
+          "id": "step-4a",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-4",
+          "type": "CREATE_METADATA_DIRECT",
+          "status": "DONE",
+          "order": 1,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "ernVersion": "4.3", "dspCode": "spotify" },
+            "output": { "xmlPath": "/tmp/ern/spotify/release-abc.xml" }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:03:00Z",
+          "completedAt": "2026-04-23T08:03:05Z",
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-4b",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-4",
+          "type": "UPLOAD_SFTP_DIRECT",
+          "status": "DONE",
+          "order": 2,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "sftpHost": "sftp.spotify.com", "remotePath": "/incoming/" },
+            "output": { "uploadedFiles": 3 }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:03:06Z",
+          "completedAt": "2026-04-23T08:04:30Z",
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-4c",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-4",
+          "type": "SYNC_DATA_FROM_DSP",
+          "status": "DONE",
+          "order": 3,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": {},
+            "output": { "releaseDspDeliveryId": "delivery-xyz" }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:04:31Z",
+          "completedAt": "2026-04-23T08:05:00Z",
+          "retryCount": 0,
+          "childSteps": []
+        }
+      ]
+    },
+    {
+      "id": "step-5",
+      "releaseSubmitId": "submit-001",
+      "parentStepId": null,
+      "type": "PROCESS_AGG_CI",
+      "status": "PROCESSING",
+      "order": 5,
+      "dspId": null,
+      "dsp": null,
+      "dspIds": [
+        { "id": "dsp-melon", "name": "Melon" },
+        { "id": "dsp-bugs", "name": "Bugs" }
+      ],
+      "metadata": {
+        "input": { "aggregator": "CI" },
+        "output": {}
+      },
+      "errorMessage": null,
+      "startedAt": "2026-04-23T08:06:00Z",
+      "completedAt": null,
+      "retryCount": 0,
+      "childSteps": [
+        {
+          "id": "step-5a",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "CREATE_METADATA_CI",
+          "status": "DONE",
+          "order": 1,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "ernVersion": "3.8.2" },
+            "output": { "xmlPath": "/tmp/ern/ci/release-abc.xml" }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:06:00Z",
+          "completedAt": "2026-04-23T08:06:05Z",
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-5b",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "UPLOAD_SFTP_CI",
+          "status": "DONE",
+          "order": 2,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "sftpHost": "sftp.ci.com" },
+            "output": { "batchId": "batch-123" }
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:06:06Z",
+          "completedAt": "2026-04-23T08:07:00Z",
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-5c",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "GET_QA_FLAG_CI",
+          "status": "PROCESSING",
+          "order": 3,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": {
+            "input": { "batchId": "batch-123" },
+            "output": null
+          },
+          "errorMessage": null,
+          "startedAt": "2026-04-23T08:07:01Z",
+          "completedAt": null,
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-5d",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "WAITING_ADMIN_EXPORT",
+          "status": "PENDING",
+          "order": 4,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": null,
+          "errorMessage": null,
+          "startedAt": null,
+          "completedAt": null,
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-5e",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "SEND_EMAIL_TO_STATE",
+          "status": "PENDING",
+          "order": 5,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": null,
+          "errorMessage": null,
+          "startedAt": null,
+          "completedAt": null,
+          "retryCount": 0,
+          "childSteps": []
+        },
+        {
+          "id": "step-5f",
+          "releaseSubmitId": "submit-001",
+          "parentStepId": "step-5",
+          "type": "SYNC_DATA_DSP_CI",
+          "status": "PENDING",
+          "order": 6,
+          "dspId": null,
+          "dsp": null,
+          "dspIds": null,
+          "metadata": null,
+          "errorMessage": null,
+          "startedAt": null,
+          "completedAt": null,
+          "retryCount": 0,
+          "childSteps": []
+        }
+      ]
+    }
+  ]
+}

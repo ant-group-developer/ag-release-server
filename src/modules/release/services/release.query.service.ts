@@ -816,14 +816,23 @@ export class ReleaseQueryService {
 	}
 
 	private joinFull(qb: SelectQueryBuilder<Release>) {
-		// ===== release level =====
 		qb.leftJoinAndSelect('release.label', 'label')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
 
-			// release artist
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
 			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
+
+			.leftJoinAndSelect('release.releaseContributors', 'releaseContributors')
+			.leftJoinAndSelect(
+				'releaseContributors.artistRole',
+				'releaseContributorRole',
+			)
+			.leftJoinAndSelect(
+				'releaseContributors.artist',
+				'releaseContributorArtist',
+			)
+
 			.leftJoinAndSelect(
 				'releaseArtist.artistProfiles',
 				'releaseArtistProfile',
@@ -833,13 +842,18 @@ export class ReleaseQueryService {
 				'releaseArtistProfileDsp',
 			)
 
+			.leftJoinAndSelect('release.releaseLanguage', 'releaseLanguage')
+			.leftJoinAndSelect(
+				'releaseLanguage.metadataLanguage',
+				'releaseMetadataLanguage',
+			)
+
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 
-			// ===== tracks =====
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
 
@@ -858,7 +872,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
 			.leftJoinAndSelect(
 				'trackLanguage.metadataLanguage',
-				'metadataLanguage',
+				'trackMetadataLanguage',
 			)
 
 			.leftJoinAndSelect('track.trackContributors', 'trackContributors')
@@ -868,7 +882,6 @@ export class ReleaseQueryService {
 			)
 			.leftJoinAndSelect('trackContributors.artist', 'contributorArtist')
 
-			// dsp delivery
 			.leftJoinAndSelect(
 				'release.releaseDspDeliveries',
 				'releaseDspDelivery',

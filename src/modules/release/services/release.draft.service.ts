@@ -261,7 +261,7 @@ export class ReleaseDraftService {
 	}
 
 	async getErrorsSchemaReleaseById(id: string) {
-		const release = await this.releaseQueryService.findOneWithRelation(id);
+		const release = await this.releaseQueryService.findOneReleaseFull(id);
 
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}
