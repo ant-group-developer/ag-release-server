@@ -21,6 +21,10 @@ import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 
 class CreateTrackDraftDto {
+	@Length(10, 10)
+	@IsOptional()
+	id?: string;
+
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 100 })
 	@IsString()
 	@IsNotEmpty()
@@ -104,25 +108,6 @@ export class BulkCreateTrackDraft {
 	trackDrafts: CreateTrackDraftDto[];
 }
 
-export class BulkUpdateTrackDraft {
-	@IsNotEmpty()
-	@ArrayMinSize(1)
-	@ValidateNested({ each: true })
-	@Type(() => UpdateOrderTrackDraft)
-	trackDrafts: UpdateOrderTrackDraft[];
-}
-
-export class UpdateOrderTrackDraft {
-	@Length(10, 10)
-	@IsNotEmpty()
-	id: string;
-
-	@IsInt()
-	@IsNotEmpty()
-	@Min(0)
-	order: number;
-}
-
 class AudioFile {
 	@IsOptional()
 	@IsInt()
@@ -193,4 +178,12 @@ export class UpdateTrackPolicyDto {
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
 	actionId?: string;
+}
+
+export class BulkUpdateTrackDraft {
+	@IsNotEmpty()
+	@ArrayMinSize(1)
+	@ValidateNested({ each: true })
+	@Type(() => UpdateTrackDraftDto)
+	trackDrafts: UpdateTrackDraftDto[];
 }

@@ -88,5 +88,10 @@ export const appConfigDefault: AppConfigShape = {
 			organisationId: '',
 			baseUrl: '',
 		},
+		spotify: {
+			clientId: '',
+			clientSecret: '',
+			token: '',
+		},
 	},
 };

@@ -523,10 +523,15 @@ export class ReleaseDdexService {
 				catalogNumber: release.catalogId ?? undefined,
 
 				artists: release.releaseArtists.map((ra) => ({
-					name: ra.artist?.name ?? '',
+					name:
+						ra.artist?.artistProfiles?.find(
+							(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+						)?.name ??
+						ra.artist?.name ??
+						'',
 					role: 'MainArtist',
-					spotifyId: ra.artist.spotifyId,
-					appleMusicId: ra.artist.appleMusicId,
+					spotifyId: ra.artist?.spotifyId,
+					appleMusicId: ra.artist?.appleMusicId,
 				})),
 
 				parentalWarning,
@@ -609,12 +614,22 @@ export class ReleaseDdexService {
 					),
 
 					artists: track.trackArtists.map((ta) => ({
-						name: ta.artist?.name ?? '',
+						name:
+							ta.artist?.artistProfiles?.find(
+								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+							)?.name ??
+							ta.artist?.name ??
+							'',
 						role: 'MainArtist',
 					})),
 
 					contributors: track.trackContributors?.map((c) => ({
-						name: c.artist?.name ?? '',
+						name:
+							c.artist?.artistProfiles?.find(
+								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+							)?.name ??
+							c.artist?.name ??
+							'',
 						role: c.artistRole?.code ?? '',
 					})),
 

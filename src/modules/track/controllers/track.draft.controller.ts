@@ -22,6 +22,7 @@ import {
 import { BulkDeleteTracksDto, QueryGetListTrackDto } from '../dto/track.dto';
 import { ITrackDraft } from '../interfaces/track.interface';
 import { TrackDraftService } from '../services/track.draft.service';
+import { AppResponseSuccess } from 'src/app.const';
 
 @ApiTags('Tracks Draft')
 @Controller('tracks/draft')
@@ -56,13 +57,10 @@ export class TrackDraftController {
 	@Put('bulk')
 	async bulkUpdate(
 		@Body() data: BulkUpdateTrackDraft,
-	): Promise<ResponseSuccess<ITrackDraft[]>> {
-		const result = await this.trackDraftService.bulkUpdate(data);
+	) {
+		await this.trackDraftService.bulkUpdate(data);
 
-		return new ResponseSuccess({
-			data: result,
-			messageCode: TrackMessageCodeSuccess.CREATE,
-		});
+		return AppResponseSuccess.JOB_PROCESSING();
 	}
 
 	@Get(':id/track-policies')

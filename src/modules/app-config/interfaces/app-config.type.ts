@@ -110,6 +110,13 @@ export interface PartnerCiConfig {
 	baseUrl: string;
 }
 
+export interface PartnerSpotifyConfig {
+	clientId: string;
+	clientSecret: string;
+	token?: string;
+}
+
 export interface PartnersConfig {
 	ci: PartnerCiConfig;
+	spotify: PartnerSpotifyConfig;
 }

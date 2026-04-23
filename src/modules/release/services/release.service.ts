@@ -384,6 +384,7 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
+		// return 'test_upc'
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -425,13 +426,6 @@ export class ReleaseService {
 
 		// -------- Update release --------
 		await this.releaseRepo.update(releaseId, { upc: newUpc });
-
-		// await this.releaseLogRepo.insert({
-		// 	status: ReleaseLogStatus.SUCCESS,
-		// 	releaseId,
-		// 	logs: 'Cấp mã UPC thành công',
-		// 	step: 'Khởi tạo UPC',
-		// });
 
 		return newUpc;
 	}

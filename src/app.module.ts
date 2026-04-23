@@ -7,7 +7,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { ActionModule } from './modules/action/action.module';
-import { CiModule } from './modules/partners-api/ci/ci.module';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistProfileModule } from './modules/artist-profile/artist-profile.module';
@@ -46,6 +45,7 @@ import { ReleaseArtistModule } from './modules/release-artist/release-artist.mod
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
+// import { ReleaseSubmitModule } from './modules/release/modules/release-submit/release-submit.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
@@ -66,6 +66,7 @@ import { TrackSensitiveModule } from './modules/track-sensitive/track-sensitive.
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserModule } from './modules/user/user.module';
+import { PartnersApiModule } from './modules/partners-api/partners-api.module';
 
 @Module({
 	imports: [
@@ -163,7 +164,8 @@ import { UserModule } from './modules/user/user.module';
 		ErnModule,
 
 		BatchImportModule,
-		CiModule,
+		PartnersApiModule,
+		// ReleaseSubmitModule,
 	],
 	controllers: [AppController],
 	providers: [
