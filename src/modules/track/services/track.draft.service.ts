@@ -101,16 +101,12 @@ export class TrackDraftService {
 	}
 
 	// update
-	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
-		const { trackDrafts } = data;
-
-		await Promise.all(
-			trackDrafts.map((track) =>
-				this.trackQueryService.findOne(track.id),
-			),
-		);
-
-		return await this.trackRepo.save(trackDrafts);
+	async bulkUpdate(data: BulkUpdateTrackDraft){
+		for(const t of data.trackDrafts){
+			if(t.id){
+				this.updateSafeSync(t.id, t)
+			}
+		}
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
@@ -142,6 +138,10 @@ export class TrackDraftService {
 		} catch (error) {
 			this.logger.error(error)
 		}
+	}
+
+	async updateSafeSync(id: string, data: UpdateTrackDraftDto){
+		this.update(id, data).catch(err => console.log(err))
 	}
 
 	async updateTrackPolicy({
