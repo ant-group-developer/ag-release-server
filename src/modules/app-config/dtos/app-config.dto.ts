@@ -166,11 +166,30 @@ export class UpdatePartnerCiConfigDto {
 	baseUrl: string;
 }
 
+export class UpdatePartnerSpotifyConfigDto {
+	@IsOptional()
+	@IsString()
+	clientId: string;
+
+	@IsOptional()
+	@IsString()
+	clientSecret: string;
+
+	@IsOptional()
+	@IsString()
+	token?: string;
+}
+
 export class UpdatePartnersConfigDto {
 	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdatePartnerCiConfigDto)
 	ci?: UpdatePartnerCiConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdatePartnerSpotifyConfigDto)
+	spotify?: UpdatePartnerSpotifyConfigDto;
 }
 
 export class UpdateConfigDto {

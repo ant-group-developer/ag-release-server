@@ -51,6 +51,16 @@ export class ArtistController {
 		});
 	}
 
+	@SystemAdminOnly()
+	@Post('sync-spotify')
+	async syncSpotifyArtistName(): Promise<ResponseSuccess<void>> {
+		// Start in background to avoid HTTP timeout
+		this.artistService.syncSpotifyArtistName().catch(console.error);
+		return new ResponseSuccess({
+			message: 'Background sync for Spotify artist names has been started.',
+		});
+	}
+
 	@Get()
 	async getList(
 		@Query() query: QueryGetListArtistDto,

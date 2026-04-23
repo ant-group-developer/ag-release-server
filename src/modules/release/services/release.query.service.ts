@@ -865,6 +865,14 @@ export class ReleaseQueryService {
 
 			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
 			.leftJoinAndSelect('trackArtists.artist', 'trackArtist')
+			.leftJoinAndSelect(
+				'trackArtist.artistProfiles',
+				'trackArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'trackArtistProfile.dsp',
+				'trackArtistProfileDsp',
+			)
 
 			.leftJoinAndSelect('track.trackSensitive', 'trackSensitive')
 
@@ -881,6 +889,14 @@ export class ReleaseQueryService {
 				'contributorRole',
 			)
 			.leftJoinAndSelect('trackContributors.artist', 'contributorArtist')
+			.leftJoinAndSelect(
+				'contributorArtist.artistProfiles',
+				'contributorArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'contributorArtistProfile.dsp',
+				'contributorArtistProfileDsp',
+			)
 
 			.leftJoinAndSelect(
 				'release.releaseDspDeliveries',
