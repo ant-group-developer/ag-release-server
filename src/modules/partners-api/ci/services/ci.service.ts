@@ -90,7 +90,20 @@ export class CiService {
 		}
 	}
 
-	
+	/**
+	 * Trigger deliver desire cho 1 export
+	 * POST {{baseUrl}}/exports/v1/organisations/:organisation_id/export/:export_id/deliver_desire
+	 */
+	async deliverDesire(exportId: string): Promise<any> {
+		try {
+			const endpoint = `/exports/v1/organisations/${this.organisationId}/export/${exportId}/deliver_desire`;
+			const response = await this.client.get(endpoint);
+			return response.data;
+		} catch (error) {
+			this.logger.error(`Error deliverDesire at exportId=${exportId}`, error?.message || error);
+			throw error;
+		}
+	}
 
 	// lấy thông tin import
 	// {{baseUrl}}/imports/v1/organisations/:organisation_id/batch/:batchId

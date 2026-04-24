@@ -570,10 +570,13 @@ export class ReleaseService {
 	// get qa flag ci
 	async getQaFlagCi(id: string) {
 		const release = await this.releaseQueryService.findOne(id);
-		const res = await this.ciService.getReleases({
+		const resListReleaseCi = await this.ciService.getReleases({
 			gtin: release.upc ? [release.upc] : [],
 		});
-		const idCi = res._embedded.find((item: any) => item.barcode === release.upc)?.id;
+		const idCi = resListReleaseCi._embedded.find((item: any) => item.barcode === release.upc)?.id;
+		if (!idCi) {
+			throw new ResponseError({ message: 'Không tìm thấy CI' });
+		}
 		const res2 = await this.ciService.getReleaseQaFlags(idCi);
 		return res2._embedded;
 	}

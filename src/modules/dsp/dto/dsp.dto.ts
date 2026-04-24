@@ -99,6 +99,10 @@ export class CreateDspDto {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	ddexName?: string | null;
+
+	@IsOptional()
+	@IsBoolean()
+	hasDeal?: boolean;
 }
 
 class UpdateDspActionDto {

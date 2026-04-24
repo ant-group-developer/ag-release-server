@@ -2,6 +2,7 @@ export enum ReleaseSubmitStatus {
 	NEW = 'NEW',
 	PROCESSING = 'PROCESSING',
 	WAITING_ACTION = 'WAITING_ACTION',
+	PARTIAL_DONE = 'PARTIAL_DONE',
 	DONE = 'DONE',
 	FAILED = 'FAILED',
 }
@@ -44,6 +45,9 @@ export enum SubmitStepType {
 	SEND_EMAIL_TO_STATE = 'SEND_EMAIL_TO_STATE',
 	WAITING_ADMIN_EXPORT = 'WAITING_ADMIN_EXPORT',
 	SYNC_DATA_DSP_CI = 'SYNC_DATA_DSP_CI',
+
+	// === Shared steps ===
+	WAIT_PARTNER_PROCESS = 'WAIT_PARTNER_PROCESS',
 }
 
 export enum SubmitLogLevel {
