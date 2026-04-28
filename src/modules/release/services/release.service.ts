@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
@@ -39,6 +39,7 @@ import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-de
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
+import { ReleaseSubmitService } from '../modules/release-submit/services/release-submit.service';
 
 @Injectable()
 export class ReleaseService {
@@ -63,7 +64,10 @@ export class ReleaseService {
 		private readonly releaseExecutionsService: ReleaseExecutionsService,
 
 		// partners api
-		private readonly ciService: CiService,	
+		private readonly ciService: CiService,
+
+		@Inject(forwardRef(() => ReleaseSubmitService))
+		private readonly releaseSubmitService: ReleaseSubmitService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -488,6 +492,12 @@ export class ReleaseService {
 			.catch((_e) => {
 				this.logger.error(_e);
 			});
+	}
+
+	async submit3(id: string, dto: SubmitReleaseDto) {
+		await this.releaseQueryService.findOne(id);
+		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
+		return this.releaseSubmitService.submit(id, dto.code);
 	}
 
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {

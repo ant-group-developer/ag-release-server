@@ -27,9 +27,10 @@ import {
 	SubmitStepType,
 } from '../release-submit.enum';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
-import { QueryGetListSubmitDto } from '../dto/release-submit.dto';
+import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 
 @Injectable()
 export class ReleaseSubmitService {
@@ -81,6 +82,33 @@ export class ReleaseSubmitService {
 			},
 		});
 		const saved = await this.submitRepo.save(submit);
+
+		// Mark tất cả DSPs được chọn → PROCESSING trong ReleaseDspDelivery
+		if (dspCodes?.length) {
+			const dsps = await this.manager.find(Dsp, {
+				where: { code: In(dspCodes) },
+			});
+			for (const dsp of dsps) {
+				const existed = await this.manager.findOne(ReleaseDspDelivery, {
+					where: { releaseId, dspId: dsp.id },
+				});
+				if (existed) {
+					await this.manager.update(
+						ReleaseDspDelivery,
+						{ releaseId, dspId: dsp.id },
+						{ status: ReleaseDspStatus.PROCESSING, lastEnqueuedAt: new Date() },
+					);
+				} else {
+					await this.manager.save(ReleaseDspDelivery, {
+						releaseId,
+						dspId: dsp.id,
+						isSelected: true,
+						status: ReleaseDspStatus.PROCESSING,
+						lastEnqueuedAt: new Date(),
+					});
+				}
+			}
+		}
 
 		this.submitLog.log({
 			releaseSubmitId: saved.id,
@@ -246,20 +274,24 @@ export class ReleaseSubmitService {
 			}
 
 			if (parent.type === SubmitStepType.PROCESS_DIRECT) {
+				let directOrder = 1;
 				const directChildTypes = [
 					SubmitStepType.CREATE_METADATA_DIRECT,
 					SubmitStepType.UPLOAD_SFTP_DIRECT,
 					SubmitStepType.WAIT_PARTNER_PROCESS,
 					SubmitStepType.SYNC_DATA_FROM_DSP,
 				];
-				directChildTypes.forEach((type, i) => {
+				for (const type of directChildTypes) {
 					childStepsToInsert.push({
 						releaseSubmitId: submitId,
 						parentStepId: parent.id,
 						type,
-						order: i + 1,
+						order: directOrder++,
+						...(type === SubmitStepType.WAIT_PARTNER_PROCESS && {
+							metadata: { input: { waitMinutes: DEFAULT_WAIT_MINUTES } },
+						}),
 					});
-				});
+				}
 			}
 
 			if (parent.type === SubmitStepType.PROCESS_AGG_CI) {
@@ -278,7 +310,7 @@ export class ReleaseSubmitService {
 					SubmitStepType.UPLOAD_SFTP_CI,
 					SubmitStepType.CREATE_FOLDER_DONE_CI,
 					SubmitStepType.WAIT_PARTNER_PROCESS,
-					SubmitStepType.GET_QA_FLAG_CI,
+					SubmitStepType.VALIDATE_QA_CI,
 				];
 				
 				for (const type of commonTypes) {
@@ -287,6 +319,9 @@ export class ReleaseSubmitService {
 						parentStepId: parent.id,
 						type,
 						order: childOrder++,
+						...(type === SubmitStepType.WAIT_PARTNER_PROCESS && {
+							metadata: { input: { waitMinutes: DEFAULT_WAIT_MINUTES } },
+						}),
 					});
 				}
 
@@ -399,8 +434,15 @@ export class ReleaseSubmitService {
 	 * - Có WAITING_ACTION → WAITING_ACTION
 	 * - Mix DONE + FAILED → PARTIAL_DONE
 	 * - Tất cả FAILED → FAILED
+	 *
+	 * Đồng thời sync kết quả vào ReleaseDspDelivery:
+	 * - Branch FAILED → DSPs của branch đó → ISSUES
+	 * - Ghi tổng kết vào metadata.output.results
 	 */
 	private async resolveSubmitStatus(submitId: string) {
+		const submit = await this.submitRepo.findOne({ where: { id: submitId } });
+		if (!submit) return;
+
 		const distSteps = await this.stepRepo.find({
 			where: {
 				releaseSubmitId: submitId,
@@ -437,15 +479,68 @@ export class ReleaseSubmitService {
 			finalStatus = ReleaseSubmitStatus.PARTIAL_DONE;
 		}
 
+		// Sync kết quả vào ReleaseDspDelivery + thu thập results
+		const results: ReleaseSubmitResultDto[] = [];
+
+		for (const branch of distBranches) {
+			const dsps: Dsp[] = branch.metadata?.input?.dsps || [];
+			const branchDone = branch.status === SubmitStepStatus.DONE;
+			const branchFailed = branch.status === SubmitStepStatus.FAILED;
+
+			// Lấy QA flags từ VALIDATE_QA_CI child step (nếu có)
+			let qaFlags: any = null;
+			if (branchFailed) {
+				const qaStep = await this.stepRepo.findOne({
+					where: {
+						parentStepId: branch.id,
+						type: SubmitStepType.VALIDATE_QA_CI,
+					},
+				});
+				qaFlags = qaStep?.metadata?.output?.qaFlags || null;
+			}
+
+			for (const dsp of dsps) {
+				// Chỉ update DSPs có branch kết thúc (DONE hoặc FAILED)
+				// WAITING_ACTION thì giữ nguyên PROCESSING
+				if (branchFailed) {
+					await this.manager.update(
+						ReleaseDspDelivery,
+						{ releaseId: submit.releaseId, dspId: dsp.id },
+						{
+							status: ReleaseDspStatus.ISSUES,
+							issues: qaFlags,
+						},
+					);
+				}
+
+				results.push({
+					dsp,
+					status: branchDone ? 'success' : branchFailed ? 'failed' : 'processing',
+					message: branchDone
+						? `Distributed to ${dsp.name || dsp.code}`
+						: branchFailed
+							? `Failed to distribute to ${dsp.name || dsp.code}`
+							: `Waiting for action on ${dsp.name || dsp.code}`,
+				});
+			}
+		}
+
+		// Ghi results vào metadata.output
+		const updatedMetadata = {
+			...submit.metadata,
+			output: { results },
+		};
+
 		await this.submitRepo.update(submitId, {
 			status: finalStatus,
 			completedAt: hasWaiting ? null : new Date(),
+			metadata: updatedMetadata,
 		});
 
 		this.submitLog.log({
 			releaseSubmitId: submitId,
 			message: `Submit resolved: ${finalStatus}`,
-			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })) },
+			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })), results },
 		});
 	}
 
@@ -892,8 +987,8 @@ export class ReleaseSubmitService {
 			}
 
 			case SubmitStepType.WAIT_PARTNER_PROCESS: {
-				const WAIT_MINUTES = 1;
-				const scheduledAt = new Date(Date.now() + WAIT_MINUTES * 60 * 1000);
+				const waitMinutes = step.metadata?.input?.waitMinutes ?? 3;
+				const scheduledAt = new Date(Date.now() + waitMinutes * 60 * 1000);
 
 				await this.stepRepo.update(step.id, {
 					status: SubmitStepStatus.WAITING_ACTION,
@@ -903,22 +998,26 @@ export class ReleaseSubmitService {
 				this.submitLog.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
-					message: `[WAIT_PARTNER_PROCESS_CI] Scheduled resume at ${scheduledAt.toISOString()} (+${WAIT_MINUTES}min)`,
+					message: `[WAIT_PARTNER_PROCESS] Scheduled resume at ${scheduledAt.toISOString()} (+${waitMinutes}min)`,
 				});
 				break;
 			}
 
-			case SubmitStepType.GET_QA_FLAG_CI: {
-				// break;
-				this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[GET_QA_FLAG_CI] Release: ${releaseId}` });
+			case SubmitStepType.VALIDATE_QA_CI: {
+				this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[VALIDATE_QA_CI] Release: ${releaseId}` });
 				const qaFlags = await this.releaseService.getQaFlagCi(releaseId);
+				const hasIssues = Array.isArray(qaFlags) && qaFlags.length > 0;
 
 				await this.stepRepo.update(step.id, {
 					metadata: {
 						input: { releaseId },
-						output: { qaFlags },
+						output: { qaFlags, hasIssues },
 					} as any,
 				});
+
+				if (hasIssues) {
+					throw new Error(`QA validation failed: ${qaFlags.length} issue(s) found`);
+				}
 				break;
 			}
 

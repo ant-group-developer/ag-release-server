@@ -4,6 +4,7 @@ import { AfterLoad, Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typ
 import { ReleaseSubmitStep } from './release-submit-step.entity';
 import { ReleaseSubmitStatus } from '../release-submit.enum';
 import { ReleaseSubmitLog } from './release-submit-log.entity';
+import { ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 
 @Entity('release_submits')
 export class ReleaseSubmit extends BaseUUIDEntity {
@@ -34,6 +35,9 @@ export class ReleaseSubmit extends BaseUUIDEntity {
             releaseSnapshot: Release;
 			dspCodes: string[];
         },
+		output: {
+			results: ReleaseSubmitResultDto[];
+		}
     };
 
 	@Column({
