@@ -43,6 +43,13 @@ export class ReleaseSubmitController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	/** Xem steps đang chờ CRON resume của 1 submit cụ thể */
+	@Get(':id/steps/waiting')
+	async getWaitingStepsBySubmit(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseSubmitService.getWaitingStepsBySubmitId(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	/** Retry 1 step bị failed */
 	@Post('steps/:stepId/retry')
 	async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
@@ -55,6 +62,13 @@ export class ReleaseSubmitController {
 	async resumeFromWaiting(@Param('stepId', ParseUUIDPipe) stepId: string) {
 		const result =
 			await this.releaseSubmitService.resumeFromWaiting(stepId);
+		return new ResponseSuccess({ data: result });
+	}
+
+	/** Xem các steps đang chờ CRON resume */
+	@Get('steps/waiting')
+	async getWaitingSteps(@Query('releaseId') releaseId?: string) {
+		const result = await this.releaseSubmitService.getWaitingSteps(releaseId);
 		return new ResponseSuccess({ data: result });
 	}
 }

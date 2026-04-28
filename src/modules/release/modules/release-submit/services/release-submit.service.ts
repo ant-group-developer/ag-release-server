@@ -8,7 +8,9 @@ import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-c
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseQueryService } from 'src/modules/release/services/release.query.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
@@ -31,6 +33,7 @@ import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-su
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
+import console from 'console';
 
 @Injectable()
 export class ReleaseSubmitService {
@@ -66,6 +69,17 @@ export class ReleaseSubmitService {
 	// ==========================================
 
 	async submit(releaseId: string, dspCodes: string[]) {
+		// Cancel submit cũ chưa hoàn thành
+		await this.submitRepo
+			.createQueryBuilder()
+			.update()
+			.set({ status: ReleaseSubmitStatus.FAILED, completedAt: new Date() })
+			.where('release_id = :releaseId', { releaseId })
+			.andWhere('status IN (:...statuses)', {
+				statuses: [ReleaseSubmitStatus.NEW, ReleaseSubmitStatus.PROCESSING, ReleaseSubmitStatus.WAITING_ACTION],
+			})
+			.execute();
+
 		// Lấy full release data để snapshot
 		const release =
 			await this.releaseQueryService.findOneReleaseFull(releaseId);
@@ -83,32 +97,11 @@ export class ReleaseSubmitService {
 		});
 		const saved = await this.submitRepo.save(submit);
 
+		// Sync release status
+		await this.syncReleaseStatus(releaseId);
+
 		// Mark tất cả DSPs được chọn → PROCESSING trong ReleaseDspDelivery
-		if (dspCodes?.length) {
-			const dsps = await this.manager.find(Dsp, {
-				where: { code: In(dspCodes) },
-			});
-			for (const dsp of dsps) {
-				const existed = await this.manager.findOne(ReleaseDspDelivery, {
-					where: { releaseId, dspId: dsp.id },
-				});
-				if (existed) {
-					await this.manager.update(
-						ReleaseDspDelivery,
-						{ releaseId, dspId: dsp.id },
-						{ status: ReleaseDspStatus.PROCESSING, lastEnqueuedAt: new Date() },
-					);
-				} else {
-					await this.manager.save(ReleaseDspDelivery, {
-						releaseId,
-						dspId: dsp.id,
-						isSelected: true,
-						status: ReleaseDspStatus.PROCESSING,
-						lastEnqueuedAt: new Date(),
-					});
-				}
-			}
-		}
+		await this.markDspDeliveriesProcessing(releaseId, dspCodes);
 
 		this.submitLog.log({
 			releaseSubmitId: saved.id,
@@ -123,8 +116,7 @@ export class ReleaseSubmitService {
 				message: `processAsync failed: ${err.message}`,
 				data: { stack: err.stack },
 			});
-		});
-
+		})
 		return saved;
 	}
 
@@ -151,6 +143,7 @@ export class ReleaseSubmitService {
 				status: ReleaseSubmitStatus.FAILED,
 				summary: err.message,
 			});
+			await this.syncReleaseStatus(submit.releaseId);
 		}
 	}
 
@@ -464,6 +457,7 @@ export class ReleaseSubmitService {
 
 		const statuses = distBranches.map(s => s.status);
 		const hasWaiting = statuses.includes(SubmitStepStatus.WAITING_ACTION);
+		const hasProcessing = statuses.includes(SubmitStepStatus.PROCESSING) || statuses.includes(SubmitStepStatus.NEW);
 		const hasFailed = statuses.includes(SubmitStepStatus.FAILED);
 		const allDone = statuses.every(s => s === SubmitStepStatus.DONE);
 		const allFailed = statuses.every(s => s === SubmitStepStatus.FAILED);
@@ -471,6 +465,8 @@ export class ReleaseSubmitService {
 		let finalStatus: ReleaseSubmitStatus;
 		if (hasWaiting) {
 			finalStatus = ReleaseSubmitStatus.WAITING_ACTION;
+		} else if (hasProcessing) {
+			finalStatus = ReleaseSubmitStatus.PROCESSING;
 		} else if (allDone) {
 			finalStatus = ReleaseSubmitStatus.DONE;
 		} else if (allFailed) {
@@ -536,6 +532,9 @@ export class ReleaseSubmitService {
 			completedAt: hasWaiting ? null : new Date(),
 			metadata: updatedMetadata,
 		});
+
+		// Sync release status
+		await this.syncReleaseStatus(submit.releaseId);
 
 		this.submitLog.log({
 			releaseSubmitId: submitId,
@@ -1189,6 +1188,49 @@ export class ReleaseSubmitService {
 	}
 
 	// ==========================================
+	// WAITING STEPS — Debug CRON
+	// ==========================================
+
+	async getWaitingSteps(releaseId?: string) {
+		const where: any = { status: SubmitStepStatus.WAITING_ACTION };
+		if (releaseId) {
+			where.releaseSubmit = { releaseId };
+		}
+
+		const steps = await this.stepRepo.find({
+			where,
+			order: { scheduledAt: 'ASC' },
+			select: ['id', 'releaseSubmitId', 'type', 'status', 'scheduledAt', 'createdAt', 'parentStepId'],
+			relations: releaseId ? ['releaseSubmit'] : [],
+		});
+
+		const now = new Date();
+		return steps.map(s => ({
+			...s,
+			isReadyForResume: s.scheduledAt ? s.scheduledAt <= now : false,
+			timeUntilResume: s.scheduledAt ? Math.round((s.scheduledAt.getTime() - now.getTime()) / 1000) : null,
+		}));
+	}
+
+	async getWaitingStepsBySubmitId(submitId: string) {
+		const steps = await this.stepRepo.find({
+			where: { status: SubmitStepStatus.WAITING_ACTION, releaseSubmitId: submitId },
+			order: { scheduledAt: 'ASC' },
+		});
+
+		const now = new Date();
+		return steps.map(s => ({
+			id: s.id,
+			type: s.type,
+			status: s.status,
+			scheduledAt: s.scheduledAt,
+			parentStepId: s.parentStepId,
+			isReadyForResume: s.scheduledAt ? s.scheduledAt <= now : false,
+			timeUntilResume: s.scheduledAt ? Math.round((s.scheduledAt.getTime() - now.getTime()) / 1000) : null,
+		}));
+	}
+
+	// ==========================================
 	// RESUME — Admin hoàn thành WAITING_ACTION
 	// ==========================================
 
@@ -1198,6 +1240,10 @@ export class ReleaseSubmitService {
 		if (step.status !== SubmitStepStatus.WAITING_ACTION) {
 			throw new Error('Step is not in WAITING_ACTION status');
 		}
+
+		// Lấy releaseId từ submit
+		const submit = await this.submitRepo.findOne({ where: { id: step.releaseSubmitId } });
+		const releaseId = submit?.releaseId;
 
 		// Mark step as DONE
 		await this.stepRepo.update(stepId, {
@@ -1210,13 +1256,20 @@ export class ReleaseSubmitService {
 			status: ReleaseSubmitStatus.PROCESSING,
 		});
 
-		this.runPipeline(step.releaseSubmitId).catch((err) => {
-			this.submitLog.error({
-				releaseSubmitId: step.releaseSubmitId,
-				releaseSubmitStepId: step.id,
-				message: `Resume re-execute failed: ${err.message}`,
+		this.runPipeline(step.releaseSubmitId)
+			.catch((err) => {
+				this.submitLog.error({
+					releaseSubmitId: step.releaseSubmitId,
+					releaseSubmitStepId: step.id,
+					message: `Resume re-execute failed: ${err.message}`,
+				});
+			})
+			.finally(async () => {
+				// Luôn sync release status sau khi pipeline xong (dù thành công hay thất bại)
+				if (releaseId) {
+					await this.syncReleaseStatus(releaseId);
+				}
 			});
-		});
 
 		return { message: 'Resumed' };
 	}
@@ -1233,6 +1286,70 @@ export class ReleaseSubmitService {
 			.andWhere('order > :afterOrder', { afterOrder })
 			.andWhere('status = :status', { status: SubmitStepStatus.NEW })
 			.execute();
+	}
+
+	// ==========================================
+	// SYNC RELEASE STATUS
+	// ==========================================
+
+	async syncReleaseStatus(releaseId: string) {
+		const latest = await this.submitRepo.findOne({
+			where: { releaseId },
+			order: { createdAt: 'DESC' },
+		});
+
+		console.log(latest)
+
+		if (!latest) return;
+
+		const map: Record<ReleaseSubmitStatus, ReleaseStatus> = {
+			[ReleaseSubmitStatus.NEW]: ReleaseStatus.PROCESSING,
+			[ReleaseSubmitStatus.PROCESSING]: ReleaseStatus.PROCESSING,
+			[ReleaseSubmitStatus.WAITING_ACTION]: ReleaseStatus.AWAITING_ACTION,
+			[ReleaseSubmitStatus.DONE]: ReleaseStatus.DISTRIBUTED,
+			[ReleaseSubmitStatus.PARTIAL_DONE]: ReleaseStatus.PARTIAL_DONE,
+			[ReleaseSubmitStatus.FAILED]: ReleaseStatus.FAILED,
+		};
+
+		const newStatus = map[latest.status] ?? ReleaseStatus.PROCESSING;
+
+		await this.manager.update(Release, releaseId, {
+			status: newStatus,
+		});
+
+		console.log(`[SYNC_RELEASE_STATUS] Release ${releaseId} → ${newStatus} (from submit ${latest.id}: ${latest.status})`);
+
+		return newStatus;
+	}
+
+	private async markDspDeliveriesProcessing(releaseId: string, dspCodes: string[]) {
+		if (!dspCodes?.length) return;
+
+		const dsps = await this.manager.find(Dsp, {
+			where: { code: In(dspCodes) },
+		});
+
+		for (const dsp of dsps) {
+			const existed = await this.manager.findOne(ReleaseDspDelivery, {
+				where: { releaseId, dspId: dsp.id },
+			});
+
+			if (existed) {
+				await this.manager.update(
+					ReleaseDspDelivery,
+					{ releaseId, dspId: dsp.id },
+					{ status: ReleaseDspStatus.PROCESSING, lastEnqueuedAt: new Date() },
+				);
+			} else {
+				await this.manager.save(ReleaseDspDelivery, {
+					releaseId,
+					dspId: dsp.id,
+					isSelected: true,
+					status: ReleaseDspStatus.PROCESSING,
+					lastEnqueuedAt: new Date(),
+				});
+			}
+		}
 	}
 
 	// query

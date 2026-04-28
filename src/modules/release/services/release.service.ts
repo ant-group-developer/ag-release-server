@@ -500,6 +500,12 @@ export class ReleaseService {
 		return this.releaseSubmitService.submit(id, dto.code);
 	}
 
+	async testSyncReleaseStatus(id: string) {
+		await this.releaseSubmitService.syncReleaseStatus(id);
+		const release = await this.releaseQueryService.findOne(id);
+		return { status: release.status };
+	}
+
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 		await this.releaseRepo.update(id, {

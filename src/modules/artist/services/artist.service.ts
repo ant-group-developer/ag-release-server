@@ -15,6 +15,7 @@ import {
 import { Artist } from '../entities/artist.entity';
 import { ICreateArtist } from '../interfaces/artist.interface.';
 import { ArtistQueryService } from './artist.query.service';
+import { SpotifyService } from 'src/modules/partners-api/spotify/services/spotify.service';
 
 @Injectable()
 export class ArtistService {
@@ -28,7 +29,9 @@ export class ArtistService {
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,
-		private readonly spotifyService2: SpotifyService2,
+		
+		private readonly spotifyService: SpotifyService,
+		// private readonly spotifyService2: SpotifyService2,
 	) {}
 
 	async handleCreate(data: CreateArtistDto, userId: string) {
@@ -293,7 +296,7 @@ export class ArtistService {
 			}
 
 			try {
-				const detail = await this.spotifyService2.getArtistDetail(
+				const detail = await this.spotifyService.getArtistDetail(
 					spotifyId,
 				);
 
