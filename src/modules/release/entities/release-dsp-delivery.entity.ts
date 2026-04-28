@@ -62,6 +62,13 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	logs: string | null;
 
 	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Danh sách issues (QA flags, validation errors, v.v.)',
+	})
+	issues: any | null;
+
+	@Column({
 		type: 'text',
 		nullable: true,
 		comment: 'Đường dẫn folder metadata trên server cho lần delivery này',

@@ -28,6 +28,7 @@ export class ReleaseSubmitController {
 		);
 		return new ResponseSuccess({ data: result });
 	}
+	
 	/** Lấy danh sách submits */
 	@Get()
 	async getList(@Query() query: QueryGetListSubmitDto) {
