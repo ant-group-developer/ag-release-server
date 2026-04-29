@@ -12,12 +12,14 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 // import { ReleaseSubmitService } from './services/release-submit.service';
 import { QueryGetListSubmitDto } from './dto/release-submit.dto';
 import { ReleaseSubmitService2 } from './services/release-submit2.service';
+import { State51EmailService } from './services/state51-email.service';
 
 @ApiTags('Release Submits')
 @Controller('release-submits')
 export class ReleaseSubmitController {
 	constructor(
 		private readonly releaseSubmitService: ReleaseSubmitService2,
+		private readonly state51EmailService: State51EmailService,
 	) {}
 
 	/** User bấm submit release */
@@ -82,4 +84,5 @@ export class ReleaseSubmitController {
 	// 	const result = await this.releaseSubmitService.getWaitingSteps(releaseId);
 	// 	return new ResponseSuccess({ data: result });
 	// }
+
 }

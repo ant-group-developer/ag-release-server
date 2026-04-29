@@ -29,6 +29,7 @@ import {
 	SubmitStepType,
 } from '../release-submit.enum';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
+import { State51EmailService } from './state51-email.service';
 import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
@@ -36,6 +37,7 @@ import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.consta
 import console from 'console';
 import { Track } from 'src/modules/track/entities/track.entity';
 
+@Injectable()
 export class ReleaseSubmitService2 {
 
     private readonly DISTRIBUTION_TYPES = [SubmitStepType.PROCESS_DIRECT, SubmitStepType.PROCESS_AGG_CI];
@@ -67,6 +69,9 @@ export class ReleaseSubmitService2 {
         private readonly submitLog: ReleaseSubmitLogService,
         private readonly notificationResendService: NotificationResendService,
         private readonly fileExportCiService: FileExportCiService,
+
+        @Inject(forwardRef(() => State51EmailService))
+        private readonly state51EmailService: State51EmailService,
     ) {}
     
     async submit(releaseId: string, dspCodes: string[]) {
@@ -350,7 +355,7 @@ export class ReleaseSubmitService2 {
 				let childOrder = 1;
 
 				// Steps chung — luôn tạo
-				const commonTypes = [
+				const commonTypes: SubmitStepType[] = [
 					SubmitStepType.CREATE_AND_UPLOAD_CI,
 					SubmitStepType.CREATE_FOLDER_DONE_CI,
 					SubmitStepType.WAIT_PARTNER_PROCESS,
@@ -381,6 +386,16 @@ export class ReleaseSubmitService2 {
                         type: SubmitStepType.SEND_EMAIL_TO_STATE,
                         order: childOrder++,
                         metadata: { input: { upc, ciDspCodes: state51DspCodes, dsps:state51Dsps } },
+                    });
+
+                    // WAIT_PARTNER_PROCESS — chờ State51 xử lý sau khi nhận email (1 ngày)
+                    childStepsToInsert.push({
+                        releaseSubmitId: submitId,
+                        parentStepId: parent.id,
+                        type: SubmitStepType.WAIT_PARTNER_PROCESS,
+                        order: childOrder++,
+                        // metadata: { input: { waitMinutes: 1440 } },
+                        metadata: { input: { waitMinutes: 1 } },
                     });
                 }
 
@@ -921,63 +936,49 @@ export class ReleaseSubmitService2 {
             case SubmitStepType.SEND_EMAIL_TO_STATE: {
                 this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SEND_EMAIL_TO_STATE] Release: ${releaseId}` });
 
-                // Lấy danh sách CI DSP codes từ parent
-                const parent = await this.getParentStep(step);
-                const ciDsps = parent?.metadata?.input?.dsps || [];
-                const ciDspCodes = ciDsps
-                    .map((d: Dsp) => d.codeCi)
-                    .filter((code: any): code is string => code !== null);
+                // Lấy CI DSP codes từ step metadata (đã set sẵn ở buildPipeline)
+                const ciDspCodes = step.metadata?.input?.ciDspCodes || [];
                 if (ciDspCodes.length === 0) {
-                    throw new Error('Missing CI DSP codes from parent step');
+                    throw new Error('Missing CI DSP codes from step metadata');
                 }
 
-                // Lấy aggregator info để lấy deliveryEmail
-                const ciDsp = await this.manager.findOne(Dsp, {
-                    where: { id: ciDsps[0].id },
-                    relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
-                });
-                const aggregator = ciDsp?.dspRoutingConfig?.aggregator;
-                if (!aggregator?.deliveryEmail) {
-                    throw new Error(`[SEND_EMAIL_TO_STATE] Missing deliveryEmail on aggregator`);
+                // Lấy deliveryEmail từ aggregator
+                const dsps = step.metadata?.input?.dsps || [];
+                const ciDsp = dsps.length > 0
+                    ? await this.manager.findOne(Dsp, {
+                        where: { id: dsps[0].id },
+                        relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+                    })
+                    : null;
+                const deliveryEmail = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
+                const deliveryEmailSubject = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmailSubject;
+
+                if (!deliveryEmail) {
+                    throw new Error('[SEND_EMAIL_TO_STATE] Missing deliveryEmail on aggregator');
                 }
 
-                // Export Excel từ snapshot
                 const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
-                const buffer = await this.fileExportCiService.createFileExportCi({
-                    data: [{ listCodeDspCi: ciDspCodes, upc }],
+
+                // Enqueue vào State51Email — KHÔNG gửi email ngay
+                await this.state51EmailService.enqueue({
+                    upc,
+                    dspCiCodes: ciDspCodes,
+                    releaseSubmitStepId: step.id,
+                    releaseId,
+                    deliveryEmail,
+                    deliveryEmailSubject,
                 });
 
-                const baseDir = process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
-                const tempDir = path.join(baseDir, 'temp_exports', releaseId);
-                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-                const fileName = `Release_${releaseId}_CI.xlsx`;
-                const filePath = path.join(tempDir, fileName);
-                fs.writeFileSync(filePath, buffer);
-
-                // Gửi email
-                const subject = aggregator.deliveryEmailSubject || `[Distribution] Release: ${releaseId}`;
-                const html = ` `;
-
-                await this.notificationResendService.sendEmail({
-                    to: [aggregator.deliveryEmail],
-                    subject,
-                    html,
-                    attachments: [{ filename: fileName, path: filePath }],
+                // Chuyển sang WAITING_ACTION — chờ batch module gửi email rồi resume
+                await this.stepRepo.update(step.id, {
+                    status: SubmitStepStatus.WAITING_ACTION,
                 });
-
-                // Cleanup
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                    const files = fs.readdirSync(tempDir);
-                    if (files.length === 0) fs.rmdirSync(tempDir);
-                }
 
                 this.submitLog.success({
                     releaseSubmitId: step.releaseSubmitId,
                     releaseSubmitStepId: step.id,
-                    message: `[SEND_EMAIL_TO_STATE] Email sent to ${aggregator.deliveryEmail}`,
-                    data: { fileName, to: aggregator.deliveryEmail },
+                    message: `[SEND_EMAIL_TO_STATE] Queued for batch email, step paused`,
+                    data: { upc, ciDspCodes },
                 });
                 break;
             }
@@ -1052,16 +1053,12 @@ export class ReleaseSubmitService2 {
 	async handleScheduledSteps() {
 		const now = new Date();
 
-        console.log("[CRON] handleScheduledSteps");
-
 		const readySteps = await this.stepRepo.find({
 			where: {
 				status: SubmitStepStatus.WAITING_ACTION,
 				scheduledAt: LessThanOrEqual(now),
 			},
 		});
-
-        console.log(readySteps)
 
 		for (const step of readySteps) {
 			this.submitLog.log({
