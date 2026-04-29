@@ -39,7 +39,7 @@ import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-de
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
-import { ReleaseSubmitService } from '../modules/release-submit/services/release-submit.service';
+import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
 
 @Injectable()
 export class ReleaseService {
@@ -66,8 +66,9 @@ export class ReleaseService {
 		// partners api
 		private readonly ciService: CiService,
 
-		@Inject(forwardRef(() => ReleaseSubmitService))
-		private readonly releaseSubmitService: ReleaseSubmitService,
+		@Inject(forwardRef(() => ReleaseSubmitService2))
+		private readonly releaseSubmitService2: ReleaseSubmitService2,
+
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -497,14 +498,14 @@ export class ReleaseService {
 	async submit3(id: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
-		return this.releaseSubmitService.submit(id, dto.code);
+		return this.releaseSubmitService2.submit(id, dto.code);
 	}
 
-	async testSyncReleaseStatus(id: string) {
-		await this.releaseSubmitService.syncReleaseStatus(id);
-		const release = await this.releaseQueryService.findOne(id);
-		return { status: release.status };
-	}
+	// async testSyncReleaseStatus(id: string) {
+	// 	await this.releaseSubmitService2.syncReleaseStatus(id);
+	// 	const release = await this.releaseQueryService.findOne(id);
+	// 	return { status: release.status };
+	// }
 
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
@@ -585,16 +586,19 @@ export class ReleaseService {
 
 	// get qa flag ci
 	async getQaFlagCi(id: string) {
-		const release = await this.releaseQueryService.findOne(id);
-		const resListReleaseCi = await this.ciService.getReleases({
-			gtin: release.upc ? [release.upc] : [],
-		});
-		const idCi = resListReleaseCi._embedded.find((item: any) => item.barcode === release.upc)?.id;
-		if (!idCi) {
-			throw new ResponseError({ message: 'Không tìm thấy CI' });
-		}
-		const res2 = await this.ciService.getReleaseQaFlags(idCi);
-		return res2._embedded;
+
+		return []
+
+		// const release = await this.releaseQueryService.findOne(id);
+		// const resListReleaseCi = await this.ciService.getReleases({
+		// 	gtin: release.upc ? [release.upc] : [],
+		// });
+		// const idCi = resListReleaseCi._embedded.find((item: any) => item.barcode === release.upc)?.id;
+		// if (!idCi) {
+		// 	throw new ResponseError({ message: 'Không tìm thấy CI' });
+		// }
+		// const res2 = await this.ciService.getReleaseQaFlags(idCi);
+		// return res2._embedded;
 	}
 
 }
