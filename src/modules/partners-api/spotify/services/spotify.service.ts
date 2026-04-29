@@ -18,9 +18,8 @@ export class SpotifyService {
 	constructor(private readonly appConfigService: AppConfigService) {}
 
 	async getToken(bodyClientId?: string, bodyClientSecret?: string) {
-		const partners = this.appConfigService.getCache().config?.partners;
-		const clientId = bodyClientId || partners?.spotify?.clientId;
-		const clientSecret = bodyClientSecret || partners?.spotify?.clientSecret;
+		const clientId = bodyClientId || this.appConfigService.getValue<string>('config.partners.spotify.clientId');
+		const clientSecret = bodyClientSecret || this.appConfigService.getValue<string>('config.partners.spotify.clientSecret');
 
 		if (!clientId || !clientSecret) {
 			throw new Error('Spotify credentials not configured');
@@ -82,7 +81,6 @@ export class SpotifyService {
 				{
 					headers: {
 						Authorization: `Bearer ${await this.getCacheToken()}`,
-						// Authorization: 'Bearer BQCBByzQdM-BktTBAl1pW4tvDQUX74x02FlSaaApUB7GQ4s0n0To7u2iTvoniA7a-Df_KgqPksRGOTTlJYW1fkWuh07f3WwU6LAL2i02rdObl459uPRwQLqNr5mi69_QTgkJ14CU3wFDohdq76XLD3vMA0tWZvVNKBjdoEGlVVwPPzohkmoNgTQvkdG5e3sbQbp4sIQKW8hSF4Hfk19mbEJUcAfcycLe_bRzDZ92JAE9UqZhzQjDeVlDu06DcUWea4JyvncUWUtSZ7IaAxiPm_8gpWeV4Touz95PGD272SuvrIgSbb_oVePvmFPV1W-GaTE0_O7nC993dvBzae1GZB-WZoxJhgTWIBeG3gyPRO1Pf_-lGxJJ6pduoXDRY-uXAiD-MI9LRF1j62vueI4ph5mjhP5W'
 					},
 				},
 			);

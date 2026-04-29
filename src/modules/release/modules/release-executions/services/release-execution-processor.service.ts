@@ -297,7 +297,7 @@ export class ReleaseExecutionProcessorService {
 				if (failedCount >= totalDsps) {
 					releaseStatus = ReleaseStatus.FAILED;
 				} else {
-					releaseStatus = ReleaseStatus.PARTIALLY_FAILED;
+					releaseStatus = ReleaseStatus.PARTIAL_DONE;
 				}
 			} else if (awaitingCount > 0) {
 				releaseStatus = ReleaseStatus.AWAITING_ACTION;

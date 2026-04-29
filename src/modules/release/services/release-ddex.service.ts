@@ -107,7 +107,7 @@ export class ReleaseDdexService {
 		this.processAudioFiles({ audioFiles, outputDir: resourcesDir });
 
 		// 5. DDEX file
-		await this.createErnFile({
+		const xml = await this.createErnFile({
 			releaseId,
 			outputDir: releaseDir,
 			ernVersion,
@@ -133,6 +133,7 @@ export class ReleaseDdexService {
 			outputDir: outputRoot,
 			outputRoot,
 			batchId,
+			xml
 		};
 	}
 
@@ -166,6 +167,8 @@ export class ReleaseDdexService {
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
+
+		return xmlContent
 	}
 
 	async generateReleaseXml(
@@ -253,6 +256,8 @@ export class ReleaseDdexService {
 		fs.writeFileSync(manifestPath, xml, 'utf-8');
 
 		this.logger.log(`[MANIFEST_CREATED] ${manifestPath}`);
+
+		return xml
 	}
 
 	async uploadMetadataDdexSpotifyToSftp(releaseId: string) {

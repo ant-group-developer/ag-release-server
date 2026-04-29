@@ -52,11 +52,14 @@ import { ReleaseExecutionsService } from './modules/release-executions/services/
 import { CiModule } from '../partners-api/ci/ci.module';
 import { ErnModule2 } from '../ern2/ern.module';
 import { ReleaseSubmitController } from './modules/release-submit/release-submit.controller';
-import { ReleaseSubmitService } from './modules/release-submit/services/release-submit.service';
 import { ReleaseSubmitLogService } from './modules/release-submit/services/release-submit-log.service';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
 import { ReleaseSubmitLog } from './modules/release-submit/entities/release-submit-log.entity';
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
+import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
+import { State51EmailService } from './modules/release-submit/services/state51-email.service';
+import { State51Email } from './modules/release-submit/entities/state51-email.entity';
+import { State51EmailController } from './modules/release-submit/state51-email.controller';
 
 @Module({
 	imports: [
@@ -76,7 +79,8 @@ import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.
 			ReleaseExecutionDsp,
 			ReleaseExecutionStep,
 
-			ReleaseSubmit, ReleaseSubmitStep, ReleaseSubmitLog
+			ReleaseSubmit, ReleaseSubmitStep, ReleaseSubmitLog,
+			State51Email
 		]),
 
 		AppConfigModule,
@@ -116,6 +120,7 @@ import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.
 		ReleaseExecutionController,
 
 		ReleaseSubmitController,
+		State51EmailController
 	],
 	providers: [
 		ReleaseService,
@@ -132,8 +137,10 @@ import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.
 		ReleaseExecutionsQueryService,
 		ReleaseExecutionProcessorService,
 
-		ReleaseSubmitService,
+		// ReleaseSubmitService,
+		ReleaseSubmitService2,
 		ReleaseSubmitLogService,
+		State51EmailService
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
 })

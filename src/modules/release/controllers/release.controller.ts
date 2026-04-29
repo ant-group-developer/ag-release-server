@@ -181,6 +181,12 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	// @Get(':id/test-status')
+	// async testSyncStatus(@Param('id', ParseUUIDPipe) id: string) {
+	// 	const result = await this.releaseService.testSyncReleaseStatus(id);
+	// 	return new ResponseSuccess({ data: result });
+	// }
+
 	@Get(':id/file-export-ci')
 	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
 		const buffer = await this.releaseService.getFileExportCiById(id);
