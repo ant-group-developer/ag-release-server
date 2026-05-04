@@ -1,240 +1,55 @@
-price 
-giá các bài hát trong cùng album nên trùng nhau
-giá của album phải bằng tổng các bài hát  
+lấy data từ các dsp
 
-premium
-mid 
-low 
-bundle
+spotify, các luồng direct: chỉ cần gửi sang dsp, call api sync data
+các dsp bên ci:
+
+import 
+
+Create And Upload Ci
+
+Create Folder Done Ci
+
+Wait Partner Process
+
+Validate Qa Ci
+
+// export
+Send Email To State 
+chờ server ci xử lý
+
+Waiting Admin Export 
+gửi file export lên ci
+
+cần 1 module để xem các job 
+type: email_state51 | admin_export
+metadata: {
+    upc: string 
+    dspCodes: string[]
+}
+releaseSubmitId: string
+createdAt
+status: đang chờ | đã xử lý | huỷ 
+
+sau khi xử lý thì xử lý tiếp luồng release submit cũ 
+
+Wait Partner Process
+
+Sync Data Dsp Ci
 
 
+// waiting action (send email to state, admin export)
 
+// module job (send email to state51, admin export)
 
-
-
-
-
-
-
-
-
-release_submit: {
-    id: 'string',
-    release_id: 'string',
-    status: new | processing | done | failed,
-    release: {
-        id: 'string',
-        title: 'string',
-        upc: 'string',
-    },
-
-    steps: [
-        {
-            id: 'string',
-            release_submit_id: 'string',
-            step_type: {
-                id: string,
-                type: 'genUpc' | 'genIsrc' | 'validate' | 'processDirect' | 'processAggCi',
-                step_child: [
-                    {
-                        id: 'string',
-                        type: createMetadataDirect | uploadToSftpDirect | createMetadataAggCi | uploadToSftpAggCi,
-                        status: new | processing | done | failed, 
-                        order: number,
-                        dsp_id: string,
-                        dsp: {
-                            id: 'string',
-                            name: 'string',
-                        }
-                    }
-                ]
-            },
-            status: new | processing | done | failed,
-            order: number,
-        },
-    ],
+{
+    id: string 
+    type: 'email_state51' | 'admin_export'
+    metadata: any 
+    releaseSubmitId: string
+    stepId: string
+    createdAt: Date
+    status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
-release_submit_step: {
-    id: 'string',
-    release_submit_id: 'string',
-    step_type: 'genUpc' | 'genIsrc' | 'validate' | 'createMetadataCi',
-    status: 'string',
-    order: number,
-    step: {
-        id: 'string',
-        name: 'string',
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-data
-
-
-price 
-giá các bài hát trong cùng album nên trùng nhau
-giá của album phải bằng tổng các bài hát  
-
-premium
-mid 
-low 
-bundle
-
-
-
-
-
-
-
-
-
-
-
-
-release_submit: {
-    id: 'string',
-    release_id: 'string',
-    status: new | processing | done | failed,
-    release: {
-        id: 'string',
-        title: 'string',
-        upc: 'string',
-    },
-
-    release_snapshot: {
-        id: 'string',
-        title: 'string',
-        upc: 'string',
-    },
-
-    steps: [
-        {
-            id: 'string',
-            release_submit_id: 'string',
-            step_type: {
-                id: string,
-                type: 'genUpc' | 'genIsrc' | 'validate',
-                dsp_id: null,
-                metadata: {
-                    input: any,
-                    output: any,
-                }
-                steps: []
-            },
-            status: new | processing | done | failed,
-            order: number,
-        },
-        {
-            id: 'string',
-            release_submit_id: 'string',
-            step_type: {
-                id: string,
-                type: processDirect,
-                dsp_id: string,
-                dsp: {
-                    id: 'string',
-                    name: 'string',
-                },
-                metadata: {
-                    input: any,
-                    output: any,
-                },
-                steps: [
-                    {
-                        id: 'string',
-                        type: createMetadataDirect | uploadToSftpDirect | syncDataFromDsp, 
-                        status: new | processing | done | failed,
-                        order: number,
-                        metadata: {
-                            input: any,
-                            output: any,
-                        },
-                    }
-                ]
-            },
-            status: new | processing | done | failed,
-            order: number,
-        },
-        {
-            id: 'string',
-            release_submit_id: 'string',
-            step_type: {
-                id: string,
-                type: processAggCi,
-                metadata: {
-                    input: any,
-                    output: any,
-                },
-                dsps: [
-                    {
-                        id: 'string',
-                        name: 'string',
-                    },
-                    {
-                        id: 'string',
-                        name: 'string',
-                    },
-                ], 
-                steps: [
-                    {
-                        id: 'string',
-                        type: createMetadataAggCi | uploadToSftpAggCi | 
-                            getQaFlagCi | sendEmailToState | waitingAdminExport | syncDataDspCi,
-                        status: new | processing | waiting_admin_export | done | failed,
-                        order: number,
-                        metadata: {
-                            input: any,
-                            output: any,
-                        },
-                    },
-                    {
-                        id: 'string',
-                        type: getQaFlagCi,
-                        status: new | processing | waiting_admin_export | done | failed,
-                        order: number,
-                        metadata: {
-                            input: {
-                                
-                            },
-                            output: any,
-                        },
-                    }
-                ]
-            },
-            status: new | processing | waiting_admin_export | done | failed,
-            order: number,
-        },
-    ],
-}
-
-release_submit_step: {
-    id: 'string',
-    release_submit_id: 'string',
-    step_type: 'genUpc' | 'genIsrc' | 'validate' | 'createMetadataCi',
-    status: 'string',
-    order: number,
-    step: {
-        id: 'string',
-        name: 'string',
-    }
-}
-
-agg_step_ci_dsp: {
-
-}
-
-
-// job sync data from partners
-lấy data từ ci
-upc -> id từ ci -> call api get list qa flag -> cập nhật vào hệ thống 
-lấy data từ spotify
+khi vào thấy được list 
+    upc | dspCodes | jobType | status | createdAt | step: "Process Agg Ci.sendEmailToState"

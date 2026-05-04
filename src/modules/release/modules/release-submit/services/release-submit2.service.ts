@@ -29,7 +29,8 @@ import {
 	SubmitStepType,
 } from '../release-submit.enum';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
-import { State51EmailService } from './state51-email.service';
+import { CiDistributionJobService } from './ci-distribution-job.service';
+import { CiJobType } from '../entities/ci-distribution-job.entity';
 import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
@@ -67,11 +68,9 @@ export class ReleaseSubmitService2 {
         @Inject(forwardRef(() => ReleaseService))
         private readonly releaseService: ReleaseService,
         private readonly submitLog: ReleaseSubmitLogService,
-        private readonly notificationResendService: NotificationResendService,
-        private readonly fileExportCiService: FileExportCiService,
 
-        @Inject(forwardRef(() => State51EmailService))
-        private readonly state51EmailService: State51EmailService,
+        @Inject(forwardRef(() => CiDistributionJobService))
+		private readonly ciJobService: CiDistributionJobService,
     ) {}
     
     async submit(releaseId: string, dspCodes: string[]) {
@@ -356,10 +355,10 @@ export class ReleaseSubmitService2 {
 
 				// Steps chung — luôn tạo
 				const commonTypes: SubmitStepType[] = [
-					SubmitStepType.CREATE_AND_UPLOAD_CI,
-					SubmitStepType.CREATE_FOLDER_DONE_CI,
-					SubmitStepType.WAIT_PARTNER_PROCESS,
-					SubmitStepType.VALIDATE_QA_CI,
+					// SubmitStepType.CREATE_AND_UPLOAD_CI,
+					// SubmitStepType.CREATE_FOLDER_DONE_CI,
+					// SubmitStepType.WAIT_PARTNER_PROCESS,
+					// SubmitStepType.VALIDATE_QA_CI,
 				];
 				
 				for (const type of commonTypes) {
@@ -387,16 +386,6 @@ export class ReleaseSubmitService2 {
                         order: childOrder++,
                         metadata: { input: { upc, ciDspCodes: state51DspCodes, dsps:state51Dsps } },
                     });
-
-                    // WAIT_PARTNER_PROCESS — chờ State51 xử lý sau khi nhận email (1 ngày)
-                    childStepsToInsert.push({
-                        releaseSubmitId: submitId,
-                        parentStepId: parent.id,
-                        type: SubmitStepType.WAIT_PARTNER_PROCESS,
-                        order: childOrder++,
-                        // metadata: { input: { waitMinutes: 1440 } },
-                        metadata: { input: { waitMinutes: 1 } },
-                    });
                 }
 
                 // WAITING_ADMIN_EXPORT — chỉ tạo nếu có DSP có deal CI
@@ -413,6 +402,16 @@ export class ReleaseSubmitService2 {
                         metadata: { input: { upc, ciDspCodes: ciDealDspCodes, dsps: ciDealDsps } },
                     });
                 }
+
+                // WAIT_PARTNER_PROCESS — xử lý sau khi nhận export (1 ngày)
+                childStepsToInsert.push({
+                    releaseSubmitId: submitId,
+                    parentStepId: parent.id,
+                    type: SubmitStepType.WAIT_PARTNER_PROCESS,
+                    order: childOrder++,
+                    // metadata: { input: { waitMinutes: 1440 } },
+                    metadata: { input: { waitMinutes: 1 } },
+                });
 
                 // SYNC_DATA_DSP_CI — luôn tạo, sync tất cả ciDsps
                 childStepsToInsert.push({
@@ -959,14 +958,17 @@ export class ReleaseSubmitService2 {
 
                 const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
 
-                // Enqueue vào State51Email — KHÔNG gửi email ngay
-                await this.state51EmailService.enqueue({
+                // Tạo CI distribution job — KHÔNG gửi email ngay
+                await this.ciJobService.createJob({
+                    type: CiJobType.EMAIL_STATE51,
                     upc,
                     dspCiCodes: ciDspCodes,
-                    releaseSubmitStepId: step.id,
+                    releaseSubmitId: step.releaseSubmitId,
+                    stepId: step.id,
                     releaseId,
                     deliveryEmail,
                     deliveryEmailSubject,
+                    stepLabel: 'Process Agg Ci.sendEmailToState',
                 });
 
                 // Chuyển sang WAITING_ACTION — chờ batch module gửi email rồi resume
@@ -977,17 +979,39 @@ export class ReleaseSubmitService2 {
                 this.submitLog.success({
                     releaseSubmitId: step.releaseSubmitId,
                     releaseSubmitStepId: step.id,
-                    message: `[SEND_EMAIL_TO_STATE] Queued for batch email, step paused`,
+                    message: `[SEND_EMAIL_TO_STATE] CI job created, step paused`,
                     data: { upc, ciDspCodes },
                 });
                 break;
             }
 
             case SubmitStepType.WAITING_ADMIN_EXPORT: {
-                this.submitLog.warning({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[WAITING_ADMIN_EXPORT] Waiting for admin action` });
+                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[WAITING_ADMIN_EXPORT] Release: ${releaseId}` });
+
+                const adminDspCodes = step.metadata?.input?.ciDspCodes || [];
+                const adminUpc = submitDb.metadata?.input?.releaseSnapshot?.upc;
+
+                // Tạo CI distribution job cho admin export
+                await this.ciJobService.createJob({
+                    type: CiJobType.ADMIN_EXPORT,
+                    upc: adminUpc,
+                    dspCiCodes: adminDspCodes,
+                    releaseSubmitId: step.releaseSubmitId,
+                    stepId: step.id,
+                    releaseId,
+                    stepLabel: 'Process Agg Ci.waitingAdminExport',
+                });
+
                 // Chuyển sang WAITING_ACTION, dừng execution tại đây
                 await this.stepRepo.update(step.id, {
                     status: SubmitStepStatus.WAITING_ACTION,
+                });
+
+                this.submitLog.success({
+                    releaseSubmitId: step.releaseSubmitId,
+                    releaseSubmitStepId: step.id,
+                    message: `[WAITING_ADMIN_EXPORT] CI job created, step paused`,
+                    data: { upc: adminUpc, dspCodes: adminDspCodes },
                 });
                 break;
             }
