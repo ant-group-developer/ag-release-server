@@ -414,4 +414,12 @@ export class ReleaseController {
 
 	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
 	// }
+
+	@ApiOperation({ summary: 'Sync lại release status từ DSP deliveries' })
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@Post(':id/sync-release-status')
+	async syncReleaseStatus(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.syncReleaseStatus(id);
+		return new ResponseSuccess({ data: result });
+	}
 }

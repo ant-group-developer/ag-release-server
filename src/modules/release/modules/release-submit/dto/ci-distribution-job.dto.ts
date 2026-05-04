@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { CiJobStatus, CiJobType } from '../entities/ci-distribution-job.entity';
@@ -57,4 +57,11 @@ export class BatchActionCiJobDto {
 	@IsArray()
 	@IsUUID('4', { each: true })
 	ids: string[];
+}
+
+export class ConfirmCompletedCiJobDto extends BatchActionCiJobDto {
+	@ApiProperty({ description: 'Export ID từ CI' })
+	@IsOptional()
+	// @IsNotEmpty()
+	exportIdFromCi?: string;
 }

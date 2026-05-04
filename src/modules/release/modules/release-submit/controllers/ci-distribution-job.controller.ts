@@ -14,6 +14,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
 import {
 	BatchActionCiJobDto,
+	ConfirmCompletedCiJobDto,
 	QueryGetListCiJobDto,
 } from '../dto/ci-distribution-job.dto';
 
@@ -70,10 +71,10 @@ export class CiDistributionJobController {
 		summary: 'Admin xác nhận đã gửi — mark completed → resume pipeline',
 		description: 'Chỉ áp dụng cho jobs type admin_export. Nếu tất cả jobs cùng step xong → resume pipeline.',
 	})
-	@ApiBody({ type: BatchActionCiJobDto })
+	@ApiBody({ type: ConfirmCompletedCiJobDto })
 	@Post('confirm-completed')
-	async confirmCompleted(@Body() body: BatchActionCiJobDto) {
-		const result = await this.jobService.confirmCompleted(body.ids);
+	async confirmCompleted(@Body() body: ConfirmCompletedCiJobDto) {
+		const result = await this.jobService.confirmCompleted(body.ids, body.exportIdFromCi);
 		return new ResponseSuccess({ data: result });
 	}
 

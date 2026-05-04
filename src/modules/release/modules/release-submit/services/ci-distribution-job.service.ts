@@ -1,8 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Inject, forwardRef } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { OnEvent } from '@nestjs/event-emitter';
+import { CronJob } from 'cron';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -15,12 +17,16 @@ import { ReleaseSubmitService2 } from './release-submit2.service';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { AppEvent } from 'src/common/enums/common';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
 
 @Injectable()
-export class CiDistributionJobService {
+export class CiDistributionJobService implements OnModuleInit {
 	private readonly logger = new Logger(CiDistributionJobService.name);
+	private static readonly CRON_JOB_NAME = 'ci-daily-send';
 
 	constructor(
 		@InjectRepository(CiDistributionJob)
@@ -32,7 +38,46 @@ export class CiDistributionJobService {
 		private readonly submitLog: ReleaseSubmitLogService,
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly notificationResendService: NotificationResendService,
+		private readonly schedulerRegistry: SchedulerRegistry,
+		private readonly appConfigService: AppConfigService,
 	) {}
+
+	onModuleInit() {
+		this.registerDailySendCron();
+	}
+
+	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
+	handleAppConfigUpdated() {
+		this.registerDailySendCron();
+	}
+
+	private registerDailySendCron() {
+		const jobName = CiDistributionJobService.CRON_JOB_NAME;
+
+		// Xoá job cũ nếu tồn tại
+		const jobs = this.schedulerRegistry.getCronJobs();
+		if (jobs.has(jobName)) {
+			this.schedulerRegistry.deleteCronJob(jobName);
+			this.logger.log(`Deleted existing cron job: ${jobName}`);
+		}
+
+		try {
+			const cronExpression =
+				this.appConfigService.cache?.config?.partners?.ci?.dailySendCron || '0 8 * * *';
+
+			const job = new CronJob(cronExpression, () => {
+				this.handleDailySend().catch((err) => {
+					this.logger.error(`[CRON] Daily send failed: ${err.message}`);
+				});
+			});
+
+			this.schedulerRegistry.addCronJob(jobName, job);
+			job.start();
+			this.logger.log(`Registered cron job [${jobName}] with expression: ${cronExpression}`);
+		} catch (err) {
+			this.logger.error(`Failed to create cron job [${jobName}]: ${(err as Error).message}`);
+		}
+	}
 
 	// ==========================================
 	// CRUD / Query
@@ -82,7 +127,7 @@ export class CiDistributionJobService {
 			where: { id },
 			relations: ['step'],
 		});
-		if (!record) throw new NotFoundException('CI distribution job not found');
+		if (!record) throw CiDistributionJobException.NOT_FOUND();
 		return record;
 	}
 
@@ -95,8 +140,13 @@ export class CiDistributionJobService {
 	 * Check tất cả jobs cùng stepId đã completed chưa.
 	 * Nếu tất cả xong → resume step EXPORT_CI.
 	 * Gọi sau mỗi lần complete job.
+	 * Output để lưu vào metadata step nếu có
 	 */
-	private async checkAndResumeStep(stepId: string, releaseSubmitId: string): Promise<boolean> {
+	private async checkAndResumeStep(
+		stepId: string,
+		releaseSubmitId: string,
+		outputMetadataStep?: Record<string, any>,
+	): Promise<boolean> {
 		const pendingCount = await this.repo.count({
 			where: {
 				stepId,
@@ -107,7 +157,7 @@ export class CiDistributionJobService {
 		if (pendingCount === 0) {
 			this.logger.log(`[checkAndResumeStep] All jobs for step ${stepId} completed, resuming`);
 			try {
-				await this.releaseSubmitService.resumeFromWaiting(stepId);
+				await this.releaseSubmitService.resumeFromWaiting({ stepId, outputMetadataStep });
 				this.submitLog.success({
 					releaseSubmitId,
 					releaseSubmitStepId: stepId,
@@ -175,17 +225,15 @@ export class CiDistributionJobService {
 		const allJobs = await this.repo.find({ where: { id: In(ids) } });
 		const invalidType = allJobs.filter((j) => j.type !== CiJobType.EMAIL_STATE51);
 		if (invalidType.length > 0) {
-			throw new ResponseError({
-				statusCode: 400,
-				message: `autoSendEmail chỉ áp dụng cho type email_state51. Các job không hợp lệ: ${invalidType.map((j) => j.id).join(', ')}`,
-			});
+			throw CiDistributionJobException.INVALID_TYPE_EMAIL(invalidType.map((j) => j.id));
 		}
 		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING].includes(j.status));
 		if (invalidStatus.length > 0) {
-			throw new ResponseError({
-				statusCode: 400,
-				message: `autoSendEmail chỉ xử lý jobs có status pending. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
-			});
+			throw CiDistributionJobException.INVALID_STATUS(
+				'autoSendEmail',
+				['pending'],
+				invalidStatus.map((j) => ({ id: j.id, status: j.status })),
+			);
 		}
 
 		const jobs = allJobs;
@@ -278,18 +326,19 @@ export class CiDistributionJobService {
 	 * Mark jobs as PROCESSING (chờ admin xác nhận đã gửi)
 	 */
 	async downloadExcel(ids: string[]): Promise<{ buffer: Buffer; fileName: string }> {
-		if (!ids?.length) throw new ResponseError({ statusCode: 400, message: 'No job IDs provided' });
+		if (!ids?.length) throw CiDistributionJobException.NO_IDS_PROVIDED();
 
 		// Validate status
 		const allJobs = await this.repo.find({ where: { id: In(ids) }, order: { createdAt: 'ASC' } });
-		if (allJobs.length === 0) throw new ResponseError({ statusCode: 404, message: 'Không tìm thấy jobs' });
+		if (allJobs.length === 0) throw CiDistributionJobException.JOBS_NOT_FOUND();
 
 		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
 		if (invalidStatus.length > 0) {
-			throw new ResponseError({
-				statusCode: 400,
-				message: `downloadExcel chỉ xử lý jobs có status pending/processing. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
-			});
+			throw CiDistributionJobException.INVALID_STATUS(
+				'downloadExcel',
+				['pending', 'processing'],
+				invalidStatus.map((j) => ({ id: j.id, status: j.status })),
+			);
 		}
 
 		const jobs = allJobs;
@@ -318,24 +367,22 @@ export class CiDistributionJobService {
 	/**
 	 * Admin xác nhận đã gửi — mark completed → resume pipeline
 	 */
-	async confirmCompleted(ids: string[]) {
+	async confirmCompleted(ids: string[], exportIdFromCi?: string) {
 		if (!ids?.length) return { completed: 0, resumed: 0 };
 
 		// Validate type + status
 		const allJobs = await this.repo.find({ where: { id: In(ids) } });
 		const invalidType = allJobs.filter((j) => j.type !== CiJobType.ADMIN_EXPORT);
 		if (invalidType.length > 0) {
-			throw new ResponseError({
-				statusCode: 400,
-				message: `confirmCompleted chỉ áp dụng cho type admin_export. Các job không hợp lệ: ${invalidType.map((j) => j.id).join(', ')}`,
-			});
+			throw CiDistributionJobException.INVALID_TYPE_ADMIN_EXPORT(invalidType.map((j) => j.id));
 		}
 		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
 		if (invalidStatus.length > 0) {
-			throw new ResponseError({
-				statusCode: 400,
-				message: `confirmCompleted chỉ xử lý jobs có status pending/processing. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
-			});
+			throw CiDistributionJobException.INVALID_STATUS(
+				'confirmCompleted',
+				['pending', 'processing'],
+				invalidStatus.map((j) => ({ id: j.id, status: j.status })),
+			);
 		}
 
 		const jobs = allJobs;
@@ -346,6 +393,9 @@ export class CiDistributionJobService {
 			{ status: CiJobStatus.COMPLETED, sentAt: new Date() },
 		);
 
+		// Build output để lưu vào step metadata
+		// const outputMetadataStep = exportIdFromCi ? { exportIdFromCi } : undefined;
+
 		// Check và resume EXPORT_CI step nếu tất cả jobs xong
 		const stepIds = [...new Set(jobs.map((j) => j.stepId))];
 		let totalResumed = 0;
@@ -353,6 +403,7 @@ export class CiDistributionJobService {
 			const resumed = await this.checkAndResumeStep(
 				stepId,
 				jobs.find((j) => j.stepId === stepId)!.releaseSubmitId,
+				// outputMetadataStep,
 			);
 			if (resumed) totalResumed++;
 		}
@@ -379,8 +430,7 @@ export class CiDistributionJobService {
 	// CRON — Tự động gửi email cuối ngày
 	// ==========================================
 
-	/** Chạy 15:00 VN hàng ngày (08:00 UTC) — chỉ gửi type email_state51 */
-	@Cron('0 8 * * *')
+	/** Chạy theo lịch config partners.ci.dailySendCron — chỉ gửi type email_state51 */
 	async handleDailySend() {
 		this.logger.log('[CRON] Daily CI distribution job batch');
 		try {

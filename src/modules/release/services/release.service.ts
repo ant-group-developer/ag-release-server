@@ -601,4 +601,11 @@ export class ReleaseService {
 		return res2._embedded;
 	}
 
+	/** Sync lại release status từ DSP deliveries */
+	async syncReleaseStatus(releaseId: string) {
+		await this.releaseQueryService.findOne(releaseId);
+		const newStatus = await this.releaseSubmitService2.deriveAndUpdateReleaseStatus(releaseId);
+		return { releaseId, status: newStatus };
+	}
+
 }

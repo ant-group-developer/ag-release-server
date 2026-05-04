@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import * as fs from 'fs';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
@@ -16,11 +15,9 @@ import { ReleaseQueryService } from 'src/modules/release/services/release.query.
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
-import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
-import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { removeFolder } from 'src/utils/util';
 import * as path from 'path';
-import { EntityManager, In, IsNull, LessThanOrEqual, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { ReleaseSubmitStep } from '../entities/release-submit-step.entity';
 import { ReleaseSubmit } from '../entities/release-submit.entity';
 import {
@@ -30,13 +27,14 @@ import {
 } from '../release-submit.enum';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
 import { CiDistributionJobService } from './ci-distribution-job.service';
+import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { CiJobType } from '../entities/ci-distribution-job.entity';
 import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
-import console from 'console';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { ReleaseSubmitException } from '../constants/release-submit.constant';
 
 @Injectable()
 export class ReleaseSubmitService2 {
@@ -71,6 +69,8 @@ export class ReleaseSubmitService2 {
 
         @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJobService,
+
+		private readonly ciService: CiService,
     ) {}
     
     async submit(releaseId: string, dspCodes: string[]) {
@@ -353,12 +353,13 @@ export class ReleaseSubmitService2 {
 
 				let childOrder = 1;
 
+                // xulici
 				// Steps chung — luôn tạo
 				const commonTypes: SubmitStepType[] = [
-					// SubmitStepType.CREATE_AND_UPLOAD_CI,
-					// SubmitStepType.CREATE_FOLDER_DONE_CI,
-					// SubmitStepType.WAIT_PARTNER_PROCESS,
-					// SubmitStepType.VALIDATE_QA_CI,
+					SubmitStepType.CREATE_AND_UPLOAD_CI,
+					SubmitStepType.CREATE_FOLDER_DONE_CI,
+					SubmitStepType.WAIT_PARTNER_PROCESS,
+					SubmitStepType.VALIDATE_QA_CI,
 				];
 				
 				for (const type of commonTypes) {
@@ -405,8 +406,8 @@ export class ReleaseSubmitService2 {
                     parentStepId: parent.id,
                     type: SubmitStepType.WAIT_PARTNER_PROCESS,
                     order: childOrder++,
-                    // metadata: { input: { waitMinutes: 1440 } },
-                    metadata: { input: { waitMinutes: 1 } },
+                    metadata: { input: { waitMinutes: 1440 } },
+                    // metadata: { input: { waitMinutes: 1 } },
                 });
 
                 // SYNC_DATA_DSP_CI — luôn tạo, sync tất cả ciDsps
@@ -508,6 +509,7 @@ export class ReleaseSubmitService2 {
 		const dsps = await this.manager.find(Dsp, {
 			where: { code: In(dspCodes) },
 		});
+
 		const dspIds = dsps.map(d => d.id);
 		if (!dspIds.length) return;
 
@@ -522,12 +524,12 @@ export class ReleaseSubmitService2 {
      * Đọc tất cả DSP deliveries của release → tổng hợp → cập nhật Release status.
      * @param submitStatus - nếu submit đang WAITING_ACTION → release = AWAITING_ACTION
      */
-    private async deriveAndUpdateReleaseStatus(
+    async deriveAndUpdateReleaseStatus(
         releaseId: string,
         submitStatus?: ReleaseSubmitStatus,
     ): Promise<ReleaseStatus> {
         const deliveries = await this.manager.find(ReleaseDspDelivery, {
-            where: { releaseId },
+            where: { releaseId, status: Not(ReleaseDspStatus.NEVER_DISTRIBUTED) },
         });
 
         if (deliveries.length === 0) {
@@ -994,40 +996,38 @@ export class ReleaseSubmitService2 {
             }
 
             case SubmitStepType.SYNC_DATA_DSP_CI: {
-                // Lấy tất cả CI DSP IDs từ parent
-                const parent = await this.getParentStep(step);
-                const ciDsps = parent?.metadata?.input?.dsps || [];
+                const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
+                if (!upc) throw new Error('Missing UPC from release snapshot');
 
-                for (const dspInfo of ciDsps) {
-                    const existed = await this.manager.findOne(ReleaseDspDelivery, {
-                        where: { releaseId, dspId: dspInfo.id },
-                    });
+                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] Fetching DSP statuses from CI for UPC: ${upc}` });
 
-                    const deliveryData = {
-                        status: ReleaseDspStatus.DISTRIBUTED,
-                        lastDeliveredAt: new Date(),
-                        isSelected: true,
-                    };
+                const dspStatuses = await this.ciService.getStatusDsps(upc);
 
-                    if (!existed) {
-                        await this.manager.save(ReleaseDspDelivery, {
-                            releaseId,
-                            dspId: dspInfo.id,
-                            ...deliveryData,
-                        });
-                    } else {
-                        await this.manager.update(
-                            ReleaseDspDelivery,
-                            { releaseId, dspId: dspInfo.id },
-                            deliveryData,
-                        );
-                    }
-                }
+                // Map CI code → system code
+                const ciCodes = dspStatuses.map(d => d.ciCode).filter(Boolean);
+                const dsps = ciCodes.length > 0
+                    ? await this.manager.find(Dsp, { where: { codeCi: In(ciCodes) } })
+                    : [];
+                const ciToSystem = new Map(dsps.map(d => [d.codeCi, { code: d.code, name: d.name }]));
 
-                this.submitLog.success({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] ${ciDsps.length} DSPs synced` });
+                const mappedStatuses = dspStatuses.map(d => ({
+                    ciCode: d.ciCode,
+                    code: ciToSystem.get(d.ciCode)?.code || null,
+                    name: ciToSystem.get(d.ciCode)?.name || null,
+                    status: d.status,
+                }));
+
+                // Lưu kết quả vào metadata.output
+                await this.stepRepo.update(step.id, {
+                    metadata: {
+                        ...step.metadata,
+                        output: { ...step.metadata?.output, result: mappedStatuses },
+                    } as any,
+                });
+
+                this.submitLog.success({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`, data: { dspStatuses: mappedStatuses } });
                 break;
             }
-
 
             default:
                 throw new Error(`Unknown step type1: ${step.type}`);
@@ -1068,7 +1068,7 @@ export class ReleaseSubmitService2 {
 				message: `[CRON] Auto-resuming scheduled step ${step.type}`,
 			});
 
-			this.resumeFromWaiting(step.id).catch((err) => {
+			this.resumeFromWaiting({ stepId: step.id }).catch((err) => {
 				this.submitLog.error({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
@@ -1078,17 +1078,24 @@ export class ReleaseSubmitService2 {
 		}
 	}
 
-    async resumeFromWaiting(stepId: string) {
+    async resumeFromWaiting({ stepId, outputMetadataStep }: { stepId: string; outputMetadataStep?: Record<string, any> }) {
 		const step = await this.stepRepo.findOne({ where: { id: stepId } });
 		if (!step) throw new NotFoundException('Step not found');
 		if (step.status !== SubmitStepStatus.WAITING_ACTION) {
 			throw new Error('Step is not in WAITING_ACTION status');
 		}
 
+		// Merge output vào metadata mà không mất data cũ
+		// const updatedMetadata = {
+		// 	...step.metadata,
+		// 	...(outputMetadataStep ? { output: { ...step.metadata?.output, ...outputMetadataStep } } : {}),
+		// };
+
 		// Mark step as DONE
 		await this.stepRepo.update(stepId, {
 			status: SubmitStepStatus.DONE,
 			completedAt: new Date(),
+			// metadata: updatedMetadata,
 		});
 
 		// Resume execution
@@ -1109,7 +1116,6 @@ export class ReleaseSubmitService2 {
 		return { message: 'Resumed' };
 	}
 
-    
 	async retryStep(stepId: string) {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
@@ -1225,8 +1231,8 @@ export class ReleaseSubmitService2 {
 			finalStatus = ReleaseSubmitStatus.PARTIAL_DONE;
 		}
 
-		// Sync kết quả vào ReleaseDspDelivery + thu thập results
-		const results: ReleaseSubmitResultDto[] = [];
+		// Sync kết quả vào ReleaseDspDelivery + thu thập result
+		const result: ReleaseSubmitResultDto[] = [];
 
 		for (const branch of distBranches) {
 			const dsps: Dsp[] = branch.metadata?.input?.dsps || [];
@@ -1245,9 +1251,45 @@ export class ReleaseSubmitService2 {
 				qaFlags = qaStep?.metadata?.output?.qaFlags || null;
 			}
 
+			// CI branch: lấy trạng thái thực từ SYNC_DATA_DSP_CI step
+			if (branch.type === SubmitStepType.PROCESS_AGG_CI && branchDone) {
+				const syncStep = await this.stepRepo.findOne({
+					where: {
+						parentStepId: branch.id,
+						type: SubmitStepType.SYNC_DATA_DSP_CI,
+					},
+				});
+				const ciResult = syncStep?.metadata?.output?.result || [];
+
+				for (const r of ciResult) {
+					const dspCode = r.code || r.ciCode;
+					const dsp = dsps.find(d => d.code === dspCode);
+
+					if (dsp) {
+						if (r.status === 'transfer failed') {
+							await this.manager.update(
+								ReleaseDspDelivery,
+								{ releaseId: submit.releaseId, dspId: dsp.id },
+								{ status: ReleaseDspStatus.ISSUES },
+							);
+						} else {
+							await this.manager.update(
+								ReleaseDspDelivery,
+								{ releaseId: submit.releaseId, dspId: dsp.id },
+								{
+									status: ReleaseDspStatus.DISTRIBUTED,
+									lastDeliveredAt: new Date(),
+								},
+							);
+						}
+					}
+
+					result.push({ dspCode, status: r.status });
+				}
+				continue;
+			}
+
 			for (const dsp of dsps) {
-				// Chỉ update DSPs có branch kết thúc (DONE hoặc FAILED)
-				// WAITING_ACTION thì giữ nguyên PROCESSING
 				if (branchFailed) {
 					await this.manager.update(
 						ReleaseDspDelivery,
@@ -1259,22 +1301,17 @@ export class ReleaseSubmitService2 {
 					);
 				}
 
-				results.push({
-					dsp,
+				result.push({
+					dspCode: dsp.code,
 					status: branchDone ? 'success' : branchFailed ? 'failed' : 'processing',
-					message: branchDone
-						? `Distributed to ${dsp.name || dsp.code}`
-						: branchFailed
-							? `Failed to distribute to ${dsp.name || dsp.code}`
-							: `Waiting for action on ${dsp.name || dsp.code}`,
 				});
 			}
 		}
 
-		// Ghi results vào metadata.output
+		// Ghi result vào metadata.output
 		const updatedMetadata = {
 			...submit.metadata,
-			output: { results },
+			output: { result },
 		};
 
 		await this.submitRepo.update(submitId, {
@@ -1289,7 +1326,7 @@ export class ReleaseSubmitService2 {
 		this.submitLog.log({
 			releaseSubmitId: submitId,
 			message: `Submit resolved: ${finalStatus}`,
-			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })), results },
+			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })), result },
 		});
 	}
 

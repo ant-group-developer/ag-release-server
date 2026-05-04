@@ -32,7 +32,6 @@ export class QueryGetListSubmitDto extends BaseQueryDto2 {
 }
 
 export class ReleaseSubmitResultDto {
-	dsp: Dsp;
-	status: 'success' | 'failed' | 'processing';
-	message: string;
+	dspCode: string;
+	status: string;
 }
