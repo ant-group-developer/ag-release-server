@@ -8,7 +8,7 @@ import {
 	Query,
 	Res,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
@@ -22,34 +22,38 @@ import {
 export class CiDistributionJobController {
 	constructor(private readonly jobService: CiDistributionJobService) {}
 
-	/** Lấy danh sách jobs (phân trang + lọc theo type, status, upc) */
+	@ApiOperation({ summary: 'Danh sách CI distribution jobs' })
+	@ApiQuery({ type: QueryGetListCiJobDto })
 	@Get()
 	async getList(@Query() query: QueryGetListCiJobDto) {
 		const result = await this.jobService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 
-	/** Lấy chi tiết job */
+	@ApiOperation({ summary: 'Chi tiết CI distribution job' })
+	@ApiParam({ name: 'id', format: 'uuid' })
 	@Get(':id')
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.jobService.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 
-	/**
-	 * Auto Send Email — chọn nhiều jobs → hệ thống tạo Excel → gửi email tự động
-	 * Sau khi gửi → mark completed → resume pipeline
-	 */
+	@ApiOperation({
+		summary: 'Auto gửi email — chọn jobs → tạo Excel → gửi email tự động',
+		description: 'Gom các jobs theo deliveryEmail, tạo file Excel, gửi email. Sau khi gửi → mark completed. Nếu tất cả jobs cùng step xong → resume pipeline.',
+	})
+	@ApiBody({ type: BatchActionCiJobDto })
 	@Post('auto-send-email')
 	async autoSendEmail(@Body() body: BatchActionCiJobDto) {
 		const result = await this.jobService.autoSendEmail(body.ids);
 		return new ResponseSuccess({ data: result });
 	}
 
-	/**
-	 * Download Excel — chọn nhiều jobs → tải file Excel về cho admin gửi bằng tay
-	 * Mark jobs → PROCESSING (chờ admin xác nhận)
-	 */
+	@ApiOperation({
+		summary: 'Download Excel — chọn jobs → tải file Excel về',
+		description: 'Tạo file Excel chứa UPC + DSP codes cho admin gửi bằng tay. Mark jobs → PROCESSING (chờ admin xác nhận).',
+	})
+	@ApiBody({ type: BatchActionCiJobDto })
 	@Post('download-excel')
 	async downloadExcel(@Body() body: BatchActionCiJobDto, @Res() res: Response) {
 		const { buffer, fileName } = await this.jobService.downloadExcel(body.ids);
@@ -62,16 +66,19 @@ export class CiDistributionJobController {
 		res.end(buffer);
 	}
 
-	/**
-	 * Admin xác nhận đã gửi file → mark completed → resume pipeline
-	 */
+	@ApiOperation({
+		summary: 'Admin xác nhận đã gửi — mark completed → resume pipeline',
+		description: 'Chỉ áp dụng cho jobs type admin_export. Nếu tất cả jobs cùng step xong → resume pipeline.',
+	})
+	@ApiBody({ type: BatchActionCiJobDto })
 	@Post('confirm-completed')
 	async confirmCompleted(@Body() body: BatchActionCiJobDto) {
 		const result = await this.jobService.confirmCompleted(body.ids);
 		return new ResponseSuccess({ data: result });
 	}
 
-	/** Huỷ 1 job */
+	@ApiOperation({ summary: 'Huỷ 1 job' })
+	@ApiParam({ name: 'id', format: 'uuid' })
 	@Post(':id/cancel')
 	async cancelJob(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.jobService.cancelJob(id);

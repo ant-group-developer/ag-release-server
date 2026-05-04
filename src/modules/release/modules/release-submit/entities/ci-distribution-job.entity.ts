@@ -2,6 +2,7 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { ReleaseSubmit } from './release-submit.entity';
 import { ReleaseSubmitStep } from './release-submit-step.entity';
+import { Release } from 'src/modules/release/entities/release.entity';
 
 export enum CiJobType {
 	EMAIL_STATE51 = 'email_state51',
@@ -42,6 +43,10 @@ export class CiDistributionJob extends BaseUUIDEntity {
 
 	@Column({ name: 'release_id', type: 'uuid', nullable: true })
 	releaseId: string | null;
+
+	@ManyToOne(() => Release, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'release_id' })
+	release: Release;
 
 	@Column({
 		type: 'varchar',

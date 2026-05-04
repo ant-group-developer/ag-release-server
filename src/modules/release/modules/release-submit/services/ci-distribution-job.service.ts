@@ -16,7 +16,7 @@ import { ReleaseSubmitLogService } from './release-submit-log.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 
 @Injectable()
 export class CiDistributionJobService {
@@ -61,6 +61,10 @@ export class CiDistributionJobService {
 		}
 
 		orderAndPaging2({ qb, filter: query });
+
+		qb.leftJoin('job.release', 'release');
+		qb.addSelect(['release.title']);
+
 		const [items, total] = await qb.getManyAndCount();
 		return new PageDto({
 			items,
@@ -82,8 +86,45 @@ export class CiDistributionJobService {
 		return record;
 	}
 
+	/** Tìm job theo stepId */
+	async findByStepId(stepId: string): Promise<CiDistributionJob | null> {
+		return this.repo.findOne({ where: { stepId } });
+	}
+
+	/**
+	 * Check tất cả jobs cùng stepId đã completed chưa.
+	 * Nếu tất cả xong → resume step EXPORT_CI.
+	 * Gọi sau mỗi lần complete job.
+	 */
+	private async checkAndResumeStep(stepId: string, releaseSubmitId: string): Promise<boolean> {
+		const pendingCount = await this.repo.count({
+			where: {
+				stepId,
+				status: In([CiJobStatus.PENDING, CiJobStatus.PROCESSING]),
+			},
+		});
+
+		if (pendingCount === 0) {
+			this.logger.log(`[checkAndResumeStep] All jobs for step ${stepId} completed, resuming`);
+			try {
+				await this.releaseSubmitService.resumeFromWaiting(stepId);
+				this.submitLog.success({
+					releaseSubmitId,
+					releaseSubmitStepId: stepId,
+					message: `[CiJob] All jobs completed, EXPORT_CI step resumed`,
+				});
+				return true;
+			} catch (err) {
+				this.logger.error(`Failed to resume step ${stepId}: ${err.message}`);
+			}
+		} else {
+			this.logger.log(`[checkAndResumeStep] ${pendingCount} jobs still pending for step ${stepId}`);
+		}
+		return false;
+	}
+
 	// ==========================================
-	// Tạo job (gọi từ pipeline)
+	// Tạo job (gọi từ EXPORT_CI step)
 	// ==========================================
 
 	/** Tạo job — gọi bởi SEND_EMAIL_TO_STATE hoặc WAITING_ADMIN_EXPORT step */
@@ -130,12 +171,24 @@ export class CiDistributionJobService {
 	async autoSendEmail(ids: string[]) {
 		if (!ids?.length) return { sent: 0, resumed: 0 };
 
-		const jobs = await this.repo.find({
-			where: {
-				id: In(ids),
-				status: In([CiJobStatus.PENDING, CiJobStatus.PROCESSING]),
-			},
-		});
+		// Validate type + status
+		const allJobs = await this.repo.find({ where: { id: In(ids) } });
+		const invalidType = allJobs.filter((j) => j.type !== CiJobType.EMAIL_STATE51);
+		if (invalidType.length > 0) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: `autoSendEmail chỉ áp dụng cho type email_state51. Các job không hợp lệ: ${invalidType.map((j) => j.id).join(', ')}`,
+			});
+		}
+		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING].includes(j.status));
+		if (invalidStatus.length > 0) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: `autoSendEmail chỉ xử lý jobs có status pending. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
+			});
+		}
+
+		const jobs = allJobs;
 
 		if (jobs.length === 0) {
 			this.logger.warn('No pending/processing jobs found for given IDs');
@@ -202,12 +255,7 @@ export class CiDistributionJobService {
 				);
 
 				for (const job of group) {
-					try {
-						await this.releaseSubmitService.resumeFromWaiting(job.stepId);
-						totalResumed++;
-					} catch (err) {
-						this.logger.error(`Failed to resume step ${job.stepId}: ${err.message}`);
-					}
+					await this.checkAndResumeStep(job.stepId, job.releaseSubmitId);
 				}
 
 				totalSent += group.length;
@@ -230,17 +278,21 @@ export class CiDistributionJobService {
 	 * Mark jobs as PROCESSING (chờ admin xác nhận đã gửi)
 	 */
 	async downloadExcel(ids: string[]): Promise<{ buffer: Buffer; fileName: string }> {
-		if (!ids?.length) throw new Error('No job IDs provided');
+		if (!ids?.length) throw new ResponseError({ statusCode: 400, message: 'No job IDs provided' });
 
-		const jobs = await this.repo.find({
-			where: {
-				id: In(ids),
-				status: In([CiJobStatus.PENDING, CiJobStatus.PROCESSING]),
-			},
-			order: { createdAt: 'ASC' },
-		});
+		// Validate status
+		const allJobs = await this.repo.find({ where: { id: In(ids) }, order: { createdAt: 'ASC' } });
+		if (allJobs.length === 0) throw new ResponseError({ statusCode: 404, message: 'Không tìm thấy jobs' });
 
-		if (jobs.length === 0) throw new NotFoundException('No pending/processing jobs found');
+		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
+		if (invalidStatus.length > 0) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: `downloadExcel chỉ xử lý jobs có status pending/processing. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
+			});
+		}
+
+		const jobs = allJobs;
 
 		// Tạo Excel
 		const excelData = jobs.map((j) => ({
@@ -269,17 +321,24 @@ export class CiDistributionJobService {
 	async confirmCompleted(ids: string[]) {
 		if (!ids?.length) return { completed: 0, resumed: 0 };
 
-		const jobs = await this.repo.find({
-			where: {
-				id: In(ids),
-				type: CiJobType.ADMIN_EXPORT,
-				status: In([CiJobStatus.PENDING, CiJobStatus.PROCESSING]),
-			},
-		});
-
-		if (jobs.length === 0) {
-			return { completed: 0, resumed: 0 };
+		// Validate type + status
+		const allJobs = await this.repo.find({ where: { id: In(ids) } });
+		const invalidType = allJobs.filter((j) => j.type !== CiJobType.ADMIN_EXPORT);
+		if (invalidType.length > 0) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: `confirmCompleted chỉ áp dụng cho type admin_export. Các job không hợp lệ: ${invalidType.map((j) => j.id).join(', ')}`,
+			});
 		}
+		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
+		if (invalidStatus.length > 0) {
+			throw new ResponseError({
+				statusCode: 400,
+				message: `confirmCompleted chỉ xử lý jobs có status pending/processing. Các job không hợp lệ: ${invalidStatus.map((j) => `${j.id}(${j.status})`).join(', ')}`,
+			});
+		}
+
+		const jobs = allJobs;
 
 		// Mark completed
 		await this.repo.update(
@@ -287,24 +346,18 @@ export class CiDistributionJobService {
 			{ status: CiJobStatus.COMPLETED, sentAt: new Date() },
 		);
 
-		// Resume pipeline steps
+		// Check và resume EXPORT_CI step nếu tất cả jobs xong
+		const stepIds = [...new Set(jobs.map((j) => j.stepId))];
 		let totalResumed = 0;
-		for (const job of jobs) {
-			try {
-				await this.releaseSubmitService.resumeFromWaiting(job.stepId);
-				totalResumed++;
-
-				this.submitLog.success({
-					releaseSubmitId: job.releaseSubmitId,
-					releaseSubmitStepId: job.stepId,
-					message: `[CiJob] Job ${job.type} confirmed completed, step resumed`,
-				});
-			} catch (err) {
-				this.logger.error(`Failed to resume step ${job.stepId}: ${err.message}`);
-			}
+		for (const stepId of stepIds) {
+			const resumed = await this.checkAndResumeStep(
+				stepId,
+				jobs.find((j) => j.stepId === stepId)!.releaseSubmitId,
+			);
+			if (resumed) totalResumed++;
 		}
 
-		this.logger.log(`[confirmCompleted] ${jobs.length} completed, ${totalResumed} resumed`);
+		this.logger.log(`[confirmCompleted] ${jobs.length} completed, ${totalResumed} steps resumed`);
 		return { completed: jobs.length, resumed: totalResumed };
 	}
 

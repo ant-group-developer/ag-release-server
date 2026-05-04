@@ -373,23 +373,11 @@ export class ReleaseSubmitService2 {
 					});
 				}
 
-                // SEND_EMAIL_TO_STATE — chỉ tạo nếu có DSP cần State51
-                if (state51Dsps.length > 0) {
+                // EXPORT_CI — 1 step duy nhất tạo tất cả CI jobs (email + admin export)
+                if (state51Dsps.length > 0 || ciDealDsps.length > 0) {
                     const state51DspCodes = state51Dsps
                         .map((d: Dsp) => d.codeCi)
                         .filter((code: string): code is string => !!code);
-
-                    childStepsToInsert.push({
-                        releaseSubmitId: submitId,
-                        parentStepId: parent.id,
-                        type: SubmitStepType.SEND_EMAIL_TO_STATE,
-                        order: childOrder++,
-                        metadata: { input: { upc, ciDspCodes: state51DspCodes, dsps:state51Dsps } },
-                    });
-                }
-
-                // WAITING_ADMIN_EXPORT — chỉ tạo nếu có DSP có deal CI
-                if (ciDealDsps.length > 0) {
                     const ciDealDspCodes = ciDealDsps
                         .map((d: Dsp) => d.codeCi)
                         .filter((code: string): code is string => !!code);
@@ -397,9 +385,17 @@ export class ReleaseSubmitService2 {
                     childStepsToInsert.push({
                         releaseSubmitId: submitId,
                         parentStepId: parent.id,
-                        type: SubmitStepType.WAITING_ADMIN_EXPORT,
+                        type: SubmitStepType.EXPORT_CI,
                         order: childOrder++,
-                        metadata: { input: { upc, ciDspCodes: ciDealDspCodes, dsps: ciDealDsps } },
+                        metadata: {
+                            input: {
+                                upc,
+                                state51Dsps,
+                                state51DspCodes,
+                                ciDealDsps,
+                                ciDealDspCodes,
+                            },
+                        },
                     });
                 }
 
@@ -932,46 +928,58 @@ export class ReleaseSubmitService2 {
                 break;
             }
 
-            case SubmitStepType.SEND_EMAIL_TO_STATE: {
-                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SEND_EMAIL_TO_STATE] Release: ${releaseId}` });
+            case SubmitStepType.EXPORT_CI: {
+                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[EXPORT_CI] Release: ${releaseId}` });
 
-                // Lấy CI DSP codes từ step metadata (đã set sẵn ở buildPipeline)
-                const ciDspCodes = step.metadata?.input?.ciDspCodes || [];
-                if (ciDspCodes.length === 0) {
-                    throw new Error('Missing CI DSP codes from step metadata');
-                }
-
-                // Lấy deliveryEmail từ aggregator
-                const dsps = step.metadata?.input?.dsps || [];
-                const ciDsp = dsps.length > 0
-                    ? await this.manager.findOne(Dsp, {
-                        where: { id: dsps[0].id },
-                        relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
-                    })
-                    : null;
-                const deliveryEmail = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
-                const deliveryEmailSubject = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmailSubject;
-
-                if (!deliveryEmail) {
-                    throw new Error('[SEND_EMAIL_TO_STATE] Missing deliveryEmail on aggregator');
-                }
-
+                const exportInput = step.metadata?.input || {};
                 const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
 
-                // Tạo CI distribution job — KHÔNG gửi email ngay
-                await this.ciJobService.createJob({
-                    type: CiJobType.EMAIL_STATE51,
-                    upc,
-                    dspCiCodes: ciDspCodes,
-                    releaseSubmitId: step.releaseSubmitId,
-                    stepId: step.id,
-                    releaseId,
-                    deliveryEmail,
-                    deliveryEmailSubject,
-                    stepLabel: 'Process Agg Ci.sendEmailToState',
-                });
+                // Tạo job email_state51 (nếu có state51 DSPs)
+                const state51DspCodes: string[] = exportInput.state51DspCodes || [];
+                const state51DspsData: any[] = exportInput.state51Dsps || [];
+                if (state51DspCodes.length > 0) {
+                    // Lấy deliveryEmail từ aggregator
+                    const ciDsp = state51DspsData.length > 0
+                        ? await this.manager.findOne(Dsp, {
+                            where: { id: state51DspsData[0].id },
+                            relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+                        })
+                        : null;
+                    const deliveryEmail = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
+                    const deliveryEmailSubject = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmailSubject;
 
-                // Chuyển sang WAITING_ACTION — chờ batch module gửi email rồi resume
+                    if (!deliveryEmail) {
+                        throw new Error('[EXPORT_CI] Missing deliveryEmail on aggregator for state51 DSPs');
+                    }
+
+                    await this.ciJobService.createJob({
+                        type: CiJobType.EMAIL_STATE51,
+                        upc,
+                        dspCiCodes: state51DspCodes,
+                        releaseSubmitId: step.releaseSubmitId,
+                        stepId: step.id,
+                        releaseId,
+                        deliveryEmail,
+                        deliveryEmailSubject,
+                        stepLabel: 'Export CI - Email State51',
+                    });
+                }
+
+                // Tạo job admin_export (nếu có deal DSPs)
+                const ciDealDspCodes: string[] = exportInput.ciDealDspCodes || [];
+                if (ciDealDspCodes.length > 0) {
+                    await this.ciJobService.createJob({
+                        type: CiJobType.ADMIN_EXPORT,
+                        upc,
+                        dspCiCodes: ciDealDspCodes,
+                        releaseSubmitId: step.releaseSubmitId,
+                        stepId: step.id,
+                        releaseId,
+                        stepLabel: 'Export CI - Admin Export',
+                    });
+                }
+
+                // WAITING_ACTION — chờ tất cả CI jobs xong mới resume
                 await this.stepRepo.update(step.id, {
                     status: SubmitStepStatus.WAITING_ACTION,
                 });
@@ -979,39 +987,8 @@ export class ReleaseSubmitService2 {
                 this.submitLog.success({
                     releaseSubmitId: step.releaseSubmitId,
                     releaseSubmitStepId: step.id,
-                    message: `[SEND_EMAIL_TO_STATE] CI job created, step paused`,
-                    data: { upc, ciDspCodes },
-                });
-                break;
-            }
-
-            case SubmitStepType.WAITING_ADMIN_EXPORT: {
-                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[WAITING_ADMIN_EXPORT] Release: ${releaseId}` });
-
-                const adminDspCodes = step.metadata?.input?.ciDspCodes || [];
-                const adminUpc = submitDb.metadata?.input?.releaseSnapshot?.upc;
-
-                // Tạo CI distribution job cho admin export
-                await this.ciJobService.createJob({
-                    type: CiJobType.ADMIN_EXPORT,
-                    upc: adminUpc,
-                    dspCiCodes: adminDspCodes,
-                    releaseSubmitId: step.releaseSubmitId,
-                    stepId: step.id,
-                    releaseId,
-                    stepLabel: 'Process Agg Ci.waitingAdminExport',
-                });
-
-                // Chuyển sang WAITING_ACTION, dừng execution tại đây
-                await this.stepRepo.update(step.id, {
-                    status: SubmitStepStatus.WAITING_ACTION,
-                });
-
-                this.submitLog.success({
-                    releaseSubmitId: step.releaseSubmitId,
-                    releaseSubmitStepId: step.id,
-                    message: `[WAITING_ADMIN_EXPORT] CI job created, step paused`,
-                    data: { upc: adminUpc, dspCodes: adminDspCodes },
+                    message: `[EXPORT_CI] ${state51DspCodes.length > 0 ? 'email_state51' : ''} ${ciDealDspCodes.length > 0 ? 'admin_export' : ''} jobs created, step paused`,
+                    data: { upc, state51DspCodes, ciDealDspCodes },
                 });
                 break;
             }
