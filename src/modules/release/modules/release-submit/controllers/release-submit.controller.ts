@@ -12,6 +12,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 // import { ReleaseSubmitService } from './services/release-submit.service';
 import { QueryGetListSubmitDto } from '../dto/release-submit.dto';
 import { ReleaseSubmitService2 } from '../services/release-submit2.service';
+import { ExecutionType } from '../entities/release-submit.entity';
 
 
 @ApiTags('Release Submits')
@@ -24,10 +25,11 @@ export class ReleaseSubmitController {
 	/** User bấm submit release */
 	@Post()
 	async submit(@Body() body: { releaseId: string; dspCodes: string[] }) {
-		const result = await this.releaseSubmitService.submit(
-			body.releaseId,
-			body.dspCodes,
-		);
+		const result = await this.releaseSubmitService.submit({
+			releaseId: body.releaseId,
+			dspCodes: body.dspCodes,
+			type: ExecutionType.INITIAL_RELEASE
+		});
 		return new ResponseSuccess({ data: result });
 	}
 	

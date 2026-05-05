@@ -11,12 +11,12 @@ export class SpotifyController {
 		private readonly spotifyService2: SpotifyService2,
 	) {}
 
-	// @Post('token')
-	// async getToken(
-	// 	@Body() body: { clientId?: string; clientSecret?: string },
-	// ) {
-	// 	return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
-	// }
+	@Post('token')
+	async getToken(
+		@Body() body: { clientId?: string; clientSecret?: string },
+	) {
+		return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
+	}
 
 	@Get('artists/:id')
 	async getArtistDetail(@Param('id') id: string) {

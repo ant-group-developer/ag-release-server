@@ -11,13 +11,13 @@ export class NotificationController {
 		private readonly notificationResendService: NotificationResendService,
 	) {}
 
-	@Get('emails')
+	@Get('resend/emails')
 	async getEmails(@Query() query: GetEmailsDto) {
 		const emails = await this.notificationResendService.getEmails(query);
 		return new ResponseSuccess({ message: 'Thành công', data: emails });
 	}
 
-	@Post('test-resend')
+	@Post('resend/test')
 	async testResend(@Body('email') email: string) {
 		if (!email) {
 			throw new ResponseError({ message: 'Vui lòng truyền email cần gửi vào body { "email": "..." }' });

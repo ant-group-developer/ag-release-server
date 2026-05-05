@@ -6,8 +6,22 @@ import { ReleaseSubmitStatus } from '../release-submit.enum';
 import { ReleaseSubmitLog } from './release-submit-log.entity';
 import { ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 
+export enum ExecutionType {
+	INITIAL_RELEASE = 'INITIAL_RELEASE',
+	UPDATE = 'UPDATE',
+	TAKEDOWN = 'TAKEDOWN',
+	RETRY = 'RETRY',
+}
+
 @Entity('release_submits')
 export class ReleaseSubmit extends BaseUUIDEntity {
+	@Column({
+		type: 'varchar',
+		length: 50,
+		comment: 'Loại action: VD lần đầu phân phối (INITIAL) hay gỡ (TAKEDOWN)',
+	})	
+	type: ExecutionType;
+
 	@Column({
 		name: 'release_id',
 		type: 'uuid',

@@ -31,15 +31,13 @@ import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseLog } from '../modules/release-log/entities/release-log.entity';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 import { enhanceReleasesDetails } from '../utils/release.utils';
-// import { ReleaseDdexCiService } from './release.ddex-ci.service';
-// import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
-import { ExecutionType } from '../modules/release-executions/enum/release-execution.enum';
 import { ReleaseExecutionsService } from '../modules/release-executions/services/release-executions.service';
 import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
+import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
 
 @Injectable()
 export class ReleaseService {
@@ -498,7 +496,7 @@ export class ReleaseService {
 	async submit3(id: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
-		return this.releaseSubmitService2.submit(id, dto.code);
+		return this.releaseSubmitService2.submit({releaseId: id, dspCodes: dto.code, type: ExecutionType.INITIAL_RELEASE});
 	}
 
 	// async testSyncReleaseStatus(id: string) {
@@ -512,21 +510,7 @@ export class ReleaseService {
 		await this.releaseRepo.update(id, {
 			releaseEndDate: new Date(),
 		});
-		this.releaseExecutionsService
-			.createAndProcess({
-				releaseId: id,
-				type: ExecutionType.TAKEDOWN,
-				originalDspCodes: dto.code,
-				triggeredById: userId,
-			})
-			.then(async () => {
-				await this.releaseRepo.update(id, {
-					status: ReleaseStatus.TAKEN_DOWN,
-				});
-			})
-			.catch((_e) => {
-				this.logger.error(_e);
-			});
+		return this.releaseSubmitService2.submit({releaseId: id, dspCodes: dto.code, type: ExecutionType.TAKEDOWN});
 	}
 
 	private async processingSubmit({

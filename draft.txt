@@ -1,55 +1,119 @@
-lấy data từ các dsp
-
-spotify, các luồng direct: chỉ cần gửi sang dsp, call api sync data
-các dsp bên ci:
-
-import 
-
-Create And Upload Ci
-
-Create Folder Done Ci
-
-Wait Partner Process
-
-Validate Qa Ci
-
-// export
-Send Email To State 
-chờ server ci xử lý
-
-Waiting Admin Export 
-gửi file export lên ci
-
-cần 1 module để xem các job 
-type: email_state51 | admin_export
-metadata: {
-    upc: string 
-    dspCodes: string[]
-}
-releaseSubmitId: string
-createdAt
-status: đang chờ | đã xử lý | huỷ 
-
-sau khi xử lý thì xử lý tiếp luồng release submit cũ 
-
-Wait Partner Process
-
-Sync Data Dsp Ci
-
-
-// waiting action (send email to state, admin export)
-
-// module job (send email to state51, admin export)
-
 {
-    id: string 
-    type: 'email_state51' | 'admin_export'
-    metadata: any 
-    releaseSubmitId: string
-    stepId: string
-    createdAt: Date
-    status: 'pending' | 'processing' | 'completed' | 'failed'
+    "page": 0,
+    "pageSize": 10,
+    "total": "1",
+    "organisation_id": 52978127640016,
+    "type": "DeliverDesireCollection",
+    "queryParams": {},
+    "export_id": "75386263720191",
+    "_embedded": [
+        {
+            "type": "DeliverDesire",
+            "status": "complete",
+            "exportRequest": {
+                "type": "Export",
+                "name": "TakeDown Bombshelter Digital Services LLC",
+                "asset_type": "audio",
+                "completion_date": "2021-06-04T14:09:10.000Z",
+                "identifier": "takedown-bombshelter-digital-ser-0",
+                "notes": null,
+                "number_of_tracks": 1,
+                "status": "complete",
+                "export_external_id": "bombshelter-digital-services-llc_TKD_FL_20210529161322",
+                "number_of_services": 1,
+                "task": "TakeDown",
+                "total_tracks": 1,
+                "organisation": {
+                    "type": "Organisation",
+                    "name": "ANT MUSIC LLC",
+                    "DPID": "PADPIDA20190227007",
+                    "merlin_member_id": null,
+                    "id": 52978127640016,
+                    "modify_time": "2026-02-11T15:08:31.000Z",
+                    "organisation_id": "52978127640016"
+                },
+                "id": 75386263720191,
+                "modify_time": "2021-06-04T14:07:41.000Z",
+                "export_id": "75386263720191"
+            },
+            "releaseFormat": {
+                "type": "ReleaseFormatEntity",
+                "additional_identifier": "",
+                "barcode": "036336099357",
+                "catalog_no": "BMB 042",
+                "explicit_content": "yes",
+                "gtin": "036336099357",
+                "identifier": "best-friend-file-38",
+                "meta_modify_time": "2021-05-27T17:13:07.000Z",
+                "released": "2021-05-28T00:00:00.000Z",
+                "status": "live",
+                "title": "Best Friend",
+                "weight": null,
+                "version_description": "",
+                "grid": "",
+                "track_count": 1,
+                "format_type": "Single",
+                "qa_flags_run": "2025-01-29T16:27:37.000Z",
+                "volume_part": 1,
+                "volume_total_parts": 1,
+                "c_copy": "2021 Mega Mind Music",
+                "p_copy": "2021 Mega Mind Music",
+                "price_band": "full",
+                "GTIN": "036336099357",
+                "sound_carrier_id": "58423300180",
+                "id": 75314821860032,
+                "modify_time": "2025-01-29T16:27:37.000Z",
+                "release_format_id": "75314821860032",
+                "display_artist": "Robin Joe feat. Faze",
+                "asset_controller_id": "52978127640016",
+                "asset_owner_id": "52978127640016",
+                "release_start_date": "2021-05-28T00:00:00.000Z"
+            },
+            "exportBatch": {
+                "type": "ExportBatch",
+                "exported_products_count": 1,
+                "exported_tracks_count": 1,
+                "identifier": null,
+                "external_batch_id": "20210604130742572",
+                "batch_transfer_status": "transferred",
+                "transfer_end_time": "2021-06-04T14:08:45.000Z",
+                "id": 75593765770158,
+                "modify_time": "2021-06-04T14:08:45.000Z",
+                "internal_batch_id": "75593765770158"
+            },
+            "musicService": {
+                "type": "MusicService",
+                "name": "Audiomack",
+                "dpc": "ADM",
+                "development_status": "live",
+                "id": 53053389780156,
+                "modify_time": "2025-02-25T15:23:25.000Z",
+                "DPID": "PADPIDA2017103008S"
+            },
+            "deliver_desire_id": "75386349910278",
+            "status_cause": "",
+            "id": 75386349910278,
+            "create_time": "2021-05-29T16:16:19.000Z",
+            "modify_time": "2021-06-04T14:07:52.000Z",
+            "_links": {
+                "self": {
+                    "href": "https://api.openimp.com/exports/v1/organisations/52978127640016/export/75386263720191/deliver_desire/75386349910278"
+                },
+                "export": {
+                    "href": "https://api.openimp.com/exports/v1/organisations/52978127640016/export/75386263720191"
+                }
+            }
+        }
+    ],
+    "_links": {
+        "self": {
+            "href": "https://api.openimp.com/exports/v1/organisations/52978127640016/export/75386263720191/deliver_desire"
+        },
+        "first": {
+            "href": "https://api.openimp.com/exports/v1/organisations/52978127640016/export/75386263720191/deliver_desire?page=0"
+        },
+        "last": {
+            "href": "https://api.openimp.com/exports/v1/organisations/52978127640016/export/75386263720191/deliver_desire?page=0"
+        }
+    }
 }
-
-khi vào thấy được list 
-    upc | dspCodes | jobType | status | createdAt | step: "Process Agg Ci.sendEmailToState"

@@ -19,7 +19,7 @@ import { removeFolder } from 'src/utils/util';
 import * as path from 'path';
 import { EntityManager, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { ReleaseSubmitStep } from '../entities/release-submit-step.entity';
-import { ReleaseSubmit } from '../entities/release-submit.entity';
+import { ExecutionType, ReleaseSubmit } from '../entities/release-submit.entity';
 import {
 	ReleaseSubmitStatus,
 	SubmitStepStatus,
@@ -73,7 +73,7 @@ export class ReleaseSubmitService2 {
 		private readonly ciService: CiService,
     ) {}
     
-    async submit(releaseId: string, dspCodes: string[]) {
+    async submit({releaseId, dspCodes, type}: {releaseId: string, dspCodes: string[], type: ExecutionType}) {
         // Cancel submit cũ chưa hoàn thành
         await this.cancelPendingSubmits(releaseId);
 
@@ -85,6 +85,7 @@ export class ReleaseSubmitService2 {
         const submit = this.submitRepo.create({
             releaseId,
             status: ReleaseSubmitStatus.NEW,
+            type,
             metadata: {
                 input: {
                     dspCodes,
