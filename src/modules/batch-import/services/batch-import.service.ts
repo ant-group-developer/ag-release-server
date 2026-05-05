@@ -11,6 +11,7 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
@@ -648,6 +649,7 @@ export class BatchImportService {
 			manager.delete(ReleaseContributor, { releaseId }),
 			manager.delete(ReleaseLocalize, { releaseId }),
 			manager.delete(ReleaseDspDelivery, { releaseId }),
+			manager.delete(ReleaseCoverArt, { releaseId }),
 		]);
 	}
 
@@ -669,6 +671,7 @@ export class BatchImportService {
 			dsps,
 			artists,
 			countries,
+			priceTiers,
 			defaultTrackType,
 			defaultTrackOriginType,
 		] = await Promise.all([
@@ -681,6 +684,10 @@ export class BatchImportService {
 			this.dataSource.getRepository(Dsp).find(),
 			this.dataSource.getRepository(Artist).find(),
 			this.dataSource.getRepository(Country).find(),
+			this.dataSource.getRepository(PriceTier).find({
+				relations: { currency: true },
+				where: { isActive: true },
+			}),
 			this.dataSource
 				.getRepository(TrackType)
 				.findOne({ where: { isDefault: true } }),
@@ -695,11 +702,23 @@ export class BatchImportService {
 			label: new Map(labels.map((r) => [r.name, r.id])),
 			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
 			artistRole: new Map(artistRoles.map((r) => [r.name, r.id])),
-			language: new Map(languages.map((r) => [r.name, r.id])),
+			language: new Map([
+				...languages.map((r) => [r.name, r.id] as [string, string]),
+				...languages.map(
+					(r) => [`${r.name} - ${r.code}`, r.id] as [string, string],
+				),
+			]),
 			dsp: new Map(dsps.map((r) => [r.name, r.id])),
 			artist: new Map(artists.map((r) => [r.name, r.id])),
 			country: new Map(countries.map((r) => [r.iso2, r.id])),
 			countryByName: new Map(countries.map((r) => [r.name, r.id])),
+			priceTier: new Map(
+				priceTiers.map((r) => [
+					`${r.amount}|${r.currency?.code}`,
+					r.id,
+				]),
+			),
+			defaultPriceTierId: priceTiers.find((r) => r.isDefault)?.id || null,
 			defaultTrackTypeId: defaultTrackType?.id || null,
 			defaultTrackOriginTypeId: defaultTrackOriginType?.id || null,
 		};
