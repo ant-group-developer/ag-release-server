@@ -5,6 +5,7 @@ import { CreateReleaseFromExcelDto } from '../dto/batch-import-create.dto';
 import {
 	GetBatchImportLogsDto,
 	GetBatchProgressDto,
+	LogFailedReleaseDto,
 	LogSkippedReleaseDto,
 	ReleaseStatusDto,
 	UploadCompleteDto,
@@ -70,6 +71,17 @@ export class BatchImportController {
 	@Post('log-skipped')
 	async logSkippedRelease(@Body() dto: LogSkippedReleaseDto) {
 		const result = await this.batchImportService.logSkippedRelease(dto);
+
+		return { data: result };
+	}
+
+	@Post('log-failed')
+	async logFailedRelease(@Body() dto: LogFailedReleaseDto) {
+		const result = await this.batchImportService.logFailedRelease(
+			dto.logId,
+			dto.error,
+			dto.rawError,
+		);
 
 		return { data: result };
 	}
