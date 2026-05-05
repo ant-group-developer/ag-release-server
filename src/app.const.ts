@@ -6,9 +6,9 @@ export class AppResponseSuccess {
 	}
 
 	static JOB_PROCESSING<T>(data?: T) {
-		return new ResponseSuccess({ 
-			data, 
-			message: 'Job is processing, will be completed in a few minutes' 
+		return new ResponseSuccess({
+			data,
+			message: 'Job is processing, will be completed in a few minutes',
 		});
 	}
 }

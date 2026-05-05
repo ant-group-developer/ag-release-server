@@ -12,9 +12,7 @@ export class SpotifyController {
 	) {}
 
 	@Post('token')
-	async getToken(
-		@Body() body: { clientId?: string; clientSecret?: string },
-	) {
+	async getToken(@Body() body: { clientId?: string; clientSecret?: string }) {
 		return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
 	}
 

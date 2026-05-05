@@ -213,7 +213,10 @@ export class ReleaseDraftService {
 		});
 
 		if (release.albumFormat?.code === 'Single') {
-			await this.trackDraftService.updateTracksOfRelease({ releaseId, data: { priceTierId }});
+			await this.trackDraftService.updateTracksOfRelease({
+				releaseId,
+				data: { priceTierId },
+			});
 		}
 	}
 
@@ -261,7 +264,9 @@ export class ReleaseDraftService {
 	}
 
 	async getErrorsSchemaReleaseById(id: string) {
-		const release = await this.releaseQueryService.findOneReleaseFull(id);
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+		});
 
 		return this.releaseValidateService.getErrorsSchemaRelease(release);
 	}

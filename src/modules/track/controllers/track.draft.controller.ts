@@ -13,6 +13,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
+import { AppResponseSuccess } from 'src/app.const';
 import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
@@ -22,7 +23,6 @@ import {
 import { BulkDeleteTracksDto, QueryGetListTrackDto } from '../dto/track.dto';
 import { ITrackDraft } from '../interfaces/track.interface';
 import { TrackDraftService } from '../services/track.draft.service';
-import { AppResponseSuccess } from 'src/app.const';
 
 @ApiTags('Tracks Draft')
 @Controller('tracks/draft')
@@ -55,9 +55,7 @@ export class TrackDraftController {
 	}
 
 	@Put('bulk')
-	async bulkUpdate(
-		@Body() data: BulkUpdateTrackDraft,
-	) {
+	async bulkUpdate(@Body() data: BulkUpdateTrackDraft) {
 		await this.trackDraftService.bulkUpdate(data);
 
 		return AppResponseSuccess.JOB_PROCESSING();

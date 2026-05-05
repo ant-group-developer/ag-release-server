@@ -66,11 +66,15 @@ export class ReleaseSubmitLogService {
 		const stepInfo = input.releaseSubmitStepId
 			? ` Step: ${input.releaseSubmitStepId}`
 			: '';
-		this.logger.log(`${tag}${submitInfo}${stepInfo} ${input.message ?? ''}`);
+		this.logger.log(
+			`${tag}${submitInfo}${stepInfo} ${input.message ?? ''}`,
+		);
 
 		this.saveDb(level, input).catch((err) => {
-			this.logger.error(`[SubmitLog:writeSafe] Failed to persist log: ${err.message}`);
-		})
+			this.logger.error(
+				`[SubmitLog:writeSafe] Failed to persist log: ${err.message}`,
+			);
+		});
 	}
 
 	private async saveDb(level: SubmitLogLevel, input: SubmitLogInput) {
@@ -90,9 +94,7 @@ export class ReleaseSubmitLogService {
 			});
 			await this.logRepo.save(entity);
 		} catch (err) {
-			this.logger.error(
-				`${tag} Failed to persist log: ${err.message}`,
-			);
+			this.logger.error(`${tag} Failed to persist log: ${err.message}`);
 		}
 	}
 }

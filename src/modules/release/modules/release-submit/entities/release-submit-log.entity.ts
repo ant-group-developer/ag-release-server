@@ -1,8 +1,8 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { ReleaseSubmit } from './release-submit.entity';
-import { ReleaseSubmitStep } from './release-submit-step.entity';
 import { SubmitLogLevel } from '../release-submit.enum';
+import { ReleaseSubmitStep } from './release-submit-step.entity';
+import { ReleaseSubmit } from './release-submit.entity';
 
 @Entity('release_submit_step_logs')
 export class ReleaseSubmitLog extends BaseUUIDEntity {

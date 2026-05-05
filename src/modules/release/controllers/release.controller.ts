@@ -25,6 +25,7 @@ import {
 	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
 import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
@@ -40,7 +41,6 @@ import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDdexService } from '../services/release-ddex.service';
 import { ReleaseService } from '../services/release.service';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @ApiTags('Releases')
 @Controller('releases')

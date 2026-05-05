@@ -785,12 +785,18 @@ export class ReleaseQueryService {
 		return toSnakeCaseKeys(raw);
 	}
 
-	async findOneReleaseFull(releaseId: string): Promise<Release> {
+	async findOneReleaseFull({
+		releaseId,
+		relations,
+	}: {
+		releaseId: string;
+		relations?: string[];
+	}): Promise<Release> {
 		const qb = this.releaseRepo
 			.createQueryBuilder('release')
 			.where('release.id = :releaseId', { releaseId });
 
-		this.joinFull(qb);
+		this.joinFull({ qb, relations });
 
 		const release = await qb.getOne();
 
@@ -807,7 +813,7 @@ export class ReleaseQueryService {
 
 	async getListFull(query: QueryGetListReleaseDto) {
 		const qb = this.releaseRepo.createQueryBuilder('release');
-		this.joinFull(qb);
+		this.joinFull({ qb });
 		this.filterByQuery(qb, query);
 
 		const [items, totalItems] = await qb.getManyAndCount();
@@ -815,7 +821,13 @@ export class ReleaseQueryService {
 		return { items, totalItems };
 	}
 
-	private joinFull(qb: SelectQueryBuilder<Release>) {
+	private joinFull({
+		qb,
+		relations,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		relations?: string[];
+	}) {
 		qb.leftJoinAndSelect('release.label', 'label')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
@@ -823,7 +835,10 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
 			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
 
-			.leftJoinAndSelect('release.releaseContributors', 'releaseContributors')
+			.leftJoinAndSelect(
+				'release.releaseContributors',
+				'releaseContributors',
+			)
 			.leftJoinAndSelect(
 				'releaseContributors.artistRole',
 				'releaseContributorRole',
@@ -896,22 +911,24 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect(
 				'contributorArtistProfile.dsp',
 				'contributorArtistProfileDsp',
-			)
+			);
 
-			.leftJoinAndSelect(
+		if (relations?.includes('release.releaseDspDeliveries')) {
+			qb.leftJoinAndSelect(
 				'release.releaseDspDeliveries',
 				'releaseDspDelivery',
 			)
-			.leftJoinAndSelect(
-				'releaseDspDelivery.dsp',
-				'releaseDspDeliveryDsp',
-			)
-			.leftJoinAndSelect(
-				'releaseDspDeliveryDsp.dspRoutingConfig',
-				'dspRoutingConfig',
-			)
-			.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator')
+				.leftJoinAndSelect(
+					'releaseDspDelivery.dsp',
+					'releaseDspDeliveryDsp',
+				)
+				.leftJoinAndSelect(
+					'releaseDspDeliveryDsp.dspRoutingConfig',
+					'dspRoutingConfig',
+				)
+				.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator');
+		}
 
-			.orderBy('track.order', 'ASC');
+		qb.orderBy('track.order', 'ASC');
 	}
 }

@@ -101,10 +101,10 @@ export class TrackDraftService {
 	}
 
 	// update
-	async bulkUpdate(data: BulkUpdateTrackDraft){
-		for(const t of data.trackDrafts){
-			if(t.id){
-				this.updateSafeSync(t.id, t)
+	async bulkUpdate(data: BulkUpdateTrackDraft) {
+		for (const t of data.trackDrafts) {
+			if (t.id) {
+				this.updateSafeSync(t.id, t);
 			}
 		}
 	}
@@ -132,16 +132,16 @@ export class TrackDraftService {
 		return this.trackQueryService.ensureDraftTrack(result);
 	}
 
-	async updateSafe(id: string, data: UpdateTrackDraftDto){
+	async updateSafe(id: string, data: UpdateTrackDraftDto) {
 		try {
-			await this.update(id, data)
+			await this.update(id, data);
 		} catch (error) {
-			this.logger.error(error)
+			this.logger.error(error);
 		}
 	}
 
-	async updateSafeSync(id: string, data: UpdateTrackDraftDto){
-		this.update(id, data).catch(err => console.log(err))
+	updateSafeSync(id: string, data: UpdateTrackDraftDto) {
+		this.update(id, data).catch((err) => console.log(err));
 	}
 
 	async updateTrackPolicy({
@@ -165,7 +165,9 @@ export class TrackDraftService {
 			releaseId,
 		});
 
-		await Promise.all(tracks.map((track) => this.updateSafe(track.id, data)));
+		await Promise.all(
+			tracks.map((track) => this.updateSafe(track.id, data)),
+		);
 	}
 
 	//delete

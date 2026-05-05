@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
-import { SpotifyModule } from './spotify/spotify.module';
 import { CiModule } from './ci/ci.module';
+import { SpotifyModule } from './spotify/spotify.module';
 
 @Global()
 @Module({

@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import axios, { AxiosInstance } from 'axios';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { GetCiReleasesDto } from '../dtos/ci.dto';
-import { CiDeliverDesireResponse, CiDeliverDesire } from '../interfaces/ci-deliver-desire.interface';
+import {
+	CiDeliverDesire,
+	CiDeliverDesireResponse,
+} from '../interfaces/ci-deliver-desire.interface';
 import { CiExportListResponse } from '../interfaces/ci-export.interface';
 
 export interface CiDspStatus {
@@ -18,8 +21,12 @@ export class CiService {
 	constructor(private readonly appConfigService: AppConfigService) {}
 
 	private get client(): AxiosInstance {
-		const baseUrl = this.appConfigService.getValue<string>('config.partners.ci.baseUrl');
-		const token = this.appConfigService.getValue<string>('config.partners.ci.token');
+		const baseUrl = this.appConfigService.getValue<string>(
+			'config.partners.ci.baseUrl',
+		);
+		const token = this.appConfigService.getValue<string>(
+			'config.partners.ci.token',
+		);
 
 		return axios.create({
 			baseURL: baseUrl,
@@ -31,16 +38,21 @@ export class CiService {
 	}
 
 	get organisationId(): string {
-		return this.appConfigService.getValue<string>('config.partners.ci.organisationId') || '52978127640016';
+		return (
+			this.appConfigService.getValue<string>(
+				'config.partners.ci.organisationId',
+			) || '52978127640016'
+		);
 	}
-
 
 	private buildParams(params?: any): URLSearchParams {
 		const searchParams = new URLSearchParams();
 		if (params) {
 			for (const key of Object.keys(params)) {
 				if (Array.isArray(params[key])) {
-					params[key].forEach((val: any) => searchParams.append(key, String(val)));
+					params[key].forEach((val: any) =>
+						searchParams.append(key, String(val)),
+					);
 				} else if (params[key] !== undefined && params[key] !== null) {
 					searchParams.append(key, String(params[key]));
 				}
@@ -59,7 +71,10 @@ export class CiService {
 			const response = await this.client.get(endpoint);
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error getReleaseDetail at ${releaseId}`, error?.message || error);
+			this.logger.error(
+				`Error getReleaseDetail at ${releaseId}`,
+				error?.message || error,
+			);
 			throw error;
 		}
 	}
@@ -90,7 +105,10 @@ export class CiService {
 			const response = await this.client.get(endpoint);
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error getReleaseQaFlags at ${releaseId}`, error?.message || error);
+			this.logger.error(
+				`Error getReleaseQaFlags at ${releaseId}`,
+				error?.message || error,
+			);
 			throw error;
 		}
 	}
@@ -105,7 +123,10 @@ export class CiService {
 			const response = await this.client.get(endpoint);
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error deliverDesire at exportId=${exportId}`, error?.message || error);
+			this.logger.error(
+				`Error deliverDesire at exportId=${exportId}`,
+				error?.message || error,
+			);
 			throw error;
 		}
 	}
@@ -122,9 +143,18 @@ export class CiService {
 		for (const exp of exports) {
 			try {
 				const desire = await this.deliverDesire(exp.export_id);
-				results.push({ export_id: exp.export_id, status: exp.status, desires: desire._embedded || [] });
+				results.push({
+					export_id: exp.export_id,
+					status: exp.status,
+					desires: desire._embedded || [],
+				});
 			} catch (err) {
-				results.push({ export_id: exp.export_id, status: exp.status, desires: [], error: err?.message });
+				results.push({
+					export_id: exp.export_id,
+					status: exp.status,
+					desires: [],
+					error: err?.message,
+				});
 			}
 		}
 
@@ -143,7 +173,10 @@ export class CiService {
 			});
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error getExportsByGtin at gtin=${gtin}`, error?.message || error);
+			this.logger.error(
+				`Error getExportsByGtin at gtin=${gtin}`,
+				error?.message || error,
+			);
 			throw error;
 		}
 	}
@@ -170,7 +203,9 @@ export class CiService {
 				const desires = desireResponse._embedded || [];
 				allDesires.push(...desires);
 			} catch (err) {
-				this.logger.warn(`[getStatusDsp] Failed to get deliverDesire for export ${exp.export_id}: ${err?.message}`);
+				this.logger.warn(
+					`[getStatusDsp] Failed to get deliverDesire for export ${exp.export_id}: ${err?.message}`,
+				);
 			}
 		}
 
@@ -182,19 +217,27 @@ export class CiService {
 			if (!ciCode) continue;
 
 			const existing = latestByDsp.get(ciCode);
-			if (!existing || new Date(desire.modify_time) > new Date(existing.modify_time)) {
+			if (
+				!existing ||
+				new Date(desire.modify_time) > new Date(existing.modify_time)
+			) {
 				latestByDsp.set(ciCode, desire);
 			}
 		}
 
 		// 4. Map ra output
-		const result: CiDspStatus[] = Array.from(latestByDsp, ([ciCode, desire]) => ({
-			ciCode,
-			name: desire.musicService?.name || ciCode,
-			status: desire.exportBatch?.batch_transfer_status || 'unknown',
-		}));
+		const result: CiDspStatus[] = Array.from(
+			latestByDsp,
+			([ciCode, desire]) => ({
+				ciCode,
+				name: desire.musicService?.name || ciCode,
+				status: desire.exportBatch?.batch_transfer_status || 'unknown',
+			}),
+		);
 
-		this.logger.log(`[getStatusDsps] UPC=${upc}: ${result.length} DSPs found`);
+		this.logger.log(
+			`[getStatusDsps] UPC=${upc}: ${result.length} DSPs found`,
+		);
 		return result;
 	}
 
@@ -206,7 +249,10 @@ export class CiService {
 			const response = await this.client.get(endpoint);
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error getImportDetail at ${batchId}`, error?.message || error);
+			this.logger.error(
+				`Error getImportDetail at ${batchId}`,
+				error?.message || error,
+			);
 			throw error;
 		}
 	}

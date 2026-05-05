@@ -17,7 +17,6 @@ export enum SubmitStepStatus {
 	SKIPPED = 'SKIPPED',
 }
 
-
 /**
  * Step types — enum chỉ dùng ở code (type safety + autocomplete).
  * DB lưu varchar, nên thêm type mới chỉ cần thêm vào enum này, không cần migration.

@@ -3,10 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '../cache/cache.module';
 import { PermissionModule } from '../permission/permission.module';
 import { RoleModule } from '../role/role.module';
-import { TenantModule } from '../tenant/tenant.module';
 import { TenantRolesModule } from '../tenant-roles/tenant-roles.module';
-import { UserModule } from '../user/user.module';
+import { TenantModule } from '../tenant/tenant.module';
 import { UserRole } from '../user-role/user-role.entity';
+import { UserModule } from '../user/user.module';
 import { AccessControlService } from './access-control.service';
 
 @Module({

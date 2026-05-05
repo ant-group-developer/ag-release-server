@@ -18,8 +18,16 @@ export class SpotifyService {
 	constructor(private readonly appConfigService: AppConfigService) {}
 
 	async getToken(bodyClientId?: string, bodyClientSecret?: string) {
-		const clientId = bodyClientId || this.appConfigService.getValue<string>('config.partners.spotify.clientId');
-		const clientSecret = bodyClientSecret || this.appConfigService.getValue<string>('config.partners.spotify.clientSecret');
+		const clientId =
+			bodyClientId ||
+			this.appConfigService.getValue<string>(
+				'config.partners.spotify.clientId',
+			);
+		const clientSecret =
+			bodyClientSecret ||
+			this.appConfigService.getValue<string>(
+				'config.partners.spotify.clientSecret',
+			);
 
 		if (!clientId || !clientSecret) {
 			throw new Error('Spotify credentials not configured');

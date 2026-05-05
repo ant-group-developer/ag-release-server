@@ -43,8 +43,7 @@ export class TrackArtistController {
 	async bulkCreate(
 		@Body() dto: BulkCreateTrackArtistDto,
 	): Promise<ResponseSuccess<TrackArtist | TrackArtist[]>> {
-		const result =
-			await this.trackArtistService.bulkCreate(dto);
+		const result = await this.trackArtistService.bulkCreate(dto);
 		return new ResponseSuccess({
 			data: result,
 			messageCode: TrackArtistMessageCodeSuccess.CREATE,

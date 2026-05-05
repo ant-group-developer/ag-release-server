@@ -14,19 +14,20 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { UserId } from 'src/common/decorators/req.decorators';
 import {
 	PageDto,
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 import { DeleteResult } from 'typeorm';
+import { AccessControlService } from '../access-control/access-control.service';
 import { AuthMessages } from '../auth/constants/messages';
 import {
 	SystemAdminOnly,
 	TenantOwnerOrAdminOnly,
 } from '../auth/decorators/auth.decorator';
 import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
-import { AccessControlService } from '../access-control/access-control.service';
 import { UpdateUserRoleDto } from '../user-role/user-role.dto';
 import { UserMessages } from './constants/messages';
 import {
@@ -41,7 +42,6 @@ import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
 import { checkIsSystemTenant } from './utils/user-type.util';
-import { UserId } from 'src/common/decorators/req.decorators';
 
 @TenantOwnerOrAdminOnly()
 @ApiTags('Users')
@@ -97,7 +97,9 @@ export class UserController {
 		});
 	}
 
-	@ApiOperation({ summary: 'Get roles available for assignment in the current tenant' })
+	@ApiOperation({
+		summary: 'Get roles available for assignment in the current tenant',
+	})
 	@Get('assignable-roles')
 	async getAssignableRoles(
 		@Req() req: Request,
@@ -108,13 +110,14 @@ export class UserController {
 				? queryTenantId
 				: req.user!.tenantId;
 
-		const data = await this.accessControlService.getAssignableRoles(
-			targetTenantId,
-		);
+		const data =
+			await this.accessControlService.getAssignableRoles(targetTenantId);
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Get roles assigned to a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Get roles assigned to a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Get(':userId/roles')
 	async getUserRoles(
@@ -134,7 +137,9 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Get resolved permissions of a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Get resolved permissions of a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Get(':userId/permissions')
 	async getUserPermissions(
@@ -154,14 +159,16 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Update roles assigned to a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Update roles assigned to a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Post(':userId/roles')
 	async updateUserRoles(
 		@Param('userId', ParseUUIDPipe) userId: string,
 		@Body() payload: UpdateUserRoleDto,
 		@Req() req: Request,
-		@UserId() userReqId: string
+		@UserId() userReqId: string,
 	) {
 		const targetTenantId =
 			req.user!.tenantId === SYSTEM_TENANT_ID && payload.tenantId
@@ -172,13 +179,15 @@ export class UserController {
 			targetTenantId,
 			userId,
 			payload.roleIds,
-			userReqId
+			userReqId,
 		);
 		return new ResponseSuccess({ data });
 	}
 
 	@Get(':id')
-	async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ResponseSuccess<User>> {
+	async findOne(
+		@Param('id', ParseUUIDPipe) id: string,
+	): Promise<ResponseSuccess<User>> {
 		const result = await this.userService.findOne(id, {
 			relations: {
 				tenantUser: {

@@ -37,8 +37,14 @@ export class CiDistributionJobException {
 		});
 	}
 
-	static INVALID_STATUS(action: string, allowedStatuses: string[], invalidJobs: { id: string; status: string }[]) {
-		const detail = invalidJobs.map((j) => `${j.id}(${j.status})`).join(', ');
+	static INVALID_STATUS(
+		action: string,
+		allowedStatuses: string[],
+		invalidJobs: { id: string; status: string }[],
+	) {
+		const detail = invalidJobs
+			.map((j) => `${j.id}(${j.status})`)
+			.join(', ');
 		return new ResponseError({
 			statusCode: 400,
 			message: `${action} chỉ xử lý jobs có status ${allowedStatuses.join('/')}. Các job không hợp lệ: ${detail}`,

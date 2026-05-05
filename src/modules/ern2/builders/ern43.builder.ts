@@ -39,7 +39,7 @@ export class Ern43Builder2 {
 
 		this.buildMessageHeader(root);
 		this.buildPartyList(root);
-		
+
 		this.buildResourceList(root);
 		this.buildReleaseList(root);
 		this.buildDealList(root);
@@ -493,8 +493,10 @@ export class Ern43Builder2 {
 
 		const hasDeals =
 			this.input.deals &&
-			((this.input.deals.release && this.input.deals.release.length > 0) ||
-				(this.input.deals.tracks && this.input.deals.tracks.length > 0));
+			((this.input.deals.release &&
+				this.input.deals.release.length > 0) ||
+				(this.input.deals.tracks &&
+					this.input.deals.tracks.length > 0));
 
 		if (hasDeals) {
 			this.buildExplicitDeals(dealList);
@@ -505,7 +507,7 @@ export class Ern43Builder2 {
 		// Release visibility
 		this.buildVisibility(dealList);
 	}
-	
+
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Main release deal
 		if (this.input.deals?.release && this.input.deals.release.length > 0) {
@@ -556,9 +558,13 @@ export class Ern43Builder2 {
 					}
 
 					const validity = terms.ele('ValidityPeriod');
-					validity.ele('StartDateTime').txt(`${deal.startDate}T00:00:00`);
+					validity
+						.ele('StartDateTime')
+						.txt(`${deal.startDate}T00:00:00`);
 					if (deal.endDate) {
-						validity.ele('EndDateTime').txt(`${deal.endDate}T00:00:00`);
+						validity
+							.ele('EndDateTime')
+							.txt(`${deal.endDate}T00:00:00`);
 					}
 
 					for (const cm of deal.commercialModels) {
@@ -662,8 +668,6 @@ export class Ern43Builder2 {
 			})
 			.txt(amount);
 	}
-
-
 
 	private normalizePriceValue(value: number | string): string {
 		if (typeof value === 'number') return String(value);

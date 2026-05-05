@@ -1,10 +1,17 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { AfterLoad, Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { ReleaseSubmitStep } from './release-submit-step.entity';
+import {
+	AfterLoad,
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+} from 'typeorm';
+import { ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { ReleaseSubmitStatus } from '../release-submit.enum';
 import { ReleaseSubmitLog } from './release-submit-log.entity';
-import { ReleaseSubmitResultDto } from '../dto/release-submit.dto';
+import { ReleaseSubmitStep } from './release-submit-step.entity';
 
 export enum ExecutionType {
 	INITIAL_RELEASE = 'INITIAL_RELEASE',
@@ -18,8 +25,9 @@ export class ReleaseSubmit extends BaseUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 50,
-		comment: 'Loại action: VD lần đầu phân phối (INITIAL) hay gỡ (TAKEDOWN)',
-	})	
+		comment:
+			'Loại action: VD lần đầu phân phối (INITIAL) hay gỡ (TAKEDOWN)',
+	})
 	type: ExecutionType;
 
 	@Column({
@@ -45,14 +53,14 @@ export class ReleaseSubmit extends BaseUUIDEntity {
 		comment: 'Input data: releaseSnapshot, config, etc.',
 	})
 	metadata: {
-        input: {
-            releaseSnapshot: Release;
+		input: {
+			releaseSnapshot: Release;
 			dspCodes: string[];
-        },
+		};
 		output: {
 			result: ReleaseSubmitResultDto[];
-		}
-    };
+		};
+	};
 
 	@Column({
 		name: 'completed_at',
