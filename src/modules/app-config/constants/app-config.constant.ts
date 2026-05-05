@@ -87,6 +87,7 @@ export const appConfigDefault: AppConfigShape = {
 			token: '',
 			organisationId: '',
 			baseUrl: '',
+			dailySendCron: '0 8 * * *',
 		},
 		spotify: {
 			clientId: '',

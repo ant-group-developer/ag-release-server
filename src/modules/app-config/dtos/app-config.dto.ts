@@ -164,6 +164,10 @@ export class UpdatePartnerCiConfigDto {
 	@IsOptional()
 	@IsString()
 	baseUrl: string;
+
+	@IsString()
+	@IsNotEmpty()
+	dailySendCron: string;
 }
 
 export class UpdatePartnerSpotifyConfigDto {

@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import * as fs from 'fs';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
@@ -16,11 +15,9 @@ import { ReleaseQueryService } from 'src/modules/release/services/release.query.
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
-import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
-import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { removeFolder } from 'src/utils/util';
 import * as path from 'path';
-import { EntityManager, In, IsNull, LessThanOrEqual, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { ReleaseSubmitStep } from '../entities/release-submit-step.entity';
 import { ReleaseSubmit } from '../entities/release-submit.entity';
 import {
@@ -29,13 +26,15 @@ import {
 	SubmitStepType,
 } from '../release-submit.enum';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
-import { State51EmailService } from './state51-email.service';
+import { CiDistributionJobService } from './ci-distribution-job.service';
+import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
+import { CiJobType } from '../entities/ci-distribution-job.entity';
 import { QueryGetListSubmitDto, ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
-import console from 'console';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { ReleaseSubmitException } from '../constants/release-submit.constant';
 
 @Injectable()
 export class ReleaseSubmitService2 {
@@ -67,11 +66,11 @@ export class ReleaseSubmitService2 {
         @Inject(forwardRef(() => ReleaseService))
         private readonly releaseService: ReleaseService,
         private readonly submitLog: ReleaseSubmitLogService,
-        private readonly notificationResendService: NotificationResendService,
-        private readonly fileExportCiService: FileExportCiService,
 
-        @Inject(forwardRef(() => State51EmailService))
-        private readonly state51EmailService: State51EmailService,
+        @Inject(forwardRef(() => CiDistributionJobService))
+		private readonly ciJobService: CiDistributionJobService,
+
+		private readonly ciService: CiService,
     ) {}
     
     async submit(releaseId: string, dspCodes: string[]) {
@@ -354,6 +353,7 @@ export class ReleaseSubmitService2 {
 
 				let childOrder = 1;
 
+                // xulici
 				// Steps chung — luôn tạo
 				const commonTypes: SubmitStepType[] = [
 					SubmitStepType.CREATE_AND_UPLOAD_CI,
@@ -374,33 +374,11 @@ export class ReleaseSubmitService2 {
 					});
 				}
 
-                // SEND_EMAIL_TO_STATE — chỉ tạo nếu có DSP cần State51
-                if (state51Dsps.length > 0) {
+                // EXPORT_CI — 1 step duy nhất tạo tất cả CI jobs (email + admin export)
+                if (state51Dsps.length > 0 || ciDealDsps.length > 0) {
                     const state51DspCodes = state51Dsps
                         .map((d: Dsp) => d.codeCi)
                         .filter((code: string): code is string => !!code);
-
-                    childStepsToInsert.push({
-                        releaseSubmitId: submitId,
-                        parentStepId: parent.id,
-                        type: SubmitStepType.SEND_EMAIL_TO_STATE,
-                        order: childOrder++,
-                        metadata: { input: { upc, ciDspCodes: state51DspCodes, dsps:state51Dsps } },
-                    });
-
-                    // WAIT_PARTNER_PROCESS — chờ State51 xử lý sau khi nhận email (1 ngày)
-                    childStepsToInsert.push({
-                        releaseSubmitId: submitId,
-                        parentStepId: parent.id,
-                        type: SubmitStepType.WAIT_PARTNER_PROCESS,
-                        order: childOrder++,
-                        // metadata: { input: { waitMinutes: 1440 } },
-                        metadata: { input: { waitMinutes: 1 } },
-                    });
-                }
-
-                // WAITING_ADMIN_EXPORT — chỉ tạo nếu có DSP có deal CI
-                if (ciDealDsps.length > 0) {
                     const ciDealDspCodes = ciDealDsps
                         .map((d: Dsp) => d.codeCi)
                         .filter((code: string): code is string => !!code);
@@ -408,11 +386,29 @@ export class ReleaseSubmitService2 {
                     childStepsToInsert.push({
                         releaseSubmitId: submitId,
                         parentStepId: parent.id,
-                        type: SubmitStepType.WAITING_ADMIN_EXPORT,
+                        type: SubmitStepType.EXPORT_CI,
                         order: childOrder++,
-                        metadata: { input: { upc, ciDspCodes: ciDealDspCodes, dsps: ciDealDsps } },
+                        metadata: {
+                            input: {
+                                upc,
+                                state51Dsps,
+                                state51DspCodes,
+                                ciDealDsps,
+                                ciDealDspCodes,
+                            },
+                        },
                     });
                 }
+
+                // WAIT_PARTNER_PROCESS — xử lý sau khi nhận export (1 ngày)
+                childStepsToInsert.push({
+                    releaseSubmitId: submitId,
+                    parentStepId: parent.id,
+                    type: SubmitStepType.WAIT_PARTNER_PROCESS,
+                    order: childOrder++,
+                    metadata: { input: { waitMinutes: 1440 } },
+                    // metadata: { input: { waitMinutes: 1 } },
+                });
 
                 // SYNC_DATA_DSP_CI — luôn tạo, sync tất cả ciDsps
                 childStepsToInsert.push({
@@ -513,6 +509,7 @@ export class ReleaseSubmitService2 {
 		const dsps = await this.manager.find(Dsp, {
 			where: { code: In(dspCodes) },
 		});
+
 		const dspIds = dsps.map(d => d.id);
 		if (!dspIds.length) return;
 
@@ -527,12 +524,12 @@ export class ReleaseSubmitService2 {
      * Đọc tất cả DSP deliveries của release → tổng hợp → cập nhật Release status.
      * @param submitStatus - nếu submit đang WAITING_ACTION → release = AWAITING_ACTION
      */
-    private async deriveAndUpdateReleaseStatus(
+    async deriveAndUpdateReleaseStatus(
         releaseId: string,
         submitStatus?: ReleaseSubmitStatus,
     ): Promise<ReleaseStatus> {
         const deliveries = await this.manager.find(ReleaseDspDelivery, {
-            where: { releaseId },
+            where: { releaseId, status: Not(ReleaseDspStatus.NEVER_DISTRIBUTED) },
         });
 
         if (deliveries.length === 0) {
@@ -933,43 +930,58 @@ export class ReleaseSubmitService2 {
                 break;
             }
 
-            case SubmitStepType.SEND_EMAIL_TO_STATE: {
-                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SEND_EMAIL_TO_STATE] Release: ${releaseId}` });
+            case SubmitStepType.EXPORT_CI: {
+                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[EXPORT_CI] Release: ${releaseId}` });
 
-                // Lấy CI DSP codes từ step metadata (đã set sẵn ở buildPipeline)
-                const ciDspCodes = step.metadata?.input?.ciDspCodes || [];
-                if (ciDspCodes.length === 0) {
-                    throw new Error('Missing CI DSP codes from step metadata');
-                }
-
-                // Lấy deliveryEmail từ aggregator
-                const dsps = step.metadata?.input?.dsps || [];
-                const ciDsp = dsps.length > 0
-                    ? await this.manager.findOne(Dsp, {
-                        where: { id: dsps[0].id },
-                        relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
-                    })
-                    : null;
-                const deliveryEmail = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
-                const deliveryEmailSubject = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmailSubject;
-
-                if (!deliveryEmail) {
-                    throw new Error('[SEND_EMAIL_TO_STATE] Missing deliveryEmail on aggregator');
-                }
-
+                const exportInput = step.metadata?.input || {};
                 const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
 
-                // Enqueue vào State51Email — KHÔNG gửi email ngay
-                await this.state51EmailService.enqueue({
-                    upc,
-                    dspCiCodes: ciDspCodes,
-                    releaseSubmitStepId: step.id,
-                    releaseId,
-                    deliveryEmail,
-                    deliveryEmailSubject,
-                });
+                // Tạo job email_state51 (nếu có state51 DSPs)
+                const state51DspCodes: string[] = exportInput.state51DspCodes || [];
+                const state51DspsData: any[] = exportInput.state51Dsps || [];
+                if (state51DspCodes.length > 0) {
+                    // Lấy deliveryEmail từ aggregator
+                    const ciDsp = state51DspsData.length > 0
+                        ? await this.manager.findOne(Dsp, {
+                            where: { id: state51DspsData[0].id },
+                            relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+                        })
+                        : null;
+                    const deliveryEmail = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
+                    const deliveryEmailSubject = ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmailSubject;
 
-                // Chuyển sang WAITING_ACTION — chờ batch module gửi email rồi resume
+                    if (!deliveryEmail) {
+                        throw new Error('[EXPORT_CI] Missing deliveryEmail on aggregator for state51 DSPs');
+                    }
+
+                    await this.ciJobService.createJob({
+                        type: CiJobType.EMAIL_STATE51,
+                        upc,
+                        dspCiCodes: state51DspCodes,
+                        releaseSubmitId: step.releaseSubmitId,
+                        stepId: step.id,
+                        releaseId,
+                        deliveryEmail,
+                        deliveryEmailSubject,
+                        stepLabel: 'Export CI - Email State51',
+                    });
+                }
+
+                // Tạo job admin_export (nếu có deal DSPs)
+                const ciDealDspCodes: string[] = exportInput.ciDealDspCodes || [];
+                if (ciDealDspCodes.length > 0) {
+                    await this.ciJobService.createJob({
+                        type: CiJobType.ADMIN_EXPORT,
+                        upc,
+                        dspCiCodes: ciDealDspCodes,
+                        releaseSubmitId: step.releaseSubmitId,
+                        stepId: step.id,
+                        releaseId,
+                        stepLabel: 'Export CI - Admin Export',
+                    });
+                }
+
+                // WAITING_ACTION — chờ tất cả CI jobs xong mới resume
                 await this.stepRepo.update(step.id, {
                     status: SubmitStepStatus.WAITING_ACTION,
                 });
@@ -977,56 +989,45 @@ export class ReleaseSubmitService2 {
                 this.submitLog.success({
                     releaseSubmitId: step.releaseSubmitId,
                     releaseSubmitStepId: step.id,
-                    message: `[SEND_EMAIL_TO_STATE] Queued for batch email, step paused`,
-                    data: { upc, ciDspCodes },
-                });
-                break;
-            }
-
-            case SubmitStepType.WAITING_ADMIN_EXPORT: {
-                this.submitLog.warning({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[WAITING_ADMIN_EXPORT] Waiting for admin action` });
-                // Chuyển sang WAITING_ACTION, dừng execution tại đây
-                await this.stepRepo.update(step.id, {
-                    status: SubmitStepStatus.WAITING_ACTION,
+                    message: `[EXPORT_CI] ${state51DspCodes.length > 0 ? 'email_state51' : ''} ${ciDealDspCodes.length > 0 ? 'admin_export' : ''} jobs created, step paused`,
+                    data: { upc, state51DspCodes, ciDealDspCodes },
                 });
                 break;
             }
 
             case SubmitStepType.SYNC_DATA_DSP_CI: {
-                // Lấy tất cả CI DSP IDs từ parent
-                const parent = await this.getParentStep(step);
-                const ciDsps = parent?.metadata?.input?.dsps || [];
+                const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
+                if (!upc) throw new Error('Missing UPC from release snapshot');
 
-                for (const dspInfo of ciDsps) {
-                    const existed = await this.manager.findOne(ReleaseDspDelivery, {
-                        where: { releaseId, dspId: dspInfo.id },
-                    });
+                this.submitLog.log({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] Fetching DSP statuses from CI for UPC: ${upc}` });
 
-                    const deliveryData = {
-                        status: ReleaseDspStatus.DISTRIBUTED,
-                        lastDeliveredAt: new Date(),
-                        isSelected: true,
-                    };
+                const dspStatuses = await this.ciService.getStatusDsps(upc);
 
-                    if (!existed) {
-                        await this.manager.save(ReleaseDspDelivery, {
-                            releaseId,
-                            dspId: dspInfo.id,
-                            ...deliveryData,
-                        });
-                    } else {
-                        await this.manager.update(
-                            ReleaseDspDelivery,
-                            { releaseId, dspId: dspInfo.id },
-                            deliveryData,
-                        );
-                    }
-                }
+                // Map CI code → system code
+                const ciCodes = dspStatuses.map(d => d.ciCode).filter(Boolean);
+                const dsps = ciCodes.length > 0
+                    ? await this.manager.find(Dsp, { where: { codeCi: In(ciCodes) } })
+                    : [];
+                const ciToSystem = new Map(dsps.map(d => [d.codeCi, { code: d.code, name: d.name }]));
 
-                this.submitLog.success({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] ${ciDsps.length} DSPs synced` });
+                const mappedStatuses = dspStatuses.map(d => ({
+                    ciCode: d.ciCode,
+                    code: ciToSystem.get(d.ciCode)?.code || null,
+                    name: ciToSystem.get(d.ciCode)?.name || null,
+                    status: d.status,
+                }));
+
+                // Lưu kết quả vào metadata.output
+                await this.stepRepo.update(step.id, {
+                    metadata: {
+                        ...step.metadata,
+                        output: { ...step.metadata?.output, result: mappedStatuses },
+                    } as any,
+                });
+
+                this.submitLog.success({ releaseSubmitId: step.releaseSubmitId, releaseSubmitStepId: step.id, message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`, data: { dspStatuses: mappedStatuses } });
                 break;
             }
-
 
             default:
                 throw new Error(`Unknown step type1: ${step.type}`);
@@ -1067,7 +1068,7 @@ export class ReleaseSubmitService2 {
 				message: `[CRON] Auto-resuming scheduled step ${step.type}`,
 			});
 
-			this.resumeFromWaiting(step.id).catch((err) => {
+			this.resumeFromWaiting({ stepId: step.id }).catch((err) => {
 				this.submitLog.error({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
@@ -1077,17 +1078,24 @@ export class ReleaseSubmitService2 {
 		}
 	}
 
-    async resumeFromWaiting(stepId: string) {
+    async resumeFromWaiting({ stepId, outputMetadataStep }: { stepId: string; outputMetadataStep?: Record<string, any> }) {
 		const step = await this.stepRepo.findOne({ where: { id: stepId } });
 		if (!step) throw new NotFoundException('Step not found');
 		if (step.status !== SubmitStepStatus.WAITING_ACTION) {
 			throw new Error('Step is not in WAITING_ACTION status');
 		}
 
+		// Merge output vào metadata mà không mất data cũ
+		// const updatedMetadata = {
+		// 	...step.metadata,
+		// 	...(outputMetadataStep ? { output: { ...step.metadata?.output, ...outputMetadataStep } } : {}),
+		// };
+
 		// Mark step as DONE
 		await this.stepRepo.update(stepId, {
 			status: SubmitStepStatus.DONE,
 			completedAt: new Date(),
+			// metadata: updatedMetadata,
 		});
 
 		// Resume execution
@@ -1108,7 +1116,6 @@ export class ReleaseSubmitService2 {
 		return { message: 'Resumed' };
 	}
 
-    
 	async retryStep(stepId: string) {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
@@ -1224,8 +1231,8 @@ export class ReleaseSubmitService2 {
 			finalStatus = ReleaseSubmitStatus.PARTIAL_DONE;
 		}
 
-		// Sync kết quả vào ReleaseDspDelivery + thu thập results
-		const results: ReleaseSubmitResultDto[] = [];
+		// Sync kết quả vào ReleaseDspDelivery + thu thập result
+		const result: ReleaseSubmitResultDto[] = [];
 
 		for (const branch of distBranches) {
 			const dsps: Dsp[] = branch.metadata?.input?.dsps || [];
@@ -1244,9 +1251,45 @@ export class ReleaseSubmitService2 {
 				qaFlags = qaStep?.metadata?.output?.qaFlags || null;
 			}
 
+			// CI branch: lấy trạng thái thực từ SYNC_DATA_DSP_CI step
+			if (branch.type === SubmitStepType.PROCESS_AGG_CI && branchDone) {
+				const syncStep = await this.stepRepo.findOne({
+					where: {
+						parentStepId: branch.id,
+						type: SubmitStepType.SYNC_DATA_DSP_CI,
+					},
+				});
+				const ciResult = syncStep?.metadata?.output?.result || [];
+
+				for (const r of ciResult) {
+					const dspCode = r.code || r.ciCode;
+					const dsp = dsps.find(d => d.code === dspCode);
+
+					if (dsp) {
+						if (r.status === 'transfer failed') {
+							await this.manager.update(
+								ReleaseDspDelivery,
+								{ releaseId: submit.releaseId, dspId: dsp.id },
+								{ status: ReleaseDspStatus.ISSUES },
+							);
+						} else {
+							await this.manager.update(
+								ReleaseDspDelivery,
+								{ releaseId: submit.releaseId, dspId: dsp.id },
+								{
+									status: ReleaseDspStatus.DISTRIBUTED,
+									lastDeliveredAt: new Date(),
+								},
+							);
+						}
+					}
+
+					result.push({ dspCode, status: r.status });
+				}
+				continue;
+			}
+
 			for (const dsp of dsps) {
-				// Chỉ update DSPs có branch kết thúc (DONE hoặc FAILED)
-				// WAITING_ACTION thì giữ nguyên PROCESSING
 				if (branchFailed) {
 					await this.manager.update(
 						ReleaseDspDelivery,
@@ -1258,22 +1301,17 @@ export class ReleaseSubmitService2 {
 					);
 				}
 
-				results.push({
-					dsp,
+				result.push({
+					dspCode: dsp.code,
 					status: branchDone ? 'success' : branchFailed ? 'failed' : 'processing',
-					message: branchDone
-						? `Distributed to ${dsp.name || dsp.code}`
-						: branchFailed
-							? `Failed to distribute to ${dsp.name || dsp.code}`
-							: `Waiting for action on ${dsp.name || dsp.code}`,
 				});
 			}
 		}
 
-		// Ghi results vào metadata.output
+		// Ghi result vào metadata.output
 		const updatedMetadata = {
 			...submit.metadata,
-			output: { results },
+			output: { result },
 		};
 
 		await this.submitRepo.update(submitId, {
@@ -1288,7 +1326,7 @@ export class ReleaseSubmitService2 {
 		this.submitLog.log({
 			releaseSubmitId: submitId,
 			message: `Submit resolved: ${finalStatus}`,
-			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })), results },
+			data: { branchStatuses: distBranches.map(s => ({ type: s.type, status: s.status })), result },
 		});
 	}
 

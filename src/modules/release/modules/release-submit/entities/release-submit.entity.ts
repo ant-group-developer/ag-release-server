@@ -36,7 +36,7 @@ export class ReleaseSubmit extends BaseUUIDEntity {
 			dspCodes: string[];
         },
 		output: {
-			results: ReleaseSubmitResultDto[];
+			result: ReleaseSubmitResultDto[];
 		}
     };
 

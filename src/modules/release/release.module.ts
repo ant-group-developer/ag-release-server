@@ -51,15 +51,15 @@ import { ReleaseExecutionsQueryService } from './modules/release-executions/serv
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { ErnModule2 } from '../ern2/ern.module';
-import { ReleaseSubmitController } from './modules/release-submit/release-submit.controller';
+import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { ReleaseSubmitLogService } from './modules/release-submit/services/release-submit-log.service';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
 import { ReleaseSubmitLog } from './modules/release-submit/entities/release-submit-log.entity';
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
-import { State51EmailService } from './modules/release-submit/services/state51-email.service';
-import { State51Email } from './modules/release-submit/entities/state51-email.entity';
-import { State51EmailController } from './modules/release-submit/state51-email.controller';
+import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
+import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
+import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 
 @Module({
 	imports: [
@@ -80,7 +80,7 @@ import { State51EmailController } from './modules/release-submit/state51-email.c
 			ReleaseExecutionStep,
 
 			ReleaseSubmit, ReleaseSubmitStep, ReleaseSubmitLog,
-			State51Email
+			CiDistributionJob
 		]),
 
 		AppConfigModule,
@@ -120,7 +120,7 @@ import { State51EmailController } from './modules/release-submit/state51-email.c
 		ReleaseExecutionController,
 
 		ReleaseSubmitController,
-		State51EmailController
+		CiDistributionJobController
 	],
 	providers: [
 		ReleaseService,
@@ -140,7 +140,7 @@ import { State51EmailController } from './modules/release-submit/state51-email.c
 		// ReleaseSubmitService,
 		ReleaseSubmitService2,
 		ReleaseSubmitLogService,
-		State51EmailService
+		CiDistributionJobService
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
 })
