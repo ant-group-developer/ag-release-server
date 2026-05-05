@@ -74,13 +74,26 @@ export class ExcelService {
 
 		const logo = await this.excelGetDataService.getLogo();
 
-		const logoPath = logo
-			? path.join(process.cwd(), logo)
-			: defaultLogoPath;
-
 		/* ADD IMAGE */
 
-		const logoBuffer = fs.readFileSync(logoPath);
+		let logoBuffer: Buffer;
+
+		if (
+			logo &&
+			(logo.startsWith('http://') || logo.startsWith('https://'))
+		) {
+			try {
+				const response = await fetch(logo);
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				logoBuffer = Buffer.from(await response.arrayBuffer());
+			} catch {
+				logoBuffer = fs.readFileSync(defaultLogoPath);
+			}
+		} else if (logo) {
+			logoBuffer = fs.readFileSync(path.join(process.cwd(), logo));
+		} else {
+			logoBuffer = fs.readFileSync(defaultLogoPath);
+		}
 
 		const logoId = workbook.addImage({
 			buffer: logoBuffer as any,
