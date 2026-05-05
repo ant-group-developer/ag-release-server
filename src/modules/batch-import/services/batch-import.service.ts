@@ -15,6 +15,7 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
+import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -22,6 +23,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
+import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
@@ -313,7 +315,7 @@ export class BatchImportService {
 						`[INFO] Existing release found for UPC "${upc}" (id: ${releaseId}). Updating release.`,
 					);
 
-					// Delete all old sub-entities
+					// Delete all old sub-entities (including localizes)
 					await this.deleteReleaseSubEntities(manager, releaseId);
 
 					// Update release entity fields
@@ -329,6 +331,7 @@ export class BatchImportService {
 						pLineYear: mapped.release.pLineYear,
 						pLineOwner: mapped.release.pLineOwner,
 						releaseDate: mapped.release.releaseDate,
+						releaseOriginalDate: mapped.release.releaseOriginalDate,
 						releaseTime: mapped.release.releaseTime,
 						metadataCi: mapped.release.metadataCi,
 					});
@@ -432,6 +435,14 @@ export class BatchImportService {
 						t.audioFile.fileId = savedFile.id;
 						await manager.save(AudioFile, t.audioFile);
 					}
+
+					// Save Track Localizes (secondary language titles)
+					for (const tl of t.trackLocalizes) {
+						tl.trackId = trackId;
+						if (tl.languageId) {
+							await manager.save(TrackLocalize, tl);
+						}
+					}
 				}
 
 				// Save CoverArt thumbnail (original)
@@ -461,6 +472,14 @@ export class BatchImportService {
 					coverArt.height = 0;
 					coverArt.type = 'original';
 					await manager.save(ReleaseCoverArt, coverArt);
+				}
+
+				// Save Release Localizes (secondary language titles)
+				for (const rl of mapped.releaseLocalizes) {
+					rl.releaseId = releaseId;
+					if (rl.languageId) {
+						await manager.save(ReleaseLocalize, rl);
+					}
 				}
 
 				await queryRunner.commitTransaction();
@@ -528,6 +547,7 @@ export class BatchImportService {
 			await manager.delete(TrackContributor, {
 				trackId: In(trackIds),
 			});
+			await manager.delete(TrackLocalize, { trackId: In(trackIds) });
 			await manager.delete(AudioFile, { trackId: In(trackIds) });
 		}
 
@@ -538,6 +558,7 @@ export class BatchImportService {
 			manager.delete(ReleaseLanguage, { releaseId }),
 			manager.delete(ReleaseArtist, { releaseId }),
 			manager.delete(ReleaseContributor, { releaseId }),
+			manager.delete(ReleaseLocalize, { releaseId }),
 			manager.delete(ReleaseDspDelivery, { releaseId }),
 		]);
 	}

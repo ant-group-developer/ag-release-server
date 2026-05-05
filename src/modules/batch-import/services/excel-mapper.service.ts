@@ -7,6 +7,7 @@ import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
+import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
@@ -15,6 +16,7 @@ import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
+import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { DataSource, EntityManager } from 'typeorm';
 import {
@@ -70,8 +72,8 @@ export class ExcelMapperService {
 		// --- Release ---
 		const release = new Release();
 		release.upc = this.str(firstRow[C.UPC]);
-		release.title = this.str(firstRow[C.ALBUM_TITLE]) || releaseFolder;
-		release.version = this.str(firstRow[C.ALBUM_SUBTITLE]) || null;
+		release.title = this.str(firstRow[C.RELEASE_TITLE]) || releaseFolder;
+		release.version = this.str(firstRow[C.RELEASE_SUBTITLE]) || null;
 		release.albumFormatId =
 			maps.albumFormat.get(this.str(firstRow[C.RELEASE_TYPE]) || '') ||
 			'';
@@ -87,7 +89,7 @@ export class ExcelMapperService {
 		release.cLineYear = cLine.year;
 		release.cLineOwner = cLine.owner;
 
-		// P-Line
+		// P-Line (from first track row as fallback for release-level)
 		const pLine = this.parseCPLine(this.str(firstRow[C.P_LINE]));
 		release.pLineYear = pLine.year;
 		release.pLineOwner = pLine.owner;
@@ -95,7 +97,15 @@ export class ExcelMapperService {
 		// Release date
 		const releaseDateStr = this.str(firstRow[C.RELEASE_DATE]);
 		release.releaseDate = releaseDateStr ? new Date(releaseDateStr) : null;
-		release.releaseTime = this.str(firstRow[C.RELEASE_DATE_TIME]) || null;
+		release.releaseTime = null;
+
+		// Original Release Date
+		const originalReleaseDateStr = this.str(
+			firstRow[C.ORIGINAL_RELEASE_DATE],
+		);
+		release.releaseOriginalDate = originalReleaseDateStr
+			? new Date(originalReleaseDateStr)
+			: null;
 
 		// metadataCi
 		release.metadataCi = {
@@ -145,9 +155,25 @@ export class ExcelMapperService {
 			artistName: string;
 			entity: ReleaseArtist;
 		}[] = [];
-		const mainArtistRaw = this.str(firstRow[C.ALBUM_MAIN_ARTIST]);
+		const mainArtistRaw = this.str(firstRow[C.RELEASE_MAIN_ARTIST]);
 		if (mainArtistRaw) {
 			const names = mainArtistRaw
+				.split('|')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			for (const name of names) {
+				const ra = new ReleaseArtist();
+				ra.addArtistToTracks = true;
+				releaseArtists.push({ artistName: name, entity: ra });
+			}
+		}
+
+		// Secondary Release Main Artist (treated as additional main artists)
+		const secondaryMainArtistRaw = this.str(
+			firstRow[C.SECONDARY_RELEASE_MAIN_ARTIST],
+		);
+		if (secondaryMainArtistRaw) {
+			const names = secondaryMainArtistRaw
 				.split('|')
 				.map((s) => s.trim())
 				.filter(Boolean);
@@ -184,6 +210,27 @@ export class ExcelMapperService {
 			}
 		}
 
+		// Secondary Release Featured Artist (also as Featured Artist role)
+		const secondaryFeaturedRaw = this.str(
+			firstRow[C.SECONDARY_RELEASE_FEATURED_ARTIST],
+		);
+		if (secondaryFeaturedRaw) {
+			const roleCode = 'Featured Artist';
+			const names = secondaryFeaturedRaw
+				.split('|')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			for (const name of names) {
+				const rc = new ReleaseContributor();
+				rc.addContributorToTracks = false;
+				releaseContributors.push({
+					artistName: name,
+					roleCode,
+					entity: rc,
+				});
+			}
+		}
+
 		// --- Publisher → DSP Delivery ---
 		const dspDeliveries: ReleaseDspDelivery[] = [];
 		const publisherStr = this.str(firstRow[C.PUBLISHER]);
@@ -203,6 +250,11 @@ export class ExcelMapperService {
 			}
 		}
 
+		// --- Release Localize (secondary language title/subtitle) ---
+		const releaseLocalizes: ReleaseLocalize[] = [];
+		// Note: Secondary-Language columns for release are not in the Excel currently,
+		// but the infrastructure is ready if they are added later.
+
 		// --- Tracks ---
 		const tracks: {
 			track: Track;
@@ -213,6 +265,7 @@ export class ExcelMapperService {
 				entity: TrackContributor;
 			}[];
 			trackLanguage: TrackLanguage;
+			trackLocalizes: TrackLocalize[];
 			audioFile: AudioFile | null;
 			audioStorageKey: string | null;
 		}[] = [];
@@ -225,7 +278,7 @@ export class ExcelMapperService {
 			track.title = this.str(row[C.TRACK_TITLE]) || `Track ${i + 1}`;
 			track.version = this.str(row[C.TRACK_SUBTITLE]) || null;
 			track.isrc = this.str(row[C.ISRC]) || null;
-			track.iswc = this.str(row[C.ISWC]) || null;
+			track.iswc = null;
 			track.order = Number(row[C.TRACK_NUMBER]) || i + 1;
 			track.trackTypeId = maps.defaultTrackTypeId;
 			track.trackOriginTypeId = maps.defaultTrackOriginTypeId;
@@ -289,6 +342,32 @@ export class ExcelMapperService {
 				}
 			}
 
+			// Secondary-Language-Track-Main-Artist (additional main artists)
+			const secondaryTrackMainRaw = this.str(
+				row[C.SECONDARY_LANGUAGE_TRACK_MAIN_ARTIST],
+			);
+			if (secondaryTrackMainRaw) {
+				const names = secondaryTrackMainRaw
+					.split('|')
+					.map((s) => s.trim())
+					.filter(Boolean);
+				for (const name of names) {
+					// Avoid duplicate if already in trackArtists
+					const exists = trackArtists.some(
+						(ta) => ta.artistName === name,
+					);
+					if (!exists) {
+						const ta = new TrackArtist();
+						ta.trackId = track.id;
+						ta.isFromTrackAction = true;
+						trackArtists.push({
+							artistName: name,
+							entity: ta,
+						});
+					}
+				}
+			}
+
 			// --- Track Contributors ---
 			const trackContributors: {
 				artistName: string;
@@ -314,6 +393,54 @@ export class ExcelMapperService {
 						entity: tc,
 					});
 				}
+			}
+
+			// Secondary-Language-Track-Featured-Artist (additional featured contributors)
+			const secondaryTrackFeaturedRaw = this.str(
+				row[C.SECONDARY_LANGUAGE_TRACK_FEATURED_ARTIST],
+			);
+			if (secondaryTrackFeaturedRaw) {
+				const roleCode = 'Featured Artist';
+				const names = secondaryTrackFeaturedRaw
+					.split('|')
+					.map((s) => s.trim())
+					.filter(Boolean);
+				for (const name of names) {
+					const exists = trackContributors.some(
+						(tc) =>
+							tc.artistName === name && tc.roleCode === roleCode,
+					);
+					if (!exists) {
+						const tc = new TrackContributor();
+						tc.trackId = track.id;
+						tc.isFromTrackAction = true;
+						trackContributors.push({
+							artistName: name,
+							roleCode,
+							entity: tc,
+						});
+					}
+				}
+			}
+
+			// --- Track Localize (secondary language title/subtitle) ---
+			const trackLocalizes: TrackLocalize[] = [];
+			const secondaryTrackTitle = this.str(
+				row[C.SECONDARY_LANGUAGE_TRACK_TITLE],
+			);
+			const secondaryTrackSubtitle = this.str(
+				row[C.SECONDARY_LANGUAGE_TRACK_SUBTITLE],
+			);
+			if (secondaryTrackTitle) {
+				const tl = new TrackLocalize();
+				tl.trackId = track.id;
+				tl.title = secondaryTrackTitle;
+				tl.version = secondaryTrackSubtitle || null;
+				// Use metadata language as the localize language
+				if (trkMetaLang) {
+					tl.languageId = maps.language.get(trkMetaLang) || '';
+				}
+				trackLocalizes.push(tl);
 			}
 
 			// --- AudioFile (duration from Track-Length) ---
@@ -357,6 +484,7 @@ export class ExcelMapperService {
 				trackArtists,
 				trackContributors,
 				trackLanguage,
+				trackLocalizes,
 				audioFile,
 				audioStorageKey: _audioStorageKey || null,
 			});
@@ -387,6 +515,7 @@ export class ExcelMapperService {
 			releaseLanguage,
 			releaseArtists,
 			releaseContributors,
+			releaseLocalizes,
 			dspDeliveries,
 			tracks,
 		};
