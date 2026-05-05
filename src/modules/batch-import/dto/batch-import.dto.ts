@@ -96,3 +96,16 @@ export class LogSkippedReleaseDto {
 	@IsNotEmpty()
 	reason: string;
 }
+
+export class LogFailedReleaseDto {
+	@IsString()
+	@IsNotEmpty()
+	logId: string;
+
+	@IsString()
+	@IsNotEmpty()
+	error: string;
+
+	@IsOptional()
+	rawError?: any;
+}

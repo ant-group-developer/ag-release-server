@@ -131,6 +131,7 @@ export class TenantService {
 				isActive: true,
 				type: true,
 				maxLabels: true,
+				code: true,
 				parent: {
 					id: true,
 					logo: true,
@@ -141,6 +142,7 @@ export class TenantService {
 					isActive: true,
 					type: true,
 					maxLabels: true,
+					code: true,
 				},
 				tenantUser: {
 					id: true,
