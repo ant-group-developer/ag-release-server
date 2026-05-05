@@ -452,7 +452,7 @@ export class ReleaseValidateService {
 				result.push(
 					new FieldErrorDetails({
 						messageCode:
-							'formFields.validate.missingRequiredContributorsRoles',
+							`formFields.validate.missingRequired.${missing.join('')}`,
 						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 						page: 'core-detail',
 						field: 'releaseContributors',
