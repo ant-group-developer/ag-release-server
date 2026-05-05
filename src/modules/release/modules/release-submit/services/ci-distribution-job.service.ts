@@ -1,27 +1,32 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Inject, forwardRef } from '@nestjs/common';
-import { SchedulerRegistry } from '@nestjs/schedule';
+import {
+	Inject,
+	Injectable,
+	Logger,
+	OnModuleInit,
+	forwardRef,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PageDto } from 'src/common/dtos/common.response.dto';
+import { AppEvent } from 'src/common/enums/common';
+import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
+import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { In, Repository } from 'typeorm';
+import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
+import { QueryGetListCiJobDto } from '../dto/ci-distribution-job.dto';
 import {
 	CiDistributionJob,
 	CiJobStatus,
 	CiJobType,
 } from '../entities/ci-distribution-job.entity';
-import { QueryGetListCiJobDto } from '../dto/ci-distribution-job.dto';
-import { ReleaseSubmitService2 } from './release-submit2.service';
 import { ReleaseSubmitLogService } from './release-submit-log.service';
-import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
-import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { AppEvent } from 'src/common/enums/common';
-import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
-import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
+import { ReleaseSubmitService2 } from './release-submit2.service';
 
 @Injectable()
 export class CiDistributionJobService implements OnModuleInit {
@@ -63,19 +68,26 @@ export class CiDistributionJobService implements OnModuleInit {
 
 		try {
 			const cronExpression =
-				this.appConfigService.cache?.config?.partners?.ci?.dailySendCron || '0 8 * * *';
+				this.appConfigService.cache?.config?.partners?.ci
+					?.dailySendCron || '0 8 * * *';
 
 			const job = new CronJob(cronExpression, () => {
 				this.handleDailySend().catch((err) => {
-					this.logger.error(`[CRON] Daily send failed: ${err.message}`);
+					this.logger.error(
+						`[CRON] Daily send failed: ${err.message}`,
+					);
 				});
 			});
 
 			this.schedulerRegistry.addCronJob(jobName, job);
 			job.start();
-			this.logger.log(`Registered cron job [${jobName}] with expression: ${cronExpression}`);
+			this.logger.log(
+				`Registered cron job [${jobName}] with expression: ${cronExpression}`,
+			);
 		} catch (err) {
-			this.logger.error(`Failed to create cron job [${jobName}]: ${(err as Error).message}`);
+			this.logger.error(
+				`Failed to create cron job [${jobName}]: ${(err as Error).message}`,
+			);
 		}
 	}
 
@@ -155,9 +167,14 @@ export class CiDistributionJobService implements OnModuleInit {
 		});
 
 		if (pendingCount === 0) {
-			this.logger.log(`[checkAndResumeStep] All jobs for step ${stepId} completed, resuming`);
+			this.logger.log(
+				`[checkAndResumeStep] All jobs for step ${stepId} completed, resuming`,
+			);
 			try {
-				await this.releaseSubmitService.resumeFromWaiting({ stepId, outputMetadataStep });
+				await this.releaseSubmitService.resumeFromWaiting({
+					stepId,
+					outputMetadataStep,
+				});
 				this.submitLog.success({
 					releaseSubmitId,
 					releaseSubmitStepId: stepId,
@@ -165,10 +182,14 @@ export class CiDistributionJobService implements OnModuleInit {
 				});
 				return true;
 			} catch (err) {
-				this.logger.error(`Failed to resume step ${stepId}: ${err.message}`);
+				this.logger.error(
+					`Failed to resume step ${stepId}: ${err.message}`,
+				);
 			}
 		} else {
-			this.logger.log(`[checkAndResumeStep] ${pendingCount} jobs still pending for step ${stepId}`);
+			this.logger.log(
+				`[checkAndResumeStep] ${pendingCount} jobs still pending for step ${stepId}`,
+			);
 		}
 		return false;
 	}
@@ -223,11 +244,17 @@ export class CiDistributionJobService implements OnModuleInit {
 
 		// Validate type + status
 		const allJobs = await this.repo.find({ where: { id: In(ids) } });
-		const invalidType = allJobs.filter((j) => j.type !== CiJobType.EMAIL_STATE51);
+		const invalidType = allJobs.filter(
+			(j) => j.type !== CiJobType.EMAIL_STATE51,
+		);
 		if (invalidType.length > 0) {
-			throw CiDistributionJobException.INVALID_TYPE_EMAIL(invalidType.map((j) => j.id));
+			throw CiDistributionJobException.INVALID_TYPE_EMAIL(
+				invalidType.map((j) => j.id),
+			);
 		}
-		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING].includes(j.status));
+		const invalidStatus = allJobs.filter(
+			(j) => ![CiJobStatus.PENDING].includes(j.status),
+		);
 		if (invalidStatus.length > 0) {
 			throw CiDistributionJobException.INVALID_STATUS(
 				'autoSendEmail',
@@ -243,13 +270,14 @@ export class CiDistributionJobService implements OnModuleInit {
 			return { sent: 0, resumed: 0 };
 		}
 
-		const baseDir = process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
 		const tempDir = path.join(baseDir, 'temp_exports', 'ci_batch');
 		if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 		const dateStr = new Date().toISOString().slice(0, 10);
 		let totalSent = 0;
-		let totalResumed = 0;
+		const totalResumed = 0;
 
 		try {
 			// Group theo deliveryEmail
@@ -262,7 +290,9 @@ export class CiDistributionJobService implements OnModuleInit {
 
 			for (const [toEmail, group] of grouped) {
 				if (toEmail === 'unknown') {
-					this.logger.warn(`Skipping ${group.length} jobs with no deliveryEmail`);
+					this.logger.warn(
+						`Skipping ${group.length} jobs with no deliveryEmail`,
+					);
 					continue;
 				}
 
@@ -272,14 +302,18 @@ export class CiDistributionJobService implements OnModuleInit {
 					listCodeDspCi: j.dspCiCodes,
 				}));
 
-				const buffer = await this.fileExportCiService.createFileExportCi({ data: excelData });
+				const buffer =
+					await this.fileExportCiService.createFileExportCi({
+						data: excelData,
+					});
 				const fileName = `CI_Batch_${dateStr}_${Date.now()}.xlsx`;
 				const filePath = path.join(tempDir, fileName);
 				fs.writeFileSync(filePath, buffer);
 
 				// Subject từ record đầu tiên hoặc mặc định
 				const subjectTemplate =
-					group[0].deliveryEmailSubject || `[Distribution] CI Batch - ${dateStr}`;
+					group[0].deliveryEmailSubject ||
+					`[Distribution] CI Batch - ${dateStr}`;
 
 				const success = await this.notificationResendService.sendEmail({
 					to: [toEmail],
@@ -291,7 +325,9 @@ export class CiDistributionJobService implements OnModuleInit {
 				if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
 				if (!success) {
-					this.logger.error(`Failed to send batch email to ${toEmail}`);
+					this.logger.error(
+						`Failed to send batch email to ${toEmail}`,
+					);
 					continue;
 				}
 
@@ -303,13 +339,18 @@ export class CiDistributionJobService implements OnModuleInit {
 				);
 
 				for (const job of group) {
-					await this.checkAndResumeStep(job.stepId, job.releaseSubmitId);
+					await this.checkAndResumeStep(
+						job.stepId,
+						job.releaseSubmitId,
+					);
 				}
 
 				totalSent += group.length;
 			}
 
-			this.logger.log(`[autoSendEmail] ${totalSent} sent, ${totalResumed} steps resumed`);
+			this.logger.log(
+				`[autoSendEmail] ${totalSent} sent, ${totalResumed} steps resumed`,
+			);
 			return { sent: totalSent, resumed: totalResumed };
 		} finally {
 			// Cleanup temp dir
@@ -325,14 +366,25 @@ export class CiDistributionJobService implements OnModuleInit {
 	 * Download Excel — admin chọn jobs → tạo file Excel → return buffer
 	 * Mark jobs as PROCESSING (chờ admin xác nhận đã gửi)
 	 */
-	async downloadExcel(ids: string[]): Promise<{ buffer: Buffer; fileName: string }> {
+	async downloadExcel(
+		ids: string[],
+	): Promise<{ buffer: Buffer; fileName: string }> {
 		if (!ids?.length) throw CiDistributionJobException.NO_IDS_PROVIDED();
 
 		// Validate status
-		const allJobs = await this.repo.find({ where: { id: In(ids) }, order: { createdAt: 'ASC' } });
-		if (allJobs.length === 0) throw CiDistributionJobException.JOBS_NOT_FOUND();
+		const allJobs = await this.repo.find({
+			where: { id: In(ids) },
+			order: { createdAt: 'ASC' },
+		});
+		if (allJobs.length === 0)
+			throw CiDistributionJobException.JOBS_NOT_FOUND();
 
-		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
+		const invalidStatus = allJobs.filter(
+			(j) =>
+				![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(
+					j.status,
+				),
+		);
 		if (invalidStatus.length > 0) {
 			throw CiDistributionJobException.INVALID_STATUS(
 				'downloadExcel',
@@ -349,7 +401,9 @@ export class CiDistributionJobService implements OnModuleInit {
 			listCodeDspCi: j.dspCiCodes,
 		}));
 
-		const buffer = await this.fileExportCiService.createFileExportCi({ data: excelData });
+		const buffer = await this.fileExportCiService.createFileExportCi({
+			data: excelData,
+		});
 
 		// Mark as PROCESSING (admin đã tải, chờ xác nhận)
 		await this.repo.update(
@@ -360,7 +414,9 @@ export class CiDistributionJobService implements OnModuleInit {
 		const dateStr = new Date().toISOString().slice(0, 10);
 		const fileName = `CI_Export_${dateStr}_${Date.now()}.xlsx`;
 
-		this.logger.log(`[downloadExcel] Generated Excel for ${jobs.length} jobs`);
+		this.logger.log(
+			`[downloadExcel] Generated Excel for ${jobs.length} jobs`,
+		);
 		return { buffer, fileName };
 	}
 
@@ -372,11 +428,20 @@ export class CiDistributionJobService implements OnModuleInit {
 
 		// Validate type + status
 		const allJobs = await this.repo.find({ where: { id: In(ids) } });
-		const invalidType = allJobs.filter((j) => j.type !== CiJobType.ADMIN_EXPORT);
+		const invalidType = allJobs.filter(
+			(j) => j.type !== CiJobType.ADMIN_EXPORT,
+		);
 		if (invalidType.length > 0) {
-			throw CiDistributionJobException.INVALID_TYPE_ADMIN_EXPORT(invalidType.map((j) => j.id));
+			throw CiDistributionJobException.INVALID_TYPE_ADMIN_EXPORT(
+				invalidType.map((j) => j.id),
+			);
 		}
-		const invalidStatus = allJobs.filter((j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status));
+		const invalidStatus = allJobs.filter(
+			(j) =>
+				![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(
+					j.status,
+				),
+		);
 		if (invalidStatus.length > 0) {
 			throw CiDistributionJobException.INVALID_STATUS(
 				'confirmCompleted',
@@ -408,7 +473,9 @@ export class CiDistributionJobService implements OnModuleInit {
 			if (resumed) totalResumed++;
 		}
 
-		this.logger.log(`[confirmCompleted] ${jobs.length} completed, ${totalResumed} steps resumed`);
+		this.logger.log(
+			`[confirmCompleted] ${jobs.length} completed, ${totalResumed} steps resumed`,
+		);
 		return { completed: jobs.length, resumed: totalResumed };
 	}
 
@@ -449,7 +516,9 @@ export class CiDistributionJobService implements OnModuleInit {
 
 			const ids = pendingEmailJobs.map((j) => j.id);
 			const result = await this.autoSendEmail(ids);
-			this.logger.log(`[CRON] Daily batch result: ${JSON.stringify(result)}`);
+			this.logger.log(
+				`[CRON] Daily batch result: ${JSON.stringify(result)}`,
+			);
 		} catch (err) {
 			this.logger.error(`[CRON] Daily batch failed: ${err.message}`);
 		}

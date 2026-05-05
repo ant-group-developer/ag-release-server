@@ -4,7 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
-import { SpotifyService2 } from 'src/modules/partners-api/spotify/services/spotify2.service';
+import { SpotifyService } from 'src/modules/partners-api/spotify/services/spotify.service';
 import { In, Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';
 import {
@@ -15,7 +15,6 @@ import {
 import { Artist } from '../entities/artist.entity';
 import { ICreateArtist } from '../interfaces/artist.interface.';
 import { ArtistQueryService } from './artist.query.service';
-import { SpotifyService } from 'src/modules/partners-api/spotify/services/spotify.service';
 
 @Injectable()
 export class ArtistService {
@@ -29,7 +28,7 @@ export class ArtistService {
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,
-		
+
 		private readonly spotifyService: SpotifyService,
 		// private readonly spotifyService2: SpotifyService2,
 	) {}
@@ -296,12 +295,12 @@ export class ArtistService {
 			}
 
 			try {
-				const detail = await this.spotifyService.getArtistDetail(
-					spotifyId,
-				);
+				const detail =
+					await this.spotifyService.getArtistDetail(spotifyId);
 
 				if (detail && detail.name) {
-					const modifierId = artist.modifierId || artist.creatorId || 'system';
+					const modifierId =
+						artist.modifierId || artist.creatorId || 'system';
 
 					await this.artistProfileService.bulkUpdate(
 						[

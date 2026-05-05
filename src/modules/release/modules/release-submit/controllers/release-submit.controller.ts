@@ -11,26 +11,25 @@ import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 // import { ReleaseSubmitService } from './services/release-submit.service';
 import { QueryGetListSubmitDto } from '../dto/release-submit.dto';
+import { ExecutionType } from '../entities/release-submit.entity';
 import { ReleaseSubmitService2 } from '../services/release-submit2.service';
-
 
 @ApiTags('Release Submits')
 @Controller('release-submits')
 export class ReleaseSubmitController {
-	constructor(
-		private readonly releaseSubmitService: ReleaseSubmitService2,
-	) {}
+	constructor(private readonly releaseSubmitService: ReleaseSubmitService2) {}
 
 	/** User bấm submit release */
 	@Post()
 	async submit(@Body() body: { releaseId: string; dspCodes: string[] }) {
-		const result = await this.releaseSubmitService.submit(
-			body.releaseId,
-			body.dspCodes,
-		);
+		const result = await this.releaseSubmitService.submit({
+			releaseId: body.releaseId,
+			dspCodes: body.dspCodes,
+			type: ExecutionType.INITIAL_RELEASE,
+		});
 		return new ResponseSuccess({ data: result });
 	}
-	
+
 	/** Lấy danh sách submits */
 	@Get()
 	async getList(@Query() query: QueryGetListSubmitDto) {
@@ -83,5 +82,4 @@ export class ReleaseSubmitController {
 	// 	const result = await this.releaseSubmitService.getWaitingSteps(releaseId);
 	// 	return new ResponseSuccess({ data: result });
 	// }
-
 }

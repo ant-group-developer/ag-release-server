@@ -1,4 +1,4 @@
-import { BeforeInsert, Column } from 'typeorm';
+import { Column } from 'typeorm';
 import { BaseCustomIDEntity, BaseUUIDEntity } from './base.entity';
 
 export abstract class BaseUserTrackedUUIDEntity extends BaseUUIDEntity {

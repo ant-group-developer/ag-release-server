@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
 	IsArray,
@@ -11,7 +12,6 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 export class CreateReleaseArtistDto {

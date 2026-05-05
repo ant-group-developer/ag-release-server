@@ -6,6 +6,7 @@ import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { removeFolder } from 'src/utils/util';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
@@ -20,7 +21,6 @@ import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
 import { ReleaseLogService } from '../../modules/release-log/services/release-log.service';
 import { ReleaseDdexService } from '../release-ddex.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @Injectable()
 export class ReleaseDspDeliveryService {

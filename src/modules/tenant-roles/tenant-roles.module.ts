@@ -7,7 +7,11 @@ import { TenantRolesController } from './tenant-roles.controller';
 import { TenantRolesService } from './tenant-roles.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([TenantRole]), RoleModule, forwardRef(() => TenantModule)],
+	imports: [
+		TypeOrmModule.forFeature([TenantRole]),
+		RoleModule,
+		forwardRef(() => TenantModule),
+	],
 	controllers: [TenantRolesController],
 	providers: [TenantRolesService],
 	exports: [TenantRolesService],

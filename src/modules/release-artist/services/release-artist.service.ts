@@ -63,9 +63,7 @@ export class ReleaseArtistService {
 		const results = await Promise.all(
 			data.items.map((item) => this.createSafe(item)),
 		);
-		return results.filter(
-			(item): item is ReleaseArtist => item !== null,
-		);
+		return results.filter((item): item is ReleaseArtist => item !== null);
 	}
 
 	// read

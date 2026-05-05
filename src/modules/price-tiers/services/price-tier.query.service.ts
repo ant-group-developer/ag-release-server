@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { orderAndPaging, orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Currency } from 'src/modules/currency/entities/currency.entity';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository } from 'typeorm';
 import { PriceTierMessage } from '../constants/price-tiers.constant';
 import { QueryGetListPriceTier } from '../dto/price-tier.dto';
 import { PriceTier } from '../entities/price-tier.entity';
-import { FieldOrderCurrency } from '../enum/price-tier.enum';
 
 @Injectable()
 export class PriceTierQueryService {

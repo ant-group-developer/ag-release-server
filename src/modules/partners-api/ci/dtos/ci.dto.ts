@@ -7,8 +7,12 @@ export class GetCiReleasesDto {
 	@IsString({ each: true })
 	@Transform(({ value }) => {
 		if (!value) return value;
-		if (typeof value === 'string') return value.split(',').map((i) => i.trim());
-		if (Array.isArray(value)) return value.flatMap((i) => (typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i));
+		if (typeof value === 'string')
+			return value.split(',').map((i) => i.trim());
+		if (Array.isArray(value))
+			return value.flatMap((i) =>
+				typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i,
+			);
 		return [value];
 	})
 	gtin?: string[];
@@ -18,8 +22,12 @@ export class GetCiReleasesDto {
 	@IsString({ each: true })
 	@Transform(({ value }) => {
 		if (!value) return value;
-		if (typeof value === 'string') return value.split(',').map((i) => i.trim());
-		if (Array.isArray(value)) return value.flatMap((i) => (typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i));
+		if (typeof value === 'string')
+			return value.split(',').map((i) => i.trim());
+		if (Array.isArray(value))
+			return value.flatMap((i) =>
+				typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i,
+			);
 		return [value];
 	})
 	upc?: string[];
@@ -29,8 +37,12 @@ export class GetCiReleasesDto {
 	@IsString({ each: true })
 	@Transform(({ value }) => {
 		if (!value) return value;
-		if (typeof value === 'string') return value.split(',').map((i) => i.trim());
-		if (Array.isArray(value)) return value.flatMap((i) => (typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i));
+		if (typeof value === 'string')
+			return value.split(',').map((i) => i.trim());
+		if (Array.isArray(value))
+			return value.flatMap((i) =>
+				typeof i === 'string' ? i.split(',').map((x) => x.trim()) : i,
+			);
 		return [value];
 	})
 	isrc?: string[];

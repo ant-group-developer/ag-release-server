@@ -1,6 +1,6 @@
 import { Controller, Get, Logger, Param, Query } from '@nestjs/common';
-import { CiService } from '../services/ci.service';
 import { GetCiReleasesDto } from '../dtos/ci.dto';
+import { CiService } from '../services/ci.service';
 
 @Controller('partners/ci/releases')
 export class CiReleaseController {

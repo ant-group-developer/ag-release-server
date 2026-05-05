@@ -11,6 +11,16 @@ async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	APP_GOLBAL = app;
 
+	// setInterval(() => {
+	// 	const memoryData = process.memoryUsage();
+	// 	const toMB = (bytes: number) =>
+	// 		(bytes / 1024 / 1024).toFixed(2) + ' MB';
+	// 	Logger.log(
+	// 		`RAM Usage - RSS: ${toMB(memoryData.rss)} | Heap Total: ${toMB(memoryData.heapTotal)} | Heap Used: ${toMB(memoryData.heapUsed)}`,
+	// 		'MemoryTracker',
+	// 	);
+	// }, 5000);
+
 	// Set up global validation pipe with class-transformer options
 	app.useGlobalPipes(globalValidationPipe);
 

@@ -6,6 +6,7 @@ import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-r
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
@@ -24,7 +25,6 @@ import {
 	StepStatus,
 	StepType,
 } from '../enum/release-execution.enum';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @Injectable()
 export class ReleaseExecutionProcessorService {
@@ -564,7 +564,8 @@ export class ReleaseExecutionProcessorService {
 				const { outputDir, batchId } =
 					await this.releaseDdexService.createMetadataOnServer({
 						releaseId,
-						ernVersion: ciConfig.ernVersion as unknown as ErnVersion2,
+						ernVersion:
+							ciConfig.ernVersion as unknown as ErnVersion2,
 						sender: ciConfig.sender,
 						recipient: ciConfig.recipient,
 					});
@@ -769,7 +770,8 @@ export class ReleaseExecutionProcessorService {
 					html,
 					attachments: [
 						{
-							filename: meta.fileName || 'distribution_export.xlsx',
+							filename:
+								meta.fileName || 'distribution_export.xlsx',
 							path: meta.filePath,
 						},
 					],

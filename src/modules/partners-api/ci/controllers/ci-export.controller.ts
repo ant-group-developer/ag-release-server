@@ -26,7 +26,9 @@ export class CiExportController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@ApiOperation({ summary: 'Lấy deliver desire của tất cả exports theo GTIN' })
+	@ApiOperation({
+		summary: 'Lấy deliver desire của tất cả exports theo GTIN',
+	})
 	@ApiQuery({ name: 'gtin', required: true, example: '850080651032' })
 	@Get('deliver-desire-by-gtin')
 	async deliverDesireByGtin(@Query('gtin') gtin: string) {

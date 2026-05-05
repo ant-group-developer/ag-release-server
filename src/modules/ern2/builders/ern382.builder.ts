@@ -112,7 +112,9 @@ export class Ern382Builder2 {
 		sr.ele('ResourceReference').txt(ref);
 
 		// Reference title
-		const refTitle = sr.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = sr.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(track.title);
 		if (track.version) {
 			refTitle.ele('SubTitle').txt(track.version);
@@ -137,11 +139,17 @@ export class Ern382Builder2 {
 			? `${track.title} (${track.version})`
 			: track.title;
 		details
-			.ele('Title', { TitleType: 'DisplayTitle', LanguageAndScriptCode: 'en' })
+			.ele('Title', {
+				TitleType: 'DisplayTitle',
+				LanguageAndScriptCode: 'en',
+			})
 			.ele('TitleText')
 			.txt(displayTitle);
 
-		const formalTitle = details.ele('Title', { TitleType: 'FormalTitle', LanguageAndScriptCode: 'en' });
+		const formalTitle = details.ele('Title', {
+			TitleType: 'FormalTitle',
+			LanguageAndScriptCode: 'en',
+		});
 		formalTitle.ele('TitleText').txt(track.title);
 		if (track.version) {
 			formalTitle.ele('SubTitle').txt(track.version);
@@ -380,7 +388,9 @@ export class Ern382Builder2 {
 		release.ele('ReleaseReference').txt(ref);
 
 		// Reference title
-		const refTitle = release.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = release.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(track.title);
 		if (track.version) refTitle.ele('SubTitle').txt(track.version);
 
@@ -488,7 +498,9 @@ export class Ern382Builder2 {
 		release.ele('ReleaseReference').txt('R0');
 
 		// Reference title
-		const refTitle = release.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = release.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(this.input.release.title);
 		if (this.input.release.version) {
 			refTitle.ele('SubTitle').txt(this.input.release.version);
@@ -584,8 +596,10 @@ export class Ern382Builder2 {
 
 		const hasDeals =
 			this.input.deals &&
-			((this.input.deals.release && this.input.deals.release.length > 0) ||
-				(this.input.deals.tracks && this.input.deals.tracks.length > 0));
+			((this.input.deals.release &&
+				this.input.deals.release.length > 0) ||
+				(this.input.deals.tracks &&
+					this.input.deals.tracks.length > 0));
 
 		if (hasDeals) {
 			this.buildExplicitDeals(dealList);
@@ -632,7 +646,9 @@ export class Ern382Builder2 {
 			}
 
 			// Add EffectiveDate once per ReleaseDeal using the first deal's start date
-			rd.ele('EffectiveDate').txt(this.input.deals.release[0].startDate.split('T')[0]);
+			rd.ele('EffectiveDate').txt(
+				this.input.deals.release[0].startDate.split('T')[0],
+			);
 		}
 
 		// Track release deals
@@ -674,7 +690,9 @@ export class Ern382Builder2 {
 				}
 
 				// Add EffectiveDate once per ReleaseDeal
-				rd.ele('EffectiveDate').txt(this.input.deals.tracks[0].startDate.split('T')[0]);
+				rd.ele('EffectiveDate').txt(
+					this.input.deals.tracks[0].startDate.split('T')[0],
+				);
 			}
 		}
 	}

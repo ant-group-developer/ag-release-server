@@ -13,7 +13,7 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
-import { BaseQueryDto, BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderCurrency, PriceTierType } from '../enum/price-tier.enum';
 
 export class CreatePriceTierDto {

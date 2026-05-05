@@ -43,9 +43,7 @@ export class TrackArtistService {
 		return await this.trackArtistRepo.save(trackArtist);
 	}
 
-	async createSafe(
-		data: CreateTrackArtistDto,
-	): Promise<TrackArtist | null> {
+	async createSafe(data: CreateTrackArtistDto): Promise<TrackArtist | null> {
 		try {
 			return await this.create(data);
 		} catch (error: any) {
@@ -56,15 +54,11 @@ export class TrackArtistService {
 		}
 	}
 
-	async bulkCreate(
-		data: BulkCreateTrackArtistDto,
-	): Promise<TrackArtist[]> {
+	async bulkCreate(data: BulkCreateTrackArtistDto): Promise<TrackArtist[]> {
 		const results = await Promise.all(
 			data.items.map((item) => this.createSafe(item)),
 		);
-		return results.filter(
-			(item): item is TrackArtist => item !== null,
-		);
+		return results.filter((item): item is TrackArtist => item !== null);
 	}
 
 	async copyArtistFromReleaseSource1({

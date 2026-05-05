@@ -7,14 +7,14 @@ import { Permission } from '../permission/entities/permission.entity';
 import { PermissionService } from '../permission/services/permission.service';
 import { Role } from '../role/entities/role.entity';
 import { RoleService } from '../role/services/role.service';
+import { TenantRolesService } from '../tenant-roles/tenant-roles.service';
 import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 import { TenantType } from '../tenant/tenant.enum';
 import { TenantService } from '../tenant/tenant.service';
-import { TenantRolesService } from '../tenant-roles/tenant-roles.service';
+import { UserRole } from '../user-role/user-role.entity';
 import { TenantUserType, UserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import { UserService } from '../user/services/user.service';
-import { UserRole } from '../user-role/user-role.entity';
 import { AuthContext } from './access-control.interface';
 
 const AUTH_CACHE_TTL = 86_400_000; // 24 hours in ms
@@ -93,14 +93,22 @@ export class AccessControlService {
 
 		const query = this.userRoleRepository.manager
 			.createQueryBuilder(Role, 'role')
-			.select(['role.id', 'role.name', 'role.code', 'role.color', 'role.note'])
+			.select([
+				'role.id',
+				'role.name',
+				'role.code',
+				'role.color',
+				'role.note',
+			])
 			.leftJoinAndSelect('role.rolePermissions', 'rolePermissions')
 			.leftJoinAndSelect('rolePermissions.permission', 'permission')
 			.where('role.isActive = :isActive', { isActive: true });
 
 		if (enabledRoleIds !== null) {
 			if (enabledRoleIds.length === 0) return [];
-			query.andWhere('role.id IN (:...enabledRoleIds)', { enabledRoleIds });
+			query.andWhere('role.id IN (:...enabledRoleIds)', {
+				enabledRoleIds,
+			});
 		}
 
 		return query.orderBy('role.name', 'ASC').getMany();
@@ -135,7 +143,9 @@ export class AccessControlService {
 
 		if (enabledRoleIds !== null) {
 			if (enabledRoleIds.length === 0) return [];
-			query.andWhere('role.id IN (:...enabledRoleIds)', { enabledRoleIds });
+			query.andWhere('role.id IN (:...enabledRoleIds)', {
+				enabledRoleIds,
+			});
 		}
 
 		const userRoles = await query.getMany();
@@ -153,7 +163,7 @@ export class AccessControlService {
 		tenantId: string,
 		userId: string,
 		roleIds: string[],
-		userReqId: string
+		userReqId: string,
 	) {
 		if (tenantId === SYSTEM_TENANT_ID) return [];
 
@@ -186,7 +196,7 @@ export class AccessControlService {
 				userId,
 				roleId,
 				creatorId: userReqId,
-				modifierId: userReqId
+				modifierId: userReqId,
 			})),
 		);
 		const result = await this.userRoleRepository.save(newData);
@@ -217,7 +227,11 @@ export class AccessControlService {
 			return this.resolveFullAccessPermissionEntities(enabledRoleIds);
 		}
 
-		return this.resolveUserPermissionEntities(userId, tenantId, enabledRoleIds);
+		return this.resolveUserPermissionEntities(
+			userId,
+			tenantId,
+			enabledRoleIds,
+		);
 	}
 
 	// ─── Private Helpers ─────────────────────────────────────────
@@ -236,10 +250,15 @@ export class AccessControlService {
 
 		if (tenantId === SYSTEM_TENANT_ID) return false;
 
-		const membership = await this.tenantUserService.findOne(tenantId, userId);
+		const membership = await this.tenantUserService.findOne(
+			tenantId,
+			userId,
+		);
 		return (
 			!!membership &&
-			[TenantUserType.OWNER, TenantUserType.ADMIN].includes(membership.type)
+			[TenantUserType.OWNER, TenantUserType.ADMIN].includes(
+				membership.type,
+			)
 		);
 	}
 
@@ -263,10 +282,9 @@ export class AccessControlService {
 			tenantType = TenantType.WHITE_LABEL;
 			tenantUserType = TenantUserType.OWNER;
 		} else {
-			const tenant = await this.tenantService.getOneTenantData(
-				tenantId,
-				{ select: ['isActive', 'type'] },
-			);
+			const tenant = await this.tenantService.getOneTenantData(tenantId, {
+				select: ['isActive', 'type'],
+			});
 			this.tenantService.checkActive(tenant.isActive);
 			tenantType = tenant.type;
 
@@ -326,7 +344,11 @@ export class AccessControlService {
 			return this.resolveFullAccessPermissionCodes(enabledRoleIds);
 		}
 
-		return this.resolveUserPermissionCodes(userId, tenantId, enabledRoleIds);
+		return this.resolveUserPermissionCodes(
+			userId,
+			tenantId,
+			enabledRoleIds,
+		);
 	}
 
 	private async resolveFullAccessPermissionCodes(
@@ -371,7 +393,9 @@ export class AccessControlService {
 
 		if (enabledRoleIds !== null) {
 			if (enabledRoleIds.length === 0) return [];
-			query.andWhere('role.id IN (:...enabledRoleIds)', { enabledRoleIds });
+			query.andWhere('role.id IN (:...enabledRoleIds)', {
+				enabledRoleIds,
+			});
 		}
 
 		const results = await query.getRawMany();
@@ -433,10 +457,11 @@ export class AccessControlService {
 
 		if (enabledRoleIds !== null) {
 			if (enabledRoleIds.length === 0) return [];
-			query.andWhere('role.id IN (:...enabledRoleIds)', { enabledRoleIds });
+			query.andWhere('role.id IN (:...enabledRoleIds)', {
+				enabledRoleIds,
+			});
 		}
 
 		return query.getRawMany();
 	}
 }
-

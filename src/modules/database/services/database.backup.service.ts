@@ -30,7 +30,9 @@ export class DatabaseBackupService {
 
 	async eventBackup() {
 		if (!this.appConfigService.cache.config.backupDatabase.enable) {
-			throw new ResponseError({ message: 'Tính năng Backup Database đang bị tắt' });
+			throw new ResponseError({
+				message: 'Tính năng Backup Database đang bị tắt',
+			});
 		}
 
 		const data = await this.newJobBackup();
@@ -122,14 +124,18 @@ export class DatabaseBackupService {
 		const bucketName = this.configService.get<string>(
 			'GCS_PROTECTED_BUCKET',
 		)!;
-		const r2BucketName = this.configService.get<string>('R2_PROTECTED_BUCKET')!;
+		const r2BucketName = this.configService.get<string>(
+			'R2_PROTECTED_BUCKET',
+		)!;
 		const rcloneConfigPath = this.configService.get<string>(
 			'BACKUP_RCLONE_CONFIG_PATH',
 		)!;
 
 		// Inject R2 credentials from env directly to rclone
-		const r2AccessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID') || '';
-		const r2SecretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY') || '';
+		const r2AccessKeyId =
+			this.configService.get<string>('R2_ACCESS_KEY_ID') || '';
+		const r2SecretAccessKey =
+			this.configService.get<string>('R2_SECRET_ACCESS_KEY') || '';
 		const r2Endpoint = this.configService.get<string>('R2_ENDPOINT') || '';
 
 		try {

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as fs from 'fs';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { GetEmailsDto } from '../dtos/get-emails.dto';
 
@@ -29,10 +30,11 @@ export class NotificationResendService {
 			// Xử lý attachments nếu có để truyền theo chuẩn Resend API
 			const formattedAttachments = [];
 			if (attachments && attachments.length > 0) {
-				const fs = require('fs');
 				for (const att of attachments) {
 					if (fs.existsSync(att.path)) {
-						const content = fs.readFileSync(att.path).toString('base64');
+						const content = fs
+							.readFileSync(att.path)
+							.toString('base64');
 						formattedAttachments.push({
 							filename: att.filename,
 							content,
@@ -66,7 +68,7 @@ export class NotificationResendService {
 				this.logger.error(`Resend API Error: ${errorDetails}`);
 				return false;
 			}
-			
+
 			const data = await response.json();
 			this.logger.log(`Email sent successfully via Resend: ${data.id}`);
 			return true;
@@ -89,7 +91,11 @@ export class NotificationResendService {
 				const searchParams = new URLSearchParams();
 				const p = params as Record<string, any>;
 				for (const key of Object.keys(p)) {
-					if (p[key] !== undefined && p[key] !== null && p[key] !== '') {
+					if (
+						p[key] !== undefined &&
+						p[key] !== null &&
+						p[key] !== ''
+					) {
 						searchParams.append(key, String(p[key]));
 					}
 				}
@@ -109,10 +115,12 @@ export class NotificationResendService {
 
 			if (!response.ok) {
 				const errorDetails = await response.text();
-				this.logger.error(`Resend API Error (getEmails): ${errorDetails}`);
+				this.logger.error(
+					`Resend API Error (getEmails): ${errorDetails}`,
+				);
 				return [];
 			}
-			
+
 			const data = await response.json();
 			return data.data || [];
 		} catch (error) {

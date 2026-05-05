@@ -1,6 +1,6 @@
-import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { CiJobStatus, CiJobType } from '../entities/ci-distribution-job.entity';
 
@@ -43,7 +43,10 @@ export class QueryGetListCiJobDto extends BaseQueryDto2 {
 	@IsString()
 	upc?: string;
 
-	@ApiPropertyOptional({ enum: FieldOrderCiJob, default: FieldOrderCiJob.job_createdAt })
+	@ApiPropertyOptional({
+		enum: FieldOrderCiJob,
+		default: FieldOrderCiJob.job_createdAt,
+	})
 	@IsEnum(FieldOrderCiJob)
 	fieldOrder: string = FieldOrderCiJob.job_createdAt;
 }

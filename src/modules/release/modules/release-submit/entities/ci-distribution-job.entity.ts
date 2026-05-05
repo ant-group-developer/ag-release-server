@@ -1,8 +1,8 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { ReleaseSubmit } from './release-submit.entity';
-import { ReleaseSubmitStep } from './release-submit-step.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { ReleaseSubmitStep } from './release-submit-step.entity';
+import { ReleaseSubmit } from './release-submit.entity';
 
 export enum CiJobType {
 	EMAIL_STATE51 = 'email_state51',

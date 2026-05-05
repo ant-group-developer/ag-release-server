@@ -37,9 +37,7 @@ export interface ErnInput2 {
 	deals?: {
 		release: ErnDealInput2[];
 		tracks?: ErnDealInput2[];
-	}
-
-	
+	};
 }
 
 // ============================================================================

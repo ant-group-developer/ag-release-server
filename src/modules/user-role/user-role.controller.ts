@@ -1,21 +1,29 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Get,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { UserId } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { AccessControlService } from '../access-control/access-control.service';
 import { TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
 import { UpdateUserRoleDto } from './user-role.dto';
-import { UserId } from 'src/common/decorators/req.decorators';
 
 @TenantOwnerOrAdminOnly()
 @ApiTags('User Roles')
 @Controller('users')
 export class UserRoleController {
-	constructor(
-		private readonly accessControlService: AccessControlService,
-	) {}
+	constructor(private readonly accessControlService: AccessControlService) {}
 
-	@ApiOperation({ summary: 'Get roles assigned to a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Get roles assigned to a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Get(':userId/roles')
 	async getUserRoles(
@@ -29,7 +37,9 @@ export class UserRoleController {
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Get resolved permissions of a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Get resolved permissions of a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Get(':userId/permissions')
 	async getUserPermissions(
@@ -43,25 +53,29 @@ export class UserRoleController {
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Update roles assigned to a user in the current tenant' })
+	@ApiOperation({
+		summary: 'Update roles assigned to a user in the current tenant',
+	})
 	@ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
 	@Post(':userId/roles')
 	async updateUserRoles(
 		@Param('userId', ParseUUIDPipe) userId: string,
 		@Body() payload: UpdateUserRoleDto,
 		@Req() req: Request,
-		@UserId() userReqId: string
+		@UserId() userReqId: string,
 	) {
 		const data = await this.accessControlService.updateUserRoles(
 			req.user!.tenantId,
 			userId,
 			payload.roleIds,
-			userReqId
+			userReqId,
 		);
 		return new ResponseSuccess({ data });
 	}
 
-	@ApiOperation({ summary: 'Get roles available for assignment in the current tenant' })
+	@ApiOperation({
+		summary: 'Get roles available for assignment in the current tenant',
+	})
 	@Get('assignable-roles')
 	async getAssignableRoles(@Req() req: Request) {
 		const data = await this.accessControlService.getAssignableRoles(
