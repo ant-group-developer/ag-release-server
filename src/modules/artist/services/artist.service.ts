@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { ArtistProfileService } from 'src/modules/artist-profile/artist-profile.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
+import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
+import { SpotifyService } from 'src/modules/partners-api/spotify/services/spotify.service';
 import { In, Repository } from 'typeorm';
 import { ArtistMessage } from '../constants/artist.constant';
 import {
@@ -26,6 +28,9 @@ export class ArtistService {
 		private readonly artistQueryService: ArtistQueryService,
 
 		private readonly artistProfileService: ArtistProfileService,
+
+		private readonly spotifyService: SpotifyService,
+		// private readonly spotifyService2: SpotifyService2,
 	) {}
 
 	async handleCreate(data: CreateArtistDto, userId: string) {
@@ -268,5 +273,55 @@ export class ArtistService {
 
 	async deleteArtistProfile(artistProfileId: string) {
 		await this.artistProfileService.delete(artistProfileId);
+	}
+
+	async syncSpotifyArtistName() {
+		const artists = await this.artistRepo.find({
+			relations: ['artistProfiles', 'artistProfiles.dsp'],
+		});
+
+		for (const artist of artists) {
+			const spotifyProfile = artist.artistProfiles.find(
+				(p) => p.dsp.code === String(DspCode.SPOTIFY),
+			);
+
+			if (!spotifyProfile || !spotifyProfile.url) {
+				continue;
+			}
+
+			const spotifyId = artist.spotifyId;
+			if (!spotifyId) {
+				continue;
+			}
+
+			try {
+				const detail =
+					await this.spotifyService.getArtistDetail(spotifyId);
+
+				if (detail && detail.name) {
+					const modifierId =
+						artist.modifierId || artist.creatorId || 'system';
+
+					await this.artistProfileService.bulkUpdate(
+						[
+							{
+								id: spotifyProfile.id,
+								name: detail.name,
+							},
+						],
+						modifierId,
+					);
+					this.logger.log(
+						`Updated Spotify name for artist ${artist.name} to ${detail.name}`,
+					);
+				}
+			} catch (error: any) {
+				this.logger.error(
+					`Failed to sync artist ${artist.name}: ${error.message}`,
+				);
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+		}
 	}
 }

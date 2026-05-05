@@ -11,6 +11,12 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 
+import {
+	ErnInput2,
+	ErnVersion2,
+	ManifestInput2,
+} from 'src/modules/ern2/interfaces/ern-input.interface';
+import { ErnService2 } from 'src/modules/ern2/services/ern.service';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import {
 	genBatchId,
@@ -20,8 +26,6 @@ import {
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 import { Release } from '../entities/release.entity';
 import { ReleaseQueryService } from './release.query.service';
-import { ErnService2 } from 'src/modules/ern2/services/ern.service';
-import { ErnInput2, ErnVersion2, ManifestInput2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -71,7 +75,9 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}) {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull({
+			releaseId,
+		});
 
 		const batchId = genBatchId();
 
@@ -107,7 +113,7 @@ export class ReleaseDdexService {
 		this.processAudioFiles({ audioFiles, outputDir: resourcesDir });
 
 		// 5. DDEX file
-		await this.createErnFile({
+		const xml = await this.createErnFile({
 			releaseId,
 			outputDir: releaseDir,
 			ernVersion,
@@ -133,6 +139,7 @@ export class ReleaseDdexService {
 			outputDir: outputRoot,
 			outputRoot,
 			batchId,
+			xml,
 		};
 	}
 
@@ -155,7 +162,9 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}) {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull({
+			releaseId,
+		});
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
 			ernVersion,
@@ -166,6 +175,8 @@ export class ReleaseDdexService {
 
 		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
+
+		return xmlContent;
 	}
 
 	async generateReleaseXml(
@@ -173,7 +184,9 @@ export class ReleaseDdexService {
 		dspCode: string,
 		ernVersion?: ErnVersion2,
 	): Promise<string> {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull({
+			releaseId,
+		});
 
 		const config =
 			await this.dspRoutingConfigsService.resolveFullDeliveryConfig(
@@ -182,7 +195,8 @@ export class ReleaseDdexService {
 
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
-			ernVersion: ernVersion || (config.ernVersion as unknown as ErnVersion2),
+			ernVersion:
+				ernVersion || (config.ernVersion as unknown as ErnVersion2),
 			sender: config.sender,
 			recipient: config.recipient,
 		});
@@ -253,10 +267,14 @@ export class ReleaseDdexService {
 		fs.writeFileSync(manifestPath, xml, 'utf-8');
 
 		this.logger.log(`[MANIFEST_CREATED] ${manifestPath}`);
+
+		return xml;
 	}
 
 	async uploadMetadataDdexSpotifyToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull({
+			releaseId,
+		});
 		try {
 			const sftp =
 				await this.dspRoutingConfigsService.resolveSftpMetadataByDspCode(
@@ -276,7 +294,9 @@ export class ReleaseDdexService {
 	}
 
 	async uploadMetadataDdexCiToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFull(releaseId);
+		const release = await this.releaseQuery.findOneReleaseFull({
+			releaseId,
+		});
 		try {
 			const sftp =
 				await this.aggregatorsService.resolveSftpAggregatorCode({
@@ -523,10 +543,15 @@ export class ReleaseDdexService {
 				catalogNumber: release.catalogId ?? undefined,
 
 				artists: release.releaseArtists.map((ra) => ({
-					name: ra.artist?.name ?? '',
+					name:
+						ra.artist?.artistProfiles?.find(
+							(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+						)?.name ??
+						ra.artist?.name ??
+						'',
 					role: 'MainArtist',
-					spotifyId: ra.artist.spotifyId,
-					appleMusicId: ra.artist.appleMusicId,
+					spotifyId: ra.artist?.spotifyId,
+					appleMusicId: ra.artist?.appleMusicId,
 				})),
 
 				parentalWarning,
@@ -600,7 +625,8 @@ export class ReleaseDdexService {
 						undefined,
 
 					languageOfPerformance:
-						track.trackLanguage?.audioLanguage?.code === 'NoLanguage'
+						track.trackLanguage?.audioLanguage?.code ===
+						'NoLanguage'
 							? undefined
 							: track.trackLanguage?.audioLanguage?.code,
 
@@ -609,12 +635,22 @@ export class ReleaseDdexService {
 					),
 
 					artists: track.trackArtists.map((ta) => ({
-						name: ta.artist?.name ?? '',
+						name:
+							ta.artist?.artistProfiles?.find(
+								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+							)?.name ??
+							ta.artist?.name ??
+							'',
 						role: 'MainArtist',
 					})),
 
 					contributors: track.trackContributors?.map((c) => ({
-						name: c.artist?.name ?? '',
+						name:
+							c.artist?.artistProfiles?.find(
+								(p) => p.dsp?.code === String(DspCode.SPOTIFY),
+							)?.name ??
+							c.artist?.name ??
+							'',
 						role: c.artistRole?.code ?? '',
 					})),
 
@@ -674,7 +710,8 @@ export class ReleaseDdexService {
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
-							currencyCode: release.priceTier?.currency?.code ?? '',
+							currencyCode:
+								release.priceTier?.currency?.code ?? '',
 						},
 					},
 				],
@@ -692,7 +729,9 @@ export class ReleaseDdexService {
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+							currencyCode:
+								release.tracks?.[0]?.priceTier?.currency
+									?.code ?? '',
 						},
 					},
 					{
@@ -708,7 +747,9 @@ export class ReleaseDdexService {
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+							currencyCode:
+								release.tracks?.[0]?.priceTier?.currency
+									?.code ?? '',
 						},
 					},
 					{
@@ -724,7 +765,9 @@ export class ReleaseDdexService {
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
-							currencyCode: release.tracks?.[0]?.priceTier?.currency?.code ?? '',
+							currencyCode:
+								release.tracks?.[0]?.priceTier?.currency
+									?.code ?? '',
 						},
 					},
 				],

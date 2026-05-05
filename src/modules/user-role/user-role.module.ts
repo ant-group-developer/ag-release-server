@@ -5,10 +5,7 @@ import { UserRoleController } from './user-role.controller';
 import { UserRole } from './user-role.entity';
 
 @Module({
-	imports: [
-		TypeOrmModule.forFeature([UserRole]),
-		AccessControlModule,
-	],
+	imports: [TypeOrmModule.forFeature([UserRole]), AccessControlModule],
 	controllers: [UserRoleController],
 })
 export class UserRoleModule {}

@@ -290,7 +290,8 @@ export class ReleaseValidateService {
 		if (isSingle && !hasMatchingTitle) {
 			result.push(
 				new FieldErrorDetails({
-					messageCode: 'formFields.validate.releaseNameMustMatchTrackName',
+					messageCode:
+						'formFields.validate.releaseNameMustMatchTrackName',
 					message:
 						'Tên bản phát hành Single bắt buộc phải trùng khớp với tên ít nhất 1 bài hát',
 					page: 'core-detail',
@@ -450,7 +451,8 @@ export class ReleaseValidateService {
 				const missing = missingRoles.map((r) => r.name);
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.missingRequiredContributorsRoles',
+						messageCode:
+							`formFields.validate.missingRequired.${missing.join('')}`,
 						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 						page: 'core-detail',
 						field: 'releaseContributors',
@@ -516,7 +518,8 @@ export class ReleaseValidateService {
 			if (isrc && isrc.length !== 12) {
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.isrcMustBe12Characters',
+						messageCode:
+							'formFields.validate.isrcMustBe12Characters',
 						message: 'Mã ISRC phải có chính xác 12 ký tự',
 						page: 'tracks',
 						field: `tracks.${index}.isrc`,

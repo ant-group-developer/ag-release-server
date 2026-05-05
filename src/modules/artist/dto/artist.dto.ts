@@ -21,7 +21,7 @@ import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constant
 import { FieldOrderArtist } from '../enum/artist.enum';
 
 class CreateArtistProfileDto {
-	@IsNotEmpty()
+	// @IsNotEmpty()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	@Transform(({ value }) =>
 		typeof value === 'string' ? value.trim() : value,
@@ -46,7 +46,7 @@ export class CreateArtistDto {
 	})
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
-	@IsNotEmpty()
+	// @IsNotEmpty()
 	name: string;
 
 	@ApiProperty({
@@ -93,7 +93,7 @@ class UpdateArtistProfileDto {
 	@IsOptional()
 	id?: string;
 
-	@IsNotEmpty()
+	// @IsNotEmpty()
 	@MaxLength(50)
 	name: string;
 

@@ -37,6 +37,8 @@ export class BucketR2Service {
 			region: 'auto',
 			endpoint: R2_ENDPOINT,
 			credentials: { accessKeyId, secretAccessKey },
+			requestChecksumCalculation: 'WHEN_REQUIRED',
+			responseChecksumValidation: 'WHEN_REQUIRED',
 		});
 
 		this.publicBucketName =
@@ -66,7 +68,7 @@ export class BucketR2Service {
 	}
 
 	async getSignedUrlUpload(data: IGetSignedUrlUpload): Promise<string> {
-		const { key, isPublic = false } = data;
+		const { key, isPublic = false, contentType } = data;
 
 		if (!key) {
 			throw new Error('Key is required');
@@ -77,6 +79,7 @@ export class BucketR2Service {
 		const command = new PutObjectCommand({
 			Bucket: bucketName,
 			Key: key,
+			ContentType: contentType,
 		});
 
 		return getSignedUrl(this.client, command, {

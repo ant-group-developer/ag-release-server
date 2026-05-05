@@ -108,8 +108,16 @@ export interface PartnerCiConfig {
 	token: string;
 	organisationId: string;
 	baseUrl: string;
+	dailySendCron: string; // Cron expression cho lịch gửi email hàng ngày (vd: '0 8 * * *')
+}
+
+export interface PartnerSpotifyConfig {
+	clientId: string;
+	clientSecret: string;
+	token?: string;
 }
 
 export interface PartnersConfig {
 	ci: PartnerCiConfig;
+	spotify: PartnerSpotifyConfig;
 }

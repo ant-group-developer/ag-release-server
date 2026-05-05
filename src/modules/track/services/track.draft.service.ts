@@ -101,16 +101,12 @@ export class TrackDraftService {
 	}
 
 	// update
-	async bulkUpdate(data: BulkUpdateTrackDraft): Promise<ITrackDraft[]> {
-		const { trackDrafts } = data;
-
-		await Promise.all(
-			trackDrafts.map((track) =>
-				this.trackQueryService.findOne(track.id),
-			),
-		);
-
-		return await this.trackRepo.save(trackDrafts);
+	async bulkUpdate(data: BulkUpdateTrackDraft) {
+		for (const t of data.trackDrafts) {
+			if (t.id) {
+				this.updateSafeSync(t.id, t);
+			}
+		}
 	}
 
 	async update(id: string, data: UpdateTrackDraftDto): Promise<ITrackDraft> {
@@ -136,12 +132,16 @@ export class TrackDraftService {
 		return this.trackQueryService.ensureDraftTrack(result);
 	}
 
-	async updateSafe(id: string, data: UpdateTrackDraftDto){
+	async updateSafe(id: string, data: UpdateTrackDraftDto) {
 		try {
-			await this.update(id, data)
+			await this.update(id, data);
 		} catch (error) {
-			this.logger.error(error)
+			this.logger.error(error);
 		}
+	}
+
+	updateSafeSync(id: string, data: UpdateTrackDraftDto) {
+		this.update(id, data).catch((err) => console.log(err));
 	}
 
 	async updateTrackPolicy({
@@ -165,7 +165,9 @@ export class TrackDraftService {
 			releaseId,
 		});
 
-		await Promise.all(tracks.map((track) => this.updateSafe(track.id, data)));
+		await Promise.all(
+			tracks.map((track) => this.updateSafe(track.id, data)),
+		);
 	}
 
 	//delete

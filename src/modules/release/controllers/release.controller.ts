@@ -25,6 +25,7 @@ import {
 	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
 import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { streamDownload } from 'src/utils/util';
@@ -40,7 +41,6 @@ import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
 import { ReleaseDdexService } from '../services/release-ddex.service';
 import { ReleaseService } from '../services/release.service';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 
 @ApiTags('Releases')
 @Controller('releases')
@@ -181,6 +181,12 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	// @Get(':id/test-status')
+	// async testSyncStatus(@Param('id', ParseUUIDPipe) id: string) {
+	// 	const result = await this.releaseService.testSyncReleaseStatus(id);
+	// 	return new ResponseSuccess({ data: result });
+	// }
+
 	@Get(':id/file-export-ci')
 	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
 		const buffer = await this.releaseService.getFileExportCiById(id);
@@ -268,7 +274,7 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		await this.releaseService.submit2(id, userId, dto);
+		await this.releaseService.submit3(id, dto);
 
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
@@ -408,4 +414,12 @@ export class ReleaseController {
 
 	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
 	// }
+
+	@ApiOperation({ summary: 'Sync lại release status từ DSP deliveries' })
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@Post(':id/sync-release-status')
+	async syncReleaseStatus(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.syncReleaseStatus(id);
+		return new ResponseSuccess({ data: result });
+	}
 }

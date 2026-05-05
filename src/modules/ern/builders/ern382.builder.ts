@@ -112,7 +112,9 @@ export class Ern382Builder {
 		sr.ele('ResourceReference').txt(ref);
 
 		// Reference title
-		const refTitle = sr.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = sr.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(track.title);
 		if (track.version) {
 			refTitle.ele('SubTitle').txt(track.version);
@@ -137,11 +139,17 @@ export class Ern382Builder {
 			? `${track.title} (${track.version})`
 			: track.title;
 		details
-			.ele('Title', { TitleType: 'DisplayTitle', LanguageAndScriptCode: 'en' })
+			.ele('Title', {
+				TitleType: 'DisplayTitle',
+				LanguageAndScriptCode: 'en',
+			})
 			.ele('TitleText')
 			.txt(displayTitle);
 
-		const formalTitle = details.ele('Title', { TitleType: 'FormalTitle', LanguageAndScriptCode: 'en' });
+		const formalTitle = details.ele('Title', {
+			TitleType: 'FormalTitle',
+			LanguageAndScriptCode: 'en',
+		});
 		formalTitle.ele('TitleText').txt(track.title);
 		if (track.version) {
 			formalTitle.ele('SubTitle').txt(track.version);
@@ -380,7 +388,9 @@ export class Ern382Builder {
 		release.ele('ReleaseReference').txt(ref);
 
 		// Reference title
-		const refTitle = release.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = release.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(track.title);
 		if (track.version) refTitle.ele('SubTitle').txt(track.version);
 
@@ -488,7 +498,9 @@ export class Ern382Builder {
 		release.ele('ReleaseReference').txt('R0');
 
 		// Reference title
-		const refTitle = release.ele('ReferenceTitle', { LanguageAndScriptCode: 'en' });
+		const refTitle = release.ele('ReferenceTitle', {
+			LanguageAndScriptCode: 'en',
+		});
 		refTitle.ele('TitleText').txt(this.input.release.title);
 		if (this.input.release.version) {
 			refTitle.ele('SubTitle').txt(this.input.release.version);

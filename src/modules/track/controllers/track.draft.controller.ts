@@ -13,6 +13,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TrackMessageCodeSuccess } from '../constants/track.constant';
 
+import { AppResponseSuccess } from 'src/app.const';
 import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
@@ -54,15 +55,10 @@ export class TrackDraftController {
 	}
 
 	@Put('bulk')
-	async bulkUpdate(
-		@Body() data: BulkUpdateTrackDraft,
-	): Promise<ResponseSuccess<ITrackDraft[]>> {
-		const result = await this.trackDraftService.bulkUpdate(data);
+	async bulkUpdate(@Body() data: BulkUpdateTrackDraft) {
+		await this.trackDraftService.bulkUpdate(data);
 
-		return new ResponseSuccess({
-			data: result,
-			messageCode: TrackMessageCodeSuccess.CREATE,
-		});
+		return AppResponseSuccess.JOB_PROCESSING();
 	}
 
 	@Get(':id/track-policies')

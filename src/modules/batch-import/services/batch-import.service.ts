@@ -11,10 +11,12 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Language } from 'src/modules/language/entities/language.entity';
+import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
+import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
@@ -22,6 +24,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
+import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
@@ -135,6 +138,35 @@ export class BatchImportService {
 		return { logId: saved.id };
 	}
 
+	async logFailedRelease(logId: string, errorMsg: string, rawError?: any) {
+		const log = await this.logRepo.findOneBy({ id: logId });
+		if (!log) {
+			throw new Error(`Log record not found: ${logId}`);
+		}
+
+		log.status = BatchImportStatus.FAILED;
+		this.appendLogError(log, errorMsg);
+
+		if (rawError) {
+			const rawErrorStr =
+				typeof rawError === 'string'
+					? rawError
+					: JSON.stringify(
+							rawError,
+							Object.getOwnPropertyNames(rawError),
+						);
+			this.appendLogError(log, `Raw Error: ${rawErrorStr}`);
+		}
+
+		await this.logRepo.save(log);
+
+		this.logger.log(
+			`Logged failed release for logId "${logId}": ${errorMsg}`,
+		);
+
+		return { success: true };
+	}
+
 	async validateRelease(dto: ValidateReleaseDto) {
 		const {
 			tenantCode,
@@ -226,6 +258,7 @@ export class BatchImportService {
 			excelData,
 			storageKeys,
 			audioMetadata,
+			fileIds,
 		} = dto;
 
 		const log = await this.logRepo.findOneBy({ id: logId });
@@ -313,7 +346,7 @@ export class BatchImportService {
 						`[INFO] Existing release found for UPC "${upc}" (id: ${releaseId}). Updating release.`,
 					);
 
-					// Delete all old sub-entities
+					// Delete all old sub-entities (including localizes)
 					await this.deleteReleaseSubEntities(manager, releaseId);
 
 					// Update release entity fields
@@ -329,6 +362,7 @@ export class BatchImportService {
 						pLineYear: mapped.release.pLineYear,
 						pLineOwner: mapped.release.pLineOwner,
 						releaseDate: mapped.release.releaseDate,
+						releaseOriginalDate: mapped.release.releaseOriginalDate,
 						releaseTime: mapped.release.releaseTime,
 						metadataCi: mapped.release.metadataCi,
 					});
@@ -352,19 +386,29 @@ export class BatchImportService {
 				await manager.save(ReleaseLanguage, mapped.releaseLanguage);
 
 				// Save ReleaseArtists
+				const insertedReleaseArtistIds = new Set<string>();
 				for (const ra of mapped.releaseArtists) {
 					const artistId = artistIdMap.get(ra.artistName);
-					if (!artistId) continue;
+					if (!artistId || insertedReleaseArtistIds.has(artistId))
+						continue;
+
+					insertedReleaseArtistIds.add(artistId);
 					ra.entity.releaseId = releaseId;
 					ra.entity.artistId = artistId;
 					await manager.save(ReleaseArtist, ra.entity);
 				}
 
 				// Save ReleaseContributors
+				const insertedReleaseContributorKeys = new Set<string>();
 				for (const rc of mapped.releaseContributors) {
 					const artistId = artistIdMap.get(rc.artistName);
 					const artistRoleId = maps.artistRole.get(rc.roleCode);
 					if (!artistId || !artistRoleId) continue;
+
+					const key = `${artistId}-${artistRoleId}`;
+					if (insertedReleaseContributorKeys.has(key)) continue;
+
+					insertedReleaseContributorKeys.add(key);
 					rc.entity.releaseId = releaseId;
 					rc.entity.artistId = artistId;
 					rc.entity.artistRoleId = artistRoleId;
@@ -386,18 +430,28 @@ export class BatchImportService {
 					t.trackLanguage.trackId = trackId;
 					await manager.save(TrackLanguage, t.trackLanguage);
 
+					const insertedTrackArtistIds = new Set<string>();
 					for (const ta of t.trackArtists) {
 						const artistId = artistIdMap.get(ta.artistName);
-						if (!artistId) continue;
+						if (!artistId || insertedTrackArtistIds.has(artistId))
+							continue;
+
+						insertedTrackArtistIds.add(artistId);
 						ta.entity.trackId = trackId;
 						ta.entity.artistId = artistId;
 						await manager.save(TrackArtist, ta.entity);
 					}
 
+					const insertedTrackContributorKeys = new Set<string>();
 					for (const tc of t.trackContributors) {
 						const artistId = artistIdMap.get(tc.artistName);
 						const artistRoleId = maps.artistRole.get(tc.roleCode);
 						if (!artistId || !artistRoleId) continue;
+
+						const key = `${artistId}-${artistRoleId}`;
+						if (insertedTrackContributorKeys.has(key)) continue;
+
+						insertedTrackContributorKeys.add(key);
 						tc.entity.trackId = trackId;
 						tc.entity.artistId = artistId;
 						tc.entity.artistRoleId = artistRoleId;
@@ -407,30 +461,59 @@ export class BatchImportService {
 					if (t.audioFile && t.audioStorageKey) {
 						t.audioFile.trackId = trackId;
 
-						// Create FileEntity for the uploaded audio
-						const ext = path
-							.extname(t.audioStorageKey)
-							.replace('.', '');
-						const fileEntity = new FileEntity();
-						fileEntity.fileName = path.basename(t.audioStorageKey);
-						fileEntity.key = t.audioStorageKey;
-						fileEntity.contentType =
-							ext === 'wav'
-								? 'audio/wav'
-								: ext === 'flac'
-									? 'audio/flac'
-									: 'audio/mpeg';
-						fileEntity.extension = ext;
-						fileEntity.fileSize = 0;
-						fileEntity.bucket = 'ag-music';
+						let savedFileId: string | undefined;
 
-						const savedFile = await manager.save(
-							FileEntity,
-							fileEntity,
-						);
+						// If fileIds were passed, try to find the pre-created FileEntity by key
+						if (fileIds && fileIds.length > 0) {
+							const existingFile = await manager.findOne(
+								FileEntity,
+								{
+									where: { key: t.audioStorageKey },
+									select: ['id'],
+								},
+							);
+							if (existingFile) {
+								savedFileId = existingFile.id;
+							}
+						}
 
-						t.audioFile.fileId = savedFile.id;
+						// Fallback: create manually if not found (for legacy or error cases)
+						if (!savedFileId) {
+							const ext = path
+								.extname(t.audioStorageKey)
+								.replace('.', '');
+							const fileEntity = new FileEntity();
+							fileEntity.fileName = path.basename(
+								t.audioStorageKey,
+							);
+							fileEntity.key = t.audioStorageKey;
+							fileEntity.contentType =
+								ext === 'wav'
+									? 'audio/wav'
+									: ext === 'flac'
+										? 'audio/flac'
+										: 'audio/mpeg';
+							fileEntity.extension = ext;
+							fileEntity.fileSize = 0;
+							fileEntity.bucket = 'ag-music';
+
+							const savedFile = await manager.save(
+								FileEntity,
+								fileEntity,
+							);
+							savedFileId = savedFile.id;
+						}
+
+						t.audioFile.fileId = savedFileId;
 						await manager.save(AudioFile, t.audioFile);
+					}
+
+					// Save Track Localizes (secondary language titles)
+					for (const tl of t.trackLocalizes) {
+						tl.trackId = trackId;
+						if (tl.languageId) {
+							await manager.save(TrackLocalize, tl);
+						}
 					}
 				}
 
@@ -440,27 +523,52 @@ export class BatchImportService {
 					imageExts.some((e) => k.toLowerCase().endsWith(e)),
 				);
 				if (thumbnailKey) {
-					const ext = path.extname(thumbnailKey).replace('.', '');
-					const fileEntity = new FileEntity();
-					fileEntity.fileName = path.basename(thumbnailKey);
-					fileEntity.key = thumbnailKey;
-					fileEntity.contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-					fileEntity.extension = ext;
-					fileEntity.fileSize = 0;
-					fileEntity.bucket = 'ag-music';
+					let savedFileId: string | undefined;
 
-					const savedFile = await manager.save(
-						FileEntity,
-						fileEntity,
-					);
+					// If fileIds were passed, try to find the pre-created FileEntity by key
+					if (fileIds && fileIds.length > 0) {
+						const existingFile = await manager.findOne(FileEntity, {
+							where: { key: thumbnailKey },
+							select: ['id'],
+						});
+						if (existingFile) {
+							savedFileId = existingFile.id;
+						}
+					}
+
+					// Fallback: create manually if not found (for legacy or error cases)
+					if (!savedFileId) {
+						const ext = path.extname(thumbnailKey).replace('.', '');
+						const fileEntity = new FileEntity();
+						fileEntity.fileName = path.basename(thumbnailKey);
+						fileEntity.key = thumbnailKey;
+						fileEntity.contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+						fileEntity.extension = ext;
+						fileEntity.fileSize = 0;
+						fileEntity.bucket = 'ag-music';
+
+						const savedFile = await manager.save(
+							FileEntity,
+							fileEntity,
+						);
+						savedFileId = savedFile.id;
+					}
 
 					const coverArt = new ReleaseCoverArt();
-					coverArt.fileId = savedFile.id;
+					coverArt.fileId = savedFileId;
 					coverArt.releaseId = releaseId;
 					coverArt.width = 0;
 					coverArt.height = 0;
 					coverArt.type = 'original';
 					await manager.save(ReleaseCoverArt, coverArt);
+				}
+
+				// Save Release Localizes (secondary language titles)
+				for (const rl of mapped.releaseLocalizes) {
+					rl.releaseId = releaseId;
+					if (rl.languageId) {
+						await manager.save(ReleaseLocalize, rl);
+					}
 				}
 
 				await queryRunner.commitTransaction();
@@ -528,6 +636,7 @@ export class BatchImportService {
 			await manager.delete(TrackContributor, {
 				trackId: In(trackIds),
 			});
+			await manager.delete(TrackLocalize, { trackId: In(trackIds) });
 			await manager.delete(AudioFile, { trackId: In(trackIds) });
 		}
 
@@ -538,7 +647,9 @@ export class BatchImportService {
 			manager.delete(ReleaseLanguage, { releaseId }),
 			manager.delete(ReleaseArtist, { releaseId }),
 			manager.delete(ReleaseContributor, { releaseId }),
+			manager.delete(ReleaseLocalize, { releaseId }),
 			manager.delete(ReleaseDspDelivery, { releaseId }),
+			manager.delete(ReleaseCoverArt, { releaseId }),
 		]);
 	}
 
@@ -560,6 +671,7 @@ export class BatchImportService {
 			dsps,
 			artists,
 			countries,
+			priceTiers,
 			defaultTrackType,
 			defaultTrackOriginType,
 		] = await Promise.all([
@@ -572,6 +684,10 @@ export class BatchImportService {
 			this.dataSource.getRepository(Dsp).find(),
 			this.dataSource.getRepository(Artist).find(),
 			this.dataSource.getRepository(Country).find(),
+			this.dataSource.getRepository(PriceTier).find({
+				relations: { currency: true },
+				where: { isActive: true },
+			}),
 			this.dataSource
 				.getRepository(TrackType)
 				.findOne({ where: { isDefault: true } }),
@@ -586,11 +702,23 @@ export class BatchImportService {
 			label: new Map(labels.map((r) => [r.name, r.id])),
 			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
 			artistRole: new Map(artistRoles.map((r) => [r.name, r.id])),
-			language: new Map(languages.map((r) => [r.name, r.id])),
+			language: new Map([
+				...languages.map((r) => [r.name, r.id] as [string, string]),
+				...languages.map(
+					(r) => [`${r.name} - ${r.code}`, r.id] as [string, string],
+				),
+			]),
 			dsp: new Map(dsps.map((r) => [r.name, r.id])),
 			artist: new Map(artists.map((r) => [r.name, r.id])),
 			country: new Map(countries.map((r) => [r.iso2, r.id])),
 			countryByName: new Map(countries.map((r) => [r.name, r.id])),
+			priceTier: new Map(
+				priceTiers.map((r) => [
+					`${r.amount}|${r.currency?.code}`,
+					r.id,
+				]),
+			),
+			defaultPriceTierId: priceTiers.find((r) => r.isDefault)?.id || null,
 			defaultTrackTypeId: defaultTrackType?.id || null,
 			defaultTrackOriginTypeId: defaultTrackOriginType?.id || null,
 		};

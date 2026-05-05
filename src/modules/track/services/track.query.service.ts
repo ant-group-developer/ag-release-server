@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
+import { PriceTierType } from 'src/modules/price-tiers/enum/price-tier.enum';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
@@ -30,7 +31,6 @@ import {
 	ITrackDraft,
 	ITrackNonDraft,
 } from '../interfaces/track.interface';
-import { PriceTierType } from 'src/modules/price-tiers/enum/price-tier.enum';
 
 @Injectable()
 export class TrackQueryService {
@@ -78,7 +78,9 @@ export class TrackQueryService {
 		const [items, totalItems] = await this.trackRepo.findAndCount({
 			select: { id: true, title: true },
 			where: {
-				...(keyword && keyword.length > 0 && keyword[0] ? { title: ILike(`%${keyword[0]}%`) } : {}),
+				...(keyword && keyword.length > 0 && keyword[0]
+					? { title: ILike(`%${keyword[0]}%`) }
+					: {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
@@ -432,13 +434,13 @@ export class TrackQueryService {
 			});
 
 			const priceTier = await this.priceTierRepo.findOneOrFail({
-				where: { id: priceTierId }
+				where: { id: priceTierId },
 			});
 
 			if (priceTier.type !== PriceTierType.TRACK) {
 				throw new ResponseError({
-					message: 'Invalid priceTier.type'
-				})
+					message: 'Invalid priceTier.type',
+				});
 			}
 		}
 
@@ -628,7 +630,8 @@ export class TrackQueryService {
 				if (!kw) return;
 				qb.andWhere(
 					new Brackets((qbInner) => {
-						qbInner.where(`track.title ILIKE :kw_${index}`)
+						qbInner
+							.where(`track.title ILIKE :kw_${index}`)
 							.orWhere(`track.lyric ILIKE :kw_${index}`)
 							.orWhere(`track.version ILIKE :kw_${index}`);
 					}),

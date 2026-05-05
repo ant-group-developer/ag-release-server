@@ -1,14 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import archiver from 'archiver';
 import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
-import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
-import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
+import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
@@ -28,17 +27,14 @@ import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { ReleaseLog } from '../modules/release-log/entities/release-log.entity';
-import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
-import { enhanceReleasesDetails } from '../utils/release.utils';
-// import { ReleaseDdexCiService } from './release.ddex-ci.service';
-// import { ReleaseSpotifyService2 } from './release.ddex-spotify2.service';
-import { ExecutionType } from '../modules/release-executions/enum/release-execution.enum';
 import { ReleaseExecutionsService } from '../modules/release-executions/services/release-executions.service';
+import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
+import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
+import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
+import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
-import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 
 @Injectable()
 export class ReleaseService {
@@ -63,7 +59,10 @@ export class ReleaseService {
 		private readonly releaseExecutionsService: ReleaseExecutionsService,
 
 		// partners api
-		private readonly ciService: CiService,	
+		private readonly ciService: CiService,
+
+		@Inject(forwardRef(() => ReleaseSubmitService2))
+		private readonly releaseSubmitService2: ReleaseSubmitService2,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -80,7 +79,9 @@ export class ReleaseService {
 	}
 
 	async findOneFull(id: string) {
-		const release = await this.releaseQueryService.findOneReleaseFull(id);
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+		});
 
 		const { releaseCoverArts, ...restOfRelease } = release;
 
@@ -165,17 +166,23 @@ export class ReleaseService {
 
 	// file export ci
 	async listCodeExportCiById(id: string) {
-		const release = await this.releaseQueryService.findOneReleaseFull(id);
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+			relations: ['release.releaseDspDeliveries'],
+		});
 
 		return release.listCodeExportCi;
 	}
 
 	async dataExportCiById(id: string) {
-		const { listCodeExportCi: listCodeDspCi, upc } =
-			await this.releaseQueryService.findOneReleaseFull(id);
+		const { listCodeExportCi, upc } =
+			await this.releaseQueryService.findOneReleaseFull({
+				releaseId: id,
+				relations: ['release.releaseDspDeliveries'],
+			});
 
 		return {
-			listCodeDspCi,
+			listCodeDspCi: listCodeExportCi,
 			upc,
 		};
 	}
@@ -384,6 +391,7 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
+		// return 'test_upc'
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -425,13 +433,6 @@ export class ReleaseService {
 
 		// -------- Update release --------
 		await this.releaseRepo.update(releaseId, { upc: newUpc });
-
-		// await this.releaseLogRepo.insert({
-		// 	status: ReleaseLogStatus.SUCCESS,
-		// 	releaseId,
-		// 	logs: 'Cấp mã UPC thành công',
-		// 	step: 'Khởi tạo UPC',
-		// });
 
 		return newUpc;
 	}
@@ -483,7 +484,10 @@ export class ReleaseService {
 
 	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, { status: ReleaseStatus.SUBMITTED, releaseEndDate: null });
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.SUBMITTED,
+			releaseEndDate: null,
+		});
 		this.releaseExecutionsService
 			.createAndProcess({
 				releaseId: id,
@@ -496,26 +500,35 @@ export class ReleaseService {
 			});
 	}
 
+	async submit3(id: string, dto: SubmitReleaseDto) {
+		await this.releaseQueryService.findOne(id);
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.SUBMITTED,
+			releaseEndDate: null,
+		});
+		return this.releaseSubmitService2.submit({
+			releaseId: id,
+			dspCodes: dto.code,
+			type: ExecutionType.INITIAL_RELEASE,
+		});
+	}
+
+	// async testSyncReleaseStatus(id: string) {
+	// 	await this.releaseSubmitService2.syncReleaseStatus(id);
+	// 	const release = await this.releaseQueryService.findOne(id);
+	// 	return { status: release.status };
+	// }
+
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 		await this.releaseRepo.update(id, {
 			releaseEndDate: new Date(),
 		});
-		this.releaseExecutionsService
-			.createAndProcess({
-				releaseId: id,
-				type: ExecutionType.TAKEDOWN,
-				originalDspCodes: dto.code,
-				triggeredById: userId,
-			})
-			.then(async () => {
-				await this.releaseRepo.update(id, {
-					status: ReleaseStatus.TAKEN_DOWN,
-				});
-			})
-			.catch((_e) => {
-				this.logger.error(_e);
-			});
+		return this.releaseSubmitService2.submit({
+			releaseId: id,
+			dspCodes: dto.code,
+			type: ExecutionType.TAKEDOWN,
+		});
 	}
 
 	private async processingSubmit({
@@ -575,13 +588,29 @@ export class ReleaseService {
 
 	// get qa flag ci
 	async getQaFlagCi(id: string) {
+		// return []
+
 		const release = await this.releaseQueryService.findOne(id);
-		const res = await this.ciService.getReleases({
+		const resListReleaseCi = await this.ciService.getReleases({
 			gtin: release.upc ? [release.upc] : [],
 		});
-		const idCi = res._embedded.find((item: any) => item.barcode === release.upc)?.id;
+		const idCi = resListReleaseCi._embedded.find(
+			(item: any) => item.barcode === release.upc,
+		)?.id;
+		if (!idCi) {
+			throw new ResponseError({ message: 'Không tìm thấy CI' });
+		}
 		const res2 = await this.ciService.getReleaseQaFlags(idCi);
 		return res2._embedded;
 	}
 
+	/** Sync lại release status từ DSP deliveries */
+	async syncReleaseStatus(releaseId: string) {
+		await this.releaseQueryService.findOne(releaseId);
+		const newStatus =
+			await this.releaseSubmitService2.deriveAndUpdateReleaseStatus(
+				releaseId,
+			);
+		return { releaseId, status: newStatus };
+	}
 }

@@ -164,6 +164,24 @@ export class UpdatePartnerCiConfigDto {
 	@IsOptional()
 	@IsString()
 	baseUrl: string;
+
+	@IsString()
+	@IsNotEmpty()
+	dailySendCron: string;
+}
+
+export class UpdatePartnerSpotifyConfigDto {
+	@IsOptional()
+	@IsString()
+	clientId: string;
+
+	@IsOptional()
+	@IsString()
+	clientSecret: string;
+
+	@IsOptional()
+	@IsString()
+	token?: string;
 }
 
 export class UpdatePartnersConfigDto {
@@ -171,6 +189,11 @@ export class UpdatePartnersConfigDto {
 	@ValidateNested()
 	@Type(() => UpdatePartnerCiConfigDto)
 	ci?: UpdatePartnerCiConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdatePartnerSpotifyConfigDto)
+	spotify?: UpdatePartnerSpotifyConfigDto;
 }
 
 export class UpdateConfigDto {

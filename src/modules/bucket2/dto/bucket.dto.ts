@@ -37,6 +37,8 @@ class CreateFileDto {
 
 class FolderBucket {
 	// nếu không truyền keyBucket thì hệ thống sẽ tự generate
+	@IsOptional()
+	@IsString()
 	key?: string;
 
 	// mục đích upload, dùng để xác định cấu trúc folder

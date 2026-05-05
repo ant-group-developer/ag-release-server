@@ -42,4 +42,8 @@ export class CreateReleaseFromExcelDto {
 			duration: number | null;
 		}
 	>;
+
+	@IsArray()
+	@IsOptional()
+	fileIds?: string[];
 }

@@ -71,8 +71,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
 		// Single unified call — handles user/tenant validation,
 		// permission resolution, and Redis caching
-		const authContext =
-			await this.accessControlService.getAuthContext(userId, tenantId);
+		const authContext = await this.accessControlService.getAuthContext(
+			userId,
+			tenantId,
+		);
 
 		this.userService.updateLastActive(authContext.userId);
 

@@ -4,7 +4,7 @@ export enum ReleaseStatus {
 	PROCESSING = 'processing',
 	AWAITING_ACTION = 'awaiting_action',
 	DISTRIBUTED = 'distributed',
-	PARTIALLY_FAILED = 'partially_failed',
+	PARTIAL_DONE = 'partial_done',
 	FAILED = 'failed',
 	TAKEN_DOWN = 'taken_down',
 }
