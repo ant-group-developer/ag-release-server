@@ -37,6 +37,8 @@ export interface ExcelLookupMaps {
 	artist: Map<string, string>; // name → id
 	country: Map<string, string>; // iso2 → id
 	countryByName: Map<string, string>; // name → id
+	priceTier: Map<string, string>; // "amount|currencyCode" → id
+	defaultPriceTierId: string | null;
 	defaultTrackTypeId: string | null;
 	defaultTrackOriginTypeId: string | null;
 }
@@ -297,6 +299,17 @@ export class ExcelMapperService {
 			if (parentalWarning) {
 				track.trackSensitiveId =
 					maps.trackSensitive.get(parentalWarning) || null;
+			}
+
+			// Track-SRP + Track-SRP-Currency → PriceTier (fallback to default)
+			const trackSrp = this.str(row[C.TRACK_SRP]);
+			const trackSrpCurrency = this.str(row[C.TRACK_SRP_CURRENCY]);
+			if (trackSrp && trackSrpCurrency) {
+				const ptKey = `${trackSrp}|${trackSrpCurrency}`;
+				track.priceTierId =
+					maps.priceTier.get(ptKey) || maps.defaultPriceTierId;
+			} else {
+				track.priceTierId = maps.defaultPriceTierId;
 			}
 
 			// --- Track Language ---
