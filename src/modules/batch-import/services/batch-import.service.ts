@@ -695,7 +695,12 @@ export class BatchImportService {
 			label: new Map(labels.map((r) => [r.name, r.id])),
 			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
 			artistRole: new Map(artistRoles.map((r) => [r.name, r.id])),
-			language: new Map(languages.map((r) => [r.name, r.id])),
+			language: new Map([
+				...languages.map((r) => [r.name, r.id] as [string, string]),
+				...languages.map(
+					(r) => [`${r.name} - ${r.code}`, r.id] as [string, string],
+				),
+			]),
 			dsp: new Map(dsps.map((r) => [r.name, r.id])),
 			artist: new Map(artists.map((r) => [r.name, r.id])),
 			country: new Map(countries.map((r) => [r.iso2, r.id])),
