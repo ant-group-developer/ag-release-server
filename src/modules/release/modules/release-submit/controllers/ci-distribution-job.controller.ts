@@ -5,6 +5,7 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Post,
+	Put,
 	Query,
 	Res,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ import {
 	BatchActionCiJobDto,
 	ConfirmCompletedCiJobDto,
 	QueryGetListCiJobDto,
+	UpdateCiJobDto,
 } from '../dto/ci-distribution-job.dto';
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
 
@@ -101,6 +103,22 @@ export class CiDistributionJobController {
 	@Post(':id/cancel')
 	async cancelJob(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.jobService.cancelJob(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@ApiOperation({
+		summary: 'Update CI distribution job',
+		description:
+			'Chỉ cho phép update status = cancel, deliveryEmail, dspCiCodes, deliveryEmailSubject',
+	})
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@ApiBody({ type: UpdateCiJobDto })
+	@Put(':id')
+	async updateJob(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: UpdateCiJobDto,
+	) {
+		const result = await this.jobService.updateJob(id, body);
 		return new ResponseSuccess({ data: result });
 	}
 }

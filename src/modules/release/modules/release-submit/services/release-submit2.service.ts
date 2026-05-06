@@ -1611,7 +1611,7 @@ export class ReleaseSubmitService2 {
 	}
 
 	async getList(query: QueryGetListSubmitDto) {
-		const { page, pageSize, status, releaseId } = query;
+		const { page, pageSize, status, releaseId, type } = query;
 
 		const qb = this.submitRepo.createQueryBuilder('submit');
 		// .leftJoinAndSelect('submit.steps', 'steps', 'steps.parent_step_id IS NULL');
@@ -1619,6 +1619,11 @@ export class ReleaseSubmitService2 {
 		// Filter status
 		if (status?.length) {
 			qb.andWhere('submit.status IN (:...status)', { status });
+		}
+
+		// Filter type
+		if (type?.length) {
+			qb.andWhere('submit.type IN (:...type)', { type });
 		}
 
 		// Filter releaseId
