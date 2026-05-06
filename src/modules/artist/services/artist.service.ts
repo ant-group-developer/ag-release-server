@@ -275,129 +275,53 @@ export class ArtistService {
 		await this.artistProfileService.delete(artistProfileId);
 	}
 
-	syncSpotifyArtistNameSafe() {
-		this.syncSpotifyArtistName().catch(console.error);
-	}
-
 	async syncSpotifyArtistName() {
-		const BATCH_SIZE = 200;
-		let offset = 0;
-		let updatedCount = 0;
+		const artists = await this.artistRepo.find({
+			relations: ['artistProfiles', 'artistProfiles.dsp'],
+		});
 
-		while (true) {
-			const artists = await this.artistRepo.find({
-				relations: ['artistProfiles', 'artistProfiles.dsp'],
-				order: { createdAt: 'ASC' },
-				skip: offset,
-				take: BATCH_SIZE,
-			});
+		for (const artist of artists) {
+			const spotifyProfile = artist.artistProfiles.find(
+				(p) => p.dsp.code === String(DspCode.SPOTIFY),
+			);
 
-			if (!artists.length) break;
+			if (!spotifyProfile || !spotifyProfile.url) {
+				continue;
+			}
 
-			for (const artist of artists) {
-				const spotifyProfile = artist.artistProfiles.find(
-					(p) => p.dsp?.code === String(DspCode.SPOTIFY),
-				);
+			const spotifyId = artist.spotifyId;
+			if (!spotifyId) {
+				continue;
+			}
 
-				if (!spotifyProfile || !spotifyProfile.url) {
-					continue;
-				}
+			try {
+				const detail =
+					await this.spotifyService.getArtistDetail(spotifyId);
 
-				const spotifyId = artist.spotifyId;
-				if (!spotifyId) {
-					continue;
-				}
+				if (detail && detail.name) {
+					const modifierId =
+						artist.modifierId || artist.creatorId || 'system';
 
-				try {
-					const detail =
-						await this.spotifyService.getArtistDetail(spotifyId);
-
-					if (detail && detail.name) {
-						await this.artistProfileService.bulkUpdate([
+					await this.artistProfileService.bulkUpdate(
+						[
 							{
 								id: spotifyProfile.id,
 								name: detail.name,
 							},
-						]);
-
-						updatedCount++;
-
-						this.logger.log(
-							`Updated Spotify name for artist ${artist.name} to ${detail.name}`,
-						);
-					}
-				} catch (error: any) {
-					this.logger.error(
-						`Failed to sync artist ${artist.name}: ${error.message}`,
+						],
+						modifierId,
 					);
-				}
-
-				await new Promise((resolve) => setTimeout(resolve, 3000));
-			}
-
-			this.logger.log(
-				`Updating Spotify artist profiles. Offset: ${offset}, Updated: ${updatedCount}`,
-			);
-
-			offset += BATCH_SIZE;
-			if (artists.length < BATCH_SIZE) break;
-		}
-
-		return { updatedCount };
-	}
-
-	async syncArtistProfileNameWithDsp() {
-		const BATCH_SIZE = 200;
-		let offset = 0;
-		let updatedCount = 0;
-
-		while (true) {
-			const artists = await this.artistRepo.find({
-				relations: ['artistProfiles', 'artistProfiles.dsp'],
-				order: { createdAt: 'ASC' },
-				skip: offset,
-				take: BATCH_SIZE,
-			});
-
-			if (!artists.length) break;
-
-			for (const artist of artists) {
-				const profilesToUpdate = [];
-
-				for (const profile of artist.artistProfiles) {
-					if (!profile.dsp) continue;
-
-					if (
-						profile.name?.toLowerCase() ===
-						profile.dsp.name?.toLowerCase()
-					) {
-						profilesToUpdate.push({
-							id: profile.id,
-							name: artist.name,
-						});
-					}
-				}
-
-				if (profilesToUpdate.length > 0) {
-					await this.artistProfileService.bulkUpdate(
-						profilesToUpdate,
-					);
-
-					updatedCount += profilesToUpdate.length;
 					this.logger.log(
-						`Updated ${profilesToUpdate.length} profiles for artist ${artist.name}`,
+						`Updated Spotify name for artist ${artist.name} to ${detail.name}`,
 					);
 				}
+			} catch (error: any) {
+				this.logger.error(
+					`Failed to sync artist ${artist.name}: ${error.message}`,
+				);
 			}
 
-			this.logger.log(
-				`Updating artist profiles. Offset: ${offset}, Updated: ${updatedCount}`,
-			);
-
-			offset += BATCH_SIZE;
-			if (artists.length < BATCH_SIZE) break;	
+			await new Promise((resolve) => setTimeout(resolve, 3000));
 		}
-
-		return { updatedCount };
 	}
 }

@@ -46,7 +46,7 @@ export class ArtistProfileService {
 	}
 
 	// update
-	async bulkUpdate(data: IBulkUpdateArtistProfile[], userId?: string) {
+	async bulkUpdate(data: IBulkUpdateArtistProfile[], userId: string) {
 		await Promise.all(
 			data.map(({ id, ...rest }) =>
 				this.update(id, rest, userId).catch((_e) => {}),
@@ -57,7 +57,7 @@ export class ArtistProfileService {
 	private async update(
 		id: string,
 		data: IUpdateArtistProfile,
-		userId?: string,
+		userId: string,
 	) {
 		const { artistId, dspId } = data;
 
