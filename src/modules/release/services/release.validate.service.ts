@@ -278,6 +278,31 @@ export class ReleaseValidateService {
 					field: 'title',
 				}),
 			);
+		} else {
+			if (release.title !== release.title.trim()) {
+				result.push(
+					new FieldErrorDetails({
+						messageCode: 'formFields.validate.noLeadingTrailingSpace',
+						message: 'Tên không được có khoảng trắng ở đầu và cuối',
+						page: 'core-detail',
+						field: 'title',
+					}),
+				);
+			}
+
+			const featMatches = release.title.match(
+				/\b(ft\.*|featuring|feat\.*)(?=\W|$)/gi,
+			);
+			if (featMatches) {
+				result.push(
+					new FieldErrorDetails({
+						messageCode: 'formFields.validate.titleCannotContainFeat',
+						message: 'Tiêu đề không được chứa "feat"',
+						page: 'core-detail',
+						field: 'title',
+					}),
+				);
+			}
 		}
 
 		// title validation
@@ -514,6 +539,35 @@ export class ReleaseValidateService {
 		tracks.forEach((track, index) => {
 			const { trackLanguage } = track;
 
+			if (track.title) {
+				if (track.title !== track.title.trim()) {
+					result.push(
+						new FieldErrorDetails({
+							messageCode: 'formFields.validate.noLeadingTrailingSpace',
+							message: 'Tên bài hát không được có khoảng trắng ở đầu và cuối',
+							page: 'tracks',
+							field: `tracks.${index}.title`,
+							trackId: track.id,
+						}),
+					);
+				}
+
+				const featMatches = track.title.match(
+					/\b(ft\.*|featuring|feat\.*)(?=\W|$)/gi,
+				);
+				if (featMatches) {
+					result.push(
+						new FieldErrorDetails({
+							messageCode: 'formFields.validate.titleCannotContainFeat',
+							message: 'Tiêu đề không được chứa "feat"',
+							page: 'tracks',
+							field: `tracks.${index}.title`,
+							trackId: track.id,
+						}),
+					);
+				}
+			}
+
 			const isrc = track.isrc?.trim();
 			if (isrc && isrc.length !== 12) {
 				result.push(
@@ -620,6 +674,7 @@ export class ReleaseValidateService {
 					const missing = missingRoles.map((r) => r.name);
 					result.push(
 						new FieldErrorDetails({
+							messageCode: `formFields.validate.missingRequired.${missing.join('')}`,	
 							message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 							page: 'tracks',
 							field: `tracks.${index}.trackContributors`,

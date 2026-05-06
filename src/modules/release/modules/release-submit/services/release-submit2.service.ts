@@ -39,7 +39,7 @@ import {
 	QueryGetListSubmitDto,
 	ReleaseSubmitResultDto,
 } from '../dto/release-submit.dto';
-import { CiJobType } from '../entities/ci-distribution-job.entity';
+import { CiDistributionJob, CiJobStatus, CiJobType } from '../entities/ci-distribution-job.entity';
 import { ReleaseSubmitStep } from '../entities/release-submit-step.entity';
 import {
 	ExecutionType,
@@ -211,6 +211,20 @@ export class ReleaseSubmitService2 {
 				stepStatuses: [
 					SubmitStepStatus.NEW,
 					SubmitStepStatus.WAITING_ACTION,
+				],
+			})
+			.execute();
+
+		// Skip pending CI distribution jobs
+		await this.manager
+			.createQueryBuilder()
+			.update(CiDistributionJob)
+			.set({ status: CiJobStatus.SKIPPED })
+			.where('release_submit_id IN (:...ids)', { ids: submitIds })
+			.andWhere('status IN (:...jobStatuses)', {
+				jobStatuses: [
+					CiJobStatus.PENDING,
+					CiJobStatus.PROCESSING,
 				],
 			})
 			.execute();
@@ -399,10 +413,10 @@ export class ReleaseSubmitService2 {
 				// xulici
 				// Steps chung — luôn tạo
 				const commonTypes: SubmitStepType[] = [
-					SubmitStepType.CREATE_AND_UPLOAD_CI,
-					SubmitStepType.CREATE_FOLDER_DONE_CI,
-					SubmitStepType.WAIT_PARTNER_PROCESS,
-					SubmitStepType.VALIDATE_QA_CI,
+					// SubmitStepType.CREATE_AND_UPLOAD_CI,
+					// SubmitStepType.CREATE_FOLDER_DONE_CI,
+					// SubmitStepType.WAIT_PARTNER_PROCESS,
+					// SubmitStepType.VALIDATE_QA_CI,
 				];
 
 				for (const type of commonTypes) {

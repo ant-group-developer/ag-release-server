@@ -14,6 +14,7 @@ export enum CiJobStatus {
 	PROCESSING = 'processing',
 	COMPLETED = 'completed',
 	FAILED = 'failed',
+	SKIPPED = 'skipped',
 }
 
 @Entity('ci_distribution_jobs')
