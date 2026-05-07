@@ -863,7 +863,6 @@ export class ReleaseQueryService {
 				'releaseLanguage.metadataLanguage',
 				'releaseMetadataLanguage',
 			)
-			
 
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')

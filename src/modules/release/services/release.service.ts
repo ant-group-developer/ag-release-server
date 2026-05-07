@@ -5,6 +5,7 @@ import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
+import { Cache2Service } from 'src/modules/cache2/cache2.service';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
@@ -63,6 +64,8 @@ export class ReleaseService {
 
 		@Inject(forwardRef(() => ReleaseSubmitService2))
 		private readonly releaseSubmitService2: ReleaseSubmitService2,
+
+		private readonly cache2Service: Cache2Service,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
