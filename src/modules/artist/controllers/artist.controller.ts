@@ -55,10 +55,21 @@ export class ArtistController {
 	@Post('sync-spotify')
 	syncSpotifyArtistName() {
 		// Start in background to avoid HTTP timeout
-		this.artistService.syncSpotifyArtistName().catch(console.error);
+		this.artistService.syncSpotifyArtistNameSafe();
 		return new ResponseSuccess({
 			message:
 				'Background sync for Spotify artist names has been started.',
+		});
+	}
+
+	@SystemAdminOnly()
+	@Post('sync-artist-profile-name')
+	async syncArtistProfileNameWithDsp() {
+		const data = await this.artistService.syncArtistProfileNameWithDsp();
+		return new ResponseSuccess({
+			data,
+			message:
+				'Background sync-artist-profile-name has been started.',
 		});
 	}
 

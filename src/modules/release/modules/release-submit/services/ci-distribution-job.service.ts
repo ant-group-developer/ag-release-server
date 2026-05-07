@@ -19,7 +19,7 @@ import { NotificationResendService } from 'src/modules/notification/services/not
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { In, Repository } from 'typeorm';
 import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
-import { QueryGetListCiJobDto } from '../dto/ci-distribution-job.dto';
+import { QueryGetListCiJobDto, UpdateCiJobDto } from '../dto/ci-distribution-job.dto';
 import {
 	CiDistributionJob,
 	CiJobStatus,
@@ -522,5 +522,36 @@ export class CiDistributionJobService implements OnModuleInit {
 		} catch (err) {
 			this.logger.error(`[CRON] Daily batch failed: ${err.message}`);
 		}
+	}
+
+	async updateJob(id: string, dto: UpdateCiJobDto) {
+		const job = await this.findOne(id);
+
+		const updateData: Partial<CiDistributionJob> = {};
+
+		if (dto.status === 'skipped') {
+			updateData.status = CiJobStatus.SKIPPED;
+			this.submitLog.warning({
+				releaseSubmitId: job.releaseSubmitId,
+				releaseSubmitStepId: job.stepId,
+				message: `[CiJob] Job ${job.type} skipped`,
+			});
+		}
+
+		if (dto.deliveryEmail !== undefined) {
+			updateData.deliveryEmail = dto.deliveryEmail;
+		}
+
+		if (dto.dspCiCodes !== undefined) {
+			updateData.dspCiCodes = dto.dspCiCodes;
+		}
+
+		if (dto.deliveryEmailSubject !== undefined) {
+			updateData.deliveryEmailSubject = dto.deliveryEmailSubject;
+		}
+
+		await this.repo.update(job.id, updateData);
+
+		return this.findOne(id);
 	}
 }

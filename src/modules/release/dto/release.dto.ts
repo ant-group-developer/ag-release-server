@@ -335,6 +335,15 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	})
 	isVariousArtist?: boolean;
 
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsArray()
 	tenantIds?: string[];
 }
 
