@@ -110,7 +110,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		CountryModule,
 		AggregatorsModule,
 		NotificationModule,
-		// ReleaseExecutionsModule
 		CiModule,
 	],
 	controllers: [
@@ -128,8 +127,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseDraftService,
 		ReleaseValidateService,
 		ReleaseQueryService,
-
-		// ReleaseDdexCiService,
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,

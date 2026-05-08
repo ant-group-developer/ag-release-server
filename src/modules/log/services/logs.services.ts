@@ -20,7 +20,7 @@ type WriteLogDto = {
 
 @Injectable()
 export class LogsService {
-	private readonly logger = new Logger('LogsService.nameadgda');
+	private readonly logger = new Logger(LogsService.name);
 
 	/**
 	 * Config level nào sẽ persist DB
