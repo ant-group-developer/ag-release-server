@@ -43,7 +43,7 @@ import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 // import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
 import { ErnModule2 } from '../ern2/ern.module';
-import { LogsModule } from '../log/services/logs.module';
+import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';

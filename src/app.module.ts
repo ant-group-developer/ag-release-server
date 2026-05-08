@@ -47,7 +47,7 @@ import { ReleaseLocalizeModule } from './modules/release-localize/release-locali
 import { ReleaseModule } from './modules/release/release.module';
 // import { ReleaseSubmitModule } from './modules/release/modules/release-submit/release-submit.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
-import { LogsModule } from './modules/log/services/logs.module';
+import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';

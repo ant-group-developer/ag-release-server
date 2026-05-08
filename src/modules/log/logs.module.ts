@@ -1,8 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationModule } from 'src/modules/notification/notification.module';
-import { Logs } from '../entites/logs.entity';
-import { LogsService } from './logs.services';
+import { Logs } from './entites/logs.entity';
+import { LogsService } from './services/logs.services';
 
 @Global()
 @Module({
