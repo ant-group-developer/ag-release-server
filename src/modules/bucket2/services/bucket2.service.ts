@@ -226,27 +226,23 @@ export class BucketService2 {
 	async getListFileBuffersByKeys(
 		keys: string[],
 		bucketName: string,
-	): Promise<
-		{
-			fileBuffer: Buffer;
-			key: string;
-		}[]
-	> {
-		const results: {
-			fileBuffer: Buffer;
-			key: string;
-		}[] = [];
+	): Promise<{ fileBuffer: Buffer; key: string }[]> {
+		const BATCH_SIZE = 10;
+		const results: { fileBuffer: Buffer; key: string }[] = [];
 
-		for (const key of keys) {
-			const fileBuffer = await this.bucketR2Service.getObjectBuffer({
-				bucketName,
-				key,
-			});
-
-			results.push({
-				fileBuffer,
-				key,
-			});
+		for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+			const batch = keys.slice(i, i + BATCH_SIZE);
+			const batchResults = await Promise.all(
+				batch.map(async (key) => {
+					const fileBuffer =
+						await this.bucketR2Service.getObjectBuffer({
+							bucketName,
+							key,
+						});
+					return { fileBuffer, key };
+				}),
+			);
+			results.push(...batchResults);
 		}
 
 		return results;

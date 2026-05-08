@@ -328,26 +328,38 @@ export class ReleaseDdexService {
 		audioFiles: AudioFileInfo[];
 		coverImage: CoverImageInfo;
 	}> {
-		const audioFiles: AudioFileInfo[] = [];
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
 
 		// Fetch audio files
-		for (const [index, track] of tracks.entries()) {
-			if (!track.audioFile) {
-				continue;
-			}
+		const tracksWithAudio = tracks.filter(
+			(
+				track,
+			): track is typeof track & {
+				audioFile: NonNullable<typeof track.audioFile>;
+			} => !!track.audioFile,
+		);
+		const fileIds = tracksWithAudio.map((track) => track.audioFile.fileId);
+		const fileBuffers = await this.bucket2Sv.getListFileBuffers(fileIds);
 
-			const { fileBuffer, fileDb } = await this.bucket2Sv.getFileBuffer(
+		// Map theo fileId để tránh lệch thứ tự
+		const fileBufferMap = new Map(
+			fileBuffers.map((item) => [item.fileDb.id, item]),
+		);
+
+		const audioFiles = tracksWithAudio.map((track, index) => {
+			const originalIndex = tracks.indexOf(track);
+			const { fileBuffer, fileDb } = fileBufferMap.get(
 				track.audioFile.fileId,
-			);
-
-			audioFiles.push({
+			)!;
+			return {
 				buffer: fileBuffer,
 				extension: fileDb.extension,
-				isrc: track.isrc || `TEMP${String(index + 1).padStart(4, '0')}`,
-				trackNo: index + 1,
-			});
-		}
+				isrc:
+					track.isrc ||
+					`TEMP${String(originalIndex + 1).padStart(4, '0')}`,
+				trackNo: originalIndex + 1,
+			};
+		});
 
 		// Fetch cover image
 		const coverArt = release.releaseCoverArts?.find(
@@ -410,16 +422,6 @@ export class ReleaseDdexService {
 		audioFiles: AudioFileInfo[];
 		outputDir: string;
 	}) {
-		// for (const audio of audioFiles) {
-		// 	const ext = this.normalizeAudioExtension(audio.extension);
-		// 	const trackNoStr = String(audio.trackNo).padStart(1, '0'); // T1S, T2S, ...
-		// 	const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
-		// 	const filePath = path.join(outputDir, fileName);
-		//
-		// 	fs.writeFileSync(filePath, audio.buffer);
-		// 	this.logger.log(`[AUDIO_SAVED] ${fileName}`);
-		// }
-
 		for (const [index, audio] of audioFiles.entries()) {
 			const ext = this.normalizeAudioExtension(audio.extension);
 			const trackNoStr = String(index).padStart(1, '0'); // T0S, T1S, ...
