@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import {
 	BulkCreateTrackDraft,
 	BulkUpdateTrackDraft,
+	CreateTrackDraftDto,
 	UpdateTrackDraftDto,
 	UpdateTrackPolicyDto,
 } from '../dto/track.draft.dto';
@@ -48,6 +49,8 @@ export class TrackDraftService {
 	async bulkCreate(data: BulkCreateTrackDraft): Promise<ITrackDraft[]> {
 		const { trackDrafts } = data;
 
+		await this.generateTrackDraftOrders(trackDrafts);
+
 		const enrichedTrackDrafts =
 			await this.trackQueryService.enrichTrackDraftWithReleaseData({
 				trackDrafts,
@@ -59,6 +62,34 @@ export class TrackDraftService {
 				this.createSingleTrackDraft(item),
 			),
 		);
+	}
+
+	private async generateTrackDraftOrders(
+		trackDrafts: CreateTrackDraftDto[],
+	): Promise<CreateTrackDraftDto[]> {
+		if (!trackDrafts.length) {
+			return trackDrafts;
+		}
+
+		const releaseId = trackDrafts[0].releaseId;
+
+		const raw = await this.trackRepo
+			.createQueryBuilder('track')
+			.select('COALESCE(MAX(track.order), 0)', 'maxOrder')
+			.where('track.releaseId = :releaseId', { releaseId })
+			.getRawOne<{ maxOrder: string }>();
+
+		const maxOrder = Number(raw?.maxOrder ?? 0);
+
+		let nextOrder = maxOrder + 1;
+
+		trackDrafts.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+		for (const trackDraft of trackDrafts) {
+			trackDraft.order = nextOrder++;
+		}
+
+		return trackDrafts;
 	}
 
 	// read

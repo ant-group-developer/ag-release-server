@@ -467,7 +467,7 @@ export class TrackQueryService {
 		return release;
 	}
 
-	//
+	// kéo data từ release sang tracks
 	async enrichTrackDraftWithReleaseData({
 		trackDrafts,
 		releaseId,
