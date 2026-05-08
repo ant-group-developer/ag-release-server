@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { Logs } from 'src/modules/log/entites/logs.entity';
 import {
 	AfterLoad,
 	Column,
@@ -8,7 +9,6 @@ import {
 	OneToMany,
 } from 'typeorm';
 import { SubmitStepStatus, SubmitStepType } from '../release-submit.enum';
-import { ReleaseSubmitLog } from './release-submit-log.entity';
 import { ReleaseSubmit } from './release-submit.entity';
 
 @Entity('release_submit_steps')
@@ -36,8 +36,8 @@ export class ReleaseSubmitStep extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseSubmitStep, (step) => step.parentStep)
 	childSteps: ReleaseSubmitStep[];
 
-	@OneToMany(() => ReleaseSubmitLog, (log) => log.releaseSubmitStep)
-	logs: ReleaseSubmitLog[];
+	@OneToMany(() => Logs, (log) => log.releaseSubmitStep)
+	logs: Logs[];
 
 	@AfterLoad()
 	sortChildSteps() {
