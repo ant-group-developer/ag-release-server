@@ -25,7 +25,6 @@ import {
 } from 'src/utils/util';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 import { Release } from '../entities/release.entity';
-import { ReleaseQueryService } from './release.query.service';
 
 interface AudioFileInfo {
 	buffer: Buffer;
@@ -44,7 +43,6 @@ export class ReleaseDdexService {
 	private readonly logger = new Logger(ReleaseDdexService.name);
 
 	constructor(
-		private readonly releaseQuery: ReleaseQueryService,
 		private readonly bucket2Sv: BucketService2,
 
 		private readonly ernService2: ErnService2,
@@ -59,12 +57,12 @@ export class ReleaseDdexService {
 	 * Main entry point - tạo metadata Spotify trên server
 	 */
 	async createMetadataOnServer({
-		releaseId,
+		release,
 		ernVersion,
 		recipient,
 		sender,
 	}: {
-		releaseId: string;
+		release: Release;
 		ernVersion: ErnVersion2;
 		sender: {
 			partyId: string;
@@ -75,10 +73,6 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}) {
-		const release = await this.releaseQuery.findOneReleaseFull({
-			releaseId,
-		});
-
 		const batchId = genBatchId();
 
 		const upc = release.upc ?? 'new_upc';
@@ -114,7 +108,7 @@ export class ReleaseDdexService {
 
 		// 5. DDEX file
 		const xml = await this.createErnFile({
-			releaseId,
+			release,
 			outputDir: releaseDir,
 			ernVersion,
 			recipient,
@@ -130,7 +124,7 @@ export class ReleaseDdexService {
 		});
 
 		this.logger.log({
-			releaseId,
+			releaseId: release.id,
 			step: 'createMetadataOnServer',
 			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
 		});
@@ -144,13 +138,13 @@ export class ReleaseDdexService {
 	}
 
 	async createErnFile({
-		releaseId,
+		release,
 		outputDir,
 		ernVersion,
 		sender,
 		recipient,
 	}: {
-		releaseId: string;
+		release: Release;
 		outputDir: string;
 		ernVersion: ErnVersion2;
 		sender: {
@@ -162,9 +156,6 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}) {
-		const release = await this.releaseQuery.findOneReleaseFull({
-			releaseId,
-		});
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
 			ernVersion,
@@ -180,14 +171,10 @@ export class ReleaseDdexService {
 	}
 
 	async generateReleaseXml(
-		releaseId: string,
+		release: Release,
 		dspCode: string,
 		ernVersion?: ErnVersion2,
 	): Promise<string> {
-		const release = await this.releaseQuery.findOneReleaseFull({
-			releaseId,
-		});
-
 		const config =
 			await this.dspRoutingConfigsService.resolveFullDeliveryConfig(
 				dspCode,
@@ -271,10 +258,7 @@ export class ReleaseDdexService {
 		return xml;
 	}
 
-	async uploadMetadataDdexSpotifyToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFull({
-			releaseId,
-		});
+	async uploadMetadataDdexSpotifyToSftp(release: Release) {
 		try {
 			const sftp =
 				await this.dspRoutingConfigsService.resolveSftpMetadataByDspCode(
@@ -293,10 +277,7 @@ export class ReleaseDdexService {
 		}
 	}
 
-	async uploadMetadataDdexCiToSftp(releaseId: string) {
-		const release = await this.releaseQuery.findOneReleaseFull({
-			releaseId,
-		});
+	async uploadMetadataDdexCiToSftp(release: Release) {
 		try {
 			const sftp =
 				await this.aggregatorsService.resolveSftpAggregatorCode({
@@ -349,7 +330,6 @@ export class ReleaseDdexService {
 	}> {
 		const audioFiles: AudioFileInfo[] = [];
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
-		const releaseId = release.id;
 
 		// Fetch audio files
 		for (const [index, track] of tracks.entries()) {

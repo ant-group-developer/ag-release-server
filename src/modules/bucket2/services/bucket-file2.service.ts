@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { Like, Repository } from 'typeorm';
+import { In, Like, Repository } from 'typeorm';
 
 import { FileEntity } from '../entities/bucket.file.entity';
 import { ICreateFile } from '../interfaces/bucket.interface';
@@ -16,6 +16,10 @@ export class BucketFileService2 {
 	async create(data: ICreateFile) {
 		const file = this.fileRepo.create(data);
 		return await this.fileRepo.save(file);
+	}
+
+	getList(ids: string[]) {
+		return this.fileRepo.find({ where: { id: In(ids) } });
 	}
 
 	async findOne(id: string) {

@@ -184,6 +184,74 @@ export class BucketService2 {
 		};
 	}
 
+	async getListFileBuffers(fileIds: string[]): Promise<
+		{
+			fileBuffer: Buffer;
+			fileDb: FileEntity;
+		}[]
+	> {
+		const listFileDb = await this.bucketFileService.getList(fileIds);
+
+		if (!listFileDb.length) {
+			return [];
+		}
+
+		const bucketName = listFileDb[0].bucket;
+
+		const keys = listFileDb.map((fileDb) => fileDb.key);
+
+		const listFileBufferByKeys = await this.getListFileBuffersByKeys(
+			keys,
+			bucketName,
+		);
+
+		const fileBufferMap = new Map(
+			listFileBufferByKeys.map((item) => [item.key, item.fileBuffer]),
+		);
+
+		return listFileDb.map((fileDb) => {
+			const fileBuffer = fileBufferMap.get(fileDb.key);
+
+			if (!fileBuffer) {
+				throw new Error(`File buffer not found for key: ${fileDb.key}`);
+			}
+
+			return {
+				fileBuffer,
+				fileDb,
+			};
+		});
+	}
+
+	async getListFileBuffersByKeys(
+		keys: string[],
+		bucketName: string,
+	): Promise<
+		{
+			fileBuffer: Buffer;
+			key: string;
+		}[]
+	> {
+		const results: {
+			fileBuffer: Buffer;
+			key: string;
+		}[] = [];
+
+		for (const key of keys) {
+			const fileBuffer = await this.bucketR2Service.getObjectBuffer({
+				bucketName,
+				key,
+			});
+
+			results.push({
+				fileBuffer,
+				key,
+			});
+		}
+
+		return results;
+	}
+
 	async downloadFolder({
 		prefix,
 		destFolder,

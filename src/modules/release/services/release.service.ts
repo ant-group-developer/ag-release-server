@@ -5,7 +5,7 @@ import axios from 'axios';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
-import { Cache2Service } from 'src/modules/cache2/cache2.service';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
@@ -28,12 +28,11 @@ import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { ReleaseExecutionsService } from '../modules/release-executions/services/release-executions.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
 import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
 import { enhanceReleasesDetails } from '../utils/release.utils';
-import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
+import { ReleaseDdexService } from './release-ddex.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -56,8 +55,6 @@ export class ReleaseService {
 		private readonly appConfigService: AppConfigService,
 
 		private readonly fileExportCiService: FileExportCiService,
-		private readonly deliveryService: ReleaseDspDeliveryService,
-		private readonly releaseExecutionsService: ReleaseExecutionsService,
 
 		// partners api
 		private readonly ciService: CiService,
@@ -65,7 +62,7 @@ export class ReleaseService {
 		@Inject(forwardRef(() => ReleaseSubmitService2))
 		private readonly releaseSubmitService2: ReleaseSubmitService2,
 
-		private readonly cache2Service: Cache2Service,
+		private readonly releaseDdexService: ReleaseDdexService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -458,50 +455,23 @@ export class ReleaseService {
 		}
 	}
 
-	// nghiệp vụ
-	async submit(id: string, userId: string, dto: SubmitReleaseDto) {
-		await this.releaseQueryService.findOne(id);
-
-		await this.releaseRepo.update(id, { status: ReleaseStatus.PROCESSING });
-
-		this.releaseLogService.pending({
-			releaseId: id,
-			step: 'Bắt đầu xử lý phát hành',
-			message: 'Bản phát hành đang được đưa vào hàng đợi xử lý',
-		});
-
-		this.processingSubmit({ id, userId, dto }).catch(async (error) => {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.FAILED,
-			});
-
-			this.releaseLogService.failed({
-				releaseId: id,
-				step: 'Lỗi phát hành',
-				message: `Lỗi bất ngờ: ${error?.message ?? 'Không xác định'}`,
-			});
-		});
-
-		return { message: 'Đang được xử lý' };
-	}
-
-	async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
-		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.SUBMITTED,
-			releaseEndDate: null,
-		});
-		this.releaseExecutionsService
-			.createAndProcess({
-				releaseId: id,
-				type: ExecutionType.INITIAL_RELEASE,
-				originalDspCodes: dto.code,
-				triggeredById: userId,
-			})
-			.catch((_e) => {
-				this.logger.error(_e);
-			});
-	}
+	// async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
+	// 	await this.releaseQueryService.findOne(id);
+	// 	await this.releaseRepo.update(id, {
+	// 		status: ReleaseStatus.SUBMITTED,
+	// 		releaseEndDate: null,
+	// 	});
+	// 	this.releaseExecutionsService
+	// 		.createAndProcess({
+	// 			releaseId: id,
+	// 			type: ExecutionType.INITIAL_RELEASE,
+	// 			originalDspCodes: dto.code,
+	// 			triggeredById: userId,
+	// 		})
+	// 		.catch((_e) => {
+	// 			this.logger.error(_e);
+	// 		});
+	// }
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
@@ -534,60 +504,60 @@ export class ReleaseService {
 		});
 	}
 
-	private async processingSubmit({
-		id,
-		userId,
-		dto,
-	}: {
-		id: string;
-		userId: string;
-		dto: SubmitReleaseDto;
-	}) {
-		const release = await this.releaseQueryService.findOneWithRelation(id);
+	// private async processingSubmit({
+	// 	id,
+	// 	userId,
+	// 	dto,
+	// }: {
+	// 	id: string;
+	// 	userId: string;
+	// 	dto: SubmitReleaseDto;
+	// }) {
+	// 	const release = await this.releaseQueryService.findOneWithRelation(id);
 
-		// Gen UPC / ISRC if needed
-		if (!release.upc) {
-			await this.genUpcById(id);
-		}
+	// 	// Gen UPC / ISRC if needed
+	// 	if (!release.upc) {
+	// 		await this.genUpcById(id);
+	// 	}
 
-		await this.genListIsrc(release);
+	// 	await this.genListIsrc(release);
 
-		// Validate
-		const errors =
-			this.releaseValidateService.getErrorsSchemaRelease(release);
+	// 	// Validate
+	// 	const errors =
+	// 		this.releaseValidateService.getErrorsSchemaRelease(release);
 
-		if (errors.length > 0) {
-			this.releaseLogService.failed({
-				releaseId: id,
-				step: 'Kiểm tra dữ liệu phát hành (Validation)',
-				message: errors
-					.map((e) => e?.message ?? 'Lỗi không xác định')
-					.join(', '),
-			});
+	// 	if (errors.length > 0) {
+	// 		this.releaseLogService.failed({
+	// 			releaseId: id,
+	// 			step: 'Kiểm tra dữ liệu phát hành (Validation)',
+	// 			message: errors
+	// 				.map((e) => e?.message ?? 'Lỗi không xác định')
+	// 				.join(', '),
+	// 		});
 
-			throw new ResponseError({
-				message:
-					'Release validation failed. Please check the input data.',
-				data: errors,
-			});
-		}
+	// 		throw new ResponseError({
+	// 			message:
+	// 				'Release validation failed. Please check the input data.',
+	// 			data: errors,
+	// 		});
+	// 	}
 
-		// Distribute to all DSPs
-		const dspErrors = await this.deliveryService.executeDistribution(
-			id,
-			dto.code,
-		);
+	// 	// Distribute to all DSPs
+	// 	const dspErrors = await this.deliveryService.executeDistribution(
+	// 		id,
+	// 		dto.code,
+	// 	);
 
-		if (!dspErrors || dspErrors.length === 0) {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.DISTRIBUTED,
-			});
-		} else {
-			await this.releaseRepo.update(id, {
-				status: ReleaseStatus.FAILED,
-			});
-		}
-	}
+	// 	if (!dspErrors || dspErrors.length === 0) {
+	// 		await this.releaseRepo.update(id, {
+	// 			status: ReleaseStatus.DISTRIBUTED,
+	// 		});
+	// 	} else {
+	// 		await this.releaseRepo.update(id, {
+	// 			status: ReleaseStatus.FAILED,
+	// 		});
+	// 	}
+	// }
 
 	// get qa flag ci
 	async getQaFlagCi(id: string) {
@@ -615,5 +585,17 @@ export class ReleaseService {
 				releaseId,
 			);
 		return { releaseId, status: newStatus };
+	}
+
+	async getReleaseXml(id: string, code: string, ernVersion?: ErnVersion2) {
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+		});
+
+		return this.releaseDdexService.generateReleaseXml(
+			release,
+			code || 'spotify',
+			ernVersion,
+		);
 	}
 }
