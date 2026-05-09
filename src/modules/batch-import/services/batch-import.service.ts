@@ -15,6 +15,7 @@ import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -52,6 +53,7 @@ export class BatchImportService {
 		private readonly logRepo: Repository<BatchImportLog>,
 		private readonly excelMapper: ExcelMapperService,
 		private readonly dataSource: DataSource,
+		private readonly releaseCoverArtService: ReleaseCoverArtService,
 	) {}
 
 	async getLogs(params: GetBatchImportLogsDto) {
@@ -517,7 +519,7 @@ export class BatchImportService {
 					}
 				}
 
-				// Save CoverArt thumbnail (original)
+				// Save CoverArt — original + all resized variants (75x75, 100x100, 160x160, 300x300)
 				const imageExts = ['.png', '.jpg', '.jpeg'];
 				const thumbnailKey = storageKeys.find((k) =>
 					imageExts.some((e) => k.toLowerCase().endsWith(e)),
@@ -554,13 +556,15 @@ export class BatchImportService {
 						savedFileId = savedFile.id;
 					}
 
-					const coverArt = new ReleaseCoverArt();
-					coverArt.fileId = savedFileId;
-					coverArt.releaseId = releaseId;
-					coverArt.width = 0;
-					coverArt.height = 0;
-					coverArt.type = 'original';
-					await manager.save(ReleaseCoverArt, coverArt);
+					// Generate all cover art sizes (original + 75x75, 100x100, 160x160, 300x300)
+					// Reuses the existing resize pipeline from ReleaseCoverArtService
+					await this.releaseCoverArtService.generateCoverArtsForBatchImport(
+						{
+							fileCoverArtOriginalId: savedFileId,
+							releaseId,
+							manager,
+						},
+					);
 				}
 
 				// Save Release Localizes (secondary language titles)
