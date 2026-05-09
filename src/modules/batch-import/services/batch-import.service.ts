@@ -575,10 +575,12 @@ export class BatchImportService {
 					}
 				}
 
-				await queryRunner.commitTransaction();
-
+				// Update log status inside the transaction for atomicity
+				// (prevents stuck 'creating' state if server crashes after commit)
 				log.status = BatchImportStatus.COMPLETED;
-				await this.logRepo.save(log);
+				await manager.save(log);
+
+				await queryRunner.commitTransaction();
 
 				const action = isUpdate ? 'updated' : 'created';
 				this.logger.log(
