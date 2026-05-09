@@ -260,6 +260,39 @@ export class ReleaseCoverArtService {
 	}
 
 	/**
+	 * Public entry point for batch import to generate all cover art sizes.
+	 * Reuses the internal resize pipeline but accepts an optional EntityManager
+	 * for transaction safety during batch import.
+	 *
+	 * Flow:
+	 * 1. Downloads original image from R2
+	 * 2. Resizes to 75x75, 100x100, 160x160, 300x300 using sharp
+	 * 3. Uploads resized images to R2
+	 * 4. Saves all 5 ReleaseCoverArt records (original + 4 sizes)
+	 */
+	async generateCoverArtsForBatchImport({
+		fileCoverArtOriginalId,
+		releaseId,
+		manager,
+	}: {
+		fileCoverArtOriginalId: string;
+		releaseId: string;
+		manager?: EntityManager;
+	}) {
+		const listArtOnBucket = await this.generateCoverArtsOnBucket(
+			fileCoverArtOriginalId,
+			releaseId,
+		);
+
+		const releaseCoverArtEntities = this.buildReleaseCoverArtEntities({
+			listArtOnBucket,
+			releaseId,
+		});
+
+		await this.bulkCreate({ data: releaseCoverArtEntities, manager });
+	}
+
+	/**
 	 * Convert dữ liệu resize thành entity để lưu DB
 	 *
 	 * ví dụ:
