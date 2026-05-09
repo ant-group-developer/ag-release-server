@@ -39,16 +39,12 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { ReleaseDdexService } from '../services/release-ddex.service';
 import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
-	constructor(
-		private readonly releaseService: ReleaseService,
-		private readonly releaseDdexService: ReleaseDdexService,
-	) {}
+	constructor(private readonly releaseService: ReleaseService) {}
 
 	@Get()
 	async getList(
@@ -153,7 +149,7 @@ export class ReleaseController {
 		@Query('code') code: string,
 		@Query('ernVersion') ernVersion?: ErnVersion2,
 	) {
-		return this.releaseDdexService.generateReleaseXml(
+		return this.releaseService.getReleaseXml(
 			id,
 			code || 'spotify',
 			ernVersion,
@@ -310,110 +306,6 @@ export class ReleaseController {
 			data: result,
 		});
 	}
-
-	// @RequirePermissions(Permission.RELEASE.UPDATE)
-	// @Post(':id/parse-release')
-	// async parseMetadata(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result = await this.releaseService.parseMetadata(id);
-	// }
-
-	// @RequirePermissions(Permission.RELEASE.UPDATE)
-	// @Post(':id/create-and-upload-metadata-ci')
-	// createMetadataCiAndUploadToSftp(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	this.releaseService
-	// 		.createMetadataCiAndUploadToSftp(id)
-	// 		.catch((_e) => {});
-	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
-	// }
-
-	// // @RequirePermissions(Permission.RELEASE.UPDATE)
-	// @Post(':id/create-metadata-ci-on-server')
-	// async createMetadataCiOnServer(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result = await this.releaseService.createMetadataCiOnServer(id);
-	// 	return result;
-	// }
-
-	// @Post(':id/upload-metadata-ci-to-bucket')
-	// async uploadMetadataCiToBucket(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	// @Body('localDir') localDir: string,
-	// ) {
-	// 	const result = await this.releaseService.uploadMetadataCiToBucket({
-	// 		id,
-	// 		// localDir,
-	// 	});
-	// 	return result;
-	// }
-
-	// @Post(':id/download-metadata-ci-to-bucket')
-	// async downloadMetadataCiFromBucket(@Param('id', ParseUUIDPipe) id: string) {
-	// 	const result =
-	// 		await this.releaseService.downloadMetadataCiFromBucket(id);
-	// 	return result;
-	// }
-
-	// // @RequirePermissions(Permission.RELEASE.UPDATE)
-	// @Post(':id/upload-metadata-ci-to-sftp')
-	// async uploadMetadataCiToSftp(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result = await this.releaseService.uploadMetadataCiToSftp(id);
-	// 	return result;
-	// }
-
-	// // @RequirePermissions(Permission.RELEASE.UPDATE)
-	// @Post(':id/create-metadata-ci-and-upload-to-bucket')
-	// async createMetadataCiAndUploadToBucket(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result =
-	// 		await this.releaseService.createMetadataCiAndUploadToBucket(id);
-	// 	return result;
-	// }
-
-	// // spotify
-	// @Post(':id/create-metadata-spotify-on-server')
-	// async createMetadataSpotifyOnServer(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result =
-	// 		await this.releaseService.createMetadataSpotifyOnServer(id);
-	// 	return result;
-	// }
-
-	// @Post(':id/upload-metadata-spotify-to-sftp')
-	// async uploadMetadataSpotifyToSftp(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	const result =
-	// 		await this.releaseService.uploadMetadataSpotifyToSftp(id);
-	// 	return result;
-	// }
-
-	// @Post(':id/create-and-upload-metadata-spotify')
-	// createAndUploadMetadataSpotify(
-	// 	@Param('id', ParseUUIDPipe) id: string,
-	// 	@Req() req: Request,
-	// ) {
-	// 	this.releaseService.createAndUploadMetadataSpotify(id).catch((_e) => {
-	// 		console.log(_e);
-	// 	});
-
-	// 	return new ResponseSuccess({ message: 'Đang được xử lý' });
-	// }
 
 	@ApiOperation({ summary: 'Sync lại release status từ DSP deliveries' })
 	@ApiParam({ name: 'id', format: 'uuid' })

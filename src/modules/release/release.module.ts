@@ -43,6 +43,7 @@ import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 // import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
 import { ErnModule2 } from '../ern2/ern.module';
+import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';
@@ -54,11 +55,9 @@ import { ReleaseExecutionsService } from './modules/release-executions/services/
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
-import { ReleaseSubmitLog } from './modules/release-submit/entities/release-submit-log.entity';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
-import { ReleaseSubmitLogService } from './modules/release-submit/services/release-submit-log.service';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
 
 @Module({
@@ -81,11 +80,11 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 
 			ReleaseSubmit,
 			ReleaseSubmitStep,
-			ReleaseSubmitLog,
 			CiDistributionJob,
 		]),
 
 		AppConfigModule,
+		LogsModule,
 
 		ReleaseLanguageModule,
 		ReleaseCoverArtModule,
@@ -111,7 +110,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		CountryModule,
 		AggregatorsModule,
 		NotificationModule,
-		// ReleaseExecutionsModule
 		CiModule,
 	],
 	controllers: [
@@ -129,8 +127,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseDraftService,
 		ReleaseValidateService,
 		ReleaseQueryService,
-
-		// ReleaseDdexCiService,
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,
@@ -138,10 +134,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseExecutionsService,
 		ReleaseExecutionsQueryService,
 		ReleaseExecutionProcessorService,
-
-		// ReleaseSubmitService,
 		ReleaseSubmitService2,
-		ReleaseSubmitLogService,
 		CiDistributionJobService,
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],

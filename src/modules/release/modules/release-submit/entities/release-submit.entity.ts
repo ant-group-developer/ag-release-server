@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { Logs } from 'src/modules/log/entites/logs.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import {
 	AfterLoad,
@@ -10,7 +11,6 @@ import {
 } from 'typeorm';
 import { ReleaseSubmitResultDto } from '../dto/release-submit.dto';
 import { ReleaseSubmitStatus } from '../release-submit.enum';
-import { ReleaseSubmitLog } from './release-submit-log.entity';
 import { ReleaseSubmitStep } from './release-submit-step.entity';
 
 export enum ExecutionType {
@@ -79,8 +79,11 @@ export class ReleaseSubmit extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseSubmitStep, (step) => step.releaseSubmit)
 	steps: ReleaseSubmitStep[];
 
-	@OneToMany(() => ReleaseSubmitLog, (log) => log.releaseSubmit)
-	logs: ReleaseSubmitLog[];
+	// @OneToMany(() => ReleaseSubmitLog, (log) => log.releaseSubmit)
+	// logs: ReleaseSubmitLog[];
+
+	@OneToMany(() => Logs, (log) => log.releaseSubmit)
+	logs: Logs[];
 
 	@AfterLoad()
 	sortSteps() {

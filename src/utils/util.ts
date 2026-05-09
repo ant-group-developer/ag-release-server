@@ -288,3 +288,27 @@ export const MediaUrlTransformer: ValueTransformer = {
 		return value.startsWith('http') ? value : `${domain}/${value}`;
 	},
 };
+
+export async function batchPromiseAll<T, R>({
+	items,
+	batchSize,
+	fn,
+}: {
+	items: T[];
+	batchSize: number;
+	fn: (item: T, index: number) => Promise<R>;
+}): Promise<R[]> {
+	const results: R[] = [];
+
+	for (let i = 0; i < items.length; i += batchSize) {
+		const batch = items.slice(i, i + batchSize);
+
+		const batchResults = await Promise.all(
+			batch.map((item, j) => fn(item, i + j)),
+		);
+
+		results.push(...batchResults);
+	}
+
+	return results;
+}
