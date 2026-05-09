@@ -1,7 +1,7 @@
 {
-  "logId": "3357fc2e-6ba6-4fee-8e39-4ae706c4db37",
+  "logId": "352f750a-3e1f-43a3-b1a6-1f0ece8f0ed9",
   "tenantCode": "winstar-media",
-  "batchId": "20260506025738343",
+  "batchId": "20260509101823589",
   "releaseFolder": "850080651100",
   "excelData": [
     {
@@ -52,6 +52,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -76,7 +77,10 @@
       "Territory-Availability": "WW",
       "Download-Purchase": "Y",
       "Subscription-Streaming": "Y",
-      "Ad-Supported-Streaming": "Y"
+      "Ad-Supported-Streaming": "Y",
+      "Album-SRP-Currency": "USD",
+      "Track-SRP": "0.99",
+      "Track-SRP-Currency": "USD"
     },
     {
       "Label": "AMG",
@@ -87,6 +91,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -111,7 +116,10 @@
       "Territory-Availability": "WW",
       "Download-Purchase": "Y",
       "Subscription-Streaming": "Y",
-      "Ad-Supported-Streaming": "Y"
+      "Ad-Supported-Streaming": "Y",
+      "Album-SRP-Currency": "USD",
+      "Track-SRP": "0.99",
+      "Track-SRP-Currency": "USD"
     },
     {
       "Label": "AMG",
@@ -122,6 +130,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -157,6 +166,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -192,6 +202,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -227,6 +238,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -262,6 +274,7 @@
       "Release Featured Artist": "Olivia Baynton",
       "Secondary Release Featured Artist": "Adamu Hassan Nagudu",
       "Release Title": "Quietly Yours",
+      "Genre": "Alternative",
       "Release Date": "2026-03-16",
       "Original Release Date": "2026-03-16",
       "C Line": "2026 AMG, Exclusive Licensed ANT MUSIC",
@@ -290,15 +303,15 @@
     }
   ],
   "storageKeys": [
-    "releases/20260506025738343/850080651100/QT6KL2500029.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500030.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500031.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500032.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500033.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500034.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500035.wav",
-    "releases/20260506025738343/850080651100/QT6KL2500036.wav",
-    "releases/20260506025738343/850080651100/850080651100.jpg"
+    "releases/20260509101823589/850080651100/QT6KL2500029.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500030.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500031.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500032.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500033.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500034.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500035.wav",
+    "releases/20260509101823589/850080651100/QT6KL2500036.wav",
+    "releases/20260509101823589/850080651100/850080651100.jpg"
   ],
   "audioMetadata": {
     "QT6KL2500029": {
@@ -351,14 +364,14 @@
     }
   },
   "fileIds": [
-    "2764ec50-eadf-4e75-a4da-0510e4e0bfbb",
-    "a25ae61c-e319-4500-b4f2-d51e604c662f",
-    "794647b3-b839-4fec-a82e-a7d0fb8d0076",
-    "dc2e3f01-0849-4465-90b4-865905a738e7",
-    "485ba194-8ed4-4d7f-b749-44236363ddea",
-    "2fec343c-2531-44ec-8e15-d43bffb79a7c",
-    "29a1f032-9667-4575-9b45-4e3022239c1c",
-    "c04bedcb-8e6c-41e4-aefc-bea284d967fb",
-    "7d89d494-1c80-4f39-97c0-e60a4a09b33c"
+    "19cb65b4-56dc-4e9e-853d-677454ae1946",
+    "ac146921-fc7a-4ae8-ba43-953944be1989",
+    "17592cca-adba-44fa-a9a1-ec3680b77335",
+    "60955a02-4243-4ac7-b0ef-b97f1c97d3bd",
+    "345a266f-5c09-40d7-a365-e4cd9c735705",
+    "4a77a8ac-1779-4229-b6ea-cf6251b61591",
+    "32e84824-e841-47d6-a5af-9e5d1c0eef56",
+    "f13e13f6-beca-4c63-8361-a21fbe00ca45",
+    "8f7ba50e-aa34-4ba0-aca0-9a5d6b9fe64e"
   ]
 }
