@@ -70,19 +70,33 @@ export class ExcelMapperService {
 		>,
 	) {
 		const firstRow = excelData[0];
+		const warnings: string[] = [];
 
 		// --- Release ---
 		const release = new Release();
 		release.upc = this.str(firstRow[C.UPC]);
 		release.title = this.str(firstRow[C.RELEASE_TITLE]) || releaseFolder;
 		release.version = this.str(firstRow[C.RELEASE_SUBTITLE]) || null;
+		const releaseTypeRaw = this.str(firstRow[C.RELEASE_TYPE]) || '';
 		release.albumFormatId =
-			maps.albumFormat.get(this.str(firstRow[C.RELEASE_TYPE]) || '') ||
-			'';
-		release.primaryGenreId =
-			maps.genre.get(this.str(firstRow[C.GENRE]) || '') || null;
-		release.labelId =
-			maps.label.get(this.str(firstRow[C.LABEL]) || '') || null;
+			maps.albumFormat.get(releaseTypeRaw.toLowerCase()) || '';
+
+		if (releaseTypeRaw && !release.albumFormatId) {
+			warnings.push(
+				`[WARN] Album format not found for "${releaseTypeRaw}". Available: ${Array.from(maps.albumFormat.keys()).join(', ')}`,
+			);
+		}
+		const genreRaw = this.str(firstRow[C.GENRE]) || '';
+		release.primaryGenreId = maps.genre.get(genreRaw) || null;
+		if (genreRaw && !release.primaryGenreId) {
+			warnings.push(`[WARN] Genre not found for "${genreRaw}"`);
+		}
+
+		const labelRaw = this.str(firstRow[C.LABEL]) || '';
+		release.labelId = maps.label.get(labelRaw) || null;
+		if (labelRaw && !release.labelId) {
+			warnings.push(`[WARN] Label not found for "${labelRaw}"`);
+		}
 		release.catalogId = this.str(firstRow[C.CATALOG_NUMBER]) || null;
 		release.status = ReleaseStatus.DRAFT;
 
@@ -128,9 +142,17 @@ export class ExcelMapperService {
 			const codes = territory
 				.split('|')
 				.map((c) => c.trim().toUpperCase());
-			releaseTerritory.selectedCountries = codes
-				.map((c) => maps.country.get(c))
-				.filter((id): id is string => !!id);
+			releaseTerritory.selectedCountries = [];
+			for (const c of codes) {
+				const countryId = maps.country.get(c);
+				if (countryId) {
+					releaseTerritory.selectedCountries.push(countryId);
+				} else {
+					warnings.push(
+						`[WARN] Territory country code "${c}" not found`,
+					);
+				}
+			}
 		}
 
 		// --- Release Language ---
@@ -139,17 +161,32 @@ export class ExcelMapperService {
 		if (relMetaLang) {
 			releaseLanguage.metadataLanguageId =
 				maps.language.get(relMetaLang) || null;
+			if (!releaseLanguage.metadataLanguageId) {
+				warnings.push(
+					`[WARN] Metadata language not found for "${relMetaLang}"`,
+				);
+			}
 		}
 		const relMetaCountry = this.str(firstRow[C.METADATA_LANGUAGE_COUNTRY]);
 
 		if (relMetaCountry) {
 			releaseLanguage.metadataLanguageCountryId =
 				maps.countryByName.get(relMetaCountry) || null;
+			if (!releaseLanguage.metadataLanguageCountryId) {
+				warnings.push(
+					`[WARN] Metadata language country not found for "${relMetaCountry}"`,
+				);
+			}
 		}
 		const relAudioLang = this.str(firstRow[C.AUDIO_LANGUAGE]);
 		if (relAudioLang) {
 			releaseLanguage.audioLanguageId =
 				maps.language.get(relAudioLang) || null;
+			if (!releaseLanguage.audioLanguageId) {
+				warnings.push(
+					`[WARN] Audio language not found for "${relAudioLang}"`,
+				);
+			}
 		}
 
 		// --- Release Artists (Main) ---
@@ -245,8 +282,8 @@ export class ExcelMapperService {
 					delivery.dspId = dspId;
 					dspDeliveries.push(delivery);
 				} else {
-					this.logger.warn(
-						`DSP not found for code "${code}" — skipping`,
+					warnings.push(
+						`[WARN] DSP not found for "${code}" — skipped`,
 					);
 				}
 			}
@@ -291,14 +328,24 @@ export class ExcelMapperService {
 			track.pLineOwner = pLine.owner;
 
 			// Genre (same lookup as release)
-			track.primaryGenreId =
-				maps.genre.get(this.str(row[C.GENRE]) || '') || null;
+			const trackGenreRaw = this.str(row[C.GENRE]) || '';
+			track.primaryGenreId = maps.genre.get(trackGenreRaw) || null;
+			if (trackGenreRaw && !track.primaryGenreId) {
+				warnings.push(
+					`[WARN] Track #${i + 1}: Genre not found for "${trackGenreRaw}"`,
+				);
+			}
 
 			// Parental-Warning → TrackSensitive
 			const parentalWarning = this.str(row[C.PARENTAL_WARNING]);
 			if (parentalWarning) {
 				track.trackSensitiveId =
 					maps.trackSensitive.get(parentalWarning) || null;
+				if (!track.trackSensitiveId) {
+					warnings.push(
+						`[WARN] Track #${i + 1}: Parental warning not found for "${parentalWarning}"`,
+					);
+				}
 			}
 
 			// Track-SRP + Track-SRP-Currency → PriceTier (fallback to default)
@@ -308,6 +355,11 @@ export class ExcelMapperService {
 				const ptKey = `${trackSrp}|${trackSrpCurrency}`;
 				track.priceTierId =
 					maps.priceTier.get(ptKey) || maps.defaultPriceTierId;
+				if (!maps.priceTier.get(ptKey)) {
+					warnings.push(
+						`[WARN] Track #${i + 1}: Price tier not found for "${trackSrp} ${trackSrpCurrency}" — using default`,
+					);
+				}
 			} else {
 				track.priceTierId = maps.defaultPriceTierId;
 			}
@@ -319,6 +371,11 @@ export class ExcelMapperService {
 			if (trkMetaLang) {
 				trackLanguage.metadataLanguageId =
 					maps.language.get(trkMetaLang) || null;
+				if (!trackLanguage.metadataLanguageId) {
+					warnings.push(
+						`[WARN] Track #${i + 1}: Metadata language not found for "${trkMetaLang}"`,
+					);
+				}
 			}
 			const trkMetaCountry = this.str(row[C.METADATA_LANGUAGE_COUNTRY]);
 			if (trkMetaCountry) {
@@ -326,11 +383,21 @@ export class ExcelMapperService {
 					maps.countryByName.get(trkMetaCountry) || null;
 				trackLanguage.metadataLanguageCountryId = countryId;
 				trackLanguage.recordingCountryId = countryId;
+				if (!countryId) {
+					warnings.push(
+						`[WARN] Track #${i + 1}: Metadata language country not found for "${trkMetaCountry}"`,
+					);
+				}
 			}
 			const trkAudioLang = this.str(row[C.AUDIO_LANGUAGE]);
 			if (trkAudioLang) {
 				trackLanguage.audioLanguageId =
 					maps.language.get(trkAudioLang) || null;
+				if (!trackLanguage.audioLanguageId) {
+					warnings.push(
+						`[WARN] Track #${i + 1}: Audio language not found for "${trkAudioLang}"`,
+					);
+				}
 			}
 
 			// --- Track Main Artist ---
@@ -531,6 +598,7 @@ export class ExcelMapperService {
 			releaseLocalizes,
 			dspDeliveries,
 			tracks,
+			warnings,
 		};
 	}
 
