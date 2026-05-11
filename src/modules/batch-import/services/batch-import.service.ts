@@ -294,6 +294,14 @@ export class BatchImportService {
 				audioMetadata,
 			);
 
+			// Surface mapping warnings in the batch import log
+			if (mapped.warnings.length > 0) {
+				for (const w of mapped.warnings) {
+					this.appendLogError(log, w);
+				}
+				await this.logRepo.save(log);
+			}
+
 			// return {
 			// 	mapped,
 			// };
@@ -708,7 +716,9 @@ export class BatchImportService {
 		]);
 
 		return {
-			albumFormat: new Map(albumFormats.map((r) => [r.name, r.id])),
+			albumFormat: new Map(
+				albumFormats.map((r) => [r.name.toLowerCase(), r.id]),
+			),
 			genre: new Map(genres.map((r) => [r.name, r.id])),
 			label: new Map(labels.map((r) => [r.name, r.id])),
 			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),
