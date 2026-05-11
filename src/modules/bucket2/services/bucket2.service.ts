@@ -136,11 +136,12 @@ export class BucketService2 {
 
 	async getUrlDown(id: string) {
 		const file = await this.bucketFileService.findOne(id);
-		const { key, fileName } = file;
+		const { key, fileName, bucket } = file;
 
 		return this.bucketR2Service.getSignedUrlDown({
 			key,
 			fileName,
+			bucket,
 		});
 	}
 

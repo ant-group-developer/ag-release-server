@@ -30,4 +30,5 @@ export interface IGetSignedUrlDown {
 	key: string;
 	isPublic?: boolean;
 	fileName: string;
+	bucket?: string;
 }

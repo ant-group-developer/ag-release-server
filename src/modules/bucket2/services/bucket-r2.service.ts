@@ -101,9 +101,9 @@ export class BucketR2Service {
 	}
 
 	async getSignedUrlDown(data: IGetSignedUrlDown): Promise<string> {
-		const { key, isPublic = false, fileName } = data;
+		const { key, isPublic = false, fileName, bucket } = data;
 
-		const bucketName = this.getBucketName({ isPublic });
+		const bucketName = bucket ?? this.getBucketName({ isPublic });
 
 		const command = new GetObjectCommand({
 			Bucket: bucketName,
