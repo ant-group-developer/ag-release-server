@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CacheModule } from '../cache/cache.module';
 import { Permission } from '../permission/entities/permission.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { Role } from './entities/role.entity';
@@ -8,7 +9,10 @@ import { RoleQueryService } from './services/role.query.service';
 import { RoleService } from './services/role.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Role, RolePermission, Permission])],
+	imports: [
+		TypeOrmModule.forFeature([Role, RolePermission, Permission]),
+		CacheModule,
+	],
 	controllers: [RoleController],
 	providers: [RoleService, RoleQueryService],
 	exports: [RoleService, RoleQueryService],
