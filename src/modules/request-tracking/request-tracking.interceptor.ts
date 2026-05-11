@@ -19,6 +19,7 @@ export class RequestTrackingInterceptor implements NestInterceptor {
 		'/metrics',
 		'/favicon.ico',
 		'/request-tracking',
+		'/app-config/v2/public',
 	];
 
 	private readonly ignoreMethods = ['OPTIONS'];
