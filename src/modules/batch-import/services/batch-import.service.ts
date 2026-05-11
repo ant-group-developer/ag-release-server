@@ -302,9 +302,19 @@ export class BatchImportService {
 				await this.logRepo.save(log);
 			}
 
-			// return {
-			// 	mapped,
-			// };
+			// Validate required FK fields before attempting DB insert
+			const missingFields: string[] = [];
+			if (!mapped.release.albumFormatId) {
+				missingFields.push('Album Format (Release Type)');
+			}
+			if (missingFields.length > 0) {
+				const msg = `Cannot create release: missing required field(s): ${missingFields.join(', ')}. Please check the Excel data.`;
+				log.status = BatchImportStatus.FAILED;
+				this.appendLogError(log, msg);
+				await this.logRepo.save(log);
+				this.logger.error(`Release "${releaseFolder}" aborted: ${msg}`);
+				return { success: false, error: msg };
+			}
 
 			// Collect all unique artist names
 			const allArtistNames = new Set<string>();
