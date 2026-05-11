@@ -6,6 +6,7 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
+import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -27,6 +28,7 @@ import { TrackContributor } from 'src/modules/track-contributor/entities/track-c
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -645,6 +647,8 @@ export class BatchImportService {
 			});
 			await manager.delete(TrackLocalize, { trackId: In(trackIds) });
 			await manager.delete(AudioFile, { trackId: In(trackIds) });
+			await manager.delete(TrackPolicy, { trackId: In(trackIds) });
+			await manager.delete(TrackScanHistory, { trackId: In(trackIds) });
 		}
 
 		// Delete release sub-entities + tracks

@@ -29,7 +29,9 @@ export class TrackPolicy extends BaseUUIDEntity {
 	})
 	dspId: string;
 
-	@ManyToOne(() => Track, (track) => track.trackPolicies)
+	@ManyToOne(() => Track, (track) => track.trackPolicies, {
+		onDelete: 'CASCADE',
+	})
 	@JoinColumn({ name: 'track_id' })
 	track: Track;
 
