@@ -606,7 +606,8 @@ export class BatchImportService {
 				error,
 			);
 			const message =
-				error instanceof Error ? error.message : String(error);
+				(error instanceof Error ? error.message : String(error)) ||
+				'Unknown error (empty message)';
 			const stack = error instanceof Error ? error.stack : undefined;
 
 			log.status = BatchImportStatus.FAILED;
