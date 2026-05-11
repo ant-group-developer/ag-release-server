@@ -125,12 +125,12 @@ export class BucketService2 {
 
 	// read
 	async getUrlRead(id: string) {
-		const file = await this.bucketFileService.findOne(id);
-		const { key } = file;
+		const { key, bucket } = await this.bucketFileService.findOne(id);
 
 		return this.bucketR2Service.getSignedUrlRead({
 			key,
 			isPublic: false,
+			bucket,
 		});
 	}
 
@@ -140,7 +140,6 @@ export class BucketService2 {
 
 		return this.bucketR2Service.getSignedUrlDown({
 			key,
-			isPublic: false,
 			fileName,
 		});
 	}
@@ -154,7 +153,7 @@ export class BucketService2 {
 			urlPrivate: this.getUrlPrivate(file.key),
 			urlRead: await this.bucketR2Service.getSignedUrlRead({
 				key: file.key,
-				isPublic: false,
+				bucket: file.bucket,
 			}),
 		};
 	}

@@ -23,6 +23,7 @@ export interface IGetSignedUrlUpload {
 export interface IGetSignedUrlRead {
 	key: string;
 	isPublic?: boolean;
+	bucket?: string;
 }
 
 export interface IGetSignedUrlDown {

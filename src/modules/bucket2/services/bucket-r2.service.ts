@@ -88,9 +88,9 @@ export class BucketR2Service {
 	}
 
 	async getSignedUrlRead(data: IGetSignedUrlRead): Promise<string> {
-		const { key, isPublic = false } = data;
+		const { key, isPublic = false, bucket } = data;
 
-		const bucketName = this.getBucketName({ isPublic });
+		const bucketName = bucket ?? this.getBucketName({ isPublic });
 
 		const command = new GetObjectCommand({
 			Bucket: bucketName,

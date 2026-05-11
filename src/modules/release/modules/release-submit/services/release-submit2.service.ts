@@ -1612,10 +1612,22 @@ export class ReleaseSubmitService2 {
 	}
 
 	async getList(query: QueryGetListSubmitDto) {
-		const { page, pageSize, status, releaseId, type } = query;
+		const { keyword, page, pageSize, status, releaseId, type } = query;
 
 		const qb = this.submitRepo.createQueryBuilder('submit');
 		// .leftJoinAndSelect('submit.steps', 'steps', 'steps.parent_step_id IS NULL');
+
+		if (keyword?.length) {
+			const keywords = keyword.map((k) => `%${k}%`);
+
+			qb.andWhere(
+				`(
+					submit.release_title ILIKE ANY(:keywords)
+					OR submit.release_upc ILIKE ANY(:keywords)
+				)`,
+				{ keywords },
+			);
+		}
 
 		// Filter status
 		if (status?.length) {

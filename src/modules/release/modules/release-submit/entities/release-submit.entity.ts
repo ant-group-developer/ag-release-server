@@ -30,6 +30,12 @@ export class ReleaseSubmit extends BaseUUIDEntity {
 	})
 	type: ExecutionType;
 
+	@Column({ name: 'release_title', type: 'varchar', length: 255 })
+	releaseTitle: string;
+
+	@Column({ name: 'release_upc', type: 'varchar', length: 255 })
+	releaseUpc: string;
+
 	@Column({
 		name: 'release_id',
 		type: 'uuid',

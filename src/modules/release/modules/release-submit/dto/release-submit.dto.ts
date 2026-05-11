@@ -1,8 +1,8 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { ReleaseSubmitStatus } from '../release-submit.enum';
 import { ExecutionType } from '../entities/release-submit.entity';
+import { ReleaseSubmitStatus } from '../release-submit.enum';
 
 export enum FieldOrderSubmit {
 	submit_createdAt = 'submit.createdAt',
