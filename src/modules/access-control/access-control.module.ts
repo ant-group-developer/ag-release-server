@@ -14,7 +14,7 @@ import { AccessControlService } from './access-control.service';
 		TypeOrmModule.forFeature([UserRole]),
 		forwardRef(() => UserModule),
 		forwardRef(() => TenantModule),
-		TenantRolesModule,
+		forwardRef(() => TenantRolesModule),
 		PermissionModule,
 		RoleModule,
 		CacheModule,

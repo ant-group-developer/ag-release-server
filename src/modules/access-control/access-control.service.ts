@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CacheService } from '../cache/cache.service';
@@ -25,6 +25,7 @@ export class AccessControlService {
 		private readonly userService: UserService,
 		private readonly tenantService: TenantService,
 		private readonly tenantUserService: TenantUserService,
+		@Inject(forwardRef(() => TenantRolesService))
 		private readonly tenantRolesService: TenantRolesService,
 		private readonly permissionService: PermissionService,
 		private readonly roleService: RoleService,
