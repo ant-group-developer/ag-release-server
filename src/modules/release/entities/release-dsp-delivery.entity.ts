@@ -1,12 +1,13 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 
 @Entity('release_dsp_delivery', {
 	comment: 'Bảng liên kết release với các DSP được phân phối',
 })
+@Unique('uq_release_dsp_delivery_release_dsp', ['releaseId', 'dspId'])
 export class ReleaseDspDelivery extends BaseUUIDEntity {
 	@Column({ type: 'boolean', default: true })
 	isSelected: boolean;

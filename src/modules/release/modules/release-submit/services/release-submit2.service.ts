@@ -233,6 +233,42 @@ export class ReleaseSubmitService2 {
 			.execute();
 	}
 
+	// private async markDspDeliveriesProcessing(
+	// 	releaseId: string,
+	// 	dspCodes: string[],
+	// ) {
+	// 	if (!dspCodes?.length) return;
+
+	// 	const dsps = await this.manager.find(Dsp, {
+	// 		where: { code: In(dspCodes) },
+	// 	});
+
+	// 	for (const dsp of dsps) {
+	// 		const existed = await this.manager.findOne(ReleaseDspDelivery, {
+	// 			where: { releaseId, dspId: dsp.id },
+	// 		});
+
+	// 		if (existed) {
+	// 			await this.manager.update(
+	// 				ReleaseDspDelivery,
+	// 				{ releaseId, dspId: dsp.id },
+	// 				{
+	// 					status: ReleaseDspStatus.PROCESSING,
+	// 					lastEnqueuedAt: new Date(),
+	// 				},
+	// 			);
+	// 		} else {
+	// 			await this.manager.save(ReleaseDspDelivery, {
+	// 				releaseId,
+	// 				dspId: dsp.id,
+	// 				isSelected: true,
+	// 				status: ReleaseDspStatus.PROCESSING,
+	// 				lastEnqueuedAt: new Date(),
+	// 			});
+	// 		}
+	// 	}
+	// }
+
 	private async markDspDeliveriesProcessing(
 		releaseId: string,
 		dspCodes: string[],
@@ -241,32 +277,31 @@ export class ReleaseSubmitService2 {
 
 		const dsps = await this.manager.find(Dsp, {
 			where: { code: In(dspCodes) },
+			select: ['id'],
 		});
 
-		for (const dsp of dsps) {
-			const existed = await this.manager.findOne(ReleaseDspDelivery, {
-				where: { releaseId, dspId: dsp.id },
-			});
+		if (!dsps.length) return;
 
-			if (existed) {
-				await this.manager.update(
-					ReleaseDspDelivery,
-					{ releaseId, dspId: dsp.id },
-					{
-						status: ReleaseDspStatus.PROCESSING,
-						lastEnqueuedAt: new Date(),
-					},
-				);
-			} else {
-				await this.manager.save(ReleaseDspDelivery, {
+		const now = new Date();
+
+		await this.manager
+			.createQueryBuilder()
+			.insert()
+			.into(ReleaseDspDelivery)
+			.values(
+				dsps.map((dsp) => ({
 					releaseId,
 					dspId: dsp.id,
 					isSelected: true,
 					status: ReleaseDspStatus.PROCESSING,
-					lastEnqueuedAt: new Date(),
-				});
-			}
-		}
+					lastEnqueuedAt: now,
+				})),
+			)
+			.orUpdate(
+				['status', 'last_enqueued_at'], // columns to update on conflict
+				['release_id', 'dsp_id'], // conflict target (unique constraint)
+			)
+			.execute();
 	}
 
 	private async buildPipeline(submitId: string, dspCodes: string[]) {
