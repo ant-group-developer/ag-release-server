@@ -100,6 +100,22 @@ export class ExcelMapperService {
 		release.catalogId = this.str(firstRow[C.CATALOG_NUMBER]) || null;
 		release.status = ReleaseStatus.DRAFT;
 
+		// Release PriceTier
+		const albumSrp = this.str(firstRow[C.ALBUM_SRP]);
+		const albumSrpCurrency = this.str(firstRow[C.ALBUM_SRP_CURRENCY]);
+		if (albumSrp && albumSrpCurrency) {
+			const ptKey = `${albumSrp}|${albumSrpCurrency}`.toLowerCase();
+			release.priceTierId =
+				maps.priceTier.get(ptKey) || maps.defaultPriceTierId;
+			if (!maps.priceTier.get(ptKey)) {
+				warnings.push(
+					`[WARN] Album price tier not found for "${albumSrp} ${albumSrpCurrency}" — using default`,
+				);
+			}
+		} else {
+			release.priceTierId = maps.defaultPriceTierId;
+		}
+
 		// C-Line
 		const cLine = this.parseCPLine(this.str(firstRow[C.C_LINE]));
 		release.cLineYear = cLine.year;
@@ -352,7 +368,7 @@ export class ExcelMapperService {
 			const trackSrp = this.str(row[C.TRACK_SRP]);
 			const trackSrpCurrency = this.str(row[C.TRACK_SRP_CURRENCY]);
 			if (trackSrp && trackSrpCurrency) {
-				const ptKey = `${trackSrp}|${trackSrpCurrency}`;
+				const ptKey = `${trackSrp}|${trackSrpCurrency}`.toLowerCase();
 				track.priceTierId =
 					maps.priceTier.get(ptKey) || maps.defaultPriceTierId;
 				if (!maps.priceTier.get(ptKey)) {
