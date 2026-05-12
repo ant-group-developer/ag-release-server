@@ -2,6 +2,7 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { AccessControlService } from 'src/modules/access-control/access-control.service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { In, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
@@ -23,6 +24,8 @@ export class TenantUserService {
 		private readonly userService: UserService,
 		@Inject(forwardRef(() => TenantService))
 		private readonly tenantService: TenantService,
+		@Inject(forwardRef(() => AccessControlService))
+		private readonly accessControlService: AccessControlService,
 	) {}
 
 	async getDefaultTenant(userId: string) {
@@ -108,7 +111,12 @@ export class TenantUserService {
 			creatorId: userReqId,
 			modifierId: userReqId,
 		});
-		return this.tenantUserRepository.save(tenantUser);
+		const result = await this.tenantUserRepository.save(tenantUser);
+
+		// Invalidate auth cache for this user in this tenant
+		await this.accessControlService.invalidateAuthContext(userId, tenantId);
+
+		return result;
 	}
 
 	async updateUserTenantType(
@@ -118,7 +126,12 @@ export class TenantUserService {
 	): Promise<TenantUser> {
 		const tenantUser = await this.checkMembership(tenantId, userId);
 		tenantUser.type = type;
-		return this.tenantUserRepository.save(tenantUser);
+		const result = await this.tenantUserRepository.save(tenantUser);
+
+		// Invalidate auth cache — tenant user type changed
+		await this.accessControlService.invalidateAuthContext(userId, tenantId);
+
+		return result;
 	}
 
 	async inviteUserToTenant(
@@ -159,7 +172,16 @@ export class TenantUserService {
 			);
 		}
 
-		return this.tenantUserRepository.delete({ tenantId, userId });
+		return this.tenantUserRepository
+			.delete({ tenantId, userId })
+			.then(async (result) => {
+				// Invalidate auth cache — user removed from tenant
+				await this.accessControlService.invalidateAuthContext(
+					userId,
+					tenantId,
+				);
+				return result;
+			});
 	}
 
 	async bulkUpdateTenantUser(
@@ -183,7 +205,12 @@ export class TenantUserService {
 				modifierId: userReqId,
 			}),
 		);
-		return this.tenantUserRepository.save(newData);
+		const result = await this.tenantUserRepository.save(newData);
+
+		// Invalidate all auth contexts for this user (tenants changed)
+		await this.accessControlService.invalidateAuthContext(userId);
+
+		return result;
 	}
 
 	async removeCurrentOwner(tenantId: string) {
@@ -202,16 +229,32 @@ export class TenantUserService {
 			} else {
 				await this.removeCurrentOwner(tenantId);
 				tenantUser.type = TenantUserType.OWNER;
-				return this.tenantUserRepository.save(tenantUser);
+				const result = await this.tenantUserRepository.save(tenantUser);
+
+				// Invalidate — owner changed
+				await this.accessControlService.invalidateAuthContext(
+					undefined,
+					tenantId,
+				);
+
+				return result;
 			}
 		} else {
 			await this.removeCurrentOwner(tenantId);
-			return this.addUserToTenant(
+			const result = await this.addUserToTenant(
 				tenantId,
 				ownerId,
 				TenantUserType.OWNER,
 				userReqId,
 			);
+
+			// Invalidate — owner changed
+			await this.accessControlService.invalidateAuthContext(
+				undefined,
+				tenantId,
+			);
+
+			return result;
 		}
 	}
 

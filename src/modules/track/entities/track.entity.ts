@@ -13,6 +13,7 @@ import {
 	ManyToOne,
 	OneToMany,
 	OneToOne,
+	Unique,
 } from 'typeorm';
 
 import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
@@ -26,6 +27,7 @@ import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { ScanCopyrightStatus } from '../enum/track.enum';
 import { ITrack } from '../interfaces/track.interface';
 
+@Unique('UQ_tracks_release_id_order', ['releaseId', 'order'])
 @Entity('tracks', {
 	comment: 'Bảng track chứa metadata chi tiết của từng bài hát trong release',
 })

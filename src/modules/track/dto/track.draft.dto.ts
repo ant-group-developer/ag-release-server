@@ -20,7 +20,7 @@ import { CreateAudioFileDraftDto } from 'src/modules/audio-file/dto/audio-file.d
 import { MAX_INTEGER } from 'src/modules/database/constants/database.constants';
 import { UpdateTrackLanguageDraftDto } from 'src/modules/track-language/dto/track-language.draft.dto';
 
-class CreateTrackDraftDto {
+export class CreateTrackDraftDto {
 	@Length(10, 10)
 	@IsOptional()
 	id?: string;

@@ -46,7 +46,10 @@ import { ReleaseContributorModule } from './modules/release-contributor/release-
 import { ReleaseLocalizeModule } from './modules/release-localize/release-localize.module';
 import { ReleaseModule } from './modules/release/release.module';
 // import { ReleaseSubmitModule } from './modules/release/modules/release-submit/release-submit.module';
+import { Cache2Module } from './modules/cache2/cache2.module';
+import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
+import { RequestTrackingModule } from './modules/request-tracking/request-tracking.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
@@ -80,6 +83,9 @@ import { UserModule } from './modules/user/user.module';
 		// }),
 
 		CacheModule,
+		Cache2Module,
+		LogsModule,
+		RequestTrackingModule,
 
 		EventEmitterModule.forRoot(),
 

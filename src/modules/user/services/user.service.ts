@@ -1,9 +1,15 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+	ConflictException,
+	forwardRef,
+	Inject,
+	Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'argon2';
 import { isUUID } from 'class-validator';
 import { Request } from 'express';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AccessControlService } from 'src/modules/access-control/access-control.service';
 import { Brackets, FindOneOptions, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
 import { CreateUserDto, GetListUserDto, UpdateUserDto } from '../dto/user.dto';
@@ -16,6 +22,8 @@ export class UserService {
 	constructor(
 		@InjectRepository(User)
 		private readonly userRepository: Repository<User>,
+		@Inject(forwardRef(() => AccessControlService))
+		private readonly accessControlService: AccessControlService,
 	) {}
 
 	private async checkEmailUniqueness(email: string): Promise<void> {
@@ -223,6 +231,9 @@ export class UserService {
 			avatar,
 			modifierId: userReqId,
 		});
+
+		// Invalidate auth cache so auth/me returns fresh user data
+		await this.accessControlService.invalidateAuthContext(savedData.id);
 
 		return this.findOne(savedData.id);
 	}

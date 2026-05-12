@@ -858,6 +858,7 @@ export class ReleaseQueryService {
 			)
 
 			.leftJoinAndSelect('release.releaseLanguage', 'releaseLanguage')
+			.leftJoinAndSelect('releaseLanguage.audioLanguage', 'audioLanguage')
 			.leftJoinAndSelect(
 				'releaseLanguage.metadataLanguage',
 				'releaseMetadataLanguage',
@@ -892,7 +893,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('track.trackSensitive', 'trackSensitive')
 
 			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
-			.leftJoinAndSelect('trackLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 't_audioLanguage')
 			.leftJoinAndSelect(
 				'trackLanguage.metadataLanguage',
 				'trackMetadataLanguage',

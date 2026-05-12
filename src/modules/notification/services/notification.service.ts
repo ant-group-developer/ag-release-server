@@ -32,7 +32,7 @@ export class NotificationService {
 			{ time, fileName },
 		);
 
-		await this.sendToDev(subject, html);
+		await this.sendToDev({ subject, html });
 	}
 
 	async sendNotificationBackupFail(data: {
@@ -53,10 +53,10 @@ export class NotificationService {
 			error: error ?? '',
 		});
 
-		await this.sendToDev(subject, html);
+		await this.sendToDev({ subject, html });
 	}
 
-	async sendToDev(subject: string, html: string) {
+	async sendToDev({ subject, html }: { subject: string; html: string }) {
 		const listUserDev = await this.notificationUserService.getListUserDev();
 		const listEmails: string[] = [];
 		const listTelegramIds: string[] = [];

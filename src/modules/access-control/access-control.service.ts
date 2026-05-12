@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CacheService } from '../cache/cache.service';
@@ -25,6 +25,7 @@ export class AccessControlService {
 		private readonly userService: UserService,
 		private readonly tenantService: TenantService,
 		private readonly tenantUserService: TenantUserService,
+		@Inject(forwardRef(() => TenantRolesService))
 		private readonly tenantRolesService: TenantRolesService,
 		private readonly permissionService: PermissionService,
 		private readonly roleService: RoleService,
@@ -65,15 +66,28 @@ export class AccessControlService {
 
 	/**
 	 * Invalidate cached auth context when user roles/permissions/status change.
+	 * - userId + tenantId: invalidate specific user-tenant combo
+	 * - userId only: invalidate all tenants for this user
+	 * - tenantId only: invalidate all users in this tenant
 	 */
 	async invalidateAuthContext(
-		userId: string,
+		userId?: string,
 		tenantId?: string,
 	): Promise<void> {
-		if (tenantId) {
+		if (userId && tenantId) {
 			await this.cacheService.del({
 				entity: EntityCache.AUTH_CONTEXT,
 				key: `${userId}_${tenantId}`,
+			});
+		} else if (userId) {
+			await this.cacheService.delByPrefix({
+				entity: EntityCache.AUTH_CONTEXT,
+				prefix: `${userId}_*`,
+			});
+		} else if (tenantId) {
+			await this.cacheService.delByPrefix({
+				entity: EntityCache.AUTH_CONTEXT,
+				prefix: `*_${tenantId}`,
 			});
 		}
 	}

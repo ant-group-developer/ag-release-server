@@ -125,23 +125,23 @@ export class BucketService2 {
 
 	// read
 	async getUrlRead(id: string) {
-		const file = await this.bucketFileService.findOne(id);
-		const { key } = file;
+		const { key, bucket } = await this.bucketFileService.findOne(id);
 
 		return this.bucketR2Service.getSignedUrlRead({
 			key,
 			isPublic: false,
+			bucket,
 		});
 	}
 
 	async getUrlDown(id: string) {
 		const file = await this.bucketFileService.findOne(id);
-		const { key, fileName } = file;
+		const { key, fileName, bucket } = file;
 
 		return this.bucketR2Service.getSignedUrlDown({
 			key,
-			isPublic: false,
 			fileName,
+			bucket,
 		});
 	}
 
@@ -154,7 +154,7 @@ export class BucketService2 {
 			urlPrivate: this.getUrlPrivate(file.key),
 			urlRead: await this.bucketR2Service.getSignedUrlRead({
 				key: file.key,
-				isPublic: false,
+				bucket: file.bucket,
 			}),
 		};
 	}
@@ -182,6 +182,70 @@ export class BucketService2 {
 			fileBuffer,
 			fileDb,
 		};
+	}
+
+	async getListFileBuffers(fileIds: string[]): Promise<
+		{
+			fileBuffer: Buffer;
+			fileDb: FileEntity;
+		}[]
+	> {
+		const listFileDb = await this.bucketFileService.getList(fileIds);
+
+		if (!listFileDb.length) {
+			return [];
+		}
+
+		const bucketName = listFileDb[0].bucket;
+
+		const keys = listFileDb.map((fileDb) => fileDb.key);
+
+		const listFileBufferByKeys = await this.getListFileBuffersByKeys(
+			keys,
+			bucketName,
+		);
+
+		const fileBufferMap = new Map(
+			listFileBufferByKeys.map((item) => [item.key, item.fileBuffer]),
+		);
+
+		return listFileDb.map((fileDb) => {
+			const fileBuffer = fileBufferMap.get(fileDb.key);
+
+			if (!fileBuffer) {
+				throw new Error(`File buffer not found for key: ${fileDb.key}`);
+			}
+
+			return {
+				fileBuffer,
+				fileDb,
+			};
+		});
+	}
+
+	async getListFileBuffersByKeys(
+		keys: string[],
+		bucketName: string,
+	): Promise<{ fileBuffer: Buffer; key: string }[]> {
+		const BATCH_SIZE = 10;
+		const results: { fileBuffer: Buffer; key: string }[] = [];
+
+		for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+			const batch = keys.slice(i, i + BATCH_SIZE);
+			const batchResults = await Promise.all(
+				batch.map(async (key) => {
+					const fileBuffer =
+						await this.bucketR2Service.getObjectBuffer({
+							bucketName,
+							key,
+						});
+					return { fileBuffer, key };
+				}),
+			);
+			results.push(...batchResults);
+		}
+
+		return results;
 	}
 
 	async downloadFolder({

@@ -6,6 +6,8 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
+import { CacheService } from 'src/modules/cache/cache.service';
+import { EntityCache } from 'src/modules/cache/enum/cache.enum';
 import { In, Repository } from 'typeorm';
 import { RoleMessages } from '../constants/role.constant';
 import {
@@ -34,6 +36,7 @@ export class RoleService {
 		private readonly rolePermissionRepo: Repository<RolePermission>,
 
 		private readonly roleQueryService: RoleQueryService,
+		private readonly cacheService: CacheService,
 	) {}
 
 	// create
@@ -149,6 +152,9 @@ export class RoleService {
 
 		const result = await this.getOne(id);
 
+		// Invalidate all auth contexts — role permissions may have changed
+		await this.invalidateAllAuthContexts();
+
 		return new ResponseSuccess({
 			data: result,
 			messageWarning: messageWarnings.join('\n'),
@@ -196,6 +202,9 @@ export class RoleService {
 	async handleDelete(id: string): Promise<void> {
 		await this.deleteRolePermissionOfRole({ roleId: id });
 		await this.deleteRole(id);
+
+		// Invalidate all auth contexts — role removed
+		await this.invalidateAllAuthContexts();
 	}
 
 	async deleteRole(id: string) {
@@ -226,5 +235,16 @@ export class RoleService {
 				data: between,
 			});
 		}
+	}
+
+	/**
+	 * Invalidate all auth_context cache entries.
+	 * Role changes are global — affects all users across all tenants.
+	 */
+	private async invalidateAllAuthContexts(): Promise<void> {
+		await this.cacheService.delByPrefix({
+			entity: EntityCache.AUTH_CONTEXT,
+			prefix: '*',
+		});
 	}
 }

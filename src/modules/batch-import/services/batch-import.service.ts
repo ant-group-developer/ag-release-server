@@ -6,6 +6,7 @@ import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity'
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
+import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { Country } from 'src/modules/country/entities/country.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Genre } from 'src/modules/genre/entities/genre.entity';
@@ -15,6 +16,7 @@ import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
+import { ReleaseCoverArtService } from 'src/modules/release-cover-art/services/release-cover-art.service';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 import { ReleaseLocalize } from 'src/modules/release-localize/entities/release-localize.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -26,6 +28,7 @@ import { TrackContributor } from 'src/modules/track-contributor/entities/track-c
 import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
 import { TrackOriginType } from 'src/modules/track-origin-type/entities/track-origin-type.entity';
+import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
 import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensitive.entity';
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -52,15 +55,37 @@ export class BatchImportService {
 		private readonly logRepo: Repository<BatchImportLog>,
 		private readonly excelMapper: ExcelMapperService,
 		private readonly dataSource: DataSource,
+		private readonly releaseCoverArtService: ReleaseCoverArtService,
 	) {}
 
 	async getLogs(params: GetBatchImportLogsDto) {
-		const { page = 1, pageSize = 20, batchId, status } = params;
+		const {
+			page = 1,
+			pageSize = 20,
+			batchId,
+			upc,
+			tenantCode,
+			status,
+		} = params;
 
 		const qb = this.logRepo.createQueryBuilder('log');
 
 		if (batchId) {
-			qb.andWhere('log.batchId = :batchId', { batchId });
+			qb.andWhere('log.batchId LIKE :batchId', {
+				batchId: `%${batchId}%`,
+			});
+		}
+
+		if (upc) {
+			qb.andWhere('log.releaseFolder LIKE :upc', {
+				upc: `%${upc}%`,
+			});
+		}
+
+		if (tenantCode) {
+			qb.andWhere('log.tenantCode LIKE :tenantCode', {
+				tenantCode: `%${tenantCode}%`,
+			});
 		}
 
 		if (status) {
@@ -200,16 +225,28 @@ export class BatchImportService {
 
 		const isValid = errors.length === 0;
 
-		const log = this.logRepo.create({
-			tenantCode,
-			batchId,
-			releaseFolder,
-			status: isValid
-				? BatchImportStatus.VALIDATED
-				: BatchImportStatus.VALIDATION_FAILED,
-			excelData,
-			errors: errors.length > 0 ? errors : null,
+		let log = await this.logRepo.findOne({
+			where: { batchId, releaseFolder },
 		});
+
+		if (!log) {
+			log = this.logRepo.create({
+				tenantCode,
+				batchId,
+				releaseFolder,
+				status: isValid
+					? BatchImportStatus.VALIDATED
+					: BatchImportStatus.VALIDATION_FAILED,
+				excelData,
+				errors: errors.length > 0 ? errors : null,
+			});
+		} else {
+			log.status = isValid
+				? BatchImportStatus.VALIDATED
+				: BatchImportStatus.VALIDATION_FAILED;
+			log.excelData = excelData;
+			log.errors = errors.length > 0 ? errors : null;
+		}
 
 		const saved = await this.logRepo.save(log);
 
@@ -290,9 +327,27 @@ export class BatchImportService {
 				audioMetadata,
 			);
 
-			// return {
-			// 	mapped,
-			// };
+			// Surface mapping warnings in the batch import log
+			if (mapped.warnings.length > 0) {
+				for (const w of mapped.warnings) {
+					this.appendLogError(log, w);
+				}
+				await this.logRepo.save(log);
+			}
+
+			// Validate required FK fields before attempting DB insert
+			const missingFields: string[] = [];
+			if (!mapped.release.albumFormatId) {
+				missingFields.push('Album Format (Release Type)');
+			}
+			if (missingFields.length > 0) {
+				const msg = `Cannot create release: missing required field(s): ${missingFields.join(', ')}. Please check the Excel data.`;
+				log.status = BatchImportStatus.FAILED;
+				this.appendLogError(log, msg);
+				await this.logRepo.save(log);
+				this.logger.error(`Release "${releaseFolder}" aborted: ${msg}`);
+				return { success: false, error: msg };
+			}
 
 			// Collect all unique artist names
 			const allArtistNames = new Set<string>();
@@ -517,7 +572,7 @@ export class BatchImportService {
 					}
 				}
 
-				// Save CoverArt thumbnail (original)
+				// Save CoverArt — original + all resized variants (75x75, 100x100, 160x160, 300x300)
 				const imageExts = ['.png', '.jpg', '.jpeg'];
 				const thumbnailKey = storageKeys.find((k) =>
 					imageExts.some((e) => k.toLowerCase().endsWith(e)),
@@ -554,13 +609,15 @@ export class BatchImportService {
 						savedFileId = savedFile.id;
 					}
 
-					const coverArt = new ReleaseCoverArt();
-					coverArt.fileId = savedFileId;
-					coverArt.releaseId = releaseId;
-					coverArt.width = 0;
-					coverArt.height = 0;
-					coverArt.type = 'original';
-					await manager.save(ReleaseCoverArt, coverArt);
+					// Generate all cover art sizes (original + 75x75, 100x100, 160x160, 300x300)
+					// Reuses the existing resize pipeline from ReleaseCoverArtService
+					await this.releaseCoverArtService.generateCoverArtsForBatchImport(
+						{
+							fileCoverArtOriginalId: savedFileId,
+							releaseId,
+							manager,
+						},
+					);
 				}
 
 				// Save Release Localizes (secondary language titles)
@@ -571,10 +628,12 @@ export class BatchImportService {
 					}
 				}
 
-				await queryRunner.commitTransaction();
-
+				// Update log status inside the transaction for atomicity
+				// (prevents stuck 'creating' state if server crashes after commit)
 				log.status = BatchImportStatus.COMPLETED;
-				await this.logRepo.save(log);
+				await manager.save(log);
+
+				await queryRunner.commitTransaction();
 
 				const action = isUpdate ? 'updated' : 'created';
 				this.logger.log(
@@ -600,7 +659,8 @@ export class BatchImportService {
 				error,
 			);
 			const message =
-				error instanceof Error ? error.message : String(error);
+				(error instanceof Error ? error.message : String(error)) ||
+				'Unknown error (empty message)';
 			const stack = error instanceof Error ? error.stack : undefined;
 
 			log.status = BatchImportStatus.FAILED;
@@ -638,6 +698,8 @@ export class BatchImportService {
 			});
 			await manager.delete(TrackLocalize, { trackId: In(trackIds) });
 			await manager.delete(AudioFile, { trackId: In(trackIds) });
+			await manager.delete(TrackPolicy, { trackId: In(trackIds) });
+			await manager.delete(TrackScanHistory, { trackId: In(trackIds) });
 		}
 
 		// Delete release sub-entities + tracks
@@ -697,7 +759,9 @@ export class BatchImportService {
 		]);
 
 		return {
-			albumFormat: new Map(albumFormats.map((r) => [r.name, r.id])),
+			albumFormat: new Map(
+				albumFormats.map((r) => [r.name.toLowerCase(), r.id]),
+			),
 			genre: new Map(genres.map((r) => [r.name, r.id])),
 			label: new Map(labels.map((r) => [r.name, r.id])),
 			trackSensitive: new Map(trackSensitives.map((r) => [r.name, r.id])),

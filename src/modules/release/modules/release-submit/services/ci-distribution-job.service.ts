@@ -15,17 +15,20 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { In, Repository } from 'typeorm';
 import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
-import { QueryGetListCiJobDto } from '../dto/ci-distribution-job.dto';
+import {
+	QueryGetListCiJobDto,
+	UpdateCiJobDto,
+} from '../dto/ci-distribution-job.dto';
 import {
 	CiDistributionJob,
 	CiJobStatus,
 	CiJobType,
 } from '../entities/ci-distribution-job.entity';
-import { ReleaseSubmitLogService } from './release-submit-log.service';
 import { ReleaseSubmitService2 } from './release-submit2.service';
 
 @Injectable()
@@ -40,7 +43,7 @@ export class CiDistributionJobService implements OnModuleInit {
 		@Inject(forwardRef(() => ReleaseSubmitService2))
 		private readonly releaseSubmitService: ReleaseSubmitService2,
 
-		private readonly submitLog: ReleaseSubmitLogService,
+		private readonly log: LogsService,
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly notificationResendService: NotificationResendService,
 		private readonly schedulerRegistry: SchedulerRegistry,
@@ -175,7 +178,7 @@ export class CiDistributionJobService implements OnModuleInit {
 					stepId,
 					outputMetadataStep,
 				});
-				this.submitLog.success({
+				this.log.success({
 					releaseSubmitId,
 					releaseSubmitStepId: stepId,
 					message: `[CiJob] All jobs completed, EXPORT_CI step resumed`,
@@ -484,7 +487,7 @@ export class CiDistributionJobService implements OnModuleInit {
 		const job = await this.findOne(id);
 		await this.repo.update(job.id, { status: CiJobStatus.FAILED });
 
-		this.submitLog.warning({
+		this.log.warning({
 			releaseSubmitId: job.releaseSubmitId,
 			releaseSubmitStepId: job.stepId,
 			message: `[CiJob] Job ${job.type} cancelled`,
@@ -522,5 +525,36 @@ export class CiDistributionJobService implements OnModuleInit {
 		} catch (err) {
 			this.logger.error(`[CRON] Daily batch failed: ${err.message}`);
 		}
+	}
+
+	async updateJob(id: string, dto: UpdateCiJobDto) {
+		const job = await this.findOne(id);
+
+		const updateData: Partial<CiDistributionJob> = {};
+
+		if (dto.status === 'skipped') {
+			updateData.status = CiJobStatus.SKIPPED;
+			this.log.warning({
+				releaseSubmitId: job.releaseSubmitId,
+				releaseSubmitStepId: job.stepId,
+				message: `[CiJob] Job ${job.type} skipped`,
+			});
+		}
+
+		if (dto.deliveryEmail !== undefined) {
+			updateData.deliveryEmail = dto.deliveryEmail;
+		}
+
+		if (dto.dspCiCodes !== undefined) {
+			updateData.dspCiCodes = dto.dspCiCodes;
+		}
+
+		if (dto.deliveryEmailSubject !== undefined) {
+			updateData.deliveryEmailSubject = dto.deliveryEmailSubject;
+		}
+
+		await this.repo.update(job.id, updateData);
+
+		return this.findOne(id);
 	}
 }

@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AccessControlService } from '../access-control/access-control.service';
 import { RoleService } from '../role/services/role.service';
 import { TenantService } from '../tenant/tenant.service';
 import { TenantRole } from './tenant-role.entity';
@@ -12,7 +13,10 @@ export class TenantRolesService {
 		@InjectRepository(TenantRole)
 		private readonly tenantRoleRepository: Repository<TenantRole>,
 		private readonly roleService: RoleService,
+		@Inject(forwardRef(() => TenantService))
 		private readonly tenantService: TenantService,
+		@Inject(forwardRef(() => AccessControlService))
+		private readonly accessControlService: AccessControlService,
 	) {}
 
 	async update(tenantId: string, { data }: UpdateTenantRolesDto) {
@@ -27,7 +31,15 @@ export class TenantRolesService {
 				isActive,
 			})),
 		);
-		return this.tenantRoleRepository.save(newData);
+		const result = await this.tenantRoleRepository.save(newData);
+
+		// Invalidate all auth contexts in this tenant — permissions changed
+		await this.accessControlService.invalidateAuthContext(
+			undefined,
+			tenantId,
+		);
+
+		return result;
 	}
 
 	async get(tenantId: string) {

@@ -6,14 +6,11 @@ import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-r
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
-import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
-import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { removeFolder } from 'src/utils/util';
 import { EntityManager, In } from 'typeorm';
@@ -33,14 +30,12 @@ export class ReleaseExecutionProcessorService {
 	constructor(
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
-		private readonly releaseDdexService: ReleaseDdexService,
 
 		@Inject(forwardRef(() => ReleaseService))
 		private readonly releaseService: ReleaseService,
 
 		private readonly dspRoutingService: DspRoutingConfigsService,
 		private readonly sftpConnectService: SftpConnectService,
-		private readonly notificationService: NotificationService,
 		private readonly notificationResendService: NotificationResendService,
 	) {}
 
@@ -500,87 +495,87 @@ export class ReleaseExecutionProcessorService {
 			}
 
 			case StepType.CREATE_METADATA_ERN: {
-				// Resolve config của DSP này (sender, recipient, ernVersion)
-				const config =
-					await this.dspRoutingService.resolveFullDeliveryConfig(
-						dspCode!,
-					);
+				// // Resolve config của DSP này (sender, recipient, ernVersion)
+				// const config =
+				// 	await this.dspRoutingService.resolveFullDeliveryConfig(
+				// 		dspCode!,
+				// 	);
 
-				// Tạo metadata (XML + audio + image) trên server
-				const { outputDir, batchId } =
-					await this.releaseDdexService.createMetadataOnServer({
-						releaseId,
-						ernVersion: config.ernVersion as unknown as ErnVersion2,
-						sender: config.sender,
-						recipient: config.recipient,
-					});
+				// // Tạo metadata (XML + audio + image) trên server
+				// const { outputDir, batchId } =
+				// 	await this.releaseDdexService.createMetadataOnServer({
+				// 		releaseId,
+				// 		ernVersion: config.ernVersion as unknown as ErnVersion2,
+				// 		sender: config.sender,
+				// 		recipient: config.recipient,
+				// 	});
 
-				// Lưu outputDir + batchId vào step metadata để UPLOAD_SFTP đọc lại
-				await this.manager.update(ReleaseExecutionStep, step.id, {
-					metadata: { outputDir, batchId, dspCode } as Record<
-						string,
-						any
-					>,
-				});
+				// // Lưu outputDir + batchId vào step metadata để UPLOAD_SFTP đọc lại
+				// await this.manager.update(ReleaseExecutionStep, step.id, {
+				// 	metadata: { outputDir, batchId, dspCode } as Record<
+				// 		string,
+				// 		any
+				// 	>,
+				// });
 
-				this.logger.log(
-					`[CREATE_METADATA_ERN] Release: ${releaseId} | DSP: ${dspCode} | outputDir: ${outputDir}`,
-				);
+				// this.logger.log(
+				// 	`[CREATE_METADATA_ERN] Release: ${releaseId} | DSP: ${dspCode} | outputDir: ${outputDir}`,
+				// );
 				break;
 			}
 
 			case StepType.CREATE_METADATA_CI: {
 				// Resolve config CI từ 1 DSP bất kỳ thuộc CI (lấy sender/recipient CI)
 				// Tìm 1 execDsp thuộc CI trong cùng execution để lấy dspCode
-				const execution = execDsp.execution;
-				const allExecDsps = await this.manager.find(
-					ReleaseExecutionDsp,
-					{
-						where: { executionId: execution.id },
-						relations: [
-							'dsp',
-							'dsp.dspRoutingConfig',
-							'dsp.dspRoutingConfig.aggregator',
-						],
-					},
-				);
-				const ciDspCode = allExecDsps.find(
-					(d) =>
-						d.dsp?.dspRoutingConfig?.mode ===
-							RoutingModeEnum.AGGREGATOR &&
-						d.dsp?.dspRoutingConfig?.aggregator?.code === 'CI',
-				)?.dsp?.code;
+				// const execution = execDsp.execution;
+				// const allExecDsps = await this.manager.find(
+				// 	ReleaseExecutionDsp,
+				// 	{
+				// 		where: { executionId: execution.id },
+				// 		relations: [
+				// 			'dsp',
+				// 			'dsp.dspRoutingConfig',
+				// 			'dsp.dspRoutingConfig.aggregator',
+				// 		],
+				// 	},
+				// );
+				// const ciDspCode = allExecDsps.find(
+				// 	(d) =>
+				// 		d.dsp?.dspRoutingConfig?.mode ===
+				// 			RoutingModeEnum.AGGREGATOR &&
+				// 		d.dsp?.dspRoutingConfig?.aggregator?.code === 'CI',
+				// )?.dsp?.code;
 
-				const ciConfig = ciDspCode
-					? await this.dspRoutingService.resolveFullDeliveryConfig(
-							ciDspCode,
-						)
-					: null;
+				// const ciConfig = ciDspCode
+				// 	? await this.dspRoutingService.resolveFullDeliveryConfig(
+				// 			ciDspCode,
+				// 		)
+				// 	: null;
 
-				if (!ciConfig) {
-					throw new Error('Không tìm thấy config CI để tạo metadata');
-				}
+				// if (!ciConfig) {
+				// 	throw new Error('Không tìm thấy config CI để tạo metadata');
+				// }
 
-				const { outputDir, batchId } =
-					await this.releaseDdexService.createMetadataOnServer({
-						releaseId,
-						ernVersion:
-							ciConfig.ernVersion as unknown as ErnVersion2,
-						sender: ciConfig.sender,
-						recipient: ciConfig.recipient,
-					});
+				// const { outputDir, batchId } =
+				// 	await this.releaseDdexService.createMetadataOnServer({
+				// 		releaseId,
+				// 		ernVersion:
+				// 			ciConfig.ernVersion as unknown as ErnVersion2,
+				// 		sender: ciConfig.sender,
+				// 		recipient: ciConfig.recipient,
+				// 	});
 
-				await this.manager.update(ReleaseExecutionStep, step.id, {
-					metadata: {
-						outputDir,
-						batchId,
-						dspCode: ciDspCode,
-					} as Record<string, any>,
-				});
+				// await this.manager.update(ReleaseExecutionStep, step.id, {
+				// 	metadata: {
+				// 		outputDir,
+				// 		batchId,
+				// 		dspCode: ciDspCode,
+				// 	} as Record<string, any>,
+				// });
 
-				this.logger.log(
-					`[CREATE_METADATA_CI] Release: ${releaseId} | outputDir: ${outputDir}`,
-				);
+				// this.logger.log(
+				// 	`[CREATE_METADATA_CI] Release: ${releaseId} | outputDir: ${outputDir}`,
+				// );
 				break;
 			}
 

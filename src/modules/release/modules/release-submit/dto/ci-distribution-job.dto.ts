@@ -11,6 +11,39 @@ export enum FieldOrderCiJob {
 	job_type = 'job.type',
 }
 
+export class UpdateCiJobDto {
+	@ApiProperty({
+		description: 'Chỉ cho phép skipped',
+		example: 'skipped',
+		enum: ['skipped'],
+	})
+	@IsOptional()
+	@IsEnum([CiJobStatus.SKIPPED])
+	status?: CiJobStatus.SKIPPED;
+
+	@ApiPropertyOptional({ example: 'support@state51.com' })
+	@IsOptional()
+	@IsString()
+	deliveryEmail?: string;
+
+	@ApiPropertyOptional({
+		description: 'DSP CI codes',
+		type: [String],
+		example: ['SPOTIFY', 'APPLE_MUSIC'],
+	})
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	dspCiCodes?: string[];
+
+	@ApiPropertyOptional({
+		example: 'New CI distribution request',
+	})
+	@IsOptional()
+	@IsString()
+	deliveryEmailSubject?: string;
+}
+
 export class QueryGetListCiJobDto extends BaseQueryDto2 {
 	@ApiPropertyOptional({ enum: CiJobType, example: 'email_state51' })
 	@IsOptional()

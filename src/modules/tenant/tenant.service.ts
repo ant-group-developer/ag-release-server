@@ -11,6 +11,7 @@ import differenceBy from 'lodash/differenceBy';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { buildTree, TreeNode } from 'src/utils/util.build-tree';
 import { Brackets, FindOneOptions, In, TreeRepository } from 'typeorm';
+import { AccessControlService } from '../access-control/access-control.service';
 import { AuthMessages } from '../auth/constants/messages';
 import { TenantUserType } from '../user/enum/user.enum';
 import { TenantUserService } from '../user/services/tenant-user.service';
@@ -35,6 +36,8 @@ export class TenantService {
 		private readonly tenantTreeRepo: TreeRepository<Tenant>,
 		@Inject(forwardRef(() => TenantUserService))
 		private readonly tenantUserService: TenantUserService,
+		@Inject(forwardRef(() => AccessControlService))
+		private readonly accessControlService: AccessControlService,
 	) {}
 
 	checkCanAccess(tenantUserId: string, tenantId: string, parentId?: string) {
@@ -477,6 +480,9 @@ export class TenantService {
 				{ isActive: dto.isActive, modifierId: userReqId },
 			);
 		}
+
+		// Invalidate all auth contexts for users in this tenant
+		await this.accessControlService.invalidateAuthContext(undefined, id);
 
 		return this.findOne(id, tenantId);
 	}

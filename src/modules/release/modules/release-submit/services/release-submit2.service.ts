@@ -14,6 +14,7 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
@@ -39,7 +40,11 @@ import {
 	QueryGetListSubmitDto,
 	ReleaseSubmitResultDto,
 } from '../dto/release-submit.dto';
-import { CiJobType } from '../entities/ci-distribution-job.entity';
+import {
+	CiDistributionJob,
+	CiJobStatus,
+	CiJobType,
+} from '../entities/ci-distribution-job.entity';
 import { ReleaseSubmitStep } from '../entities/release-submit-step.entity';
 import {
 	ExecutionType,
@@ -51,7 +56,6 @@ import {
 	SubmitStepType,
 } from '../release-submit.enum';
 import { CiDistributionJobService } from './ci-distribution-job.service';
-import { ReleaseSubmitLogService } from './release-submit-log.service';
 
 @Injectable()
 export class ReleaseSubmitService2 {
@@ -84,7 +88,7 @@ export class ReleaseSubmitService2 {
 
 		@Inject(forwardRef(() => ReleaseService))
 		private readonly releaseService: ReleaseService,
-		private readonly submitLog: ReleaseSubmitLogService,
+		private readonly logService: LogsService,
 
 		@Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJobService,
@@ -131,7 +135,7 @@ export class ReleaseSubmitService2 {
 		// Mark tất cả DSPs được chọn → PROCESSING trong ReleaseDspDelivery
 		await this.markDspDeliveriesProcessing(releaseId, dspCodes);
 
-		this.submitLog.log({
+		this.logService.log({
 			releaseSubmitId: saved.id,
 			message: 'Submit created, starting async processing',
 			data: { releaseId, dspCodes },
@@ -139,7 +143,7 @@ export class ReleaseSubmitService2 {
 
 		// Fire-and-forget: bắt đầu xử lý bất đồng bộ
 		this.processAsync(saved.id).catch((err) => {
-			this.submitLog.error({
+			this.logService.error({
 				releaseSubmitId: saved.id,
 				message: `processAsync failed: ${err.message}`,
 				data: { stack: err.stack },
@@ -158,7 +162,7 @@ export class ReleaseSubmitService2 {
 			// Phase 2: Chạy tuần tự các parent steps
 			await this.runPipeline(submitId);
 		} catch (err) {
-			this.submitLog.error({
+			this.logService.error({
 				releaseSubmitId: submitId,
 				message: `Fatal error: ${err.message}`,
 				data: { stack: err.stack },
@@ -212,6 +216,17 @@ export class ReleaseSubmitService2 {
 					SubmitStepStatus.NEW,
 					SubmitStepStatus.WAITING_ACTION,
 				],
+			})
+			.execute();
+
+		// Skip pending CI distribution jobs
+		await this.manager
+			.createQueryBuilder()
+			.update(CiDistributionJob)
+			.set({ status: CiJobStatus.SKIPPED })
+			.where('release_submit_id IN (:...ids)', { ids: submitIds })
+			.andWhere('status IN (:...jobStatuses)', {
+				jobStatuses: [CiJobStatus.PENDING, CiJobStatus.PROCESSING],
 			})
 			.execute();
 	}
@@ -472,7 +487,7 @@ export class ReleaseSubmitService2 {
 			);
 		}
 
-		this.submitLog.success({
+		this.logService.success({
 			releaseSubmitId: submitId,
 			message: `Plan created: ${savedParents.length} parent steps, ${childStepsToInsert.length} child steps`,
 			data: { parentTypes: savedParents.map((s) => s.type) },
@@ -516,7 +531,7 @@ export class ReleaseSubmitService2 {
 					completedAt: new Date(),
 				});
 
-				this.submitLog.error({
+				this.logService.error({
 					releaseSubmitId: submitId,
 					releaseSubmitStepId: step.id,
 					message: `Critical step ${step.type} failed, submit marked FAILED`,
@@ -714,7 +729,7 @@ export class ReleaseSubmitService2 {
 				status: SubmitStepStatus.DONE,
 				completedAt: new Date(),
 			});
-			this.submitLog.success({
+			this.logService.success({
 				releaseSubmitId: step.releaseSubmitId,
 				releaseSubmitStepId: step.id,
 				message: `Step ${step.type} completed`,
@@ -725,7 +740,7 @@ export class ReleaseSubmitService2 {
 				status: SubmitStepStatus.FAILED,
 				completedAt: new Date(),
 			});
-			this.submitLog.error({
+			this.logService.error({
 				releaseSubmitId: step.releaseSubmitId,
 				releaseSubmitStepId: step.id,
 				message: `Step ${step.type} failed: ${err.message}`,
@@ -760,7 +775,7 @@ export class ReleaseSubmitService2 {
 
 		switch (step.type) {
 			case SubmitStepType.GEN_UPC: {
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[GEN_UPC] Release: ${releaseId}`,
@@ -777,7 +792,7 @@ export class ReleaseSubmitService2 {
 
 			case SubmitStepType.GEN_ISRCS: {
 				// Handled by children (GEN_ISRC per track)
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[GEN_ISRCS] handled by children`,
@@ -787,7 +802,7 @@ export class ReleaseSubmitService2 {
 
 			case SubmitStepType.GEN_ISRC: {
 				const trackId = step.metadata?.input?.trackId;
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[GEN_ISRC] Track: ${trackId}`,
@@ -803,7 +818,7 @@ export class ReleaseSubmitService2 {
 			}
 
 			case SubmitStepType.VALIDATE: {
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[VALIDATE] Release: ${releaseId}`,
@@ -851,13 +866,13 @@ export class ReleaseSubmitService2 {
 				// Create metadata
 				const { outputDir, batchId, xml } =
 					await this.releaseDdexService.createMetadataOnServer({
-						releaseId,
+						release: submitDb.metadata.input.releaseSnapshot,
 						ernVersion: config.ernVersion as unknown as ErnVersion2,
 						sender: config.sender,
 						recipient: config.recipient,
 					});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[CREATE_AND_UPLOAD_DIRECT] Metadata created for DSP: ${dspCode}`,
@@ -882,7 +897,7 @@ export class ReleaseSubmitService2 {
 					} as any,
 				});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[CREATE_AND_UPLOAD_DIRECT] DSP: ${dspCode} uploaded`,
@@ -920,7 +935,7 @@ export class ReleaseSubmitService2 {
 					);
 				}
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[SYNC_DATA_FROM_DSP] DSP: ${dsp.name} synced`,
@@ -955,13 +970,13 @@ export class ReleaseSubmitService2 {
 				// Create metadata
 				const { outputDir, batchId, xml } =
 					await this.releaseDdexService.createMetadataOnServer({
-						releaseId,
+						release: submitDb.metadata.input.releaseSnapshot,
 						ernVersion: config.ernVersion as unknown as ErnVersion2,
 						sender: config.sender,
 						recipient: config.recipient,
 					});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[CREATE_AND_UPLOAD_CI] Metadata created`,
@@ -988,7 +1003,7 @@ export class ReleaseSubmitService2 {
 					} as any,
 				});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[CREATE_AND_UPLOAD_CI] uploaded`,
@@ -1031,7 +1046,7 @@ export class ReleaseSubmitService2 {
 						`${batchId}.done`,
 					);
 					await client.mkdir(donePath, true);
-					this.submitLog.success({
+					this.logService.success({
 						releaseSubmitId: step.releaseSubmitId,
 						releaseSubmitStepId: step.id,
 						message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
@@ -1054,7 +1069,7 @@ export class ReleaseSubmitService2 {
 					scheduledAt,
 				});
 
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[WAIT_PARTNER_PROCESS] Scheduled resume at ${scheduledAt.toISOString()} (+${waitMinutes}min)`,
@@ -1063,7 +1078,7 @@ export class ReleaseSubmitService2 {
 			}
 
 			case SubmitStepType.VALIDATE_QA_CI: {
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[VALIDATE_QA_CI] Release: ${releaseId}`,
@@ -1088,7 +1103,7 @@ export class ReleaseSubmitService2 {
 			}
 
 			case SubmitStepType.EXPORT_CI: {
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[EXPORT_CI] Release: ${releaseId}`,
@@ -1158,7 +1173,7 @@ export class ReleaseSubmitService2 {
 					status: SubmitStepStatus.WAITING_ACTION,
 				});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[EXPORT_CI] ${state51DspCodes.length > 0 ? 'email_state51' : ''} ${ciDealDspCodes.length > 0 ? 'admin_export' : ''} jobs created, step paused`,
@@ -1171,7 +1186,7 @@ export class ReleaseSubmitService2 {
 				const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
 				if (!upc) throw new Error('Missing UPC from release snapshot');
 
-				this.submitLog.log({
+				this.logService.log({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[SYNC_DATA_DSP_CI] Fetching DSP statuses from CI for UPC: ${upc}`,
@@ -1211,7 +1226,7 @@ export class ReleaseSubmitService2 {
 					} as any,
 				});
 
-				this.submitLog.success({
+				this.logService.success({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`,
@@ -1253,14 +1268,14 @@ export class ReleaseSubmitService2 {
 		});
 
 		for (const step of readySteps) {
-			this.submitLog.log({
+			this.logService.log({
 				releaseSubmitId: step.releaseSubmitId,
 				releaseSubmitStepId: step.id,
 				message: `[CRON] Auto-resuming scheduled step ${step.type}`,
 			});
 
 			this.resumeFromWaiting({ stepId: step.id }).catch((err) => {
-				this.submitLog.error({
+				this.logService.error({
 					releaseSubmitId: step.releaseSubmitId,
 					releaseSubmitStepId: step.id,
 					message: `[CRON] Auto-resume failed: ${err.message}`,
@@ -1302,7 +1317,7 @@ export class ReleaseSubmitService2 {
 
 		// runPipeline → resolveSubmitStatus → deriveAndUpdateReleaseStatus sẽ tự sync
 		this.runPipeline(step.releaseSubmitId).catch((err) => {
-			this.submitLog.error({
+			this.logService.error({
 				releaseSubmitId: step.releaseSubmitId,
 				releaseSubmitStepId: step.id,
 				message: `Resume re-execute failed: ${err.message}`,
@@ -1362,7 +1377,7 @@ export class ReleaseSubmitService2 {
 
 		// Re-execute
 		this.runPipeline(step.releaseSubmitId).catch((err) => {
-			this.submitLog.error({
+			this.logService.error({
 				releaseSubmitId: step.releaseSubmitId,
 				releaseSubmitStepId: step.id,
 				message: `Retry re-execute failed: ${err.message}`,
@@ -1406,7 +1421,7 @@ export class ReleaseSubmitService2 {
 				status: ReleaseSubmitStatus.DONE,
 				completedAt: new Date(),
 			});
-			this.submitLog.success({
+			this.logService.success({
 				releaseSubmitId: submitId,
 				message: 'All steps completed (no distribution branches)',
 			});
@@ -1531,17 +1546,17 @@ export class ReleaseSubmitService2 {
 		// Derive release status từ DSP deliveries
 		await this.deriveAndUpdateReleaseStatus(submit.releaseId, finalStatus);
 
-		this.submitLog.log({
-			releaseSubmitId: submitId,
-			message: `Submit resolved: ${finalStatus}`,
-			data: {
-				branchStatuses: distBranches.map((s) => ({
-					type: s.type,
-					status: s.status,
-				})),
-				result,
-			},
-		});
+		// this.log.log({
+		// 	releaseSubmitId: submitId,
+		// 	message: `Submit resolved: ${finalStatus}`,
+		// 	data: {
+		// 		branchStatuses: distBranches.map((s) => ({
+		// 			type: s.type,
+		// 			status: s.status,
+		// 		})),
+		// 		result,
+		// 	},
+		// });
 	}
 
 	// query
@@ -1597,14 +1612,31 @@ export class ReleaseSubmitService2 {
 	}
 
 	async getList(query: QueryGetListSubmitDto) {
-		const { page, pageSize, status, releaseId } = query;
+		const { keyword, page, pageSize, status, releaseId, type } = query;
 
 		const qb = this.submitRepo.createQueryBuilder('submit');
 		// .leftJoinAndSelect('submit.steps', 'steps', 'steps.parent_step_id IS NULL');
 
+		if (keyword?.length) {
+			const keywords = keyword.map((k) => `%${k}%`);
+
+			qb.andWhere(
+				`(
+					submit.release_title ILIKE ANY(:keywords)
+					OR submit.release_upc ILIKE ANY(:keywords)
+				)`,
+				{ keywords },
+			);
+		}
+
 		// Filter status
 		if (status?.length) {
 			qb.andWhere('submit.status IN (:...status)', { status });
+		}
+
+		// Filter type
+		if (type?.length) {
+			qb.andWhere('submit.type IN (:...type)', { type });
 		}
 
 		// Filter releaseId
