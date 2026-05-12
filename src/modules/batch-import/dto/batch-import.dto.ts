@@ -24,6 +24,14 @@ export class GetBatchImportLogsDto {
 
 	@IsOptional()
 	@IsString()
+	upc?: string;
+
+	@IsOptional()
+	@IsString()
+	tenantCode?: string;
+
+	@IsOptional()
+	@IsString()
 	status?: string;
 }
 

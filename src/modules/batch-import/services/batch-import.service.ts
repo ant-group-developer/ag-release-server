@@ -59,12 +59,33 @@ export class BatchImportService {
 	) {}
 
 	async getLogs(params: GetBatchImportLogsDto) {
-		const { page = 1, pageSize = 20, batchId, status } = params;
+		const {
+			page = 1,
+			pageSize = 20,
+			batchId,
+			upc,
+			tenantCode,
+			status,
+		} = params;
 
 		const qb = this.logRepo.createQueryBuilder('log');
 
 		if (batchId) {
-			qb.andWhere('log.batchId = :batchId', { batchId });
+			qb.andWhere('log.batchId LIKE :batchId', {
+				batchId: `%${batchId}%`,
+			});
+		}
+
+		if (upc) {
+			qb.andWhere('log.releaseFolder LIKE :upc', {
+				upc: `%${upc}%`,
+			});
+		}
+
+		if (tenantCode) {
+			qb.andWhere('log.tenantCode LIKE :tenantCode', {
+				tenantCode: `%${tenantCode}%`,
+			});
 		}
 
 		if (status) {
@@ -204,16 +225,28 @@ export class BatchImportService {
 
 		const isValid = errors.length === 0;
 
-		const log = this.logRepo.create({
-			tenantCode,
-			batchId,
-			releaseFolder,
-			status: isValid
-				? BatchImportStatus.VALIDATED
-				: BatchImportStatus.VALIDATION_FAILED,
-			excelData,
-			errors: errors.length > 0 ? errors : null,
+		let log = await this.logRepo.findOne({
+			where: { batchId, releaseFolder },
 		});
+
+		if (!log) {
+			log = this.logRepo.create({
+				tenantCode,
+				batchId,
+				releaseFolder,
+				status: isValid
+					? BatchImportStatus.VALIDATED
+					: BatchImportStatus.VALIDATION_FAILED,
+				excelData,
+				errors: errors.length > 0 ? errors : null,
+			});
+		} else {
+			log.status = isValid
+				? BatchImportStatus.VALIDATED
+				: BatchImportStatus.VALIDATION_FAILED;
+			log.excelData = excelData;
+			log.errors = errors.length > 0 ? errors : null;
+		}
 
 		const saved = await this.logRepo.save(log);
 
