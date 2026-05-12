@@ -68,30 +68,30 @@ export class LogsService {
 	}
 
 	private saveDbAndSendNotificationToDev_Safe(data: WriteLogDto) {
-		// console.log(data);
+		console.log(data);
 
 		switch (data.level) {
 			case LogLevel.ERROR:
-				// this.logger.error(data.message, data.data);
+				this.logger.error(data.message, data.data);
 				break;
 
 			case LogLevel.WARNING:
-				// this.logger.warn(data.message, data.data);
+				this.logger.warn(data.message, data.data);
 				break;
 
 			default:
-				// this.logger.log(data.message, data.data);
+				this.logger.log(data.message, data.data);
 				break;
 		}
 
-		// if (data.type === ErrorType.SYSTEM) {
-		// 	this.notificationService
-		// 		.sendToDev({
-		// 			subject: `[${data.level}] SYSTEM ERROR`,
-		// 			html: JSON.stringify(data, null, 2),
-		// 		})
-		// 		.catch((error) => this.logger.error(error));
-		// }
+		if (data.type === ErrorType.SYSTEM) {
+			this.notificationService
+				.sendToDev({
+					subject: `[${data.level}] SYSTEM ERROR`,
+					html: JSON.stringify(data, null, 2),
+				})
+				.catch((error) => this.logger.error(error));
+		}
 
 		// skip persist
 		if (!this.saveDbLevels.includes(data.level!)) {
