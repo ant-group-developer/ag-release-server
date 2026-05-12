@@ -117,6 +117,8 @@ export class ReleaseSubmitService2 {
 		const submit = this.submitRepo.create({
 			releaseId,
 			status: ReleaseSubmitStatus.NEW,
+			releaseTitle: release.title ?? '',
+			releaseUpc: release.upc ?? '',
 			type,
 			metadata: {
 				input: {
@@ -947,25 +949,111 @@ export class ReleaseSubmitService2 {
 			// CI Aggregator sub-steps
 			// ============================
 
+			// case SubmitStepType.CREATE_AND_UPLOAD_CI: {
+			// 	// Tìm 1 DSP CI bất kỳ để lấy config
+			// 	const parent = await this.getParentStep(step);
+			// 	const ciDsps = parent?.metadata?.input?.dsps || [];
+			// 	if (ciDsps.length === 0) throw new Error('No CI DSPs found');
+
+			// 	const ciDsp = await this.manager.findOne(Dsp, {
+			// 		where: { id: ciDsps[0].id },
+			// 		relations: [
+			// 			'dspRoutingConfig',
+			// 			'dspRoutingConfig.aggregator',
+			// 		],
+			// 	});
+			// 	if (!ciDsp?.code) throw new Error('CI DSP not found');
+
+			// 	const config =
+			// 		await this.dspRoutingService.resolveFullDeliveryConfig(
+			// 			ciDsp.code,
+			// 		);
+
+			// 	// Create metadata
+			// 	const { outputDir, batchId, xml } =
+			// 		await this.releaseDdexService.createMetadataOnServer({
+			// 			release: submitDb.metadata.input.releaseSnapshot,
+			// 			ernVersion: config.ernVersion as unknown as ErnVersion2,
+			// 			sender: config.sender,
+			// 			recipient: config.recipient,
+			// 		});
+
+			// 	this.logService.success({
+			// 		releaseSubmitId: step.releaseSubmitId,
+			// 		releaseSubmitStepId: step.id,
+			// 		message: `[CREATE_AND_UPLOAD_CI] Metadata created`,
+			// 		data: { outputDir, batchId },
+			// 	});
+
+			// 	// Upload SFTP
+			// 	await this.sftpConnectService.uploadFolder({
+			// 		sftp: config.sftp,
+			// 		localDir: outputDir,
+			// 		remoteDir: config.sftp.path ?? '/',
+			// 	});
+
+			// 	await removeFolder(outputDir);
+
+			// 	// Save metadata for downstream steps (CREATE_FOLDER_DONE_CI, etc.)
+			// 	await this.stepRepo.update(step.id, {
+			// 		metadata: {
+			// 			input: {
+			// 				ernVersion: config.ernVersion,
+			// 				dspCode: ciDsp.code,
+			// 			},
+			// 			output: { outputDir, batchId, xml },
+			// 		} as any,
+			// 	});
+
+			// 	this.logService.success({
+			// 		releaseSubmitId: step.releaseSubmitId,
+			// 		releaseSubmitStepId: step.id,
+			// 		message: `[CREATE_AND_UPLOAD_CI] uploaded`,
+			// 	});
+			// 	break;
+			// }
+
 			case SubmitStepType.CREATE_AND_UPLOAD_CI: {
-				// Tìm 1 DSP CI bất kỳ để lấy config
+				// Tìm DSP CI có config hợp lệ
 				const parent = await this.getParentStep(step);
 				const ciDsps = parent?.metadata?.input?.dsps || [];
 				if (ciDsps.length === 0) throw new Error('No CI DSPs found');
 
-				const ciDsp = await this.manager.findOne(Dsp, {
-					where: { id: ciDsps[0].id },
-					relations: [
-						'dspRoutingConfig',
-						'dspRoutingConfig.aggregator',
-					],
-				});
-				if (!ciDsp?.code) throw new Error('CI DSP not found');
+				let ciDsp: Dsp | null = null;
+				let config: Awaited<
+					ReturnType<
+						typeof this.dspRoutingService.resolveFullDeliveryConfig
+					>
+				> | null = null;
 
-				const config =
-					await this.dspRoutingService.resolveFullDeliveryConfig(
-						ciDsp.code,
-					);
+				for (const dspRef of ciDsps) {
+					const candidate = await this.manager.findOne(Dsp, {
+						where: { id: dspRef.id },
+						relations: [
+							'dspRoutingConfig',
+							'dspRoutingConfig.aggregator',
+						],
+					});
+					if (!candidate?.code) continue;
+
+					try {
+						const candidateConfig =
+							await this.dspRoutingService.resolveFullDeliveryConfig(
+								candidate.code,
+							);
+						if (candidateConfig) {
+							ciDsp = candidate;
+							config = candidateConfig;
+							break;
+						}
+					} catch {
+						// DSP này không có config, thử DSP tiếp theo
+						continue;
+					}
+				}
+
+				if (!ciDsp || !config)
+					throw new Error('No CI DSP with valid config found');
 
 				// Create metadata
 				const { outputDir, batchId, xml } =
