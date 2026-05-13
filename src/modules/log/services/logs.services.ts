@@ -72,15 +72,15 @@ export class LogsService {
 
 		switch (data.level) {
 			case LogLevel.ERROR:
-				// this.logger.error(data.message, data.data);
+				this.logger.error(data.message, data.data);
 				break;
 
 			case LogLevel.WARNING:
-				// this.logger.warn(data.message, data.data);
+				this.logger.warn(data.message, data.data);
 				break;
 
 			default:
-				// this.logger.log(data.message, data.data);
+				this.logger.log(data.message, data.data);
 				break;
 		}
 

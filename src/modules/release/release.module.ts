@@ -45,6 +45,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { Track } from '../track/entities/track.entity';
 import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';
 import { ReleaseExecutionStep } from './modules/release-executions/entities/release-execution-step.entity';
@@ -64,6 +65,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 	imports: [
 		TypeOrmModule.forFeature([
 			Release,
+			Track,
 			AlbumFormat,
 			Genre,
 			Label,
