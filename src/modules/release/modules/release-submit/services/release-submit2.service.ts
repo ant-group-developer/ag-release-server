@@ -601,13 +601,13 @@ export class ReleaseSubmitService2 {
 				s.status !== SubmitStepStatus.FAILED,
 		);
 
-		// for (const distStep of pendingDistSteps) {
-		//     await this.runStep(distStep);
-		// }
+		for (const distStep of pendingDistSteps) {
+			await this.runStep(distStep);
+		}
 
-		await Promise.allSettled(
-			pendingDistSteps.map((step) => this.runStep(step)),
-		);
+		// await Promise.allSettled(
+		// 	pendingDistSteps.map((step) => this.runStep(step)),
+		// );
 
 		await this.resolveSubmitStatus(submitId);
 	}
