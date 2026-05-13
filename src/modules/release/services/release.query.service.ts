@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrmService } from 'src/modules/orm/orm.service';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
 	Brackets,
@@ -37,6 +38,9 @@ export class ReleaseQueryService {
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(Track)
+		private readonly trackRepo: Repository<Track>,
 
 		private readonly ormService: OrmService,
 	) {
@@ -785,7 +789,7 @@ export class ReleaseQueryService {
 		return toSnakeCaseKeys(raw);
 	}
 
-	async findOneReleaseFull({
+	async findOneReleaseFull1({
 		releaseId,
 		relations,
 	}: {
@@ -807,6 +811,139 @@ export class ReleaseQueryService {
 		release.tracks = release.tracks ?? [];
 		release.releaseArtists = release.releaseArtists ?? [];
 		release.releaseCoverArts = release.releaseCoverArts ?? [];
+
+		return release;
+	}
+
+	async findOneReleaseFull({
+		releaseId,
+		relations,
+	}: {
+		releaseId: string;
+		relations?: string[];
+	}): Promise<Release> {
+		// Query 1: release + các relation phẳng (không nhân rows)
+		const release = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect('release.label', 'label')
+			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
+			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
+			.leftJoinAndSelect('release.releaseLanguage', 'releaseLanguage')
+			.leftJoinAndSelect('releaseLanguage.audioLanguage', 'audioLanguage')
+			.leftJoinAndSelect(
+				'releaseLanguage.metadataLanguage',
+				'releaseMetadataLanguage',
+			)
+			.leftJoinAndSelect('release.releaseTerritory', 'releaseTerritory')
+			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
+			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
+			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
+			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.where('release.id = :releaseId', { releaseId })
+			.getOne();
+
+		if (!release) throw ReleaseException.NOT_FOUND();
+
+		// Query 2: release artists + profiles (tách riêng tránh nhân với tracks)
+		const releaseWithArtists = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtists')
+			.leftJoinAndSelect('releaseArtists.artist', 'releaseArtist')
+			.leftJoinAndSelect(
+				'releaseArtist.artistProfiles',
+				'releaseArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'releaseArtistProfile.dsp',
+				'releaseArtistProfileDsp',
+			)
+			.leftJoinAndSelect(
+				'release.releaseContributors',
+				'releaseContributors',
+			)
+			.leftJoinAndSelect(
+				'releaseContributors.artistRole',
+				'releaseContributorRole',
+			)
+			.leftJoinAndSelect(
+				'releaseContributors.artist',
+				'releaseContributorArtist',
+			)
+			.where('release.id = :releaseId', { releaseId })
+			.getOne();
+
+		// Query 3: tracks + tất cả relation của track
+		const tracks = await this.trackRepo
+			.createQueryBuilder('track')
+			.leftJoinAndSelect('track.audioFile', 'audioFile')
+			.leftJoinAndSelect('track.priceTier', 'priceTier')
+			.leftJoinAndSelect('priceTier.currency', 'currency')
+			.leftJoinAndSelect('track.primaryGenre', 'trackPrimaryGenre')
+			.leftJoinAndSelect('track.subGenre', 'trackSubGenre')
+			.leftJoinAndSelect('track.trackSensitive', 'trackSensitive')
+			.leftJoinAndSelect('track.trackLanguage', 'trackLanguage')
+			.leftJoinAndSelect('trackLanguage.audioLanguage', 't_audioLanguage')
+			.leftJoinAndSelect(
+				'trackLanguage.metadataLanguage',
+				'trackMetadataLanguage',
+			)
+			.leftJoinAndSelect('track.trackArtists', 'trackArtists')
+			.leftJoinAndSelect('trackArtists.artist', 'trackArtist')
+			.leftJoinAndSelect(
+				'trackArtist.artistProfiles',
+				'trackArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'trackArtistProfile.dsp',
+				'trackArtistProfileDsp',
+			)
+			.leftJoinAndSelect('track.trackContributors', 'trackContributors')
+			.leftJoinAndSelect(
+				'trackContributors.artistRole',
+				'contributorRole',
+			)
+			.leftJoinAndSelect('trackContributors.artist', 'contributorArtist')
+			.leftJoinAndSelect(
+				'contributorArtist.artistProfiles',
+				'contributorArtistProfile',
+			)
+			.leftJoinAndSelect(
+				'contributorArtistProfile.dsp',
+				'contributorArtistProfileDsp',
+			)
+			.where('track.release_id = :releaseId', { releaseId })
+			.orderBy('track.order', 'ASC')
+			.getMany();
+
+		// Query 4: optional DSP deliveries
+		if (relations?.includes('release.releaseDspDeliveries')) {
+			const releaseWithDsp = await this.releaseRepo
+				.createQueryBuilder('release')
+				.leftJoinAndSelect(
+					'release.releaseDspDeliveries',
+					'releaseDspDelivery',
+				)
+				.leftJoinAndSelect(
+					'releaseDspDelivery.dsp',
+					'releaseDspDeliveryDsp',
+				)
+				.leftJoinAndSelect(
+					'releaseDspDeliveryDsp.dspRoutingConfig',
+					'dspRoutingConfig',
+				)
+				.leftJoinAndSelect('dspRoutingConfig.aggregator', 'aggregator')
+				.where('release.id = :releaseId', { releaseId })
+				.getOne();
+
+			release.releaseDspDeliveries =
+				releaseWithDsp?.releaseDspDeliveries ?? [];
+		}
+
+		// Assemble
+		release.releaseArtists = releaseWithArtists?.releaseArtists ?? [];
+		release.releaseContributors =
+			releaseWithArtists?.releaseContributors ?? [];
+		release.tracks = tracks ?? [];
 
 		return release;
 	}
