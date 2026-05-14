@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
 	ResponseError,
 	ResponseSuccess,
@@ -15,12 +15,43 @@ export class NotificationController {
 	) {}
 
 	@Get('resend/emails')
+	@ApiOperation({
+		summary: 'Lấy danh sách emails từ Resend',
+	})
+	@ApiResponse({
+		status: 200,
+		description: 'Lấy danh sách emails thành công',
+	})
 	async getEmails(@Query() query: GetEmailsDto) {
 		const emails = await this.notificationResendService.getEmails(query);
 		return new ResponseSuccess({ message: 'Thành công', data: emails });
 	}
 
 	@Post('resend/test')
+	@ApiOperation({
+		summary: 'Gửi email test thông qua Resend',
+	})
+	@ApiBody({
+		schema: {
+			type: 'object',
+			required: ['email'],
+			properties: {
+				email: {
+					type: 'string',
+					example: 'test@example.com',
+					description: 'Email nhận mail test',
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Gửi email test thành công',
+	})
+	@ApiResponse({
+		status: 400,
+		description: 'Thiếu email hoặc gửi email thất bại',
+	})
 	async testResend(@Body('email') email: string) {
 		if (!email) {
 			throw new ResponseError({
