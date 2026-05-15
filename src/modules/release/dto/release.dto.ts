@@ -219,7 +219,14 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	priceTierId?: string | null;
 }
 
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
 export class QueryGetListReleaseDto extends BaseQueryDto {
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Release IDs',
+		example: ['550e8400-e29b-41d4-a716-446655440000'],
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -232,6 +239,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@IsArray()
 	ids?: string[];
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Include release IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -244,13 +255,25 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@IsArray()
 	idInclude?: string[];
 
+	@ApiPropertyOptional({
+		description: 'Release title',
+		example: 'My Album',
+	})
 	@IsOptional()
 	@IsString()
 	title?: string;
 
+	@ApiPropertyOptional({
+		enum: FieldOrderRelease,
+		default: FieldOrderRelease.TITLE,
+	})
 	@IsEnum(FieldOrderRelease)
 	fieldOrder: FieldOrderRelease = FieldOrderRelease.TITLE;
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Album format IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -262,6 +285,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10, { each: true })
 	albumFormatId?: string[];
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Primary genre IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -273,6 +300,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10, { each: true })
 	primaryGenreId?: string[];
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Sub genre IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -284,6 +315,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10, { each: true })
 	subGenreId?: string[];
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Label IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -295,6 +330,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10, { each: true })
 	labelId?: string[];
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Artist IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -306,14 +345,27 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@Length(10, 10, { each: true })
 	artistId?: string[];
 
+	@ApiPropertyOptional({
+		type: String,
+		format: 'date-time',
+		description: 'Start release date',
+	})
 	@IsOptional()
-	// @IsDate()
 	startDateRelease?: Date;
 
+	@ApiPropertyOptional({
+		type: String,
+		format: 'date-time',
+		description: 'End release date',
+	})
 	@IsOptional()
-	// @IsDate()
 	endDateRelease?: Date;
 
+	@ApiPropertyOptional({
+		enum: ReleaseStatus,
+		isArray: true,
+		description: 'Release statuses',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -326,6 +378,11 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@IsEnum(ReleaseStatus, { each: true })
 	status?: ReleaseStatus[];
 
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Is various artist release',
+		example: true,
+	})
 	@IsOptional()
 	@IsBoolean()
 	@Transform(({ value }) => {
@@ -335,6 +392,10 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	})
 	isVariousArtist?: boolean;
 
+	@ApiPropertyOptional({
+		type: [String],
+		description: 'Tenant IDs',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -478,4 +539,14 @@ export class FileExportReleaseCiDto {
 	@ArrayNotEmpty()
 	@IsString({ each: true })
 	dspCodeCi: string[];
+}
+
+export class BulkSubmitReleaseDto {
+	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsUUID('4', { each: true })
+	ids: string[];
+
+	@ApiProperty({ type: [String] })
+	@IsString({ each: true })
+	codes: string[];
 }

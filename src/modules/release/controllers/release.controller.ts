@@ -11,7 +11,14 @@ import {
 	Req,
 	Res,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBody,
+	ApiOperation,
+	ApiParam,
+	ApiQuery,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import {
 	PageDto,
 	ResponseError,
@@ -32,6 +39,7 @@ import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
 import {
+	BulkSubmitReleaseDto,
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
 	UpdateReleaseDto,
@@ -104,6 +112,20 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Bulk submit releases' })
+	@ApiBody({ type: BulkSubmitReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@Post('bulk-submit')
+	async bulkSubmit(@Req() req: Request, @Body() dto: BulkSubmitReleaseDto) {
+		await this.releaseService.bulkSubmit(dto);
+
+		return new ResponseSuccess({
+			messageCode: 'common.processing',
+		});
+	}
+
+	// id
 	@Get(':id')
 	async getOne(
 		@Param('id') id: string,
@@ -270,7 +292,7 @@ export class ReleaseController {
 		@Body() dto: SubmitReleaseDto,
 	) {
 		const userId = req.user!.sub;
-		await this.releaseService.submit3(id, dto);
+		await this.releaseService.submit(id, dto);
 
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
