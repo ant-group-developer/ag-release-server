@@ -59,6 +59,15 @@ export class CiDistributionJobController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('daily-send')
+	async handleDailySend() {
+		await this.jobService.handleDailySend();
+
+		return {
+			message: 'Daily send executed',
+		};
+	}
+
 	@ApiOperation({
 		summary: 'Download Excel — chọn jobs → tải file Excel về',
 		description:

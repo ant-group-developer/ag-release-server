@@ -19,6 +19,7 @@ import {
 import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
 import {
+	BulkSubmitReleaseDto,
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
@@ -455,42 +456,25 @@ export class ReleaseService {
 		}
 	}
 
-	// async submit2(id: string, userId: string, dto: SubmitReleaseDto) {
-	// 	await this.releaseQueryService.findOne(id);
-	// 	await this.releaseRepo.update(id, {
-	// 		status: ReleaseStatus.SUBMITTED,
-	// 		releaseEndDate: null,
-	// 	});
-	// 	this.releaseExecutionsService
-	// 		.createAndProcess({
-	// 			releaseId: id,
-	// 			type: ExecutionType.INITIAL_RELEASE,
-	// 			originalDspCodes: dto.code,
-	// 			triggeredById: userId,
-	// 		})
-	// 		.catch((_e) => {
-	// 			this.logger.error(_e);
-	// 		});
-	// }
+	async bulkSubmit(dto: BulkSubmitReleaseDto) {
+		for (const id of dto.ids) {
+			await this.submit(id, { code: dto.codes });
+		}
+	}
 
-	async submit3(id: string, dto: SubmitReleaseDto) {
+	async submit(id: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
 		await this.releaseRepo.update(id, {
 			status: ReleaseStatus.SUBMITTED,
 			releaseEndDate: null,
 		});
+
 		return this.releaseSubmitService2.submit({
 			releaseId: id,
 			dspCodes: dto.code,
 			type: ExecutionType.INITIAL_RELEASE,
 		});
 	}
-
-	// async testSyncReleaseStatus(id: string) {
-	// 	await this.releaseSubmitService2.syncReleaseStatus(id);
-	// 	const release = await this.releaseQueryService.findOne(id);
-	// 	return { status: release.status };
-	// }
 
 	async takedown(id: string, userId: string, dto: SubmitReleaseDto) {
 		await this.releaseQueryService.findOne(id);
@@ -503,61 +487,6 @@ export class ReleaseService {
 			type: ExecutionType.TAKEDOWN,
 		});
 	}
-
-	// private async processingSubmit({
-	// 	id,
-	// 	userId,
-	// 	dto,
-	// }: {
-	// 	id: string;
-	// 	userId: string;
-	// 	dto: SubmitReleaseDto;
-	// }) {
-	// 	const release = await this.releaseQueryService.findOneWithRelation(id);
-
-	// 	// Gen UPC / ISRC if needed
-	// 	if (!release.upc) {
-	// 		await this.genUpcById(id);
-	// 	}
-
-	// 	await this.genListIsrc(release);
-
-	// 	// Validate
-	// 	const errors =
-	// 		this.releaseValidateService.getErrorsSchemaRelease(release);
-
-	// 	if (errors.length > 0) {
-	// 		this.releaseLogService.failed({
-	// 			releaseId: id,
-	// 			step: 'Kiểm tra dữ liệu phát hành (Validation)',
-	// 			message: errors
-	// 				.map((e) => e?.message ?? 'Lỗi không xác định')
-	// 				.join(', '),
-	// 		});
-
-	// 		throw new ResponseError({
-	// 			message:
-	// 				'Release validation failed. Please check the input data.',
-	// 			data: errors,
-	// 		});
-	// 	}
-
-	// 	// Distribute to all DSPs
-	// 	const dspErrors = await this.deliveryService.executeDistribution(
-	// 		id,
-	// 		dto.code,
-	// 	);
-
-	// 	if (!dspErrors || dspErrors.length === 0) {
-	// 		await this.releaseRepo.update(id, {
-	// 			status: ReleaseStatus.DISTRIBUTED,
-	// 		});
-	// 	} else {
-	// 		await this.releaseRepo.update(id, {
-	// 			status: ReleaseStatus.FAILED,
-	// 		});
-	// 	}
-	// }
 
 	// get qa flag ci
 	async getQaFlagCi(id: string) {

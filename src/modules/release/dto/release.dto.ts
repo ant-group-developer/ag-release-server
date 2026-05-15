@@ -479,3 +479,13 @@ export class FileExportReleaseCiDto {
 	@IsString({ each: true })
 	dspCodeCi: string[];
 }
+
+export class BulkSubmitReleaseDto {
+	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsUUID('4', { each: true })
+	ids: string[];
+
+	@ApiProperty({ type: [String] })
+	@IsString({ each: true })
+	codes: string[];
+}
