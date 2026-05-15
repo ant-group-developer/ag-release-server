@@ -10,7 +10,7 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
@@ -156,6 +156,11 @@ export class ReleaseDraftController {
 	}
 
 	@Delete()
+	@ApiOperation({ summary: 'Bulk delete releases' })
+	@ApiResponse({
+		status: 200,
+		description: 'Bulk delete releases successfully',
+	})
 	async bulkDelete(
 		@Query() query: QueryGetListReleaseDto,
 		@Req() req: Request,
@@ -166,6 +171,7 @@ export class ReleaseDraftController {
 		// }
 
 		const result = await this.releaseDraftService.bulkDeleteRelease(query);
+
 		return new ResponseSuccess({ data: result });
 	}
 
