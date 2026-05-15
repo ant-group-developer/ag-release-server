@@ -102,6 +102,18 @@ export class CiDistributionJobService implements OnModuleInit {
 	async getList(query: QueryGetListCiJobDto) {
 		const qb = this.repo.createQueryBuilder('job');
 
+		if (query.keyword?.length) {
+			const keywords = query.keyword.map((k) => `%${k}%`);
+
+			qb.andWhere(
+				`(
+					job.type ILIKE ANY(:keywords)
+					OR job.upc ILIKE ANY(:keywords)
+				)`,
+				{ keywords },
+			);
+		}
+
 		if (query.type) {
 			qb.andWhere('job.type = :type', { type: query.type });
 		}

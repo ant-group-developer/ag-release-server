@@ -43,6 +43,12 @@ pipeline_step_log
 
 ── Kết quả cuối cùng (chỉ ghi khi pipeline thành công) ──
 
+
+
+
+
+
+
 release_dsp_delivery
   id, release_id, dsp_id
   status: ReleaseDspStatus  ← never_distributed | distributed | taken_down...
