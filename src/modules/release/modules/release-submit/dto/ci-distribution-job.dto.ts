@@ -9,6 +9,7 @@ export enum FieldOrderCiJob {
 	job_updatedAt = 'job.updatedAt',
 	job_status = 'job.status',
 	job_type = 'job.type',
+	job_upc = 'job.upc',
 }
 
 export class UpdateCiJobDto {
