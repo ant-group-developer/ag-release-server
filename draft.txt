@@ -1,6 +1,35 @@
 Bài toán
 Hệ thống phân phối nhạc tới các DSP (Spotify, Apple Music, TikTok...). Một release có nhiều tracks. User submit release, chọn DSP muốn đẩy lên — hệ thống sinh ra pipeline xử lý phức tạp gồm nhiều step tuần tự/song song, có thể retry, cancel, chờ đối tác.
 
+Đường đi tới các dsp sẽ khác nhau có thể là direct, hoặc qua 1 bên trung gian khác, 
+ví dụ: spotify gửi trực tiếp qua sftp của spotify, 
+apple music, tiktok thì lại qua aggregator ci, chỉ cần gửi đến server ci, nó sẽ tự xử lý
+
+luồng direct chỉ đơn giản có các bước tạo, upload sang sftp spotify metadata {
+  ern.xml, các file audio, ảnh, file đánh dấu sự kiện đã tải xong
+}
+chờ đối tác xử lý: khoảng 10p
+call api get status để cập nhật lại bên server 
+
+luồng aggregator thì lại khác, thay vì gửi trực tiếp sang các dsp thì sẽ gửi vào aggregator rồi aggregator sẽ tự phân phối tới các dsp, 
+mỗi loại aggregator thì lại có 1 luồng nghiệp vụ xử lý khác, ví dụ aggregator ci
+
+các bước:
+import
+tạo metadata, upload lên sftp của ci {
+  ern.xml, các file audio, ảnh, file đánh dấu sự kiện đã tải xong
+}
+chờ đối tác xử lý: khoảng 10p
+
+export: sẽ dùng file excel có 2 trường upc, dsp_code_cis để gửi đi thông tin release nào cần tới dsp nào
+export sẽ chia tiếp: đã có deal trực tiếp với ci hay chưa, nếu có thì sẽ tải file excel về, upload lên hệ thống của ci qua giao diện
+nếu chưa có deal với ci thì sẽ gửi file excel qua email tới state51
+
+chờ hệ thống ci xử lý
+sync status từ ci về 
+
+call api get status để cập nhật lại bên server 
+
 Data model
 release
   id, title, artist_id, ...
@@ -13,52 +42,45 @@ dsp
 
 ── Mỗi lần user bấm submit ──────────────────────────────
 
-release_submission
+release_submit
   id
   release_id
   type: delivery | takedown
-  dsp_ids: int[]          ← user chọn DSP nào
+  dspCodes: uuid[]          ← user chọn DSP nào
   submitted_by, submitted_at
 
 ── Pipeline orchestration ───────────────────────────────
 
-pipeline_execution
+submit_step
   id
-  submission_id           ← trỏ release_submission (nguồn gốc của pipeline)
+  submission_id           ← trỏ release_submit (nguồn gốc của pipeline)
   parent_execution_id     ← null nếu root, self-join thành cây
   step_type               ← validate | gen_upc | gen_isrc | create_ern | upload_sftp | poll_partner...
   execution_mode          ← sequential | parallel
   failure_policy          ← stop_all | isolate
   status                  ← StepStatus
-  input: jsonb
-  output: jsonb
+  metadata: {
+    input: jsonb;
+    output: jsonb;
+  },
   attempt_number, max_attempts
   started_at, finished_at
 
-pipeline_step_log
+step_log
   id, execution_id
   level: info | warn | error
   message, metadata: jsonb
   created_at
 
-── Kết quả cuối cùng (chỉ ghi khi pipeline thành công) ──
-
-
-
-
-
-
-
+── Kết quả cuối cùng (chỉ ghi khi phân phối tới dsp thành công) ──
 release_dsp_delivery
   id, release_id, dsp_id
   status: ReleaseDspStatus  ← never_distributed | distributed | taken_down...
-  context: jsonb            ← upc, isrcs (shared data sau khi gen xong)
-  last_submission_id        ← trỏ lần submit gần nhất thành công
 Quan hệ:
 release (1) ──< track (nhiều)
-release (1) ──< release_submission (nhiều)   ← mỗi lần submit/takedown
+release (1) ──< release_submit (nhiều)   ← mỗi lần submit/takedown
 release_submission (1) ──< pipeline_execution (nhiều, cây)
-release (1) ──< release_dsp_delivery (nhiều) ← 1 row per DSP, upsert khi done
+release (1) ──< release_dsp_delivery (nhiều) ← 1 row per DSP, upsert khi xử lý
 
 Status 3 tầng
 StepStatus (internal)
@@ -70,6 +92,8 @@ ReleaseDspStatus (user thấy, per DSP)
 
 ReleaseStatus (user thấy, tổng release)
   draft | submitted | processing | distributed | failed | taken_down | cancelled
+
+  
 Rollup rules — pure function, không side effect:
 typescript// StepStatus[] → ReleaseDspStatus
 function rollupDspStatus(statuses: StepStatus[]): ReleaseDspStatus {

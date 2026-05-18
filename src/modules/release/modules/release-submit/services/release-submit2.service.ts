@@ -578,6 +578,7 @@ export class ReleaseSubmitService2 {
 				const failedSubmit = await this.submitRepo.findOne({
 					where: { id: submitId },
 				});
+
 				if (failedSubmit) {
 					const failedDspCodes =
 						failedSubmit.metadata?.input?.dspCodes || [];
