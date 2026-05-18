@@ -222,7 +222,7 @@ export class ReleaseDraftService {
 
 	// delete
 	async handleDeleteById(id: string): Promise<void> {
-		await this.releaseQueryService.validateDelete(id);
+		// await this.releaseQueryService.validateDelete(id);
 		await this.deleteRelatedRecords({ releaseId: id });
 		await this.deleteDb(id);
 	}
