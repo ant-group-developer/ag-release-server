@@ -199,6 +199,7 @@ export class ReleaseArtistService {
 		await this.trackDraftService.updateTrackArtist(releaseArtist);
 	}
 
+	// Nếu addArtistToTracks thay đổi thì thêm hoặc xoá artist khỏi track tương ứng
 	private async handleIsAddArtistToTrack({
 		addArtistToTracks,
 		addArtistToTracksPrevious,
