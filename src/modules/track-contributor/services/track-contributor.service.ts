@@ -171,15 +171,16 @@ export class TrackContributorService {
 	) {
 		const { artistId, artistRoleId } = releaseContributor;
 
-		const trackArtistEntities = tracksOfRelease.map((track) => ({
+		const trackContributorEntities = tracksOfRelease.map((track) => ({
 			trackId: track.id,
 			artistId,
 			artistRoleId,
 			releaseContributorId: releaseContributor.id,
+			createdAt: releaseContributor.createdAt,
 		}));
 
 		await this.mergeTrackContributors({
-			items: trackArtistEntities,
+			items: trackContributorEntities,
 			typeSource: TypeSource.FROM_RELEASE,
 		});
 	}
@@ -232,12 +233,18 @@ export class TrackContributorService {
 			artistRoleId: string;
 			trackId: string;
 			releaseContributorId: string;
+			createdAt: Date;
 		}[];
 		typeSource: TypeSource;
 	}) {
 		for (const item of items) {
-			const { artistId, artistRoleId, trackId, releaseContributorId } =
-				item;
+			const {
+				artistId,
+				artistRoleId,
+				trackId,
+				releaseContributorId,
+				createdAt,
+			} = item;
 
 			const existing = await this.trackContributorRepo.findOne({
 				where: {
@@ -275,6 +282,7 @@ export class TrackContributorService {
 						isFromReleaseAction:
 							typeSource === TypeSource.FROM_RELEASE,
 						isFromTrackAction: typeSource === TypeSource.FROM_TRACK,
+						createdAt: createdAt,
 					}),
 				);
 			}

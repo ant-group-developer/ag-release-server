@@ -184,6 +184,3 @@ rollupStatus phải pure function — không DB write, không side effect, chỉ
 AbortSignal phải truyền xuyên suốt từ engine xuống handler. Handler tự đăng ký signal.addEventListener('abort', cleanup) — không cleanup là để lại rác trên SFTP, email gửi dở, data không nhất quán với DSP.
 context trong release_dsp_delivery là single source of truth cho UPC và ISRCs. Gen xong lưu vào đây ngay, các step sau đọc từ context, không truyền qua nhau qua output.
 release_dsp_delivery chỉ upsert khi pipeline thành công — đây là bảng trạng thái thuần, không phải bảng orchestration. Nguồn gốc orchestration là release_submission.
-
-
-
