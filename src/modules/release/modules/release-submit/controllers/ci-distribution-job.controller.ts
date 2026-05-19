@@ -22,6 +22,7 @@ import {
 	BatchActionCiJobDto,
 	ConfirmCompletedCiJobDto,
 	QueryGetListCiJobDto,
+	QueryGroupedCiJobDto,
 	UpdateCiJobDto,
 } from '../dto/ci-distribution-job.dto';
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
@@ -37,6 +38,21 @@ export class CiDistributionJobController {
 	async getList(@Query() query: QueryGetListCiJobDto) {
 		const result = await this.jobService.getList(query);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@ApiOperation({
+		summary: 'Danh sách grouped CI distribution jobs',
+	})
+	@ApiQuery({
+		type: QueryGroupedCiJobDto,
+	})
+	@Get('grouped')
+	async getGrouped(@Query() query: QueryGroupedCiJobDto) {
+		const result = await this.jobService.getGrouped(query);
+
+		return new ResponseSuccess({
+			data: result,
+		});
 	}
 
 	@ApiOperation({ summary: 'Chi tiết CI distribution job' })

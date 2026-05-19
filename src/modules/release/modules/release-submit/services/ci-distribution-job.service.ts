@@ -22,6 +22,7 @@ import { In, Repository } from 'typeorm';
 import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
 import {
 	QueryGetListCiJobDto,
+	QueryGroupedCiJobDto,
 	UpdateCiJobDto,
 } from '../dto/ci-distribution-job.dto';
 import {
@@ -145,6 +146,81 @@ export class CiDistributionJobService implements OnModuleInit {
 				page: query.page,
 				pageSize: query.pageSize,
 				totalItems: total,
+			},
+		});
+	}
+
+	async getGrouped(query: QueryGroupedCiJobDto) {
+		const page = query.page || 1;
+		const pageSize = query.pageSize || 10;
+
+		const qb = this.repo
+			.createQueryBuilder('job')
+			.select('job.type', 'type')
+			.addSelect('job.delivery_email', 'deliveryEmail')
+			.addSelect('job.delivery_email_subject', 'deliveryEmailSubject')
+			.addSelect('DATE(job.created_at)', 'dateGroup')
+			.addSelect('MIN(job.sent_at)', 'sentAt')
+			.addSelect(
+				`JSON_AGG(JSON_BUILD_OBJECT(
+				'id', job.id,
+				'upc', job.upc,
+				'dspCodes', job.dsp_ci_codes,
+				'type', job.type,
+				'status', job.status,
+				'sentAt', job.sent_at,
+				'stepLabel', job.step_label,
+				'releaseSubmitId', job.release_submit_id,
+				'stepId', job.step_id,
+				'releaseId', job.release_id,
+				'deliveryEmail', job.delivery_email,
+				'deliveryEmailSubject', job.delivery_email_subject,
+				'createdAt', job.created_at,
+				'updatedAt', job.updated_at
+			))`,
+				'data',
+			)
+			.addSelect(`ARRAY_AGG(job.upc)`, 'upcs')
+			.groupBy('job.type')
+			.addGroupBy('job.delivery_email')
+			.addGroupBy('job.delivery_email_subject')
+			.addGroupBy('DATE(job.created_at)')
+			.orderBy('DATE(job.created_at)', 'DESC');
+
+		if (query.type) {
+			qb.andWhere('job.type = :type', { type: query.type });
+		}
+
+		if (query.dateGroup) {
+			qb.having('DATE(MIN(job.created_at)) = :dateGroup', {
+				dateGroup: query.dateGroup,
+			});
+		}
+
+		if (query.upcs?.length) {
+			qb.andHaving('ARRAY_AGG(job.upc) && :upcs', {
+				upcs: query.upcs,
+			});
+		}
+
+		const countQb = qb.clone();
+
+		const totalItems = await countQb
+			.select('COUNT(*)::int', 'count')
+			.getRawMany()
+			.then((rows) => rows.length);
+
+		const items = await qb
+			.offset((page - 1) * pageSize)
+			.limit(pageSize)
+			.getRawMany();
+
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize,
+				totalItems,
 			},
 		});
 	}
