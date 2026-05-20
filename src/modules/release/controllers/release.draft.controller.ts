@@ -10,7 +10,7 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
@@ -28,6 +28,7 @@ import {
 import { ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
+	SyncReleaseToTracksDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
@@ -135,6 +136,21 @@ export class ReleaseDraftController {
 		const result = await this.releaseDraftService.update(id, data, userId);
 
 		return ReleaseSuccess.UPDATE(result);
+	}
+
+	@Post(':id/sync-to-tracks')
+	@ApiOperation({
+		summary: 'Sync selected release data to all tracks',
+	})
+	@ApiParam({
+		name: 'id',
+		description: 'Release ID',
+	})
+	async syncReleaseDataToTracks(
+		@Param('id') id: string,
+		@Body() dto: SyncReleaseToTracksDto,
+	) {
+		return this.releaseDraftService.syncReleaseDataToTracks(id, dto);
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

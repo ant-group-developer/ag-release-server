@@ -35,9 +35,11 @@ import { TrackDraftService } from 'src/modules/track/services/track.draft.servic
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { DataSource, Repository } from 'typeorm';
+import { ReleaseException } from '../constants/release.constant';
 import { LookupMaps, ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
+	SyncReleaseToTracksDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
@@ -218,6 +220,125 @@ export class ReleaseDraftService {
 				data: { priceTierId },
 			});
 		}
+	}
+
+	async syncReleaseDataToTracks(
+		releaseId: string,
+		dto: SyncReleaseToTracksDto,
+	) {
+		return this.dataSource.transaction(async (manager) => {
+			const releaseRepo = manager.getRepository(Release);
+			const trackRepo = manager.getRepository(Track);
+			const trackLanguageRepo = manager.getRepository(TrackLanguage);
+			// const trackArtistRepo = manager.getRepository(TrackArtist);
+			// const trackContributorRepo =
+			// 	manager.getRepository(TrackContributor);
+
+			const release = await releaseRepo.findOne({
+				where: { id: releaseId },
+				relations: {
+					releaseArtists: true,
+					releaseContributors: true,
+					releaseLanguage: true,
+				},
+			});
+
+			if (!release) {
+				throw ReleaseException.NOT_FOUND();
+			}
+
+			const tracks = await trackRepo.find({
+				where: { releaseId },
+				relations: {
+					trackLanguage: true,
+				},
+			});
+
+			for (const track of tracks) {
+				const updateTrack: Partial<Track> = {};
+
+				if (dto.syncPrimaryGenre) {
+					updateTrack.primaryGenreId = release.primaryGenreId;
+				}
+
+				if (dto.syncSubGenre) {
+					updateTrack.subGenreId = release.subGenreId;
+				}
+
+				if (dto.syncCopyright) {
+					updateTrack.pLineYear = release.pLineYear;
+					updateTrack.pLineOwner = release.pLineOwner;
+				}
+
+				// if (dto.syncArtists) {
+				// 	updateTrack.copyArtistsFromRelease = true;
+				// }
+
+				// if (dto.syncContributors) {
+				// 	updateTrack.copyContributorsFromRelease = true;
+				// }
+
+				if (Object.keys(updateTrack).length) {
+					await trackRepo.update(track.id, updateTrack);
+				}
+
+				if (dto.syncLanguage && release.releaseLanguage) {
+					await trackLanguageRepo.update(
+						{ trackId: track.id },
+						{
+							metadataLanguageId:
+								release.releaseLanguage.metadataLanguageId,
+							audioLanguageId:
+								release.releaseLanguage.audioLanguageId,
+							metadataLanguageCountryId:
+								release.releaseLanguage
+									.metadataLanguageCountryId,
+						},
+					);
+				}
+
+				// if (dto.syncArtists) {
+				// 	await trackArtistRepo.delete({
+				// 		trackId: track.id,
+				// 		isFromReleaseAction: true,
+				// 	});
+
+				// 	if (release.releaseArtists?.length) {
+				// 		await trackArtistRepo.insert(
+				// 			release.releaseArtists.map((item) => ({
+				// 				trackId: track.id,
+				// 				artistId: item.artistId,
+				// 				releaseArtistId: item.id,
+				// 				isFromReleaseAction: true,
+				// 			})),
+				// 		);
+				// 	}
+				// }
+
+				// if (dto.syncContributors) {
+				// 	await trackContributorRepo.delete({
+				// 		trackId: track.id,
+				// 		isFromReleaseAction: true,
+				// 	});
+
+				// 	if (release.releaseContributors?.length) {
+				// 		await trackContributorRepo.insert(
+				// 			release.releaseContributors.map((item) => ({
+				// 				trackId: track.id,
+				// 				artistId: item.artistId,
+				// 				artistRoleId: item.artistRoleId,
+				// 				releaseContributorId: item.id,
+				// 				isFromReleaseAction: true,
+				// 			})),
+				// 		);
+				// 	}
+				// }
+			}
+
+			return {
+				syncedTracks: tracks.length,
+			};
+		});
 	}
 
 	// delete
