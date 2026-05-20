@@ -392,12 +392,12 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
-		// return 'test_upc'
+		// return '123456789012';
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
 		if (release.upc) {
-			return { upc: release.upc, alreadyExists: true };
+			return release.upc ?? '';
 		}
 
 		const prefixUpcId =
