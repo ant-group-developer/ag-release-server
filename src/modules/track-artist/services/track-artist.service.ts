@@ -78,6 +78,7 @@ export class TrackArtistService {
 				// artistRoleId: releaseArtist.artistRoleId,
 				trackId,
 				releaseArtistId: releaseArtist.id,
+				createdAt: releaseArtist.createdAt,
 			}));
 
 			await this.mergeTrackArtists({
@@ -123,6 +124,7 @@ export class TrackArtistService {
 			artistId,
 			// artistRoleId,
 			releaseArtistId: releaseArtist.id,
+			createdAt: releaseArtist.createdAt,
 		}));
 
 		await this.mergeTrackArtists({
@@ -350,6 +352,7 @@ export class TrackArtistService {
 			// artistRoleId: string;
 			trackId: string;
 			releaseArtistId: string;
+			createdAt: Date;
 		}[];
 		typeSource: TypeSource;
 	}) {

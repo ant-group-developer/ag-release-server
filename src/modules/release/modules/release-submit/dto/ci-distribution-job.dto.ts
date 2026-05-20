@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+	IsArray,
+	IsDateString,
+	IsEnum,
+	IsOptional,
+	IsString,
+	IsUUID,
+} from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { CiJobStatus, CiJobType } from '../entities/ci-distribution-job.entity';
 
@@ -10,6 +17,60 @@ export enum FieldOrderCiJob {
 	job_status = 'job.status',
 	job_type = 'job.type',
 	job_upc = 'job.upc',
+}
+
+export class QueryGroupedCiJobDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({
+		description: 'Ngày group job',
+		example: '2026-05-19',
+	})
+	@IsOptional()
+	@IsDateString()
+	dateGroup?: string;
+
+	@ApiPropertyOptional({
+		description: 'Danh sách UPC',
+		example: ['123456789012', '987654321098'],
+		type: [String],
+	})
+	@IsOptional()
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.split(',') : value,
+	)
+	upcs?: string[];
+
+	@ApiPropertyOptional({
+		description: 'Loại CI job',
+		enum: CiJobType,
+		example: CiJobType.EMAIL_STATE51,
+	})
+	@IsOptional()
+	@IsEnum(CiJobType)
+	type?: CiJobType;
+}
+
+export class GroupedCiJobDto {
+	type: CiJobType;
+	deliveryEmail: string | null;
+	deliveryEmailSubject: string | null;
+	sentAt: Date | null;
+	upcs: (string | null)[];
+	dateGroup: Date;
+	data: {
+		id: string;
+		upc: string | null;
+		dspCodes: string[];
+		status: CiJobStatus;
+		deliveryEmail: string | null;
+		deliveryEmailSubject: string | null;
+		sentAt: Date | null;
+		stepLabel: string | null;
+		releaseSubmitId: string;
+		stepId: string;
+		releaseId: string | null;
+		createdAt: Date;
+		updatedAt: Date;
+	}[];
 }
 
 export class UpdateCiJobDto {

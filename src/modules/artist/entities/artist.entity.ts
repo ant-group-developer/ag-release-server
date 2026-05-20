@@ -11,7 +11,6 @@ import { Genre } from 'src/modules/genre/entities/genre.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { User } from 'src/modules/user/entities/user.entity';
-import { MediaUrlTransformer } from 'src/utils/util';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { ArtistSource } from '../enum/artist.enum';
 
@@ -40,7 +39,6 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 		length: LENGTH_PICTURE,
 		nullable: true,
 		comment: 'Ảnh đại diện của nghệ sĩ',
-		transformer: MediaUrlTransformer,
 	})
 	picture: string | null;
 

@@ -53,6 +53,10 @@ import { ReleaseExecution } from './modules/release-executions/entities/release-
 import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
+import {
+	ReleaseExecution3,
+	ReleaseExecutionStep3,
+} from './modules/release-executions3/entites/release-execution3.entity';
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
@@ -83,6 +87,9 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 			ReleaseSubmit,
 			ReleaseSubmitStep,
 			CiDistributionJob,
+
+			ReleaseExecution3,
+			ReleaseExecutionStep3,
 		]),
 
 		AppConfigModule,
