@@ -187,6 +187,18 @@ export class CiDistributionJobService implements OnModuleInit {
 			.addGroupBy('DATE(job.created_at)')
 			.orderBy('DATE(job.created_at)', 'DESC');
 
+		if (query.keyword?.length) {
+			const keywords = query.keyword.map((k) => `%${k}%`);
+
+			qb.andWhere(
+				`(
+					job.type ILIKE ANY(:keywords)
+					OR job.upc ILIKE ANY(:keywords)
+				)`,
+				{ keywords },
+			);
+		}
+
 		if (query.type) {
 			qb.andWhere('job.type = :type', { type: query.type });
 		}
