@@ -23,6 +23,7 @@ export enum ReleaseExecutionStepStatus {
 	DONE = 'DONE',
 	FAILED = 'FAILED',
 	SKIPPED = 'SKIPPED',
+	CANCELLED = 'CANCELLED',
 }
 
 /**

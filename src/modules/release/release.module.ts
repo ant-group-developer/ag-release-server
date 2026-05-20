@@ -53,10 +53,8 @@ import { ReleaseExecution } from './modules/release-executions/entities/release-
 import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
-import {
-	ReleaseExecution3,
-	ReleaseExecutionStep3,
-} from './modules/release-executions3/entites/release-execution3.entity';
+import { ReleaseExecutionStep3 } from './modules/release-executions3/entites/release-execution3-step.entity';
+import { ReleaseExecution3 } from './modules/release-executions3/entites/release-execution3.entity';
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';

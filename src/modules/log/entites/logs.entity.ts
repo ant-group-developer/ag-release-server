@@ -1,8 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import {
-	ReleaseExecution3,
-	ReleaseExecutionStep3,
-} from 'src/modules/release/modules/release-executions3/entites/release-execution3.entity';
+import { ReleaseExecutionStep3 } from 'src/modules/release/modules/release-executions3/entites/release-execution3-step.entity';
+import { ReleaseExecution3 } from 'src/modules/release/modules/release-executions3/entites/release-execution3.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { ReleaseSubmitStep } from '../../release/modules/release-submit/entities/release-submit-step.entity';
 import { ReleaseSubmit } from '../../release/modules/release-submit/entities/release-submit.entity';

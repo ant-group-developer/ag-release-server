@@ -6,10 +6,8 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { EntityManager, In, Repository } from 'typeorm';
-import {
-	ReleaseExecution3,
-	ReleaseExecutionStep3,
-} from '../entites/release-execution3.entity';
+import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
+import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ExecutionStepFailurePolicy,
 	ExecutionStepMode,

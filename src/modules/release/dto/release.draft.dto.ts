@@ -1,6 +1,7 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+	IsBoolean,
 	IsDate,
 	IsEnum,
 	IsNotEmpty,
@@ -188,4 +189,36 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
 	priceTierId?: string | null;
+}
+
+export class SyncReleaseToTracksDto {
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncPrimaryGenre?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncSubGenre?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncLanguage?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncCopyright?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncArtists?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
+	syncContributors?: boolean;
 }
