@@ -194,7 +194,6 @@ export class CiDistributionJobService implements OnModuleInit {
 				`(
 					job.type ILIKE ANY(:keywords)
 					OR job.upc ILIKE ANY(:keywords)
-					OR release.title ILIKE ANY(:keywords)
 				)`,
 				{ keywords },
 			);
