@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
@@ -51,7 +52,7 @@ export class ReleaseExecution3Service {
 		);
 
 		await this.builder.buildPipeline(execution.id);
-		await this.engine.runByExecutionId(execution.id);
+		// await this.engine.runByExecutionId(execution.id);
 
 		return this.findOne(execution.id);
 	}
@@ -80,32 +81,39 @@ export class ReleaseExecution3Service {
 
 		const [items, total] = await qb.getManyAndCount();
 
-		return {
+		return new PageDto({
+			metadata: { totalItems: total, page, pageSize },
 			items,
-			total,
-			page,
-			pageSize,
-		};
+		});
 	}
 
 	async findOne(id: string) {
-		const execution = await this.executionRepo.findOne({
+		const entity = await this.executionRepo.findOne({
 			where: { id },
+			relations: {
+				logs: true,
+			},
 		});
 
-		if (!execution) {
-			throw new NotFoundException('Execution not found');
+		if (!entity) {
+			throw new NotFoundException('Release submit not found');
 		}
 
 		const steps = await this.stepRepo.find({
-			where: { releaseExecutionId: id },
-			order: { order: 'ASC' },
+			where: {
+				releaseExecutionId: id,
+			},
+			relations: {
+				logs: true,
+			},
+			order: {
+				order: 'ASC',
+			},
 		});
 
-		return {
-			...execution,
-			steps: this.buildStepTree(steps),
-		};
+		entity.steps = this.buildStepTreeList(steps);
+
+		return entity;
 	}
 
 	async retryStep(stepId: string) {
@@ -130,15 +138,13 @@ export class ReleaseExecution3Service {
 		return this.engine.runByStepId(stepId);
 	}
 
-	private buildStepTree(
-		steps: ReleaseExecutionStep3[],
-	): ReleaseExecutionStep3[] {
-		const stepMap = new Map<string, ReleaseExecutionStep3>();
+	private buildStepTreeList(steps: ReleaseExecutionStep3[]) {
+		const map = new Map<string, ReleaseExecutionStep3>();
 		const roots: ReleaseExecutionStep3[] = [];
 
 		for (const step of steps) {
 			step.childSteps = [];
-			stepMap.set(step.id, step);
+			map.set(step.id, step);
 		}
 
 		for (const step of steps) {
@@ -147,18 +153,16 @@ export class ReleaseExecution3Service {
 				continue;
 			}
 
-			const parent = stepMap.get(step.parentStepId);
+			const parent = map.get(step.parentStepId);
 
-			if (parent) {
-				step.parentStep = parent;
-				parent.childSteps.push(step);
+			if (!parent) {
+				roots.push(step);
+				continue;
 			}
+
+			parent.childSteps.push(step);
 		}
 
-		for (const step of steps) {
-			step.childSteps.sort((a, b) => a.order - b.order);
-		}
-
-		return roots.sort((a, b) => a.order - b.order);
+		return roots;
 	}
 }
