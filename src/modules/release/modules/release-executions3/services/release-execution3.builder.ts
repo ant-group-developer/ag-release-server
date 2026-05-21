@@ -3,18 +3,19 @@ import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
-	ExecutionStepFailurePolicy,
-	ExecutionStepMode,
+	ReleaseExecutionStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 
-// pipeline-definition.ts
+/** 24 hours — CI export takes much longer than direct partner processing */
+const WAIT_CI_EXPORT_MINUTES = 1440;
+
+type PartialStep = Partial<ReleaseExecutionStep3>;
 
 @Injectable()
 export class ReleaseExecution3Builder {
@@ -29,405 +30,302 @@ export class ReleaseExecution3Builder {
 		private readonly manager: EntityManager,
 	) {}
 
-	private PIPELINE_DEFINITION = {
-		mode: ExecutionStepMode.SEQUENTIAL,
-		failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
+	// ─── Public entry point ───────────────────────────────────────────────────
 
-		children: [
-			{
-				type: ReleaseExecutionStepType.GEN_UPC,
-				mode: ExecutionStepMode.SEQUENTIAL,
-				failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-			},
-
-			{
-				type: ReleaseExecutionStepType.GEN_ISRCS,
-				mode: ExecutionStepMode.PARALLEL,
-				failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-
-				// children sinh động theo số track
-			},
-
-			{
-				type: ReleaseExecutionStepType.VALIDATE,
-				mode: ExecutionStepMode.SEQUENTIAL,
-				failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-			},
-
-			{
-				type: ReleaseExecutionStepType.PROCESS_DIRECT,
-				mode: ExecutionStepMode.SEQUENTIAL,
-				failurePolicy: ExecutionStepFailurePolicy.ISOLATE,
-
-				children: [
-					{
-						type: ReleaseExecutionStepType.CREATE_AND_UPLOAD_DIRECT,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-
-					{
-						type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-
-					{
-						type: ReleaseExecutionStepType.SYNC_DATA_FROM_DSP,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-				],
-			},
-
-			{
-				type: ReleaseExecutionStepType.PROCESS_AGG_CI,
-				mode: ExecutionStepMode.SEQUENTIAL,
-				failurePolicy: ExecutionStepFailurePolicy.ISOLATE,
-
-				children: [
-					{
-						type: ReleaseExecutionStepType.CREATE_AND_UPLOAD_CI,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-
-					{
-						type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-
-					{
-						type: ReleaseExecutionStepType.EXPORT_CI,
-						mode: ExecutionStepMode.PARALLEL,
-						failurePolicy: ExecutionStepFailurePolicy.ANY_SUCCESS,
-
-						children: [
-							{
-								type: ReleaseExecutionStepType.SEND_EMAIL_TO_STATE,
-							},
-
-							{
-								type: ReleaseExecutionStepType.WAITING_ADMIN_EXPORT,
-							},
-						],
-					},
-
-					{
-						type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
-						failurePolicy: ExecutionStepFailurePolicy.STOP_ALL,
-					},
-				],
-			},
-		],
-	};
-
-	/**
-	 * Chỉ build plan:
-	 * - lấy execution + snapshot
-	 * - tạo parent steps
-	 * - tạo child steps
-	 * - không chạy step nào
-	 */
-	async build(executionId: string, dspCodes: string[]): Promise<void> {
+	async buildPipeline(executionId: string): Promise<void> {
 		const execution = await this.executionRepo.findOne({
 			where: { id: executionId },
 		});
 
 		if (!execution) {
-			throw new Error(`Release execution ${executionId} not found`);
+			throw new Error('Execution not found');
 		}
 
-		const snapshot = execution.metadata?.input?.releaseSnapshot;
-
-		const dsps = dspCodes?.length
-			? await this.manager.find(Dsp, {
-					where: { code: In(dspCodes) },
-					relations: [
-						'dspRoutingConfig',
-						'dspRoutingConfig.aggregator',
-					],
-				})
-			: [];
-
-		const parentStepsToInsert: Partial<ReleaseExecutionStep3>[] = [
-			...this.buildCriticalSteps({
-				executionId,
-				snapshot,
-			}),
-			...this.buildDirectSteps({
-				executionId,
-				dsps,
-			}),
-			...this.buildCiSteps({
-				executionId,
-				dsps,
-				snapshot,
-			}),
-		];
-
-		const orderedParentSteps = parentStepsToInsert.map((step, index) => ({
-			...step,
-			order: index + 1,
-		}));
-
-		const savedParents = await this.stepRepo.save(
-			orderedParentSteps.map((step) => this.stepRepo.create(step)),
-		);
-
-		const childStepsToInsert = this.buildChildSteps({
-			executionId,
-			parents: savedParents,
-			snapshot,
+		await this.executionRepo.update(executionId, {
+			status: ReleaseExecutionStatus.PROCESSING,
 		});
 
-		if (childStepsToInsert.length > 0) {
+		const snapshot = execution.metadata?.input?.releaseSnapshot;
+		const dspCodes: string[] = execution.metadata?.input?.dspCodes || [];
+
+		const dsps = await this.fetchDsps(dspCodes);
+		const { directDsps, ciDsps } = this.partitionDsps(dsps);
+
+		const parentSteps = this.buildParentSteps(
+			executionId,
+			snapshot,
+			directDsps,
+			ciDsps,
+		);
+
+		const savedParents = await this.stepRepo.save(
+			parentSteps.map((step) => this.stepRepo.create(step)),
+		);
+
+		const childSteps = this.buildAllChildSteps(
+			executionId,
+			savedParents,
+			snapshot,
+		);
+
+		if (childSteps.length > 0) {
 			await this.stepRepo.save(
-				childStepsToInsert.map((step) => this.stepRepo.create(step)),
+				childSteps.map((step) => this.stepRepo.create(step)),
 			);
 		}
 	}
 
-	private buildCriticalSteps({
-		executionId,
-		snapshot,
-	}: {
-		executionId: string;
-		snapshot: any;
-	}): Partial<ReleaseExecutionStep3>[] {
-		const steps: Partial<ReleaseExecutionStep3>[] = [];
+	// ─── DSP helpers ─────────────────────────────────────────────────────────
 
-		// upc
+	private async fetchDsps(dspCodes: string[]): Promise<Dsp[]> {
+		if (dspCodes.length === 0) return [];
+
+		return this.manager.find(Dsp, {
+			where: { code: In(dspCodes) },
+			relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+		});
+	}
+
+	private partitionDsps(dsps: Dsp[]): {
+		directDsps: Dsp[];
+		ciDsps: Dsp[];
+	} {
+		const directDsps: Dsp[] = [];
+		const ciDsps: Dsp[] = [];
+
+		for (const dsp of dsps) {
+			const config = dsp.dspRoutingConfig;
+			const isCI =
+				config?.mode === RoutingModeEnum.AGGREGATOR &&
+				config.aggregator?.code === 'CI';
+
+			if (isCI) {
+				ciDsps.push(dsp);
+			} else {
+				directDsps.push(dsp);
+			}
+		}
+
+		return { directDsps, ciDsps };
+	}
+
+	// ─── Parent step builders ─────────────────────────────────────────────────
+
+	private buildParentSteps(
+		executionId: string,
+		snapshot: any,
+		directDsps: Dsp[],
+		ciDsps: Dsp[],
+	): PartialStep[] {
+		const steps: PartialStep[] = [];
+		let order = 1;
+
 		if (!snapshot?.upc) {
 			steps.push({
 				releaseExecutionId: executionId,
 				type: ReleaseExecutionStepType.GEN_UPC,
+				order: order++,
 			});
 		}
 
-		// isrcs
-		const tracksWithoutIsrc =
-			snapshot?.tracks?.filter((track: Track) => !track.isrc) || [];
+		const tracksWithoutIsrc: Track[] =
+			snapshot?.tracks?.filter((t: Track) => !t.isrc) || [];
 
 		if (tracksWithoutIsrc.length > 0) {
 			steps.push({
 				releaseExecutionId: executionId,
 				type: ReleaseExecutionStepType.GEN_ISRCS,
+				order: order++,
+				childExecutionMode: 'sequential',
 				metadata: {
 					input: {
-						trackIds: tracksWithoutIsrc.map(
-							(track: Track) => track.id,
-						),
+						trackIds: tracksWithoutIsrc.map((t: Track) => t.id),
 					},
 				},
 			});
 		}
 
-		// validate
 		steps.push({
 			releaseExecutionId: executionId,
 			type: ReleaseExecutionStepType.VALIDATE,
+			order: order++,
+		});
+
+		for (const dsp of directDsps) {
+			steps.push({
+				releaseExecutionId: executionId,
+				type: ReleaseExecutionStepType.PROCESS_DIRECT,
+				order: order++,
+				childExecutionMode: 'sequential',
+				metadata: { input: { dsps: [dsp] } },
+			});
+		}
+
+		if (ciDsps.length > 0) {
+			steps.push({
+				releaseExecutionId: executionId,
+				type: ReleaseExecutionStepType.PROCESS_AGG_CI,
+				order: order++,
+				childExecutionMode: 'sequential',
+				metadata: { input: { dsps: ciDsps } },
+			});
+		}
+
+		return steps;
+	}
+
+	// ─── Child step builders ──────────────────────────────────────────────────
+
+	private buildAllChildSteps(
+		executionId: string,
+		parents: ReleaseExecutionStep3[],
+		snapshot: any,
+	): PartialStep[] {
+		const childSteps: PartialStep[] = [];
+
+		for (const parent of parents) {
+			switch (parent.type) {
+				case ReleaseExecutionStepType.GEN_ISRCS:
+					childSteps.push(
+						...this.buildIsrcChildSteps(executionId, parent),
+					);
+					break;
+
+				case ReleaseExecutionStepType.PROCESS_DIRECT:
+					childSteps.push(
+						...this.buildDirectChildSteps(executionId, parent),
+					);
+					break;
+
+				case ReleaseExecutionStepType.PROCESS_AGG_CI:
+					childSteps.push(
+						...this.buildCiChildSteps(
+							executionId,
+							parent,
+							snapshot,
+						),
+					);
+					break;
+			}
+		}
+
+		return childSteps;
+	}
+
+	private buildIsrcChildSteps(
+		executionId: string,
+		parent: ReleaseExecutionStep3,
+	): PartialStep[] {
+		const trackIds: string[] = parent.metadata?.input?.trackIds || [];
+
+		return trackIds.map((trackId, index) => ({
+			releaseExecutionId: executionId,
+			parentStepId: parent.id,
+			type: ReleaseExecutionStepType.GEN_ISRC,
+			order: index + 1,
+			metadata: { input: { trackId } },
+		}));
+	}
+
+	private buildDirectChildSteps(
+		executionId: string,
+		parent: ReleaseExecutionStep3,
+	): PartialStep[] {
+		const types = [
+			ReleaseExecutionStepType.CREATE_AND_UPLOAD_DIRECT,
+			ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+			ReleaseExecutionStepType.SYNC_DATA_FROM_DSP,
+		];
+
+		return types.map((type, index) => ({
+			releaseExecutionId: executionId,
+			parentStepId: parent.id,
+			type,
+			order: index + 1,
+			...(type === ReleaseExecutionStepType.WAIT_PARTNER_PROCESS && {
+				metadata: { input: { waitMinutes: DEFAULT_WAIT_MINUTES } },
+			}),
+		}));
+	}
+
+	private buildCiChildSteps(
+		executionId: string,
+		parent: ReleaseExecutionStep3,
+		snapshot: any,
+	): PartialStep[] {
+		const steps: PartialStep[] = [];
+		let order = 1;
+
+		const parentCiDsps: Dsp[] = parent.metadata?.input?.dsps || [];
+		const upc = snapshot?.upc;
+
+		const ciDealDsps = parentCiDsps.filter((dsp) => dsp.hasDeal);
+		const state51Dsps = parentCiDsps.filter((dsp) => !dsp.hasDeal);
+
+		// Step 1–4: common CI processing steps
+		const commonTypes = [
+			ReleaseExecutionStepType.CREATE_AND_UPLOAD_CI,
+			ReleaseExecutionStepType.CREATE_FOLDER_DONE_CI,
+			ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+			ReleaseExecutionStepType.VALIDATE_QA_CI,
+		];
+
+		for (const type of commonTypes) {
+			steps.push({
+				releaseExecutionId: executionId,
+				parentStepId: parent.id,
+				type,
+				order: order++,
+				...(type === ReleaseExecutionStepType.WAIT_PARTNER_PROCESS && {
+					metadata: { input: { waitMinutes: DEFAULT_WAIT_MINUTES } },
+				}),
+			});
+		}
+
+		// Step 5: export to CI/State51 DSPs (conditional)
+		if (state51Dsps.length > 0 || ciDealDsps.length > 0) {
+			steps.push({
+				releaseExecutionId: executionId,
+				parentStepId: parent.id,
+				type: ReleaseExecutionStepType.EXPORT_CI,
+				order: order++,
+				metadata: {
+					input: {
+						upc,
+						state51Dsps,
+						state51DspCodes: this.extractValidCodes(state51Dsps),
+						ciDealDsps,
+						ciDealDspCodes: this.extractValidCodes(ciDealDsps),
+					},
+				},
+			});
+		}
+
+		// Step 6: wait 24h for CI export to be processed by partner
+		steps.push({
+			releaseExecutionId: executionId,
+			parentStepId: parent.id,
+			type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+			order: order++,
+			metadata: { input: { waitMinutes: WAIT_CI_EXPORT_MINUTES } },
+		});
+
+		// Step 7: sync back data from DSP
+		steps.push({
+			releaseExecutionId: executionId,
+			parentStepId: parent.id,
+			type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
+			order: order++,
 		});
 
 		return steps;
 	}
 
-	// direct
-	private buildDirectSteps({
-		executionId,
-		dsps,
-	}: {
-		executionId: string;
-		dsps: Dsp[];
-	}): Partial<ReleaseExecutionStep3>[] {
-		const directDsps = dsps.filter((dsp) => {
-			const config = dsp.dspRoutingConfig;
+	// ─── Utils ────────────────────────────────────────────────────────────────
 
-			const isCi =
-				config?.mode === RoutingModeEnum.AGGREGATOR &&
-				config.aggregator?.code === 'CI';
-
-			return !isCi;
-		});
-
-		return directDsps.map((dsp) => ({
-			releaseExecutionId: executionId,
-			type: ReleaseExecutionStepType.PROCESS_DIRECT,
-			metadata: {
-				input: {
-					dsps: [dsp],
-				},
-			},
-		}));
-	}
-
-	private buildCiSteps({
-		executionId,
-		dsps,
-	}: {
-		executionId: string;
-		dsps: Dsp[];
-		snapshot: Release;
-	}): Partial<ReleaseExecutionStep3>[] {
-		const ciDsps = dsps.filter((dsp) => {
-			const config = dsp.dspRoutingConfig;
-
-			return (
-				config?.mode === RoutingModeEnum.AGGREGATOR &&
-				config.aggregator?.code === 'CI'
-			);
-		});
-
-		if (ciDsps.length === 0) return [];
-
-		return [
-			{
-				releaseExecutionId: executionId,
-				type: ReleaseExecutionStepType.PROCESS_AGG_CI,
-				metadata: {
-					input: {
-						dsps: ciDsps,
-					},
-				},
-			},
-		];
-	}
-
-	private buildChildSteps({
-		executionId,
-		parents,
-		snapshot,
-	}: {
-		executionId: string;
-		parents: ReleaseExecutionStep3[];
-		snapshot: Release;
-	}): Partial<ReleaseExecutionStep3>[] {
-		const childSteps: Partial<ReleaseExecutionStep3>[] = [];
-
-		for (const parent of parents) {
-			if (parent.type === ReleaseExecutionStepType.GEN_ISRCS) {
-				const trackIds: string[] =
-					parent.metadata?.input?.trackIds || [];
-
-				trackIds.forEach((trackId, index) => {
-					childSteps.push({
-						releaseExecutionId: executionId,
-						parentStepId: parent.id,
-						type: ReleaseExecutionStepType.GEN_ISRC,
-						order: index + 1,
-						metadata: {
-							input: {
-								trackId,
-							},
-						},
-					});
-				});
-			}
-
-			if (parent.type === ReleaseExecutionStepType.PROCESS_DIRECT) {
-				const directChildTypes = [
-					ReleaseExecutionStepType.CREATE_AND_UPLOAD_DIRECT,
-					ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-					ReleaseExecutionStepType.SYNC_DATA_FROM_DSP,
-				];
-
-				directChildTypes.forEach((type, index) => {
-					childSteps.push({
-						releaseExecutionId: executionId,
-						parentStepId: parent.id,
-						type,
-						order: index + 1,
-						...(type ===
-						ReleaseExecutionStepType.WAIT_PARTNER_PROCESS
-							? {
-									metadata: {
-										input: {
-											waitMinutes: DEFAULT_WAIT_MINUTES,
-										},
-									},
-								}
-							: {}),
-					});
-				});
-			}
-
-			if (parent.type === ReleaseExecutionStepType.PROCESS_AGG_CI) {
-				const ciDsps: Dsp[] = parent.metadata?.input?.dsps || [];
-
-				const ciDealDsps = ciDsps.filter((dsp) => dsp.hasDeal);
-				const state51Dsps = ciDsps.filter((dsp) => !dsp.hasDeal);
-
-				const state51DspCodes = state51Dsps
-					.map((dsp) => dsp.codeCi)
-					.filter((code): code is string => !!code);
-
-				const ciDealDspCodes = ciDealDsps
-					.map((dsp) => dsp.codeCi)
-					.filter((code): code is string => !!code);
-
-				let order = 1;
-
-				const commonTypes = [
-					ReleaseExecutionStepType.CREATE_AND_UPLOAD_CI,
-					ReleaseExecutionStepType.CREATE_FOLDER_DONE_CI,
-					ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-					ReleaseExecutionStepType.VALIDATE_QA_CI,
-				];
-
-				for (const type of commonTypes) {
-					childSteps.push({
-						releaseExecutionId: executionId,
-						parentStepId: parent.id,
-						type,
-						order: order++,
-						...(type ===
-						ReleaseExecutionStepType.WAIT_PARTNER_PROCESS
-							? {
-									metadata: {
-										input: {
-											waitMinutes: DEFAULT_WAIT_MINUTES,
-										},
-									},
-								}
-							: {}),
-					});
-				}
-
-				if (state51Dsps.length > 0 || ciDealDsps.length > 0) {
-					childSteps.push({
-						releaseExecutionId: executionId,
-						parentStepId: parent.id,
-						type: ReleaseExecutionStepType.EXPORT_CI,
-						order: order++,
-						metadata: {
-							input: {
-								upc: snapshot?.upc,
-								state51Dsps,
-								state51DspCodes,
-								ciDealDsps,
-								ciDealDspCodes,
-							},
-						},
-					});
-				}
-
-				childSteps.push({
-					releaseExecutionId: executionId,
-					parentStepId: parent.id,
-					type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
-					order: order++,
-					metadata: {
-						input: {
-							waitMinutes: 1440,
-						},
-					},
-				});
-
-				childSteps.push({
-					releaseExecutionId: executionId,
-					parentStepId: parent.id,
-					type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
-					order: order++,
-				});
-			}
-		}
-
-		return childSteps;
+	private extractValidCodes(dsps: Dsp[]): string[] {
+		return dsps
+			.map((dsp) => dsp.codeCi)
+			.filter((code): code is string => !!code);
 	}
 }

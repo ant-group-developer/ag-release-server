@@ -57,3 +57,33 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 		});
 	}
 }
+
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import {
+	ExecutionType,
+	ReleaseExecutionStepStatus,
+} from '../enums/release-execution3.enum';
+
+export class CreateReleaseExecution3Dto {
+	@IsUUID()
+	releaseId: string;
+
+	@IsArray()
+	@IsString({ each: true })
+	dspCodes: string[];
+
+	@IsOptional()
+	@IsEnum(ExecutionType)
+	type?: ExecutionType;
+}
+
+export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
+	@IsOptional()
+	@IsUUID()
+	releaseId?: string;
+
+	@IsOptional()
+	@IsEnum(ReleaseExecutionStepStatus)
+	status?: ReleaseExecutionStepStatus;
+}
