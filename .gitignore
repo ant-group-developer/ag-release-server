@@ -2,6 +2,7 @@
 # compiled output
 /dist
 /node_modules
+/node_modules1
 /build
 /exports
 /backups
