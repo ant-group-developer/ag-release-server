@@ -642,6 +642,7 @@ export class CiDistributionJobService implements OnModuleInit {
 
 		if (dto.status === 'skipped') {
 			updateData.status = CiJobStatus.SKIPPED;
+			updateData.note = 'User chủ động cancel';
 			this.log.warning({
 				releaseSubmitId: job.releaseSubmitId,
 				releaseSubmitStepId: job.stepId,
