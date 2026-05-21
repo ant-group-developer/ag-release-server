@@ -11,12 +11,10 @@ import {
 } from 'typeorm';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import {
-	ExecutionStepFailurePolicy,
 	ExecutionType,
 	ReleaseExecutionStatus,
-	ReleaseExecutionStepStatus,
-	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
+import { ReleaseExecutionStep3 } from './release-execution3-step.entity';
 
 @Entity('release_excutions3')
 export class ReleaseExecution3 extends BaseUUIDEntity {
@@ -94,91 +92,4 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 				.sort((a, b) => a.order - b.order);
 		}
 	}
-}
-
-@Entity('release_execution_steps3')
-export class ReleaseExecutionStep3 extends BaseUUIDEntity {
-	@Column({ name: 'release_execution_id', type: 'uuid' })
-	releaseExecutionId: string;
-
-	@ManyToOne(
-		() => ReleaseExecution3,
-		(releaseExecution) => releaseExecution.steps,
-		{
-			onDelete: 'CASCADE',
-		},
-	)
-	@JoinColumn({ name: 'release_execution_id' })
-	releaseExecution: ReleaseExecution3;
-
-	/** Self-referencing FK for sub-steps */
-	@Column({ name: 'parent_step_id', type: 'uuid', nullable: true })
-	parentStepId: string | null;
-
-	@ManyToOne(() => ReleaseExecutionStep3, (step) => step.childSteps, {
-		onDelete: 'CASCADE',
-		nullable: true,
-	})
-	@JoinColumn({ name: 'parent_step_id' })
-	parentStep: ReleaseExecutionStep3 | null;
-
-	@OneToMany(() => ReleaseExecutionStep3, (step) => step.parentStep)
-	childSteps: ReleaseExecutionStep3[];
-
-	@OneToMany(() => Logs, (log) => log.releaseSubmitStep)
-	logs: Logs[];
-
-	@AfterLoad()
-	sortChildSteps() {
-		if (this.childSteps) {
-			this.childSteps.sort((a, b) => a.order - b.order);
-		}
-	}
-
-	@Column({ type: 'varchar', length: 50 })
-	type: ReleaseExecutionStepType;
-
-	@Column({
-		type: 'varchar',
-		default: ReleaseExecutionStepStatus.NEW,
-	})
-	status: ReleaseExecutionStepStatus;
-
-	@Column({ type: 'int', default: 0 })
-	order: number;
-
-	@Column({ type: 'jsonb', nullable: true })
-	metadata: Record<string, any> | null;
-
-	@Column({
-		name: 'started_at',
-		type: 'timestamp with time zone',
-		nullable: true,
-	})
-	startedAt: Date | null;
-
-	@Column({
-		name: 'completed_at',
-		type: 'timestamp with time zone',
-		nullable: true,
-	})
-	completedAt: Date | null;
-
-	@Column({
-		name: 'scheduled_at',
-		type: 'timestamp with time zone',
-		nullable: true,
-	})
-	scheduledAt: Date | null;
-
-	@Column({ name: 'retry_count', type: 'int', default: 0 })
-	retryCount: number;
-
-	@Column({
-		name: 'failure_policy',
-		type: 'enum',
-		enum: ExecutionStepFailurePolicy,
-		default: ExecutionStepFailurePolicy.STOP_ALL,
-	})
-	failurePolicy: ExecutionStepFailurePolicy;
 }

@@ -825,6 +825,28 @@ export class ReleaseSubmitService2 {
 						output: { upc },
 					} as any,
 				});
+
+				await this.submitRepo.update(submitDb.id, {
+					metadata: {
+						input: { releaseId },
+						output: { upc },
+					} as any,
+				});
+
+				await this.submitRepo.update(submitDb.id, {
+					releaseUpc: upc,
+					metadata: {
+						...submitDb.metadata,
+						input: {
+							...submitDb.metadata.input,
+							releaseSnapshot: {
+								...submitDb.metadata.input.releaseSnapshot,
+								upc,
+							},
+						},
+					},
+				});
+
 				break;
 			}
 
