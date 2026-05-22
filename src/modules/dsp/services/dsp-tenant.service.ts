@@ -94,7 +94,7 @@ export class TenantDspAgreementService {
 		// 2. Các DSP mặc định của hệ thống
 		const [agreements, defaultDsps] = await Promise.all([
 			this.agreementRepo.find({
-				where: { tenantId, isActive: true },
+				where: { tenantId },
 				relations: ['dsp', 'sftpConfig'],
 			}),
 			this.dspRepo.find({
