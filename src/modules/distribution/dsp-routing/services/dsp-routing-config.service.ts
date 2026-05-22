@@ -2,7 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { decryptSecretSafe } from 'src/utils/util.encrypt';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { Repository } from 'typeorm';
@@ -315,7 +315,7 @@ export class DspRoutingConfigsService {
 	 * Returns ernVersion, sender, recipient, sftp — everything needed to process.
 	 */
 	async resolveFullDeliveryConfig(code: string): Promise<{
-		ernVersion: ErnVersion;
+		ernVersion: ErnVersion2;
 		sender: { partyId: string; name: string };
 		recipient: { partyId: string; name: string };
 		sftp: SftpMetadata;
@@ -349,7 +349,7 @@ export class DspRoutingConfigsService {
 		let sender: { partyId: string; name: string };
 		let sftpMetadata: SftpMetadata | null = null;
 		let createsDoneFolder = false;
-		let ernVersion: ErnVersion = ErnVersion.ERN_382;
+		let ernVersion: ErnVersion2 = ErnVersion2.ERN_382;
 		let isCI = false;
 
 		switch (routing.mode) {
@@ -362,8 +362,7 @@ export class DspRoutingConfigsService {
 				sender = { partyId, name: partyName };
 				sftpMetadata = routing.sftpConfig?.metadata ?? null;
 				ernVersion =
-					(routing.sftpConfig?.ernVersion as ErnVersion) ??
-					ErnVersion.ERN_382;
+					routing.sftpConfig?.ernVersion ?? ErnVersion2.ERN_382;
 				break;
 			}
 
@@ -378,8 +377,8 @@ export class DspRoutingConfigsService {
 				sftpMetadata = agg.sftpConfig?.metadata ?? null;
 				createsDoneFolder = agg.createsDoneFolder ?? false;
 				ernVersion =
-					(agg.sftpConfig?.ernVersion as ErnVersion) ??
-					ErnVersion.ERN_382;
+					(agg.sftpConfig?.ernVersion as ErnVersion2) ??
+					ErnVersion2.ERN_382;
 				if (agg.code === 'CI') {
 					isCI = true;
 				}

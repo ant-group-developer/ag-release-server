@@ -1,6 +1,7 @@
 // src/modules/sftp-configs/entities/sftp-config.entity.ts
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { ErnVersion } from 'src/modules/ern/interfaces/ern-input.interface';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { Aggregator } from '../../aggregator/entities/aggregator.entity';
 import { DspRoutingConfig } from '../../dsp-routing/entities/dsp-routing-config.entity';
@@ -21,7 +22,7 @@ export class SftpConfig extends BaseUserTrackedUUIDEntity {
 		default: ErnVersion.ERN_382,
 		comment: 'DDEX ERN version (e.g. 3.8.2, 4.3)',
 	})
-	ernVersion: ErnVersion | null;
+	ernVersion: ErnVersion2 | null;
 
 	@OneToOne(() => Aggregator, (a) => a.sftpConfig, {
 		onDelete: 'CASCADE',

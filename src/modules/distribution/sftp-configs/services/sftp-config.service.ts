@@ -72,7 +72,7 @@ export class SftpConfigsService {
 		manager,
 	}: {
 		data: CreateSftpConfigDto;
-		userId: string;
+		userId?: string;
 		manager?: EntityManager;
 	}): Promise<SftpConfig> {
 		const repo = this.getDeliverySftpConfigRepo(manager);
