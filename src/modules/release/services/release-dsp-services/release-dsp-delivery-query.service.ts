@@ -2,12 +2,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { TenantDspAgreement } from 'src/modules/dsp/entities/dsp-tenant.entity';
+import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
 import { OrmAlias } from 'src/modules/orm/const/orm-alias.const';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import { ReleaseException } from '../../constants/release.constant';
 import { GetListReleaseDspDeliveriesDto } from '../../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
+import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
 
 @Injectable()
@@ -16,24 +19,84 @@ export class ReleaseDspDeliveryQueryService {
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly repo: Repository<ReleaseDspDelivery>,
 
-		@InjectRepository(Dsp)
-		private readonly dspRepo: Repository<Dsp>,
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
+
+		private readonly tenantDspAgreementService: TenantDspAgreementService,
 	) {}
+
+	// async getAndSyncReleaseDspDeliveries(
+	// 	releaseId: string,
+	// 	query: GetListReleaseDspDeliveriesDto,
+	// ) {
+	// 	await this.syncMissingDeliveries(releaseId);
+	// 	query.releaseId = releaseId;
+	// 	return this.getList(query);
+	// }
+
+	// async getAndSyncReleaseDspDeliveries(
+	// 	releaseId: string,
+	// 	query: GetListReleaseDspDeliveriesDto,
+	// ) {
+	// 	await this.syncMissingDeliveries(releaseId);
+	// 	query.releaseId = releaseId;
+
+	// 	const release = await this.releaseRepo.findOne({
+	// 		where: { id: releaseId },
+	// 		select: ['tenantId'],
+	// 	});
+
+	// 	if (!release) {
+	// 		throw ReleaseException.NOT_FOUND();
+	// 	}
+
+	// 	const [dataPage, agreements] = await Promise.all([
+	// 		this.getList(query),
+	// 		this.tenantDspAgreementService.tenantGetDsps(release.tenantId),
+	// 	]);
+
+	// 	const agreementMap = new Map(agreements.map((a) => [a.dspId, a]));
+
+	// 	dataPage.items = dataPage.items.map((item) => ({
+	// 		...item,
+	// 		isActive: agreementMap.get(item.dspId)?.isActive ?? false,
+	// 	}));
+
+	// 	return dataPage;
+	// }
 
 	async getAndSyncReleaseDspDeliveries(
 		releaseId: string,
 		query: GetListReleaseDspDeliveriesDto,
+		agreements: TenantDspAgreement[],
 	) {
 		await this.syncMissingDeliveries(releaseId);
 		query.releaseId = releaseId;
-		return this.getList(query);
+
+		const agreementMap = new Map(agreements.map((a) => [a.dspId, a]));
+
+		const dataPage = await this.getList(query);
+
+		dataPage.items = dataPage.items.map((item) => ({
+			...item,
+			isActive: agreementMap.get(item.dspId)?.isActive ?? false,
+		}));
+
+		return dataPage;
 	}
 
 	private async syncMissingDeliveries(releaseId: string) {
-		const dsps = await this.dspRepo.find({
-			where: { isActive: true },
-			select: ['id'],
+		const release = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			select: ['tenantId'],
 		});
+		if (!release) {
+			throw ReleaseException.NOT_FOUND();
+		}
+
+		const dsps = (
+			await this.tenantDspAgreementService.tenantGetDsps(release.tenantId)
+		).map((a) => a.dsp);
 
 		const existDeliveries = await this.repo.find({
 			where: { releaseId },

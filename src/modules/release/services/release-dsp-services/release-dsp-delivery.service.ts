@@ -1,14 +1,17 @@
 // services/release-dsp-delivery.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
+import { ReleaseException } from '../../constants/release.constant';
 import {
 	CreateReleaseDspDeliveryDto,
 	GetListReleaseDspDeliveriesDto,
 	UpdateReleaseDspDeliveryDto,
 } from '../../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
+import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
@@ -18,6 +21,11 @@ export class ReleaseDspDeliveryService {
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly repo: Repository<ReleaseDspDelivery>,
 		private readonly queryService: ReleaseDspDeliveryQueryService,
+
+		private readonly tenantDspAgreementService: TenantDspAgreementService,
+
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
 	) {}
 	// ==================== Delivery orchestration ====================
 	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {
@@ -78,6 +86,56 @@ export class ReleaseDspDeliveryService {
 				{ isSelected: true },
 			);
 		}
+	}
+
+	async getAndSyncReleaseDspDeliveries(
+		releaseId: string,
+		query: GetListReleaseDspDeliveriesDto,
+	) {
+		// Lấy tenantId của release
+		// để resolve danh sách DSP được phép phân phối
+		const release = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			select: ['tenantId'],
+		});
+
+		if (!release) {
+			throw ReleaseException.NOT_FOUND();
+		}
+
+		// Lấy danh sách DSP agreement của tenant
+		// bao gồm cả DSP mặc định hệ thống
+		const agreements = await this.tenantDspAgreementService.tenantGetDsps(
+			release.tenantId,
+		);
+
+		// Đồng bộ release_dsp_delivery với agreements hiện tại
+		// đồng thời trả về danh sách delivery sau sync
+		const dataPage = await this.queryService.getAndSyncReleaseDspDeliveries(
+			releaseId,
+			query,
+			agreements,
+		);
+
+		// Các DSP đã bị disable nhưng vẫn đang selected
+		// sẽ tự động bỏ chọn để tránh tiếp tục delivery
+		const bulkDeselect = dataPage.items
+			.filter((item) => !item.isActive && item.isSelected)
+			.map((item) => ({
+				id: item.id,
+				isSelected: false,
+			}));
+
+		// Bulk update trạng thái deselect
+		if (bulkDeselect.length) {
+			await this.bulkUpdate({
+				data: {
+					items: bulkDeselect,
+				},
+			});
+		}
+
+		return dataPage;
 	}
 
 	async ensureDeliveriesExist(
