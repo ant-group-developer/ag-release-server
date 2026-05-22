@@ -29,6 +29,17 @@ export class QueryGroupedCiJobDto extends BaseQueryDto2 {
 	dateGroup?: string;
 
 	@ApiPropertyOptional({
+		description: 'Danh sách status',
+		example: ['pending', 'processing'],
+		type: [String],
+	})
+	@IsOptional()
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.split(',') : value,
+	)
+	status?: string[];
+
+	@ApiPropertyOptional({
 		description: 'Danh sách UPC',
 		example: ['123456789012', '987654321098'],
 		type: [String],

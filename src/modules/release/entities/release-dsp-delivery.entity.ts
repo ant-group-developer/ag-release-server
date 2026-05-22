@@ -12,6 +12,8 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	@Column({ type: 'boolean', default: true })
 	isSelected: boolean;
 
+	isActive: boolean;
+
 	@Column({ name: 'release_id', type: 'uuid' })
 	releaseId: string;
 

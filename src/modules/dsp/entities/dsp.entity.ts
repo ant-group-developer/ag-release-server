@@ -19,6 +19,7 @@ import {
 	OneToMany,
 	OneToOne,
 } from 'typeorm';
+import { TenantDspAgreement } from './dsp-tenant.entity';
 
 @Entity('dsps', {
 	comment:
@@ -63,6 +64,13 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		comment: 'Đánh dấu DSP đang được kích hoạt hay không',
 	})
 	isActive: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: true,
+		comment: 'Có phải public hay ko',
+	})
+	isDefault: boolean; // public
 
 	@Column({
 		name: 'has_deal',
@@ -121,6 +129,12 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		(dspRoutingConfig) => dspRoutingConfig.dsp,
 	)
 	dspRoutingConfig: DspRoutingConfig;
+
+	@OneToMany(
+		() => TenantDspAgreement,
+		(tenantDspAgreement) => tenantDspAgreement.dsp,
+	)
+	tenantDspAgreements: TenantDspAgreement[];
 
 	releaseDspsCount?: number;
 }

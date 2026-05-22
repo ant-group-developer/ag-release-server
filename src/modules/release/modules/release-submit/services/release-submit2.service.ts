@@ -225,7 +225,10 @@ export class ReleaseSubmitService2 {
 		await this.manager
 			.createQueryBuilder()
 			.update(CiDistributionJob)
-			.set({ status: CiJobStatus.SKIPPED })
+			.set({
+				status: CiJobStatus.SKIPPED,
+				note: 'Job submit cha bị huỷ do được submit lại',
+			})
 			.where('release_submit_id IN (:...ids)', { ids: submitIds })
 			.andWhere('status IN (:...jobStatuses)', {
 				jobStatuses: [CiJobStatus.PENDING, CiJobStatus.PROCESSING],

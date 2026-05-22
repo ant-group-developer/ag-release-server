@@ -43,9 +43,9 @@ export class CiDistributionJobController {
 	@ApiOperation({
 		summary: 'Danh sách grouped CI distribution jobs',
 	})
-	@ApiQuery({
-		type: QueryGroupedCiJobDto,
-	})
+	// @ApiQuery({
+	// 	type: QueryGroupedCiJobDto,
+	// })
 	@Get('grouped')
 	async getGrouped(@Query() query: QueryGroupedCiJobDto) {
 		const result = await this.jobService.getGrouped(query);

@@ -32,10 +32,7 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 	@Column({ name: 'release_upc', type: 'varchar', length: 255 })
 	releaseUpc: string;
 
-	@Column({
-		name: 'release_id',
-		type: 'uuid',
-	})
+	@Column({ name: 'release_id', type: 'uuid' })
 	releaseId: string;
 
 	@ManyToOne(() => Release, { onDelete: 'CASCADE' })
