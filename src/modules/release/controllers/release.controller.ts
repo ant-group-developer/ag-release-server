@@ -224,7 +224,7 @@ export class ReleaseController {
 		const data = await this.releaseService.getFileCsvMetadata(id);
 		streamDownload(res, {
 			...data,
-			contentType: data.contentType || 'application/octet-stream',
+			contentType: String(data.contentType || 'application/octet-stream'),
 		});
 	}
 
@@ -233,7 +233,7 @@ export class ReleaseController {
 		const data = await this.releaseService.getFileXlsxMetadata(id);
 		streamDownload(res, {
 			...data,
-			contentType: data.contentType || 'application/octet-stream',
+			contentType: String(data.contentType || 'application/octet-stream'),
 		});
 	}
 
@@ -242,7 +242,7 @@ export class ReleaseController {
 		const data = await this.releaseService.getFileTxtMetadata(id);
 		streamDownload(res, {
 			...data,
-			contentType: data.contentType || 'application/octet-stream',
+			contentType: String(data.contentType || 'application/octet-stream'),
 		});
 	}
 
@@ -251,7 +251,7 @@ export class ReleaseController {
 		const data = await this.releaseService.getAssets(id);
 		streamDownload(res, {
 			...data,
-			contentType: data.contentType || 'application/octet-stream',
+			contentType: String(data.contentType || 'application/octet-stream'),
 		});
 	}
 
@@ -260,7 +260,7 @@ export class ReleaseController {
 		const data = await this.releaseService.getCoverArtStream(id);
 		streamDownload(res, {
 			...data,
-			contentType: data.contentType || 'application/octet-stream',
+			contentType: String(data.contentType || 'application/octet-stream'),
 		});
 	}
 
