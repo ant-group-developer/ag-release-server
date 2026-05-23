@@ -23,7 +23,7 @@ export class ReleaseExecution3Service {
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 
-		private readonly builder: ReleaseExecution3Builder,
+		private readonly execution3Builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
 	) {}
 
@@ -51,7 +51,7 @@ export class ReleaseExecution3Service {
 			}),
 		);
 
-		await this.builder.buildPipeline(execution.id);
+		await this.execution3Builder.startProcessing(execution.id);
 		// await this.engine.runByExecutionId(execution.id);
 
 		return this.findOne(execution.id);
@@ -160,7 +160,7 @@ export class ReleaseExecution3Service {
 				continue;
 			}
 
-			parent.childSteps.push(step);
+			parent.childSteps?.push(step);
 		}
 
 		return roots;

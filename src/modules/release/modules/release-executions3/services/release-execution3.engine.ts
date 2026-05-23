@@ -93,11 +93,11 @@ export class ReleaseExecutionStepEngine {
 			}
 
 			step.parentStep = parent;
-			parent.childSteps.push(step);
+			parent.childSteps?.push(step);
 		}
 
 		for (const step of steps) {
-			step.childSteps.sort((a, b) => a.order - b.order);
+			step.childSteps?.sort((a, b) => a.order - b.order);
 		}
 
 		return roots.sort((a, b) => a.order - b.order);
@@ -126,11 +126,11 @@ export class ReleaseExecutionStepEngine {
 			}
 
 			step.parentStep = parent;
-			parent.childSteps.push(step);
+			parent.childSteps?.push(step);
 		}
 
 		for (const step of steps) {
-			step.childSteps.sort((a, b) => a.order - b.order);
+			step.childSteps?.sort((a, b) => a.order - b.order);
 		}
 
 		return stepMap.get(rootStepId) || null;
