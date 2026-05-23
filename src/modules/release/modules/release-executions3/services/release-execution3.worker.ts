@@ -31,14 +31,14 @@ export class ReleaseExecution3Worker {
 			case ReleaseExecutionStepType.VALIDATE:
 				return this.validate(step);
 
-			case ReleaseExecutionStepType.CREATE_AND_UPLOAD_DIRECT:
-				return this.createAndUploadDirect(step);
+			// case ReleaseExecutionStepType.CREATE_AND_UPLOAD_DIRECT:
+			// 	return this.createAndUploadDirect(step);
 
-			case ReleaseExecutionStepType.SYNC_DATA_FROM_DSP:
-				return this.syncDataFromDsp(step);
+			// case ReleaseExecutionStepType.SYNC_DATA_FROM_DSP:
+			// 	return this.syncDataFromDsp(step);
 
-			case ReleaseExecutionStepType.CREATE_AND_UPLOAD_CI:
-				return this.createAndUploadCi(step);
+			// case ReleaseExecutionStepType.CREATE_AND_UPLOAD_CI:
+			// 	return this.createAndUploadCi(step);
 
 			case ReleaseExecutionStepType.CREATE_FOLDER_DONE_CI:
 				return this.createFolderDoneCi(step);
@@ -46,11 +46,11 @@ export class ReleaseExecution3Worker {
 			case ReleaseExecutionStepType.VALIDATE_QA_CI:
 				return this.validateQaCi(step);
 
-			case ReleaseExecutionStepType.EXPORT_CI:
-				return this.exportCi(step);
+			// case ReleaseExecutionStepType.EXPORT_CI:
+			// 	return this.exportCi(step);
 
-			case ReleaseExecutionStepType.SEND_EMAIL_TO_STATE:
-				return this.sendEmailToState(step);
+			// case ReleaseExecutionStepType.SEND_EMAIL_TO_STATE:
+			// 	return this.sendEmailToState(step);
 
 			case ReleaseExecutionStepType.WAITING_ADMIN_EXPORT:
 				return ReleaseExecutionStepStatus.WAITING_ACTION;

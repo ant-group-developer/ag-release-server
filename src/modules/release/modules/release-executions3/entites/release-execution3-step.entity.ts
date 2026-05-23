@@ -41,7 +41,7 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	parentStep: ReleaseExecutionStep3 | null;
 
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.parentStep)
-	childSteps: ReleaseExecutionStep3[];
+	childSteps?: ReleaseExecutionStep3[];
 
 	@OneToMany(() => Logs, (log) => log.releaseSubmitStep)
 	logs: Logs[];

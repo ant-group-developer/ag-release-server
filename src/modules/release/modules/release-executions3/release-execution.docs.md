@@ -101,3 +101,120 @@ tất cả processing -> proceesing
 1 thằng WAITING_ACTION -> WAITING_ACTION
 chỉ 1 vài thằng WAITING_ACTION -> WAITING_ACTION
 tất cả WAITING_ACTION -> WAITING_ACTION
+
+// giải thuật
+// build stepsParent
+// const steps = buildParentSteps
+// map qua steps, gọi tới hàm buildChildSteps
+// switch case
+// case upc break
+case isrc
+
+<!--
+buildStep (
+   step?: Step,
+   releaseExecution: ReleaseExecution3,
+) => Step[] {
+   const { releaseSnapShot } = releaseExecution
+   const stepResult: step[] = []
+
+   if (!step) {
+      stepResult.push[
+         { gen_upc, input: { releaseSnapShot.releaseId }},
+         { gen_isrcs, input: { releaseSnapShot.trackId1, releaseSnapShot.trackId2, vv }},
+         { validate },
+         { process dsps }
+      ]
+   }
+
+   if step.type: gen_upc
+      stepResult.push []
+
+   if gen_isrcs
+      stepResult.push [
+         { gen_isrc, input: {trackId} },
+         { gen_isrc, input: {trackId} }
+      ]
+
+      if step.type: gen_isrc
+         stepResult.push []
+
+   if step.type: validate
+      stepResult.push []
+
+   if step.type: process dsps
+      stepResult.push [
+         { process_direct },
+         { process_agg }
+      ]
+
+      if step.type: process_direct
+         stepResult.push [
+            { process_direct_child },
+            { process_direct_child }
+         ]
+
+         if step.type: process_direct_child
+            stepResult.push [
+               create_metadat_on_server,
+               upload_metadata_to_sftp,
+               wait_partner_process,
+               sync_data_partner
+            ]
+
+            if step.type: create_metadat_on_server
+               stepResult.push []
+            if step.type: upload_metadata_to_sftp
+               stepResult.push []
+            if step.type: wait_partner_process
+               stepResult.push []
+            if step.type: sync_data_partner
+               stepResult.push []
+
+      if step.type: process_agg
+         stepResult.push [
+               process_agg_ci
+         ]
+
+         if step.type: process_agg_ci
+            stepResult.push [
+               import
+               export
+            ]
+
+            if step.type: import
+               stepResult.push [
+                  create_metadat_on_server,
+                  upload_metadata_to_sftp,
+                  create_done_folder,
+                  wait_partner_process,
+                  validate qa ci,
+               ]
+
+            if step.type: export
+               stepResult.push [
+                  ci,
+                  state51
+               ]
+
+               if step.type: ci
+                  stepResult.push [
+                     { admin_export, input : { upc, dsps }}
+                  ]
+                  if step.type: admin_export
+                     stepResult.push []
+
+               if step.type: state51
+                  stepResult.push [
+                     { send_email, input : { upc, dsps }}
+                  ]
+
+                  if step.type: send_email
+                     stepResult.push []
+
+   for(const step of stepResult){
+      this.buildStep(step, releaseExecution)
+   }
+} -->
+
+// build thằng step nào thì sinh ra những thằng con cần thiết, map qua nó, xử lý từng thằng con
