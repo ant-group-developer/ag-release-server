@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DspRoutingConfigsModule } from 'src/modules/distribution/dsp-routing/dsp-routing.module';
+import { SftpConnectModule } from 'src/modules/distribution/sftp-connect/sftp-connect.module';
 import { ReleaseExecution3Controller } from './controllers/release-execution3.controller';
 import { ReleaseExecutionStepTestController } from './controllers/release-execution3.engine.controller';
 import { ReleaseSubmitTestController } from './controllers/release-submit-test.controller';
@@ -13,6 +15,9 @@ import { ReleaseExecution3Worker } from './services/release-execution3.worker';
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([ReleaseExecution3, ReleaseExecutionStep3]),
+
+		DspRoutingConfigsModule,
+		SftpConnectModule,
 	],
 	controllers: [
 		ReleaseExecution3Controller,
