@@ -1,0 +1,319 @@
+import { Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as readline from 'readline';
+import * as path from 'path';
+import * as zlib from 'zlib';
+import * as os from 'os';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const AdmZip = require('adm-zip');
+import { FactSalesRow } from '../../interfaces';
+
+/**
+ * Abstract base parser for all DSP sales data files.
+ * Produces FactSalesRow[] instead of FactDspRow[].
+ */
+export abstract class BaseSalesParser {
+  protected readonly logger: Logger;
+  protected readonly dspId: string;
+
+  /** Number of header rows to skip before the actual column header (default 0). */
+  protected skipHeaderRows = 0;
+
+  constructor(dspId: string) {
+    this.dspId = dspId;
+    this.logger = new Logger(`${this.constructor.name}`);
+  }
+
+  /**
+   * Parse an entire file into standardized sales rows.
+   */
+  async parseFile(filePath: string, batchId: string): Promise<FactSalesRow[]> {
+    const lowerPath = filePath.toLowerCase();
+
+    if (lowerPath.endsWith('.zip')) {
+      return this.parseZipFile(filePath, batchId);
+    }
+
+    return this.parseSingleFile(filePath, batchId);
+  }
+
+  /**
+   * Extract a .zip, parse all data files inside, then cleanup.
+   */
+  private async parseZipFile(zipPath: string, batchId: string): Promise<FactSalesRow[]> {
+    const zip = new AdmZip(zipPath);
+    const tempDir = path.join(os.tmpdir(), `etl-sales-zip-${Date.now()}-${Math.random().toString(36).substring(7)}`);
+
+    try {
+      zip.extractAllTo(tempDir, true);
+      const extractedFiles = this.findExtractedDataFiles(tempDir);
+      const allRows: FactSalesRow[] = [];
+
+      for (const extracted of extractedFiles) {
+        const rows = await this.parseSingleFile(extracted, batchId);
+        allRows.push(...rows);
+      }
+
+      return allRows;
+    } finally {
+      try {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch { /* ignore cleanup errors */ }
+    }
+  }
+
+  private findExtractedDataFiles(dir: string): string[] {
+    const results: string[] = [];
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...this.findExtractedDataFiles(fullPath));
+      } else {
+        const name = entry.name.toLowerCase();
+        if (name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt') ||
+            name.endsWith('.csv.gz') || name.endsWith('.tsv.gz') || name.endsWith('.txt.gz')) {
+          results.push(fullPath);
+        }
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Parse a single flat file.
+   */
+  private async parseSingleFile(filePath: string, batchId: string): Promise<FactSalesRow[]> {
+    const rows: FactSalesRow[] = [];
+    let delimiter = this.getDelimiter(filePath);
+    const isGzipped = filePath.toLowerCase().endsWith('.gz');
+
+    let inputStream: NodeJS.ReadableStream;
+    if (isGzipped) {
+      const rawStream = fs.createReadStream(filePath);
+      const gunzip = zlib.createGunzip();
+      inputStream = rawStream.pipe(gunzip);
+      inputStream.setEncoding('utf-8');
+    } else {
+      inputStream = fs.createReadStream(filePath, { encoding: 'utf-8' });
+    }
+
+    const rl = readline.createInterface({ input: inputStream, crlfDelay: Infinity });
+
+    let headers: string[] = [];
+    let lineNum = 0;
+    const headerLine = this.skipHeaderRows + 1; // The actual column header line number
+
+    for await (const rawLine of rl) {
+      lineNum++;
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      // Skip pre-header rows (e.g. Spotify format version, Pandora summary)
+      if (lineNum < headerLine) {
+        this.onSkippedHeaderRow(lineNum, line, filePath);
+        continue;
+      }
+
+      if (lineNum === headerLine) {
+        // Auto-detect delimiter based on header line
+        const tabCount = (line.match(/\t/g) || []).length;
+        const commaCount = (line.match(/,/g) || []).length;
+        if (tabCount > commaCount && tabCount > 3) delimiter = '\t';
+        else if (commaCount > tabCount && commaCount > 3) delimiter = ',';
+        
+        headers = this.parseLine(line, delimiter);
+        continue;
+      }
+
+      try {
+        const values = this.parseLine(line, delimiter);
+        if (values.length < headers.length * 0.3) continue;
+
+        const record: Record<string, string> = {};
+        headers.forEach((h, i) => {
+          record[h.trim()] = (values[i] || '').trim();
+        });
+
+        const parsed = this.parseRow(record, batchId, filePath);
+        if (parsed) {
+          if (Array.isArray(parsed)) {
+            rows.push(...parsed);
+          } else {
+            rows.push(parsed);
+          }
+        }
+      } catch (err) {
+        if (lineNum <= headerLine + 3) {
+          this.logger.warn(`Line ${lineNum} error in ${path.basename(filePath)}: ${err.message}`);
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  /**
+   * Called for each skipped header row. Override to extract metadata (e.g. Pandora CommercialModelType).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected onSkippedHeaderRow(_lineNum: number, _line: string, _filePath: string): void {
+    // Default: do nothing
+  }
+
+  /**
+   * Transform a single record into FactSalesRow(s).
+   */
+  protected abstract parseRow(
+    record: Record<string, string>,
+    batchId: string,
+    filePath: string,
+  ): FactSalesRow | FactSalesRow[] | null;
+
+  // ── Delimiter & line parsing (same as BaseParser) ──
+
+  protected getDelimiter(filePath: string): string {
+    const name = filePath.toLowerCase().replace(/\.gz$/, '');
+    const ext = path.extname(name);
+    if (ext === '.csv') return ',';
+    if (ext === '.tsv') return '\t';
+    if (ext === '.txt') return '\t';
+    return '\t';
+  }
+
+  protected parseLine(line: string, delimiter: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+    return result;
+  }
+
+  // ── Shared utilities ──
+
+  protected normalizeDate(dateStr: string, isStart = true): string {
+    if (!dateStr) return '1970-01-01';
+    const cleaned = dateStr.trim().replace(/"/g, '');
+
+    // YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SSUTC
+    if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
+    // YYYYMMDD
+    if (/^\d{8}$/.test(cleaned)) return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
+    // YYYYMMDD-YYYYMMDD (range format, e.g. Tencent "20230101-20230131" or "20230101 - 20230131")
+    const mRange = cleaned.match(/^(\d{8})\s*-\s*(\d{8})$/);
+    if (mRange) {
+      const part = isStart ? mRange[1] : mRange[2];
+      return `${part.substring(0, 4)}-${part.substring(4, 6)}-${part.substring(6, 8)}`;
+    }
+    // DD-MM-YYYY or DD/MM/YYYY or MM/DD/YYYY
+    const m1 = cleaned.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+    if (m1) {
+      const p1 = parseInt(m1[1], 10);
+      const p2 = parseInt(m1[2], 10);
+      if (p1 > 12) {
+        // Must be DD/MM/YYYY
+        return `${m1[3]}-${m1[2].padStart(2, '0')}-${m1[1].padStart(2, '0')}`;
+      } else if (p2 > 12) {
+        // Must be MM/DD/YYYY
+        return `${m1[3]}-${m1[1].padStart(2, '0')}-${m1[2].padStart(2, '0')}`;
+      }
+      // Ambiguous, assume MM/DD/YYYY as many DSPs are US-based (Saavn uses MM/DD/YYYY)
+      return `${m1[3]}-${m1[1].padStart(2, '0')}-${m1[2].padStart(2, '0')}`;
+    }
+    // YYYY/M/D or YYYY/MM/DD
+    const m2 = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    if (m2) return `${m2[1]}-${m2[2].padStart(2, '0')}-${m2[3].padStart(2, '0')}`;
+    // MM-YYYY (monthly, e.g. SoundCloud "08-2025")
+    const m3 = cleaned.match(/^(\d{2})-(\d{4})$/);
+    if (m3) return `${m3[2]}-${m3[1]}-01`;
+
+    this.logger.warn(`Unknown date format: "${dateStr}"`);
+    return '1970-01-01';
+  }
+
+  protected normalizeCountryCode(code: string): string {
+    if (!code || code === 'N/A' || code === 'Unknown' || code === '' || code === 'ZZ') return 'XX';
+    const cleaned = code.trim().toUpperCase();
+    if (cleaned.length === 2 && /^[A-Z]{2}$/.test(cleaned)) return cleaned;
+    return 'XX';
+  }
+
+  protected safeInt(val: string, defaultVal = 0): number {
+    if (!val || val === '' || val === 'N/A') return defaultVal;
+    // Handle float strings like "1.0"
+    const parsed = parseFloat(val);
+    return isNaN(parsed) ? defaultVal : Math.max(0, Math.round(parsed));
+  }
+
+  protected safeFloat(val: string, defaultVal = 0): number {
+    if (!val || val === '' || val === 'N/A') return defaultVal;
+    const parsed = parseFloat(val);
+    return isNaN(parsed) ? defaultVal : parsed;
+  }
+
+  /**
+   * Preserve exact decimal string for Decimal128 columns.
+   * Returns the raw string value if it's a valid number, otherwise '0'.
+   */
+  protected safeDecimal(val: string, defaultVal = '0'): string {
+    if (!val || val === '' || val === 'N/A') return defaultVal;
+    const cleaned = val.trim();
+    if (isNaN(Number(cleaned))) return defaultVal;
+    return cleaned;
+  }
+
+  protected createBaseRow(batchId: string): FactSalesRow {
+    return {
+      reporting_period_start: '1970-01-01',
+      reporting_period_end: '1970-01-01',
+      dsp_id: this.dspId,
+      service_name: '',
+      dpid: '',
+      member_name: '',
+      label_name: '',
+      territory_code: 'XX',
+      isrc: '',
+      upc: '',
+      grid: '',
+      release_id: '',
+      track_title: '',
+      artist_name: '',
+      album_title: '',
+      composer_name: '',
+      genre: '',
+      quantity: 0,
+      quantity_creations: 0,
+      quantity_views: 0,
+      revenue_usd: '0',
+      revenue_local: '0',
+      revenue_currency: 'USD',
+      usage_type: '',
+      monetisation_type: '',
+      service_tier: '',
+      plan_name: '',
+      commercial_model: '',
+      metadata: {},
+      source_category: 'sales',
+      batch_id: batchId,
+    };
+  }
+}

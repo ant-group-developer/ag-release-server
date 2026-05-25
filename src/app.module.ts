@@ -23,6 +23,9 @@ import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
+import { ClickHouseModule } from './modules/clickhouse/clickhouse.module';
+import { EtlModule } from './modules/etl/etl.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DDEXModule } from './modules/ddex';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
@@ -90,6 +93,8 @@ import { UserModule } from './modules/user/user.module';
 		EventEmitterModule.forRoot(),
 
 		DatabaseModule,
+		ClickHouseModule,
+		EtlModule,
 		// ... other modules
 
 		CountryModule,
@@ -152,6 +157,7 @@ import { UserModule } from './modules/user/user.module';
 		TenantIssueModule,
 		TenantTierModule,
 		StatisticsModule,
+		AnalyticsModule,
 
 		NewsCategoryModule,
 		NewsPostModule,
