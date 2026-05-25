@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
+import { RequirePermissions } from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 
 import { TenantTierResponse } from './constants/tenant-tiers.constant';
 import {
@@ -26,7 +27,7 @@ import { TenantTierService } from './services/tenant-tier.service';
 export class TenantTierController {
 	constructor(private readonly tenantTierService: TenantTierService) {}
 
-	@SystemAdminOnly()
+	@RequirePermissions(Permission.TENANT_TIER.CREATE)
 	@Post()
 	async create(@Body() data: CreateTenantTierDto, @Req() req: Request) {
 		const userId = req.user!.sub;
@@ -34,7 +35,7 @@ export class TenantTierController {
 		return new ResponseSuccess(TenantTierResponse.CREATE_SUCCESS(result));
 	}
 
-	@SystemAdminOnly()
+	@RequirePermissions(Permission.TENANT_TIER.READ)
 	@Get()
 	async getList(@Query() query: QueryGetListTenantTierDto) {
 		const result = await this.tenantTierService.getList(query);
@@ -53,7 +54,7 @@ export class TenantTierController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@SystemAdminOnly()
+	@RequirePermissions(Permission.TENANT_TIER.UPDATE)
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -65,7 +66,7 @@ export class TenantTierController {
 		return new ResponseSuccess(TenantTierResponse.UPDATE_SUCCESS(result));
 	}
 
-	@SystemAdminOnly()
+	@RequirePermissions(Permission.TENANT_TIER.DELETE)
 	@Delete(':id')
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.tenantTierService.delete(id);

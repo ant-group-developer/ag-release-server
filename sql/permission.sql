@@ -23,6 +23,7 @@ VALUES
   ('Label: Read', 'label.read', 'Read labels.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Label: Update', 'label.update', 'Update labels.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Release: Create', 'release.create', 'Create releases.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Release: Delete', 'release.delete', 'Delete releases.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Release: Read', 'release.read', 'Read releases.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Release: Review', 'release.review', 'Review releases.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Release: Take Down', 'release.take_down', 'Take down releases.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
@@ -40,11 +41,20 @@ VALUES
   ('Track: Scan', 'track.scan', 'Scan tracks.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('User: Create', 'user.create', 'Create users.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('User: Delete', 'user.delete', 'Delete users.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('User: Invite', 'user.invite', 'Invite user to tenant.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('User: Read', 'user.read', 'Read users.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
-  ('User: Update', 'user.update', 'Update users.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('User: Update Info', 'user.update.info', 'Update user basic info (name, email, avatar).', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('User: Update Role', 'user.update.role', 'Assign or change roles for a user.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('User: Update Status', 'user.update.status', 'Toggle user active/inactive status.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('User: Update Tenant Type', 'user.update.tenant_type', 'Change user tenant type (admin/member).', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Workspace: Create', 'workspace.create', 'Create workspaces.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
   ('Workspace: Read', 'workspace.read', 'Read workspaces.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
-  ('Workspace: Update', 'workspace.update', 'Update workspaces.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2')
+  ('Workspace: Update Config', 'workspace.update.config', 'Update workspace config (maxLabels, type, parentId, tier).', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Workspace: Update Info', 'workspace.update.info', 'Update workspace basic info (name, code, title, domain, etc).', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Workspace: Update Owner', 'workspace.update.owner', 'Change workspace owner.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Workspace: Update Status', 'workspace.update.status', 'Toggle workspace active/inactive.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Role: Read', 'role.read', 'View roles and role details.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2'),
+  ('Permission: Read', 'permission.read', 'View permissions.', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2')
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   note = EXCLUDED.note;

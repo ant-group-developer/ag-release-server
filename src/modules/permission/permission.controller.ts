@@ -13,9 +13,10 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	RequirePermissions,
 	SystemAdminOnly,
-	TenantOwnerOrAdminOnly,
 } from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import {
 	PermissionMessageCodeSuccess,
 	PermissionMessageSuccess,
@@ -53,21 +54,21 @@ export class PermissionController {
 		return new ResponseSuccess({ ...result });
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.PERMISSION.READ)
 	@Get()
 	async getList(@Query() query: QueryGetListPermissionDto) {
 		const result = await this.permissionService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.PERMISSION.READ)
 	@Get('simple')
 	async getListSimple() {
 		const result = await this.permissionService.getAll();
 		return new ResponseSuccess({ data: result });
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.PERMISSION.READ)
 	@Get(':id')
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.permissionService.findOne(id);
