@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
@@ -20,6 +20,7 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
+import { ReleaseService } from 'src/modules/release/services/release.service';
 
 @Injectable()
 export class ReleaseExecution3Worker {
@@ -31,8 +32,9 @@ export class ReleaseExecution3Worker {
 		private readonly sftpConnectService: SftpConnectService,
 		private readonly releaseDdexService: ReleaseDdexService,
 		private readonly releaseValidateService: ReleaseValidateService,
-		// @Inject(forwardRef(() => ReleaseService))
-		// private readonly releaseService: ReleaseService,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
 		private readonly trackService: TrackService,
 		private readonly ciService: CiService,
 		// private readonly ciJobService: CiDistributionJobService,
@@ -43,12 +45,16 @@ export class ReleaseExecution3Worker {
 	// DISPATCHER
 	// ─────────────────────────────────────────────
 
-	async dispatchStepTask(
-		step: ReleaseExecutionStep3,
-	): Promise<ReleaseExecutionStepStatus> {
+	async dispatchStepTask({
+		step,
+		releaseExecution,
+	}: {
+		step: ReleaseExecutionStep3;
+		releaseExecution: ReleaseExecution3;
+	}): Promise<ReleaseExecutionStepStatus> {
 		switch (step.type) {
 			case ReleaseExecutionStepType.GEN_UPC:
-				return this.genUpc(step);
+				return this.genUpc({step, releaseExecution});
 
 			case ReleaseExecutionStepType.GEN_ISRCS:
 				return this.genIsrcs(step);
@@ -152,39 +158,28 @@ export class ReleaseExecution3Worker {
 	// CRITICAL STEPS
 	// ─────────────────────────────────────────────
 
-	private async genUpc(
-		step: ReleaseExecutionStep3,
-	): Promise<ReleaseExecutionStepStatus> {
+	private async genUpc({
+		step,
+		releaseExecution,
+	}: {
+		step: ReleaseExecutionStep3;
+		releaseExecution: ReleaseExecution3;
+	}): Promise<ReleaseExecutionStepStatus> {
+		
 		try {
-			const execution = await this.getExecution(step);
-			const releaseId = this.releaseIdFromExecution(execution);
+			const data = releaseExecution.metadata
 
-			// const upc = await this.releaseService.genUpcById(releaseId);
+			const upc = await this.releaseService.genUpcById(data.input.releaseSnapshot.id);
 
 			// // Ghi output vào step metadata
-			// step.metadata = {
-			// 	...step.metadata,
-			// 	output: { upc },
-			// };
+			step.metadata = {
+				...step.metadata,
+				output: { upc },
+			};
 			await this.manager.save(ReleaseExecutionStep3, step);
 
-			// Cập nhật snapshot trong execution để các step sau dùng được
-			await this.manager.save(ReleaseExecution3, {
-				...execution,
-				metadata: {
-					...execution.metadata,
-					input: {
-						...execution.metadata.input,
-						releaseSnapshot: {
-							...execution.metadata.input.releaseSnapshot,
-							// upc,
-						},
-					},
-				},
-			});
-
 			this.logService.success({
-				// message: `[GEN_UPC] Release ${releaseId} → ${upc}`,
+				message: `[GEN_UPC] Release ${data.input.releaseSnapshot.id}: ${upc}`,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
@@ -194,7 +189,6 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	/** GEN_ISRCS chỉ là container — status derive từ children */
 	private async genIsrcs(
 		step: ReleaseExecutionStep3,
 	): Promise<ReleaseExecutionStepStatus> {

@@ -16,14 +16,18 @@ export enum ExecutionType {
 }
 
 export enum ReleaseExecutionStepStatus {
-	NEW = 'NEW',
-	PROCESSING = 'PROCESSING',
 	WAITING_ACTION = 'WAITING_ACTION',
 	WAITING_PARTNER = 'WAITING_PARTNER',
-	DONE = 'DONE',
+
 	FAILED = 'FAILED',
-	SKIPPED = 'SKIPPED',
+
 	CANCELLED = 'CANCELLED',
+	SKIPPED = 'SKIPPED',
+
+	PROCESSING = 'PROCESSING',
+	NEW = 'NEW',
+	DONE = 'DONE',
+
 }
 
 /**
