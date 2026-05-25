@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Logs } from 'src/modules/log/entites/logs.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import {
@@ -74,6 +75,14 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 		input: {
 			releaseSnapshot: Release;
 			dspCodes: string[];
+			dspDirect: Dsp[];
+			dspAggregator: {
+				ci: {
+					ci: Dsp[];
+					state51: Dsp[];
+				};
+			};
+			upcAutoIfReleaseSnapshotNull?: string;
 		};
 		output: {
 			result: ReleaseExecutionResultDto[];

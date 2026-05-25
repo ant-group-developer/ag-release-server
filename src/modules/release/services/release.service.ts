@@ -66,6 +66,7 @@ export class ReleaseService {
 
 		private readonly releaseDdexService: ReleaseDdexService,
 
+		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
 	) {}
 
