@@ -32,7 +32,7 @@ export class TenantRolesController {
 	@ApiParam({ name: 'tenantId', type: 'string', format: 'uuid' })
 	@Get(':tenantId/configured-roles')
 	async get(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
-		const data = await this.tenantRolesService.get(tenantId);
+		const data = await this.tenantRolesService.getEnabledRoleIds(tenantId);
 		return new ResponseSuccess({ data });
 	}
 }

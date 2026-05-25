@@ -251,7 +251,18 @@ export class UserController {
 		@Req() req: Request,
 	): Promise<ResponseSuccess<User>> {
 		const userReqId = req.user!.sub;
+		const tenantId = req.user!.tenantId;
+
 		const result = await this.userService.update(id, payload, userReqId);
+
+		if (payload.tenantUserType) {
+			await this.tenantUserService.updateUserTenantType(
+				tenantId,
+				id,
+				payload.tenantUserType,
+			);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 

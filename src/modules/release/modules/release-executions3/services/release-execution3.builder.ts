@@ -28,26 +28,6 @@ export class ReleaseExecution3Builder {
 		private readonly manager: EntityManager,
 	) {}
 
-	async startProcessing(executionId: string): Promise<void> {
-		const execution = await this.executionRepo.findOne({
-			where: { id: executionId },
-		});
-
-		if (!execution) {
-			throw new Error('Execution not found');
-		}
-
-		await this.executionRepo.update(executionId, {
-			status: ReleaseExecutionStatus.PROCESSING,
-		});
-
-		const allSteps = this.buildStepsChild({ releaseExecution: execution });
-
-		await this.manager.transaction(async (tx) => {
-			await this.saveStepsRecursive(allSteps, tx);
-		});
-	}
-
 	buildStepsChild({
 		step,
 		releaseExecution,
@@ -111,15 +91,14 @@ export class ReleaseExecution3Builder {
 				break;
 
 			case ReleaseExecutionStepType.PROCESS_DIRECT: {
-				const dspDirect =
-					releaseExecution.metadata.input.dspDirect ?? [];
-				dspDirect.forEach((dsp, index) => {
-					stepResult.push({
-						type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
-						order: index + 1,
-						metadata: { input: { dsp } },
-					});
-				});
+				// const { directDsps } = releaseExecution.metadata.input;
+				// directDsps.forEach((dsp, index) => {
+				// 	stepResult.push({
+				// 		type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
+				// 		order: index + 1,
+				// 		metadata: { input: { dsp } },
+				// 	});
+				// });
 				break;
 			}
 
@@ -187,37 +166,34 @@ export class ReleaseExecution3Builder {
 				break;
 
 			case ReleaseExecutionStepType.EXPORT:
-				if (
-					releaseExecution.metadata.input.dspAggregator.ci.ci.length >
-					0
-				) {
-					stepResult.push({
-						type: ReleaseExecutionStepType.CI,
-						order: 1,
-					});
-				}
+				// const { ciDsps } = releaseExecution.metadata.input;
+				// const ciDealDsps = ciDsps.filter((dsp) => dsp.hasDeal);
+				// const state51Dsps = ciDsps.filter((dsp) => !dsp.hasDeal);
 
-				if (
-					releaseExecution.metadata.input.dspAggregator.ci.state51
-						.length > 0
-				) {
-					stepResult.push({
-						type: ReleaseExecutionStepType.STATE51,
-						order: 2,
-					});
-				}
+				// if (ciDealDsps.length > 0) {
+				// 	stepResult.push({
+				// 		type: ReleaseExecutionStepType.CI,
+				// 		order: 1,
+				// 		metadata: { input: { ciDealDsps } },
+				// 	});
+				// }
+
+				// if (state51Dsps.length > 0) {
+				// 	stepResult.push({
+				// 		type: ReleaseExecutionStepType.STATE51,
+				// 		order: 2,
+				// 		metadata: { input: { state51Dsps } },
+				// 	});
+				// }
 				break;
 
 			case ReleaseExecutionStepType.CI:
-				const upc =
-					releaseSnapshot.upc ??
-					releaseExecution.metadata.input
-						.upcAutoIfReleaseSnapshotNull;
-				const ciDspsInput = step.metadata?.input?.ciDealDsps ?? [];
+				// const { upc } = releaseSnapshot;
+				// const ciDspsInput = step.metadata?.input?.ciDealDsps ?? [];
 				stepResult.push({
 					type: ReleaseExecutionStepType.WAITING_ADMIN_EXPORT,
 					order: 1,
-					metadata: { input: { upc, dsps: ciDspsInput } },
+					// metadata: { input: { upc, dsps: ciDspsInput } },
 				});
 				break;
 
@@ -259,6 +235,238 @@ export class ReleaseExecution3Builder {
 
 		return savedSteps;
 	}
+
+	async startProcessing(executionId: string): Promise<void> {
+		const execution = await this.executionRepo.findOne({
+			where: { id: executionId },
+		});
+
+		if (!execution) {
+			throw new Error('Execution not found');
+		}
+
+		await this.executionRepo.update(executionId, {
+			status: ReleaseExecutionStatus.PROCESSING,
+		});
+
+		const allSteps = this.buildStepsChild({ releaseExecution: execution });
+
+		await this.manager.transaction(async (tx) => {
+			await this.saveStepsRecursive(allSteps, tx);
+		});
+	}
+
+	// buildStepsChild({
+	// 	step,
+	// 	releaseExecution,
+	// }: {
+	// 	step?: ReleaseExecutionStep3;
+	// 	releaseExecution: ReleaseExecution3;
+	// }): ReleaseExecutionStep3[] {
+	// 	const { releaseSnapshot } = releaseExecution.metadata.input;
+	// 	const stepResult: Partial<ReleaseExecutionStep3>[] = [];
+
+	// 	switch (step?.type) {
+	// 		case undefined:
+	// 			stepResult.push(
+	// 				{
+	// 					type: ReleaseExecutionStepType.GEN_UPC,
+	// 					order: 1,
+	// 					metadata: {
+	// 						input: { releaseId: releaseSnapshot.id },
+	// 					},
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.GEN_ISRCS,
+	// 					order: 2,
+	// 					metadata: {
+	// 						input: {
+	// 							trackIds: releaseSnapshot.tracks.map(
+	// 								(t) => t.id,
+	// 							),
+	// 						},
+	// 					},
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.VALIDATE,
+	// 					order: 3,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.PROCESS_DSPS,
+	// 					order: 4,
+	// 				},
+	// 			);
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.GEN_ISRCS: {
+	// 			const trackIds: string[] =
+	// 				step?.parentStep?.metadata?.input?.trackIds ?? [];
+	// 			trackIds.forEach((trackId, index) => {
+	// 				stepResult.push({
+	// 					type: ReleaseExecutionStepType.GEN_ISRC,
+	// 					order: index + 1,
+	// 					metadata: { input: { trackId } },
+	// 				});
+	// 			});
+	// 			break;
+	// 		}
+
+	// 		case ReleaseExecutionStepType.PROCESS_DSPS:
+	// 			stepResult.push(
+	// 				{ type: ReleaseExecutionStepType.PROCESS_DIRECT, order: 1 },
+	// 				{ type: ReleaseExecutionStepType.PROCESS_AGG, order: 2 },
+	// 			);
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.PROCESS_DIRECT: {
+	// 			const dspDirect =
+	// 				releaseExecution.metadata.input.dspDirect ?? [];
+	// 			dspDirect.forEach((dsp, index) => {
+	// 				stepResult.push({
+	// 					type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
+	// 					order: index + 1,
+	// 					metadata: { input: { dsp } },
+	// 				});
+	// 			});
+	// 			break;
+	// 		}
+
+	// 		case ReleaseExecutionStepType.PROCESS_DIRECT_CHILD:
+	// 			stepResult.push(
+	// 				{
+	// 					type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+	// 					order: 1,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
+	// 					order: 2,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+	// 					order: 3,
+	// 					metadata: {
+	// 						input: { waitMinutes: DEFAULT_WAIT_MINUTES },
+	// 					},
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+	// 					order: 4,
+	// 				},
+	// 			);
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.PROCESS_AGG:
+	// 			stepResult.push({
+	// 				type: ReleaseExecutionStepType.PROCESS_AGG_CI,
+	// 				order: 1,
+	// 			});
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.PROCESS_AGG_CI:
+	// 			stepResult.push(
+	// 				{ type: ReleaseExecutionStepType.IMPORT, order: 1 },
+	// 				{ type: ReleaseExecutionStepType.EXPORT, order: 2 },
+	// 			);
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.IMPORT:
+	// 			stepResult.push(
+	// 				{
+	// 					type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+	// 					order: 1,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
+	// 					order: 2,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.CREATE_FOLDER_DONE_CI,
+	// 					order: 3,
+	// 				},
+	// 				{
+	// 					type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+	// 					order: 4,
+	// 					metadata: {
+	// 						input: { waitMinutes: DEFAULT_WAIT_MINUTES },
+	// 					},
+	// 				},
+	// 				{ type: ReleaseExecutionStepType.VALIDATE_QA_CI, order: 5 },
+	// 			);
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.EXPORT:
+	// 			if (
+	// 				releaseExecution.metadata.input.dspAggregator.ci.ci.length >
+	// 				0
+	// 			) {
+	// 				stepResult.push({
+	// 					type: ReleaseExecutionStepType.CI,
+	// 					order: 1,
+	// 				});
+	// 			}
+
+	// 			if (
+	// 				releaseExecution.metadata.input.dspAggregator.ci.state51
+	// 					.length > 0
+	// 			) {
+	// 				stepResult.push({
+	// 					type: ReleaseExecutionStepType.STATE51,
+	// 					order: 2,
+	// 				});
+	// 			}
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.CI:
+	// 			const upc =
+	// 				releaseSnapshot.upc ??
+	// 				releaseExecution.metadata.input
+	// 					.upcAutoIfReleaseSnapshotNull;
+	// 			const ciDspsInput = step.metadata?.input?.ciDealDsps ?? [];
+	// 			stepResult.push({
+	// 				type: ReleaseExecutionStepType.WAITING_ADMIN_EXPORT,
+	// 				order: 1,
+	// 				metadata: { input: { upc, dsps: ciDspsInput } },
+	// 			});
+	// 			break;
+
+	// 		case ReleaseExecutionStepType.STATE51:
+	// 			// const state51DspsInput =
+	// 			// step.metadata?.input?.state51Dsps ?? [];
+	// 			stepResult.push({
+	// 				type: ReleaseExecutionStepType.SEND_EMAIL_STATE51,
+	// 				order: 1,
+	// 				metadata: {
+	// 					input: {
+	// 						upc: releaseSnapshot.upc,
+	// 						// dsps: state51DspsInput,
+	// 					},
+	// 				},
+	// 			});
+	// 			break;
+
+	// 		default:
+	// 			return [];
+	// 	}
+
+	// 	// Gán id, parentStepId, releaseExecutionId rồi đệ quy
+	// 	const savedSteps: ReleaseExecutionStep3[] = [];
+
+	// 	for (const childStep of stepResult) {
+	// 		childStep.id = uuidv4();
+	// 		childStep.releaseExecutionId = releaseExecution.id;
+	// 		childStep.parentStepId = step?.id ?? null;
+
+	// 		const children = this.buildStepsChild({
+	// 			step: childStep as ReleaseExecutionStep3,
+	// 			releaseExecution,
+	// 		});
+
+	// 		childStep.childSteps = children;
+	// 		savedSteps.push(childStep as ReleaseExecutionStep3);
+	// 	}
+
+	// 	return savedSteps;
+	// }
 
 	private async saveStepsRecursive(
 		steps: ReleaseExecutionStep3[],

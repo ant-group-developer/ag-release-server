@@ -67,6 +67,16 @@ export abstract class UpdateUserDto {
 	@IsOptional()
 	@IsEnum(UserType)
 	type?: UserType;
+
+	@ApiPropertyOptional({
+		enum: [TenantUserType.ADMIN, TenantUserType.MEMBER],
+	})
+	@IsOptional()
+	@IsEnum([TenantUserType.ADMIN, TenantUserType.MEMBER], {
+		message: (option) =>
+			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
+	})
+	tenantUserType?: TenantUserType.ADMIN | TenantUserType.MEMBER;
 }
 
 export class CreateUserDto extends UpdateUserDto {
@@ -93,16 +103,6 @@ export class CreateUserDto extends UpdateUserDto {
 	@IsOptional()
 	@IsUUID()
 	tenantId?: string;
-
-	@ApiPropertyOptional({
-		enum: [TenantUserType.ADMIN, TenantUserType.MEMBER],
-	})
-	@IsOptional()
-	@IsEnum([TenantUserType.ADMIN, TenantUserType.MEMBER], {
-		message: (option) =>
-			`${option.property} must be ${TenantUserType.ADMIN} or ${TenantUserType.MEMBER} only`,
-	})
-	tenantUserType?: TenantUserType.ADMIN | TenantUserType.MEMBER;
 }
 
 export class GetListUserDto extends BaseQueryDto {
