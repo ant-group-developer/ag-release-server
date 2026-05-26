@@ -13,9 +13,10 @@ import {
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	RequirePermissions,
 	SystemAdminOnly,
-	TenantOwnerOrAdminOnly,
 } from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import {
 	RoleMessageCodeSuccess,
 	RoleMessageSuccess,
@@ -44,7 +45,7 @@ export class RoleController {
 		});
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.ROLE.READ)
 	@Get(':id')
 	async getOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.roleService.getOne(id);
@@ -54,7 +55,7 @@ export class RoleController {
 		});
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.ROLE.READ)
 	@Get()
 	async getList(@Query() data: GetListRole) {
 		const result = await this.roleService.getList(data);

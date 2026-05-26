@@ -13,9 +13,10 @@ import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import {
-	TenantOwnerOrAdminOnly,
+	RequirePermissions,
 	TenantWhiteLabelOnly,
 } from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import { TenantUserService } from '../user/services/tenant-user.service';
 import {
 	checkIsNotSystemAdmin,
@@ -39,7 +40,7 @@ export class TenantController {
 		private readonly tenantUserService: TenantUserService,
 	) {}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.WORKSPACE.READ)
 	@Get()
 	@ApiOperation({ summary: 'Get all tenants' })
 	async findAll(
@@ -80,7 +81,7 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.WORKSPACE.READ)
 	@Get(':id')
 	async findOne(
 		@Param('id') id: string,
@@ -91,7 +92,7 @@ export class TenantController {
 	}
 
 	@TenantWhiteLabelOnly()
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(Permission.WORKSPACE.CREATE)
 	@Post()
 	async create(
 		@Body() payload: CreateTenantDto,
@@ -114,15 +115,55 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@TenantOwnerOrAdminOnly()
+	@RequirePermissions(
+		Permission.WORKSPACE.UPDATE_INFO,
+		Permission.WORKSPACE.UPDATE_STATUS,
+		Permission.WORKSPACE.UPDATE_OWNER,
+		Permission.WORKSPACE.UPDATE_CONFIG,
+	)
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
-		@Body() { ownerId, ...payload }: UpdateTenantDto,
+		@Body() { ownerId: rawOwnerId, ...payload }: UpdateTenantDto,
 		@Req() req: Request,
 	): Promise<ResponseSuccess<Tenant>> {
 		const userType = req.user!.type;
 		const userReqId = req.user!.sub;
+		const isSysAdmin = checkIsSystemAdmin(userType);
+		let ownerId = rawOwnerId;
+
+		// Field-level permission: strip fields user cannot change (system admins bypass)
+		if (!isSysAdmin) {
+			const userPerms = new Set<string>(
+				Array.isArray(req.user!.permission)
+					? req.user!.permission
+					: [],
+			);
+
+			if (!userPerms.has(Permission.WORKSPACE.UPDATE_INFO)) {
+				delete payload.name;
+				delete payload.code;
+				delete payload.title;
+				delete payload.domain;
+				delete payload.email;
+				delete payload.logo;
+				delete payload.icon;
+				delete payload.primaryColor;
+			}
+
+			if (!userPerms.has(Permission.WORKSPACE.UPDATE_STATUS)) {
+				delete payload.isActive;
+			}
+
+			if (!userPerms.has(Permission.WORKSPACE.UPDATE_OWNER)) {
+				ownerId = undefined;
+			}
+
+			if (!userPerms.has(Permission.WORKSPACE.UPDATE_CONFIG)) {
+				delete payload.maxLabels;
+				delete payload.tenantTierId;
+			}
+		}
 
 		if (checkIsNotSystemAdmin(userType)) {
 			delete payload.type;
@@ -141,7 +182,7 @@ export class TenantController {
 				req.user!.id,
 				result.parent?.id,
 			);
-		if (ownerId && (isOwnerParentTenant || checkIsSystemAdmin(userType))) {
+		if (ownerId && (isOwnerParentTenant || isSysAdmin)) {
 			await this.tenantUserService.updateOwner(
 				result.id,
 				ownerId,
