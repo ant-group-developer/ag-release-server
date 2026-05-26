@@ -609,7 +609,7 @@ export class ReleaseDdexService {
 					languageOfPerformance:
 						track.trackLanguage?.audioLanguage?.code ===
 						'NoLanguage'
-							? undefined
+							? 'zxx' // No linguistic content https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
 							: track.trackLanguage?.audioLanguage?.code,
 
 					parentalWarning: normalizeParentalWarning(

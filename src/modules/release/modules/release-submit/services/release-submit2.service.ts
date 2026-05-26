@@ -506,7 +506,7 @@ export class ReleaseSubmitService2 {
 					parentStepId: parent.id,
 					type: SubmitStepType.WAIT_PARTNER_PROCESS,
 					order: childOrder++,
-					metadata: { input: { waitMinutes: 1440 } },
+					metadata: { input: { waitMinutes: 1440 / 2 } },
 					// metadata: { input: { waitMinutes: 1 } },
 				});
 
@@ -1208,7 +1208,7 @@ export class ReleaseSubmitService2 {
 			}
 
 			case SubmitStepType.WAIT_PARTNER_PROCESS: {
-				const waitMinutes = step.metadata?.input?.waitMinutes ?? 3;
+				const waitMinutes = step.metadata?.input?.waitMinutes ?? 5;
 				const scheduledAt = new Date(
 					Date.now() + waitMinutes * 60 * 1000,
 				);
@@ -1413,15 +1413,26 @@ export class ReleaseSubmitService2 {
 			where: {
 				status: SubmitStepStatus.WAITING_ACTION,
 				scheduledAt: LessThanOrEqual(now),
+				releaseSubmit: {
+					status: Not(
+						In([
+							ReleaseSubmitStatus.CANCELLED,
+							ReleaseSubmitStatus.FAILED,
+							ReleaseSubmitStatus.DONE,
+						]),
+					),
+				},
 			},
 		});
 
 		for (const step of readySteps) {
-			this.logService.log({
-				releaseSubmitId: step.releaseSubmitId,
-				releaseSubmitStepId: step.id,
-				message: `[CRON] Auto-resuming scheduled step ${step.type}`,
-			});
+			// Atomic claim — chỉ 1 cron instance xử lý được
+			const result = await this.stepRepo.update(
+				{ id: step.id, status: SubmitStepStatus.WAITING_ACTION },
+				{ status: SubmitStepStatus.PROCESSING },
+			);
+
+			if (result.affected === 0) continue; // bị instance khác claim rồi, bỏ qua
 
 			this.resumeFromWaiting({ stepId: step.id }).catch((err) => {
 				this.logService.error({
@@ -1442,29 +1453,30 @@ export class ReleaseSubmitService2 {
 	}) {
 		const step = await this.stepRepo.findOne({ where: { id: stepId } });
 		if (!step) throw new NotFoundException('Step not found');
-		if (step.status !== SubmitStepStatus.WAITING_ACTION) {
-			throw new Error('Step is not in WAITING_ACTION status');
+
+		// Cron đã claim → status = PROCESSING
+		// Manual resume → status = WAITING_ACTION, cần claim trước
+		if (step.status === SubmitStepStatus.WAITING_ACTION) {
+			const claim = await this.stepRepo.update(
+				{ id: stepId, status: SubmitStepStatus.WAITING_ACTION },
+				{ status: SubmitStepStatus.PROCESSING },
+			);
+			if (claim.affected === 0) {
+				throw new Error('Step đang được xử lý bởi tiến trình khác');
+			}
+		} else if (step.status !== SubmitStepStatus.PROCESSING) {
+			throw new Error(`Step status invalid: ${step.status}`);
 		}
 
-		// Merge output vào metadata mà không mất data cũ
-		// const updatedMetadata = {
-		// 	...step.metadata,
-		// 	...(outputMetadataStep ? { output: { ...step.metadata?.output, ...outputMetadataStep } } : {}),
-		// };
-
-		// Mark step as DONE
 		await this.stepRepo.update(stepId, {
 			status: SubmitStepStatus.DONE,
 			completedAt: new Date(),
-			// metadata: updatedMetadata,
 		});
 
-		// Resume execution
 		await this.submitRepo.update(step.releaseSubmitId, {
 			status: ReleaseSubmitStatus.PROCESSING,
 		});
 
-		// runPipeline → resolveSubmitStatus → deriveAndUpdateReleaseStatus sẽ tự sync
 		this.runPipeline(step.releaseSubmitId).catch((err) => {
 			this.logService.error({
 				releaseSubmitId: step.releaseSubmitId,

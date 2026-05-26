@@ -14,9 +14,9 @@ export class ReleaseExecutionStepEngine {
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
 	) {}
 
-
+	// main
 	async processStep(
-    	step: ReleaseExecutionStep3,
+		step: ReleaseExecutionStep3,
 	): Promise<ReleaseExecutionStepStatus> {
 		if (!step.childSteps?.length) {
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
@@ -25,30 +25,36 @@ export class ReleaseExecutionStepEngine {
 			});
 			await this.updateStepStatus(step, status);
 			return status;
-		}
-
-		else if (step.childExecutionMode === 'sequential') {
+		} else if (step.childExecutionMode === 'sequential') {
 			for (const childStep of step.childSteps) {
 				const childStatus = await this.processStep(childStep);
 
 				if (this.shouldStopSequential(childStatus)) {
-					await this.setRemaining(childStep, step.childSteps, childStatus);
+					await this.setRemaining(
+						childStep,
+						step.childSteps,
+						childStatus,
+					);
 					return this.resolveAndUpdateParentStatus(step);
 				}
 			}
 
 			return this.resolveAndUpdateParentStatus(step);
-		}
+		} else if (step.childExecutionMode === 'parallel') {
+			// await Promise.allSettled(
+			// 	step.childSteps.map((child) => this.processStep(child)),
+			// );
 
-		else if (step.childExecutionMode === 'parallel') {
-			await Promise.allSettled(
-				step.childSteps.map((child) => this.processStep(child)),
-			);
+			for (const child of step.childSteps) {
+				await this.processStep(child);
+			}
 
 			return this.resolveAndUpdateParentStatus(step);
 		}
 
-		throw new Error(`Unknown childExecutionMode: ${step.childExecutionMode}`);
+		throw new Error(
+			`Unknown childExecutionMode: ${step.childExecutionMode}`,
+		);
 	}
 
 	private async resolveAndUpdateParentStatus(
@@ -181,8 +187,6 @@ export class ReleaseExecutionStepEngine {
 		return stepMap.get(rootStepId) || null;
 	}
 
-	
-
 	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
 		return [
 			ReleaseExecutionStepStatus.FAILED,
@@ -198,7 +202,9 @@ export class ReleaseExecutionStepEngine {
 		const children = step.childSteps || [];
 
 		if (!children?.length) {
-			throw new Error(`Step ${step.id} has no children to resolve status from`);
+			throw new Error(
+				`Step ${step.id} has no children to resolve status from`,
+			);
 		}
 
 		// ===== WAITING =====
