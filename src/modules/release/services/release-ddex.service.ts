@@ -11,6 +11,7 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { DspCode } from 'src/modules/dsp/enum/dsp.enum';
 
+import { NO_LINGUISTIC_CONTENT_LANGUAGE } from 'src/common/constants/common.default.constants';
 import {
 	ErnInput2,
 	ErnVersion2,
@@ -607,10 +608,8 @@ export class ReleaseDdexService {
 						undefined,
 
 					languageOfPerformance:
-						track.trackLanguage?.audioLanguage?.code ===
-						'NoLanguage'
-							? 'zxx' // No linguistic content https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
-							: track.trackLanguage?.audioLanguage?.code,
+						track.trackLanguage?.audioLanguage?.code ??
+						NO_LINGUISTIC_CONTENT_LANGUAGE, // No linguistic content https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
 
 					parentalWarning: normalizeParentalWarning(
 						track.trackSensitive?.code,

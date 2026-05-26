@@ -38,3 +38,5 @@ export const DEFAULT_SCORE_WARNING = 60;
 export const DEFAULT_AUTO_SCAN_TIME = '01:00';
 
 export const DEFAULT_WAIT_MINUTES = 5;
+
+export const NO_LINGUISTIC_CONTENT_LANGUAGE = 'zxx';

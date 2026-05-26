@@ -11,6 +11,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
 
+import { NO_LINGUISTIC_CONTENT_LANGUAGE } from 'src/common/constants/common.default.constants';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseException } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
@@ -282,7 +283,8 @@ export class ReleaseValidateService {
 			if (release.title !== release.title.trim()) {
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.noLeadingTrailingSpace',
+						messageCode:
+							'formFields.validate.noLeadingTrailingSpace',
 						message: 'Tên không được có khoảng trắng ở đầu và cuối',
 						page: 'core-detail',
 						field: 'title',
@@ -296,7 +298,8 @@ export class ReleaseValidateService {
 			if (featMatches) {
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.titleCannotContainFeat',
+						messageCode:
+							'formFields.validate.titleCannotContainFeat',
 						message: 'Tiêu đề không được chứa "feat"',
 						page: 'core-detail',
 						field: 'title',
@@ -456,28 +459,35 @@ export class ReleaseValidateService {
 			);
 		}
 
-		// release contributors validation (Dynamic isRequired)
+		const LYRICIST_ROLE_CODE = 'Lyricist';
+
 		if (requiredRoles.length > 0) {
 			let applicableRoles = requiredRoles;
-			if (release.releaseLanguage?.audioLanguage?.code === 'NoLanguage') {
+
+			const isNoLinguisticContent =
+				release.releaseLanguage?.audioLanguage?.code ===
+				NO_LINGUISTIC_CONTENT_LANGUAGE;
+
+			if (isNoLinguisticContent) {
 				applicableRoles = applicableRoles.filter(
-					(r) => r.code !== 'Lyricist',
+					(role) => role.code !== LYRICIST_ROLE_CODE,
 				);
 			}
 
 			const missingRoles = applicableRoles.filter(
 				(role) =>
 					!release.releaseContributors?.some(
-						(c) => c.artistRole?.code === role.code,
+						(contributor) =>
+							contributor.artistRole?.code === role.code,
 					),
 			);
 
 			if (missingRoles.length > 0) {
-				const missing = missingRoles.map((r) => r.name);
+				const missing = missingRoles.map((role) => role.name);
+
 				result.push(
 					new FieldErrorDetails({
-						messageCode:
-							`formFields.validate.missingRequired.${missing.join('')}`,
+						messageCode: `formFields.validate.missingRequired.${missing.join('')}`,
 						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 						page: 'core-detail',
 						field: 'releaseContributors',
@@ -543,8 +553,10 @@ export class ReleaseValidateService {
 				if (track.title !== track.title.trim()) {
 					result.push(
 						new FieldErrorDetails({
-							messageCode: 'formFields.validate.noLeadingTrailingSpace',
-							message: 'Tên bài hát không được có khoảng trắng ở đầu và cuối',
+							messageCode:
+								'formFields.validate.noLeadingTrailingSpace',
+							message:
+								'Tên bài hát không được có khoảng trắng ở đầu và cuối',
 							page: 'tracks',
 							field: `tracks.${index}.title`,
 							trackId: track.id,
@@ -558,7 +570,8 @@ export class ReleaseValidateService {
 				if (featMatches) {
 					result.push(
 						new FieldErrorDetails({
-							messageCode: 'formFields.validate.titleCannotContainFeat',
+							messageCode:
+								'formFields.validate.titleCannotContainFeat',
 							message: 'Tiêu đề không được chứa "feat"',
 							page: 'tracks',
 							field: `tracks.${index}.title`,
@@ -655,33 +668,38 @@ export class ReleaseValidateService {
 			}
 
 			// track contributors validation (Dynamic isRequired)
-			if (requiredRoles.length > 0) {
-				let applicableRoles = requiredRoles;
-				if (track.trackLanguage?.audioLanguage?.code === 'NoLanguage') {
-					applicableRoles = applicableRoles.filter(
-						(r) => r.code !== 'Lyricist',
-					);
-				}
+			const LYRICIST_ROLE_CODE = 'Lyricist';
 
-				const missingRoles = applicableRoles.filter(
-					(role) =>
-						!track.trackContributors?.some(
-							(c) => c.artistRole?.code === role.code,
-						),
+			const isNoLinguisticContent =
+				track.trackLanguage?.audioLanguage?.code ===
+				NO_LINGUISTIC_CONTENT_LANGUAGE;
+
+			const applicableRoles = isNoLinguisticContent
+				? requiredRoles.filter(
+						(role) => role.code !== LYRICIST_ROLE_CODE,
+					)
+				: requiredRoles;
+
+			const missingRoles = applicableRoles.filter(
+				(role) =>
+					!track.trackContributors?.some(
+						(contributor) =>
+							contributor.artistRole?.code === role.code,
+					),
+			);
+
+			if (missingRoles.length > 0) {
+				const missing = missingRoles.map((role) => role.name);
+
+				result.push(
+					new FieldErrorDetails({
+						messageCode: `formFields.validate.missingRequired.${missing.join('')}`,
+						message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+						page: 'tracks',
+						field: `tracks.${index}.trackContributors`,
+						trackId: track.id,
+					}),
 				);
-
-				if (missingRoles.length > 0) {
-					const missing = missingRoles.map((r) => r.name);
-					result.push(
-						new FieldErrorDetails({
-							messageCode: `formFields.validate.missingRequired.${missing.join('')}`,	
-							message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
-							page: 'tracks',
-							field: `tracks.${index}.trackContributors`,
-							trackId: track.id,
-						}),
-					);
-				}
 			}
 
 			//
