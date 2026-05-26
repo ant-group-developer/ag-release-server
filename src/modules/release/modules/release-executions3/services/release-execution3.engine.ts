@@ -18,25 +18,25 @@ export class ReleaseExecutionStepEngine {
 
 	// xử lí toàn bộ thằng con rồi mới xử lí chính nó
 	async processStep(
-		step: ReleaseExecutionStep3,
+		STEP: ReleaseExecutionStep3,
 	): Promise<ReleaseExecutionStepStatus> {
-		if (!step.childSteps?.length) {
+		if (!STEP.childSteps?.length) {
 			// gọi sang worker để xử lý logic chính của step, lấy về status, lưu db
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
-				step,
-				releaseExecution: step.releaseExecution,
+				step: STEP,
+				releaseExecution: STEP.releaseExecution,
 			});
 
 			// lưu db
-			await this.updateStepStatus(step, status);
+			await this.updateStepStatus(STEP, status);
 			return status;
 		}
 
 		// xử lý tuần tự, các step trong 1 cha sẽ phụ thuộc vào nhau,
 		// nếu step trước failed thì các step sau sẽ không chạy nữa,
 		// ngược lại nếu step trước done thì mới chạy step sau
-		else if (step.childExecutionMode === 'sequential') {
-			for (const childStep of step.childSteps) {
+		else if (STEP.childExecutionMode === 'sequential') {
+			for (const childStep of STEP.childSteps) {
 				// gọi đệ quy
 				const childStatus = await this.processStep(childStep);
 
@@ -44,32 +44,32 @@ export class ReleaseExecutionStepEngine {
 				if (this.shouldStopSequential(childStatus)) {
 					await this.setRemaining(
 						childStep,
-						step.childSteps,
+						STEP.childSteps,
 						childStatus,
 					);
 
-					return this.resolveStatusByChild_AndUpdateDb(step);
+					return this.resolveStatusByChild_AndUpdateDb(STEP);
 				}
 			}
 
-			return this.resolveStatusByChild_AndUpdateDb(step);
+			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
 		// xử lí song song, các step con sẽ không phụ thuộc vào nhau, cùng chạy 1 lúc
-		else if (step.childExecutionMode === 'parallel') {
+		else if (STEP.childExecutionMode === 'parallel') {
 			// await Promise.allSettled(
 			// 	step.childSteps.map((child) => this.processStep(child)),
 			// );
 
-			for (const child of step.childSteps) {
+			for (const child of STEP.childSteps) {
 				await this.processStep(child);
 			}
 
-			return this.resolveStatusByChild_AndUpdateDb(step);
+			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
 		throw new Error(
-			`Unknown childExecutionMode: ${step.childExecutionMode}`,
+			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
 		);
 	}
 

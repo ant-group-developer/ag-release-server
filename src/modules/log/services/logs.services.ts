@@ -16,6 +16,9 @@ type WriteLogDto = {
 
 	releaseSubmitId?: string;
 	releaseSubmitStepId?: string;
+
+	releaseExecutionId?: string;
+	releaseExecutionStepId?: string;
 };
 
 @Injectable()

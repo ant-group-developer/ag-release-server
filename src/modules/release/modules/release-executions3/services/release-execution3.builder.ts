@@ -42,34 +42,46 @@ export class ReleaseExecution3Builder {
 
 		switch (step?.type) {
 			case undefined:
-				stepResult.push(
-					{
+				let order = 1;
+
+				if (!releaseSnapshot.upc) {
+					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_UPC,
-						order: 1,
+						order: order++,
 						metadata: {
 							input: { releaseId: releaseSnapshot.id },
 						},
-					},
-					{
+					});
+				}
+
+				const trackIdsWithoutIsrc =
+					releaseSnapshot.tracks
+						?.filter((track) => !track.isrc)
+						.map((track) => track.id) ?? [];
+
+				if (trackIdsWithoutIsrc.length > 0) {
+					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_ISRCS,
-						order: 2,
+						order: order++,
 						metadata: {
 							input: {
-								trackIds: releaseSnapshot.tracks.map(
-									(t) => t.id,
-								),
+								trackIds: trackIdsWithoutIsrc,
 							},
 						},
-					},
+					});
+				}
+
+				stepResult.push(
 					{
 						type: ReleaseExecutionStepType.VALIDATE,
-						order: 3,
+						order: order++,
 					},
 					{
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
-						order: 4,
+						order: order++,
 					},
 				);
+
 				break;
 
 			case ReleaseExecutionStepType.GEN_ISRCS: {
@@ -137,12 +149,12 @@ export class ReleaseExecution3Builder {
 
 			case ReleaseExecutionStepType.PROCESS_AGG_CI:
 				stepResult.push(
-					{ type: ReleaseExecutionStepType.IMPORT, order: 1 },
-					{ type: ReleaseExecutionStepType.EXPORT, order: 2 },
+					{ type: ReleaseExecutionStepType.IMPORT_CI, order: 1 },
+					{ type: ReleaseExecutionStepType.EXPORT_CI, order: 2 },
 				);
 				break;
 
-			case ReleaseExecutionStepType.IMPORT:
+			case ReleaseExecutionStepType.IMPORT_CI:
 				stepResult.push(
 					{
 						type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
@@ -167,7 +179,7 @@ export class ReleaseExecution3Builder {
 				);
 				break;
 
-			case ReleaseExecutionStepType.EXPORT:
+			case ReleaseExecutionStepType.EXPORT_CI:
 				// const { ciDsps } = releaseExecution.metadata.input;
 				// const ciDealDsps = ciDsps.filter((dsp) => dsp.hasDeal);
 				// const state51Dsps = ciDsps.filter((dsp) => !dsp.hasDeal);

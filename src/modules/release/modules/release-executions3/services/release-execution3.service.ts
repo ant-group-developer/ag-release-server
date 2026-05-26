@@ -52,6 +52,7 @@ export class ReleaseExecution3Service {
 			}),
 		);
 
+		this.startProcessing(execution.id).catch((e) => console.log(e))
 		return this.findOne(execution.id);
 	}
 
@@ -63,23 +64,160 @@ export class ReleaseExecution3Service {
 			throw new Error('Only execution with NEW status can be started');
 		}
 
-		await this.executionRepo.update(id, {
-			status: ReleaseExecutionStatus.PROCESSING,
-		});
+		execution.status = ReleaseExecutionStatus.PROCESSING;
+		await this.executionRepo.save(execution);
 
 		await this.builder.startBuildPipeline(execution);
 
-		// this.engine.runByExecutionId(id);
-		const steps = execution.steps;
+		const freshExecution = await this.findOne(id);
+		const steps = freshExecution.steps || [];
+
 		for (const step of steps) {
 			const status = await this.engine.processStep(step);
 
 			if (this.shouldStopSequential(status)) {
-				// update status exeution
+				await this.updateExecutionStatus(
+					freshExecution,
+					this.mapStepStatusToExecutionStatus(status),
+				);
+
+				return;
 			}
+		}
+
+		await this.refreshExecutionStatus(freshExecution);
+	}
+
+	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.CANCELLED,
+			ReleaseExecutionStepStatus.WAITING_ACTION,
+			ReleaseExecutionStepStatus.WAITING_PARTNER,
+		].includes(status);
+	}
+
+	private mapStepStatusToExecutionStatus(
+		status: ReleaseExecutionStepStatus,
+	): ReleaseExecutionStatus {
+		switch (status) {
+			case ReleaseExecutionStepStatus.DONE:
+				return ReleaseExecutionStatus.DONE;
+
+			case ReleaseExecutionStepStatus.FAILED:
+				return ReleaseExecutionStatus.FAILED;
+
+			case ReleaseExecutionStepStatus.CANCELLED:
+				return ReleaseExecutionStatus.CANCELLED;
+
+			case ReleaseExecutionStepStatus.WAITING_ACTION:
+				return ReleaseExecutionStatus.WAITING_ACTION;
+
+			case ReleaseExecutionStepStatus.WAITING_PARTNER:
+				return ReleaseExecutionStatus.WAITING_PARTNER;
+
+			default:
+				return ReleaseExecutionStatus.PROCESSING;
 		}
 	}
 
+	private async refreshExecutionStatus(
+		execution: ReleaseExecution3,
+	): Promise<ReleaseExecutionStatus> {
+		const status = this.deriveExecutionStatusFromSteps(execution);
+
+		await this.updateExecutionStatus(execution, status);
+
+		return status;
+	}
+
+	//
+	private async updateExecutionStatus(
+		execution: ReleaseExecution3,
+		status: ReleaseExecutionStatus,
+		summary?: string,
+	): Promise<void> {
+		execution.status = status;
+
+		if (summary !== undefined) {
+			execution.summary = summary;
+		}
+
+		if (this.isFinalExecutionStatus(status)) {
+			execution.completedAt = new Date();
+		}
+
+		await this.executionRepo.save(execution);
+	}
+
+	private isFinalExecutionStatus(status: ReleaseExecutionStatus): boolean {
+		return [
+			ReleaseExecutionStatus.DONE,
+			ReleaseExecutionStatus.FAILED,
+			ReleaseExecutionStatus.CANCELLED,
+			ReleaseExecutionStatus.PARTIAL_DONE,
+		].includes(status);
+	}
+
+	private deriveExecutionStatusFromSteps(
+		execution: ReleaseExecution3,
+	): ReleaseExecutionStatus {
+		const steps = execution.steps || [];
+
+		if (!steps.length) {
+			return execution.status;
+		}
+
+		const statuses = steps.map((step) => step.status);
+
+		if (statuses.includes(ReleaseExecutionStepStatus.WAITING_ACTION)) {
+			return ReleaseExecutionStatus.WAITING_ACTION;
+		}
+
+		// if (statuses.includes(ReleaseExecutionStepStatus.WAITING_PARTNER)) {
+		// 	return ReleaseExecutionStatus.WAITING_PARTNER;
+		// }
+
+		if (statuses.some((s) => s === ReleaseExecutionStepStatus.PROCESSING)) {
+			return ReleaseExecutionStatus.PROCESSING;
+		}
+
+		if (statuses.some((s) => s === ReleaseExecutionStepStatus.NEW)) {
+			return ReleaseExecutionStatus.PROCESSING;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.DONE)) {
+			return ReleaseExecutionStatus.DONE;
+		}
+
+		if (
+			statuses.includes(ReleaseExecutionStepStatus.DONE) &&
+			(statuses.includes(ReleaseExecutionStepStatus.FAILED) ||
+				statuses.includes(ReleaseExecutionStepStatus.CANCELLED))
+		) {
+			return ReleaseExecutionStatus.PARTIAL_DONE;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.FAILED)) {
+			return ReleaseExecutionStatus.FAILED;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.CANCELLED)) {
+			return ReleaseExecutionStatus.CANCELLED;
+		}
+
+		if (
+			statuses.includes(ReleaseExecutionStepStatus.FAILED) &&
+			statuses.includes(ReleaseExecutionStepStatus.CANCELLED)
+		) {
+			return ReleaseExecutionStatus.FAILED;
+		}
+
+		return ReleaseExecutionStatus.PROCESSING;
+	}
+
+
+	// chua check
 	async retryStep(stepId: string) {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
@@ -184,76 +322,5 @@ export class ReleaseExecution3Service {
 		return entity;
 	}
 
-	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
-		return [
-			ReleaseExecutionStepStatus.FAILED,
-			ReleaseExecutionStepStatus.WAITING_ACTION,
-			ReleaseExecutionStepStatus.WAITING_PARTNER,
-			ReleaseExecutionStepStatus.CANCELLED,
-		].includes(status);
-	}
 
-	private resolveStatusByChild(
-		step: ReleaseExecutionStep3,
-	): ReleaseExecutionStepStatus {
-		const children = step.childSteps || [];
-
-		if (!children?.length) {
-			throw new Error(
-				`Step ${step.id} has no children to resolve status from`,
-			);
-		}
-
-		// ===== WAITING =====
-		if (
-			children.some(
-				(c) => c.status === ReleaseExecutionStepStatus.WAITING_ACTION,
-			)
-		) {
-			return ReleaseExecutionStepStatus.WAITING_ACTION;
-		}
-
-		if (
-			children.some(
-				(c) => c.status === ReleaseExecutionStepStatus.WAITING_PARTNER,
-			)
-		) {
-			return ReleaseExecutionStepStatus.WAITING_PARTNER;
-		}
-
-		// ===== FAILED =====
-		if (
-			children.some((c) => c.status === ReleaseExecutionStepStatus.FAILED)
-		) {
-			return ReleaseExecutionStepStatus.FAILED;
-		}
-
-		// ===== CANCELLED =====
-		if (
-			children.every(
-				(c) => c.status === ReleaseExecutionStepStatus.CANCELLED,
-			)
-		) {
-			return ReleaseExecutionStepStatus.CANCELLED;
-		}
-
-		// ===== DONE =====
-		if (
-			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
-		) {
-			return ReleaseExecutionStepStatus.DONE;
-		}
-
-		// ===== PROCESSING =====
-		if (
-			children.some(
-				(c) => c.status === ReleaseExecutionStepStatus.PROCESSING,
-			)
-		) {
-			return ReleaseExecutionStepStatus.PROCESSING;
-		}
-
-		// ===== DEFAULT =====
-		return ReleaseExecutionStepStatus.NEW;
-	}
 }
