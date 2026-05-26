@@ -7,7 +7,6 @@ WITH map(role_code, permission_code) AS (
     ('analytics.creator', 'analytics.read'),
     ('analytics.editor', 'analytics.read'),
     ('analytics.admin', 'analytics.read'),
-
     -- Artist
     ('artist.viewer', 'artist.read'),
     ('artist.creator', 'artist.read'),
@@ -19,13 +18,11 @@ WITH map(role_code, permission_code) AS (
     ('artist.admin', 'artist.create'),
     ('artist.admin', 'artist.update'),
     ('artist.admin', 'artist.delete'),
-
     -- Dashboard
     ('dashboard.viewer', 'dashboard.read'),
     ('dashboard.creator', 'dashboard.read'),
     ('dashboard.editor', 'dashboard.read'),
     ('dashboard.admin', 'dashboard.read'),
-
     -- DSP
     ('dsp.viewer', 'dsp.read'),
     ('dsp.creator', 'dsp.read'),
@@ -42,7 +39,6 @@ WITH map(role_code, permission_code) AS (
     ('dsp.admin', 'dsp.update.policies'),
     ('dsp.admin', 'dsp.delete'),
     ('dsp.admin', 'dsp.configure_integration'),
-
     -- Issue
     ('issue.viewer', 'issue.read'),
     ('issue.creator', 'issue.read'),
@@ -54,7 +50,6 @@ WITH map(role_code, permission_code) AS (
     ('issue.admin', 'issue.create'),
     ('issue.admin', 'issue.update'),
     ('issue.admin', 'issue.delete'),
-
     -- Label
     ('label.viewer', 'label.read'),
     ('label.creator', 'label.read'),
@@ -66,7 +61,6 @@ WITH map(role_code, permission_code) AS (
     ('label.admin', 'label.create'),
     ('label.admin', 'label.update'),
     ('label.admin', 'label.delete'),
-
     -- Release
     ('release.viewer', 'release.read'),
     ('release.creator', 'release.read'),
@@ -80,13 +74,11 @@ WITH map(role_code, permission_code) AS (
     ('release.admin', 'release.update'),
     ('release.admin', 'release.review'),
     ('release.admin', 'release.take_down'),
-
     -- Revenue
     ('revenue.viewer', 'revenue.read'),
     ('revenue.creator', 'revenue.read'),
     ('revenue.editor', 'revenue.read'),
     ('revenue.admin', 'revenue.read'),
-
     -- Tenant Issue
     ('tenant_issue.viewer', 'tenant_issue.read'),
     ('tenant_issue.creator', 'tenant_issue.read'),
@@ -98,7 +90,6 @@ WITH map(role_code, permission_code) AS (
     ('tenant_issue.admin', 'tenant_issue.create'),
     ('tenant_issue.admin', 'tenant_issue.update'),
     ('tenant_issue.admin', 'tenant_issue.delete'),
-
     -- Tenant Tier
     ('tenant_tier.viewer', 'tenant_tier.read'),
     ('tenant_tier.creator', 'tenant_tier.read'),
@@ -110,7 +101,6 @@ WITH map(role_code, permission_code) AS (
     ('tenant_tier.admin', 'tenant_tier.create'),
     ('tenant_tier.admin', 'tenant_tier.update'),
     ('tenant_tier.admin', 'tenant_tier.delete'),
-
     -- Track
     ('track.viewer', 'track.read'),
     ('track.creator', 'track.read'),
@@ -119,7 +109,6 @@ WITH map(role_code, permission_code) AS (
     ('track.editor', 'track.scan'),
     ('track.admin', 'track.read'),
     ('track.admin', 'track.scan'),
-
     -- User (granular)
     ('user.viewer', 'user.read'),
     ('user.creator', 'user.read'),
@@ -140,7 +129,6 @@ WITH map(role_code, permission_code) AS (
     ('user.admin', 'user.update.role'),
     ('user.admin', 'user.update.tenant_type'),
     ('user.admin', 'user.delete'),
-
     -- Workspace (granular)
     ('workspace.viewer', 'workspace.read'),
     ('workspace.creator', 'workspace.read'),
@@ -155,7 +143,6 @@ WITH map(role_code, permission_code) AS (
     ('workspace.admin', 'workspace.update.status'),
     ('workspace.admin', 'workspace.update.owner'),
     ('workspace.admin', 'workspace.update.config'),
-
     -- Role & Permission (management)
     ('user.editor', 'role.read'),
     ('user.editor', 'permission.read'),
