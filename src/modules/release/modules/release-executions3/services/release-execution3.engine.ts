@@ -14,6 +14,57 @@ export class ReleaseExecutionStepEngine {
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
 	) {}
 
+	// main
+	async processStep(
+		step: ReleaseExecutionStep3,
+	): Promise<ReleaseExecutionStepStatus> {
+		if (!step.childSteps?.length) {
+			const status = await this.releaseExecution3Worker.dispatchStepTask({
+				step,
+				releaseExecution: step.releaseExecution,
+			});
+			await this.updateStepStatus(step, status);
+			return status;
+		} else if (step.childExecutionMode === 'sequential') {
+			for (const childStep of step.childSteps) {
+				const childStatus = await this.processStep(childStep);
+
+				if (this.shouldStopSequential(childStatus)) {
+					await this.setRemaining(
+						childStep,
+						step.childSteps,
+						childStatus,
+					);
+					return this.resolveAndUpdateParentStatus(step);
+				}
+			}
+
+			return this.resolveAndUpdateParentStatus(step);
+		} else if (step.childExecutionMode === 'parallel') {
+			// await Promise.allSettled(
+			// 	step.childSteps.map((child) => this.processStep(child)),
+			// );
+
+			for (const child of step.childSteps) {
+				await this.processStep(child);
+			}
+
+			return this.resolveAndUpdateParentStatus(step);
+		}
+
+		throw new Error(
+			`Unknown childExecutionMode: ${step.childExecutionMode}`,
+		);
+	}
+
+	private async resolveAndUpdateParentStatus(
+		step: ReleaseExecutionStep3,
+	): Promise<ReleaseExecutionStepStatus> {
+		const status = this.resolveParentStatus(step);
+		await this.updateStepStatus(step, status);
+		return status;
+	}
+
 	async runByStepId(stepId: string) {
 		const rootStep = await this.stepRepo.findOne({
 			where: { id: stepId },
@@ -136,54 +187,6 @@ export class ReleaseExecutionStepEngine {
 		return stepMap.get(rootStepId) || null;
 	}
 
-	async processStep(
-		step: ReleaseExecutionStep3,
-	): Promise<ReleaseExecutionStepStatus> {
-		// ko có con thì chạy task luôn
-		if (!step.childSteps?.length) {
-			const status =
-				await this.releaseExecution3Worker.dispatchStepTask(step);
-
-			await this.updateStepStatus(step, status);
-
-			return status;
-		}
-
-		// tuần tự, step sau sẽ phụ thuộc vào step trước
-		if (step.childExecutionMode === 'sequential') {
-			for (const childStep of step.childSteps) {
-				const childStatus = await this.processStep(childStep);
-
-				if (this.shouldStopSequential(childStatus)) {
-					await this.setRemaining(
-						childStep,
-						step.childSteps,
-						childStatus,
-					);
-
-					// cập nhật lại trạng thái parent, sau mỗi step
-					const status = this.deriveStatusFromChildren(step);
-
-					await this.updateStepStatus(step, status);
-
-					return status;
-				}
-			}
-		}
-
-		// song song, các step con chạy độc lập với nhau
-		if (step.childExecutionMode === 'parallel') {
-			await Promise.all(
-				step.childSteps.map((child) => this.processStep(child)),
-			);
-		}
-
-		const parentStatus = this.deriveStatusFromChildren(step);
-		await this.updateStepStatus(step, parentStatus);
-
-		return parentStatus;
-	}
-
 	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
 		return [
 			ReleaseExecutionStepStatus.FAILED,
@@ -193,13 +196,15 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	private deriveStatusFromChildren(
+	private resolveParentStatus(
 		step: ReleaseExecutionStep3,
 	): ReleaseExecutionStepStatus {
 		const children = step.childSteps || [];
 
-		if (!children.length) {
-			return step.status;
+		if (!children?.length) {
+			throw new Error(
+				`Step ${step.id} has no children to resolve status from`,
+			);
 		}
 
 		// ===== WAITING =====
@@ -255,6 +260,7 @@ export class ReleaseExecutionStepEngine {
 		return ReleaseExecutionStepStatus.NEW;
 	}
 
+	// đánh dấu tất cả các bước còn lại (chưa được xử lý)
 	private async setRemaining(
 		currentStep: ReleaseExecutionStep3,
 		allSiblings: ReleaseExecutionStep3[],
