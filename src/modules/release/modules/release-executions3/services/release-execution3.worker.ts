@@ -10,6 +10,7 @@ import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
+import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { removeFolder } from 'src/utils/util';
@@ -20,7 +21,6 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
-import { ReleaseService } from 'src/modules/release/services/release.service';
 
 @Injectable()
 export class ReleaseExecution3Worker {
@@ -54,7 +54,7 @@ export class ReleaseExecution3Worker {
 	}): Promise<ReleaseExecutionStepStatus> {
 		switch (step.type) {
 			case ReleaseExecutionStepType.GEN_UPC:
-				return this.genUpc({step, releaseExecution});
+				return this.genUpc({ step, releaseExecution });
 
 			case ReleaseExecutionStepType.GEN_ISRCS:
 				return this.genIsrcs(step);
@@ -165,11 +165,12 @@ export class ReleaseExecution3Worker {
 		step: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
 	}): Promise<ReleaseExecutionStepStatus> {
-		
 		try {
-			const data = releaseExecution.metadata
+			const data = releaseExecution.metadata;
 
-			const upc = await this.releaseService.genUpcById(data.input.releaseSnapshot.id);
+			const upc = await this.releaseService.genUpcById(
+				data.input.releaseSnapshot.id,
+			);
 
 			// // Ghi output vào step metadata
 			step.metadata = {

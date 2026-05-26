@@ -5,10 +5,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
-import {
-	ReleaseExecutionStatus,
-	ReleaseExecutionStepType,
-} from '../enums/release-execution3.enum';
+import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
 
 /** 24 hours — CI export takes much longer than direct partner processing */
 const WAIT_CI_EXPORT_MINUTES = 1440;
@@ -18,15 +15,20 @@ type PartialStep = Partial<ReleaseExecutionStep3>;
 @Injectable()
 export class ReleaseExecution3Builder {
 	constructor(
-		@InjectRepository(ReleaseExecution3)
-		private readonly executionRepo: Repository<ReleaseExecution3>,
-
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
 	) {}
+
+	async startBuildPipeline(execution: ReleaseExecution3): Promise<void> {
+		const allSteps = this.buildStepsChild({ releaseExecution: execution });
+
+		await this.manager.transaction(async (tx) => {
+			await this.saveStepsRecursive(allSteps, tx);
+		});
+	}
 
 	buildStepsChild({
 		step,
@@ -234,26 +236,6 @@ export class ReleaseExecution3Builder {
 		}
 
 		return savedSteps;
-	}
-
-	async startProcessing(executionId: string): Promise<void> {
-		const execution = await this.executionRepo.findOne({
-			where: { id: executionId },
-		});
-
-		if (!execution) {
-			throw new Error('Execution not found');
-		}
-
-		await this.executionRepo.update(executionId, {
-			status: ReleaseExecutionStatus.PROCESSING,
-		});
-
-		const allSteps = this.buildStepsChild({ releaseExecution: execution });
-
-		await this.manager.transaction(async (tx) => {
-			await this.saveStepsRecursive(allSteps, tx);
-		});
 	}
 
 	private async saveStepsRecursive(
