@@ -24,9 +24,10 @@ import { DeleteResult } from 'typeorm';
 import { AccessControlService } from '../access-control/access-control.service';
 import { AuthMessages } from '../auth/constants/messages';
 import {
+	RequirePermissions,
 	SystemAdminOnly,
-	TenantOwnerOrAdminOnly,
 } from '../auth/decorators/auth.decorator';
+import { Permission } from '../permission/constants/permission.data.constant';
 import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 import { UpdateUserRoleDto } from '../user-role/user-role.dto';
 import { UserMessages } from './constants/messages';
@@ -41,9 +42,8 @@ import { User } from './entities/user.entity';
 import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
-import { checkIsSystemTenant } from './utils/user-type.util';
+import { checkIsSystemAdmin, checkIsSystemTenant } from './utils/user-type.util';
 
-@TenantOwnerOrAdminOnly()
 @ApiTags('Users')
 @Controller('users')
 export class UserController {
@@ -54,6 +54,7 @@ export class UserController {
 		private readonly accessControlService: AccessControlService,
 	) {}
 
+	@RequirePermissions(Permission.USER.CREATE)
 	@Post()
 	async create(
 		@Body() payload: CreateUserDto,
@@ -78,6 +79,7 @@ export class UserController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.USER.INVITE)
 	@Post('invite')
 	async inviteUserToTenant(
 		@Body() payload: InviteUserToTenantDto,
@@ -97,6 +99,7 @@ export class UserController {
 		});
 	}
 
+	@RequirePermissions(Permission.USER.UPDATE_ROLE)
 	@ApiOperation({
 		summary: 'Get roles available for assignment in the current tenant',
 	})
@@ -115,6 +118,7 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(Permission.USER.READ)
 	@ApiOperation({
 		summary: 'Get roles assigned to a user in the current tenant',
 	})
@@ -137,6 +141,7 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(Permission.USER.READ)
 	@ApiOperation({
 		summary: 'Get resolved permissions of a user in the current tenant',
 	})
@@ -159,6 +164,7 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(Permission.USER.UPDATE_ROLE)
 	@ApiOperation({
 		summary: 'Update roles assigned to a user in the current tenant',
 	})
@@ -184,6 +190,7 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(Permission.USER.READ)
 	@Get(':id')
 	async findOne(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -208,6 +215,7 @@ export class UserController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.USER.READ)
 	@Get()
 	async getList(
 		@Query() query: GetListUserDto,
@@ -244,6 +252,11 @@ export class UserController {
 		return new ResponseSuccess({ data });
 	}
 
+	@RequirePermissions(
+		Permission.USER.UPDATE_INFO,
+		Permission.USER.UPDATE_STATUS,
+		Permission.USER.UPDATE_TENANT_TYPE,
+	)
 	@Put(':id')
 	async update(
 		@Param('id') id: string,
@@ -252,6 +265,33 @@ export class UserController {
 	): Promise<ResponseSuccess<User>> {
 		const userReqId = req.user!.sub;
 		const tenantId = req.user!.tenantId;
+		const isSysAdmin = checkIsSystemAdmin(req.user!.type);
+
+		// Field-level permission: strip fields user cannot change (system admins bypass)
+		if (!isSysAdmin) {
+			const userPerms = new Set<string>(
+				Array.isArray(req.user!.permission)
+					? req.user!.permission
+					: [],
+			);
+
+			if (!userPerms.has(Permission.USER.UPDATE_STATUS)) {
+				delete payload.isActive;
+			}
+
+			if (!userPerms.has(Permission.USER.UPDATE_TENANT_TYPE)) {
+				delete payload.tenantUserType;
+			}
+
+			if (!userPerms.has(Permission.USER.UPDATE_INFO)) {
+				delete payload.name;
+				delete payload.email;
+				delete payload.avatar;
+				delete payload.password;
+				delete payload.telegramId;
+				delete payload.emailVerified;
+			}
+		}
 
 		const result = await this.userService.update(id, payload, userReqId);
 
@@ -266,6 +306,7 @@ export class UserController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@RequirePermissions(Permission.USER.DELETE)
 	@Delete(':id')
 	async remove(
 		@Param('id') id: string,
