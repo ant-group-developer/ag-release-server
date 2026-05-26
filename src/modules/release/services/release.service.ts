@@ -475,7 +475,7 @@ export class ReleaseService {
 			releaseEndDate: null,
 		});
 
-		return this.releaseExecution3Service.newExecution({
+		return this.releaseExecution3Service.newJob({
 			release,
 			dspCodes: dto.code,
 			type: ExecutionType.INITIAL_RELEASE,

@@ -23,12 +23,12 @@ export class ReleaseExecution3Service {
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 
-		private readonly execution3Builder: ReleaseExecution3Builder,
+		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
 	) {}
 
 	// new
-	async newExecution(body: {
+	async newJob(body: {
 		release: Release;
 		dspCodes: string[];
 		type: ExecutionType;
@@ -67,7 +67,17 @@ export class ReleaseExecution3Service {
 			status: ReleaseExecutionStatus.PROCESSING,
 		});
 
-		await this.execution3Builder.startBuildPipeline(execution);
+		await this.builder.startBuildPipeline(execution);
+
+		// this.engine.runByExecutionId(id);
+		const steps = execution.steps;
+		for (const step of steps) {
+			const status = await this.engine.processStep(step);
+
+			if (this.shouldStopSequential(status)) {
+				// update status exeution
+			}
+		}
 	}
 
 	async retryStep(stepId: string) {
@@ -84,13 +94,7 @@ export class ReleaseExecution3Service {
 			startedAt: null,
 			completedAt: null,
 		});
-
-		// return this.engine.runByStepId(stepId);
 	}
-
-	// async runStep(stepId: string) {
-	// 	return this.engine.runByStepId(stepId);
-	// }
 
 	private buildStepTreeList(steps: ReleaseExecutionStep3[]) {
 		const map = new Map<string, ReleaseExecutionStep3>();
@@ -178,5 +182,78 @@ export class ReleaseExecution3Service {
 		entity.steps = this.buildStepTreeList(steps);
 
 		return entity;
+	}
+
+	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.WAITING_ACTION,
+			ReleaseExecutionStepStatus.WAITING_PARTNER,
+			ReleaseExecutionStepStatus.CANCELLED,
+		].includes(status);
+	}
+
+	private resolveStatusByChild(
+		step: ReleaseExecutionStep3,
+	): ReleaseExecutionStepStatus {
+		const children = step.childSteps || [];
+
+		if (!children?.length) {
+			throw new Error(
+				`Step ${step.id} has no children to resolve status from`,
+			);
+		}
+
+		// ===== WAITING =====
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.WAITING_ACTION,
+			)
+		) {
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
+		}
+
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.WAITING_PARTNER,
+			)
+		) {
+			return ReleaseExecutionStepStatus.WAITING_PARTNER;
+		}
+
+		// ===== FAILED =====
+		if (
+			children.some((c) => c.status === ReleaseExecutionStepStatus.FAILED)
+		) {
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+
+		// ===== CANCELLED =====
+		if (
+			children.every(
+				(c) => c.status === ReleaseExecutionStepStatus.CANCELLED,
+			)
+		) {
+			return ReleaseExecutionStepStatus.CANCELLED;
+		}
+
+		// ===== DONE =====
+		if (
+			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+		) {
+			return ReleaseExecutionStepStatus.DONE;
+		}
+
+		// ===== PROCESSING =====
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.PROCESSING,
+			)
+		) {
+			return ReleaseExecutionStepStatus.PROCESSING;
+		}
+
+		// ===== DEFAULT =====
+		return ReleaseExecutionStepStatus.NEW;
 	}
 }
