@@ -472,6 +472,24 @@ export class ReleaseValidateService {
 				applicableRoles = applicableRoles.filter(
 					(role) => role.code !== LYRICIST_ROLE_CODE,
 				);
+
+				const hasLyricist = release.releaseContributors?.some(
+					(contributor) =>
+						contributor.artistRole?.code === LYRICIST_ROLE_CODE,
+				);
+
+				if (hasLyricist) {
+					result.push(
+						new FieldErrorDetails({
+							messageCode:
+								'formFields.validate.noLinguisticContentHasLyricist',
+							message:
+								'Bản phát hành không có nội dung lời thì không được có contributor với vai trò Người viết lời',
+							page: 'core-detail',
+							field: 'releaseContributors',
+						}),
+					);
+				}
 			}
 
 			const missingRoles = applicableRoles.filter(
@@ -673,6 +691,27 @@ export class ReleaseValidateService {
 			const isNoLinguisticContent =
 				track.trackLanguage?.audioLanguage?.code ===
 				NO_LINGUISTIC_CONTENT_LANGUAGE;
+
+			if (isNoLinguisticContent) {
+				const hasLyricist = track.trackContributors?.some(
+					(contributor) =>
+						contributor.artistRole?.code === LYRICIST_ROLE_CODE,
+				);
+
+				if (hasLyricist) {
+					result.push(
+						new FieldErrorDetails({
+							messageCode:
+								'formFields.validate.noLinguisticContentHasLyricist',
+							message:
+								'Track không có nội dung lời thì không được có contributor với vai trò Người viết lời',
+							page: 'tracks',
+							field: `tracks.${index}.trackContributors`,
+							trackId: track.id,
+						}),
+					);
+				}
+			}
 
 			const applicableRoles = isNoLinguisticContent
 				? requiredRoles.filter(
