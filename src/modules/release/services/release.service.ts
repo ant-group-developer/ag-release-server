@@ -29,6 +29,7 @@ import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
 import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
 import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
@@ -64,6 +65,9 @@ export class ReleaseService {
 		private readonly releaseSubmitService2: ReleaseSubmitService2,
 
 		private readonly releaseDdexService: ReleaseDdexService,
+
+		@Inject(forwardRef(() => ReleaseExecution3Service))
+		private readonly releaseExecution3Service: ReleaseExecution3Service,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -460,6 +464,22 @@ export class ReleaseService {
 		for (const id of dto.ids) {
 			await this.submit(id, { code: dto.codes });
 		}
+	}
+
+	async submit3(id: string, dto: SubmitReleaseDto) {
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: id,
+		});
+		await this.releaseRepo.update(id, {
+			status: ReleaseStatus.SUBMITTED,
+			releaseEndDate: null,
+		});
+
+		return this.releaseExecution3Service.submit({
+			release,
+			dspCodes: dto.code,
+			type: ExecutionType.INITIAL_RELEASE,
+		});
 	}
 
 	async submit(id: string, dto: SubmitReleaseDto) {

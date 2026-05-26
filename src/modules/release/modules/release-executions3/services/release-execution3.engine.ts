@@ -1,562 +1,333 @@
-// import { Injectable } from '@nestjs/common';
-// import { ReleaseExecutionStep3 } from '../entites/release-execution3.entity';
-// import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
-
-// @Injectable()
-// export class ReleaseExecution3Engine {
-// 	private async dispatchStepLogic(
-// 		step: ReleaseExecutionStep3,
-// 	): Promise<void> {
-// 		switch (step.type) {
-// 			case ReleaseExecutionStepType.GEN_UPC: {
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[GEN_UPC] Release: ${releaseId}`,
-// 				});
-// 				const upc = await this.releaseService.genUpcById(releaseId);
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: { releaseId },
-// 						output: { upc },
-// 					} as any,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.GEN_ISRCS: {
-// 				// Handled by children (GEN_ISRC per track)
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[GEN_ISRCS] handled by children`,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.GEN_ISRC: {
-// 				const trackId = step.metadata?.input?.trackId;
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[GEN_ISRC] Track: ${trackId}`,
-// 				});
-// 				const isrc = await this.trackService.genISRC(trackId);
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: { trackId },
-// 						output: { isrc },
-// 					} as any,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.VALIDATE: {
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[VALIDATE] Release: ${releaseId}`,
-// 				});
-// 				const errors =
-// 					this.releaseValidateService.getErrorsSchemaRelease(
-// 						submitDb.metadata.input.releaseSnapshot,
-// 					);
-
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: {
-// 							releaseId,
-// 						},
-// 						output: {
-// 							valid: errors.length === 0,
-// 							errors: errors,
-// 						},
-// 					} as any,
-// 				});
-
-// 				if (errors.length > 0) {
-// 					throw new Error(
-// 						`Validation failed: ${errors.map((e: any) => e.message).join(', ')}`,
-// 					);
-// 				}
-// 				break;
-// 			}
-
-// 			// ============================
-// 			// Direct DSP sub-steps
-// 			// ============================
-
-// 			case SubmitStepType.CREATE_AND_UPLOAD_DIRECT: {
-// 				const parent = await this.getParentStep(step);
-// 				const dspCode = parent?.metadata?.input?.dsps?.[0]?.code;
-// 				if (!dspCode)
-// 					throw new Error('Missing DSP code from parent step');
-
-// 				const config =
-// 					await this.dspRoutingService.resolveFullDeliveryConfig(
-// 						dspCode,
-// 					);
-
-// 				// Create metadata
-// 				const { outputDir, batchId, xml } =
-// 					await this.releaseDdexService.createMetadataOnServer({
-// 						release: submitDb.metadata.input.releaseSnapshot,
-// 						ernVersion: config.ernVersion as unknown as ErnVersion2,
-// 						sender: config.sender,
-// 						recipient: config.recipient,
-// 					});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[CREATE_AND_UPLOAD_DIRECT] Metadata created for DSP: ${dspCode}`,
-// 					data: { outputDir, batchId },
-// 				});
-
-// 				// Upload SFTP
-// 				await this.sftpConnectService.uploadFolder({
-// 					sftp: config.sftp,
-// 					localDir: outputDir,
-// 					remoteDir: config.sftp.path ?? '/',
-// 				});
-
-// 				// Cleanup local
-// 				await removeFolder(outputDir);
-
-// 				// Save metadata for downstream steps
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: { ernVersion: config.ernVersion, dspCode },
-// 						output: { outputDir, batchId, xml },
-// 					} as any,
-// 				});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[CREATE_AND_UPLOAD_DIRECT] DSP: ${dspCode} uploaded`,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.SYNC_DATA_FROM_DSP: {
-// 				const parent = await this.getParentStep(step);
-// 				const dsp = parent?.metadata?.input?.dsps?.[0];
-// 				if (!dsp) throw new Error('Missing dsp from parent step');
-
-// 				// Upsert release_dsp_delivery
-// 				const existed = await this.manager.findOne(ReleaseDspDelivery, {
-// 					where: { releaseId, dspId: dsp.id },
-// 				});
-
-// 				const deliveryData = {
-// 					status: ReleaseDspStatus.DISTRIBUTED,
-// 					lastDeliveredAt: new Date(),
-// 					isSelected: true,
-// 				};
-
-// 				if (!existed) {
-// 					await this.manager.save(ReleaseDspDelivery, {
-// 						releaseId,
-// 						dspId: dsp.id,
-// 						...deliveryData,
-// 					});
-// 				} else {
-// 					await this.manager.update(
-// 						ReleaseDspDelivery,
-// 						{ releaseId, dspId: dsp.id },
-// 						deliveryData,
-// 					);
-// 				}
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[SYNC_DATA_FROM_DSP] DSP: ${dsp.name} synced`,
-// 				});
-// 				break;
-// 			}
-
-// 			// ============================
-// 			// CI Aggregator sub-steps
-// 			// ============================
-
-// 			// case SubmitStepType.CREATE_AND_UPLOAD_CI: {
-// 			// 	// Tìm 1 DSP CI bất kỳ để lấy config
-// 			// 	const parent = await this.getParentStep(step);
-// 			// 	const ciDsps = parent?.metadata?.input?.dsps || [];
-// 			// 	if (ciDsps.length === 0) throw new Error('No CI DSPs found');
-
-// 			// 	const ciDsp = await this.manager.findOne(Dsp, {
-// 			// 		where: { id: ciDsps[0].id },
-// 			// 		relations: [
-// 			// 			'dspRoutingConfig',
-// 			// 			'dspRoutingConfig.aggregator',
-// 			// 		],
-// 			// 	});
-// 			// 	if (!ciDsp?.code) throw new Error('CI DSP not found');
-
-// 			// 	const config =
-// 			// 		await this.dspRoutingService.resolveFullDeliveryConfig(
-// 			// 			ciDsp.code,
-// 			// 		);
-
-// 			// 	// Create metadata
-// 			// 	const { outputDir, batchId, xml } =
-// 			// 		await this.releaseDdexService.createMetadataOnServer({
-// 			// 			release: submitDb.metadata.input.releaseSnapshot,
-// 			// 			ernVersion: config.ernVersion as unknown as ErnVersion2,
-// 			// 			sender: config.sender,
-// 			// 			recipient: config.recipient,
-// 			// 		});
-
-// 			// 	this.logService.success({
-// 			// 		releaseSubmitId: step.releaseSubmitId,
-// 			// 		releaseSubmitStepId: step.id,
-// 			// 		message: `[CREATE_AND_UPLOAD_CI] Metadata created`,
-// 			// 		data: { outputDir, batchId },
-// 			// 	});
-
-// 			// 	// Upload SFTP
-// 			// 	await this.sftpConnectService.uploadFolder({
-// 			// 		sftp: config.sftp,
-// 			// 		localDir: outputDir,
-// 			// 		remoteDir: config.sftp.path ?? '/',
-// 			// 	});
-
-// 			// 	await removeFolder(outputDir);
-
-// 			// 	// Save metadata for downstream steps (CREATE_FOLDER_DONE_CI, etc.)
-// 			// 	await this.stepRepo.update(step.id, {
-// 			// 		metadata: {
-// 			// 			input: {
-// 			// 				ernVersion: config.ernVersion,
-// 			// 				dspCode: ciDsp.code,
-// 			// 			},
-// 			// 			output: { outputDir, batchId, xml },
-// 			// 		} as any,
-// 			// 	});
-
-// 			// 	this.logService.success({
-// 			// 		releaseSubmitId: step.releaseSubmitId,
-// 			// 		releaseSubmitStepId: step.id,
-// 			// 		message: `[CREATE_AND_UPLOAD_CI] uploaded`,
-// 			// 	});
-// 			// 	break;
-// 			// }
-
-// 			case SubmitStepType.CREATE_AND_UPLOAD_CI: {
-// 				// Tìm DSP CI có config hợp lệ
-// 				const parent = await this.getParentStep(step);
-// 				const ciDsps = parent?.metadata?.input?.dsps || [];
-// 				if (ciDsps.length === 0) throw new Error('No CI DSPs found');
-
-// 				let ciDsp: Dsp | null = null;
-// 				let config: Awaited<
-// 					ReturnType<
-// 						typeof this.dspRoutingService.resolveFullDeliveryConfig
-// 					>
-// 				> | null = null;
-
-// 				for (const dspRef of ciDsps) {
-// 					const candidate = await this.manager.findOne(Dsp, {
-// 						where: { id: dspRef.id },
-// 						relations: [
-// 							'dspRoutingConfig',
-// 							'dspRoutingConfig.aggregator',
-// 						],
-// 					});
-// 					if (!candidate?.code) continue;
-
-// 					try {
-// 						const candidateConfig =
-// 							await this.dspRoutingService.resolveFullDeliveryConfig(
-// 								candidate.code,
-// 							);
-// 						if (candidateConfig) {
-// 							ciDsp = candidate;
-// 							config = candidateConfig;
-// 							break;
-// 						}
-// 					} catch {
-// 						// DSP này không có config, thử DSP tiếp theo
-// 						continue;
-// 					}
-// 				}
-
-// 				if (!ciDsp || !config)
-// 					throw new Error('No CI DSP with valid config found');
-
-// 				// Create metadata
-// 				const { outputDir, batchId, xml } =
-// 					await this.releaseDdexService.createMetadataOnServer({
-// 						release: submitDb.metadata.input.releaseSnapshot,
-// 						ernVersion: config.ernVersion as unknown as ErnVersion2,
-// 						sender: config.sender,
-// 						recipient: config.recipient,
-// 					});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[CREATE_AND_UPLOAD_CI] Metadata created`,
-// 					data: { outputDir, batchId },
-// 				});
-
-// 				// Upload SFTP
-// 				await this.sftpConnectService.uploadFolder({
-// 					sftp: config.sftp,
-// 					localDir: outputDir,
-// 					remoteDir: config.sftp.path ?? '/',
-// 				});
-
-// 				await removeFolder(outputDir);
-
-// 				// Save metadata for downstream steps (CREATE_FOLDER_DONE_CI, etc.)
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: {
-// 							ernVersion: config.ernVersion,
-// 							dspCode: ciDsp.code,
-// 						},
-// 						output: { outputDir, batchId, xml },
-// 					} as any,
-// 				});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[CREATE_AND_UPLOAD_CI] uploaded`,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.CREATE_FOLDER_DONE_CI: {
-// 				// Lấy batchId từ sibling CREATE_AND_UPLOAD_CI
-// 				const metaStep = await this.getSiblingStepByType(
-// 					step,
-// 					SubmitStepType.CREATE_AND_UPLOAD_CI,
-// 				);
-// 				const batchId = metaStep?.metadata?.output?.batchId;
-// 				if (!batchId) {
-// 					throw new Error(
-// 						'Missing batchId from CREATE_AND_UPLOAD_CI step',
-// 					);
-// 				}
-
-// 				// Lấy dspCode CI từ sibling CREATE_AND_UPLOAD_CI
-// 				const dspCode = metaStep?.metadata?.input?.dspCode;
-// 				if (!dspCode) {
-// 					throw new Error(
-// 						'Missing dspCode from CREATE_AND_UPLOAD_CI step',
-// 					);
-// 				}
-
-// 				const config =
-// 					await this.dspRoutingService.resolveFullDeliveryConfig(
-// 						dspCode,
-// 					);
-
-// 				const client = await this.sftpConnectService.connect(
-// 					config.sftp,
-// 				);
-// 				try {
-// 					const donePath = path.posix.join(
-// 						config.sftp.path ?? '/',
-// 						`${batchId}.done`,
-// 					);
-// 					await client.mkdir(donePath, true);
-// 					this.logService.success({
-// 						releaseSubmitId: step.releaseSubmitId,
-// 						releaseSubmitStepId: step.id,
-// 						message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
-// 						data: { batchId, donePath },
-// 					});
-// 				} finally {
-// 					await client.end();
-// 				}
-// 				break;
-// 			}
-
-// 			case SubmitStepType.WAIT_PARTNER_PROCESS: {
-// 				const waitMinutes = step.metadata?.input?.waitMinutes ?? 3;
-// 				const scheduledAt = new Date(
-// 					Date.now() + waitMinutes * 60 * 1000,
-// 				);
-
-// 				await this.stepRepo.update(step.id, {
-// 					status: SubmitStepStatus.WAITING_ACTION,
-// 					scheduledAt,
-// 				});
-
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[WAIT_PARTNER_PROCESS] Scheduled resume at ${scheduledAt.toISOString()} (+${waitMinutes}min)`,
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.VALIDATE_QA_CI: {
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[VALIDATE_QA_CI] Release: ${releaseId}`,
-// 				});
-// 				const qaFlags =
-// 					await this.releaseService.getQaFlagCi(releaseId);
-// 				const hasIssues = Array.isArray(qaFlags) && qaFlags.length > 0;
-
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						input: { releaseId },
-// 						output: { qaFlags, hasIssues },
-// 					} as any,
-// 				});
-
-// 				if (hasIssues) {
-// 					throw new Error(
-// 						`QA validation failed: ${qaFlags.length} issue(s) found`,
-// 					);
-// 				}
-// 				break;
-// 			}
-
-// 			case SubmitStepType.EXPORT_CI: {
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[EXPORT_CI] Release: ${releaseId}`,
-// 				});
-
-// 				const exportInput = step.metadata?.input || {};
-// 				const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
-
-// 				// Tạo job email_state51 (nếu có state51 DSPs)
-// 				const state51DspCodes: string[] =
-// 					exportInput.state51DspCodes || [];
-// 				const state51DspsData: any[] = exportInput.state51Dsps || [];
-// 				if (state51DspCodes.length > 0) {
-// 					// Lấy deliveryEmail từ aggregator
-// 					const ciDsp =
-// 						state51DspsData.length > 0
-// 							? await this.manager.findOne(Dsp, {
-// 									where: { id: state51DspsData[0].id },
-// 									relations: [
-// 										'dspRoutingConfig',
-// 										'dspRoutingConfig.aggregator',
-// 									],
-// 								})
-// 							: null;
-// 					const deliveryEmail =
-// 						ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
-// 					const deliveryEmailSubject =
-// 						ciDsp?.dspRoutingConfig?.aggregator
-// 							?.deliveryEmailSubject;
-
-// 					if (!deliveryEmail) {
-// 						throw new Error(
-// 							'[EXPORT_CI] Missing deliveryEmail on aggregator for state51 DSPs',
-// 						);
-// 					}
-
-// 					await this.ciJobService.createJob({
-// 						type: CiJobType.EMAIL_STATE51,
-// 						upc,
-// 						dspCiCodes: state51DspCodes,
-// 						releaseSubmitId: step.releaseSubmitId,
-// 						stepId: step.id,
-// 						releaseId,
-// 						deliveryEmail,
-// 						deliveryEmailSubject,
-// 						stepLabel: 'Export CI - Email State51',
-// 					});
-// 				}
-
-// 				// Tạo job admin_export (nếu có deal DSPs)
-// 				const ciDealDspCodes: string[] =
-// 					exportInput.ciDealDspCodes || [];
-// 				if (ciDealDspCodes.length > 0) {
-// 					await this.ciJobService.createJob({
-// 						type: CiJobType.ADMIN_EXPORT,
-// 						upc,
-// 						dspCiCodes: ciDealDspCodes,
-// 						releaseSubmitId: step.releaseSubmitId,
-// 						stepId: step.id,
-// 						releaseId,
-// 						stepLabel: 'Export CI - Admin Export',
-// 					});
-// 				}
-
-// 				// WAITING_ACTION — chờ tất cả CI jobs xong mới resume
-// 				await this.stepRepo.update(step.id, {
-// 					status: SubmitStepStatus.WAITING_ACTION,
-// 				});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[EXPORT_CI] ${state51DspCodes.length > 0 ? 'email_state51' : ''} ${ciDealDspCodes.length > 0 ? 'admin_export' : ''} jobs created, step paused`,
-// 					data: { upc, state51DspCodes, ciDealDspCodes },
-// 				});
-// 				break;
-// 			}
-
-// 			case SubmitStepType.SYNC_DATA_DSP_CI: {
-// 				const upc = submitDb.metadata?.input?.releaseSnapshot?.upc;
-// 				if (!upc) throw new Error('Missing UPC from release snapshot');
-
-// 				this.logService.log({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[SYNC_DATA_DSP_CI] Fetching DSP statuses from CI for UPC: ${upc}`,
-// 				});
-
-// 				const dspStatuses = await this.ciService.getStatusDsps(upc);
-
-// 				// Map CI code → system code
-// 				const ciCodes = dspStatuses
-// 					.map((d) => d.ciCode)
-// 					.filter(Boolean);
-// 				const dsps =
-// 					ciCodes.length > 0
-// 						? await this.manager.find(Dsp, {
-// 								where: { codeCi: In(ciCodes) },
-// 							})
-// 						: [];
-// 				const ciToSystem = new Map(
-// 					dsps.map((d) => [d.codeCi, { code: d.code, name: d.name }]),
-// 				);
-
-// 				const mappedStatuses = dspStatuses.map((d) => ({
-// 					ciCode: d.ciCode,
-// 					code: ciToSystem.get(d.ciCode)?.code || null,
-// 					name: ciToSystem.get(d.ciCode)?.name || null,
-// 					status: d.status,
-// 				}));
-
-// 				// Lưu kết quả vào metadata.output
-// 				await this.stepRepo.update(step.id, {
-// 					metadata: {
-// 						...step.metadata,
-// 						output: {
-// 							...step.metadata?.output,
-// 							result: mappedStatuses,
-// 						},
-// 					} as any,
-// 				});
-
-// 				this.logService.success({
-// 					releaseSubmitId: step.releaseSubmitId,
-// 					releaseSubmitStepId: step.id,
-// 					message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`,
-// 					data: { dspStatuses: mappedStatuses },
-// 				});
-// 				break;
-// 			}
-
-// 			default:
-// 				throw new Error(`Unknown step type1: ${step.type}`);
-// 		}
-// 	}
-// }
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
+import { ReleaseExecutionStepStatus } from '../enums/release-execution3.enum';
+import { ReleaseExecution3Worker } from './release-execution3.worker';
+
+@Injectable()
+export class ReleaseExecutionStepEngine {
+	constructor(
+		@InjectRepository(ReleaseExecutionStep3)
+		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
+
+		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+	) {}
+
+	// main
+	async processStep(
+		step: ReleaseExecutionStep3,
+	): Promise<ReleaseExecutionStepStatus> {
+		if (!step.childSteps?.length) {
+			const status = await this.releaseExecution3Worker.dispatchStepTask({
+				step,
+				releaseExecution: step.releaseExecution,
+			});
+			await this.updateStepStatus(step, status);
+			return status;
+		} else if (step.childExecutionMode === 'sequential') {
+			for (const childStep of step.childSteps) {
+				const childStatus = await this.processStep(childStep);
+
+				if (this.shouldStopSequential(childStatus)) {
+					await this.setRemaining(
+						childStep,
+						step.childSteps,
+						childStatus,
+					);
+					return this.resolveAndUpdateParentStatus(step);
+				}
+			}
+
+			return this.resolveAndUpdateParentStatus(step);
+		} else if (step.childExecutionMode === 'parallel') {
+			// await Promise.allSettled(
+			// 	step.childSteps.map((child) => this.processStep(child)),
+			// );
+
+			for (const child of step.childSteps) {
+				await this.processStep(child);
+			}
+
+			return this.resolveAndUpdateParentStatus(step);
+		}
+
+		throw new Error(
+			`Unknown childExecutionMode: ${step.childExecutionMode}`,
+		);
+	}
+
+	private async resolveAndUpdateParentStatus(
+		step: ReleaseExecutionStep3,
+	): Promise<ReleaseExecutionStepStatus> {
+		const status = this.resolveParentStatus(step);
+		await this.updateStepStatus(step, status);
+		return status;
+	}
+
+	async runByStepId(stepId: string) {
+		const rootStep = await this.stepRepo.findOne({
+			where: { id: stepId },
+		});
+
+		if (!rootStep) {
+			throw new NotFoundException('Step not found');
+		}
+
+		const allSteps = await this.stepRepo.find({
+			where: {
+				releaseExecutionId: rootStep.releaseExecutionId,
+			},
+			order: {
+				order: 'ASC',
+			},
+		});
+
+		const tree = this.buildStepTree(allSteps, stepId);
+
+		if (!tree) {
+			throw new NotFoundException('Step tree not found');
+		}
+
+		const status = await this.processStep(tree);
+
+		return {
+			stepId: tree.id,
+			type: tree.type,
+			status,
+		};
+	}
+
+	async runByExecutionId(executionId: string) {
+		const steps = await this.stepRepo.find({
+			where: { releaseExecutionId: executionId },
+			order: { order: 'ASC' },
+		});
+
+		const roots = this.buildStepTrees(steps);
+
+		for (const root of roots) {
+			await this.processStep(root);
+		}
+
+		return {
+			executionId,
+			status: roots.map((step) => ({
+				stepId: step.id,
+				type: step.type,
+				status: step.status,
+			})),
+		};
+	}
+
+	private buildStepTrees(
+		steps: ReleaseExecutionStep3[],
+	): ReleaseExecutionStep3[] {
+		const stepMap = new Map<string, ReleaseExecutionStep3>();
+		const roots: ReleaseExecutionStep3[] = [];
+
+		for (const step of steps) {
+			step.childSteps = [];
+			stepMap.set(step.id, step);
+		}
+
+		for (const step of steps) {
+			if (!step.parentStepId) {
+				roots.push(step);
+				continue;
+			}
+
+			const parent = stepMap.get(step.parentStepId);
+
+			if (!parent) {
+				continue;
+			}
+
+			step.parentStep = parent;
+			parent.childSteps?.push(step);
+		}
+
+		for (const step of steps) {
+			step.childSteps?.sort((a, b) => a.order - b.order);
+		}
+
+		return roots.sort((a, b) => a.order - b.order);
+	}
+
+	private buildStepTree(
+		steps: ReleaseExecutionStep3[],
+		rootStepId: string,
+	): ReleaseExecutionStep3 | null {
+		const stepMap = new Map<string, ReleaseExecutionStep3>();
+
+		for (const step of steps) {
+			step.childSteps = [];
+			stepMap.set(step.id, step);
+		}
+
+		for (const step of steps) {
+			if (!step.parentStepId) {
+				continue;
+			}
+
+			const parent = stepMap.get(step.parentStepId);
+
+			if (!parent) {
+				continue;
+			}
+
+			step.parentStep = parent;
+			parent.childSteps?.push(step);
+		}
+
+		for (const step of steps) {
+			step.childSteps?.sort((a, b) => a.order - b.order);
+		}
+
+		return stepMap.get(rootStepId) || null;
+	}
+
+	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.WAITING_ACTION,
+			ReleaseExecutionStepStatus.WAITING_PARTNER,
+			ReleaseExecutionStepStatus.CANCELLED,
+		].includes(status);
+	}
+
+	private resolveParentStatus(
+		step: ReleaseExecutionStep3,
+	): ReleaseExecutionStepStatus {
+		const children = step.childSteps || [];
+
+		if (!children?.length) {
+			throw new Error(
+				`Step ${step.id} has no children to resolve status from`,
+			);
+		}
+
+		// ===== WAITING =====
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.WAITING_ACTION,
+			)
+		) {
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
+		}
+
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.WAITING_PARTNER,
+			)
+		) {
+			return ReleaseExecutionStepStatus.WAITING_PARTNER;
+		}
+
+		// ===== FAILED =====
+		if (
+			children.some((c) => c.status === ReleaseExecutionStepStatus.FAILED)
+		) {
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+
+		// ===== CANCELLED =====
+		if (
+			children.every(
+				(c) => c.status === ReleaseExecutionStepStatus.CANCELLED,
+			)
+		) {
+			return ReleaseExecutionStepStatus.CANCELLED;
+		}
+
+		// ===== DONE =====
+		if (
+			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+		) {
+			return ReleaseExecutionStepStatus.DONE;
+		}
+
+		// ===== PROCESSING =====
+		if (
+			children.some(
+				(c) => c.status === ReleaseExecutionStepStatus.PROCESSING,
+			)
+		) {
+			return ReleaseExecutionStepStatus.PROCESSING;
+		}
+
+		// ===== DEFAULT =====
+		return ReleaseExecutionStepStatus.NEW;
+	}
+
+	// đánh dấu tất cả các bước còn lại (chưa được xử lý)
+	private async setRemaining(
+		currentStep: ReleaseExecutionStep3,
+		allSiblings: ReleaseExecutionStep3[],
+		targetStatus: ReleaseExecutionStepStatus,
+	): Promise<void> {
+		const currentIndex = allSiblings.findIndex(
+			(sibling) => sibling.id === currentStep.id,
+		);
+
+		if (currentIndex === -1) {
+			return;
+		}
+
+		const remainingSteps = allSiblings.slice(currentIndex + 1);
+
+		for (const sibling of remainingSteps) {
+			await this.setStepAndChildrenStatus(sibling, targetStatus);
+		}
+	}
+
+	private async setStepAndChildrenStatus(
+		step: ReleaseExecutionStep3,
+		targetStatus: ReleaseExecutionStepStatus,
+	): Promise<void> {
+		if (this.canOverrideStatus(step.status)) {
+			step.status = targetStatus;
+			step.completedAt = new Date();
+		}
+
+		if (step.childSteps?.length) {
+			for (const child of step.childSteps) {
+				await this.setStepAndChildrenStatus(child, targetStatus);
+			}
+		}
+
+		await this.stepRepo.save(step);
+	}
+
+	private canOverrideStatus(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.NEW,
+			ReleaseExecutionStepStatus.PROCESSING,
+		].includes(status);
+	}
+
+	private async updateStepStatus(
+		step: ReleaseExecutionStep3,
+		status: ReleaseExecutionStepStatus,
+	): Promise<void> {
+		step.status = status;
+
+		if (!step.startedAt) {
+			step.startedAt = new Date();
+		}
+
+		if (this.isFinalStatus(status)) {
+			step.completedAt = new Date();
+		}
+
+		await this.stepRepo.save(step);
+	}
+
+	private isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.DONE,
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.CANCELLED,
+		].includes(status);
+	}
+}

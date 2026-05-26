@@ -25,6 +25,9 @@ export class CiDistributionJob extends BaseUUIDEntity {
 	@Column({ type: 'varchar', nullable: true })
 	upc: string | null;
 
+	@Column({ type: 'varchar', nullable: true })
+	note: string | null;
+
 	@Column({ name: 'dsp_ci_codes', type: 'jsonb', default: [] })
 	dspCiCodes: string[];
 

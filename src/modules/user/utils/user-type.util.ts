@@ -41,7 +41,7 @@ export const checkIsNotSystemTenant = (tenantId: string) =>
 
 export const checkTenantType = (type: TenantType) => {
 	return {
-		isTypeLabel: type === TenantType.LABEL,
+		// isTypeLabel: type === TenantType.LABEL,
 		isTypeWhiteLabel: type === TenantType.WHITE_LABEL,
 	};
 };

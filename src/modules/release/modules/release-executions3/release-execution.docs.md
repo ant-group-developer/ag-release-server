@@ -1,3 +1,5 @@
+/_ eslint-disable _/
+
 release-execution3.builder.ts
 → build cây PENDING từ config
 → biết cấu trúc cây trông như thế nào
@@ -100,116 +102,119 @@ tất cả processing -> proceesing
 chỉ 1 vài thằng WAITING_ACTION -> WAITING_ACTION
 tất cả WAITING_ACTION -> WAITING_ACTION
 
-processStep(step) {
-if(!step.child) {
-step.status = dispatchStepTask(step)
-saveDB(step)
-return step.status
-}
+// giải thuật
+// build stepsParent
+// const steps = buildParentSteps
+// map qua steps, gọi tới hàm buildChildSteps
+// switch case
+// case upc break
+case isrc
 
-        else {
-                if(step.childExecutionMode === 'theo thứ tự'){
-                        for (const childStep of step.child){
-                                const statusChild = processStep(childStep)
+<!--
+buildStep (
+   step?: Step,
+   releaseExecution: ReleaseExecution3,
+) => Step[] {
+   const { releaseSnapShot } = releaseExecution
+   const stepResult: step[] = []
 
-                                if(statusChild === done) {
-                                        continue
-                                }
+   if (!step) {
+      stepResult.push[
+         { gen_upc, input: { releaseSnapShot.releaseId }},
+         { gen_isrcs, input: { releaseSnapShot.trackId1, releaseSnapShot.trackId2, vv }},
+         { validate },
+         { process dsps }
+      ]
+   }
 
-                                if(statusChild === failed) {
-                                        step.status = failed
-                                        setRemaining(childStep, step.childSteps, failed)
-                                        saveDb(step)
-                                        break
-                                }
+   if step.type: gen_upc
+      stepResult.push []
 
-                                if(statusChild === WAITING_ACTION || WAITING_PARTNER) {
-                                        step.status = WAITING_ACTION || WAITING_PARTNER
-                                        setRemaining(childStep, step.childSteps, WAITING_ACTION || WAITING_PARTNER)
-                                        saveDb(step)
-                                        break
-                                }
+   if gen_isrcs
+      stepResult.push [
+         { gen_isrc, input: {trackId} },
+         { gen_isrc, input: {trackId} }
+      ]
 
-                                if (statusChild === CANCELLED) {
-                                        step.status = CANCELLED
-                                        setRemaining(childStep, step.childSteps, CANCELLED)
-                                        saveDb(step)
-                                        break
-                                }
+      if step.type: gen_isrc
+         stepResult.push []
 
-                        }
-                } else if (step.childExecutionMode === 'không theo thứ tự') {
-                        for (const child of step.childSteps) {
-                                processStep(child)
-                        }
-                }
+   if step.type: validate
+      stepResult.push []
 
-                step.status = deriveParentStatus(step)
-                saveDb(step)
-        }
+   if step.type: process dsps
+      stepResult.push [
+         { process_direct },
+         { process_agg }
+      ]
 
-}
+      if step.type: process_direct
+         stepResult.push [
+            { process_direct_child },
+            { process_direct_child }
+         ]
 
-deriveParentStatus(step) {
-const children = step.childSteps
+         if step.type: process_direct_child
+            stepResult.push [
+               create_metadat_on_server,
+               upload_metadata_to_sftp,
+               wait_partner_process,
+               sync_data_partner
+            ]
 
-if (step.childExecutionMode === 'sequential') {
-// sequential: lấy status của con cuối cùng đã chạy
-// priority: WAITING\_\* > FAILED > CANCELLED > PROCESSING > DONE
-if (children.some(c => c.status === WAITING_ACTION)) return WAITING_ACTION
-if (children.some(c => c.status === WAITING_PARTNER)) return WAITING_PARTNER
-if (children.some(c => c.status === FAILED)) return FAILED
-if (children.some(c => c.status === CANCELLED)) return CANCELLED
-if (children.some(c => c.status === PROCESSING)) return PROCESSING
-if (children.every(c => c.status === DONE)) return DONE
-return PROCESSING // mix DONE + NEW/WAITING → vẫn đang chạy
-}
+            if step.type: create_metadat_on_server
+               stepResult.push []
+            if step.type: upload_metadata_to_sftp
+               stepResult.push []
+            if step.type: wait_partner_process
+               stepResult.push []
+            if step.type: sync_data_partner
+               stepResult.push []
 
-if (step.childExecutionMode === 'parallel') {
-if (children.some(c => c.status === WAITING_ACTION)) return WAITING_ACTION
-if (children.some(c => c.status === WAITING_PARTNER)) return WAITING_PARTNER
-if (children.every(c => c.status === DONE)) return DONE
-if (children.every(c => c.status === FAILED)) return FAILED
-if (children.every(c => c.status === CANCELLED)) return CANCELLED
-if (children.some(c => c.status === FAILED) && children.some(c => c.status === CANCELLED)) return FAILED
-if (children.some(c => c.status === DONE)) return PARTIAL_DONE
-return PROCESSING
-}
-}
+      if step.type: process_agg
+         stepResult.push [
+               process_agg_ci
+         ]
 
-setRemaining(currentStep, allSiblings, targetStatus) {
-const currentIndex = allSiblings.findIndex(s => s.id === currentStep.id)
+         if step.type: process_agg_ci
+            stepResult.push [
+               import
+               export
+            ]
 
-for (let i = currentIndex + 1; i < allSiblings.length; i++) {
-const sibling = allSiblings[i]
+            if step.type: import
+               stepResult.push [
+                  create_metadat_on_server,
+                  upload_metadata_to_sftp,
+                  create_done_folder,
+                  wait_partner_process,
+                  validate qa ci,
+               ]
 
-        sibling.status = targetStatus
+            if step.type: export
+               stepResult.push [
+                  ci,
+                  state51
+               ]
 
-        if (sibling.childSteps?.length > 0) {
-                setAllChildren(sibling, targetStatus)
-        }
+               if step.type: ci
+                  stepResult.push [
+                     { admin_export, input : { upc, dsps }}
+                  ]
+                  if step.type: admin_export
+                     stepResult.push []
 
-}
-}
+               if step.type: state51
+                  stepResult.push [
+                     { send_email, input : { upc, dsps }}
+                  ]
 
-setAllChildren(step, targetStatus) {
-for (const child of step.childSteps) {
-if (child.status === NEW || child.status === WAITING) {
-child.status = targetStatus
+                  if step.type: send_email
+                     stepResult.push []
 
-      if (child.childSteps?.length > 0) {
-        setAllChildren(child, targetStatus)
-      }
-    }
+   for(const step of stepResult){
+      this.buildStep(step, releaseExecution)
+   }
+} -->
 
-}
-}
-
-dispatchStepTask(step){
-switch (step.stepType) {
-case: a
-return done | failed | WAITING_ACTION | WAITING_PARTNER
-case: b
-return done | failed | WAITING_ACTION | WAITING_PARTNER
-}
-}
+// build thằng step nào thì sinh ra những thằng con cần thiết, map qua nó, xử lý từng thằng con

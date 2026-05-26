@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
@@ -6,6 +6,7 @@ import {
 	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
+	IsNumber,
 	IsOptional,
 	IsString,
 	IsUUID,
@@ -20,6 +21,8 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
+import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
+import { DspAgreementModeEnum } from '../entities/dsp-tenant.entity';
 import { FieldOrderDsp } from '../enum/dsp.enum';
 
 class CreateDspActionDto {
@@ -72,6 +75,14 @@ export class CreateDspDto {
 	})
 	@IsBoolean()
 	isActive: boolean;
+
+	@ApiProperty({
+		description: 'Indicates whether the DSP is the default option',
+		type: 'boolean',
+		example: true,
+	})
+	@IsBoolean()
+	isDefault: boolean;
 
 	@IsBoolean()
 	enablePolicy: boolean;
@@ -149,4 +160,86 @@ export class QueryGetListDspDto extends BaseQueryDto {
 
 	@IsOptional()
 	aggregatorCode?: string;
+}
+
+// DTO for tenant-dsp agreement
+class AdminToggleDspItemDto {
+	@ApiProperty({
+		example: 'spotify',
+	})
+	@IsString()
+	dspId: string;
+
+	@ApiProperty({
+		example: true,
+	})
+	@IsBoolean()
+	isActive: boolean;
+}
+export class AdminToggleDspDto {
+	@ApiProperty({
+		type: [AdminToggleDspItemDto],
+	})
+	@IsArray()
+	@ArrayNotEmpty()
+	@ValidateNested({ each: true })
+	@Type(() => AdminToggleDspItemDto)
+	items: AdminToggleDspItemDto[];
+}
+
+export class SftpMetadataDto {
+	@ApiProperty()
+	@IsString()
+	host: string;
+
+	@ApiProperty()
+	@IsNumber()
+	port: number;
+
+	@ApiProperty()
+	@IsString()
+	username: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	password?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	privateKey?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	path?: string;
+}
+export class UpsertSftpConfigDto {
+	@ApiPropertyOptional({ type: 'string', format: 'uuid' })
+	@IsUUID()
+	@IsOptional()
+	id?: string;
+
+	@ApiProperty({ enum: ErnVersion2 })
+	@IsEnum(ErnVersion2)
+	ernVersion: ErnVersion2;
+
+	@ApiProperty()
+	@ValidateNested()
+	@Type(() => SftpMetadataDto)
+	metadata: SftpMetadataDto;
+}
+
+export class UpdateTenantDspAgreementDto {
+	@ApiPropertyOptional({ enum: DspAgreementModeEnum })
+	@IsEnum(DspAgreementModeEnum)
+	@IsOptional()
+	mode?: DspAgreementModeEnum;
+
+	@ApiPropertyOptional({ type: UpsertSftpConfigDto })
+	@ValidateNested()
+	@Type(() => UpsertSftpConfigDto)
+	@IsOptional()
+	sftpConfig?: UpsertSftpConfigDto;
 }

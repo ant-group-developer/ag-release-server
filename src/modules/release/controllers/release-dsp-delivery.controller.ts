@@ -20,6 +20,8 @@ import {
 import { AppResponseSuccess } from 'src/app.const';
 import { ReleaseDspDeliverySuccess } from '../constants/release-dsp.constant';
 
+import { User } from 'src/common/decorators/req.decorators';
+import { UserReq } from 'src/common/interface/common.interface';
 import {
 	BulkUpdateReleaseDspDeliveryDto,
 	CreateReleaseDspDeliveryDto,
@@ -27,16 +29,12 @@ import {
 	UpdateReleaseDspDeliveryDto,
 } from '../dto/release-dsp.dto';
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
-import { ReleaseDspDeliveryQueryService } from '../services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryService } from '../services/release-dsp-services/release-dsp-delivery.service';
 
 @ApiTags('Release DSP Deliveries')
 @Controller('release-dsp-deliveries')
 export class ReleaseDspDeliveryController {
-	constructor(
-		private readonly service: ReleaseDspDeliveryService,
-		private readonly queryService: ReleaseDspDeliveryQueryService,
-	) {}
+	constructor(private readonly service: ReleaseDspDeliveryService) {}
 
 	@Post()
 	@ApiOperation({ summary: 'Tạo release dsp delivery' })
@@ -53,8 +51,9 @@ export class ReleaseDspDeliveryController {
 	async syncAndGetDeliveriesByRelease(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,
 		@Query() query: GetListReleaseDspDeliveriesDto,
+		@User() user: UserReq,
 	) {
-		const data = await this.queryService.getAndSyncReleaseDspDeliveries(
+		const data = await this.service.getAndSyncReleaseDspDeliveries(
 			releaseId,
 			query,
 		);

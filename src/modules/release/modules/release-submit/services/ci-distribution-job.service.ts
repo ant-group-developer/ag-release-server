@@ -180,7 +180,8 @@ export class CiDistributionJobService implements OnModuleInit {
 			))`,
 				'data',
 			)
-			.addSelect(`ARRAY_AGG(job.upc)`, 'upcs')
+			.addSelect(`ARRAY_AGG(DISTINCT job.upc)`, 'upcs')
+			.addSelect(`ARRAY_AGG(DISTINCT job.status)`, 'status')
 			.groupBy('job.type')
 			.addGroupBy('job.delivery_email')
 			.addGroupBy('job.delivery_email_subject')
@@ -209,8 +210,14 @@ export class CiDistributionJobService implements OnModuleInit {
 			});
 		}
 
+		if (query.status?.length) {
+			qb.andHaving('ARRAY_AGG(DISTINCT job.status) && :status', {
+				status: query.status,
+			});
+		}
+
 		if (query.upcs?.length) {
-			qb.andHaving('ARRAY_AGG(job.upc) && :upcs', {
+			qb.andHaving('ARRAY_AGG(DISTINCT job.upc) && :upcs', {
 				upcs: query.upcs,
 			});
 		}
@@ -635,6 +642,7 @@ export class CiDistributionJobService implements OnModuleInit {
 
 		if (dto.status === 'skipped') {
 			updateData.status = CiJobStatus.SKIPPED;
+			updateData.note = 'User chủ động cancel';
 			this.log.warning({
 				releaseSubmitId: job.releaseSubmitId,
 				releaseSubmitStepId: job.stepId,

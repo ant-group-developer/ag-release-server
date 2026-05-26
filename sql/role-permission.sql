@@ -120,28 +120,47 @@ WITH map(role_code, permission_code) AS (
     ('track.admin', 'track.read'),
     ('track.admin', 'track.scan'),
 
-    -- User
+    -- User (granular)
     ('user.viewer', 'user.read'),
     ('user.creator', 'user.read'),
     ('user.creator', 'user.create'),
+    ('user.creator', 'user.invite'),
     ('user.editor', 'user.read'),
     ('user.editor', 'user.create'),
-    ('user.editor', 'user.update'),
+    ('user.editor', 'user.invite'),
+    ('user.editor', 'user.update.info'),
+    ('user.editor', 'user.update.status'),
+    ('user.editor', 'user.update.role'),
+    ('user.editor', 'user.update.tenant_type'),
     ('user.admin', 'user.read'),
     ('user.admin', 'user.create'),
-    ('user.admin', 'user.update'),
+    ('user.admin', 'user.invite'),
+    ('user.admin', 'user.update.info'),
+    ('user.admin', 'user.update.status'),
+    ('user.admin', 'user.update.role'),
+    ('user.admin', 'user.update.tenant_type'),
     ('user.admin', 'user.delete'),
 
-    -- Workspace
+    -- Workspace (granular)
     ('workspace.viewer', 'workspace.read'),
     ('workspace.creator', 'workspace.read'),
     ('workspace.creator', 'workspace.create'),
     ('workspace.editor', 'workspace.read'),
     ('workspace.editor', 'workspace.create'),
-    ('workspace.editor', 'workspace.update'),
+    ('workspace.editor', 'workspace.update.info'),
+    ('workspace.editor', 'workspace.update.status'),
     ('workspace.admin', 'workspace.read'),
     ('workspace.admin', 'workspace.create'),
-    ('workspace.admin', 'workspace.update')
+    ('workspace.admin', 'workspace.update.info'),
+    ('workspace.admin', 'workspace.update.status'),
+    ('workspace.admin', 'workspace.update.owner'),
+    ('workspace.admin', 'workspace.update.config'),
+
+    -- Role & Permission (management)
+    ('user.editor', 'role.read'),
+    ('user.editor', 'permission.read'),
+    ('user.admin', 'role.read'),
+    ('user.admin', 'permission.read')
 )
 INSERT INTO role_permission (role_id, permission_id)
 SELECT r.id, p.id

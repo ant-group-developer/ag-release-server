@@ -222,31 +222,46 @@ export class ReleaseController {
 	@Get(':id/download/csv-metadata')
 	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileCsvMetadata(id);
-		streamDownload(res, data);
+		streamDownload(res, {
+			...data,
+			contentType: String(data.contentType || 'application/octet-stream'),
+		});
 	}
 
 	@Get(':id/download/xlsx-metadata')
 	async downloadXlsxMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileXlsxMetadata(id);
-		streamDownload(res, data);
+		streamDownload(res, {
+			...data,
+			contentType: String(data.contentType || 'application/octet-stream'),
+		});
 	}
 
 	@Get(':id/download/txt-metadata')
 	async downloadTxtMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileTxtMetadata(id);
-		streamDownload(res, data);
+		streamDownload(res, {
+			...data,
+			contentType: String(data.contentType || 'application/octet-stream'),
+		});
 	}
 
 	@Get(':id/download/assets')
 	async downloadAssets(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getAssets(id);
-		streamDownload(res, data);
+		streamDownload(res, {
+			...data,
+			contentType: String(data.contentType || 'application/octet-stream'),
+		});
 	}
 
 	@Get(':id/download/cover-art')
 	async downloadCoverArt(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getCoverArtStream(id);
-		streamDownload(res, data);
+		streamDownload(res, {
+			...data,
+			contentType: String(data.contentType || 'application/octet-stream'),
+		});
 	}
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)

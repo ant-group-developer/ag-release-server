@@ -1,47 +1,29 @@
-import {
-	Body,
-	Controller,
-	Get,
-	Param,
-	ParseUUIDPipe,
-	Post,
-	Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
+import { ReleaseExecution3Service } from '../services/release-execution3.service';
 // import { ReleaseSubmitService } from './services/release-submit.service';
-import { QueryGetListSubmitDto } from '../dto/release-submit.dto';
-import { ExecutionType } from '../entities/release-submit.entity';
-import { ReleaseSubmitService2 } from '../services/release-submit2.service';
 
 @ApiTags('Release Submits')
 @Controller('release-submits')
-// @Controller('release-submits-adgasdgsagaddg')
-export class ReleaseSubmitController {
-	constructor(private readonly releaseSubmitService: ReleaseSubmitService2) {}
-
-	/** User bấm submit release */
-	@Post()
-	async submit(@Body() body: { releaseId: string; dspCodes: string[] }) {
-		const result = await this.releaseSubmitService.submit({
-			releaseId: body.releaseId,
-			dspCodes: body.dspCodes,
-			type: ExecutionType.INITIAL_RELEASE,
-		});
-		return new ResponseSuccess({ data: result });
-	}
+// @Controller('release-submits-test')
+export class ReleaseSubmitTestController {
+	constructor(
+		private readonly releaseExecution3Service: ReleaseExecution3Service,
+	) {}
 
 	/** Lấy danh sách submits */
 	@Get()
-	async getList(@Query() query: QueryGetListSubmitDto) {
-		const result = await this.releaseSubmitService.getList(query);
+	async getList(@Query() query: QueryGetListReleaseExecution3Dto) {
+		const result = await this.releaseExecution3Service.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 
 	/** Lấy chi tiết submit + steps */
 	@Get(':id')
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.releaseSubmitService.findOne(id);
+		const result = await this.releaseExecution3Service.findOne(id);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -53,11 +35,11 @@ export class ReleaseSubmitController {
 	// }
 
 	// /** Retry 1 step bị failed */
-	@Post('steps/:stepId/retry')
-	async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
-		const result = await this.releaseSubmitService.retryStep(stepId);
-		return new ResponseSuccess({ data: result });
-	}
+	// @Post('steps/:stepId/retry')
+	// async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
+	// 	const result = await this.releaseSubmitService.retryStep(stepId);
+	// 	return new ResponseSuccess({ data: result });
+	// }
 
 	// /** Admin hoàn thành step WAITING_ACTION → resume execution */
 	// @Post('steps/:stepId/resume')
