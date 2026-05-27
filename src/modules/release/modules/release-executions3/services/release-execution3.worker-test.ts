@@ -97,7 +97,7 @@ export class ReleaseExecution3WorkerTest {
 
 			case ReleaseExecutionStepType.PROCESS_DIRECT:
 			case ReleaseExecutionStepType.PROCESS_AGG_CI:
-				// return this.deriveStatusFromChildren(step);
+			// return this.deriveStatusFromChildren(step);
 
 			default:
 				throw new Error(`Unsupported step type: ${step.type}`);
@@ -193,8 +193,7 @@ export class ReleaseExecution3WorkerTest {
 	private async genIsrcs(
 		step: ReleaseExecutionStep3,
 	): Promise<ReleaseExecutionStepStatus> {
-
-		return ReleaseExecutionStepStatus.DONE
+		return ReleaseExecutionStepStatus.DONE;
 		// return this.deriveStatusFromChildren(step);
 	}
 
