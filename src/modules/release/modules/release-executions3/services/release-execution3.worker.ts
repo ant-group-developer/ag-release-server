@@ -1,10 +1,10 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
+import path from 'path';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
 import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
@@ -14,14 +14,15 @@ import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { removeFolder } from 'src/utils/util';
-import path from 'path';
 import { EntityManager, In, IsNull } from 'typeorm';
+import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
+import { CiDistributionJob3Service } from './ci-distribution-job3.service';
 
 type StepTaskContext = {
 	step: ReleaseExecutionStep3;
@@ -45,6 +46,9 @@ export class ReleaseExecution3Worker {
 		private readonly trackService: TrackService,
 		private readonly ciService: CiService,
 		private readonly logService: LogsService,
+
+		// @Inject(forwardRef(() => CiDistributionJobService))
+		private readonly ciJobService: CiDistributionJob3Service,
 	) {}
 
 	async dispatchStepTask(
@@ -95,14 +99,14 @@ export class ReleaseExecution3Worker {
 			case ReleaseExecutionStepType.VALIDATE_QA_CI:
 				return this.validateQaCi(context);
 
-			case ReleaseExecutionStepType.CI:
+			case ReleaseExecutionStepType.EXPORT_AGG_CI_CI:
 				return this.ci(context);
 
-			case ReleaseExecutionStepType.STATE51:
+			case ReleaseExecutionStepType.EXPORT_AGG_CI_STATE51:
 				return this.state51(context);
 
 			case ReleaseExecutionStepType.WAITING_ADMIN_EXPORT:
-				return this.waitingAdminExport();
+				return this.waitingAdminExport(context);
 
 			case ReleaseExecutionStepType.SEND_EMAIL_STATE51:
 				return this.sendEmailState51(context);
@@ -124,7 +128,9 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private releaseIdFromExecution(releaseExecution: ReleaseExecution3): string {
+	private releaseIdFromExecution(
+		releaseExecution: ReleaseExecution3,
+	): string {
 		const id = releaseExecution.metadata?.input?.releaseSnapshot?.id;
 
 		if (!id) {
@@ -191,9 +197,7 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async genIsrcs(
-		context: StepTaskContext,
-	): Promise<ReleaseExecutionStepStatus> {
+	private genIsrcs(context: StepTaskContext): ReleaseExecutionStepStatus {
 		return this.deriveStatusFromChildren(context);
 	}
 
@@ -236,6 +240,7 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
+
 			const snapshot = releaseExecution.metadata?.input?.releaseSnapshot;
 
 			const errors =
@@ -317,7 +322,9 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async exportCi(context: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async exportCi(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
 		return this.deriveStatusFromChildren(context);
 	}
 
@@ -347,13 +354,9 @@ export class ReleaseExecution3Worker {
 			}
 
 			const config =
-				await this.dspRoutingService.resolveFullDeliveryConfig(
-					dspCode,
-				);
+				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			const client = await this.sftpConnectService.connect(
-				config.sftp,
-			);
+			const client = await this.sftpConnectService.connect(config.sftp);
 
 			try {
 				const donePath = path.posix.join(
@@ -361,7 +364,7 @@ export class ReleaseExecution3Worker {
 					`${batchId}.done`,
 				);
 
-				await client.mkdir(donePath, true);
+				// await client.mkdir(donePath, true);
 
 				this.logService.success({
 					message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
@@ -396,37 +399,149 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async waitingAdminExport(): Promise<ReleaseExecutionStepStatus> {
-		return ReleaseExecutionStepStatus.WAITING_ACTION;
+	private async waitingAdminExport({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const upc =
+				releaseExecution.releaseUpc ??
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			const dsps: Dsp[] =
+				releaseExecution.metadata.input.dspAggregator?.ci?.ci ?? [];
+
+			const dspCiCodes: string[] = dsps
+				.map((dsp) => dsp.codeCi)
+				.filter((code): code is string => !!code);
+
+			if (!step.metadata?.output?.jobCreated) {
+				await this.ciJobService.createJob({
+					type: CiJobType3.ADMIN_EXPORT,
+					upc,
+					dspCiCodes,
+					releaseExecutionId: step.releaseExecutionId,
+					stepId: step.id,
+					releaseId:
+						releaseExecution.metadata.input.releaseSnapshot.id,
+					stepLabel: 'Export CI - Admin Export',
+				});
+
+				step.metadata = {
+					...step.metadata,
+					output: { jobCreated: true },
+				};
+				await this.manager.save(ReleaseExecutionStep3, step);
+			}
+
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
+		} catch (err) {
+			this.logService.error({
+				message: `[WAITING_ADMIN_EXPORT] ${err.message}`,
+			});
+			return ReleaseExecutionStepStatus.FAILED;
+		}
 	}
 
-	private async sendEmailState51(
-		context: StepTaskContext,
-	): Promise<ReleaseExecutionStepStatus> {
-		return this.sendEmailToState(context);
+	private async sendEmailState51({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const upc =
+				releaseExecution.releaseUpc ??
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			const dsps: Dsp[] = step.metadata?.input?.dsps ?? [];
+			if (!dsps.length) throw new Error('Missing dsps');
+
+			const dspEntity = await this.manager.findOne(Dsp, {
+				where: { id: dsps[0].id },
+				relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+			});
+
+			const deliveryEmail =
+				dspEntity?.dspRoutingConfig?.aggregator?.deliveryEmail;
+			const deliveryEmailSubject =
+				dspEntity?.dspRoutingConfig?.aggregator?.deliveryEmailSubject ??
+				`State51 Delivery - ${upc}`;
+
+			if (!deliveryEmail)
+				throw new Error('Missing deliveryEmail on aggregator');
+
+			const dspCiCodes: string[] = dsps
+				.map((dsp) => dsp.codeCi)
+				.filter((code): code is string => !!code);
+
+			if (!step.metadata?.output?.jobCreated) {
+				await this.ciJobService.createJob({
+					type: CiJobType3.EMAIL_STATE51,
+					upc,
+					dspCiCodes,
+					releaseExecutionId: step.releaseExecutionId,
+					stepId: step.id,
+					releaseId:
+						releaseExecution.metadata.input.releaseSnapshot.id,
+					deliveryEmail,
+					deliveryEmailSubject,
+					stepLabel: 'Export CI - Email State51',
+				});
+
+				step.metadata = {
+					...step.metadata,
+					output: { jobCreated: true },
+				};
+				await this.manager.save(ReleaseExecutionStep3, step);
+			}
+
+			this.logService.success({
+				message: `[SEND_EMAIL_STATE51] Job created, sent to ${deliveryEmail}`,
+				data: { upc, dspCiCodes },
+			});
+
+			return ReleaseExecutionStepStatus.DONE;
+		} catch (err) {
+			this.logService.error({
+				message: `[SEND_EMAIL_STATE51] ${err.message}`,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		}
 	}
 
 	private async waitPartnerProcess({
 		step,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
+			const scheduledAt = step.metadata?.scheduledAt;
+
+			// Đã từng set lịch → cron resume gọi vào đây → done, tiếp tục pipeline
+			if (scheduledAt) {
+				if (new Date(scheduledAt) > new Date()) {
+					return ReleaseExecutionStepStatus.WAITING_PARTNER; // chưa đến giờ
+				}
+				return ReleaseExecutionStepStatus.DONE; // đã đến giờ
+			}
+
+			// Lần đầu chạy → set lịch và dừng lại
 			const waitMinutes =
 				step.metadata?.input?.waitMinutes ?? DEFAULT_WAIT_MINUTES;
-
-			const scheduledAt = new Date(Date.now() + waitMinutes * 60 * 1000);
+			const newScheduledAt = new Date(
+				Date.now() + waitMinutes * 60 * 1000,
+			);
 
 			step.metadata = {
 				...step.metadata,
-				scheduledAt: scheduledAt.toISOString(),
+				scheduledAt: newScheduledAt.toISOString(),
 			};
 
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			this.logService.log({
-				message: `[WAIT_PARTNER_PROCESS] Resume at ${scheduledAt.toISOString()} (+${waitMinutes}min)`,
+				message: `[WAIT_PARTNER_PROCESS] Resume at ${newScheduledAt.toISOString()} (+${waitMinutes}min)`,
 			});
 
-			return ReleaseExecutionStepStatus.WAITING_ACTION;
+			return ReleaseExecutionStepStatus.WAITING_PARTNER;
 		} catch (err) {
 			this.logService.error({
 				message: `[WAIT_PARTNER_PROCESS] ${err.message}`,
@@ -441,11 +556,23 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const parent = await this.getParentStep(step);
+			const parentStep = step.parentStepId
+				? await this.manager.findOne(ReleaseExecutionStep3, {
+						where: { id: step.parentStepId },
+					})
+				: null;
 
-			const dspCode =
-				step.metadata?.input?.dspCode ??
-				parent?.metadata?.input?.dsps?.[0]?.code;
+			let dspCode: string | undefined;
+
+			if (parentStep?.type === ReleaseExecutionStepType.IMPORT_CI) {
+				dspCode = parentStep?.metadata?.input?.primaryDsp?.code;
+			} else {
+				dspCode = step.metadata?.input?.dsp?.code;
+			}
+
+			if (!dspCode) {
+				throw new Error('Missing DSP code');
+			}
 
 			if (!dspCode) {
 				throw new Error('Missing DSP code from step or parent step');
@@ -457,7 +584,7 @@ export class ReleaseExecution3Worker {
 			const { outputDir, batchId, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
 					release: releaseExecution.metadata.input.releaseSnapshot,
-					ernVersion: config.ernVersion as unknown as ErnVersion2,
+					ernVersion: config.ernVersion,
 					sender: config.sender,
 					recipient: config.recipient,
 				});
@@ -468,7 +595,6 @@ export class ReleaseExecution3Worker {
 					...step.metadata?.input,
 					ernVersion: config.ernVersion,
 					dspCode,
-					sftp: config.sftp,
 				},
 				output: {
 					outputDir,
@@ -497,23 +623,45 @@ export class ReleaseExecution3Worker {
 		step,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const outputDir = step.metadata?.output?.outputDir;
-			const sftp = step.metadata?.input?.sftp;
-			const dspCode = step.metadata?.input?.dspCode;
+			if (!step.parentStepId) {
+				throw new Error(
+					'Missing parentStepId for UPLOAD_METADATA_TO_SFTP',
+				);
+			}
+
+			const createMetadataStep = await this.manager.findOne(
+				ReleaseExecutionStep3,
+				{
+					where: {
+						parentStepId: step.parentStepId,
+						type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+					},
+				},
+			);
+
+			const outputDir = createMetadataStep?.metadata?.output?.outputDir;
+			const dspCode = createMetadataStep?.metadata?.input?.dspCode;
 
 			if (!outputDir) {
-				throw new Error('Missing outputDir');
+				throw new Error(
+					'Missing outputDir from CREATE_METADATA_ON_SERVER',
+				);
 			}
 
-			if (!sftp) {
-				throw new Error('Missing sftp config');
+			if (!dspCode) {
+				throw new Error(
+					'Missing dspCode from CREATE_METADATA_ON_SERVER',
+				);
 			}
 
-			await this.sftpConnectService.uploadFolder({
-				sftp,
-				localDir: outputDir,
-				remoteDir: sftp.path ?? '/',
-			});
+			const config =
+				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
+
+			// await this.sftpConnectService.uploadFolder({
+			// 	sftp: config.sftp,
+			// 	localDir: outputDir,
+			// 	remoteDir: config.sftp.path ?? '/',
+			// });
 
 			await removeFolder(outputDir);
 
@@ -588,11 +736,9 @@ export class ReleaseExecution3Worker {
 				message: `[VALIDATE_QA_CI] Release: ${releaseId}`,
 			});
 
-			const qaFlags =
-				await this.releaseService.getQaFlagCi(releaseId);
+			const qaFlags = await this.releaseService.getQaFlagCi(releaseId);
 
-			const hasIssues =
-				Array.isArray(qaFlags) && qaFlags.length > 0;
+			const hasIssues = Array.isArray(qaFlags) && qaFlags.length > 0;
 
 			step.metadata = {
 				...step.metadata,
@@ -622,83 +768,6 @@ export class ReleaseExecution3Worker {
 		} catch (err) {
 			this.logService.error({
 				message: `[VALIDATE_QA_CI] ${err.message}`,
-			});
-
-			return ReleaseExecutionStepStatus.FAILED;
-		}
-	}
-
-	private async sendEmailToState({
-		step,
-		releaseExecution,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		try {
-			const releaseId = this.releaseIdFromExecution(releaseExecution);
-			const upc = releaseExecution.metadata?.input?.releaseSnapshot?.upc;
-
-			if (!upc) {
-				throw new Error('Missing UPC from release snapshot');
-			}
-
-			const input = step.metadata?.input || {};
-
-			const deliveryEmail = input.deliveryEmail;
-			const deliveryEmailSubject =
-				input.deliveryEmailSubject ||
-				`State51 Delivery - ${upc}`;
-
-			const dspCiCodes: string[] = input.dspCiCodes || [];
-
-			if (!deliveryEmail) {
-				throw new Error('Missing deliveryEmail');
-			}
-
-			if (!dspCiCodes.length) {
-				throw new Error('Missing dspCiCodes');
-			}
-
-			this.logService.log({
-				message: `[SEND_EMAIL_STATE51] Release: ${releaseId}`,
-				data: {
-					upc,
-					deliveryEmail,
-					dspCiCodes,
-				},
-			});
-
-			// TODO: thay bằng service gửi mail thật của mày
-			// await this.mailService.send({
-			// 	to: deliveryEmail,
-			// 	subject: deliveryEmailSubject,
-			// 	html: ...
-			// });
-
-			step.metadata = {
-				...step.metadata,
-				output: {
-					...step.metadata?.output,
-					upc,
-					deliveryEmail,
-					deliveryEmailSubject,
-					dspCiCodes,
-					sentAt: new Date().toISOString(),
-				},
-			};
-
-			await this.manager.save(ReleaseExecutionStep3, step);
-
-			this.logService.success({
-				message: `[SEND_EMAIL_STATE51] Sent to ${deliveryEmail}`,
-				data: {
-					upc,
-					dspCiCodes,
-				},
-			});
-
-			return ReleaseExecutionStepStatus.DONE;
-		} catch (err) {
-			this.logService.error({
-				message: `[SEND_EMAIL_STATE51] ${err.message}`,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;

@@ -155,6 +155,7 @@ export class TrackService {
 	}
 
 	async genISRC(trackId: string) {
+		// return 'QT6KL2614737';
 		const track = await this.trackQueryService.getDetailOne(trackId);
 
 		// Nếu đã có ISRC thì tuỳ bạn: return luôn hoặc throw

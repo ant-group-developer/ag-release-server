@@ -80,6 +80,7 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 				ci: {
 					ci: Dsp[];
 					state51: Dsp[];
+					primaryDsp?: Dsp | null;
 				};
 			};
 			upcAutoIfReleaseSnapshotNull?: string;

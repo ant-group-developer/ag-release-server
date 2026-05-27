@@ -60,6 +60,13 @@ import { ReleaseExecutionStep3 } from './modules/release-executions3/entites/rel
 import { ReleaseExecution3 } from './modules/release-executions3/entites/release-execution3.entity';
 import { ReleaseExecution3Service } from './modules/release-executions3/services/release-execution3.service';
 
+import { CiDistributionJob3Controller } from './modules/release-executions3/controllers/ci-distribution-job3.controller';
+import { ReleaseSubmitTestController } from './modules/release-executions3/controllers/release-submit-test.controller';
+import { CiDistributionJob3 } from './modules/release-executions3/entites/ci-distribution-job3.entity';
+import { CiDistributionJob3Service } from './modules/release-executions3/services/ci-distribution-job3.service';
+import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
+import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
+import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
@@ -67,10 +74,6 @@ import { ReleaseSubmitStep } from './modules/release-submit/entities/release-sub
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
-import { ReleaseSubmitTestController } from './modules/release-executions3/controllers/release-submit-test.controller';
-import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
-import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
-import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 
 @Module({
 	imports: [
@@ -97,6 +100,7 @@ import { ReleaseExecution3Worker } from './modules/release-executions3/services/
 
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
+			CiDistributionJob3,
 		]),
 
 		AppConfigModule,
@@ -141,8 +145,9 @@ import { ReleaseExecution3Worker } from './modules/release-executions3/services/
 		CiDistributionJobController,
 
 		ReleaseExecution3Controller,
-		// ReleaseSubmitTestController,
+		ReleaseSubmitTestController,
 		ReleaseExecutionStepTestController,
+		CiDistributionJob3Controller,
 	],
 	providers: [
 		ReleaseService,
@@ -167,6 +172,7 @@ import { ReleaseExecution3Worker } from './modules/release-executions3/services/
 		ReleaseExecutionStepEngine,
 		ReleaseExecution3Service,
 		ReleaseExecution3Worker,
+		CiDistributionJob3Service,
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
 })

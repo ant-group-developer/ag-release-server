@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
+import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import { ReleaseExecutionStepStatus } from '../enums/release-execution3.enum';
 import { ReleaseExecution3Worker } from './release-execution3.worker';
 
@@ -17,14 +18,37 @@ export class ReleaseExecutionStepEngine {
 	// main
 
 	// xử lí toàn bộ thằng con rồi mới xử lí chính nó
-	async processStep(
-		STEP: ReleaseExecutionStep3,
-	): Promise<ReleaseExecutionStepStatus> {
+	async processStep({
+		step: STEP,
+		releaseExecution,
+	}: {
+		step: ReleaseExecutionStep3;
+		releaseExecution: ReleaseExecution3;
+	}): Promise<ReleaseExecutionStepStatus> {
+		// 👇 Skip nếu đã hoàn thành
+		if (STEP.status === ReleaseExecutionStepStatus.DONE) {
+			return ReleaseExecutionStepStatus.DONE;
+		}
+
+		// // 👇 Skip nếu đang chờ và chưa đến giờ resume
+		// if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+		// 	const scheduledAt = STEP.metadata?.scheduledAt;
+		// 	if (scheduledAt && new Date(scheduledAt) > new Date()) {
+		// 		return ReleaseExecutionStepStatus.WAITING_PARTNER;
+		// 	}
+		// 	// Đã đến giờ → tiếp tục chạy bình thường xuống dưới
+		// }
+
+		await this.updateStepStatus(
+			STEP,
+			ReleaseExecutionStepStatus.PROCESSING,
+		);
+
 		if (!STEP.childSteps?.length) {
 			// gọi sang worker để xử lý logic chính của step, lấy về status, lưu db
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
 				step: STEP,
-				releaseExecution: STEP.releaseExecution,
+				releaseExecution,
 			});
 
 			// lưu db
@@ -38,7 +62,10 @@ export class ReleaseExecutionStepEngine {
 		else if (STEP.childExecutionMode === 'sequential') {
 			for (const childStep of STEP.childSteps) {
 				// gọi đệ quy
-				const childStatus = await this.processStep(childStep);
+				const childStatus = await this.processStep({
+					step: childStep,
+					releaseExecution,
+				});
 
 				// check xem có cần dừng hay ko, nếu có thì udpate những thằng step con còn lại, xử lí status cha
 				if (this.shouldStopSequential(childStatus)) {
@@ -62,7 +89,10 @@ export class ReleaseExecutionStepEngine {
 			// );
 
 			for (const child of STEP.childSteps) {
-				await this.processStep(child);
+				await this.processStep({
+					step: child,
+					releaseExecution,
+				});
 			}
 
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
@@ -158,25 +188,52 @@ export class ReleaseExecutionStepEngine {
 
 	// Khi một step bị FAILED, CANCELLED, WAITING_ACTION...
 	// thì các step phía sau trong cùng level và toàn bộ cây con của chúng cũng bị cập nhật status theo.
-	private async setRemaining(
+	// private async setRemaining(
+	// 	currentStep: ReleaseExecutionStep3,
+	// 	allSiblings: ReleaseExecutionStep3[],
+	// 	targetStatus: ReleaseExecutionStepStatus,
+	// ): Promise<void> {
+	// 	// Tìm vị trí của step hiện tại trong danh sách sibling
+	// 	const currentIndex = allSiblings.findIndex(
+	// 		(sibling) => sibling.id === currentStep.id,
+	// 	);
+
+	// 	// Nếu không tìm thấy thì bỏ qua
+	// 	if (currentIndex === -1) {
+	// 		return;
+	// 	}
+
+	// 	// Lấy tất cả step phía sau current step
+	// 	const remainingSteps = allSiblings.slice(currentIndex + 1);
+
+	// 	// Cập nhật status cho các step còn lại và toàn bộ cây con của chúng
+	// 	for (const sibling of remainingSteps) {
+	// 		await this.setStepAndChildrenStatus(sibling, targetStatus);
+	// 	}
+	// }
+
+	async setRemaining(
 		currentStep: ReleaseExecutionStep3,
 		allSiblings: ReleaseExecutionStep3[],
 		targetStatus: ReleaseExecutionStepStatus,
 	): Promise<void> {
-		// Tìm vị trí của step hiện tại trong danh sách sibling
 		const currentIndex = allSiblings.findIndex(
 			(sibling) => sibling.id === currentStep.id,
 		);
 
-		// Nếu không tìm thấy thì bỏ qua
-		if (currentIndex === -1) {
-			return;
-		}
+		// Step hiện tại không nằm trong danh sách sibling → bỏ qua
+		if (currentIndex === -1) return;
 
-		// Lấy tất cả step phía sau current step
+		// Chỉ cancel các step phía sau nếu parent chạy sequential.
+		// Parallel mode: các sibling độc lập nhau, 1 thằng fail không ảnh hưởng thằng khác.
+		const parentExecutionMode =
+			currentStep.parentStep?.childExecutionMode ?? 'sequential';
+
+		if (parentExecutionMode !== 'sequential') return;
+
 		const remainingSteps = allSiblings.slice(currentIndex + 1);
 
-		// Cập nhật status cho các step còn lại và toàn bộ cây con của chúng
+		// Cập nhật status cho tất cả step phía sau và toàn bộ cây con của chúng
 		for (const sibling of remainingSteps) {
 			await this.setStepAndChildrenStatus(sibling, targetStatus);
 		}

@@ -37,9 +37,8 @@ export class ReleaseExecution3Controller {
 
 	@Post('steps/:stepId/retry')
 	async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
-		const result = await this.releaseExecution3Service.retryStep(stepId);
-
-		return new ResponseSuccess({ data: result });
+		// const result = await this.releaseExecution3Service.retryStep(stepId);
+		// return new ResponseSuccess({ data: result });
 	}
 
 	// @Post('steps/:stepId/run')

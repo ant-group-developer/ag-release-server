@@ -621,7 +621,7 @@ export class ReleaseExecution3WorkerTest {
 				message: `[WAIT_PARTNER_PROCESS] Resume at ${scheduledAt.toISOString()} (+${waitMinutes}min)`,
 			});
 
-			return ReleaseExecutionStepStatus.WAITING_ACTION;
+			return ReleaseExecutionStepStatus.WAITING_PARTNER;
 		} catch (err) {
 			this.logService.error({
 				message: `[WAIT_PARTNER_PROCESS] ${err.message}`,
