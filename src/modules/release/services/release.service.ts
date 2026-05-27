@@ -467,6 +467,7 @@ export class ReleaseService {
 	}
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
+
 		const release = await this.releaseQueryService.findOneReleaseFull({
 			releaseId: id,
 		});

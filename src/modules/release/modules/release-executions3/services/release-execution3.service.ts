@@ -67,8 +67,10 @@ export class ReleaseExecution3Service {
 	// 	await this.runPipeline(step.releaseExecutionId);
 	// }
 
-	@Cron('* * * * * *') // 1s
-	@Cron('*/3 * * * *') // 3 phut
+	// @Cron('* * * * * *') // 1s
+	// @Cron('*/10 * * * * *') // 10s
+	// @Cron('*/3 * * * *') // 3 phut
+	@Cron('* * * * *') // mỗi 1 phút
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
@@ -133,7 +135,7 @@ export class ReleaseExecution3Service {
 
 		await this.parseMetadata(execution);
 
-		await this.builder.startBuildPipeline(execution);
+		await this.builder.buildStepsChild({ releaseExecution: execution });
 
 		await this.runPipeline(id);
 	}

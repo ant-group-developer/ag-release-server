@@ -432,12 +432,22 @@ export class ReleaseExecution3Worker {
 					output: { jobCreated: true },
 				};
 				await this.manager.save(ReleaseExecutionStep3, step);
+
+				this.logService.success({
+					message: `[WAITING_ADMIN_EXPORT] Job created`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+					data: { upc, dspCiCodes },
+				});
 			}
 
 			return ReleaseExecutionStepStatus.WAITING_ACTION;
 		} catch (err) {
 			this.logService.error({
 				message: `[WAITING_ADMIN_EXPORT] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+
 			});
 			return ReleaseExecutionStepStatus.FAILED;
 		}
@@ -496,13 +506,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[SEND_EMAIL_STATE51] Job created, sent to ${deliveryEmail}`,
-				data: { upc, dspCiCodes },
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
-			return ReleaseExecutionStepStatus.DONE;
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
 		} catch (err) {
 			this.logService.error({
 				message: `[SEND_EMAIL_STATE51] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -729,6 +742,8 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 

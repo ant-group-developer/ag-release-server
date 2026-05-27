@@ -12,6 +12,8 @@ import {
 	CiJobStatus3,
 	CiJobType3,
 } from '../entites/ci-distribution-job3.entity';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 
 @Injectable()
 export class CiDistributionJob3Service {
@@ -40,35 +42,41 @@ export class CiDistributionJob3Service {
 	}
 
 	async getList(query: QueryGetListCiJob3Dto) {
-		const page = Number(query.page || 1);
-		const pageSize = Number(query.pageSize || 10);
-
 		const qb = this.repo.createQueryBuilder('job');
-
-		if (query.status) {
-			qb.andWhere('job.status = :status', { status: query.status });
-		}
 
 		if (query.type) {
 			qb.andWhere('job.type = :type', { type: query.type });
 		}
 
-		if (query.upc) {
-			qb.andWhere('job.upc ILIKE :upc', { upc: `%${query.upc}%` });
+		if (query.status?.length) {
+			qb.andWhere('job.status IN (:...status)', { status: query.status });
 		}
 
-		qb.orderBy('job.createdAt', 'DESC')
-			.skip((page - 1) * pageSize)
-			.take(pageSize);
+		if (query.releaseExecutionId) {
+			qb.andWhere('job.releaseExecutionId = :releaseExecutionId', {
+				releaseExecutionId: query.releaseExecutionId,
+			});
+		}
+
+		if (query.upc) {
+			qb.andWhere('job.upc LIKE :upc', { upc: `%${query.upc}%` });
+		}
+
+		orderAndPaging2({ qb, filter: query });
+
+		qb.leftJoin('job.release', 'release');
+		qb.addSelect(['release.title']);
 
 		const [items, total] = await qb.getManyAndCount();
 
-		return {
+		return new PageDto({
 			items,
-			total,
-			page,
-			pageSize,
-		};
+			metadata: {
+				page: query.page,
+				pageSize: query.pageSize,
+				totalItems: total,
+			},
+		});
 	}
 
 	async getGrouped(query: QueryGroupedCiJob3Dto) {
@@ -76,44 +84,95 @@ export class CiDistributionJob3Service {
 		const pageSize = Number(query.pageSize || 10);
 
 		const qb = this.repo
-			.createQueryBuilder('job')
+			.createQueryBuilder('job') 
 			.select('job.type', 'type')
 			.addSelect('job.delivery_email', 'deliveryEmail')
 			.addSelect('job.delivery_email_subject', 'deliveryEmailSubject')
 			.addSelect('DATE(job.created_at)', 'dateGroup')
 			.addSelect('MIN(job.sent_at)', 'sentAt')
+			.addSelect('ARRAY_AGG(DISTINCT job.upc)', 'upcs')
 			.addSelect('ARRAY_AGG(DISTINCT job.status)', 'status')
 			.addSelect(
 				`JSON_AGG(JSON_BUILD_OBJECT(
 					'id', job.id,
 					'upc', job.upc,
-					'dspCiCodes', job.dsp_ci_codes,
+					'dspCodes', job.dsp_ci_codes,
 					'type', job.type,
 					'status', job.status,
 					'sentAt', job.sent_at,
 					'stepLabel', job.step_label,
-					'releaseExecutionId', job.release_execution_id,
+					'releaseSubmitId', job.release_execution_id,
 					'stepId', job.step_id,
 					'releaseId', job.release_id,
-					'createdAt', job.created_at
+					'deliveryEmail', job.delivery_email,
+					'deliveryEmailSubject', job.delivery_email_subject,
+					'createdAt', job.created_at,
+					'updatedAt', job.updated_at
 				) ORDER BY job.created_at DESC)`,
-				'jobs',
+				'data',
 			)
 			.groupBy('job.type')
 			.addGroupBy('job.delivery_email')
 			.addGroupBy('job.delivery_email_subject')
 			.addGroupBy('DATE(job.created_at)')
-			.orderBy('DATE(job.created_at)', 'DESC')
+			.orderBy('DATE(job.created_at)', 'DESC');
+
+		if (query.keyword?.length) {
+			const keywords = query.keyword.map((k) => `%${k}%`);
+
+			qb.andWhere(
+				`(
+					job.type ILIKE ANY(:keywords)
+					OR job.upc ILIKE ANY(:keywords)
+					OR job.delivery_email ILIKE ANY(:keywords)
+					OR job.delivery_email_subject ILIKE ANY(:keywords)
+				)`,
+				{ keywords },
+			);
+		}
+
+		if (query.type) {
+			qb.andWhere('job.type = :type', { type: query.type });
+		}
+
+		if (query.dateGroup) {
+			qb.andHaving('DATE(MIN(job.created_at)) = :dateGroup', {
+				dateGroup: query.dateGroup,
+			});
+		}
+
+		if (query.status?.length) {
+			qb.andHaving('ARRAY_AGG(DISTINCT job.status) && :status', {
+				status: query.status,
+			});
+		}
+
+		if (query.upcs?.length) {
+			qb.andHaving('ARRAY_AGG(DISTINCT job.upc) && :upcs', {
+				upcs: query.upcs,
+			});
+		}
+
+		const countQb = qb.clone();
+
+		const totalItems = await countQb
+			.select('COUNT(*)::int', 'count')
+			.getRawMany()
+			.then((rows) => rows.length);
+
+		const items = await qb
 			.offset((page - 1) * pageSize)
-			.limit(pageSize);
+			.limit(pageSize)
+			.getRawMany();
 
-		const items = await qb.getRawMany();
-
-		return {
+		return new PageDto({
 			items,
-			page,
-			pageSize,
-		};
+			metadata: {
+				page,
+				pageSize,
+				totalItems,
+			},
+		});
 	}
 
 	async findOne(id: string) {

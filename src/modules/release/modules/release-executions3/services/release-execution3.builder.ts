@@ -21,25 +21,19 @@ export class ReleaseExecution3Builder {
 		private readonly manager: EntityManager,
 	) {}
 
-	async startBuildPipeline(execution: ReleaseExecution3): Promise<void> {
-		const allSteps = this.buildStepsChild({ releaseExecution: execution });
-
-		await this.manager.transaction(async (tx) => {
-			await this.saveStepsRecursive(allSteps, tx);
-		});
-	}
-
-	buildStepsChild({
-		step,
+	async buildStepsChild({
+		step: STEP,
 		releaseExecution,
 	}: {
 		step?: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
-	}): ReleaseExecutionStep3[] {
+	})
+	// : Promise<ReleaseExecutionStep3[]> 
+	{
 		const { releaseSnapshot } = releaseExecution.metadata.input;
 		const stepResult: Partial<ReleaseExecutionStep3>[] = [];
 
-		switch (step?.type) {
+		switch (STEP?.type) {
 			case undefined: {
 				let order = 1;
 
@@ -86,7 +80,7 @@ export class ReleaseExecution3Builder {
 			}
 
 			case ReleaseExecutionStepType.GEN_ISRCS: {
-				const trackIds: string[] = step.metadata?.input?.trackIds ?? [];
+				const trackIds: string[] = STEP.metadata?.input?.trackIds ?? [];
 				trackIds.forEach((trackId, index) => {
 					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_ISRC,
@@ -122,7 +116,7 @@ export class ReleaseExecution3Builder {
 			}
 
 			case ReleaseExecutionStepType.PROCESS_DIRECT: {
-				const dsps: Dsp[] = step.metadata?.input?.dsps ?? [];
+				const dsps: Dsp[] = STEP.metadata?.input?.dsps ?? [];
 
 				dsps.forEach((dsp, index) => {
 					stepResult.push({
@@ -139,19 +133,19 @@ export class ReleaseExecution3Builder {
 					{
 						type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
 						order: 1,
-						metadata: { input: { dsp: step.metadata?.input?.dsp } },
+						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
 					},
 					{
 						type: ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP,
 						order: 2,
-						metadata: { input: { dsp: step.metadata?.input?.dsp } },
+						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
 					},
 					{
 						type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
 						order: 3,
 						metadata: {
 							input: {
-								dsp: step.metadata?.input?.dsp,
+								dsp: STEP.metadata?.input?.dsp,
 								waitMinutes: DEFAULT_WAIT_MINUTES,
 							},
 						},
@@ -159,7 +153,7 @@ export class ReleaseExecution3Builder {
 					{
 						type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
 						order: 4,
-						metadata: { input: { dsp: step.metadata?.input?.dsp } },
+						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
 					},
 				);
 				break;
@@ -194,7 +188,7 @@ export class ReleaseExecution3Builder {
 								},
 							},
 						},
-						{ type: ReleaseExecutionStepType.EXPORT_CI, order: 2 },
+						{ type: ReleaseExecutionStepType.EXPORT_CI, order: 2, childExecutionMode: 'parallel' },
 					);
 				}
 
@@ -252,7 +246,7 @@ export class ReleaseExecution3Builder {
 			}
 
 			case ReleaseExecutionStepType.EXPORT_AGG_CI_CI: {
-				const dsps = step?.metadata?.input?.dsps ?? [];
+				const dsps = STEP?.metadata?.input?.dsps ?? [];
 				const { upc } = releaseSnapshot;
 
 				stepResult.push({
@@ -264,7 +258,7 @@ export class ReleaseExecution3Builder {
 			}
 
 			case ReleaseExecutionStepType.EXPORT_AGG_CI_STATE51: {
-				const dsps = step?.metadata?.input?.dsps ?? [];
+				const dsps = STEP?.metadata?.input?.dsps ?? [];
 
 				stepResult.push({
 					type: ReleaseExecutionStepType.SEND_EMAIL_STATE51,
@@ -284,38 +278,50 @@ export class ReleaseExecution3Builder {
 		}
 
 		// Gán id, parentStepId, releaseExecutionId rồi đệ quy
-		const savedSteps: ReleaseExecutionStep3[] = [];
+		// const savedSteps: ReleaseExecutionStep3[] = [];
 
 		for (const childStep of stepResult) {
-			childStep.id = uuidv4();
 			childStep.releaseExecutionId = releaseExecution.id;
-			childStep.parentStepId = step?.id ?? null;
+			childStep.parentStepId = STEP?.id ?? null;
+		}
 
-			const children = this.buildStepsChild({
-				step: childStep as ReleaseExecutionStep3,
+		const stepDb = await this.stepRepo.save(stepResult);
+		// console.log('save: ', stepDb.length)
+
+		for (const childStep of stepDb) {
+			const children = await this.buildStepsChild({
+				step: childStep,
 				releaseExecution,
 			});
 
 			childStep.childSteps = children;
-			savedSteps.push(childStep as ReleaseExecutionStep3);
+			// savedSteps.push(childStep as ReleaseExecutionStep3);
 		}
 
-		return savedSteps;
+		return stepDb;
 	}
 
-	private async saveStepsRecursive(
-		steps: ReleaseExecutionStep3[],
-		tx: EntityManager,
-	): Promise<void> {
-		for (const step of steps) {
-			const children = step.childSteps;
-			step.childSteps = undefined;
+	// async startBuildPipeline(execution: ReleaseExecution3): Promise<void> {
+	// 	const listStepsTree = this.buildStepsChild({ releaseExecution: execution });
 
-			await tx.save(ReleaseExecutionStep3, step);
+	// 	await this.manager.transaction(async (tx) => {
+	// 		await this.saveStepsRecursive(listStepsTree, tx);
+	// 	});
+	// }
 
-			if (children?.length) {
-				await this.saveStepsRecursive(children, tx);
-			}
-		}
-	}
+	// private async saveStepsRecursive(
+	// 	steps: ReleaseExecutionStep3[],
+	// 	tx: EntityManager,
+	// ): Promise<void> {
+	// 	for (const step of steps) {
+	// 		const children = step.childSteps;
+	// 		step.childSteps = undefined;
+
+	// 		await tx.save(ReleaseExecutionStep3, step);
+
+	// 		if (children?.length) {
+	// 			await this.saveStepsRecursive(children, tx);
+	// 		}
+	// 	}
+	// }
 }
