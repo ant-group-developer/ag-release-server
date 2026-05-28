@@ -40,6 +40,14 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 20,
+		comment: 'Video hay audio',
+		default: 'Audio'
+	})
+	type: 'audio' | 'video'
+
+	@Column({
+		type: 'varchar',
+		length: 20,
 		nullable: true,
 		comment: 'Mã UPC của release',
 	})
@@ -322,7 +330,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 			.map((r) => {
 				if (
 					r.dsp?.dspRoutingConfig?.mode ===
-						RoutingModeEnum.AGGREGATOR &&
+					RoutingModeEnum.AGGREGATOR &&
 					r.dsp?.dspRoutingConfig?.aggregator?.code === 'CI'
 				) {
 					return r.dsp.codeCi;
