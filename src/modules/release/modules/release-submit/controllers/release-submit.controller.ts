@@ -15,10 +15,10 @@ import { ExecutionType } from '../entities/release-submit.entity';
 import { ReleaseSubmitService2 } from '../services/release-submit2.service';
 
 @ApiTags('Release Submits')
-// @Controller('release-submits')
-@Controller('release-submits-adgasdgsagaddg')
+@Controller('release-submits')
+// @Controller('release-submits-disable')
 export class ReleaseSubmitController {
-	constructor(private readonly releaseSubmitService: ReleaseSubmitService2) {}
+	constructor(private readonly releaseSubmitService: ReleaseSubmitService2) { }
 
 	/** User bấm submit release */
 	@Post()

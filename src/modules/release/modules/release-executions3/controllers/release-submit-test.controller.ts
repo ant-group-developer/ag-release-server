@@ -6,12 +6,12 @@ import { ReleaseExecution3Service } from '../services/release-execution3.service
 // import { ReleaseSubmitService } from './services/release-submit.service';
 
 @ApiTags('Release Submits')
-@Controller('release-submits')
-// @Controller('release-submits-test')
+// @Controller('release-submits')
+@Controller('release-submits-disable')
 export class ReleaseSubmitTestController {
 	constructor(
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
-	) {}
+	) { }
 
 	/** Lấy danh sách submits */
 	@Get()

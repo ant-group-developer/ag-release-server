@@ -52,7 +52,7 @@ import { ReleaseService } from '../services/release.service';
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
-	constructor(private readonly releaseService: ReleaseService) {}
+	constructor(private readonly releaseService: ReleaseService) { }
 
 	@Get()
 	async getList(
@@ -306,7 +306,7 @@ export class ReleaseController {
 		@Req() req: Request,
 		@Body() dto: SubmitReleaseDto,
 	) {
-		const result = await this.releaseService.submit3(id, dto);
+		const result = await this.releaseService.submit(id, dto);
 
 		return new ResponseSuccess({
 			data: result,

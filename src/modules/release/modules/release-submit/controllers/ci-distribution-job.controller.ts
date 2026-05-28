@@ -28,10 +28,10 @@ import {
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
 
 @ApiTags('CI Distribution Jobs')
-// @Controller('ci-distribution-jobs')
-@Controller('ci-distribution-jobs-disable')
+@Controller('ci-distribution-jobs')
+// @Controller('ci-distribution-jobs-disable')
 export class CiDistributionJobController {
-	constructor(private readonly jobService: CiDistributionJobService) {}
+	constructor(private readonly jobService: CiDistributionJobService) { }
 
 	@ApiOperation({ summary: 'Danh sách CI distribution jobs' })
 	@ApiQuery({ type: QueryGetListCiJobDto })
