@@ -13,7 +13,7 @@ export class ReleaseExecutionStepEngine {
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-	) {}
+	) { }
 
 	// main
 
@@ -28,6 +28,12 @@ export class ReleaseExecutionStepEngine {
 		// 👇 Skip nếu đã hoàn thành
 		if (STEP.status === ReleaseExecutionStepStatus.DONE) {
 			return ReleaseExecutionStepStatus.DONE;
+		}
+
+		// 👇 Skip nếu đang chờ user action — không re-trigger để tránh duplicate job
+		// (WAITING_PARTNER không skip vì cron cần re-process để kiểm tra timer)
+		if (STEP.status === ReleaseExecutionStepStatus.WAITING_ACTION) {
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
 		}
 
 		// // 👇 Skip nếu đang chờ và chưa đến giờ resume
@@ -186,32 +192,6 @@ export class ReleaseExecutionStepEngine {
 		return ReleaseExecutionStepStatus.NEW;
 	}
 
-	// Khi một step bị FAILED, CANCELLED, WAITING_ACTION...
-	// thì các step phía sau trong cùng level và toàn bộ cây con của chúng cũng bị cập nhật status theo.
-	// private async setRemaining(
-	// 	currentStep: ReleaseExecutionStep3,
-	// 	allSiblings: ReleaseExecutionStep3[],
-	// 	targetStatus: ReleaseExecutionStepStatus,
-	// ): Promise<void> {
-	// 	// Tìm vị trí của step hiện tại trong danh sách sibling
-	// 	const currentIndex = allSiblings.findIndex(
-	// 		(sibling) => sibling.id === currentStep.id,
-	// 	);
-
-	// 	// Nếu không tìm thấy thì bỏ qua
-	// 	if (currentIndex === -1) {
-	// 		return;
-	// 	}
-
-	// 	// Lấy tất cả step phía sau current step
-	// 	const remainingSteps = allSiblings.slice(currentIndex + 1);
-
-	// 	// Cập nhật status cho các step còn lại và toàn bộ cây con của chúng
-	// 	for (const sibling of remainingSteps) {
-	// 		await this.setStepAndChildrenStatus(sibling, targetStatus);
-	// 	}
-	// }
-
 	async setRemaining(
 		currentStep: ReleaseExecutionStep3,
 		allSiblings: ReleaseExecutionStep3[],
@@ -244,25 +224,47 @@ export class ReleaseExecutionStepEngine {
 		step: ReleaseExecutionStep3,
 		targetStatus: ReleaseExecutionStepStatus,
 	): Promise<void> {
-		// Chỉ override các step còn đang chạy hoặc chưa xử lý
-		if (this.canOverrideStatus(step.status)) {
+		if (this.canOverrideStatus(step.status, targetStatus)) {
 			step.status = targetStatus;
-			step.completedAt = new Date();
+			step.completedAt =
+				targetStatus === ReleaseExecutionStepStatus.NEW
+					? null // reset completedAt khi retry
+					: new Date();
+
+			// Khi retry (reset về NEW): clear output để worker chạy lại từ đầu.
+			// Giữ input nguyên để worker vẫn có đủ dữ liệu.
+			if (
+				targetStatus === ReleaseExecutionStepStatus.NEW &&
+				step.metadata?.output
+			) {
+				step.metadata = { ...step.metadata, output: null };
+			}
 		}
 
-		// Tiếp tục cập nhật toàn bộ cây con
 		if (step.childSteps?.length) {
 			for (const child of step.childSteps) {
 				await this.setStepAndChildrenStatus(child, targetStatus);
 			}
 		}
 
-		// Lưu trạng thái mới xuống DB
 		await this.stepRepo.save(step);
 	}
 
 	// Kiểm tra step có được phép override status hay không
-	private canOverrideStatus(status: ReleaseExecutionStepStatus): boolean {
+	private canOverrideStatus(
+		status: ReleaseExecutionStepStatus,
+		targetStatus?: ReleaseExecutionStepStatus,
+	): boolean {
+		// Khi reset về NEW (retry): cho phép override cả FAILED
+		if (targetStatus === ReleaseExecutionStepStatus.NEW) {
+			return [
+				ReleaseExecutionStepStatus.NEW,
+				ReleaseExecutionStepStatus.PROCESSING,
+				ReleaseExecutionStepStatus.FAILED,
+			].includes(status);
+		}
+
+		// Khi cancel: chỉ override NEW và PROCESSING
 		return [
 			ReleaseExecutionStepStatus.NEW,
 			ReleaseExecutionStepStatus.PROCESSING,
@@ -295,126 +297,37 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	//
-	// async runByStepId(stepId: string) {
-	// 	const rootStep = await this.stepRepo.findOne({
-	// 		where: { id: stepId },
-	// 	});
+	// Trong ReleaseExecutionStepEngine
+	async resetStepAndChildren(step: ReleaseExecutionStep3): Promise<void> {
+		await this.setStepAndChildrenStatus(
+			step,
+			ReleaseExecutionStepStatus.NEW,
+		);
+	}
 
-	// 	if (!rootStep) {
-	// 		throw new NotFoundException('Step not found');
-	// 	}
+	// Leo ngược từ step lên root: tại mỗi ancestor load children từ DB,
+	// derive status bằng resolveStatusByChild (giống engine) rồi lưu DB.
+	// KHÔNG re-run step nào — chỉ cập nhật status cha cho đúng.
+	async propagateStatusUp(step: ReleaseExecutionStep3): Promise<void> {
+		let currentParentId = step.parentStepId;
 
-	// 	const allSteps = await this.stepRepo.find({
-	// 		where: {
-	// 			releaseExecutionId: rootStep.releaseExecutionId,
-	// 		},
-	// 		order: {
-	// 			order: 'ASC',
-	// 		},
-	// 	});
+		while (currentParentId) {
+			const parent = await this.stepRepo.findOne({
+				where: { id: currentParentId },
+				relations: { childSteps: true }, // load children để derive status
+			});
 
-	// 	const tree = this.buildStepTree(allSteps, stepId);
+			if (!parent) break;
 
-	// 	if (!tree) {
-	// 		throw new NotFoundException('Step tree not found');
-	// 	}
+			const status = this.resolveStatusByChild(parent);
 
-	// 	const status = await this.processStep(tree);
+			parent.status = status;
+			if (this.isFinalStatus(status)) {
+				parent.completedAt = new Date();
+			}
+			await this.stepRepo.save(parent);
 
-	// 	return {
-	// 		stepId: tree.id,
-	// 		type: tree.type,
-	// 		status,
-	// 	};
-	// }
-
-	// private buildStepTree(
-	// 	steps: ReleaseExecutionStep3[],
-	// 	rootStepId: string,
-	// ): ReleaseExecutionStep3 | null {
-	// 	const stepMap = new Map<string, ReleaseExecutionStep3>();
-
-	// 	for (const step of steps) {
-	// 		step.childSteps = [];
-	// 		stepMap.set(step.id, step);
-	// 	}
-
-	// 	for (const step of steps) {
-	// 		if (!step.parentStepId) {
-	// 			continue;
-	// 		}
-
-	// 		const parent = stepMap.get(step.parentStepId);
-
-	// 		if (!parent) {
-	// 			continue;
-	// 		}
-
-	// 		step.parentStep = parent;
-	// 		parent.childSteps?.push(step);
-	// 	}
-
-	// 	for (const step of steps) {
-	// 		step.childSteps?.sort((a, b) => a.order - b.order);
-	// 	}
-
-	// 	return stepMap.get(rootStepId) || null;
-	// }
-
-	// async runByExecutionId(executionId: string) {
-	// 	const steps = await this.stepRepo.find({
-	// 		where: { releaseExecutionId: executionId },
-	// 		order: { order: 'ASC' },
-	// 	});
-
-	// 	const roots = this.buildStepTrees(steps);
-
-	// 	for (const root of roots) {
-	// 		await this.processStep(root);
-	// 	}
-
-	// 	return {
-	// 		executionId,
-	// 		status: roots.map((step) => ({
-	// 			stepId: step.id,
-	// 			type: step.type,
-	// 			status: step.status,
-	// 		})),
-	// 	};
-	// }
-
-	// private buildStepTrees(
-	// 	steps: ReleaseExecutionStep3[],
-	// ): ReleaseExecutionStep3[] {
-	// 	const stepMap = new Map<string, ReleaseExecutionStep3>();
-	// 	const roots: ReleaseExecutionStep3[] = [];
-
-	// 	for (const step of steps) {
-	// 		step.childSteps = [];
-	// 		stepMap.set(step.id, step);
-	// 	}
-
-	// 	for (const step of steps) {
-	// 		if (!step.parentStepId) {
-	// 			roots.push(step);
-	// 			continue;
-	// 		}
-
-	// 		const parent = stepMap.get(step.parentStepId);
-
-	// 		if (!parent) {
-	// 			continue;
-	// 		}
-
-	// 		step.parentStep = parent;
-	// 		parent.childSteps?.push(step);
-	// 	}
-
-	// 	for (const step of steps) {
-	// 		step.childSteps?.sort((a, b) => a.order - b.order);
-	// 	}
-
-	// 	return roots.sort((a, b) => a.order - b.order);
-	// }
+			currentParentId = parent.parentStepId;
+		}
+	}
 }

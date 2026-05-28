@@ -15,7 +15,8 @@ import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto
 import { ReleaseExecution3Service } from '../services/release-execution3.service';
 
 @ApiTags('Release Executions 3')
-@Controller('release-executions3')
+// @Controller('release-executions3')
+@Controller('release-submits')
 export class ReleaseExecution3Controller {
 	constructor(
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
@@ -37,8 +38,8 @@ export class ReleaseExecution3Controller {
 
 	@Post('steps/:stepId/retry')
 	async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
-		// const result = await this.releaseExecution3Service.retryStep(stepId);
-		// return new ResponseSuccess({ data: result });
+		const result = await this.releaseExecution3Service.retryStep(stepId);
+		return new ResponseSuccess({ data: result });
 	}
 
 	// @Post('steps/:stepId/run')

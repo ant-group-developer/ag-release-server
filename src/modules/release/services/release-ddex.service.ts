@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
-
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
 import { AggregatorCode } from 'src/modules/distribution/aggregator/enum/distribution.enum';
@@ -28,14 +28,16 @@ import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 import { Release } from '../entities/release.entity';
 
 interface AudioFileInfo {
-	buffer: Buffer;
+	// buffer: Buffer;
+	filePath: string;
 	extension: string;
 	isrc: string;
 	trackNo: number;
 }
 
 interface CoverImageInfo {
-	buffer: Buffer;
+	// buffer: Buffer;
+	filePath: string;
 	extension: string;
 }
 
@@ -65,14 +67,8 @@ export class ReleaseDdexService {
 	}: {
 		release: Release;
 		ernVersion: ErnVersion2;
-		sender: {
-			partyId: string;
-			name: string;
-		};
-		recipient: {
-			partyId: string;
-			name: string;
-		};
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
 	}) {
 		const batchId = genBatchId();
 
@@ -81,64 +77,70 @@ export class ReleaseDdexService {
 			throw new Error('Không tìm thấy mã UPC của release');
 		}
 
-		// 1. Setup folder structure
-		// release_parsed/20251120151606392/00850080651001/
 		const baseDir =
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
-
 		const outputRoot = path.join(baseDir, batchId);
-		// const outputRoot = path.resolve('release_parsed', batchId);
 		const releaseDir = path.join(outputRoot, upc);
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
 
-		// 2. Fetch files from bucket
-		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromBucket(release);
+		// Tạo tempDir riêng để chứa file tải từ bucket
+		// Sẽ bị xóa trong finally dù thành công hay lỗi
+		const tempDir = await fs.promises.mkdtemp(
+			path.join(os.tmpdir(), `release-${release.id}-${Date.now()}-`),
+		);
 
-		// 3. Process and save cover image
-		await this.processCoverImage({
-			coverImage,
-			outputDir: resourcesDir,
-			upc,
-		});
+		console.log(`Temp dir created: ${tempDir}`);
 
-		// 4. Process and save audio files
-		this.processAudioFiles({ audioFiles, outputDir: resourcesDir });
+		try {
+			const { audioFiles, coverImage } =
+				await this.fetchAudioAndImageReleaseFromBucket(
+					release,
+					tempDir,
+				);
 
-		// 5. DDEX file
-		const xml = await this.createErnFile({
-			release,
-			outputDir: releaseDir,
-			ernVersion,
-			recipient,
-			sender,
-		});
+			await this.processCoverImage({
+				coverImage,
+				outputDir: resourcesDir,
+				upc,
+			});
 
-		this.createManifestFile({
-			batchId,
-			upc,
-			outputRoot,
-			sender,
-			recipient,
-		});
+			await this.processAudioFiles({
+				audioFiles,
+				outputDir: resourcesDir,
+			});
 
-		this.logger.log({
-			releaseId: release.id,
-			step: 'createMetadataOnServer',
-			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
-		});
+			const xml = this.createErnFile({
+				release,
+				outputDir: releaseDir,
+				ernVersion,
+				recipient,
+				sender,
+			});
 
-		return {
-			outputDir: outputRoot,
-			outputRoot,
-			batchId,
-			xml,
-		};
+			this.createManifestFile({
+				batchId,
+				upc,
+				outputRoot,
+				sender,
+				recipient,
+			});
+
+			this.logger.log({
+				releaseId: release.id,
+				step: 'createMetadataOnServer',
+				message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
+			});
+
+			return { outputDir: outputRoot, outputRoot, batchId, xml };
+		} finally {
+			// Xóa file tạm dù thành công hay throw
+			// await fs.promises.rm(tempDir, { recursive: true, force: true });
+		}
 	}
 
-	async createErnFile({
+	createErnFile({
 		release,
 		outputDir,
 		ernVersion,
@@ -323,15 +325,77 @@ export class ReleaseDdexService {
 	/**
 	 * Fetch audio and image files from bucket
 	 */
+	// private async fetchAudioAndImageReleaseFromBucket(
+	// 	release: Release,
+	// ): Promise<{
+	// 	audioFiles: AudioFileInfo[];
+	// 	coverImage: CoverImageInfo;
+	// }> {
+	// 	const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
+
+	// 	// Fetch audio files
+	// 	const tracksWithAudio = tracks.filter(
+	// 		(
+	// 			track,
+	// 		): track is typeof track & {
+	// 			audioFile: NonNullable<typeof track.audioFile>;
+	// 		} => !!track.audioFile,
+	// 	);
+	// 	const fileIds = tracksWithAudio.map((track) => track.audioFile.fileId);
+	// 	const fileBuffers = await this.bucket2Sv.getListFileBuffers(fileIds);
+
+	// 	// Map theo fileId để tránh lệch thứ tự
+	// 	const fileBufferMap = new Map(
+	// 		fileBuffers.map((item) => [item.fileDb.id, item]),
+	// 	);
+
+	// 	const audioFiles = tracksWithAudio.map((track, index) => {
+	// 		const originalIndex = tracks.indexOf(track);
+	// 		const { fileBuffer, fileDb } = fileBufferMap.get(
+	// 			track.audioFile.fileId,
+	// 		)!;
+	// 		return {
+	// 			buffer: fileBuffer,
+	// 			extension: fileDb.extension,
+	// 			isrc:
+	// 				track.isrc ||
+	// 				`TEMP${String(originalIndex + 1).padStart(4, '0')}`,
+	// 			trackNo: originalIndex + 1,
+	// 		};
+	// 	});
+
+	// 	// Fetch cover image
+	// 	const coverArt = release.releaseCoverArts?.find(
+	// 		(art) => art.type === 'original',
+	// 	);
+
+	// 	if (!coverArt) {
+	// 		throw new Error(
+	// 			'Bản phát hành không có ảnh bìa gốc (original cover)',
+	// 		);
+	// 	}
+
+	// 	const { fileBuffer: coverBuffer, fileDb: coverDb } =
+	// 		await this.bucket2Sv.getFileBuffer(coverArt.fileId);
+
+	// 	return {
+	// 		audioFiles,
+	// 		coverImage: {
+	// 			buffer: coverBuffer,
+	// 			extension: coverDb.extension,
+	// 		},
+	// 	};
+	// }
+
 	private async fetchAudioAndImageReleaseFromBucket(
 		release: Release,
+		tempDir: string,
 	): Promise<{
 		audioFiles: AudioFileInfo[];
 		coverImage: CoverImageInfo;
 	}> {
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
 
-		// Fetch audio files
 		const tracksWithAudio = tracks.filter(
 			(
 				track,
@@ -339,30 +403,31 @@ export class ReleaseDdexService {
 				audioFile: NonNullable<typeof track.audioFile>;
 			} => !!track.audioFile,
 		);
-		const fileIds = tracksWithAudio.map((track) => track.audioFile.fileId);
-		const fileBuffers = await this.bucket2Sv.getListFileBuffers(fileIds);
 
-		// Map theo fileId để tránh lệch thứ tự
-		const fileBufferMap = new Map(
-			fileBuffers.map((item) => [item.fileDb.id, item]),
-		);
+		const audioFiles: AudioFileInfo[] = [];
 
-		const audioFiles = tracksWithAudio.map((track, index) => {
+		for (const track of tracksWithAudio) {
 			const originalIndex = tracks.indexOf(track);
-			const { fileBuffer, fileDb } = fileBufferMap.get(
-				track.audioFile.fileId,
-			)!;
-			return {
-				buffer: fileBuffer,
+			const destPath = path.join(
+				tempDir,
+				`track_${String(originalIndex + 1).padStart(3, '0')}.tmp`,
+			);
+
+			const fileDb = await this.bucket2Sv.streamFileToPath({
+				fileId: track.audioFile.fileId,
+				destPath,
+			});
+
+			audioFiles.push({
+				filePath: destPath,
 				extension: fileDb.extension,
 				isrc:
 					track.isrc ||
 					`TEMP${String(originalIndex + 1).padStart(4, '0')}`,
 				trackNo: originalIndex + 1,
-			};
-		});
+			});
+		}
 
-		// Fetch cover image
 		const coverArt = release.releaseCoverArts?.find(
 			(art) => art.type === 'original',
 		);
@@ -373,13 +438,16 @@ export class ReleaseDdexService {
 			);
 		}
 
-		const { fileBuffer: coverBuffer, fileDb: coverDb } =
-			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
+		const coverPath = path.join(tempDir, 'cover.tmp');
+		const coverDb = await this.bucket2Sv.streamFileToPath({
+			fileId: coverArt.fileId,
+			destPath: coverPath,
+		});
 
 		return {
 			audioFiles,
 			coverImage: {
-				buffer: coverBuffer,
+				filePath: coverPath,
 				extension: coverDb.extension,
 			},
 		};
@@ -398,8 +466,9 @@ export class ReleaseDdexService {
 		outputDir: string;
 		upc: string;
 	}): Promise<void> {
+		const buffer = await fs.promises.readFile(coverImage.filePath);
 		const img = await resizeCoverImageTo3000x3000({
-			buffer: coverImage.buffer,
+			buffer,
 		});
 
 		const ext = this.normalizeImageExtension(coverImage.extension);
@@ -407,8 +476,6 @@ export class ReleaseDdexService {
 		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
-
-		// this.logger.log(`[COVER_SAVED] ${fileName}`);
 	}
 
 	/**
@@ -416,20 +483,28 @@ export class ReleaseDdexService {
 	 * Format: resources/{ISRC}_T{trackNo}S.{ext}
 	 * Example: resources/QT6KL2500010_T1S.wav
 	 */
-	private processAudioFiles({
+	private async processAudioFiles({
 		audioFiles,
 		outputDir,
 	}: {
 		audioFiles: AudioFileInfo[];
 		outputDir: string;
-	}) {
+	}): Promise<void> {
 		for (const [index, audio] of audioFiles.entries()) {
 			const ext = this.normalizeAudioExtension(audio.extension);
-			const trackNoStr = String(index).padStart(1, '0'); // T0S, T1S, ...
+			const trackNoStr = String(index).padStart(1, '0');
 			const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
-			const filePath = path.join(outputDir, fileName);
+			const destPath = path.join(outputDir, fileName);
 
-			fs.writeFileSync(filePath, audio.buffer);
+			// Rename thay vì copy nếu tempDir và outputDir cùng filesystem
+			// (nhanh hơn, không tốn thêm disk I/O)
+			await fs.promises
+				.rename(audio.filePath, destPath)
+				.catch(async () => {
+					// Fallback: khác filesystem (tmpfs → disk) thì copy
+					await fs.promises.copyFile(audio.filePath, destPath);
+				});
+
 			this.logger.log(`[AUDIO_SAVED] ${fileName}`);
 		}
 	}

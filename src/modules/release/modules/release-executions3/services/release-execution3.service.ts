@@ -5,9 +5,14 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
+import {
+	CiDistributionJob3,
+	CiJobStatus3,
+} from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
@@ -28,44 +33,128 @@ export class ReleaseExecution3Service {
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
 		@InjectRepository(ReleaseExecutionStep3)
+		private readonly releaseExecutionStep3Repo: Repository<ReleaseExecutionStep3>,
+
+		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 		private readonly dspRoutingService: DspRoutingConfigsService,
 
 		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
-	) {}
 
-	// async retryStep(stepId: string): Promise<void> {
-	// 	const step = await this.manager.findOne(ReleaseExecutionStep3, {
-	// 		where: { id: stepId },
-	// 	});
+		private readonly logService: LogsService,
+	) { }
 
-	// 	if (!step) throw new Error('Step not found');
-	// 	if (step.status !== ReleaseExecutionStepStatus.FAILED) {
-	// 		throw new Error('Only FAILED step can be retried');
-	// 	}
+	async retryStep(stepId: string): Promise<void> {
+		const step = await this.stepRepo.findOne({
+			where: { id: stepId },
+			relations: { childSteps: true },
+		});
 
-	// 	const siblings = await this.manager.find(ReleaseExecutionStep3, {
-	// 		where: { parentStepId: step.parentStepId ?? IsNull() },
-	// 		order: { order: 'ASC' },
-	// 	});
+		if (!step) throw new Error('Step not found');
+		if (step.status !== ReleaseExecutionStepStatus.FAILED) {
+			throw new Error('Only FAILED step can be retried');
+		}
 
-	// 	// Reset step này + con của nó
-	// 	await this.engine.setRemaining(
-	// 		step,
-	// 		siblings,
-	// 		ReleaseExecutionStepStatus.NEW,
-	// 	);
+		const siblings = await this.stepRepo.find({
+			where: { parentStepId: step.parentStepId ?? IsNull() },
+			order: { order: 'ASC' },
+		});
 
-	// 	// Reset các sibling phía sau về NEW
-	// 	await this.engine.setRemaining(
-	// 		step,
-	// 		siblings,
-	// 		ReleaseExecutionStepStatus.NEW,
-	// 	);
+		// 1. Reset bản thân step FAILED + toàn bộ cây con
+		await this.engine.resetStepAndChildren(step);
 
-	// 	await this.runPipeline(step.releaseExecutionId);
-	// }
+		// 2. Reset các sibling phía sau về NEW (cùng cha)
+		await this.engine.setRemaining(
+			step,
+			siblings,
+			ReleaseExecutionStepStatus.NEW,
+		);
+
+		// 3. Leo lên reset tất cả ancestor bị FAILED do propagate,
+		//    đồng thời reset các sibling của ancestor phía sau nó
+		await this.resetAncestors(step);
+
+		await this.runPipeline(step.releaseExecutionId);
+	}
+
+	// Leo lên từng ancestor của step được retry:
+	// - Reset status của ancestor về NEW (không động vào con — đã xử lý ở bước trên)
+	// - Reset các sibling phía sau ancestor + toàn bộ cây con của chúng về NEW
+	private async resetAncestors(step: ReleaseExecutionStep3): Promise<void> {
+		let currentParentId = step.parentStepId;
+
+		while (currentParentId) {
+			const parent = await this.stepRepo.findOne({
+				where: { id: currentParentId },
+				relations: { parentStep: true }, // cần để setRemaining check childExecutionMode của ông
+			});
+
+			if (!parent) break;
+
+			// Chỉ reset status của chính ancestor, không reset con (con đã được xử lý ở trên)
+			await this.stepRepo.update(parent.id, {
+				status: ReleaseExecutionStepStatus.NEW,
+				completedAt: null,
+			});
+			parent.status = ReleaseExecutionStepStatus.NEW;
+
+			// Reset các sibling của ancestor phía sau nó + toàn bộ cây con của chúng
+			const parentSiblings = await this.stepRepo.find({
+				where: { parentStepId: parent.parentStepId ?? IsNull() },
+				order: { order: 'ASC' },
+			});
+
+			await this.engine.setRemaining(
+				parent,
+				parentSiblings,
+				ReleaseExecutionStepStatus.NEW,
+			);
+
+			currentParentId = parent.parentStepId;
+		}
+	}
+
+	// Được gọi từ bên ngoài (vd: CiJob bị user skip) để đánh dấu step là FAILED
+	// và propagate failure lên/xuống mà không re-run bất kỳ step nào
+	async failStep(stepId: string): Promise<void> {
+		console.log(
+			stepId,
+			'[ReleaseExecution3Service] Marking step as FAILED due to job skipped by user',
+		);
+
+		const step = await this.stepRepo.findOne({
+			where: { id: stepId },
+		});
+
+		if (!step) throw new Error('Step not found');
+
+		// 1. Set bản thân step về FAILED
+		await this.stepRepo.update(step.id, {
+			status: ReleaseExecutionStepStatus.FAILED,
+			completedAt: new Date(),
+		});
+		step.status = ReleaseExecutionStepStatus.FAILED;
+
+		// 2. Set các sibling phía sau (cùng cha) về FAILED + toàn bộ cây con của chúng
+		const siblings = await this.stepRepo.find({
+			where: { parentStepId: step.parentStepId ?? IsNull() },
+			order: { order: 'ASC' },
+		});
+		await this.engine.setRemaining(
+			step,
+			siblings,
+			ReleaseExecutionStepStatus.FAILED,
+		);
+
+		// 3. Leo ngược lên derive đúng status tất cả ancestor từ children thực tế trong DB
+		//    (không re-run, chỉ tính lại status cha)
+		await this.engine.propagateStatusUp(step);
+
+		// 4. Cập nhật execution status
+		const execution = await this.findOne(step.releaseExecutionId);
+		await this.refreshExecutionStatus(execution);
+	}
 
 	// @Cron('* * * * * *') // 1s
 	// @Cron('*/10 * * * * *') // 10s
@@ -101,6 +190,53 @@ export class ReleaseExecution3Service {
 		}
 	}
 
+	async resumeFromWaiting(stepId: string): Promise<void> {
+		const step = await this.releaseExecutionStep3Repo.findOne({
+			where: { id: stepId },
+		});
+
+		if (!step) {
+			throw new NotFoundException('Step not found');
+		}
+
+		if (step.status === ReleaseExecutionStepStatus.WAITING_ACTION) {
+			const claim = await this.releaseExecutionStep3Repo.update(
+				{
+					id: stepId,
+					status: ReleaseExecutionStepStatus.WAITING_ACTION,
+				},
+				{
+					status: ReleaseExecutionStepStatus.PROCESSING,
+				},
+			);
+
+			if (claim.affected === 0) {
+				throw new Error('Step đang được xử lý bởi tiến trình khác');
+			}
+		} else if (step.status !== ReleaseExecutionStepStatus.PROCESSING) {
+			throw new Error(`Step status invalid: ${step.status}`);
+		}
+
+		await this.releaseExecutionStep3Repo.update(stepId, {
+			status: ReleaseExecutionStepStatus.DONE,
+			metadata: {
+				...step.metadata,
+				output: {
+					...step.metadata?.output,
+					completed: true,
+				},
+			},
+			completedAt: new Date(),
+		});
+
+		// Vì processStep giờ skip WAITING_ACTION, parent của step này sẽ không được
+		// engine tự derive status → phải leo ngược cập nhật trước khi chạy lại pipeline
+		step.status = ReleaseExecutionStepStatus.DONE;
+		await this.engine.propagateStatusUp(step);
+
+		await this.runPipeline(step.releaseExecutionId);
+	}
+
 	async runPipeline(id: string): Promise<void> {
 		const execution = await this.findOne(id);
 		const steps = execution.steps || [];
@@ -129,6 +265,10 @@ export class ReleaseExecution3Service {
 		if (execution.status !== ReleaseExecutionStatus.NEW) {
 			throw new Error('Only execution with NEW status can be started');
 		}
+
+		await this.cancelPendingExecutions(
+			execution.metadata.input.releaseSnapshot.id,
+		);
 
 		execution.status = ReleaseExecutionStatus.PROCESSING;
 		await this.executionRepo.save(execution);
@@ -452,5 +592,66 @@ export class ReleaseExecution3Service {
 		}
 
 		return roots;
+	}
+
+	private async cancelPendingExecutions(releaseId: string) {
+		const pendingStatuses = [
+			ReleaseExecutionStatus.NEW,
+			ReleaseExecutionStatus.PROCESSING,
+			ReleaseExecutionStatus.WAITING_PARTNER,
+			ReleaseExecutionStatus.WAITING_ACTION,
+		];
+
+		const pendingExecutions = await this.executionRepo.find({
+			where: { releaseId, status: In(pendingStatuses) },
+			select: ['id'],
+		});
+
+		if (pendingExecutions.length === 0) return;
+
+		const executionIds = pendingExecutions.map((e) => e.id);
+
+		await this.executionRepo
+			.createQueryBuilder()
+			.update()
+			.set({
+				status: ReleaseExecutionStatus.CANCELLED,
+				completedAt: new Date(),
+			})
+			.where('id IN (:...ids)', { ids: executionIds })
+			.execute();
+
+		await this.releaseExecutionStep3Repo
+			.createQueryBuilder()
+			.update()
+			.set({
+				status: ReleaseExecutionStepStatus.CANCELLED,
+				completedAt: new Date(),
+			})
+			.where('release_execution_id IN (:...ids)', { ids: executionIds })
+			.andWhere('status IN (:...stepStatuses)', {
+				stepStatuses: [
+					ReleaseExecutionStepStatus.NEW,
+					ReleaseExecutionStepStatus.WAITING_ACTION,
+				],
+			})
+			.execute();
+
+		await this.manager
+			.createQueryBuilder()
+			.update(CiDistributionJob3)
+			.set({
+				status: CiJobStatus3.SKIPPED,
+				note: 'Job execution cha bị huỷ do được execute lại',
+			})
+			.where('release_execution_id IN (:...ids)', { ids: executionIds })
+			.andWhere('status IN (:...jobStatuses)', {
+				jobStatuses: [
+					CiJobStatus3.PENDING,
+					CiJobStatus3.PROCESSING,
+					CiJobStatus3.COMPLETED,
+				],
+			})
+			.execute();
 	}
 }

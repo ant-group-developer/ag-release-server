@@ -341,6 +341,26 @@ export class BucketService2 {
 		};
 	}
 
+	async streamFileToPath({
+		fileId,
+		destPath,
+	}: {
+		fileId: string;
+		destPath: string;
+	}): Promise<FileEntity> {
+		const fileDb = await this.bucketFileService.findOne(fileId);
+
+		const stream = await this.bucketR2Service.getObjectStream({
+			bucketName: fileDb.bucket,
+			key: fileDb.key,
+		});
+
+		const writeStream = fs.createWriteStream(destPath);
+		await pipeline(stream, writeStream);
+
+		return fileDb;
+	}
+
 	// update
 	async update({
 		fileId,

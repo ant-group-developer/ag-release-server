@@ -447,7 +447,6 @@ export class ReleaseExecution3Worker {
 				message: `[WAITING_ADMIN_EXPORT] ${err.message}`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
-
 			});
 			return ReleaseExecutionStepStatus.FAILED;
 		}
@@ -499,7 +498,14 @@ export class ReleaseExecution3Worker {
 
 				step.metadata = {
 					...step.metadata,
-					output: { jobCreated: true },
+					input: {
+						...step.metadata?.input,
+						deliveryEmail,
+						deliveryEmailSubject,
+					},
+					output: {
+						jobCreated: true,
+					},
 				};
 				await this.manager.save(ReleaseExecutionStep3, step);
 			}

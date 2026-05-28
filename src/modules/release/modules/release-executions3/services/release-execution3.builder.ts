@@ -3,7 +3,6 @@ import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { EntityManager, Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
@@ -19,7 +18,7 @@ export class ReleaseExecution3Builder {
 
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
-	) {}
+	) { }
 
 	async buildStepsChild({
 		step: STEP,
@@ -27,9 +26,8 @@ export class ReleaseExecution3Builder {
 	}: {
 		step?: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
-	})
-	// : Promise<ReleaseExecutionStep3[]> 
-	{
+	}) {
+		// : Promise<ReleaseExecutionStep3[]>
 		const { releaseSnapshot } = releaseExecution.metadata.input;
 		const stepResult: Partial<ReleaseExecutionStep3>[] = [];
 
@@ -188,7 +186,11 @@ export class ReleaseExecution3Builder {
 								},
 							},
 						},
-						{ type: ReleaseExecutionStepType.EXPORT_CI, order: 2, childExecutionMode: 'parallel' },
+						{
+							type: ReleaseExecutionStepType.EXPORT_CI,
+							order: 2,
+							childExecutionMode: 'parallel',
+						},
 					);
 				}
 
