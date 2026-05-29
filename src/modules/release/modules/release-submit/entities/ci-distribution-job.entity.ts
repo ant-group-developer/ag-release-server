@@ -68,6 +68,20 @@ export class CiDistributionJob extends BaseUUIDEntity {
 	@Column({ name: 'sent_at', type: 'timestamptz', nullable: true })
 	sentAt: Date | null;
 
+	@Column({
+		name: 'ci_tool_next_check_at',
+		type: 'timestamptz',
+		nullable: true,
+	})
+	nextCiToolCheckAt?: Date | null;
+
+	@Column({
+		name: 'ci_tool_job_id',
+		type: 'varchar',
+		nullable: true
+	})
+	ciToolJobId?: string | null;
+
 	/** Tên step gốc để hiển thị, ví dụ: "Process Agg Ci.sendEmailToState" */
 	@Column({ name: 'step_label', type: 'varchar', nullable: true })
 	stepLabel: string | null;

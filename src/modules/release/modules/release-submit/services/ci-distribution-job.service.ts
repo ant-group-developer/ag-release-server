@@ -6,7 +6,7 @@ import {
 	forwardRef,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { SchedulerRegistry } from '@nestjs/schedule';
+import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
 import * as fs from 'fs';
@@ -18,7 +18,7 @@ import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.s
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { CiDistributionJobException } from '../constants/ci-distribution-job.constant';
 import {
 	QueryGetListCiJobDto,
@@ -31,6 +31,7 @@ import {
 	CiJobType,
 } from '../entities/ci-distribution-job.entity';
 import { ReleaseSubmitService2 } from './release-submit2.service';
+import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
 
 @Injectable()
 export class CiDistributionJobService implements OnModuleInit {
@@ -49,7 +50,9 @@ export class CiDistributionJobService implements OnModuleInit {
 		private readonly notificationResendService: NotificationResendService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly appConfigService: AppConfigService,
-	) {}
+
+		private readonly ciToolService: CiToolService
+	) { }
 
 	onModuleInit() {
 		this.registerDailySendCron();
@@ -60,6 +63,7 @@ export class CiDistributionJobService implements OnModuleInit {
 		this.registerDailySendCron();
 	}
 
+	// job gửi mail, tool ci
 	private registerDailySendCron() {
 		const jobName = CiDistributionJobService.CRON_JOB_NAME;
 
@@ -265,6 +269,7 @@ export class CiDistributionJobService implements OnModuleInit {
 	 * Gọi sau mỗi lần complete job.
 	 * Output để lưu vào metadata step nếu có
 	 */
+
 	private async checkAndResumeStep(
 		stepId: string,
 		releaseSubmitId: string,
@@ -608,30 +613,178 @@ export class CiDistributionJobService implements OnModuleInit {
 	// CRON — Tự động gửi email cuối ngày
 	// ==========================================
 
-	/** Chạy theo lịch config partners.ci.dailySendCron — chỉ gửi type email_state51 */
+	/** Chạy theo lịch config partners.ci.dailySendCron */
 	async handleDailySend() {
 		this.logger.log('[CRON] Daily CI distribution job batch');
+
 		try {
-			const pendingEmailJobs = await this.repo.find({
+			const pendingJobs = await this.repo.find({
 				where: {
-					type: CiJobType.EMAIL_STATE51,
 					status: CiJobStatus.PENDING,
+					type: In([
+						CiJobType.EMAIL_STATE51,
+						CiJobType.ADMIN_EXPORT,
+					]),
 				},
-				order: { createdAt: 'ASC' },
+				order: {
+					createdAt: 'ASC',
+				},
 			});
 
-			if (pendingEmailJobs.length === 0) {
-				this.logger.log('[CRON] No pending email_state51 jobs');
+			if (!pendingJobs.length) {
+				this.logger.log('[CRON] No pending jobs');
 				return;
 			}
 
-			const ids = pendingEmailJobs.map((j) => j.id);
-			const result = await this.autoSendEmail(ids);
+			const emailJobIds = pendingJobs
+				.filter((j) => j.type === CiJobType.EMAIL_STATE51)
+				.map((j) => j.id);
+
+			const adminExportJobIds = pendingJobs
+				.filter((j) => j.type === CiJobType.ADMIN_EXPORT)
+				.map((j) => j.id);
+
+			const result: any = {
+				email: { sent: 0, resumed: 0 },
+				ciTool: { sentToCi: 0, resumed: 0 },
+			};
+
+			if (emailJobIds.length) {
+				result.email = await this.autoSendEmail(emailJobIds);
+			}
+
+			if (adminExportJobIds.length) {
+				result.ciTool = await this.sendExportToCi(adminExportJobIds);
+			}
+
 			this.logger.log(
 				`[CRON] Daily batch result: ${JSON.stringify(result)}`,
 			);
 		} catch (err) {
-			this.logger.error(`[CRON] Daily batch failed: ${err.message}`);
+			this.logger.error(
+				`[CRON] Daily batch failed: ${err.message}`,
+				err.stack,
+			);
+		}
+	}
+
+	/**
+	 * Cron check CI Tool job status.
+	 * Chạy mỗi phút, nhưng chỉ check job nào đã tới nextCiToolCheckAt.
+	 */
+	@Cron('* * * * *')
+	async handleCheckCiToolJobStatus() {
+		await this.checkCiToolJobStatus();
+	}
+
+	private async checkCiToolJobStatus() {
+		const jobs = await this.repo.find({
+			where: {
+				type: CiJobType.ADMIN_EXPORT,
+				status: CiJobStatus.PROCESSING,
+				nextCiToolCheckAt: LessThanOrEqual(new Date()),
+			},
+			order: {
+				createdAt: 'ASC',
+			},
+		});
+
+		if (!jobs.length) return;
+
+		const groups = new Map<string, CiDistributionJob[]>();
+
+		for (const job of jobs) {
+			if (!job.ciToolJobId) continue;
+
+			if (!groups.has(job.ciToolJobId)) {
+				groups.set(job.ciToolJobId, []);
+			}
+
+			groups.get(job.ciToolJobId)!.push(job);
+		}
+
+		for (const [ciToolJobId, groupJobs] of groups) {
+			try {
+				const ciStatusResult =
+					await this.ciToolService.getExportJobStatus(ciToolJobId);
+
+				const status = ciStatusResult?.job?.status;
+
+				if (status === 'completed') {
+					await this.repo.update(
+						{ id: In(groupJobs.map((j) => j.id)) },
+						{
+							status: CiJobStatus.COMPLETED,
+							sentAt: new Date(),
+							nextCiToolCheckAt: null,
+						},
+					);
+
+					const stepIds = [...new Set(groupJobs.map((j) => j.stepId))];
+
+					let totalResumed = 0;
+
+					for (const stepId of stepIds) {
+						const job = groupJobs.find((j) => j.stepId === stepId)!;
+
+						const resumed = await this.checkAndResumeStep(
+							stepId,
+							job.releaseSubmitId,
+							{
+								ciToolJobId,
+								ciToolResult: ciStatusResult,
+							},
+						);
+
+						if (resumed) totalResumed++;
+					}
+
+					this.logger.log(
+						`[CiTool] Job completed: ${ciToolJobId}, resumed=${totalResumed}`,
+					);
+
+					continue;
+				}
+
+				if (status === 'failed') {
+					await this.repo.update(
+						{ id: In(groupJobs.map((j) => j.id)) },
+						{
+							status: CiJobStatus.FAILED,
+							note:
+								ciStatusResult?.job?.message ||
+								'CI Tool job failed',
+							nextCiToolCheckAt: null,
+						},
+					);
+
+					this.logger.error(`[CiTool] Job failed: ${ciToolJobId}`);
+					continue;
+				}
+
+				await this.repo.update(
+					{ id: In(groupJobs.map((j) => j.id)) },
+					{
+						nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+					},
+				);
+
+				this.logger.log(
+					`[CiTool] Job still processing: ${ciToolJobId}, status=${status}`,
+				);
+			} catch (err) {
+				await this.repo.update(
+					{ id: In(groupJobs.map((j) => j.id)) },
+					{
+						nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+					},
+				);
+
+				this.logger.error(
+					`[CiTool] Check job status failed: ${ciToolJobId} - ${err.message}`,
+					err.stack,
+				);
+			}
 		}
 	}
 
@@ -665,5 +818,77 @@ export class CiDistributionJobService implements OnModuleInit {
 		await this.repo.update(job.id, updateData);
 
 		return this.findOne(id);
+	}
+
+	async sendExportToCi(ids: string[]) {
+		if (!ids?.length) throw CiDistributionJobException.NO_IDS_PROVIDED();
+
+		const jobs = await this.repo.find({
+			where: { id: In(ids) },
+			order: { createdAt: 'ASC' },
+		});
+
+		if (!jobs.length) throw CiDistributionJobException.JOBS_NOT_FOUND();
+
+		const invalidType = jobs.filter((j) => j.type !== CiJobType.ADMIN_EXPORT);
+		if (invalidType.length) {
+			throw CiDistributionJobException.INVALID_TYPE_ADMIN_EXPORT(
+				invalidType.map((j) => j.id),
+			);
+		}
+
+		const invalidStatus = jobs.filter(
+			(j) => ![CiJobStatus.PENDING, CiJobStatus.PROCESSING].includes(j.status),
+		);
+		if (invalidStatus.length) {
+			throw CiDistributionJobException.INVALID_STATUS(
+				'sendExportToCi',
+				['pending', 'processing'],
+				invalidStatus.map((j) => ({ id: j.id, status: j.status })),
+			);
+		}
+
+		const excelData = jobs.map((j) => ({
+			upc: j.upc,
+			listCodeDspCi: j.dspCiCodes,
+		}));
+
+		const buffer = await this.fileExportCiService.createFileExportCi({ data: excelData });
+
+		const dateStr = new Date().toISOString().slice(0, 10);
+		const fileName = `CI_Export_${dateStr}_${Date.now()}.xlsx`;
+
+		// Mark PROCESSING trước khi gọi CI Tool
+		await this.repo.update(
+			{ id: In(ids) },
+			{ status: CiJobStatus.PROCESSING },
+		);
+
+		const ciResult = await this.ciToolService.sendFileExportToCi({
+			buffer,
+			originalname: fileName,
+			mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		});
+
+		const ciToolJobId = ciResult?.jobId; // ← tuỳ shape response của ciToolService
+		if (!ciToolJobId) {
+			this.logger.error('[sendExportToCi] CI Tool did not return a jobId');
+			throw new Error('CI Tool did not return a jobId');
+		}
+
+		// Lưu ciToolJobId + lên lịch check sau 5 phút
+		await this.repo.update(
+			{ id: In(ids) },
+			{
+				ciToolJobId,
+				nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+			},
+		);
+
+		this.logger.log(
+			`[sendExportToCi] Sent ${jobs.length} jobs to CI Tool, ciToolJobId=${ciToolJobId}`,
+		);
+
+		return { sentToCi: jobs.length, ciToolJobId };
 	}
 }

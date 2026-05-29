@@ -68,6 +68,20 @@ export class CiDistributionJob3 extends BaseUUIDEntity {
 	@Column({ name: 'sent_at', type: 'timestamptz', nullable: true })
 	sentAt: Date | null;
 
+	@Column({
+		name: 'ci_tool_next_check_at',
+		type: 'timestamptz',
+		nullable: true,
+	})
+	nextCiToolCheckAt: Date | null;
+
+	@Column({
+		name: 'ci_tool_job_id',
+		nullable: true,
+		type: 'varchar'
+	})
+	ciToolJobId: string | null;
+
 	@Column({ name: 'step_label', type: 'varchar', nullable: true })
 	stepLabel: string | null;
 }

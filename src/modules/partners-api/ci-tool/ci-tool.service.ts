@@ -7,6 +7,22 @@ import FormData from 'form-data';
 export class CiToolService {
     constructor(private readonly httpService: HttpService) { }
 
+    async getTokenCi(): Promise<string> {
+        const { data } = await firstValueFrom(
+            this.httpService.post(
+                `${process.env.CI_TOOL_URL}/api/openimp/token`,
+                {},
+                {
+                    headers: {
+                        'x-api-key': process.env.CI_TOOL_API_KEY,
+                    },
+                },
+            ),
+        );
+
+        return data.token;
+    }
+
     async sendFileExportToCi(file: {
         buffer: Buffer;
         originalname: string;
@@ -30,6 +46,21 @@ export class CiToolService {
                     },
                     maxBodyLength: Infinity,
                     maxContentLength: Infinity,
+                },
+            ),
+        );
+
+        return data;
+    }
+
+    async getExportJobStatus(jobId: string) {
+        const { data } = await firstValueFrom(
+            this.httpService.get(
+                `${process.env.CI_TOOL_URL}/api/export/job/${jobId}`,
+                {
+                    headers: {
+                        'x-api-key': process.env.CI_TOOL_API_KEY,
+                    },
                 },
             ),
         );

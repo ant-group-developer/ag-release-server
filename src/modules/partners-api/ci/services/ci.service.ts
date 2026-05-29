@@ -18,12 +18,13 @@ export interface CiDspStatus {
 export class CiService {
 	private readonly logger = new Logger(CiService.name);
 
-	constructor(private readonly appConfigService: AppConfigService) {}
+	constructor(private readonly appConfigService: AppConfigService) { }
 
 	private get client(): AxiosInstance {
 		const baseUrl = this.appConfigService.getValue<string>(
 			'config.partners.ci.baseUrl',
 		);
+
 		const token = this.appConfigService.getValue<string>(
 			'config.partners.ci.token',
 		);

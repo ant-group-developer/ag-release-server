@@ -131,8 +131,8 @@ export class QueryGetListCiJobDto extends BaseQueryDto2 {
 	@Transform(({ value }) =>
 		value
 			? String(value)
-					.split(',')
-					.map((v) => v.trim())
+				.split(',')
+				.map((v) => v.trim())
 			: [],
 	)
 	@IsArray()

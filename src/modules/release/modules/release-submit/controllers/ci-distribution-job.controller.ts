@@ -76,6 +76,12 @@ export class CiDistributionJobController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('send-export-to-ci')
+	async sendExportToCi(@Body() body: BatchActionCiJobDto) {
+		const result = await this.jobService.sendExportToCi(body.ids);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Post('daily-send')
 	async handleDailySend() {
 		await this.jobService.handleDailySend();
