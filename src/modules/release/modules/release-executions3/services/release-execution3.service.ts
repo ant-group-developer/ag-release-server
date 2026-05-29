@@ -56,139 +56,49 @@ export class ReleaseExecution3Service {
 			throw new Error('Only FAILED step can be retried');
 		}
 
-		const siblings = await this.stepRepo.find({
-			where: { parentStepId: step.parentStepId ?? IsNull() },
-			order: { order: 'ASC' },
-		});
-
-		// 1. Reset bản thân step FAILED + toàn bộ cây con
-		await this.engine.resetStepAndChildren(step);
-
-		// 2. Reset các sibling phía sau về NEW (cùng cha)
-		await this.engine.setRemaining(
-			step,
-			siblings,
-			ReleaseExecutionStepStatus.NEW,
-		);
-
-		// 3. Leo lên reset tất cả ancestor bị FAILED do propagate,
-		//    đồng thời reset các sibling của ancestor phía sau nó
-		await this.resetAncestors(step);
+		// cập nhật lại trạng thái của nó là new, gọi lại full luồng engine sẽ tự xử lý lại
 
 		await this.runPipeline(step.releaseExecutionId);
 	}
 
-	// Leo lên từng ancestor của step được retry:
-	// - Reset status của ancestor về NEW (không động vào con — đã xử lý ở bước trên)
-	// - Reset các sibling phía sau ancestor + toàn bộ cây con của chúng về NEW
-	private async resetAncestors(step: ReleaseExecutionStep3): Promise<void> {
-		let currentParentId = step.parentStepId;
-
-		while (currentParentId) {
-			const parent = await this.stepRepo.findOne({
-				where: { id: currentParentId },
-				relations: { parentStep: true }, // cần để setRemaining check childExecutionMode của ông
-			});
-
-			if (!parent) break;
-
-			// Chỉ reset status của chính ancestor, không reset con (con đã được xử lý ở trên)
-			await this.stepRepo.update(parent.id, {
-				status: ReleaseExecutionStepStatus.NEW,
-				completedAt: null,
-			});
-			parent.status = ReleaseExecutionStepStatus.NEW;
-
-			// Reset các sibling của ancestor phía sau nó + toàn bộ cây con của chúng
-			const parentSiblings = await this.stepRepo.find({
-				where: { parentStepId: parent.parentStepId ?? IsNull() },
-				order: { order: 'ASC' },
-			});
-
-			await this.engine.setRemaining(
-				parent,
-				parentSiblings,
-				ReleaseExecutionStepStatus.NEW,
-			);
-
-			currentParentId = parent.parentStepId;
-		}
-	}
-
 	// Được gọi từ bên ngoài (vd: CiJob bị user skip) để đánh dấu step là FAILED
-	// và propagate failure lên/xuống mà không re-run bất kỳ step nào
 	async failStep(stepId: string): Promise<void> {
-		console.log(
-			stepId,
-			'[ReleaseExecution3Service] Marking step as FAILED due to job skipped by user',
-		);
 
-		const step = await this.stepRepo.findOne({
-			where: { id: stepId },
-		});
-
-		if (!step) throw new Error('Step not found');
-
-		// 1. Set bản thân step về FAILED
-		await this.stepRepo.update(step.id, {
-			status: ReleaseExecutionStepStatus.FAILED,
-			completedAt: new Date(),
-		});
-		step.status = ReleaseExecutionStepStatus.FAILED;
-
-		// 2. Set các sibling phía sau (cùng cha) về FAILED + toàn bộ cây con của chúng
-		const siblings = await this.stepRepo.find({
-			where: { parentStepId: step.parentStepId ?? IsNull() },
-			order: { order: 'ASC' },
-		});
-		await this.engine.setRemaining(
-			step,
-			siblings,
-			ReleaseExecutionStepStatus.FAILED,
-		);
-
-		// 3. Leo ngược lên derive đúng status tất cả ancestor từ children thực tế trong DB
-		//    (không re-run, chỉ tính lại status cha)
-		await this.engine.propagateStatusUp(step);
-
-		// 4. Cập nhật execution status
-		const execution = await this.findOne(step.releaseExecutionId);
-		await this.refreshExecutionStatus(execution);
 	}
 
-	// @Cron('* * * * * *') // 1s
-	// @Cron('*/10 * * * * *') // 10s
-	// @Cron('*/3 * * * *') // 3 phut
-	@Cron('* * * * *') // mỗi 1 phút
-	async resumeWaitingSteps(): Promise<void> {
-		const now = new Date();
+	// // @Cron('* * * * * *') // 1s
+	// // @Cron('*/10 * * * * *') // 10s
+	// // @Cron('*/3 * * * *') // 3 phut
+	// @Cron('* * * * *') // mỗi 1 phút
+	// async resumeWaitingSteps(): Promise<void> {
+	// 	const now = new Date();
 
-		const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
-			where: {
-				status: ReleaseExecutionStepStatus.WAITING_PARTNER,
-			},
-		});
+	// 	const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
+	// 		where: {
+	// 			status: ReleaseExecutionStepStatus.WAITING_PARTNER,
+	// 		},
+	// 	});
 
-		// Group theo executionId, chỉ resume 1 lần mỗi execution
-		const executionIds = [
-			...new Set(
-				waitingSteps
-					.filter((step) => {
-						const scheduledAt = step.metadata?.scheduledAt;
-						return scheduledAt && new Date(scheduledAt) <= now;
-					})
-					.map((step) => step.releaseExecutionId),
-			),
-		];
+	// 	// Group theo executionId, chỉ resume 1 lần mỗi execution
+	// 	const executionIds = [
+	// 		...new Set(
+	// 			waitingSteps
+	// 				.filter((step) => {
+	// 					const scheduledAt = step.metadata?.scheduledAt;
+	// 					return scheduledAt && new Date(scheduledAt) <= now;
+	// 				})
+	// 				.map((step) => step.releaseExecutionId),
+	// 		),
+	// 	];
 
-		console.log(
-			`[ReleaseExecution3Service] Found ${waitingSteps.length} waiting steps, ${executionIds.length} executions to resume`,
-		); // log thêm
+	// 	console.log(
+	// 		`[ReleaseExecution3Service] Found ${waitingSteps.length} waiting steps, ${executionIds.length} executions to resume`,
+	// 	); // log thêm
 
-		for (const executionId of executionIds) {
-			await this.runPipeline(executionId);
-		}
-	}
+	// 	for (const executionId of executionIds) {
+	// 		await this.runPipeline(executionId);
+	// 	}
+	// }
 
 	async resumeFromWaiting(stepId: string): Promise<void> {
 		const step = await this.releaseExecutionStep3Repo.findOne({
@@ -229,11 +139,6 @@ export class ReleaseExecution3Service {
 			completedAt: new Date(),
 		});
 
-		// Vì processStep giờ skip WAITING_ACTION, parent của step này sẽ không được
-		// engine tự derive status → phải leo ngược cập nhật trước khi chạy lại pipeline
-		step.status = ReleaseExecutionStepStatus.DONE;
-		await this.engine.propagateStatusUp(step);
-
 		await this.runPipeline(step.releaseExecutionId);
 	}
 
@@ -259,6 +164,7 @@ export class ReleaseExecution3Service {
 		await this.refreshExecutionStatus(execution);
 	}
 
+	// main
 	async startProcessing(id: string): Promise<void> {
 		const execution = await this.findOne(id);
 
