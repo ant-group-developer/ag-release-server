@@ -51,7 +51,7 @@ export class ReleaseExecution3Worker {
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
-	) {}
+	) { }
 
 	async dispatchStepTask(
 		context: StepTaskContext,
@@ -579,8 +579,8 @@ export class ReleaseExecution3Worker {
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
-						where: { id: step.parentStepId },
-					})
+					where: { id: step.parentStepId },
+				})
 				: null;
 
 			let dspCode: string | undefined;
@@ -917,8 +917,8 @@ export class ReleaseExecution3Worker {
 			const dsps =
 				ciCodes.length > 0
 					? await this.manager.find(Dsp, {
-							where: { codeCi: In(ciCodes) },
-						})
+						where: { codeCi: In(ciCodes) },
+					})
 					: [];
 
 			const ciToSystem = new Map(

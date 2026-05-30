@@ -29,8 +29,8 @@ import {
 import { CiDistributionJob3Service } from '../services/ci-distribution-job3.service';
 
 @ApiTags('CI Distribution Jobs V3')
-@Controller('ci-distribution-jobs3')
-// @Controller('ci-distribution-jobs')
+// @Controller('ci-distribution-jobs3')
+@Controller('ci-distribution-jobs')
 export class CiDistributionJob3Controller {
 	constructor(private readonly jobService: CiDistributionJob3Service) { }
 

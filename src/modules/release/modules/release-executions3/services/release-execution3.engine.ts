@@ -25,18 +25,18 @@ export class ReleaseExecutionStepEngine {
 		step: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
 	}): Promise<ReleaseExecutionStepStatus> {
-		// 👇 Skip nếu đã hoàn thành
+		// Skip nếu đã hoàn thành
 		if (STEP.status === ReleaseExecutionStepStatus.DONE) {
 			return ReleaseExecutionStepStatus.DONE;
 		}
 
-		// 👇 Skip nếu đang chờ user action — không re-trigger để tránh duplicate job
+		// Skip nếu đang chờ user action — không re-trigger để tránh duplicate job
 		// (WAITING_PARTNER không skip vì cron cần re-process để kiểm tra timer)
 		if (STEP.status === ReleaseExecutionStepStatus.WAITING_ACTION) {
 			return ReleaseExecutionStepStatus.WAITING_ACTION;
 		}
 
-		// // 👇 Skip nếu đang chờ và chưa đến giờ resume
+		// Skip nếu đang chờ và chưa đến giờ resume
 		// if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
 		// 	const scheduledAt = STEP.metadata?.scheduledAt;
 		// 	if (scheduledAt && new Date(scheduledAt) > new Date()) {
@@ -73,14 +73,8 @@ export class ReleaseExecutionStepEngine {
 					releaseExecution,
 				});
 
-				// check xem có cần dừng hay ko, nếu có thì udpate những thằng step con còn lại, xử lí status cha
+				// check xem có cần dừng hay ko, xử lí status cha
 				if (this.shouldStopSequential(childStatus)) {
-					await this.setRemaining(
-						childStep,
-						STEP.childSteps,
-						childStatus,
-					);
-
 					return this.resolveStatusByChild_AndUpdateDb(STEP);
 				}
 			}
@@ -192,84 +186,84 @@ export class ReleaseExecutionStepEngine {
 		return ReleaseExecutionStepStatus.NEW;
 	}
 
-	async setRemaining(
-		currentStep: ReleaseExecutionStep3,
-		allSiblings: ReleaseExecutionStep3[],
-		targetStatus: ReleaseExecutionStepStatus,
-	): Promise<void> {
-		const currentIndex = allSiblings.findIndex(
-			(sibling) => sibling.id === currentStep.id,
-		);
+	// async setRemaining(
+	// 	currentStep: ReleaseExecutionStep3,
+	// 	allSiblings: ReleaseExecutionStep3[],
+	// 	targetStatus: ReleaseExecutionStepStatus,
+	// ): Promise<void> {
+	// 	const currentIndex = allSiblings.findIndex(
+	// 		(sibling) => sibling.id === currentStep.id,
+	// 	);
 
-		// Step hiện tại không nằm trong danh sách sibling → bỏ qua
-		if (currentIndex === -1) return;
+	// 	// Step hiện tại không nằm trong danh sách sibling → bỏ qua
+	// 	if (currentIndex === -1) return;
 
-		// Chỉ cancel các step phía sau nếu parent chạy sequential.
-		// Parallel mode: các sibling độc lập nhau, 1 thằng fail không ảnh hưởng thằng khác.
-		const parentExecutionMode =
-			currentStep.parentStep?.childExecutionMode ?? 'sequential';
+	// 	// Chỉ cancel các step phía sau nếu parent chạy sequential.
+	// 	// Parallel mode: các sibling độc lập nhau, 1 thằng fail không ảnh hưởng thằng khác.
+	// 	const parentExecutionMode =
+	// 		currentStep.parentStep?.childExecutionMode ?? 'sequential';
 
-		if (parentExecutionMode !== 'sequential') return;
+	// 	if (parentExecutionMode !== 'sequential') return;
 
-		const remainingSteps = allSiblings.slice(currentIndex + 1);
+	// 	const remainingSteps = allSiblings.slice(currentIndex + 1);
 
-		// Cập nhật status cho tất cả step phía sau và toàn bộ cây con của chúng
-		for (const sibling of remainingSteps) {
-			await this.setStepAndChildrenStatus(sibling, targetStatus);
-		}
-	}
+	// 	// Cập nhật status cho tất cả step phía sau và toàn bộ cây con của chúng
+	// 	for (const sibling of remainingSteps) {
+	// 		await this.setStepAndChildrenStatus(sibling, targetStatus);
+	// 	}
+	// }
 
-	// Đệ quy cập nhật status cho step hiện tại và toàn bộ step con
-	private async setStepAndChildrenStatus(
-		step: ReleaseExecutionStep3,
-		targetStatus: ReleaseExecutionStepStatus,
-	): Promise<void> {
-		if (this.canOverrideStatus(step.status, targetStatus)) {
-			step.status = targetStatus;
-			step.completedAt =
-				targetStatus === ReleaseExecutionStepStatus.NEW
-					? null // reset completedAt khi retry
-					: new Date();
+	// // Đệ quy cập nhật status cho step hiện tại và toàn bộ step con
+	// private async setStepAndChildrenStatus(
+	// 	step: ReleaseExecutionStep3,
+	// 	targetStatus: ReleaseExecutionStepStatus,
+	// ): Promise<void> {
+	// 	if (this.canOverrideStatus(step.status, targetStatus)) {
+	// 		step.status = targetStatus;
+	// 		step.completedAt =
+	// 			targetStatus === ReleaseExecutionStepStatus.NEW
+	// 				? null // reset completedAt khi retry
+	// 				: new Date();
 
-			// Khi retry (reset về NEW): clear output để worker chạy lại từ đầu.
-			// Giữ input nguyên để worker vẫn có đủ dữ liệu.
-			if (
-				targetStatus === ReleaseExecutionStepStatus.NEW &&
-				step.metadata?.output
-			) {
-				step.metadata = { ...step.metadata, output: null };
-			}
-		}
+	// 		// Khi retry (reset về NEW): clear output để worker chạy lại từ đầu.
+	// 		// Giữ input nguyên để worker vẫn có đủ dữ liệu.
+	// 		if (
+	// 			targetStatus === ReleaseExecutionStepStatus.NEW &&
+	// 			step.metadata?.output
+	// 		) {
+	// 			step.metadata = { ...step.metadata, output: null };
+	// 		}
+	// 	}
 
-		if (step.childSteps?.length) {
-			for (const child of step.childSteps) {
-				await this.setStepAndChildrenStatus(child, targetStatus);
-			}
-		}
+	// 	if (step.childSteps?.length) {
+	// 		for (const child of step.childSteps) {
+	// 			await this.setStepAndChildrenStatus(child, targetStatus);
+	// 		}
+	// 	}
 
-		await this.stepRepo.save(step);
-	}
+	// 	await this.stepRepo.save(step);
+	// }
 
-	// Kiểm tra step có được phép override status hay không
-	private canOverrideStatus(
-		status: ReleaseExecutionStepStatus,
-		targetStatus?: ReleaseExecutionStepStatus,
-	): boolean {
-		// Khi reset về NEW (retry): cho phép override cả FAILED
-		if (targetStatus === ReleaseExecutionStepStatus.NEW) {
-			return [
-				ReleaseExecutionStepStatus.NEW,
-				ReleaseExecutionStepStatus.PROCESSING,
-				ReleaseExecutionStepStatus.FAILED,
-			].includes(status);
-		}
+	// // Kiểm tra step có được phép override status hay không
+	// private canOverrideStatus(
+	// 	status: ReleaseExecutionStepStatus,
+	// 	targetStatus?: ReleaseExecutionStepStatus,
+	// ): boolean {
+	// 	// Khi reset về NEW (retry): cho phép override cả FAILED
+	// 	if (targetStatus === ReleaseExecutionStepStatus.NEW) {
+	// 		return [
+	// 			ReleaseExecutionStepStatus.NEW,
+	// 			ReleaseExecutionStepStatus.PROCESSING,
+	// 			ReleaseExecutionStepStatus.FAILED,
+	// 		].includes(status);
+	// 	}
 
-		// Khi cancel: chỉ override NEW và PROCESSING
-		return [
-			ReleaseExecutionStepStatus.NEW,
-			ReleaseExecutionStepStatus.PROCESSING,
-		].includes(status);
-	}
+	// 	// Khi cancel: chỉ override NEW và PROCESSING
+	// 	return [
+	// 		ReleaseExecutionStepStatus.NEW,
+	// 		ReleaseExecutionStepStatus.PROCESSING,
+	// 	].includes(status);
+	// }
 
 	// lưu vào db
 	private async updateStepStatus(
@@ -298,12 +292,12 @@ export class ReleaseExecutionStepEngine {
 	}
 
 	// Trong ReleaseExecutionStepEngine
-	async resetStepAndChildren(step: ReleaseExecutionStep3): Promise<void> {
-		await this.setStepAndChildrenStatus(
-			step,
-			ReleaseExecutionStepStatus.NEW,
-		);
-	}
+	// async resetStepAndChildren(step: ReleaseExecutionStep3): Promise<void> {
+	// 	await this.setStepAndChildrenStatus(
+	// 		step,
+	// 		ReleaseExecutionStepStatus.NEW,
+	// 	);
+	// }
 
 	// Leo ngược từ step lên root: tại mỗi ancestor load children từ DB,
 	// derive status bằng resolveStatusByChild (giống engine) rồi lưu DB.

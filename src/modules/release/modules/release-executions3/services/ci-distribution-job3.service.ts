@@ -61,7 +61,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	}
 
 	// ==========================================
-	// Cron
+	// Cron: hẹn lịch gửi
 	// ==========================================
 
 	private registerDailySendCron() {
