@@ -18,6 +18,102 @@ export class ReleaseExecutionStepEngine {
 	// main
 
 	// xử lí toàn bộ thằng con rồi mới xử lí chính nó
+	// async processStep({
+	// 	step: STEP,
+	// 	releaseExecution,
+	// }: {
+	// 	step: ReleaseExecutionStep3;
+	// 	releaseExecution: ReleaseExecution3;
+	// }): Promise<ReleaseExecutionStepStatus> {
+	// 	// Skip nếu đã hoàn thành
+	// 	if (STEP.status === ReleaseExecutionStepStatus.DONE) {
+	// 		return ReleaseExecutionStepStatus.DONE;
+	// 	}
+
+	// 	// Skip nếu đang chờ user action — không re-trigger để tránh duplicate job
+	// 	// (WAITING_PARTNER không skip vì cron cần re-process để kiểm tra timer)
+	// 	if (STEP.status === ReleaseExecutionStepStatus.WAITING_ACTION) {
+	// 		return ReleaseExecutionStepStatus.WAITING_ACTION;
+	// 	}
+
+	// 	// Skip nếu đã fail — không re-trigger các step FAILED không được retry tường minh
+	// 	// (step được retry sẽ được reset về NEW trước khi runPipeline, nên sẽ không bị skip)
+	// 	if (STEP.status === ReleaseExecutionStepStatus.FAILED) {
+	// 		return ReleaseExecutionStepStatus.FAILED;
+	// 	}
+
+	// 	// Skip nếu đã bị huỷ
+	// 	if (STEP.status === ReleaseExecutionStepStatus.CANCELLED) {
+	// 		return ReleaseExecutionStepStatus.CANCELLED;
+	// 	}
+
+	// 	// Skip nếu đang chờ và chưa đến giờ resume
+	// 	// if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+	// 	// 	const scheduledAt = STEP.metadata?.scheduledAt;
+	// 	// 	if (scheduledAt && new Date(scheduledAt) > new Date()) {
+	// 	// 		return ReleaseExecutionStepStatus.WAITING_PARTNER;
+	// 	// 	}
+	// 	// 	// Đã đến giờ → tiếp tục chạy bình thường xuống dưới
+	// 	// }
+
+	// 	await this.updateStepStatus(
+	// 		STEP,
+	// 		ReleaseExecutionStepStatus.PROCESSING,
+	// 	);
+
+	// 	if (!STEP.childSteps?.length) {
+	// 		// gọi sang worker để xử lý logic chính của step, lấy về status, lưu db
+	// 		const status = await this.releaseExecution3Worker.dispatchStepTask({
+	// 			step: STEP,
+	// 			releaseExecution,
+	// 		});
+
+	// 		// lưu db
+	// 		await this.updateStepStatus(STEP, status);
+	// 		return status;
+	// 	}
+
+	// 	// xử lý tuần tự, các step trong 1 cha sẽ phụ thuộc vào nhau,
+	// 	// nếu step trước failed thì các step sau sẽ không chạy nữa,
+	// 	// ngược lại nếu step trước done thì mới chạy step sau
+	// 	else if (STEP.childExecutionMode === 'sequential') {
+	// 		for (const childStep of STEP.childSteps) {
+	// 			// gọi đệ quy
+	// 			const childStatus = await this.processStep({
+	// 				step: childStep,
+	// 				releaseExecution,
+	// 			});
+
+	// 			// check xem có cần dừng hay ko, xử lí status cha
+	// 			if (this.shouldStopSequential(childStatus)) {
+	// 				return this.resolveStatusByChild_AndUpdateDb(STEP);
+	// 			}
+	// 		}
+
+	// 		return this.resolveStatusByChild_AndUpdateDb(STEP);
+	// 	}
+
+	// 	// xử lí song song, các step con sẽ không phụ thuộc vào nhau, cùng chạy 1 lúc
+	// 	else if (STEP.childExecutionMode === 'parallel') {
+	// 		// await Promise.allSettled(
+	// 		// 	step.childSteps.map((child) => this.processStep(child)),
+	// 		// );
+
+	// 		for (const child of STEP.childSteps) {
+	// 			await this.processStep({
+	// 				step: child,
+	// 				releaseExecution,
+	// 			});
+	// 		}
+
+	// 		return this.resolveStatusByChild_AndUpdateDb(STEP);
+	// 	}
+
+	// 	throw new Error(
+	// 		`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
+	// 	);
+	// }
+
 	async processStep({
 		step: STEP,
 		releaseExecution,
@@ -25,55 +121,64 @@ export class ReleaseExecutionStepEngine {
 		step: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
 	}): Promise<ReleaseExecutionStepStatus> {
-		// Skip nếu đã hoàn thành
-		if (STEP.status === ReleaseExecutionStepStatus.DONE) {
-			return ReleaseExecutionStepStatus.DONE;
-		}
 
-		// Skip nếu đang chờ user action — không re-trigger để tránh duplicate job
-		// (WAITING_PARTNER không skip vì cron cần re-process để kiểm tra timer)
-		if (STEP.status === ReleaseExecutionStepStatus.WAITING_ACTION) {
-			return ReleaseExecutionStepStatus.WAITING_ACTION;
-		}
+		const hasChildren = !!STEP.childSteps?.length;
 
-		// Skip nếu đang chờ và chưa đến giờ resume
-		// if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
-		// 	const scheduledAt = STEP.metadata?.scheduledAt;
-		// 	if (scheduledAt && new Date(scheduledAt) > new Date()) {
-		// 		return ReleaseExecutionStepStatus.WAITING_PARTNER;
-		// 	}
-		// 	// Đã đến giờ → tiếp tục chạy bình thường xuống dưới
-		// }
+		// ===== STEP LÁ =====
+		if (!hasChildren) {
+			// Skip nếu đã ở trạng thái cuối
+			if (
+				[
+					ReleaseExecutionStepStatus.DONE,
+					ReleaseExecutionStepStatus.FAILED,
+					ReleaseExecutionStepStatus.CANCELLED,
+					ReleaseExecutionStepStatus.WAITING_ACTION,
+				].includes(STEP.status)
+			) {
+				return STEP.status;
+			}
 
-		await this.updateStepStatus(
-			STEP,
-			ReleaseExecutionStepStatus.PROCESSING,
-		);
+			// Skip nếu đang chờ partner và chưa đến giờ
+			if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+				const scheduledAt = STEP.metadata?.scheduledAt;
+				if (scheduledAt && new Date(scheduledAt) > new Date()) {
+					return ReleaseExecutionStepStatus.WAITING_PARTNER;
+				}
+				// Đã đến giờ → chạy tiếp xuống dưới
+			}
 
-		if (!STEP.childSteps?.length) {
-			// gọi sang worker để xử lý logic chính của step, lấy về status, lưu db
+			// Chạy task
+			await this.updateStepStatus(STEP, ReleaseExecutionStepStatus.PROCESSING);
+
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
 				step: STEP,
 				releaseExecution,
 			});
 
-			// lưu db
 			await this.updateStepStatus(STEP, status);
 			return status;
 		}
 
-		// xử lý tuần tự, các step trong 1 cha sẽ phụ thuộc vào nhau,
-		// nếu step trước failed thì các step sau sẽ không chạy nữa,
-		// ngược lại nếu step trước done thì mới chạy step sau
-		else if (STEP.childExecutionMode === 'sequential') {
-			for (const childStep of STEP.childSteps) {
-				// gọi đệ quy
+		// ===== STEP CHA =====
+
+		// Check WAITING_PARTNER trước khi chạy vào children
+		if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+			const scheduledAt = STEP.metadata?.scheduledAt;
+			if (scheduledAt && new Date(scheduledAt) > new Date()) {
+				return ReleaseExecutionStepStatus.WAITING_PARTNER;
+			}
+			// Đã đến giờ → chạy tiếp
+		}
+
+		await this.updateStepStatus(STEP, ReleaseExecutionStepStatus.PROCESSING);
+
+		if (STEP.childExecutionMode === 'sequential') {
+			for (const childStep of STEP.childSteps!) {
 				const childStatus = await this.processStep({
 					step: childStep,
 					releaseExecution,
 				});
 
-				// check xem có cần dừng hay ko, xử lí status cha
 				if (this.shouldStopSequential(childStatus)) {
 					return this.resolveStatusByChild_AndUpdateDb(STEP);
 				}
@@ -82,13 +187,8 @@ export class ReleaseExecutionStepEngine {
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
-		// xử lí song song, các step con sẽ không phụ thuộc vào nhau, cùng chạy 1 lúc
-		else if (STEP.childExecutionMode === 'parallel') {
-			// await Promise.allSettled(
-			// 	step.childSteps.map((child) => this.processStep(child)),
-			// );
-
-			for (const child of STEP.childSteps) {
+		if (STEP.childExecutionMode === 'parallel') {
+			for (const child of STEP.childSteps!) {
 				await this.processStep({
 					step: child,
 					releaseExecution,
@@ -98,9 +198,7 @@ export class ReleaseExecutionStepEngine {
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
-		throw new Error(
-			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
-		);
+		throw new Error(`Unknown childExecutionMode: ${STEP.childExecutionMode}`);
 	}
 
 	// tính toán status cha dựa vào con, lưu db
@@ -122,7 +220,7 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	private resolveStatusByChild(
+	resolveStatusByChild(
 		step: ReleaseExecutionStep3,
 	): ReleaseExecutionStepStatus {
 		const children = step.childSteps || [];
@@ -159,18 +257,11 @@ export class ReleaseExecutionStepEngine {
 
 		// ===== CANCELLED =====
 		if (
-			children.every(
+			children.some(
 				(c) => c.status === ReleaseExecutionStepStatus.CANCELLED,
 			)
 		) {
 			return ReleaseExecutionStepStatus.CANCELLED;
-		}
-
-		// ===== DONE =====
-		if (
-			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
-		) {
-			return ReleaseExecutionStepStatus.DONE;
 		}
 
 		// ===== PROCESSING =====
@@ -181,6 +272,15 @@ export class ReleaseExecutionStepEngine {
 		) {
 			return ReleaseExecutionStepStatus.PROCESSING;
 		}
+
+		// ===== DONE =====
+		if (
+			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+		) {
+			return ReleaseExecutionStepStatus.DONE;
+		}
+
+
 
 		// ===== DEFAULT =====
 		return ReleaseExecutionStepStatus.NEW;
@@ -204,7 +304,7 @@ export class ReleaseExecutionStepEngine {
 		await this.stepRepo.save(step);
 	}
 
-	private isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
+	isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
 		return [
 			ReleaseExecutionStepStatus.DONE,
 			ReleaseExecutionStepStatus.FAILED,

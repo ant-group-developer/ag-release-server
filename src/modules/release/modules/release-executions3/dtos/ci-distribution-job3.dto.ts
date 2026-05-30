@@ -95,8 +95,8 @@ export class UpdateCiJob3Dto {
 		enum: ['skipped'],
 	})
 	@IsOptional()
-	@IsEnum([CiJobStatus3.CANCEL])
-	status?: CiJobStatus3.CANCEL;
+	// @IsEnum([CiJobStatus3.CANCEL])
+	status?: CiJobStatus3.CANCEL = CiJobStatus3.CANCEL;
 
 	@ApiPropertyOptional({ example: 'support@state51.com' })
 	@IsOptional()

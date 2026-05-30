@@ -852,6 +852,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.FAILED;
 		return ReleaseExecutionStepStatus.DONE;
 
 		try {

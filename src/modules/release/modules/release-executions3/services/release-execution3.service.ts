@@ -77,58 +77,11 @@ export class ReleaseExecution3Service {
 		return this.findOne(execution.id);
 	}
 
-	async updateStatusStepAndRerunPipeline({
-		stepId,
-		status,
-	}: {
-		stepId: string;
-		status: ReleaseExecutionStepStatus;
-	}) {
-		const step = await this.stepRepo.findOne({
-			where: { id: stepId },
-			relations: { childSteps: true },
-		});
-
-		if (!step) throw new Error('Step not found');
-
-		await this.stepRepo.update(step.id, {
-			status,
-			completedAt: [
-				ReleaseExecutionStepStatus.DONE,
-				ReleaseExecutionStepStatus.FAILED,
-				ReleaseExecutionStepStatus.SKIPPED,
-				ReleaseExecutionStepStatus.CANCELLED,
-			].includes(status)
-				? new Date()
-				: null,
-		});
-
-		await this.runPipeline(step.releaseExecutionId);
-	}
-
-
-	// chưa handle
-	async retryStep(stepId: string): Promise<void> {
-		await this.updateStatusStepAndRerunPipeline({ stepId, status: ReleaseExecutionStepStatus.NEW })
-	}
-
-	// Được gọi từ bên ngoài (vd: CiJob bị user skip) để đánh dấu step là FAILED
-	async failStep(stepId: string): Promise<void> {
-		console.log(
-			stepId,
-			'[ReleaseExecution3Service] Marking step as FAILED due to job skipped by user',
-		);
-
-		// gọi lại để đồng bộ status cho cả luồng
-		await this.updateStatusStepAndRerunPipeline({ stepId, status: ReleaseExecutionStepStatus.FAILED })
-	}
-
-
 	// lấy ra các bản ghi đang ở WAITING_PARTNER đã tới giờ xử lí, worker sẽ update trạng thái
 	// @Cron('* * * * * *') // 1s
-	// @Cron('*/10 * * * * *') // 10s
+	@Cron('*/10 * * * * *') // 10s
 	// @Cron('*/3 * * * *') // 3 phut
-	@Cron('* * * * *') // mỗi 1 phút
+	// @Cron('* * * * *') // mỗi 1 phút
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
@@ -552,5 +505,227 @@ export class ReleaseExecution3Service {
 				],
 			})
 			.execute();
+	}
+
+	/**
+	 * Traverse lên chain cha và reset tất cả về NEW.
+	 * Reset các cha đang ở các trạng thái "bị block" không thể tự re-process:
+	 * - FAILED / CANCELLED: do retry step con
+	 * - WAITING_ACTION / WAITING_PARTNER: do step con vừa bị fail/skip bởi user
+	 */
+	private async resetAncestorsToNew(
+		step: ReleaseExecutionStep3,
+	): Promise<void> {
+		if (!step.parentStepId) return;
+
+		const parent = await this.stepRepo.findOne({
+			where: { id: step.parentStepId },
+		});
+
+		if (!parent) return;
+
+		const blockingStatuses = [
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.CANCELLED,
+			ReleaseExecutionStepStatus.WAITING_ACTION,
+			ReleaseExecutionStepStatus.WAITING_PARTNER,
+		];
+
+		if (blockingStatuses.includes(parent.status)) {
+			await this.stepRepo.update(parent.id, {
+				status: ReleaseExecutionStepStatus.NEW,
+				startedAt: null,
+				completedAt: null,
+			});
+		}
+
+		// Tiếp tục lên cha tiếp theo
+		await this.resetAncestorsToNew(parent);
+	}
+
+	private async setStepAndChildrenStatusRecursive({
+		step,
+		targetStatus,
+	}: {
+		step: ReleaseExecutionStep3;
+		targetStatus: ReleaseExecutionStepStatus;
+	}): Promise<void> {
+		await this.stepRepo.update(step.id, {
+			status: targetStatus,
+			startedAt:
+				targetStatus === ReleaseExecutionStepStatus.NEW
+					? null
+					: step.startedAt,
+			completedAt: this.getCompletedAtByStatus({
+				status: targetStatus,
+			}),
+			metadata:
+				targetStatus === ReleaseExecutionStepStatus.NEW
+					? {
+						...step.metadata,
+						output: null,
+					}
+					: step.metadata,
+		});
+
+		const children = await this.stepRepo.find({
+			where: {
+				parentStepId: step.id,
+			},
+		});
+
+		for (const child of children) {
+			await this.setStepAndChildrenStatusRecursive({
+				step: child,
+				targetStatus,
+			});
+		}
+	}
+
+	private getCompletedAtByStatus({
+		status,
+	}: {
+		status: ReleaseExecutionStepStatus;
+	}): Date | null {
+		if (status === ReleaseExecutionStepStatus.NEW) {
+			return null;
+		}
+
+		if (
+			[
+				ReleaseExecutionStepStatus.DONE,
+				ReleaseExecutionStepStatus.FAILED,
+				ReleaseExecutionStepStatus.SKIPPED,
+				ReleaseExecutionStepStatus.CANCELLED,
+			].includes(status)
+		) {
+			return new Date();
+		}
+
+		return null;
+	}
+
+	//
+	// async retryStep(stepId: string): Promise<void> {
+	// 	const step = await this.stepRepo.findOne({
+	// 		where: { id: stepId },
+	// 	});
+	// 	if (!step) throw new Error('Step not found');
+	// 	await this.updateStatusStepAndRerunPipeline({
+	// 		stepId,
+	// 		status: ReleaseExecutionStepStatus.NEW,
+	// 	});
+	// }
+
+	// async doneStep(stepId: string): Promise<void> {
+	// 	const step = await this.stepRepo.findOne({
+	// 		where: { id: stepId },
+	// 	});
+
+	// 	if (!step) throw new Error('Step not found');
+
+	// 	await this.stepRepo.update(stepId, {
+	// 		status: ReleaseExecutionStepStatus.DONE,
+	// 		completedAt: new Date(),
+	// 	});
+
+	// 	await this.runPipeline(step.releaseExecutionId);
+	// }
+
+	async retryStep(stepId: string): Promise<void> {
+		const step = await this.stepRepo.findOne({
+			where: { id: stepId },
+		});
+
+		if (!step) throw new Error('Step not found');
+
+		await this.setStepAndChildrenStatusRecursive({
+			step,
+			targetStatus: ReleaseExecutionStepStatus.NEW,
+		});
+
+		// await this.resetAncestorsToNew(step);
+
+		this.runPipeline(step.releaseExecutionId).catch((e) => console.log(e))
+	}
+
+	// async failStep(stepId: string): Promise<void> {
+	// 	const step = await this.stepRepo.findOne({
+	// 		where: { id: stepId },
+	// 	});
+
+	// 	if (!step) throw new Error('Step not found');
+
+	// 	await this.propagateStatusUpward(step);
+	// }
+
+	// async cancelStep(stepId: string): Promise<void> {
+	// 	const step = await this.stepRepo.findOne({
+	// 		where: { id: stepId },
+	// 	});
+	// 	if (!step) throw new Error('Step not found');
+	// 	// 1. Update step và toàn bộ con thành CANCELLED
+	// 	await this.setStepAndChildrenStatusRecursive({
+	// 		step,
+	// 		targetStatus: ReleaseExecutionStepStatus.CANCELLED,
+	// 	});
+	// 	// 2. Propagate lên cha
+	// 	await this.propagateStatusUpward(step);
+	// 	// 3. Refresh execution status tổng
+	// 	const execution = await this.findOne(step.releaseExecutionId);
+	// 	await this.refreshExecutionStatus(execution);
+	// }
+
+	// private async propagateStatusUpward(step: ReleaseExecutionStep3): Promise<void> {
+	// 	if (!step.parentStepId) return;
+	// 	// Lấy tất cả anh em từ DB để tính status cha
+	// 	const siblings = await this.stepRepo.find({
+	// 		where: { parentStepId: step.parentStepId },
+	// 	});
+	// 	const parent = await this.stepRepo.findOne({
+	// 		where: { id: step.parentStepId },
+	// 	});
+
+	// 	if (!parent) return;
+	// 	parent.childSteps = siblings;
+	// 	// Tính lại status cha từ con (dùng lại logic resolveStatusByChild)
+	// 	const newStatus = this.engine.resolveStatusByChild(parent);
+	// 	await this.stepRepo.update(parent.id, {
+	// 		status: newStatus,
+	// 		completedAt: this.engine.isFinalStatus(newStatus) ? new Date() : null,
+	// 	});
+	// 	// Tiếp tục lên cha tiếp theo
+	// 	parent.status = newStatus;
+	// 	await this.propagateStatusUpward(parent);
+	// }
+
+
+	async updateStatusStepAndRerunPipeline({
+		stepId,
+		status,
+	}: {
+		stepId: string;
+		status: ReleaseExecutionStepStatus;
+	}) {
+		const step = await this.stepRepo.findOne({
+			where: { id: stepId },
+			relations: { childSteps: true },
+		});
+
+		if (!step) throw new Error('Step not found');
+
+		await this.stepRepo.update(step.id, {
+			status,
+			completedAt: [
+				ReleaseExecutionStepStatus.DONE,
+				ReleaseExecutionStepStatus.FAILED,
+				ReleaseExecutionStepStatus.SKIPPED,
+				ReleaseExecutionStepStatus.CANCELLED,
+			].includes(status)
+				? new Date()
+				: null,
+		});
+
+		await this.runPipeline(step.releaseExecutionId);
 	}
 }
