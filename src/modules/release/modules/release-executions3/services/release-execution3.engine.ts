@@ -186,85 +186,6 @@ export class ReleaseExecutionStepEngine {
 		return ReleaseExecutionStepStatus.NEW;
 	}
 
-	// async setRemaining(
-	// 	currentStep: ReleaseExecutionStep3,
-	// 	allSiblings: ReleaseExecutionStep3[],
-	// 	targetStatus: ReleaseExecutionStepStatus,
-	// ): Promise<void> {
-	// 	const currentIndex = allSiblings.findIndex(
-	// 		(sibling) => sibling.id === currentStep.id,
-	// 	);
-
-	// 	// Step hiện tại không nằm trong danh sách sibling → bỏ qua
-	// 	if (currentIndex === -1) return;
-
-	// 	// Chỉ cancel các step phía sau nếu parent chạy sequential.
-	// 	// Parallel mode: các sibling độc lập nhau, 1 thằng fail không ảnh hưởng thằng khác.
-	// 	const parentExecutionMode =
-	// 		currentStep.parentStep?.childExecutionMode ?? 'sequential';
-
-	// 	if (parentExecutionMode !== 'sequential') return;
-
-	// 	const remainingSteps = allSiblings.slice(currentIndex + 1);
-
-	// 	// Cập nhật status cho tất cả step phía sau và toàn bộ cây con của chúng
-	// 	for (const sibling of remainingSteps) {
-	// 		await this.setStepAndChildrenStatus(sibling, targetStatus);
-	// 	}
-	// }
-
-	// // Đệ quy cập nhật status cho step hiện tại và toàn bộ step con
-	// private async setStepAndChildrenStatus(
-	// 	step: ReleaseExecutionStep3,
-	// 	targetStatus: ReleaseExecutionStepStatus,
-	// ): Promise<void> {
-	// 	if (this.canOverrideStatus(step.status, targetStatus)) {
-	// 		step.status = targetStatus;
-	// 		step.completedAt =
-	// 			targetStatus === ReleaseExecutionStepStatus.NEW
-	// 				? null // reset completedAt khi retry
-	// 				: new Date();
-
-	// 		// Khi retry (reset về NEW): clear output để worker chạy lại từ đầu.
-	// 		// Giữ input nguyên để worker vẫn có đủ dữ liệu.
-	// 		if (
-	// 			targetStatus === ReleaseExecutionStepStatus.NEW &&
-	// 			step.metadata?.output
-	// 		) {
-	// 			step.metadata = { ...step.metadata, output: null };
-	// 		}
-	// 	}
-
-	// 	if (step.childSteps?.length) {
-	// 		for (const child of step.childSteps) {
-	// 			await this.setStepAndChildrenStatus(child, targetStatus);
-	// 		}
-	// 	}
-
-	// 	await this.stepRepo.save(step);
-	// }
-
-	// // Kiểm tra step có được phép override status hay không
-	// private canOverrideStatus(
-	// 	status: ReleaseExecutionStepStatus,
-	// 	targetStatus?: ReleaseExecutionStepStatus,
-	// ): boolean {
-	// 	// Khi reset về NEW (retry): cho phép override cả FAILED
-	// 	if (targetStatus === ReleaseExecutionStepStatus.NEW) {
-	// 		return [
-	// 			ReleaseExecutionStepStatus.NEW,
-	// 			ReleaseExecutionStepStatus.PROCESSING,
-	// 			ReleaseExecutionStepStatus.FAILED,
-	// 		].includes(status);
-	// 	}
-
-	// 	// Khi cancel: chỉ override NEW và PROCESSING
-	// 	return [
-	// 		ReleaseExecutionStepStatus.NEW,
-	// 		ReleaseExecutionStepStatus.PROCESSING,
-	// 	].includes(status);
-	// }
-
 	// lưu vào db
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
@@ -289,39 +210,5 @@ export class ReleaseExecutionStepEngine {
 			ReleaseExecutionStepStatus.FAILED,
 			ReleaseExecutionStepStatus.CANCELLED,
 		].includes(status);
-	}
-
-	// Trong ReleaseExecutionStepEngine
-	// async resetStepAndChildren(step: ReleaseExecutionStep3): Promise<void> {
-	// 	await this.setStepAndChildrenStatus(
-	// 		step,
-	// 		ReleaseExecutionStepStatus.NEW,
-	// 	);
-	// }
-
-	// Leo ngược từ step lên root: tại mỗi ancestor load children từ DB,
-	// derive status bằng resolveStatusByChild (giống engine) rồi lưu DB.
-	// KHÔNG re-run step nào — chỉ cập nhật status cha cho đúng.
-	async propagateStatusUp(step: ReleaseExecutionStep3): Promise<void> {
-		let currentParentId = step.parentStepId;
-
-		while (currentParentId) {
-			const parent = await this.stepRepo.findOne({
-				where: { id: currentParentId },
-				relations: { childSteps: true }, // load children để derive status
-			});
-
-			if (!parent) break;
-
-			const status = this.resolveStatusByChild(parent);
-
-			parent.status = status;
-			if (this.isFinalStatus(status)) {
-				parent.completedAt = new Date();
-			}
-			await this.stepRepo.save(parent);
-
-			currentParentId = parent.parentStepId;
-		}
 	}
 }

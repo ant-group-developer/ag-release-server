@@ -88,14 +88,15 @@ export class GroupedCiJob3Dto {
 }
 
 export class UpdateCiJob3Dto {
+	// nếu cần thì thêm 
 	@ApiProperty({
 		description: 'Chỉ cho phép skipped',
 		example: 'skipped',
 		enum: ['skipped'],
 	})
 	@IsOptional()
-	@IsEnum([CiJobStatus3.SKIPPED])
-	status?: CiJobStatus3.SKIPPED;
+	@IsEnum([CiJobStatus3.CANCEL])
+	status?: CiJobStatus3.CANCEL;
 
 	@ApiPropertyOptional({ example: 'support@state51.com' })
 	@IsOptional()
@@ -134,8 +135,8 @@ export class QueryGetListCiJob3Dto extends BaseQueryDto2 {
 	@Transform(({ value }) =>
 		value
 			? String(value)
-					.split(',')
-					.map((v) => v.trim())
+				.split(',')
+				.map((v) => v.trim())
 			: [],
 	)
 	@IsArray()

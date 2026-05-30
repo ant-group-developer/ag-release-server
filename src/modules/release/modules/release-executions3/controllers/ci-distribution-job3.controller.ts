@@ -101,12 +101,12 @@ export class CiDistributionJob3Controller {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@ApiParam({ name: 'id', format: 'uuid' })
-	@Post(':id/cancel')
-	async cancelJob(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.jobService.cancelJob(id);
-		return new ResponseSuccess({ data: result });
-	}
+	// @ApiParam({ name: 'id', format: 'uuid' })
+	// @Post(':id/cancel')
+	// async cancelJob(@Param('id', ParseUUIDPipe) id: string) {
+	// 	const result = await this.jobService.cancelJob(id);
+	// 	return new ResponseSuccess({ data: result });
+	// }
 
 	@ApiParam({ name: 'id', format: 'uuid' })
 	@ApiBody({ type: UpdateCiJob3Dto })

@@ -5,16 +5,16 @@ import { ReleaseExecutionStep3 } from './release-execution3-step.entity';
 import { ReleaseExecution3 } from './release-execution3.entity';
 
 export enum CiJobType3 {
-	EMAIL_STATE51 = 'email_state51',
-	ADMIN_EXPORT = 'admin_export',
+	EMAIL_STATE51 = 'EMAIL_STATE51',
+	ADMIN_EXPORT = 'ADMIN_EXPORT',
 }
 
 export enum CiJobStatus3 {
-	PENDING = 'pending',
-	PROCESSING = 'processing',
-	COMPLETED = 'completed',
-	FAILED = 'failed',
-	SKIPPED = 'skipped',
+	PENDING = 'PENDING',
+	PROCESSING = 'PROCESSING',
+	COMPLETED = 'COMPLETED',
+	FAILED = 'FAILED',
+	CANCEL = 'CANCEL',
 }
 
 @Entity('ci_distribution_jobs3')
