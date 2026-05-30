@@ -74,6 +74,7 @@ import { ReleaseSubmitStep } from './modules/release-submit/entities/release-sub
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
+import { Video } from '../video/entities/video.entity';
 
 @Module({
 	imports: [
@@ -101,6 +102,8 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
 			CiDistributionJob3,
+
+			Video
 		]),
 
 		AppConfigModule,
@@ -176,4 +179,4 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
 })
-export class ReleaseModule {}
+export class ReleaseModule { }

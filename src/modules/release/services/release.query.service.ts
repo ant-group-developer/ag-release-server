@@ -839,6 +839,8 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.videoFile', 'videoFile')
 			.where('release.id = :releaseId', { releaseId })
 			.getOne();
 
@@ -1006,6 +1008,8 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.videoFile', 'videoFile')
 
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')

@@ -1,0 +1,53 @@
+// DB Schema & Mapping (Sử dụng DDEX ERN 4.3)
+// -------------------------------------------------------------
+// Dùng luôn thực thể cũ của Release, liên kết 1-1 với thực thể Video mới
+
+// MAPPING METADATA:
+// - Ảnh thu nhỏ (Thumbnail) -> release.coverart (Trong DDEX 4.3 xuất thành Image resource và link vào Video)
+// - Tiêu đề video -> release.title
+// - Nghệ sĩ chính -> releaseArtist
+// - Nghệ sĩ kết hợp -> releaseContributor hoặc releaseArtist
+// - Thể loại -> release.genre
+// - Ngôn ngữ -> release.language
+// - UPC -> release.upc (Optional đối với video)
+// - Video version -> release.version (Ghi nhận vào SubTitle của Formal Title)
+
+// METADATA ĐẶC THÙ VIDEO:
+// - Nội dung nhạy cảm -> video.explicit
+// - Có chứa nội dung AI -> video.isAi
+// - Mã ISRC -> video.isrc (Bắt buộc)
+// - Phụ đề & Ngôn ngữ phụ đề -> video.subtitles [] (Trong DDEX 4.3 xuất thành Text resource dạng Caption, khai báo <LanguageOfText>)
+// - Nhà cung cấp nội dung -> video.contentProvider
+// - Chủ sở hữu tác phẩm -> video.copyrightOwner
+// - Kênh YouTube đăng tải -> video.channel (Trong DDEX 4.3 ghi nhận qua <ProprietaryId Namespace="Channel"> trong TrackRelease)
+// - Từ khoá video -> video.keywords []
+// - Mô tả video -> video.description (YouTubeDescription)
+// - Dành cho trẻ em -> video.isKids (MadeForKids)
+// - Đăng không công khai -> video.isUnlisted (Xuất tag <ProprietaryId Namespace="VEVO:YouTubeUnlisted">true</ProprietaryId>)
+// - Partner custom ID 1 -> video.partnerCustomId1
+// - Partner custom ID 2 -> video.partnerCustomId2
+// - Credits (Composer, Editor, Producer...) -> release.releaseContributor (Map vai trò theo mã code của contributor)
+
+
+// LUỒNG NGHIỆP VỤ XỬ LÝ (DDEX ERN 4.3):
+// -------------------------------------------------------------
+// Khi submit: Chạy lại đầy đủ luồng direct delivery:
+// 1. Tạo thư mục tạm trên server, stream assets từ bucket nội bộ về.
+// 2. Sinh XML DDEX manifest chuẩn ERN 4.3.
+// 3. Tải các file assets (video, thumbnail, phụ đề) lên Vevo S3 trước.
+// 4. Tải file manifest XML lên sau cùng.
+// * LƯU Ý QUAN TRỌNG: KHÔNG ĐƯỢC tải lên file `delivery.complete` hay `BatchComplete` (Vevo không hỗ trợ đối với DDEX, hệ thống của họ tự động quét khi nhận được XML manifest cuối cùng).
+
+// QUÉT KẾT QUẢ INGESTION (CRON JOB):
+// -------------------------------------------------------------
+// Chạy cron job quét thư mục phân phối trên Vevo S3 định kỳ:
+// - Nếu xuất hiện file `success-$ISRC.json`: Đã tiếp nhận thành công vào catalog -> Cập nhật trạng thái dsp là DISTRIBUTED.
+// - Nếu xuất hiện file `failure-$ISRC.json`: Quá trình gửi bị lỗi -> Cập nhật trạng thái là FAILED, đọc lý do lỗi từ file JSON để hiển thị cho người dùng.
+// - Nếu không xuất hiện file nào sau một khoảng thời gian dài: Coi như thất bại (lỗi parse manifest nghiêm trọng).
+
+
+// CẤU HÌNH HỆ THỐNG:
+// -------------------------------------------------------------
+// - Thêm đối tác DSP mới: VEVO
+// - Cấu hình S3 credentials lưu trong cột metadata của bảng sftp_configs
+// - Chỉ định phiên bản DDEX ERN mặc định: 4.3

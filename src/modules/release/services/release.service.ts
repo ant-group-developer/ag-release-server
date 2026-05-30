@@ -68,7 +68,7 @@ export class ReleaseService {
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
-	) {}
+	) { }
 
 	async getOne(id: string): Promise<IReleaseDetail> {
 		const release = await this.releaseQueryService.getOneDetail(id);
@@ -351,7 +351,7 @@ export class ReleaseService {
 			}
 		}
 
-		archive.finalize().catch((_e) => {});
+		archive.finalize().catch((_e) => { });
 
 		return {
 			contentType: 'application/zip',

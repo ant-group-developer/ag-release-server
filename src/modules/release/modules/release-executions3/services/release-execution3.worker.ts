@@ -1,6 +1,8 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import path from 'path';
+import * as fs from 'fs';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
@@ -606,6 +608,7 @@ export class ReleaseExecution3Worker {
 					ernVersion: config.ernVersion,
 					sender: config.sender,
 					recipient: config.recipient,
+					dspCode,
 				});
 
 			step.metadata = {
@@ -640,6 +643,7 @@ export class ReleaseExecution3Worker {
 
 	private async uploadMetadataToSftp({
 		step,
+		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			if (!step.parentStepId) {
@@ -676,11 +680,20 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// await this.sftpConnectService.uploadFolder({
-			// 	sftp: config.sftp,
-			// 	localDir: outputDir,
-			// 	remoteDir: config.sftp.path ?? '/',
-			// });
+			// Check if Vevo S3 or regular SFTP
+			if (dspCode.toUpperCase() === 'VEVO') {
+				await this.uploadFolderToVevoS3({
+					s3Config: config.sftp,
+					localDir: outputDir,
+					releaseExecution,
+				});
+			} else {
+				// await this.sftpConnectService.uploadFolder({
+				// 	sftp: config.sftp,
+				// 	localDir: outputDir,
+				// 	remoteDir: config.sftp.path ?? '/',
+				// });
+			}
 
 			await removeFolder(outputDir);
 
@@ -697,6 +710,97 @@ export class ReleaseExecution3Worker {
 			return ReleaseExecutionStepStatus.FAILED;
 		}
 	}
+
+	private async uploadFolderToVevoS3({
+		s3Config,
+		localDir,
+		releaseExecution,
+	}: {
+		s3Config: any;
+		localDir: string;
+		releaseExecution: ReleaseExecution3;
+	}): Promise<void> {
+		const upc = releaseExecution.metadata?.input?.releaseSnapshot?.upc || 'new_upc';
+		const isrc = releaseExecution.metadata?.input?.releaseSnapshot?.video?.isrc || 'new_isrc';
+		const localReleaseDir = path.join(localDir, upc);
+
+		const allFiles = this.getAllFilesRecursive(localReleaseDir);
+		const assets = allFiles.filter((f) => !f.relativePath.endsWith('.xml'));
+		const manifest = allFiles.find((f) => f.relativePath.endsWith('.xml'));
+
+		const uniqueFolder = `${isrc}_${Date.now()}`;
+		const s3Prefix = s3Config.path || 'feed/sony/';
+
+		const s3Client = new S3Client({
+			region: s3Config.region || 'us-east-1',
+			credentials: {
+				accessKeyId: s3Config.username || '',
+				secretAccessKey: s3Config.password || '',
+			},
+			endpoint: s3Config.host ? `https://${s3Config.host}` : undefined,
+		});
+
+		// 1. Upload Assets first
+		for (const asset of assets) {
+			const s3Key = path.posix.join(s3Prefix, uniqueFolder, asset.relativePath.replace(/\\/g, '/'));
+			const fileStream = fs.createReadStream(asset.localPath);
+
+			await s3Client.send(
+				new PutObjectCommand({
+					Bucket: s3Config.bucket || '',
+					Key: s3Key,
+					Body: fileStream,
+				}),
+			);
+			this.logService.log({
+				message: `[VEVO_S3_UPLOAD] Asset uploaded: ${s3Key}`,
+				releaseExecutionId: releaseExecution.id,
+			});
+		}
+
+		// 2. Upload Manifest XML last
+		if (manifest) {
+			const s3Key = path.posix.join(s3Prefix, uniqueFolder, manifest.relativePath.replace(/\\/g, '/'));
+			const fileStream = fs.createReadStream(manifest.localPath);
+
+			await s3Client.send(
+				new PutObjectCommand({
+					Bucket: s3Config.bucket || '',
+					Key: s3Key,
+					Body: fileStream,
+				}),
+			);
+			this.logService.log({
+				message: `[VEVO_S3_UPLOAD] Manifest XML uploaded LAST: ${s3Key}`,
+				releaseExecutionId: releaseExecution.id,
+			});
+		}
+	}
+
+	private getAllFilesRecursive(
+		dirPath: string,
+		originalDirPath: string = dirPath,
+	): { localPath: string; relativePath: string }[] {
+		const files = fs.readdirSync(dirPath);
+		let fileList: { localPath: string; relativePath: string }[] = [];
+
+		for (const file of files) {
+			const absolutePath = path.join(dirPath, file);
+			if (fs.statSync(absolutePath).isDirectory()) {
+				fileList = fileList.concat(
+					this.getAllFilesRecursive(absolutePath, originalDirPath),
+				);
+			} else {
+				fileList.push({
+					localPath: absolutePath,
+					relativePath: path.relative(originalDirPath, absolutePath),
+				});
+			}
+		}
+
+		return fileList;
+	}
+
 
 	private async syncDataFromDsp({
 		step,

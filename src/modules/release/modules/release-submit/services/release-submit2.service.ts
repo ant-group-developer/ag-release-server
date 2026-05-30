@@ -7,6 +7,8 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import * as path from 'path';
+import * as fs from 'fs';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
@@ -94,7 +96,7 @@ export class ReleaseSubmitService2 {
 		private readonly ciJobService: CiDistributionJobService,
 
 		private readonly ciService: CiService,
-	) {}
+	) { }
 
 	async submit({
 		releaseId,
@@ -1270,12 +1272,12 @@ export class ReleaseSubmitService2 {
 					const ciDsp =
 						state51DspsData.length > 0
 							? await this.manager.findOne(Dsp, {
-									where: { id: state51DspsData[0].id },
-									relations: [
-										'dspRoutingConfig',
-										'dspRoutingConfig.aggregator',
-									],
-								})
+								where: { id: state51DspsData[0].id },
+								relations: [
+									'dspRoutingConfig',
+									'dspRoutingConfig.aggregator',
+								],
+							})
 							: null;
 					const deliveryEmail =
 						ciDsp?.dspRoutingConfig?.aggregator?.deliveryEmail;
@@ -1350,8 +1352,8 @@ export class ReleaseSubmitService2 {
 				const dsps =
 					ciCodes.length > 0
 						? await this.manager.find(Dsp, {
-								where: { codeCi: In(ciCodes) },
-							})
+							where: { codeCi: In(ciCodes) },
+						})
 						: [];
 				const ciToSystem = new Map(
 					dsps.map((d) => [d.codeCi, { code: d.code, name: d.name }]),

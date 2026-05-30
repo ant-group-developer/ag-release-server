@@ -20,6 +20,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 import {
 	Column,
 	Entity,
@@ -284,6 +285,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		(releaseTerritory) => releaseTerritory.release,
 	)
 	releaseTerritory: ReleaseTerritory | null;
+
+	@OneToOne(() => Video, (video) => video.release)
+	video: Video | null;
 
 	tracksCount?: number;
 	totalDuration?: number;
