@@ -75,6 +75,7 @@ import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.
 import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
 import { Video } from '../video/entities/video.entity';
+import { PartnersApiModule } from '../partners-api/partners-api.module';
 
 @Module({
 	imports: [
@@ -134,6 +135,8 @@ import { Video } from '../video/entities/video.entity';
 		AggregatorsModule,
 		NotificationModule,
 		CiModule,
+
+		PartnersApiModule
 
 		// ReleaseExecutions3Module,
 	],

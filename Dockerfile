@@ -26,6 +26,7 @@ RUN yarn install --production --frozen-lockfile
 # 2. Copy dist & scripts từ builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/src/migrations/clickhouse ./dist/migrations/clickhouse
 # COPY --from=builder /app/keys ./keys
 
 # 3. Copy & fix entrypoint script

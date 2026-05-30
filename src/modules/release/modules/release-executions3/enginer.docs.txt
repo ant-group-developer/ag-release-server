@@ -120,3 +120,8 @@ dispatchStepTask(step){
 }
 
 xử lý thằng cha,
+
+// khi gặp trạng thái dừng luồng, ko cập nhật status của những thằng con
+// cancel step, update status về cancel, ko cập nhật gì con, dừng luồng
+// retry, chỉ cần update status về new, gọi lại full execution
+

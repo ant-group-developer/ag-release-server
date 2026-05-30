@@ -169,32 +169,32 @@ export class ReleaseExecution3Service {
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
-		const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
-			where: {
-				status: ReleaseExecutionStepStatus.WAITING_PARTNER,
-			},
-		});
+	// 	const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
+	// 		where: {
+	// 			status: ReleaseExecutionStepStatus.WAITING_PARTNER,
+	// 		},
+	// 	});
 
-		// Group theo executionId, chỉ resume 1 lần mỗi execution
-		const executionIds = [
-			...new Set(
-				waitingSteps
-					.filter((step) => {
-						const scheduledAt = step.metadata?.scheduledAt;
-						return scheduledAt && new Date(scheduledAt) <= now;
-					})
-					.map((step) => step.releaseExecutionId),
-			),
-		];
+	// 	// Group theo executionId, chỉ resume 1 lần mỗi execution
+	// 	const executionIds = [
+	// 		...new Set(
+	// 			waitingSteps
+	// 				.filter((step) => {
+	// 					const scheduledAt = step.metadata?.scheduledAt;
+	// 					return scheduledAt && new Date(scheduledAt) <= now;
+	// 				})
+	// 				.map((step) => step.releaseExecutionId),
+	// 		),
+	// 	];
 
-		console.log(
-			`[ReleaseExecution3Service] Found ${waitingSteps.length} waiting steps, ${executionIds.length} executions to resume`,
-		); // log thêm
+	// 	console.log(
+	// 		`[ReleaseExecution3Service] Found ${waitingSteps.length} waiting steps, ${executionIds.length} executions to resume`,
+	// 	); // log thêm
 
-		for (const executionId of executionIds) {
-			await this.runPipeline(executionId);
-		}
-	}
+	// 	for (const executionId of executionIds) {
+	// 		await this.runPipeline(executionId);
+	// 	}
+	// }
 
 	// async resumeFromWaiting(stepId: string): Promise<void> {
 	// 	const step = await this.step3Repo.findOne({
@@ -243,10 +243,10 @@ export class ReleaseExecution3Service {
 	// 	await this.runPipeline(step.releaseExecutionId);
 	// }
 
-	async startProcessing(id: string): Promise<void> {
-		const execution = await this.findOne(id);
+	async startProcessing(id: string): Promise < void> {
+			const execution = await this.findOne(id);
 
-		if (execution.status !== ReleaseExecutionStatus.NEW) {
+			if(execution.status !== ReleaseExecutionStatus.NEW) {
 			throw new Error('Only execution with NEW status can be started');
 		}
 
