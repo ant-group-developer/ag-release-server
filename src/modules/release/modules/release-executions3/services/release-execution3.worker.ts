@@ -662,6 +662,8 @@ export class ReleaseExecution3Worker {
 				},
 			);
 
+			// return ReleaseExecutionStepStatus.FAILED;
+
 			const outputDir = createMetadataStep?.metadata?.output?.outputDir;
 			const dspCode = createMetadataStep?.metadata?.input?.dspCode;
 

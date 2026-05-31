@@ -17,6 +17,15 @@ export enum CiJobStatus3 {
 	CANCEL = 'CANCEL',
 }
 
+// export enum CiJobStatus3 {
+// 	PENDING = 'pending',
+// 	PROCESSING = 'processing',
+// 	COMPLETED = 'completed',
+// 	FAILED = 'failed',
+// 	CANCEL = 'cancel',
+// }
+
+
 @Entity('ci_distribution_jobs3')
 export class CiDistributionJob3 extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })

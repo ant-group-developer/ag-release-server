@@ -120,9 +120,10 @@ export class ReleaseExecution3Service {
 		}
 
 		// cancel job cũ
-		await this.cancelPendingExecutions(
-			execution.metadata.input.releaseSnapshot.id,
-		);
+		await this.cancelPendingExecutions({
+			releaseId: execution.metadata.input.releaseSnapshot.id,
+			excludeExecutionId: id,
+		});
 
 		execution.status = ReleaseExecutionStatus.PROCESSING;
 		await this.executionRepo.save(execution);
@@ -446,7 +447,13 @@ export class ReleaseExecution3Service {
 		return roots;
 	}
 
-	private async cancelPendingExecutions(releaseId: string) {
+	private async cancelPendingExecutions({
+		releaseId,
+		excludeExecutionId,
+	}: {
+		releaseId: string;
+		excludeExecutionId?: string;
+	}) {
 		const pendingStatuses = [
 			ReleaseExecutionStatus.NEW,
 			ReleaseExecutionStatus.PROCESSING,
@@ -454,10 +461,21 @@ export class ReleaseExecution3Service {
 			ReleaseExecutionStatus.WAITING_ACTION,
 		];
 
-		const pendingExecutions = await this.executionRepo.find({
-			where: { releaseId, status: In(pendingStatuses) },
-			select: ['id'],
-		});
+		const qb = this.executionRepo
+			.createQueryBuilder('execution')
+			.select('execution.id', 'id')
+			.where('execution.releaseId = :releaseId', { releaseId })
+			.andWhere('execution.status IN (:...statuses)', {
+				statuses: pendingStatuses,
+			});
+
+		if (excludeExecutionId) {
+			qb.andWhere('execution.id != :excludeExecutionId', {
+				excludeExecutionId,
+			});
+		}
+
+		const pendingExecutions = await qb.getRawMany<{ id: string }>();
 
 		if (pendingExecutions.length === 0) return;
 

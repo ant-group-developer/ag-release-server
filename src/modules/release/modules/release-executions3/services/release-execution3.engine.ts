@@ -188,6 +188,11 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		if (STEP.childExecutionMode === 'parallel') {
+			// await Promise.allSettled(
+			// 	STEP.childSteps!.map((child) => this.processStep({step: child, releaseExecution})),
+			// );
+
+
 			for (const child of STEP.childSteps!) {
 				await this.processStep({
 					step: child,
