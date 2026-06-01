@@ -216,6 +216,91 @@ export class TimelineAnalyticsService {
   }
 
   // ═══════════════════════════════════════════════════════
+  // DSP TRENDS DAILY TIMELINE (Lượt nghe hàng ngày xu hướng)
+  // ═══════════════════════════════════════════════════════
+  async getDspTrendsDailyTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
+    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    // 1. Tim Top N DSPs trends daily
+    const topDspsSql = `
+      SELECT
+        s.dsp_id AS dsp_id,
+        sum(s.total_quantity) AS views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${filterSql}
+      GROUP BY dsp_id
+      ORDER BY views DESC
+      LIMIT ${topN}
+    `;
+    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string }>(
+      topDspsSql,
+      params,
+    );
+    const topDsps = topDspsRows.map((r) => r.dsp_id);
+
+    if (!topDsps.length) {
+      return { topDsps: [], items: [] };
+    }
+
+    // 2. Query daily timeline
+    params.topDsps = topDsps;
+    const dspExpr = includeOther
+      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), s.dsp_id, 'Other')`
+      : 's.dsp_id';
+    const whereDsp = includeOther
+      ? ''
+      : 'AND s.dsp_id IN ({topDsps:Array(String)})';
+
+    const timelineSql = `
+      SELECT
+        s.reporting_date AS period_date,
+        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period_str,
+        ${dspExpr} AS dsp_name,
+        sum(s.total_quantity) AS trend_views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${whereDsp}
+        ${filterSql}
+      GROUP BY period_date, period_str, dsp_name
+      ORDER BY period_date ASC, trend_views DESC
+    `;
+
+    const rows = await this.clickHouseService.query<{
+      period_str: string;
+      dsp_name: string;
+      trend_views: string;
+    }>(timelineSql, params);
+
+    const periodMap = new Map<string, DspTimelinePeriod>();
+    for (const row of rows) {
+      let period = periodMap.get(row.period_str);
+      if (!period) {
+        period = { period: row.period_str, series: [] };
+        periodMap.set(row.period_str, period);
+      }
+      period.series.push({
+        dsp: row.dsp_name,
+        trendViews: Number(row.trend_views),
+      });
+    }
+
+    return { topDsps, items: Array.from(periodMap.values()) };
+  }
+
+  // ═══════════════════════════════════════════════════════
   // TERRITORY SALES TIMELINE
   // ═══════════════════════════════════════════════════════
   async getTerSalesTimeline(

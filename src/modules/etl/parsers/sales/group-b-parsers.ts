@@ -7,8 +7,8 @@ export class AnghamiSalesParser extends BaseSalesParser {
     const isrc = r['ISRC'] || '';
     if (!isrc) return null;
     const row = this.createBaseRow(batchId);
-    row.reporting_period_start = this.normalizeDate(r['Start Date']);
-    row.reporting_period_end = this.normalizeDate(r['End Date']);
+    row.reporting_period_start = this.normalizeDate(r['Start Date'], true, 'DMY');
+    row.reporting_period_end = this.normalizeDate(r['End Date'], false, 'DMY');
     row.service_name = r['Service Name'] || 'Anghami';
     row.dpid = r['DPID'] || '';
     row.member_name = r['Member Name'] || '';

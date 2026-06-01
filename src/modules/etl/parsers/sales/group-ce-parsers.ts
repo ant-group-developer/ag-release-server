@@ -11,8 +11,8 @@ export class DeezerSalesParser extends BaseSalesParser {
     const isrc = r['isrc'] || r['ISRC'] || '';
     if (!isrc) return null;
     const row = this.createBaseRow(batchId);
-    row.reporting_period_start = this.normalizeDate(r['start_report'] || r['Start Report']);
-    row.reporting_period_end = this.normalizeDate(r['end_report'] || r['End Report']);
+    row.reporting_period_start = this.normalizeDate(r['start_report'] || r['Start Report'], true, 'DMY');
+    row.reporting_period_end = this.normalizeDate(r['end_report'] || r['End Report'], false, 'DMY');
     row.isrc = isrc;
     row.upc = r['upc'] || r['UPC'] || '';
     row.territory_code = this.normalizeCountryCode(r['country'] || r['Country'] || '');
