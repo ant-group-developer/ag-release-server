@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+	Controller,
+	Get,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
@@ -11,7 +18,7 @@ import { ReleaseExecution3Service } from '../services/release-execution3.service
 export class ReleaseSubmitTestController {
 	constructor(
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
-	) { }
+	) {}
 
 	/** Lấy danh sách submits */
 	@Get()

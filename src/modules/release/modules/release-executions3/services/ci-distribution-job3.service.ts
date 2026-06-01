@@ -19,6 +19,7 @@ import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.s
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
 import {
 	QueryGetListCiJob3Dto,
@@ -30,9 +31,8 @@ import {
 	CiJobStatus3,
 	CiJobType3,
 } from '../entites/ci-distribution-job3.entity';
-import { ReleaseExecution3Service } from './release-execution3.service'; // hoặc service tương đương resume step
-import { CiToolService } from 'src/modules/partners-api/ci-tool/ci-tool.service';
 import { ReleaseExecutionStepStatus } from '../enums/release-execution3.enum';
+import { ReleaseExecution3Service } from './release-execution3.service'; // hoặc service tương đương resume step
 
 @Injectable()
 export class CiDistributionJob3Service implements OnModuleInit {
@@ -53,7 +53,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		private readonly releaseExecutionService: ReleaseExecution3Service,
 
 		private readonly ciToolService: CiToolService,
-	) { }
+	) {}
 
 	onModuleInit() {
 		this.registerDailySendCron();
@@ -122,10 +122,12 @@ export class CiDistributionJob3Service implements OnModuleInit {
 					for (const job of groupJobs) {
 						// await this.releaseExecutionService.doneStep(job.stepId);
 
-						await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-							stepId: job.stepId,
-							status: ReleaseExecutionStepStatus.DONE,
-						})
+						await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+							{
+								stepId: job.stepId,
+								status: ReleaseExecutionStepStatus.DONE,
+							},
+						);
 						this.log.success({
 							releaseExecutionId: job.releaseExecutionId,
 							releaseExecutionStepId: job.stepId,
@@ -160,10 +162,12 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 					for (const job of groupJobs) {
 						// await this.releaseExecutionService.doneStep(job.stepId);
-						await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-							stepId: job.stepId,
-							status: ReleaseExecutionStepStatus.DONE,
-						})
+						await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+							{
+								stepId: job.stepId,
+								status: ReleaseExecutionStepStatus.DONE,
+							},
+						);
 						this.log.error({
 							releaseExecutionId: job.releaseExecutionId,
 							releaseExecutionStepId: job.stepId,
@@ -297,7 +301,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		}
 	}
 
-	// 
+	//
 	async sendExportToCi(ids: string[]) {
 		if (!ids?.length) throw new NotFoundException('No job ids provided');
 
@@ -465,10 +469,12 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 				for (const job of group) {
 					// await this.releaseExecutionService.retryStep(job.stepId);
-					await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-						stepId: job.stepId,
-						status: ReleaseExecutionStepStatus.NEW,
-					})
+					await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+						{
+							stepId: job.stepId,
+							status: ReleaseExecutionStepStatus.NEW,
+						},
+					);
 					totalResumed++;
 				}
 
@@ -710,10 +716,12 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 		for (const stepId of stepIds) {
 			// await this.releaseExecutionService.retryStep(stepId);
-			await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-				stepId,
-				status: ReleaseExecutionStepStatus.DONE,
-			})
+			await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+				{
+					stepId,
+					status: ReleaseExecutionStepStatus.DONE,
+				},
+			);
 		}
 
 		this.logger.log(
@@ -723,7 +731,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	}
 
 	async updateJob(id: string, body: UpdateCiJob3Dto) {
-		body.status = CiJobStatus3.CANCEL
+		body.status = CiJobStatus3.CANCEL;
 		const job = await this.findOne(id);
 
 		const updateData: Partial<CiDistributionJob3> = {};
@@ -739,7 +747,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		}
 
 		if (body.status !== undefined) {
-			updateData.status = body.status
+			updateData.status = body.status;
 		}
 
 		if (body.deliveryEmail !== undefined) {
@@ -759,14 +767,14 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		// Khi user cancel job → đánh dấu step tương ứng là cancel
 		if (body.status === CiJobStatus3.CANCEL && job.stepId) {
 			// await this.releaseExecutionService.cancelStep(job.stepId);
-			await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-				stepId: job.stepId,
-				status: ReleaseExecutionStepStatus.CANCELLED,
-			})
+			await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+				{
+					stepId: job.stepId,
+					status: ReleaseExecutionStepStatus.CANCELLED,
+				},
+			);
 		}
 
 		return this.findOne(id);
 	}
-
-
 }

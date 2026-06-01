@@ -52,7 +52,7 @@ import { ReleaseService } from '../services/release.service';
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
-	constructor(private readonly releaseService: ReleaseService) { }
+	constructor(private readonly releaseService: ReleaseService) {}
 
 	@Get()
 	async getList(

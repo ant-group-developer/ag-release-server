@@ -20,6 +20,7 @@ import {
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
 } from '../enums/release-execution3.enum';
+import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
 import { ReleaseExecution3Builder } from './release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './release-execution3.engine';
 
@@ -43,37 +44,17 @@ export class ReleaseExecution3Service {
 		private readonly engine: ReleaseExecutionStepEngine,
 
 		private readonly logService: LogsService,
+		private readonly queueService: ReleaseExecution3Queue,
 	) {}
 
 	// đã handle
-	// new
-	async newJob(body: {
+	// đẩy vào queue, consumer tự quét và xử lí
+	async newReleaseExecution(body: {
 		release: Release;
 		dspCodes: string[];
 		type: ExecutionType;
 	}) {
-		const execution = await this.executionRepo.save(
-			this.executionRepo.create({
-				releaseId: body.release.id,
-				type: body.type,
-				status: ReleaseExecutionStatus.NEW,
-				releaseTitle: body.release.title,
-				releaseUpc: body.release.upc ?? '',
-				metadata: {
-					input: {
-						releaseSnapshot: body.release,
-						dspCodes: body.dspCodes,
-					},
-					output: {
-						result: [],
-					},
-				},
-			}),
-		);
-
-		await this.startProcessing(execution.id);
-		// .catch((e) => console.log(e));
-		return this.findOne(execution.id);
+		return await this.queueService.queueExecution(body);
 	}
 
 	// lấy ra các bản ghi đang ở WAITING_PARTNER đã tới giờ xử lí, worker sẽ update trạng thái
@@ -107,7 +88,7 @@ export class ReleaseExecution3Service {
 		); // log thêm
 
 		for (const executionId of executionIds) {
-			await this.runPipeline(executionId);
+			await this.queueService.queueRunPipeline(executionId);
 		}
 	}
 
@@ -133,11 +114,8 @@ export class ReleaseExecution3Service {
 		// build tree
 		await this.builder.buildStepsChild({ releaseExecution: execution });
 
-		// chạy pipeline
-		// await this.runPipeline(id);
-		this.runPipeline(id).catch((e) => {
-			console.error(e);
-		}); // tránh block luồng chính nếu có lỗi
+		// enqueue pipeline execution vì nó nặng
+		await this.queueService.queueRunPipeline(id);
 	}
 
 	async runPipeline(id: string): Promise<void> {
@@ -153,10 +131,10 @@ export class ReleaseExecution3Service {
 			});
 
 			if (this.shouldStopSequential(status)) {
-				await this.updateExecutionStatus(
+				await this.updateExecutionStatus({
 					execution,
-					this.mapStepStatusToExecutionStatus(status),
-				);
+					status: this.mapStepStatusToExecutionStatus(status),
+				});
 				return;
 			}
 		}
@@ -302,17 +280,21 @@ export class ReleaseExecution3Service {
 	): Promise<ReleaseExecutionStatus> {
 		const status = this.deriveExecutionStatusFromSteps(execution);
 
-		await this.updateExecutionStatus(execution, status);
+		await this.updateExecutionStatus({ execution, status });
 
 		return status;
 	}
 
 	//
-	private async updateExecutionStatus(
-		execution: ReleaseExecution3,
-		status: ReleaseExecutionStatus,
-		summary?: string,
-	): Promise<void> {
+	private async updateExecutionStatus({
+		execution,
+		status,
+		summary,
+	}: {
+		execution: ReleaseExecution3;
+		status: ReleaseExecutionStatus;
+		summary?: string;
+	}): Promise<void> {
 		execution.status = status;
 
 		if (summary !== undefined) {
@@ -504,9 +486,18 @@ export class ReleaseExecution3Service {
 			});
 
 		if (excludeExecutionId) {
-			qb.andWhere('execution.id != :excludeExecutionId', {
-				excludeExecutionId,
+			const excludeExecution = await this.executionRepo.findOne({
+				where: { id: excludeExecutionId },
+				select: ['createdAt'],
 			});
+
+			if (excludeExecution) {
+				qb.andWhere('execution.id != :excludeExecutionId', {
+					excludeExecutionId,
+				}).andWhere('execution.createdAt < :createdAt', {
+					createdAt: excludeExecution.createdAt,
+				});
+			}
 		}
 
 		const pendingExecutions = await qb.getRawMany<{ id: string }>();
@@ -557,42 +548,6 @@ export class ReleaseExecution3Service {
 				],
 			})
 			.execute();
-	}
-
-	/**
-	 * Traverse lên chain cha và reset tất cả về NEW.
-	 * Reset các cha đang ở các trạng thái "bị block" không thể tự re-process:
-	 * - FAILED / CANCELLED: do retry step con
-	 * - WAITING_ACTION / WAITING_PARTNER: do step con vừa bị fail/skip bởi user
-	 */
-	private async resetAncestorsToNew(
-		step: ReleaseExecutionStep3,
-	): Promise<void> {
-		if (!step.parentStepId) return;
-
-		const parent = await this.stepRepo.findOne({
-			where: { id: step.parentStepId },
-		});
-
-		if (!parent) return;
-
-		const blockingStatuses = [
-			ReleaseExecutionStepStatus.FAILED,
-			ReleaseExecutionStepStatus.CANCELLED,
-			ReleaseExecutionStepStatus.WAITING_ACTION,
-			ReleaseExecutionStepStatus.WAITING_PARTNER,
-		];
-
-		if (blockingStatuses.includes(parent.status)) {
-			await this.stepRepo.update(parent.id, {
-				status: ReleaseExecutionStepStatus.NEW,
-				startedAt: null,
-				completedAt: null,
-			});
-		}
-
-		// Tiếp tục lên cha tiếp theo
-		await this.resetAncestorsToNew(parent);
 	}
 
 	private async setStepAndChildrenStatusRecursive({
@@ -657,33 +612,6 @@ export class ReleaseExecution3Service {
 		return null;
 	}
 
-	//
-	// async retryStep(stepId: string): Promise<void> {
-	// 	const step = await this.stepRepo.findOne({
-	// 		where: { id: stepId },
-	// 	});
-	// 	if (!step) throw new Error('Step not found');
-	// 	await this.updateStatusStepAndRerunPipeline({
-	// 		stepId,
-	// 		status: ReleaseExecutionStepStatus.NEW,
-	// 	});
-	// }
-
-	// async doneStep(stepId: string): Promise<void> {
-	// 	const step = await this.stepRepo.findOne({
-	// 		where: { id: stepId },
-	// 	});
-
-	// 	if (!step) throw new Error('Step not found');
-
-	// 	await this.stepRepo.update(stepId, {
-	// 		status: ReleaseExecutionStepStatus.DONE,
-	// 		completedAt: new Date(),
-	// 	});
-
-	// 	await this.runPipeline(step.releaseExecutionId);
-	// }
-
 	async retryStep(stepId: string): Promise<void> {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
@@ -696,60 +624,9 @@ export class ReleaseExecution3Service {
 			targetStatus: ReleaseExecutionStepStatus.NEW,
 		});
 
-		// await this.resetAncestorsToNew(step);
-
-		this.runPipeline(step.releaseExecutionId).catch((e) => console.log(e));
+		// enqueue pipeline để xử lý async vì runPipeline nặng
+		await this.queueService.queueRunPipeline(step.releaseExecutionId);
 	}
-
-	// async failStep(stepId: string): Promise<void> {
-	// 	const step = await this.stepRepo.findOne({
-	// 		where: { id: stepId },
-	// 	});
-
-	// 	if (!step) throw new Error('Step not found');
-
-	// 	await this.propagateStatusUpward(step);
-	// }
-
-	// async cancelStep(stepId: string): Promise<void> {
-	// 	const step = await this.stepRepo.findOne({
-	// 		where: { id: stepId },
-	// 	});
-	// 	if (!step) throw new Error('Step not found');
-	// 	// 1. Update step và toàn bộ con thành CANCELLED
-	// 	await this.setStepAndChildrenStatusRecursive({
-	// 		step,
-	// 		targetStatus: ReleaseExecutionStepStatus.CANCELLED,
-	// 	});
-	// 	// 2. Propagate lên cha
-	// 	await this.propagateStatusUpward(step);
-	// 	// 3. Refresh execution status tổng
-	// 	const execution = await this.findOne(step.releaseExecutionId);
-	// 	await this.refreshExecutionStatus(execution);
-	// }
-
-	// private async propagateStatusUpward(step: ReleaseExecutionStep3): Promise<void> {
-	// 	if (!step.parentStepId) return;
-	// 	// Lấy tất cả anh em từ DB để tính status cha
-	// 	const siblings = await this.stepRepo.find({
-	// 		where: { parentStepId: step.parentStepId },
-	// 	});
-	// 	const parent = await this.stepRepo.findOne({
-	// 		where: { id: step.parentStepId },
-	// 	});
-
-	// 	if (!parent) return;
-	// 	parent.childSteps = siblings;
-	// 	// Tính lại status cha từ con (dùng lại logic resolveStatusByChild)
-	// 	const newStatus = this.engine.resolveStatusByChild(parent);
-	// 	await this.stepRepo.update(parent.id, {
-	// 		status: newStatus,
-	// 		completedAt: this.engine.isFinalStatus(newStatus) ? new Date() : null,
-	// 	});
-	// 	// Tiếp tục lên cha tiếp theo
-	// 	parent.status = newStatus;
-	// 	await this.propagateStatusUpward(parent);
-	// }
 
 	async updateStatusStepAndRerunPipeline({
 		stepId,
@@ -777,6 +654,7 @@ export class ReleaseExecution3Service {
 				: null,
 		});
 
-		await this.runPipeline(step.releaseExecutionId);
+		// enqueue pipeline để xử lý async
+		await this.queueService.queueRunPipeline(step.releaseExecutionId);
 	}
 }

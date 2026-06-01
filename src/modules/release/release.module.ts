@@ -69,10 +69,14 @@ import { CiDistributionJob3Controller } from './modules/release-executions3/cont
 import { ReleaseSubmitTestController } from './modules/release-executions3/controllers/release-submit-test.controller';
 import { CiDistributionJob3 } from './modules/release-executions3/entites/ci-distribution-job3.entity';
 import { CiDistributionJob3Service } from './modules/release-executions3/services/ci-distribution-job3.service';
+import { ReleaseExecution3Consumer } from './modules/release-executions3/services/queue/release-execution3.consumer';
+import { ReleaseExecution3Queue } from './modules/release-executions3/services/queue/release-execution3.queue';
 import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
+
+import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.run-pipeline-queue.entity';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
@@ -106,6 +110,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
 			CiDistributionJob3,
+			ReleaseExecution3RunPipelineQueue,
 
 			Video,
 			VideoArtist,
@@ -183,6 +188,8 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseExecution3Builder,
 		ReleaseExecutionStepEngine,
 		ReleaseExecution3Service,
+		ReleaseExecution3Queue,
+		ReleaseExecution3Consumer,
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
 	],
