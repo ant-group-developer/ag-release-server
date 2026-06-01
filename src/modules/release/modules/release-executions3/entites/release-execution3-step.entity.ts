@@ -62,6 +62,13 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	metadata: Record<string, any> | null;
 
 	@Column({
+		name: 'is_delivery_step',
+		type: 'boolean',
+		default: false,
+	})
+	isDeliveryStep: boolean;
+
+	@Column({
 		name: 'started_at',
 		type: 'timestamp with time zone',
 		nullable: true,

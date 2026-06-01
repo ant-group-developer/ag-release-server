@@ -134,7 +134,10 @@ export class ReleaseExecution3Service {
 		await this.builder.buildStepsChild({ releaseExecution: execution });
 
 		// chạy pipeline
-		await this.runPipeline(id);
+		// await this.runPipeline(id);
+		this.runPipeline(id).catch((e) => {
+			console.error(e);
+		}); // tránh block luồng chính nếu có lỗi
 	}
 
 	async runPipeline(id: string): Promise<void> {
@@ -208,6 +211,27 @@ export class ReleaseExecution3Service {
 		};
 
 		const ciDsps = [...ciDealDsps, ...state51Dsps];
+		const allDeliveryDsps = [...directDsps, ...ciDsps];
+
+		execution.metadata.input.delivery = {
+			all: this.buildDeliveryMetadataInput(
+				execution.metadata.input.releaseSnapshot.id,
+				allDeliveryDsps,
+			),
+			directByDspId: Object.fromEntries(
+				directDsps.map((dsp) => [
+					dsp.id,
+					this.buildDeliveryMetadataInput(
+						execution.metadata.input.releaseSnapshot.id,
+						[dsp],
+					),
+				]),
+			),
+			aggCi: this.buildDeliveryMetadataInput(
+				execution.metadata.input.releaseSnapshot.id,
+				ciDsps,
+			),
+		};
 
 		for (const dsp of ciDsps) {
 			if (!dsp.code) {
@@ -227,6 +251,17 @@ export class ReleaseExecution3Service {
 		}
 
 		await this.executionRepo.save(execution);
+	}
+
+	private buildDeliveryMetadataInput(releaseId: string, dsps: Dsp[]) {
+		return {
+			releaseId,
+			items: dsps
+				.filter((dsp) => !!dsp.id)
+				.map((dsp) => ({
+					dspId: dsp.id,
+				})),
+		};
 	}
 
 	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {

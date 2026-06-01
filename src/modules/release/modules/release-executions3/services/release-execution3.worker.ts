@@ -337,6 +337,7 @@ export class ReleaseExecution3Worker {
 		step,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
+			// return ReleaseExecutionStepStatus.DONE;
 			const metaStep = await this.getSiblingStepByType(
 				step,
 				ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
@@ -665,8 +666,6 @@ export class ReleaseExecution3Worker {
 				},
 			);
 
-			// return ReleaseExecutionStepStatus.FAILED;
-
 			const outputDir = createMetadataStep?.metadata?.output?.outputDir;
 			const dspCode = createMetadataStep?.metadata?.input?.dspCode;
 
@@ -711,7 +710,7 @@ export class ReleaseExecution3Worker {
 			this.logService.error({
 				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}`,
 			});
-
+			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
 		}
 	}

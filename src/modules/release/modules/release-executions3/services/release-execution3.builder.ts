@@ -18,7 +18,7 @@ export class ReleaseExecution3Builder {
 
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
-	) { }
+	) {}
 
 	async buildStepsChild({
 		step: STEP,
@@ -71,6 +71,14 @@ export class ReleaseExecution3Builder {
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
 						order: order++,
 						childExecutionMode: 'parallel',
+						isDeliveryStep: true,
+						metadata: {
+							input: {
+								delivery:
+									releaseExecution.metadata.input.delivery
+										?.all,
+							},
+						},
 					},
 				);
 
@@ -121,7 +129,15 @@ export class ReleaseExecution3Builder {
 						{
 							type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
 							order: index + 1,
-							metadata: { input: { dsp } },
+							isDeliveryStep: true,
+							metadata: {
+								input: {
+									dsp,
+									delivery:
+										releaseExecution.metadata.input.delivery
+											?.directByDspId?.[dsp.id],
+								},
+							},
 						},
 						// {
 						// 	type: ReleaseExecutionStepType.SYNC_RESULT_TO_RELEASE,
@@ -167,6 +183,13 @@ export class ReleaseExecution3Builder {
 				stepResult.push({
 					type: ReleaseExecutionStepType.PROCESS_AGG_CI,
 					order: 1,
+					isDeliveryStep: true,
+					metadata: {
+						input: {
+							delivery:
+								releaseExecution.metadata.input.delivery?.aggCi,
+						},
+					},
 				});
 
 				break;

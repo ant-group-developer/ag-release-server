@@ -112,7 +112,7 @@ export class ReleaseQueryService {
 	}
 
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
-		const { idInclude, page, pageSize, keyword } = query;
+		const { idInclude, page, pageSize, keyword, type } = query;
 
 		const releaseInclude = idInclude?.length
 			? await this.releaseRepo.find({
@@ -131,6 +131,7 @@ export class ReleaseQueryService {
 			},
 			where: {
 				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+				...(type ? { type } : {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
@@ -457,6 +458,7 @@ export class ReleaseQueryService {
 			startDateRelease,
 			endDateRelease,
 
+			type,
 			albumFormatId,
 			status,
 			primaryGenreId,
@@ -530,6 +532,10 @@ export class ReleaseQueryService {
 					albumFormatId,
 				},
 			);
+		}
+
+		if (type) {
+			queryBuilder.andWhere('release.type = :type', { type });
 		}
 
 		if (primaryGenreId?.length) {

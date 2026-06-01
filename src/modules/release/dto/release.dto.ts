@@ -6,6 +6,7 @@ import {
 	IsBoolean,
 	IsDate,
 	IsEnum,
+	IsIn,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -268,6 +269,14 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	title?: string;
 
 	@ApiPropertyOptional({
+		enum: ['audio', 'video'],
+		description: 'Release content type',
+	})
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	type?: 'audio' | 'video';
+
+	@ApiPropertyOptional({
 		enum: FieldOrderRelease,
 		default: FieldOrderRelease.TITLE,
 	})
@@ -442,6 +451,10 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	title?: string;
+
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	type?: 'audio' | 'video';
 
 	@IsEnum(FieldOrderRelease)
 	fieldOrder: FieldOrderRelease = FieldOrderRelease.TITLE;

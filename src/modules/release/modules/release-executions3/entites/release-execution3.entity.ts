@@ -83,6 +83,11 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 					primaryDsp?: Dsp | null;
 				};
 			};
+			delivery?: {
+				all?: ReleaseExecutionDeliveryInput;
+				directByDspId?: Record<string, ReleaseExecutionDeliveryInput>;
+				aggCi?: ReleaseExecutionDeliveryInput;
+			};
 			upcAutoIfReleaseSnapshotNull?: string;
 		};
 		output: {
@@ -100,3 +105,10 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 		}
 	}
 }
+
+export type ReleaseExecutionDeliveryInput = {
+	releaseId: string;
+	items: {
+		dspId: string;
+	}[];
+};
