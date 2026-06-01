@@ -31,7 +31,7 @@ Body can co:
   "video": {
     "isrc": "USXXX2600001",
     "explicit": false,
-    "aiContent": "Undetermined",
+    "aiContent": "UNDETERMINED",
     "channel": "ArtistVEVO",
     "contentProvider": "Content Provider",
     "copyrightOwner": "Work owner",
@@ -127,7 +127,7 @@ Body:
 | The loai | `CreateReleaseDraftDto.primaryGenreId` / `Release.primaryGenreId` | Yes | ID genre length 10. |
 | Ngon ngu | `releaseLanguage.metadataLanguageId` va/hoac `releaseLanguage.audioLanguageId` | Yes | Dung nested `releaseLanguage` trong `PUT /releases/draft/:id` hoac API release-language hien co. |
 | Noi dung nhay cam (Explicit) | `video.explicit` | No | Boolean `true/false`. |
-| Co chua noi dung AI | `video.aiContent` | No | Enum: `"All"`, `"Partly"`, `"None"`, `"Undetermined"`. Default `"Undetermined"`. |
+| Co chua noi dung AI | `video.aiContent` | No | Enum: `"ALL"`, `"PARTLY"`, `"NONE"`, `"UNDETERMINED"`. Default `"UNDETERMINED"`. |
 | ISRC | `video.isrc` | Yes | ISRC cua video. Khong dung Audio ISRC. |
 | Video file | `video.fileId` | Yes khi submit VEVO | File ID tu bucket upload video. |
 | Thumbnail file | `releaseCoverArt.fileId` / `release_cover_art` | Yes khi submit VEVO | Dung cover art original cua release. |
@@ -241,7 +241,7 @@ Cron scanner:
 - `releaseId` only required when calling `POST /videos` directly.
 - `isrc`
 - `explicit`
-- `aiContent`: `"All"` | `"Partly"` | `"None"` | `"Undetermined"`
+- `aiContent`: `"ALL"` | `"PARTLY"` | `"NONE"` | `"UNDETERMINED"`
 - `channel`
 - `description`
 - `keywords`

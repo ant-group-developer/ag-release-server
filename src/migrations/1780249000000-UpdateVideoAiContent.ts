@@ -18,19 +18,19 @@ export class UpdateVideoAiContent1780249000000 implements MigrationInterface {
 			ALTER TABLE "videos"
 			ALTER COLUMN "ai_content" TYPE varchar(20)
 			USING CASE
-				WHEN "ai_content" = true THEN 'All'
-				ELSE 'None'
+				WHEN "ai_content" = true THEN 'ALL'
+				ELSE 'NONE'
 			END
 		`);
 
 		await queryRunner.query(`
 			ALTER TABLE "videos"
-			ALTER COLUMN "ai_content" SET DEFAULT 'Undetermined'
+			ALTER COLUMN "ai_content" SET DEFAULT 'UNDETERMINED'
 		`);
 
 		await queryRunner.query(`
 			COMMENT ON COLUMN "videos"."ai_content"
-			IS 'Trang thai noi dung AI cua video theo VEVO: All, Partly, None, Undetermined'
+			IS 'Trang thai noi dung AI cua video theo VEVO: ALL, PARTLY, NONE, UNDETERMINED'
 		`);
 	}
 
@@ -48,7 +48,7 @@ export class UpdateVideoAiContent1780249000000 implements MigrationInterface {
 			ALTER TABLE "videos"
 			ALTER COLUMN "ai_content" TYPE boolean
 			USING CASE
-				WHEN "ai_content" IN ('All', 'Partly') THEN true
+				WHEN "ai_content" IN ('ALL', 'PARTLY') THEN true
 				ELSE false
 			END
 		`);
