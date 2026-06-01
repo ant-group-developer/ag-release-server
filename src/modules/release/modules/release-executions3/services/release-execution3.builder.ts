@@ -117,11 +117,18 @@ export class ReleaseExecution3Builder {
 				const dsps: Dsp[] = STEP.metadata?.input?.dsps ?? [];
 
 				dsps.forEach((dsp, index) => {
-					stepResult.push({
-						type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
-						order: index + 1,
-						metadata: { input: { dsp } },
-					});
+					stepResult.push(
+						{
+							type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
+							order: index + 1,
+							metadata: { input: { dsp } },
+						},
+						// {
+						// 	type: ReleaseExecutionStepType.SYNC_RESULT_TO_RELEASE,
+						// 	order: index + 2,
+						// 	metadata: { input: { dsp } },
+						// }
+					);
 				});
 				break;
 			}

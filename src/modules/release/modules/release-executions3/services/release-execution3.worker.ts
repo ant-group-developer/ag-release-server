@@ -125,6 +125,9 @@ export class ReleaseExecution3Worker {
 			case ReleaseExecutionStepType.UPLOAD_METADATA_TO_SFTP:
 				return this.uploadMetadataToSftp(context);
 
+			case ReleaseExecutionStepType.SYNC_RESULT_TO_RELEASE:
+				return this.syncResultToRelease(context);
+
 			default:
 				throw new Error(`Unsupported step type: ${step.type}`);
 		}
@@ -711,6 +714,13 @@ export class ReleaseExecution3Worker {
 
 			return ReleaseExecutionStepStatus.FAILED;
 		}
+	}
+
+	private async syncResultToRelease({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return await ReleaseExecutionStepStatus.DONE
 	}
 
 	private async uploadFolderToVevoS3({
