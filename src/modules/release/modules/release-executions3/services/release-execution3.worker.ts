@@ -369,7 +369,7 @@ export class ReleaseExecution3Worker {
 					`${batchId}.done`,
 				);
 
-				// await client.mkdir(donePath, true);
+				await client.mkdir(donePath, true);
 
 				this.logService.success({
 					message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
@@ -693,11 +693,11 @@ export class ReleaseExecution3Worker {
 					releaseExecution,
 				});
 			} else {
-				// await this.sftpConnectService.uploadFolder({
-				// 	sftp: config.sftp,
-				// 	localDir: outputDir,
-				// 	remoteDir: config.sftp.path ?? '/',
-				// });
+				await this.sftpConnectService.uploadFolder({
+					sftp: config.sftp,
+					localDir: outputDir,
+					remoteDir: config.sftp.path ?? '/',
+				});
 			}
 
 			await removeFolder(outputDir);
@@ -865,7 +865,7 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		// return ReleaseExecutionStepStatus.FAILED;
-		return ReleaseExecutionStepStatus.DONE;
+		// return ReleaseExecutionStepStatus.DONE;
 
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);

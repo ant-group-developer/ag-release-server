@@ -396,7 +396,7 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
-		return '0850080651803';
+		// return '0850080651803';
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC

@@ -51,3 +51,7 @@
 // - Thêm đối tác DSP mới: VEVO
 // - Cấu hình S3 credentials lưu trong cột metadata của bảng sftp_configs
 // - Chỉ định phiên bản DDEX ERN mặc định: 4.3
+
+
+cho t crud ở bảng này 
+dùng luôn api cũ bên release, thêm mới các trường vào các dto 
