@@ -1,80 +1,130 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+	CreateVideoDto,
+	UpdateVideoDto,
+	UpsertReleaseVideoDto,
+} from './dto/video.dto';
 import { Video } from './entities/video.entity';
-import { CreateVideoDto, UpdateVideoDto } from './dto/video.dto';
-
 
 @Injectable()
 export class VideoService {
-    constructor(
-        @InjectRepository(Video)
-        private readonly videoRepo: Repository<Video>,
-    ) { }
+	constructor(
+		@InjectRepository(Video)
+		private readonly videoRepo: Repository<Video>,
+	) {}
 
-    async create(dto: CreateVideoDto) {
-        const video = this.videoRepo.create(dto);
-        return this.videoRepo.save(video);
-    }
+	async create(dto: CreateVideoDto) {
+		const video = this.videoRepo.create(dto);
+		return this.videoRepo.save(video);
+	}
 
-    async findAll() {
-        return this.videoRepo.find({
-            relations: {
-                release: true,
-                videoFile: true,
-            },
-            order: {
-                createdAt: 'DESC',
-            },
-        });
-    }
+	async upsertByReleaseId(releaseId: string, dto: UpsertReleaseVideoDto) {
+		const video = await this.videoRepo.findOne({
+			where: { releaseId },
+		});
 
-    async findOne(id: string) {
-        const video = await this.videoRepo.findOne({
-            where: { id },
-            relations: {
-                release: true,
-                videoFile: true,
-            },
-        });
+		if (!video) {
+			return this.videoRepo.save(
+				this.videoRepo.create({
+					...dto,
+					releaseId,
+				}),
+			);
+		}
 
-        if (!video) {
-            throw new NotFoundException('Video not found');
-        }
+		Object.assign(video, {
+			...dto,
+			releaseId,
+		});
 
-        return video;
-    }
+		return this.videoRepo.save(video);
+	}
 
-    async findByReleaseId(releaseId: string) {
-        const video = await this.videoRepo.findOne({
-            where: { releaseId },
-            relations: {
-                release: true,
-                videoFile: true,
-            },
-        });
+	async deleteRecordOfRelease({ releaseId }: { releaseId: string }) {
+		await this.videoRepo.delete({ releaseId });
+	}
 
-        if (!video) {
-            throw new NotFoundException('Video not found');
-        }
+	async findAll() {
+		return this.videoRepo.find({
+			relations: {
+				release: true,
+				videoFile: true,
+				videoArtists: {
+					artist: true,
+				},
+				videoContributors: {
+					artist: true,
+					artistRole: true,
+				},
+			},
+			order: {
+				createdAt: 'DESC',
+			},
+		});
+	}
 
-        return video;
-    }
+	async findOne(id: string) {
+		const video = await this.videoRepo.findOne({
+			where: { id },
+			relations: {
+				release: true,
+				videoFile: true,
+				videoArtists: {
+					artist: true,
+				},
+				videoContributors: {
+					artist: true,
+					artistRole: true,
+				},
+			},
+		});
 
-    async update(id: string, dto: UpdateVideoDto) {
-        const video = await this.findOne(id);
+		if (!video) {
+			throw new NotFoundException('Video not found');
+		}
 
-        Object.assign(video, dto);
+		return video;
+	}
 
-        return this.videoRepo.save(video);
-    }
+	async findByReleaseId(releaseId: string) {
+		const video = await this.videoRepo.findOne({
+			where: { releaseId },
+			relations: {
+				release: true,
+				videoFile: true,
+				videoArtists: {
+					artist: true,
+				},
+				videoContributors: {
+					artist: true,
+					artistRole: true,
+				},
+			},
+		});
 
-    async remove(id: string) {
-        const video = await this.findOne(id);
-        await this.videoRepo.remove(video);
+		if (!video) {
+			throw new NotFoundException('Video not found');
+		}
 
-        return {
-            success: true,
-        };
-    }
+		return video;
+	}
+
+	async update(id: string, dto: UpdateVideoDto) {
+		const video = await this.findOne(id);
+
+		Object.assign(video, dto);
+
+		return this.videoRepo.save(video);
+	}
+
+	async remove(id: string) {
+		const video = await this.findOne(id);
+		await this.videoRepo.remove(video);
+
+		return {
+			success: true,
+		};
+	}
 }

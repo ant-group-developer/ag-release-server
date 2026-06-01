@@ -21,6 +21,10 @@ import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 
 export class CreateReleaseDto {
+	@IsOptional()
+	@IsString()
+	type?: 'audio' | 'video';
+
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()

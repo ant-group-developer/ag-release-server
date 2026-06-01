@@ -32,6 +32,8 @@ import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensi
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
+import { UpsertReleaseVideoDto } from 'src/modules/video/dto/video.dto';
+import { VideoService } from 'src/modules/video/video.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { newTransaction } from 'src/utils/utils.transaction';
 import { DataSource, Repository } from 'typeorm';
@@ -63,6 +65,7 @@ export class ReleaseDraftService {
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
 		private readonly releaseArtistService: ReleaseArtistService,
 		private readonly releaseTerritoryService: ReleaseTerritoryService,
+		private readonly videoService: VideoService,
 
 		private readonly trackDraftService: TrackDraftService,
 		private readonly dataSource: DataSource,
@@ -74,6 +77,7 @@ export class ReleaseDraftService {
 		tenantId: string,
 		userId: string,
 	): Promise<Release> {
+		const { video, ...releaseData } = data;
 		const {
 			albumFormatId,
 			labelId,
@@ -81,7 +85,7 @@ export class ReleaseDraftService {
 			subGenreId,
 			releaseTimezoneId,
 			priceTierId,
-		} = data;
+		} = releaseData;
 
 		await this.releaseValidateService.validate({
 			albumFormatId,
@@ -93,7 +97,7 @@ export class ReleaseDraftService {
 		});
 
 		const release = this.releaseRepo.create({
-			...data,
+			...releaseData,
 			tenantId,
 			creatorId: userId,
 			modifierId: userId,
@@ -102,6 +106,10 @@ export class ReleaseDraftService {
 
 		// coverArt
 		await this.createSubEntities(releaseDb.id);
+		await this.updateVideoSubEntities({
+			releaseId: releaseDb.id,
+			video,
+		});
 
 		return releaseDb;
 	}
@@ -142,6 +150,7 @@ export class ReleaseDraftService {
 			releaseCoverArt,
 			releaseLanguage,
 			releaseTerritory,
+			video,
 			...restOfData
 		} = data;
 
@@ -164,6 +173,7 @@ export class ReleaseDraftService {
 			releaseLanguage,
 			releaseCoverArt,
 			releaseTerritory,
+			video,
 			priceTierId: data.priceTierId,
 		});
 
@@ -184,17 +194,33 @@ export class ReleaseDraftService {
 		};
 	}
 
+	private async updateVideoSubEntities({
+		releaseId,
+		video,
+	}: {
+		releaseId: string;
+		video?: UpsertReleaseVideoDto | null;
+	}) {
+		if (video === null) {
+			await this.videoService.deleteRecordOfRelease({ releaseId });
+		} else if (video !== undefined) {
+			await this.videoService.upsertByReleaseId(releaseId, video);
+		}
+	}
+
 	private async updateSubEntities({
 		release,
 		releaseLanguage,
 		releaseCoverArt,
 		releaseTerritory,
+		video,
 		priceTierId,
 	}: {
 		release: Release;
 		releaseLanguage?: UpdateReleaseLanguageDraftDto;
 		releaseCoverArt?: CreateReleaseCoverArtDto | null;
 		releaseTerritory?: UpdateReleaseTerritoryDto;
+		video?: UpsertReleaseVideoDto | null;
 		priceTierId?: string | null;
 	}) {
 		const releaseId = release.id;
@@ -212,6 +238,11 @@ export class ReleaseDraftService {
 		await this.releaseCoverArtService.handleUpdateReleaseCoverArt({
 			releaseId,
 			releaseCoverArt,
+		});
+
+		await this.updateVideoSubEntities({
+			releaseId,
+			video,
 		});
 
 		if (release.albumFormat?.code === 'Single') {
@@ -371,6 +402,10 @@ export class ReleaseDraftService {
 			}),
 
 			this.releaseTerritoryService.deleteRecordOfRelease({
+				releaseId,
+			}),
+
+			this.videoService.deleteRecordOfRelease({
 				releaseId,
 			}),
 		]);

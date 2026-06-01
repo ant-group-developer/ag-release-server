@@ -60,6 +60,11 @@ import { ReleaseExecutionStep3 } from './modules/release-executions3/entites/rel
 import { ReleaseExecution3 } from './modules/release-executions3/entites/release-execution3.entity';
 import { ReleaseExecution3Service } from './modules/release-executions3/services/release-execution3.service';
 
+import { PartnersApiModule } from '../partners-api/partners-api.module';
+import { VideoArtist } from '../video-artist/entities/video-artist.entity';
+import { VideoContributor } from '../video-contributor/entities/video-contributor.entity';
+import { Video } from '../video/entities/video.entity';
+import { VideoModule } from '../video/video.module';
 import { CiDistributionJob3Controller } from './modules/release-executions3/controllers/ci-distribution-job3.controller';
 import { ReleaseSubmitTestController } from './modules/release-executions3/controllers/release-submit-test.controller';
 import { CiDistributionJob3 } from './modules/release-executions3/entites/ci-distribution-job3.entity';
@@ -74,8 +79,6 @@ import { ReleaseSubmitStep } from './modules/release-submit/entities/release-sub
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
 import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
-import { Video } from '../video/entities/video.entity';
-import { PartnersApiModule } from '../partners-api/partners-api.module';
 
 @Module({
 	imports: [
@@ -104,7 +107,9 @@ import { PartnersApiModule } from '../partners-api/partners-api.module';
 			ReleaseExecutionStep3,
 			CiDistributionJob3,
 
-			Video
+			Video,
+			VideoArtist,
+			VideoContributor,
 		]),
 
 		AppConfigModule,
@@ -114,6 +119,7 @@ import { PartnersApiModule } from '../partners-api/partners-api.module';
 		ReleaseCoverArtModule,
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
+		VideoModule,
 		ReleaseLogModule,
 
 		FileExportCiModule,
@@ -136,7 +142,7 @@ import { PartnersApiModule } from '../partners-api/partners-api.module';
 		NotificationModule,
 		CiModule,
 
-		PartnersApiModule
+		PartnersApiModule,
 
 		// ReleaseExecutions3Module,
 	],
@@ -182,4 +188,4 @@ import { PartnersApiModule } from '../partners-api/partners-api.module';
 	],
 	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
 })
-export class ReleaseModule { }
+export class ReleaseModule {}

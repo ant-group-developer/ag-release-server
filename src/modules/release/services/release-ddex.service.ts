@@ -26,7 +26,6 @@ import {
 } from 'src/utils/util';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
 import { Release } from '../entities/release.entity';
-import { Video } from 'src/modules/video/entities/video.entity';
 
 interface AudioFileInfo {
 	// buffer: Buffer;
@@ -55,7 +54,7 @@ export class ReleaseDdexService {
 		private readonly dspRoutingConfigsService: DspRoutingConfigsService,
 		private readonly countryService: CountryService,
 		private readonly aggregatorsService: AggregatorsService,
-	) { }
+	) {}
 
 	/**
 	 * Main entry point - tạo metadata Spotify trên server
@@ -484,11 +483,18 @@ export class ReleaseDdexService {
 		tempDir: string,
 	): Promise<{
 		videoFile: { filePath: string; fileName: string; extension: string };
-		subtitleFiles: { filePath: string; fileName: string; extension: string; language: string }[];
+		subtitleFiles: {
+			filePath: string;
+			fileName: string;
+			extension: string;
+			language: string;
+		}[];
 		coverImage: CoverImageInfo;
 	}> {
 		if (!release.video) {
-			throw new Error('Release type is video but no video metadata is linked');
+			throw new Error(
+				'Release type is video but no video metadata is linked',
+			);
 		}
 
 		// Fetch Video file
@@ -496,7 +502,10 @@ export class ReleaseDdexService {
 		if (!videoFileId) {
 			throw new Error('Video record found but has no file associated');
 		}
-		const videoDestPath = path.join(tempDir, `video_${release.video.isrc}.tmp`);
+		const videoDestPath = path.join(
+			tempDir,
+			`video_${release.video.isrc}.tmp`,
+		);
 		const videoFileDb = await this.bucket2Sv.streamFileToPath({
 			fileId: videoFileId,
 			destPath: videoDestPath,
@@ -519,7 +528,10 @@ export class ReleaseDdexService {
 		const subtitleFiles = [];
 		if (release.video.subtitles && Array.isArray(release.video.subtitles)) {
 			for (const [subIndex, sub] of release.video.subtitles.entries()) {
-				const subDestPath = path.join(tempDir, `sub_${sub.language}_${subIndex}.tmp`);
+				const subDestPath = path.join(
+					tempDir,
+					`sub_${sub.language}_${subIndex}.tmp`,
+				);
 				const subFileDb = await this.bucket2Sv.streamFileToPath({
 					fileId: sub.fileId,
 					destPath: subDestPath,
@@ -615,7 +627,12 @@ export class ReleaseDdexService {
 		isrc,
 	}: {
 		videoFile: { filePath: string; fileName: string; extension: string };
-		subtitleFiles: { filePath: string; fileName: string; extension: string; language: string }[];
+		subtitleFiles: {
+			filePath: string;
+			fileName: string;
+			extension: string;
+			language: string;
+		}[];
 		outputDir: string;
 		isrc: string;
 	}): Promise<void> {
@@ -623,18 +640,22 @@ export class ReleaseDdexService {
 		const ext = this.normalizeVideoExtension(videoFile.extension);
 		const videoFileName = `${isrc}_T1V${ext}`;
 		const videoDestPath = path.join(outputDir, videoFileName);
-		await fs.promises.rename(videoFile.filePath, videoDestPath).catch(async () => {
-			await fs.promises.copyFile(videoFile.filePath, videoDestPath);
-		});
+		await fs.promises
+			.rename(videoFile.filePath, videoDestPath)
+			.catch(async () => {
+				await fs.promises.copyFile(videoFile.filePath, videoDestPath);
+			});
 		this.logger.log(`[VIDEO_SAVED] ${videoFileName}`);
 
 		// 2. Process Subtitles
 		for (const [subIndex, sub] of subtitleFiles.entries()) {
 			const subFileName = `${isrc}_T${subIndex + 1}S.srt`;
 			const subDestPath = path.join(outputDir, subFileName);
-			await fs.promises.rename(sub.filePath, subDestPath).catch(async () => {
-				await fs.promises.copyFile(sub.filePath, subDestPath);
-			});
+			await fs.promises
+				.rename(sub.filePath, subDestPath)
+				.catch(async () => {
+					await fs.promises.copyFile(sub.filePath, subDestPath);
+				});
 			this.logger.log(`[SUBTITLE_SAVED] ${subFileName}`);
 		}
 	}
@@ -662,7 +683,10 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}): ErnInput2 {
-		if ((release.type as string) === 'video' || (release.type as string) === 'VideoSingle') {
+		if (
+			(release.type as string) === 'video' ||
+			(release.type as string) === 'VideoSingle'
+		) {
 			return this.parseErnInputFromVideo({
 				release,
 				ernVersion,
@@ -755,29 +779,29 @@ export class ReleaseDdexService {
 				pLine:
 					release.pLineYear && release.pLineOwner
 						? {
-							year: release.pLineYear,
-							text: `${release.pLineYear} ${release.pLineOwner}`,
-						}
+								year: release.pLineYear,
+								text: `${release.pLineYear} ${release.pLineOwner}`,
+							}
 						: undefined,
 
 				cLine:
 					release.cLineYear && release.cLineOwner
 						? {
-							year: release.cLineYear,
-							text: `${release.cLineYear} ${release.cLineOwner}`,
-						}
+								year: release.cLineYear,
+								text: `${release.cLineYear} ${release.cLineOwner}`,
+							}
 						: undefined,
 
 				territories,
 
 				coverArt: cover
 					? {
-						fileName: `${release.upc}${coverExt}`,
-						filePath: 'resources',
-						codecType: 'image/jpeg',
-						width: cover.width,
-						height: cover.height,
-					}
+							fileName: `${release.upc}${coverExt}`,
+							filePath: 'resources',
+							codecType: 'image/jpeg',
+							width: cover.width,
+							height: cover.height,
+						}
 					: undefined,
 			},
 
@@ -851,36 +875,36 @@ export class ReleaseDdexService {
 					pLine:
 						track.pLineYear && track.pLineOwner
 							? {
-								year: track.pLineYear,
-								text: `${track.pLineYear} ${track.pLineOwner}`,
-							}
+									year: track.pLineYear,
+									text: `${track.pLineYear} ${track.pLineOwner}`,
+								}
 							: undefined,
 
 					recordingMode: 'Stereo',
 
 					audioFile: track.audioFile
 						? {
-							fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
+								fileName: `${track.isrc}_T${index}S${this.normalizeAudioExtension(track.audioFile.file?.extension ?? 'wav')}`,
 
-							filePath: 'resources',
+								filePath: 'resources',
 
-							codecType:
-								track.audioFile.file?.extension.toUpperCase() ??
-								'WAV',
+								codecType:
+									track.audioFile.file?.extension.toUpperCase() ??
+									'WAV',
 
-							bitRate: track.audioFile.bitrate ?? undefined,
+								bitRate: track.audioFile.bitrate ?? undefined,
 
-							samplingRate: track.audioFile.sampleRate
-								? parseInt(
-									track.audioFile.sampleRate.replace(
-										/[^0-9]/g,
-										'',
-									),
-								)
-								: undefined,
+								samplingRate: track.audioFile.sampleRate
+									? parseInt(
+											track.audioFile.sampleRate.replace(
+												/[^0-9]/g,
+												'',
+											),
+										)
+									: undefined,
 
-							bitDepth: track.audioFile.bitDepth ?? undefined,
-						}
+								bitDepth: track.audioFile.bitDepth ?? undefined,
+							}
 						: undefined,
 				})),
 
@@ -1096,6 +1120,28 @@ export class ReleaseDdexService {
 			throw new Error('Video metadata not found for video release');
 		}
 
+		const artists =
+			video.videoArtists?.length > 0
+				? video.videoArtists.map((va) => ({
+						name: va.artist?.name ?? '',
+						role: 'MainArtist',
+					}))
+				: release.releaseArtists.map((ra) => ({
+						name: ra.artist?.name ?? '',
+						role: 'MainArtist',
+					}));
+
+		const contributors =
+			video.videoContributors?.length > 0
+				? video.videoContributors.map((c) => ({
+						name: c.artist?.name ?? '',
+						role: c.artistRole?.code ?? 'Composer',
+					}))
+				: release.releaseContributors?.map((c) => ({
+						name: c.artist?.name ?? '',
+						role: c.artistRole?.code ?? 'Composer',
+					}));
+
 		return {
 			version: ernVersion,
 			message: {
@@ -1114,26 +1160,31 @@ export class ReleaseDdexService {
 				genre: release.primaryGenre?.name ?? 'Pop',
 				subGenre: release.subGenre?.name ?? undefined,
 				labelName: release.label?.name ?? '',
-				artists: release.releaseArtists.map((ra) => ({
-					name: ra.artist?.name ?? '',
-					role: 'MainArtist',
-				})),
+				artists,
 				parentalWarning: video.explicit ? 'Explicit' : 'NotExplicit',
-				pLine: release.pLineYear && release.pLineOwner
-					? { year: release.pLineYear, text: `${release.pLineYear} ${release.pLineOwner}` }
-					: undefined,
-				cLine: release.cLineYear && release.cLineOwner
-					? { year: release.cLineYear, text: `${release.cLineYear} ${release.cLineOwner}` }
-					: undefined,
+				pLine:
+					release.pLineYear && release.pLineOwner
+						? {
+								year: release.pLineYear,
+								text: `${release.pLineYear} ${release.pLineOwner}`,
+							}
+						: undefined,
+				cLine:
+					release.cLineYear && release.cLineOwner
+						? {
+								year: release.cLineYear,
+								text: `${release.cLineYear} ${release.cLineOwner}`,
+							}
+						: undefined,
 				territories,
 				coverArt: cover
 					? {
-						fileName: `${release.upc}${coverExt}`,
-						filePath: 'resources',
-						codecType: 'image/jpeg',
-						width: cover.width,
-						height: cover.height,
-					}
+							fileName: `${release.upc}${coverExt}`,
+							filePath: 'resources',
+							codecType: 'image/jpeg',
+							width: cover.width,
+							height: cover.height,
+						}
 					: undefined,
 			},
 			tracks: [],
@@ -1146,18 +1197,18 @@ export class ReleaseDdexService {
 					order: 1,
 					genre: release.primaryGenre?.name ?? 'Pop',
 					subGenre: release.subGenre?.name ?? undefined,
-					parentalWarning: video.explicit ? 'Explicit' : 'NotExplicit',
-					artists: release.releaseArtists.map((ra) => ({
-						name: ra.artist?.name ?? '',
-						role: 'MainArtist',
-					})),
-					contributors: release.releaseContributors?.map((c) => ({
-						name: c.artist?.name ?? '',
-						role: c.artistRole?.code ?? 'Composer',
-					})),
-					pLine: release.pLineYear && release.pLineOwner
-						? { year: release.pLineYear, text: `${release.pLineYear} ${release.pLineOwner}` }
-						: undefined,
+					parentalWarning: video.explicit
+						? 'Explicit'
+						: 'NotExplicit',
+					artists,
+					contributors,
+					pLine:
+						release.pLineYear && release.pLineOwner
+							? {
+									year: release.pLineYear,
+									text: `${release.pLineYear} ${release.pLineOwner}`,
+								}
+							: undefined,
 					videoFile: {
 						fileName: `${video.isrc}_T1V${this.normalizeVideoExtension(video.videoFile?.extension ?? 'mp4')}`,
 						filePath: 'resources',
@@ -1171,10 +1222,10 @@ export class ReleaseDdexService {
 					channel: video.channel,
 					description: video.description || undefined,
 					isKids: video.isKids,
-					isUnlisted: false,
+					isUnlisted: video.isUnlisted,
 					partnerCustomId1: video.partnerCustomId1 || undefined,
 					partnerCustomId2: video.partnerCustomId2 || undefined,
-				}
+				},
 			],
 			deals: {
 				release: [
@@ -1186,12 +1237,16 @@ export class ReleaseDdexService {
 						endDate: release.releaseEndDate
 							? this.formatDateTime(release.releaseEndDate)
 							: '',
-						commercialModels: ['SubscriptionModel', 'AdvertisementSupportedModel'],
+						commercialModels: [
+							'SubscriptionModel',
+							'AdvertisementSupportedModel',
+						],
 						useTypes: ['Stream'],
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
-							currencyCode: release.priceTier?.currency?.code ?? '',
+							currencyCode:
+								release.priceTier?.currency?.code ?? '',
 						},
 					},
 				],

@@ -1,8 +1,8 @@
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
-import path from 'path';
 import * as fs from 'fs';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import path from 'path';
 import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
@@ -51,7 +51,7 @@ export class ReleaseExecution3Worker {
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
-	) { }
+	) {}
 
 	async dispatchStepTask(
 		context: StepTaskContext,
@@ -582,8 +582,8 @@ export class ReleaseExecution3Worker {
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
-					where: { id: step.parentStepId },
-				})
+						where: { id: step.parentStepId },
+					})
 				: null;
 
 			let dspCode: string | undefined;
@@ -720,7 +720,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		return await ReleaseExecutionStepStatus.DONE
+		return await ReleaseExecutionStepStatus.DONE;
 	}
 
 	private async uploadFolderToVevoS3({
@@ -732,8 +732,11 @@ export class ReleaseExecution3Worker {
 		localDir: string;
 		releaseExecution: ReleaseExecution3;
 	}): Promise<void> {
-		const upc = releaseExecution.metadata?.input?.releaseSnapshot?.upc || 'new_upc';
-		const isrc = releaseExecution.metadata?.input?.releaseSnapshot?.video?.isrc || 'new_isrc';
+		const upc =
+			releaseExecution.metadata?.input?.releaseSnapshot?.upc || 'new_upc';
+		const isrc =
+			releaseExecution.metadata?.input?.releaseSnapshot?.video?.isrc ||
+			'new_isrc';
 		const localReleaseDir = path.join(localDir, upc);
 
 		const allFiles = this.getAllFilesRecursive(localReleaseDir);
@@ -754,7 +757,11 @@ export class ReleaseExecution3Worker {
 
 		// 1. Upload Assets first
 		for (const asset of assets) {
-			const s3Key = path.posix.join(s3Prefix, uniqueFolder, asset.relativePath.replace(/\\/g, '/'));
+			const s3Key = path.posix.join(
+				s3Prefix,
+				uniqueFolder,
+				asset.relativePath.replace(/\\/g, '/'),
+			);
 			const fileStream = fs.createReadStream(asset.localPath);
 
 			await s3Client.send(
@@ -772,7 +779,11 @@ export class ReleaseExecution3Worker {
 
 		// 2. Upload Manifest XML last
 		if (manifest) {
-			const s3Key = path.posix.join(s3Prefix, uniqueFolder, manifest.relativePath.replace(/\\/g, '/'));
+			const s3Key = path.posix.join(
+				s3Prefix,
+				uniqueFolder,
+				manifest.relativePath.replace(/\\/g, '/'),
+			);
 			const fileStream = fs.createReadStream(manifest.localPath);
 
 			await s3Client.send(
@@ -812,7 +823,6 @@ export class ReleaseExecution3Worker {
 
 		return fileList;
 	}
-
 
 	private async syncDataFromDsp({
 		step,
@@ -930,8 +940,8 @@ export class ReleaseExecution3Worker {
 			const dsps =
 				ciCodes.length > 0
 					? await this.manager.find(Dsp, {
-						where: { codeCi: In(ciCodes) },
-					})
+							where: { codeCi: In(ciCodes) },
+						})
 					: [];
 
 			const ciToSystem = new Map(

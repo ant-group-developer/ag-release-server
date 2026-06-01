@@ -42,9 +42,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 20,
 		comment: 'Video hay audio',
-		default: 'Audio'
+		default: 'audio',
 	})
-	type: 'audio' | 'video'
+	type: 'audio' | 'video';
 
 	@Column({
 		type: 'varchar',
@@ -58,6 +58,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		comment: 'ID định dạng album (single, EP, album...)',
+		nullable: true,
 	})
 	albumFormatId: string;
 
@@ -334,7 +335,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 			.map((r) => {
 				if (
 					r.dsp?.dspRoutingConfig?.mode ===
-					RoutingModeEnum.AGGREGATOR &&
+						RoutingModeEnum.AGGREGATOR &&
 					r.dsp?.dspRoutingConfig?.aggregator?.code === 'CI'
 				) {
 					return r.dsp.codeCi;

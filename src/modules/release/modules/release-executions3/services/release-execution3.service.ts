@@ -7,7 +7,7 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { EntityManager, In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import {
 	CiDistributionJob3,
@@ -43,10 +43,9 @@ export class ReleaseExecution3Service {
 		private readonly engine: ReleaseExecutionStepEngine,
 
 		private readonly logService: LogsService,
-	) { }
+	) {}
 
-
-	// đã handle 
+	// đã handle
 	// new
 	async newJob(body: {
 		release: Release;
@@ -580,9 +579,9 @@ export class ReleaseExecution3Service {
 			metadata:
 				targetStatus === ReleaseExecutionStepStatus.NEW
 					? {
-						...step.metadata,
-						output: null,
-					}
+							...step.metadata,
+							output: null,
+						}
 					: step.metadata,
 		});
 
@@ -664,7 +663,7 @@ export class ReleaseExecution3Service {
 
 		// await this.resetAncestorsToNew(step);
 
-		this.runPipeline(step.releaseExecutionId).catch((e) => console.log(e))
+		this.runPipeline(step.releaseExecutionId).catch((e) => console.log(e));
 	}
 
 	// async failStep(stepId: string): Promise<void> {
@@ -716,7 +715,6 @@ export class ReleaseExecution3Service {
 	// 	parent.status = newStatus;
 	// 	await this.propagateStatusUpward(parent);
 	// }
-
 
 	async updateStatusStepAndRerunPipeline({
 		stepId,

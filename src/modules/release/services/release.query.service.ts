@@ -210,6 +210,13 @@ export class ReleaseQueryService {
 			)
 			.leftJoin('release.timeZone', 'timeZone')
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.videoFile', 'videoFile')
+			.leftJoin('video.videoArtists', 'videoArtist')
+			.leftJoin('videoArtist.artist', 'videoArtistEntity')
+			.leftJoin('video.videoContributors', 'videoContributor')
+			.leftJoin('videoContributor.artist', 'videoContributorArtist')
+			.leftJoin('videoContributor.artistRole', 'videoContributorRole')
 
 			.leftJoin('release.modifier', 'modifier')
 
@@ -342,6 +349,59 @@ export class ReleaseQueryService {
 				'releaseTerritory.distributeWorldwide',
 				'releaseTerritory.distributionType',
 				'releaseTerritory.selectedCountries',
+			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.isrc',
+				'video.explicit',
+				'video.isAi',
+				'video.channel',
+				'video.description',
+				'video.keywords',
+				'video.isKids',
+				'video.isUnlisted',
+				'video.subtitles',
+				'video.contentProvider',
+				'video.copyrightOwner',
+				'video.partnerCustomId1',
+				'video.partnerCustomId2',
+				'video.fileId',
+			])
+			.addSelect([
+				'videoFile.id',
+				'videoFile.fileName',
+				'videoFile.extension',
+				'videoFile.fileSize',
+				'videoFile.contentType',
+			])
+			.addSelect([
+				'videoArtist.id',
+				'videoArtist.artistId',
+				'videoArtist.videoId',
+			])
+			.addSelect([
+				'videoArtistEntity.id',
+				'videoArtistEntity.name',
+				'videoArtistEntity.code',
+				'videoArtistEntity.picture',
+			])
+			.addSelect([
+				'videoContributor.id',
+				'videoContributor.artistId',
+				'videoContributor.artistRoleId',
+				'videoContributor.videoId',
+			])
+			.addSelect([
+				'videoContributorArtist.id',
+				'videoContributorArtist.name',
+				'videoContributorArtist.code',
+				'videoContributorArtist.picture',
+			])
+			.addSelect([
+				'videoContributorRole.id',
+				'videoContributorRole.name',
+				'videoContributorRole.code',
 			])
 
 			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar']);
@@ -841,6 +901,14 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
+			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
+			.leftJoinAndSelect('video.videoContributors', 'videoContributors')
+			.leftJoinAndSelect('videoContributors.artist', 'videoContributor')
+			.leftJoinAndSelect(
+				'videoContributors.artistRole',
+				'videoContributorRole',
+			)
 			.where('release.id = :releaseId', { releaseId })
 			.getOne();
 
@@ -1010,6 +1078,14 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
+			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
+			.leftJoinAndSelect('video.videoContributors', 'videoContributors')
+			.leftJoinAndSelect('videoContributors.artist', 'videoContributor')
+			.leftJoinAndSelect(
+				'videoContributors.artistRole',
+				'videoContributorRole',
+			)
 
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')
