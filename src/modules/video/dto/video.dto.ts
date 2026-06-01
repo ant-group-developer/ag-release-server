@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
@@ -10,6 +11,7 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
+import { VideoAiContent } from '../entities/video.entity';
 
 export class CreateVideoDto {
 	@ApiProperty({ format: 'uuid' })
@@ -28,10 +30,13 @@ export class CreateVideoDto {
 	@IsBoolean()
 	explicit?: boolean;
 
-	@ApiPropertyOptional({ default: false })
+	@ApiPropertyOptional({
+		enum: VideoAiContent,
+		default: VideoAiContent.UNDETERMINED,
+	})
 	@IsOptional()
-	@IsBoolean()
-	isAi?: boolean;
+	@IsEnum(VideoAiContent)
+	aiContent?: VideoAiContent;
 
 	@ApiProperty({ maxLength: 150 })
 	@IsString()

@@ -356,7 +356,7 @@ export class ReleaseQueryService {
 				'video.releaseId',
 				'video.isrc',
 				'video.explicit',
-				'video.isAi',
+				'video.aiContent',
 				'video.channel',
 				'video.description',
 				'video.keywords',

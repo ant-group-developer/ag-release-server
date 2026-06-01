@@ -5,6 +5,13 @@ import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.enti
 import { VideoContributor } from 'src/modules/video-contributor/entities/video-contributor.entity';
 import { Column, Entity, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 
+export enum VideoAiContent {
+	ALL = 'ALL',
+	PARTLY = 'PARTLY',
+	NONE = 'NONE',
+	UNDETERMINED = 'UNDETERMINED',
+}
+
 /**
  * THỰC THỂ VIDEO (VIDEO ENTITY)
  *
@@ -49,12 +56,14 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	explicit: boolean;
 
 	@Column({
-		type: 'boolean',
-		default: false,
+		name: 'ai_content',
+		type: 'varchar',
+		length: 20,
+		default: VideoAiContent.UNDETERMINED,
 		comment:
-			'Xác định video có sử dụng công nghệ hoặc nội dung do AI tạo ra hay không',
+			'Trang thai noi dung AI cua video theo VEVO: ALL, PARTLY, NONE, UNDETERMINED',
 	})
-	isAi: boolean;
+	aiContent: VideoAiContent;
 
 	@Column({
 		type: 'varchar',
