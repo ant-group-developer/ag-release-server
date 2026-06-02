@@ -14,7 +14,7 @@ import {
 export class TimelineAnalyticsService {
   private readonly logger = new Logger(TimelineAnalyticsService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(private readonly clickHouseService: ClickHouseService) { }
 
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
@@ -56,36 +56,47 @@ export class TimelineAnalyticsService {
     params.from = fromDate;
     params.to = toDate;
 
+    // DSP name: chua assign → dsps_report.dsp_name, da assign → pg_dsps_sync.dsp_name
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const dspNameExpr = `${resolvedDspName} AS dsp_name`;
+    const joinExpr = `
+      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    `;
+
     // 1. Tim Top N DSPs dua tren views cua tenant
     const topDspsSql = `
       SELECT
         s.dsp_id AS dsp_id,
+        ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_id
+      GROUP BY s.dsp_id, dsp_name
       ORDER BY views DESC
       LIMIT ${topN}
     `;
-    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string }>(
+    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string; dsp_name: string }>(
       topDspsSql,
       params,
     );
-    const topDsps = topDspsRows.map((r) => r.dsp_id);
+    const topDspIds = topDspsRows.map((r) => r.dsp_id);
+    const topDsps = topDspsRows.map((r) => r.dsp_name);
 
-    if (!topDsps.length) {
+    if (!topDspIds.length) {
       return { topDsps: [], items: [] };
     }
 
     // 2. Query monthly timeline native JOIN
-    params.topDsps = topDsps;
+    params.topDsps = topDspIds;
     const dspExpr = includeOther
-      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), s.dsp_id, 'Other')`
-      : 's.dsp_id';
+      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
+      : dspNameExpr;
     const whereDsp = includeOther
       ? ''
       : 'AND s.dsp_id IN ({topDsps:Array(String)})';
@@ -94,10 +105,11 @@ export class TimelineAnalyticsService {
       SELECT
         toStartOfMonth(s.period) AS period_date,
         formatDateTime(s.period, '%Y-%m') AS period_str,
-        ${dspExpr} AS dsp_name,
+        ${dspExpr},
         sum(s.total_quantity) AS sales_views
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
@@ -142,36 +154,47 @@ export class TimelineAnalyticsService {
     params.from = fromDate;
     params.to = toDate;
 
+    // DSP name: chua assign -> dsps_report.dsp_name, da assign -> pg_dsps_sync.dsp_name
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const dspNameExpr = `${resolvedDspName} AS dsp_name`;
+    const joinExpr = `
+      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    `;
+
     // 1. Tim Top N DSPs trends
     const topDspsSql = `
       SELECT
         s.dsp_id AS dsp_id,
+        ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_id
+      GROUP BY s.dsp_id, dsp_name
       ORDER BY views DESC
       LIMIT ${topN}
     `;
-    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string }>(
+    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string; dsp_name: string }>(
       topDspsSql,
       params,
     );
-    const topDsps = topDspsRows.map((r) => r.dsp_id);
+    const topDspIds = topDspsRows.map((r) => r.dsp_id);
+    const topDsps = topDspsRows.map((r) => r.dsp_name);
 
-    if (!topDsps.length) {
+    if (!topDspIds.length) {
       return { topDsps: [], items: [] };
     }
 
     // 2. Query timeline
-    params.topDsps = topDsps;
+    params.topDsps = topDspIds;
     const dspExpr = includeOther
-      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), s.dsp_id, 'Other')`
-      : 's.dsp_id';
+      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
+      : dspNameExpr;
     const whereDsp = includeOther
       ? ''
       : 'AND s.dsp_id IN ({topDsps:Array(String)})';
@@ -180,10 +203,11 @@ export class TimelineAnalyticsService {
       SELECT
         toStartOfMonth(s.period) AS period_date,
         formatDateTime(s.period, '%Y-%m') AS period_str,
-        ${dspExpr} AS dsp_name,
+        ${dspExpr},
         sum(s.total_quantity) AS trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
@@ -227,36 +251,47 @@ export class TimelineAnalyticsService {
     params.from = fromDate;
     params.to = toDate;
 
+    const joinExpr = `
+      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    `;
+
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const dspNameExpr = `${resolvedDspName} AS dsp_name`;
+
     // 1. Tim Top N DSPs trends daily
     const topDspsSql = `
       SELECT
         s.dsp_id AS dsp_id,
+        ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_id
+      GROUP BY s.dsp_id, dsp_name
       ORDER BY views DESC
       LIMIT ${topN}
     `;
-    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string }>(
+    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string; dsp_name: string }>(
       topDspsSql,
       params,
     );
-    const topDsps = topDspsRows.map((r) => r.dsp_id);
+    const topDspIds = topDspsRows.map((r) => r.dsp_id);
+    const topDsps = topDspsRows.map((r) => r.dsp_name);
 
-    if (!topDsps.length) {
+    if (!topDspIds.length) {
       return { topDsps: [], items: [] };
     }
 
     // 2. Query daily timeline
-    params.topDsps = topDsps;
+    params.topDsps = topDspIds;
     const dspExpr = includeOther
-      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), s.dsp_id, 'Other')`
-      : 's.dsp_id';
+      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
+      : dspNameExpr;
     const whereDsp = includeOther
       ? ''
       : 'AND s.dsp_id IN ({topDsps:Array(String)})';
@@ -265,10 +300,11 @@ export class TimelineAnalyticsService {
       SELECT
         s.reporting_date AS period_date,
         formatDateTime(s.reporting_date, '%Y-%m-%d') AS period_str,
-        ${dspExpr} AS dsp_name,
+        ${dspExpr},
         sum(s.total_quantity) AS trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinExpr}
       WHERE t.is_deleted = 0
         AND s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})

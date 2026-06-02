@@ -14,6 +14,8 @@ export const CLICKHOUSE_TABLES = {
   TRENDS_ISRC_DAILY_CUBE: 'trends_isrc_daily_cube',
   TRENDS_DSP_DAILY_CUBE: 'trends_dsp_daily_cube',
   PG_TRACKS_SYNC: 'pg_tracks_sync',
+  PG_DSPS_SYNC: 'pg_dsps_sync',
+  DSPS_REPORT: 'dsps_report',
   TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
   SALES_TER_MONTHLY: 'sales_ter_monthly_cube',
   TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',

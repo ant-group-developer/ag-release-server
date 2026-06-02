@@ -7,8 +7,11 @@ import { FtpService } from './services/ftp/ftp.service';
 import { SyncService } from './services/sync/sync.service';
 import { SchedulerService } from './services/scheduler/scheduler.service';
 import { JobService } from './services/job/job.service';
+import { DspModule } from '../dsp/dsp.module';
+import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 
 @Module({
+  imports: [DspModule, ClickHouseModule],
   controllers: [ImportController, SyncController, JobController],
   providers: [ImportService, FtpService, SyncService, SchedulerService, JobService],
   exports: [ImportService, SyncService],
