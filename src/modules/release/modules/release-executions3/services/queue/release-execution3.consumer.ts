@@ -7,10 +7,9 @@ import { ReleaseExecution3 } from '../../entites/release-execution3.entity';
 import {
 	ReleaseExecution3RunPipelineQueue,
 	RunPipelineQueueStatus,
-} from '../../entites/release-execution3.run-pipeline-queue.entity';
+} from '../../entites/release-execution3.queue.entity';
 import { ReleaseExecutionStatus } from '../../enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../release-execution3.service';
-import { ReleaseExecution3Queue } from './release-execution3.queue';
 
 @Injectable()
 export class ReleaseExecution3Consumer {
@@ -26,8 +25,6 @@ export class ReleaseExecution3Consumer {
 
 		@InjectRepository(ReleaseExecution3RunPipelineQueue)
 		private readonly runPipelineQueueRepo: Repository<ReleaseExecution3RunPipelineQueue>,
-
-		private readonly queueService: ReleaseExecution3Queue,
 	) {}
 
 	@Cron(CronExpression.EVERY_MINUTE)

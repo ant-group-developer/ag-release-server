@@ -223,9 +223,10 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		}
 
 		try {
-			const cronExpression =
-				this.appConfigService.cache?.config?.partners?.ci
-					?.dailySendCron || '0 8 * * *';
+			const cronExpression = '*/1 * * * *'; // mỗi phút, test nhanh
+			// const cronExpression =
+			// 	this.appConfigService.cache?.config?.partners?.ci
+			// 		?.dailySendCron || '0 8 * * *';
 
 			const job = new CronJob(cronExpression, () => {
 				this.handleDailySend().catch((err) => {
@@ -284,6 +285,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 			if (emailJobIds.length) {
 				result.email = await this.autoSendEmail(emailJobIds);
+				// console.log('Email job ids to send:', emailJobIds);
 			}
 
 			if (adminExportJobIds.length) {

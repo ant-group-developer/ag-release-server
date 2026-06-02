@@ -76,7 +76,7 @@ import { ReleaseExecutionStepEngine } from './modules/release-executions3/servic
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 
-import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.run-pipeline-queue.entity';
+import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
 import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';

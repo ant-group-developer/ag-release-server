@@ -1,8 +1,10 @@
+import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
 import { VideoContributor } from 'src/modules/video-contributor/entities/video-contributor.entity';
+import { VideoGenre } from 'src/modules/video-genre/entities/video-genre.entity';
 import { Column, Entity, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 
 export enum VideoAiContent {
@@ -10,6 +12,13 @@ export enum VideoAiContent {
 	PARTLY = 'PARTLY',
 	NONE = 'NONE',
 	UNDETERMINED = 'UNDETERMINED',
+}
+
+export enum VideoVisibility {
+	DEFAULT = 'DEFAULT',
+	UNLISTED_ON_YOUTUBE = 'UNLISTED_ON_YOUTUBE',
+	UNLISTED_ON_VEVO = 'UNLISTED_ON_VEVO',
+	UNLISTED_ON_YOUTUBE_VEVO = 'UNLISTED_ON_YOUTUBE_VEVO',
 }
 
 /**
@@ -41,82 +50,111 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 20,
-		unique: true,
+		nullable: true,
 		comment:
-			'Mã ISRC (International Standard Recording Code) định danh duy nhất cho bản ghi video',
+			'Mã ISRC (International Standard Recording Code) định danh duy nhất cho bản ghi video' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	isrc: string;
+	isrc: string | null;
 
 	@Column({
 		type: 'boolean',
+		nullable: true,
 		default: false,
 		comment:
-			'Đánh dấu video chứa nội dung nhạy cảm (Explicit) cần cảnh báo giới hạn độ tuổi',
+			'Đánh dấu video chứa nội dung nhạy cảm (Explicit) cần cảnh báo giới hạn độ tuổi' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	explicit: boolean;
+	explicit: boolean | null;
 
 	@Column({
 		name: 'ai_content',
 		type: 'varchar',
 		length: 20,
+		nullable: true,
 		default: VideoAiContent.UNDETERMINED,
 		comment:
-			'Trang thai noi dung AI cua video theo VEVO: ALL, PARTLY, NONE, UNDETERMINED',
+			'Trang thai noi dung AI cua video theo VEVO: ALL, PARTLY, NONE, UNDETERMINED' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	aiContent: VideoAiContent;
+	aiContent: VideoAiContent | null;
 
 	@Column({
 		type: 'varchar',
 		length: 150,
+		nullable: true,
 		comment:
-			'Tên kênh YouTube Vevo chỉ định để đăng tải video (ví dụ: TaylorSwiftVEVO)',
+			'Tên kênh YouTube Vevo chỉ định để đăng tải video (ví dụ: TaylorSwiftVEVO)' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	channel: string;
+	channel: string | null;
 
 	@Column({
 		type: 'text',
 		nullable: true,
 		comment:
-			'Nội dung mô tả (description) đi kèm video khi xuất bản lên YouTube',
+			'Nội dung mô tả (description) đi kèm video khi xuất bản lên YouTube' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	description: string | null;
 
 	@Column({
 		type: 'jsonb',
 		nullable: true,
-		comment: 'Danh sach tu khoa video phan phoi len YouTube/Vevo',
+		comment:
+			'Danh sach tu khoa video phan phoi len YouTube/Vevo' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	keywords: string[] | null;
 
 	@Column({
 		type: 'boolean',
+		nullable: true,
 		default: false,
 		comment:
-			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube',
+			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	isKids: boolean;
+	isKids: boolean | null;
 
 	@Column({
 		type: 'boolean',
+		nullable: true,
 		default: false,
-		comment: 'Dang video o trang thai khong cong khai tren YouTube/Vevo',
+		comment:
+			'Dang video o trang thai khong cong khai tren YouTube/Vevo' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	isUnlisted: boolean;
+	isUnlisted: boolean | null;
 
 	@Column({
 		type: 'jsonb',
 		nullable: true,
 		comment:
-			'Danh sách tệp phụ đề đính kèm cấu trúc: [{ language: "vi", fileId: "uuid", fileName: "abc.srt" }]',
+			'Danh sách tệp phụ đề đính kèm cấu trúc: [{ language: "vi", fileId: "uuid", fileName: "abc.srt" }]' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	subtitles: { language: string; fileId: string; fileName: string }[];
+	subtitles: { language: string; fileId: string; fileName: string }[] | null;
+
+	@Column({
+		name: 'visibility',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		default: VideoVisibility.DEFAULT,
+		comment:
+			'Visibility của video: Default, Unlisted on YouTube, Unlisted on Vevo, Unlisted on YouTube/Vevo' +
+			COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	visibility: VideoVisibility | null;
 
 	@Column({
 		type: 'varchar',
 		length: 100,
 		nullable: true,
 		comment:
-			'Tên nhà cung cấp nội dung (Content Provider) phân phối sản phẩm',
+			'Tên nhà cung cấp nội dung (Content Provider) phân phối sản phẩm' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	contentProvider: string | null;
 
@@ -124,7 +162,9 @@ export class Video extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 150,
 		nullable: true,
-		comment: 'Chủ sở hữu tác phẩm bản quyền gốc (Repertoire Owner / Label)',
+		comment:
+			'Chủ sở hữu tác phẩm bản quyền gốc (Repertoire Owner / Label)' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	copyrightOwner: string | null;
 
@@ -134,7 +174,8 @@ export class Video extends BaseUserTrackedUUIDEntity {
 		name: 'partner_custom_id_1',
 		nullable: true,
 		comment:
-			'Mã định danh tùy chỉnh số 1 của đối tác để ánh xạ nội bộ hệ thống',
+			'Mã định danh tùy chỉnh số 1 của đối tác để ánh xạ nội bộ hệ thống' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	partnerCustomId1: string | null;
 
@@ -144,7 +185,8 @@ export class Video extends BaseUserTrackedUUIDEntity {
 		name: 'partner_custom_id_2',
 		nullable: true,
 		comment:
-			'Mã định danh tùy chỉnh số 2 của đối tác để ánh xạ nội bộ hệ thống',
+			'Mã định danh tùy chỉnh số 2 của đối tác để ánh xạ nội bộ hệ thống' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	partnerCustomId2: string | null;
 
@@ -153,7 +195,8 @@ export class Video extends BaseUserTrackedUUIDEntity {
 		name: 'file_id',
 		nullable: true,
 		comment:
-			'Khóa ngoại trỏ sang bảng files, đại diện cho tệp video nguồn tải lên hệ thống',
+			'Khóa ngoại trỏ sang bảng files, đại diện cho tệp video nguồn tải lên hệ thống' +
+			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	fileId: string | null;
 
@@ -169,4 +212,7 @@ export class Video extends BaseUserTrackedUUIDEntity {
 		(videoContributor) => videoContributor.video,
 	)
 	videoContributors: VideoContributor[];
+
+	@OneToMany(() => VideoGenre, (videoGenre) => videoGenre.video)
+	videoGenres: VideoGenre[];
 }

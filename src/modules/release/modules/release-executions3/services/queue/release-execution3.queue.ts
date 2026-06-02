@@ -6,7 +6,7 @@ import { ReleaseExecution3 } from '../../entites/release-execution3.entity';
 import {
 	ReleaseExecution3RunPipelineQueue,
 	RunPipelineQueueStatus,
-} from '../../entites/release-execution3.run-pipeline-queue.entity';
+} from '../../entites/release-execution3.queue.entity';
 import {
 	ExecutionType,
 	ReleaseExecutionStatus,
@@ -20,23 +20,18 @@ export class ReleaseExecution3Queue {
 
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
-	) {}
 
-	async queueRunPipeline(releaseExecutionId: string) {
-		return this.runPipelineQueueRepo.save(
-			this.runPipelineQueueRepo.create({
-				releaseExecutionId,
-				status: RunPipelineQueueStatus.NEW,
-			}),
-		);
-	}
+		// @Inject(forwardRef(() => ReleaseExecution3Service))
+		// private readonly executionService: ReleaseExecution3Service,
+	) {}
 
 	async queueExecution(body: {
 		release: Release;
 		dspCodes: string[];
 		type: ExecutionType;
 	}) {
-		const execution = await this.executionRepo.save(
+		// const execution =
+		await this.executionRepo.save(
 			this.executionRepo.create({
 				releaseId: body.release.id,
 				type: body.type,
@@ -55,6 +50,17 @@ export class ReleaseExecution3Queue {
 			}),
 		);
 
-		return execution;
+		// await this.executionService.startProcessing(execution.id);
+		// return execution;
+	}
+
+	async queueRunPipeline(releaseExecutionId: string) {
+		return this.runPipelineQueueRepo.save(
+			this.runPipelineQueueRepo.create({
+				releaseExecutionId,
+				status: RunPipelineQueueStatus.NEW,
+			}),
+		);
+		// await this.executionService.runPipeline(releaseExecutionId);
 	}
 }

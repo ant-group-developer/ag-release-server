@@ -75,6 +75,7 @@ import { TrackModule } from './modules/track/track.module';
 import { UserModule } from './modules/user/user.module';
 import { VideoArtistModule } from './modules/video-artist/video-artist.module';
 import { VideoContributorModule } from './modules/video-contributor/video-contributor.module';
+import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 
 @Module({
 	imports: [
@@ -169,6 +170,7 @@ import { VideoContributorModule } from './modules/video-contributor/video-contri
 		TrackContributorModule,
 		VideoArtistModule,
 		VideoContributorModule,
+		VideoGenreModule,
 
 		DistributionModule,
 

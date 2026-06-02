@@ -21,9 +21,9 @@ export class CreateVideoDto {
 
 	@ApiProperty({ maxLength: 20 })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@MaxLength(20)
-	isrc: string;
+	isrc?: string;
 
 	@ApiPropertyOptional({ default: false })
 	@IsOptional()
@@ -40,9 +40,9 @@ export class CreateVideoDto {
 
 	@ApiProperty({ maxLength: 150 })
 	@IsString()
-	@IsNotEmpty()
+	@IsOptional()
 	@MaxLength(150)
-	channel: string;
+	channel?: string;
 
 	@ApiPropertyOptional()
 	@IsOptional()

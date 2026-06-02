@@ -113,7 +113,7 @@ export class ReleaseDdexService {
 					videoFile,
 					subtitleFiles,
 					outputDir: resourcesDir,
-					isrc: release.video!.isrc,
+					isrc: release.video!.isrc ?? '',
 				});
 			} else {
 				const { audioFiles, coverImage } =
@@ -504,7 +504,7 @@ export class ReleaseDdexService {
 		}
 		const videoDestPath = path.join(
 			tempDir,
-			`video_${release.video.isrc}.tmp`,
+			`video_${release.video.isrc ?? ''}.tmp`,
 		);
 		const videoFileDb = await this.bucket2Sv.streamFileToPath({
 			fileId: videoFileId,
@@ -548,7 +548,7 @@ export class ReleaseDdexService {
 		return {
 			videoFile: {
 				filePath: videoDestPath,
-				fileName: `${release.video.isrc}.mp4`,
+				fileName: `${release.video.isrc ?? ''}.mp4`,
 				extension: videoFileDb.extension,
 			},
 			subtitleFiles,
@@ -1142,6 +1142,8 @@ export class ReleaseDdexService {
 						role: c.artistRole?.code ?? 'Composer',
 					}));
 
+		const videoIsrc = video.isrc ?? '';
+
 		return {
 			version: ernVersion,
 			message: {
@@ -1190,7 +1192,7 @@ export class ReleaseDdexService {
 			tracks: [],
 			videos: [
 				{
-					isrc: video.isrc,
+					isrc: videoIsrc,
 					title: release.title ?? '',
 					version: release.version ?? undefined,
 					duration: 300, // Default duration if not specified
@@ -1210,19 +1212,19 @@ export class ReleaseDdexService {
 								}
 							: undefined,
 					videoFile: {
-						fileName: `${video.isrc}_T1V${this.normalizeVideoExtension(video.videoFile?.extension ?? 'mp4')}`,
+						fileName: `${videoIsrc}_T1V${this.normalizeVideoExtension(video.videoFile?.extension ?? 'mp4')}`,
 						filePath: 'resources',
 						codecType: 'MP4',
 					},
 					subtitles: video.subtitles?.map((sub, subIdx) => ({
 						language: sub.language,
-						fileName: `${video.isrc}_T${subIdx + 1}S.srt`,
+						fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
 						filePath: 'resources',
 					})),
-					channel: video.channel,
+					channel: video.channel ?? undefined,
 					description: video.description || undefined,
-					isKids: video.isKids,
-					isUnlisted: video.isUnlisted,
+					isKids: video.isKids ?? undefined,
+					isUnlisted: video.isUnlisted ?? undefined,
 					partnerCustomId1: video.partnerCustomId1 || undefined,
 					partnerCustomId2: video.partnerCustomId2 || undefined,
 				},
