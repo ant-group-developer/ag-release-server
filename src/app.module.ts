@@ -26,7 +26,6 @@ import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DDEXModule } from './modules/ddex';
-import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
@@ -165,7 +164,6 @@ import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 		NewsCategoryModule,
 		NewsPostModule,
 
-		DeliveryModule,
 		ReleaseContributorModule,
 		TrackContributorModule,
 		VideoArtistModule,

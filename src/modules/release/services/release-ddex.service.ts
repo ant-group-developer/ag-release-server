@@ -210,8 +210,7 @@ export class ReleaseDdexService {
 
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
-			ernVersion:
-				ernVersion || (config.ernVersion as unknown as ErnVersion2),
+			ernVersion: ernVersion || config.ernVersion,
 			sender: config.sender,
 			recipient: config.recipient,
 		});
@@ -683,10 +682,7 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}): ErnInput2 {
-		if (
-			(release.type as string) === 'video' ||
-			(release.type as string) === 'VideoSingle'
-		) {
+		if (release.type === 'video') {
 			return this.parseErnInputFromVideo({
 				release,
 				ernVersion,

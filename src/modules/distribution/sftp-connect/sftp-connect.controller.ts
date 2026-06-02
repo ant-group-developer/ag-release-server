@@ -11,25 +11,25 @@ import { SftpConnectService } from './sftp-connect.service';
 export class SftpConnectController {
 	constructor(private readonly svc: SftpConnectService) {}
 
-	@Post('upload-folder')
-	@ApiOperation({ summary: 'Upload local folder to SFTP (recursive)' })
-	async uploadFolder(
-		@Body()
-		body: {
-			sftp: {
-				host: string;
-				port?: number;
-				username: string;
-				password?: string;
-				privateKey?: string;
-			};
-			localDir: string;
-			remoteDir: string;
-		},
-	) {
-		await this.svc.uploadFolder(body);
-		return { status: true };
-	}
+	// @Post('upload-folder')
+	// @ApiOperation({ summary: 'Upload local folder to SFTP (recursive)' })
+	// async uploadFolder(
+	// 	@Body()
+	// 	body: {
+	// 		sftp: {
+	// 			host: string;
+	// 			port?: number;
+	// 			username: string;
+	// 			password?: string;
+	// 			privateKey?: string;
+	// 		};
+	// 		localDir: string;
+	// 		remoteDir: string;
+	// 	},
+	// ) {
+	// 	await this.svc.uploadFolder(body);
+	// 	return { status: true };
+	// }
 
 	@Post('test')
 	@ApiOperation({ summary: 'Test SFTP connection (raw config)' })

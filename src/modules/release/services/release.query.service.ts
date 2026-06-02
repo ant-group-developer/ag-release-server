@@ -616,7 +616,10 @@ export class ReleaseQueryService {
 			.leftJoin('releaseContributor.artist', 'artistContributor')
 			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
 
-			.leftJoin('release.label', 'label');
+			.leftJoin('release.label', 'label')
+
+			// genre
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
 	}
 
 	private select(

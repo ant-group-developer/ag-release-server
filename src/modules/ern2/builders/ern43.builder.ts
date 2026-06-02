@@ -4,9 +4,9 @@ import {
 	ErnContributorInput,
 	ErnDealInput2,
 	ErnInput2,
+	ErnSubtitleInput,
 	ErnTrackInput2,
 	ErnVideoInput2,
-	ErnSubtitleInput,
 } from '../interfaces/ern-input.interface';
 
 /**
@@ -35,7 +35,11 @@ export class Ern43Builder2 {
 			'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
 			'xsi:schemaLocation':
 				'http://ddex.net/xml/ern/43 http://ddex.net/xml/ern/43/release-notification.xsd',
-			ReleaseProfileVersionId: this.input.release.type === 'video' || this.input.release.type === 'VideoSingle' ? 'Video' : 'Audio',
+			ReleaseProfileVersionId:
+				this.input.release.type === 'video' ||
+				this.input.release.type === 'VideoSingle'
+					? 'Video'
+					: 'Audio',
 			LanguageAndScriptCode: 'en',
 			AvsVersionId: '3',
 		});
@@ -170,7 +174,12 @@ export class Ern43Builder2 {
 			const video = this.input.videos![i];
 			if (video.subtitles) {
 				for (let j = 0; j < video.subtitles.length; j++) {
-					this.buildSubtitleResource(resourceList, video.subtitles[j], i, j);
+					this.buildSubtitleResource(
+						resourceList,
+						video.subtitles[j],
+						i,
+						j,
+					);
 				}
 			}
 		}
@@ -191,7 +200,8 @@ export class Ern43Builder2 {
 	}
 
 	private getSubtitleRef(videoIndex: number, subIndex: number): string {
-		const offset = this.input.tracks.length + (this.input.videos?.length ?? 0);
+		const offset =
+			this.input.tracks.length + (this.input.videos?.length ?? 0);
 		let cumIndex = 0;
 		for (let i = 0; i < videoIndex; i++) {
 			cumIndex += this.input.videos![i].subtitles?.length ?? 0;
@@ -200,8 +210,9 @@ export class Ern43Builder2 {
 	}
 
 	private getImageRef(): string {
-		const offset = this.input.tracks.length + 
-			(this.input.videos?.length ?? 0) + 
+		const offset =
+			this.input.tracks.length +
+			(this.input.videos?.length ?? 0) +
 			this.getTotalSubtitleCount();
 		return `A${offset + 1}`;
 	}
@@ -346,7 +357,9 @@ export class Ern43Builder2 {
 		const resId = edition.ele('ResourceId');
 		resId.ele('ISRC').txt(video.isrc);
 		if (video.isUnlisted) {
-			resId.ele('ProprietaryId', { Namespace: 'VEVO:YouTubeUnlisted' }).txt('true');
+			resId
+				.ele('ProprietaryId', { Namespace: 'VEVO:YouTubeUnlisted' })
+				.txt('true');
 		}
 
 		// PLine
@@ -361,7 +374,7 @@ export class Ern43Builder2 {
 		const techDetails = edition.ele('TechnicalDetails');
 		techDetails.ele('TechnicalResourceDetailsReference').txt(techRef);
 		const deliveryFile = techDetails.ele('DeliveryFile');
-		deliveryFile.ele('Type').txt('VideoFile');
+		deliveryFile.ele('Type').txt('AudioVisualFile');
 
 		if (video.videoFile) {
 			const file = deliveryFile.ele('File');
@@ -402,10 +415,12 @@ export class Ern43Builder2 {
 
 		// Display artist name
 		const artistName = video.artists.map((a) => a.name).join(', ');
-		vNode.ele('DisplayArtistName', {
-			ApplicableTerritoryCode: 'Worldwide',
-			IsDefault: 'true',
-		}).txt(artistName);
+		vNode
+			.ele('DisplayArtistName', {
+				ApplicableTerritoryCode: 'Worldwide',
+				IsDefault: 'true',
+			})
+			.txt(artistName);
 
 		// Display artists
 		for (let i = 0; i < video.artists.length; i++) {
@@ -427,11 +442,13 @@ export class Ern43Builder2 {
 
 		vNode.ele('Duration').txt(this.normalizeDuration(video.duration));
 
-		vNode.ele('ParentalWarningType').txt(
-			video.parentalWarning ||
-				this.input.release.parentalWarning ||
-				'NotExplicit',
-		);
+		vNode
+			.ele('ParentalWarningType')
+			.txt(
+				video.parentalWarning ||
+					this.input.release.parentalWarning ||
+					'NotExplicit',
+			);
 	}
 
 	private buildSubtitleResource(
@@ -496,7 +513,14 @@ export class Ern43Builder2 {
 
 		const image = parent.ele('Image');
 		image.ele('ResourceReference').txt(ref);
-		image.ele('Type').txt(this.input.release.type === 'video' || this.input.release.type === 'VideoSingle' ? 'VideoScreenCapture' : 'FrontCoverImage');
+		image
+			.ele('Type')
+			.txt(
+				this.input.release.type === 'video' ||
+					this.input.release.type === 'VideoSingle'
+					? 'VideoScreenCapture'
+					: 'FrontCoverImage',
+			);
 
 		// ProprietaryId
 		image
@@ -558,7 +582,14 @@ export class Ern43Builder2 {
 	private buildMainRelease(parent: ReturnType<typeof create>): void {
 		const release = parent.ele('Release');
 		release.ele('ReleaseReference').txt('R0');
-		release.ele('ReleaseType').txt(this.input.release.type === 'video' || this.input.release.type === 'VideoSingle' ? 'VideoSingle' : this.input.release.type);
+		release
+			.ele('ReleaseType')
+			.txt(
+				this.input.release.type === 'video' ||
+					this.input.release.type === 'VideoSingle'
+					? 'VideoSingle'
+					: this.input.release.type,
+			);
 		release.ele('ReleaseId').ele('ICPN').txt(this.input.release.upc);
 
 		// Title
@@ -640,18 +671,24 @@ export class Ern43Builder2 {
 		rg.ele('SequenceNumber').txt('1');
 
 		const refList = release.ele('ReleaseResourceReferenceList');
-		
+
 		// Cover art image reference link
 		if (this.input.release.coverArt) {
 			refList
-				.ele('ReleaseResourceReference', { ReleaseResourceType: 'SecondaryResource' })
+				.ele('ReleaseResourceReference', {
+					ReleaseResourceType: 'SecondaryResource',
+				})
 				.txt(this.getImageRef());
 		}
 
 		// Sound recordings
 		for (let i = 0; i < this.input.tracks.length; i++) {
-			refList.ele('ReleaseResourceReference', { ReleaseResourceType: 'PrimaryResource' }).txt(this.getTrackRef(i));
-			
+			refList
+				.ele('ReleaseResourceReference', {
+					ReleaseResourceType: 'PrimaryResource',
+				})
+				.txt(this.getTrackRef(i));
+
 			const item = rg.ele('ResourceGroupContentItem');
 			item.ele('SequenceNumber').txt(String(i + 1));
 			item.ele('ReleaseResourceReference').txt(this.getTrackRef(i));
@@ -660,22 +697,32 @@ export class Ern43Builder2 {
 		// Videos
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
-			refList.ele('ReleaseResourceReference', { ReleaseResourceType: 'PrimaryResource' }).txt(this.getVideoRef(i));
-			
+			refList
+				.ele('ReleaseResourceReference', {
+					ReleaseResourceType: 'PrimaryResource',
+				})
+				.txt(this.getVideoRef(i));
+
 			const item = rg.ele('ResourceGroupContentItem');
-			item.ele('SequenceNumber').txt(String(this.input.tracks.length + i + 1));
+			item.ele('SequenceNumber').txt(
+				String(this.input.tracks.length + i + 1),
+			);
 			item.ele('ReleaseResourceReference').txt(this.getVideoRef(i));
 
 			// Video screen capture image link
 			if (this.input.release.coverArt) {
-				item.ele('LinkedReleaseResourceReference', { LinkDescription: 'VideoScreenCapture' }).txt(this.getImageRef());
+				item.ele('LinkedReleaseResourceReference', {
+					LinkDescription: 'VideoScreenCapture',
+				}).txt(this.getImageRef());
 			}
 
 			// Subtitle caption file link
 			const video = this.input.videos![i];
 			if (video.subtitles) {
 				for (let j = 0; j < video.subtitles.length; j++) {
-					item.ele('LinkedReleaseResourceReference', { LinkDescription: 'Caption' }).txt(this.getSubtitleRef(i, j));
+					item.ele('LinkedReleaseResourceReference', {
+						LinkDescription: 'Caption',
+					}).txt(this.getSubtitleRef(i, j));
 				}
 			}
 		}
@@ -685,13 +732,21 @@ export class Ern43Builder2 {
 			const video = this.input.videos![i];
 			if (video.subtitles) {
 				for (let j = 0; j < video.subtitles.length; j++) {
-					refList.ele('ReleaseResourceReference', { ReleaseResourceType: 'SecondaryResource' }).txt(this.getSubtitleRef(i, j));
+					refList
+						.ele('ReleaseResourceReference', {
+							ReleaseResourceType: 'SecondaryResource',
+						})
+						.txt(this.getSubtitleRef(i, j));
 				}
 			}
 		}
 
 		// Linked cover art for audio-only releases at root level
-		if (this.input.release.coverArt && this.input.release.type !== 'video' && this.input.release.type !== 'VideoSingle') {
+		if (
+			this.input.release.coverArt &&
+			this.input.release.type !== 'video' &&
+			this.input.release.type !== 'VideoSingle'
+		) {
 			rg.ele('LinkedReleaseResourceReference').txt(this.getImageRef());
 		}
 
@@ -752,11 +807,13 @@ export class Ern43Builder2 {
 
 		const tr = parent.ele('TrackRelease');
 		tr.ele('ReleaseReference').txt(ref);
-		
+
 		const relId = tr.ele('ReleaseId');
 		relId.ele('ProprietaryId', { Namespace: 'ISRC' }).txt(video.isrc);
 		if (video.channel) {
-			relId.ele('ProprietaryId', { Namespace: 'Channel' }).txt(video.channel);
+			relId
+				.ele('ProprietaryId', { Namespace: 'Channel' })
+				.txt(video.channel);
 		}
 
 		tr.ele('ReleaseResourceReference').txt(resourceRef);
@@ -776,7 +833,9 @@ export class Ern43Builder2 {
 		}
 
 		// Visibility reference
-		tr.ele('ReleaseVisibilityReference').txt(`V${this.input.tracks.length + index + 1}`);
+		tr.ele('ReleaseVisibilityReference').txt(
+			`V${this.input.tracks.length + index + 1}`,
+		);
 	}
 
 	// ==================== DealList ====================
@@ -1006,7 +1065,9 @@ export class Ern43Builder2 {
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
 			const v = dealList.ele('TrackReleaseVisibility');
-			v.ele('VisibilityReference').txt(`V${this.input.tracks.length + i + 1}`);
+			v.ele('VisibilityReference').txt(
+				`V${this.input.tracks.length + i + 1}`,
+			);
 			for (const t of territories) {
 				v.ele('TerritoryCode').txt(t);
 			}
