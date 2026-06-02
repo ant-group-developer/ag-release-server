@@ -7,6 +7,7 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 
 // Controllers
 import { TimelineAnalyticsController } from './controllers/timeline-analytics.controller';
@@ -17,10 +18,11 @@ import { IsrcResolverService } from './services/isrc-resolver.service';
 import { TimelineAnalyticsService } from './services/timeline-analytics.service';
 import { RankingService } from './services/ranking.service';
 import { ClickHouseSyncService } from './services/clickhouse-sync.service';
+import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist]),
+    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp]),
   ],
   controllers: [TimelineAnalyticsController, RankingController],
   providers: [
@@ -28,6 +30,7 @@ import { ClickHouseSyncService } from './services/clickhouse-sync.service';
     TimelineAnalyticsService,
     RankingService,
     ClickHouseSyncService,
+    DspSeedingService,
   ],
   exports: [IsrcResolverService],
 })

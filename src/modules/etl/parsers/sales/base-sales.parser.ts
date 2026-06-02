@@ -210,7 +210,7 @@ export abstract class BaseSalesParser {
 
   // ── Shared utilities ──
 
-  protected normalizeDate(dateStr: string, isStart = true): string {
+  protected normalizeDate(dateStr: string, isStart = true, format?: 'DMY' | 'MDY'): string {
     if (!dateStr) return '1970-01-01';
     const cleaned = dateStr.trim().replace(/"/g, '');
 
@@ -234,6 +234,12 @@ export abstract class BaseSalesParser {
         return `${m1[3]}-${m1[2].padStart(2, '0')}-${m1[1].padStart(2, '0')}`;
       } else if (p2 > 12) {
         // Must be MM/DD/YYYY
+        return `${m1[3]}-${m1[1].padStart(2, '0')}-${m1[2].padStart(2, '0')}`;
+      }
+      // Ambiguous case (both p1 and p2 <= 12)
+      if (format === 'DMY') {
+        return `${m1[3]}-${m1[2].padStart(2, '0')}-${m1[1].padStart(2, '0')}`;
+      } else if (format === 'MDY') {
         return `${m1[3]}-${m1[1].padStart(2, '0')}-${m1[2].padStart(2, '0')}`;
       }
       // Ambiguous, assume MM/DD/YYYY as many DSPs are US-based (Saavn uses MM/DD/YYYY)

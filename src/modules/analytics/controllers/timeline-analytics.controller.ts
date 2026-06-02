@@ -62,6 +62,26 @@ export class TimelineAnalyticsController {
     return new ResponseSuccess({ data });
   }
 
+  @Post('trend-view/dsp/timeline/daily')
+  @ApiOperation({
+    summary: 'Get DSP Trends daily statistics timeline',
+    description: 'Returns near real-time daily play counts from TRENDS data, grouped by top N DSPs.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trends daily timeline retrieved successfully.',
+  })
+  async getDspTrendsDailyTimeline(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<DspTimelineResponse>> {
+    const data = await this.timelineService.getDspTrendsDailyTimeline(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
   // ═══════════════════════════════════════════════════════
   // TERRITORY TIMELINE ENDPOINTS
   // ═══════════════════════════════════════════════════════
