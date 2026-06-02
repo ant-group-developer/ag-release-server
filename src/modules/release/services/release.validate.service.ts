@@ -227,6 +227,9 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
+		if (release.type === 'video') {
+			return [];
+		}
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
 

@@ -112,7 +112,7 @@ export class ReleaseQueryService {
 	}
 
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
-		const { idInclude, page, pageSize, keyword } = query;
+		const { idInclude, page, pageSize, keyword, type } = query;
 
 		const releaseInclude = idInclude?.length
 			? await this.releaseRepo.find({
@@ -131,6 +131,7 @@ export class ReleaseQueryService {
 			},
 			where: {
 				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
+				...(type ? { type } : {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
@@ -210,6 +211,16 @@ export class ReleaseQueryService {
 			)
 			.leftJoin('release.timeZone', 'timeZone')
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.videoFile', 'videoFile')
+			.leftJoin('release.captions', 'releaseCaptions')
+			.leftJoin('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoin('releaseCaptions.language', 'releaseCaptionLanguage')
+			.leftJoin('video.videoArtists', 'videoArtist')
+			.leftJoin('videoArtist.artist', 'videoArtistEntity')
+			.leftJoin('video.videoContributors', 'videoContributor')
+			.leftJoin('videoContributor.artist', 'videoContributorArtist')
+			.leftJoin('videoContributor.artistRole', 'videoContributorRole')
 
 			.leftJoin('release.modifier', 'modifier')
 
@@ -343,6 +354,77 @@ export class ReleaseQueryService {
 				'releaseTerritory.distributionType',
 				'releaseTerritory.selectedCountries',
 			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.isrc',
+				'video.explicit',
+				'video.aiContent',
+				'video.channel',
+				'video.description',
+				'video.keywords',
+				'video.isKids',
+				'video.isUnlisted',
+				'video.contentProvider',
+				'video.copyrightOwner',
+				'video.partnerCustomId1',
+				'video.partnerCustomId2',
+				'video.fileId',
+			])
+			.addSelect([
+				'videoFile.id',
+				'videoFile.fileName',
+				'videoFile.extension',
+				'videoFile.fileSize',
+				'videoFile.contentType',
+			])
+			.addSelect([
+				'releaseCaptions.id',
+				'releaseCaptions.releaseId',
+				'releaseCaptions.languageId',
+				'releaseCaptions.type',
+				'releaseCaptions.fileId',
+			])
+			.addSelect([
+				'releaseCaptionLanguage.id',
+				'releaseCaptionLanguage.name',
+				'releaseCaptionLanguage.code',
+			])
+			.addSelect([
+				'releaseCaptionFile.id',
+				'releaseCaptionFile.fileName',
+				'releaseCaptionFile.extension',
+				'releaseCaptionFile.fileSize',
+				'releaseCaptionFile.contentType',
+			])
+			.addSelect([
+				'videoArtist.id',
+				'videoArtist.artistId',
+				'videoArtist.videoId',
+			])
+			.addSelect([
+				'videoArtistEntity.id',
+				'videoArtistEntity.name',
+				'videoArtistEntity.code',
+				'videoArtistEntity.picture',
+			])
+			.addSelect([
+				'videoContributor.id',
+				'videoContributor.artistId',
+				'videoContributor.artistRoleId',
+				'videoContributor.videoId',
+			])
+			.addSelect([
+				'videoContributorArtist.id',
+				'videoContributorArtist.name',
+				'videoContributorArtist.code',
+				'videoContributorArtist.picture',
+			])
+			.addSelect([
+				'videoContributorRole.id',
+				'videoContributorRole.name',
+				'videoContributorRole.code',
+			])
 
 			.addSelect(['modifier.id', 'modifier.name', 'modifier.avatar']);
 
@@ -397,6 +479,7 @@ export class ReleaseQueryService {
 			startDateRelease,
 			endDateRelease,
 
+			type,
 			albumFormatId,
 			status,
 			primaryGenreId,
@@ -470,6 +553,10 @@ export class ReleaseQueryService {
 					albumFormatId,
 				},
 			);
+		}
+
+		if (type) {
+			queryBuilder.andWhere('release.type = :type', { type });
 		}
 
 		if (primaryGenreId?.length) {
@@ -550,7 +637,10 @@ export class ReleaseQueryService {
 			.leftJoin('releaseContributor.artist', 'artistContributor')
 			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
 
-			.leftJoin('release.label', 'label');
+			.leftJoin('release.label', 'label')
+
+			// genre
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
 	}
 
 	private select(
@@ -839,6 +929,22 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('release.captions', 'releaseCaptions')
+			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoinAndSelect(
+				'releaseCaptions.language',
+				'releaseCaptionLanguage',
+			)
+			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
+			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
+			.leftJoinAndSelect('video.videoContributors', 'videoContributors')
+			.leftJoinAndSelect('videoContributors.artist', 'videoContributor')
+			.leftJoinAndSelect(
+				'videoContributors.artistRole',
+				'videoContributorRole',
+			)
 			.where('release.id = :releaseId', { releaseId })
 			.getOne();
 
@@ -1006,6 +1112,22 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.albumFormat', 'albumFormat')
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('release.captions', 'releaseCaptions')
+			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoinAndSelect(
+				'releaseCaptions.language',
+				'releaseCaptionLanguage',
+			)
+			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
+			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
+			.leftJoinAndSelect('video.videoContributors', 'videoContributors')
+			.leftJoinAndSelect('videoContributors.artist', 'videoContributor')
+			.leftJoinAndSelect(
+				'videoContributors.artistRole',
+				'videoContributorRole',
+			)
 
 			.leftJoinAndSelect('release.tracks', 'track')
 			.leftJoinAndSelect('track.audioFile', 'audioFile')

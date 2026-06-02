@@ -28,9 +28,10 @@ import {
 import { CiDistributionJobService } from '../services/ci-distribution-job.service';
 
 @ApiTags('CI Distribution Jobs')
-@Controller('ci-distribution-jobs')
+// @Controller('ci-distribution-jobs')
+@Controller('ci-distribution-jobs-disable')
 export class CiDistributionJobController {
-	constructor(private readonly jobService: CiDistributionJobService) {}
+	constructor(private readonly jobService: CiDistributionJobService) { }
 
 	@ApiOperation({ summary: 'Danh sách CI distribution jobs' })
 	@ApiQuery({ type: QueryGetListCiJobDto })
@@ -72,6 +73,12 @@ export class CiDistributionJobController {
 	@Post('auto-send-email')
 	async autoSendEmail(@Body() body: BatchActionCiJobDto) {
 		const result = await this.jobService.autoSendEmail(body.ids);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('send-export-to-ci')
+	async sendExportToCi(@Body() body: BatchActionCiJobDto) {
+		const result = await this.jobService.sendExportToCi(body.ids);
 		return new ResponseSuccess({ data: result });
 	}
 

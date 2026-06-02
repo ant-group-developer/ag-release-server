@@ -8,6 +8,7 @@ import { AppService } from './app.service';
 import { envValidationSchema } from './common/config/env.validation.schema';
 import { ActionModule } from './modules/action/action.module';
 import { AlbumFormatModule } from './modules/album-format/album-format.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AppConfigModule } from './modules/app-config/app-config.module';
 import { ArtistProfileModule } from './modules/artist-profile/artist-profile.module';
 import { ArtistRoleModule } from './modules/artist-role/artist-role.module';
@@ -19,19 +20,17 @@ import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
 import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
+import { ClickHouseModule } from './modules/clickhouse/clickhouse.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
-import { ClickHouseModule } from './modules/clickhouse/clickhouse.module';
-import { EtlModule } from './modules/etl/etl.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { DDEXModule } from './modules/ddex';
-import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspModule } from './modules/dsp/dsp.module';
 import { ErnModule } from './modules/ern/ern.module';
+import { EtlModule } from './modules/etl/etl.module';
 import { ExcelModule } from './modules/excel/excel.module';
 import { IsrcModule } from './modules/external/isrc/isrc.module';
 import { UpcModule } from './modules/external/upc/upc.module';
@@ -52,6 +51,7 @@ import { ReleaseModule } from './modules/release/release.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
 import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
+import { ReleaseCaptionModule } from './modules/release-caption/release-caption.module';
 import { RequestTrackingModule } from './modules/request-tracking/request-tracking.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
@@ -73,6 +73,9 @@ import { TrackSensitiveModule } from './modules/track-sensitive/track-sensitive.
 import { TrackTypeModule } from './modules/track-type/track-type.module';
 import { TrackModule } from './modules/track/track.module';
 import { UserModule } from './modules/user/user.module';
+import { VideoArtistModule } from './modules/video-artist/video-artist.module';
+import { VideoContributorModule } from './modules/video-contributor/video-contributor.module';
+import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 
 @Module({
 	imports: [
@@ -162,9 +165,12 @@ import { UserModule } from './modules/user/user.module';
 		NewsCategoryModule,
 		NewsPostModule,
 
-		DeliveryModule,
 		ReleaseContributorModule,
 		TrackContributorModule,
+		VideoArtistModule,
+		ReleaseCaptionModule,
+		VideoContributorModule,
+		VideoGenreModule,
 
 		DistributionModule,
 

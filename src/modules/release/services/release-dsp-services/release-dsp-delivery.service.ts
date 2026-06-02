@@ -28,6 +28,43 @@ export class ReleaseDspDeliveryService {
 		private readonly releaseRepo: Repository<Release>,
 	) {}
 	// ==================== Delivery orchestration ====================
+	async updateDeliveryStatus(
+		releaseIds: string[],
+		items: { dspId: string; status: ReleaseDspStatus }[],
+	): Promise<void> {
+		if (!releaseIds.length || !items.length) return;
+
+		const now = new Date();
+		const values = releaseIds.flatMap((releaseId) =>
+			items.map((item) => ({
+				releaseId,
+				dspId: item.dspId,
+				status: item.status,
+				isSelected: true,
+				lastEnqueuedAt:
+					item.status === ReleaseDspStatus.PROCESSING ? now : null,
+				lastDeliveredAt:
+					item.status === ReleaseDspStatus.DISTRIBUTED ? now : null,
+			})),
+		);
+
+		await this.repo
+			.createQueryBuilder()
+			.insert()
+			.into(ReleaseDspDelivery)
+			.values(values)
+			.orUpdate(
+				[
+					'status',
+					'is_selected',
+					'last_enqueued_at',
+					'last_delivered_at',
+				],
+				['release_id', 'dsp_id'],
+			)
+			.execute();
+	}
+
 	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {
 		const existed = await this.repo.findOne({
 			where: { releaseId, dspId },

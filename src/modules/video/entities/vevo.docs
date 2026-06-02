@@ -1,0 +1,331 @@
+# VEVO Video Release - FE Mapping Guide
+
+Backend dung Release hien co lam ban ghi chinh va gan them Video metadata 1-1.
+
+- Release metadata: `releases` va cac module con cua release.
+- Video metadata: `videos`.
+- Video artist rieng: `video_artist`.
+- Video contributor/credits rieng: `video_contributors`.
+- Khi xuat DDEX VEVO: neu video co `videoArtists/videoContributors` thi dung du lieu rieng cua video; neu chua co thi fallback ve `releaseArtists/releaseContributors`.
+
+## API chinh
+
+### Tao video release draft
+
+`POST /releases/draft`
+
+Body can co:
+
+```json
+{
+  "type": "video",
+  "title": "Video title",
+  "version": "Official Video",
+  "upc": "893...",
+  "albumFormatId": "xxxxxxxxxx",
+  "primaryGenreId": "xxxxxxxxxx",
+  "labelId": "xxxxxxxxxx",
+  "releaseDate": "2026-06-01",
+  "cLineOwner": "Copyright owner",
+  "cLineYear": 2026,
+  "video": {
+    "isrc": "USXXX2600001",
+    "explicit": false,
+    "aiContent": "UNDETERMINED",
+    "channel": "ArtistVEVO",
+    "contentProvider": "Content Provider",
+    "copyrightOwner": "Work owner",
+    "description": "YouTube description",
+    "keywords": ["keyword 1", "keyword 2"],
+    "isKids": false,
+    "isUnlisted": false,
+    "fileId": "uuid-video-file",
+    "captions": [
+      {
+        "languageId": "uuid-language-en",
+        "type": "CAPTION",
+        "fileId": "uuid-caption-file"
+      }
+    ]
+  }
+}
+```
+
+### Cap nhat video release draft
+
+`PUT /releases/draft/:releaseId`
+
+- Gui `video` object de create/update video metadata theo `releaseId`.
+- Gui `"video": null` de xoa video metadata khoi release.
+- Khong gui `video` thi giu nguyen video metadata hien co.
+
+### Lay release detail
+
+`GET /releases/:id`
+
+Response co `video`, `releaseArtists`, `releaseContributors`, `releaseLanguage`, `releaseTerritory`, `releaseCoverArts`.
+
+### CRUD video metadata rieng
+
+Co the dung khi can sua video metadata truc tiep:
+
+- `POST /videos`
+- `GET /videos`
+- `GET /videos/:id`
+- `GET /videos/release/:releaseId`
+- `PUT /videos/:id`
+- `DELETE /videos/:id`
+
+### CRUD video artists
+
+Dung cho truong "Nghe si chinh" va "Nghe si ket hop" neu FE muon gan rieng cho video.
+
+- `POST /video-artists`
+- `POST /video-artists/bulk`
+- `GET /video-artists?videoId=:videoId`
+- `GET /video-artists/:id`
+- `PUT /video-artists/:id`
+- `DELETE /video-artists/:id`
+
+Body:
+
+```json
+{
+  "videoId": "uuid-video",
+  "artistId": "xxxxxxxxxx"
+}
+```
+
+### CRUD video contributors / credits
+
+Dung cho Credits: Composer(s), Editor(s), Producer(s), Director(s).
+
+- `POST /video-contributors`
+- `POST /video-contributors/bulk`
+- `GET /video-contributors?videoId=:videoId`
+- `GET /video-contributors/:id`
+- `PUT /video-contributors/:id`
+- `DELETE /video-contributors/:id`
+
+Body:
+
+```json
+{
+  "videoId": "uuid-video",
+  "artistId": "xxxxxxxxxx",
+  "artistRoleId": "uuid-artist-role"
+}
+```
+
+## Tab Chi tiet - field mapping
+
+| UI field | Backend field/API | Required | Note |
+| --- | --- | --- | --- |
+| Tieu de Video | `CreateReleaseDraftDto.title` / `Release.title` | Yes | Max 150. |
+| Nghe si chinh | `POST /video-artists` hoac module `release-artist` | Yes | Neu gan rieng cho video thi dung `video-artists`. Neu khong, co the dung `release-artist` de fallback. |
+| Nghe si ket hop | `POST /video-artists` hoac module `release-artist` | No | Video artist khong co role rieng, tuong tu `release_artist`. |
+| The loai | `CreateReleaseDraftDto.primaryGenreId` / `Release.primaryGenreId` | Yes | ID genre length 10. |
+| Ngon ngu | `releaseLanguage.metadataLanguageId` va/hoac `releaseLanguage.audioLanguageId` | Yes | Dung nested `releaseLanguage` trong `PUT /releases/draft/:id` hoac API release-language hien co. |
+| Noi dung nhay cam (Explicit) | `video.explicit` | No | Boolean `true/false`. |
+| Co chua noi dung AI | `video.aiContent` | No | Enum: `"ALL"`, `"PARTLY"`, `"NONE"`, `"UNDETERMINED"`. Default `"UNDETERMINED"`. |
+| ISRC | `video.isrc` | Yes | ISRC cua video. Khong dung Audio ISRC. |
+| Video file | `video.fileId` | Yes khi submit VEVO | File ID tu bucket upload video. |
+| Thumbnail file | `releaseCoverArt.fileId` / `release_cover_art` | Yes khi submit VEVO | Dung cover art original cua release. |
+| Captions/subtitles | `/releases/release-captions/bulk-upsert` | No | Moi item: `{ languageId, type, fileId }`, type: `SUBTITLE` hoac `CAPTION`. |
+| Nha cung cap noi dung | `video.contentProvider` | Yes tren UI | Text max 100. |
+| Chu so huu tac pham | `video.copyrightOwner` | Yes tren UI | Text max 150. Khac voi copyright line o tab Bo sung. |
+| Kenh | `video.channel` | Yes | Ten kenh YouTube/VEVO. |
+| Tu khoa | `video.keywords` | No | Array string. |
+| Mo ta | `video.description` | Yes tren UI | YouTube description. |
+| Danh cho tre em | `video.isKids` | No | Boolean `true/false`. |
+| Dang khong cong khai | `video.isUnlisted` | No | Boolean. Neu true xuat ProprietaryId `VEVO:YouTubeUnlisted`. |
+
+## Tab Bo sung - field mapping
+
+| UI field | Backend field/API | Required | Note |
+| --- | --- | --- | --- |
+| UPC | `CreateReleaseDraftDto.upc` / `Release.upc` | No | Optional doi voi video. Neu bo trong, backend co the generate theo flow UPC hien co neu can. |
+| Audio ISRC | Ignore | No | Field nay thua, FE khong can gui. ISRC dung `video.isrc` o tab Chi tiet. |
+| Video version | `CreateReleaseDraftDto.version` / `Release.version` | No | Text do FE tu khai bao/truyen. |
+| Partner custom ID 1 | `video.partnerCustomId1` | No | Text max 100. |
+| Partner custom ID 2 | `video.partnerCustomId2` | No | Text max 100. |
+| Composer(s) | `POST /video-contributors` voi role Composer | No | FE lay `artistRoleId` cua Composer tu Artist Role. |
+| Editor(s) | `POST /video-contributors` voi role Editor | No | FE lay `artistRoleId` cua Editor tu Artist Role. |
+| Producer(s) | `POST /video-contributors` voi role Producer | No | FE lay `artistRoleId` cua Producer tu Artist Role. |
+| Director(s) | `POST /video-contributors` voi role Director | No | FE lay `artistRoleId` cua Director tu Artist Role. |
+| Copyright | `CreateReleaseDraftDto.cLineOwner` / `Release.cLineOwner` | No | Copyright owner/text cua C-Line. |
+| Copyright year | `CreateReleaseDraftDto.cLineYear` / `Release.cLineYear` | No | Nam C-Line. |
+
+Neu FE can P-Line rieng, backend da co:
+
+- `pLineOwner`
+- `pLineYear`
+
+Nhung UI hien tai field `Copyright/Copyright year` map vao C-Line: `cLineOwner/cLineYear`.
+
+## Tab Phan phoi - field mapping
+
+Dung flow release distribution hien co.
+
+| UI field/logic | Backend field/API | Note |
+| --- | --- | --- |
+| Territory / quoc gia phan phoi | `releaseTerritory` | Nested trong `PUT /releases/draft/:id` hoac API release-territory hien co. |
+| DSP VEVO selected | `releaseDspDeliveries` / submit dto codes | Khi submit gui code DSP `VEVO`. |
+| Submit distribution | `POST /releases/:id/submit3` hoac submit flow hien co | Worker se sinh DDEX ERN 4.3 va upload VEVO S3. |
+
+## Suggested FE save flow
+
+### Create form lan dau
+
+1. Upload video file vao bucket bang `POST /bucket2/private/bulk` voi `uploadPurpose = "video_file"` -> lay `fileId`.
+2. Upload thumbnail bang `POST /bucket2/private/bulk` voi `uploadPurpose = "release_cover_art"` -> lay `fileId`, tao/update `releaseCoverArt`.
+3. Upload subtitle/caption files bang `POST /bucket2/private/bulk` voi `uploadPurpose = "video_caption"` -> lay cac `fileId`.
+4. `POST /releases/draft` voi `type = "video"` va nested `video`.
+5. Sau khi response co `release.id` va `release.video.id`, tao artists/credits:
+   - `POST /video-artists/bulk`
+   - `POST /video-contributors/bulk`
+6. Cap nhat territory/dsp bang module hien co neu tab Phan phoi co thay doi.
+
+### Edit form
+
+1. `PUT /releases/draft/:releaseId` de update release fields + nested `video`.
+2. Artist/credit thay doi thi dung CRUD `video-artists` / `video-contributors`.
+3. Neu user remove video metadata: gui `video: null`.
+
+## DDEX/VEVO delivery behavior
+
+Khi submit DSP `VEVO`:
+
+1. Backend stream assets tu bucket ve temp server folder.
+2. Tao DDEX ERN 4.3 XML.
+3. Upload assets len VEVO S3 truoc: video, thumbnail, subtitles.
+4. Upload XML manifest sau cung.
+5. Khong upload `delivery.complete`, `BatchComplete`, hay done marker cho VEVO.
+
+Cron scanner:
+
+- Neu thay `success-$ISRC.json`: cap nhat VEVO delivery status thanh `DISTRIBUTED`.
+- Neu thay `failure-$ISRC.json`: cap nhat status thanh issue/failed va luu message loi.
+
+## Field summary by DTO
+
+### `CreateReleaseDraftDto` / `UpdateReleaseDraftDto`
+
+- `type`: `"video"`
+- `title`
+- `version`
+- `upc`
+- `albumFormatId`
+- `primaryGenreId`
+- `subGenreId`
+- `labelId`
+- `releaseDate`
+- `releaseEndDate`
+- `releaseOriginalDate`
+- `releaseTime`
+- `releaseTimeMode`
+- `releaseTimezoneId`
+- `cLineOwner`
+- `cLineYear`
+- `pLineOwner`
+- `pLineYear`
+- `catalogId`
+- `priceTierId`
+- `releaseCoverArt`
+- `releaseLanguage`
+- `releaseTerritory`
+- `video`
+
+### `video`
+
+- `releaseId` only required when calling `POST /videos` directly.
+- `isrc`
+- `explicit`
+- `aiContent`: `"ALL"` | `"PARTLY"` | `"NONE"` | `"UNDETERMINED"`
+- `channel`
+- `description`
+- `keywords`
+- `isKids`
+- `isUnlisted`
+- `captions`
+- `contentProvider`
+- `copyrightOwner`
+- `partnerCustomId1`
+- `partnerCustomId2`
+- `fileId`
+
+### `videoArtists`
+
+- `videoId`
+- `artistId`
+
+### `videoContributors`
+
+- `videoId`
+- `artistId`
+- `artistRoleId`
+
+## Upload assets
+
+Dung chung API bucket giong flow upload audio track.
+
+### Tao presigned upload URL
+
+`POST /bucket2/private/bulk`
+
+Video file:
+
+```json
+{
+  "bucketDtos": [
+    {
+      "file": {
+        "fileName": "video.mp4",
+        "contentType": "video/mp4",
+        "extension": "mp4",
+        "fileSize": 123456
+      },
+      "folderBucket": {
+        "uploadPurpose": "video_file",
+        "releaseId": "uuid-release"
+      }
+    }
+  ]
+}
+```
+
+Caption/subtitle file:
+
+```json
+{
+  "bucketDtos": [
+    {
+      "file": {
+        "fileName": "caption.srt",
+        "contentType": "application/x-subrip",
+        "extension": "srt",
+        "fileSize": 1234
+      },
+      "folderBucket": {
+        "uploadPurpose": "video_caption",
+        "releaseId": "uuid-release"
+      }
+    }
+  ]
+}
+```
+
+Response tra ve `fileId` va `urlUpload`. FE upload binary len `urlUpload`, sau do luu `fileId` vao:
+
+- Video file -> `video.fileId`
+- Caption/subtitle -> `/releases/release-captions/bulk-upsert`
+
+Sau khi upload thanh cong, neu can danh dau file da submit thi dung:
+
+`POST /bucket2/private/bulk/submit`
+
+```json
+{
+  "ids": ["uuid-file-1", "uuid-file-2"]
+}
+```
