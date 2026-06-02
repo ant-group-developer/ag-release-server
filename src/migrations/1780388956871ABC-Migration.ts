@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddArtistTriggerToSyncOutbox1780388956871 implements MigrationInterface {
-    name = 'AddArtistTriggerToSyncOutbox1780388956871'
+export class AddArtistTriggerToSyncOutbox1780388956871ABC implements MigrationInterface {
+    name = 'AddArtistTriggerToSyncOutbox1780388956871ABC'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // 1. Cap nhat trigger function de ho tro dich tu track_artist -> tracks

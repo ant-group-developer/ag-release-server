@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddClickHouseSyncOutbox1780388956870 implements MigrationInterface {
-    name = 'AddClickHouseSyncOutbox1780388956870'
+export class AddClickHouseSyncOutbox1780388956870ABC implements MigrationInterface {
+    name = 'AddClickHouseSyncOutbox1780388956870ABC'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // 1. Tao bang outbox
