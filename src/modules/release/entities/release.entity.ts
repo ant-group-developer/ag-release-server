@@ -12,6 +12,7 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
+import { ReleaseCaption } from 'src/modules/release-caption/entities/release-caption.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -289,6 +290,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@OneToOne(() => Video, (video) => video.release)
 	video: Video | null;
+
+	@OneToMany(() => ReleaseCaption, (caption) => caption.release)
+	captions: ReleaseCaption[];
 
 	tracksCount?: number;
 	totalDuration?: number;

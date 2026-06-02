@@ -68,11 +68,6 @@ export class CreateVideoDto {
 	@IsBoolean()
 	isUnlisted?: boolean;
 
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsArray()
-	subtitles?: { language: string; fileId: string; fileName: string }[];
-
 	@ApiPropertyOptional({ maxLength: 100 })
 	@IsOptional()
 	@IsString()

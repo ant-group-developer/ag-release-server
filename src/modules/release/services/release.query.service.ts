@@ -213,6 +213,9 @@ export class ReleaseQueryService {
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
 			.leftJoin('release.video', 'video')
 			.leftJoin('video.videoFile', 'videoFile')
+			.leftJoin('release.captions', 'releaseCaptions')
+			.leftJoin('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoin('releaseCaptions.language', 'releaseCaptionLanguage')
 			.leftJoin('video.videoArtists', 'videoArtist')
 			.leftJoin('videoArtist.artist', 'videoArtistEntity')
 			.leftJoin('video.videoContributors', 'videoContributor')
@@ -362,7 +365,6 @@ export class ReleaseQueryService {
 				'video.keywords',
 				'video.isKids',
 				'video.isUnlisted',
-				'video.subtitles',
 				'video.contentProvider',
 				'video.copyrightOwner',
 				'video.partnerCustomId1',
@@ -375,6 +377,25 @@ export class ReleaseQueryService {
 				'videoFile.extension',
 				'videoFile.fileSize',
 				'videoFile.contentType',
+			])
+			.addSelect([
+				'releaseCaptions.id',
+				'releaseCaptions.releaseId',
+				'releaseCaptions.languageId',
+				'releaseCaptions.type',
+				'releaseCaptions.fileId',
+			])
+			.addSelect([
+				'releaseCaptionLanguage.id',
+				'releaseCaptionLanguage.name',
+				'releaseCaptionLanguage.code',
+			])
+			.addSelect([
+				'releaseCaptionFile.id',
+				'releaseCaptionFile.fileName',
+				'releaseCaptionFile.extension',
+				'releaseCaptionFile.fileSize',
+				'releaseCaptionFile.contentType',
 			])
 			.addSelect([
 				'videoArtist.id',
@@ -910,6 +931,12 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('release.captions', 'releaseCaptions')
+			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoinAndSelect(
+				'releaseCaptions.language',
+				'releaseCaptionLanguage',
+			)
 			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
 			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
 			.leftJoinAndSelect('video.videoContributors', 'videoContributors')
@@ -1087,6 +1114,12 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
+			.leftJoinAndSelect('release.captions', 'releaseCaptions')
+			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
+			.leftJoinAndSelect(
+				'releaseCaptions.language',
+				'releaseCaptionLanguage',
+			)
 			.leftJoinAndSelect('video.videoArtists', 'videoArtists')
 			.leftJoinAndSelect('videoArtists.artist', 'videoArtist')
 			.leftJoinAndSelect('video.videoContributors', 'videoContributors')

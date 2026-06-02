@@ -51,6 +51,7 @@ import { ReleaseModule } from './modules/release/release.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
 import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
+import { ReleaseCaptionModule } from './modules/release-caption/release-caption.module';
 import { RequestTrackingModule } from './modules/request-tracking/request-tracking.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
@@ -167,6 +168,7 @@ import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 		ReleaseContributorModule,
 		TrackContributorModule,
 		VideoArtistModule,
+		ReleaseCaptionModule,
 		VideoContributorModule,
 		VideoGenreModule,
 

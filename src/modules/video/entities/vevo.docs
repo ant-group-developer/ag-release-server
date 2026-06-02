@@ -40,11 +40,11 @@ Body can co:
     "isKids": false,
     "isUnlisted": false,
     "fileId": "uuid-video-file",
-    "subtitles": [
+    "captions": [
       {
-        "language": "en",
-        "fileId": "uuid-caption-file",
-        "fileName": "caption.srt"
+        "languageId": "uuid-language-en",
+        "type": "CAPTION",
+        "fileId": "uuid-caption-file"
       }
     ]
   }
@@ -131,7 +131,7 @@ Body:
 | ISRC | `video.isrc` | Yes | ISRC cua video. Khong dung Audio ISRC. |
 | Video file | `video.fileId` | Yes khi submit VEVO | File ID tu bucket upload video. |
 | Thumbnail file | `releaseCoverArt.fileId` / `release_cover_art` | Yes khi submit VEVO | Dung cover art original cua release. |
-| Captions/subtitles | `video.subtitles[]` | No | Moi item: `{ language, fileId, fileName }`. |
+| Captions/subtitles | `/releases/release-captions/bulk-upsert` | No | Moi item: `{ languageId, type, fileId }`, type: `SUBTITLE` hoac `CAPTION`. |
 | Nha cung cap noi dung | `video.contentProvider` | Yes tren UI | Text max 100. |
 | Chu so huu tac pham | `video.copyrightOwner` | Yes tren UI | Text max 150. Khac voi copyright line o tab Bo sung. |
 | Kenh | `video.channel` | Yes | Ten kenh YouTube/VEVO. |
@@ -247,7 +247,7 @@ Cron scanner:
 - `keywords`
 - `isKids`
 - `isUnlisted`
-- `subtitles`
+- `captions`
 - `contentProvider`
 - `copyrightOwner`
 - `partnerCustomId1`
@@ -318,7 +318,7 @@ Caption/subtitle file:
 Response tra ve `fileId` va `urlUpload`. FE upload binary len `urlUpload`, sau do luu `fileId` vao:
 
 - Video file -> `video.fileId`
-- Caption/subtitle -> `video.subtitles[].fileId`
+- Caption/subtitle -> `/releases/release-captions/bulk-upsert`
 
 Sau khi upload thanh cong, neu can danh dau file da submit thi dung:
 

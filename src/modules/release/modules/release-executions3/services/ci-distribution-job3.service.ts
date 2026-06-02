@@ -68,7 +68,9 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	 * Cron check CI Tool job status.
 	 * Chạy mỗi phút, nhưng chỉ check job nào đã tới nextCiToolCheckAt.
 	 */
-	@Cron('* * * * *') // mỗi phút
+	// @Cron('*/5 * * * *')
+	// @Cron('* * * * *') // mỗi phút
+	@Cron('*/10 * * * * *')
 	async handleCheckCiToolJobStatus() {
 		await this.checkCiToolJobStatus();
 	}
@@ -84,6 +86,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 				createdAt: 'ASC',
 			},
 		});
+		console.log('checkCiToolJobStatus - found jobs:', jobs.length);
 
 		if (!jobs.length) return;
 
@@ -107,7 +110,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 				const status = ciStatusResult?.job?.status;
 
-				if (status === 'completed') {
+				if (status === 'success') {
 					await this.repo.update(
 						{ id: In(groupJobs.map((j) => j.id)) },
 						{
@@ -186,7 +189,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 				await this.repo.update(
 					{ id: In(groupJobs.map((j) => j.id)) },
 					{
-						nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+						nextCiToolCheckAt: new Date(Date.now() + 1 * 60 * 1000),
+						// nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
 					},
 				);
 
@@ -223,10 +227,10 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		}
 
 		try {
-			const cronExpression = '*/1 * * * *'; // mỗi phút, test nhanh
-			// const cronExpression =
-			// 	this.appConfigService.cache?.config?.partners?.ci
-			// 		?.dailySendCron || '0 8 * * *';
+			// const cronExpression = '*/1 * * * *'; // mỗi phút, test nhanh
+			const cronExpression =
+				this.appConfigService.cache?.config?.partners?.ci
+					?.dailySendCron || '0 8 * * *';
 
 			const job = new CronJob(cronExpression, () => {
 				this.handleDailySend().catch((err) => {

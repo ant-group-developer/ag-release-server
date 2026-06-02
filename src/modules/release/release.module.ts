@@ -61,6 +61,8 @@ import { ReleaseExecution3 } from './modules/release-executions3/entites/release
 import { ReleaseExecution3Service } from './modules/release-executions3/services/release-execution3.service';
 
 import { PartnersApiModule } from '../partners-api/partners-api.module';
+import { ReleaseCaption } from '../release-caption/entities/release-caption.entity';
+import { ReleaseCaptionModule } from '../release-caption/release-caption.module';
 import { VideoArtist } from '../video-artist/entities/video-artist.entity';
 import { VideoContributor } from '../video-contributor/entities/video-contributor.entity';
 import { Video } from '../video/entities/video.entity';
@@ -114,6 +116,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 
 			Video,
 			VideoArtist,
+			ReleaseCaption,
 			VideoContributor,
 		]),
 
@@ -125,6 +128,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseArtistModule,
 		ReleaseTerritoryModule,
 		VideoModule,
+		ReleaseCaptionModule,
 		ReleaseLogModule,
 
 		FileExportCiModule,

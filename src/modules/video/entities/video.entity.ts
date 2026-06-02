@@ -128,15 +128,6 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	isUnlisted: boolean | null;
 
 	@Column({
-		type: 'jsonb',
-		nullable: true,
-		comment:
-			'Danh sách tệp phụ đề đính kèm cấu trúc: [{ language: "vi", fileId: "uuid", fileName: "abc.srt" }]' +
-			COMMENT_FOR_NULLABLE_DRAFT,
-	})
-	subtitles: { language: string; fileId: string; fileName: string }[] | null;
-
-	@Column({
 		name: 'visibility',
 		type: 'varchar',
 		length: 50,

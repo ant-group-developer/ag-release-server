@@ -523,10 +523,19 @@ export class ReleaseDdexService {
 			destPath: coverPath,
 		});
 
-		// Fetch Subtitle files
+		// Fetch caption/subtitle files from the release_captions relation.
 		const subtitleFiles = [];
-		if (release.video.subtitles && Array.isArray(release.video.subtitles)) {
-			for (const [subIndex, sub] of release.video.subtitles.entries()) {
+		const captions =
+			release.captions?.map((caption) => ({
+				language: caption.language?.code ?? '',
+				fileId: caption.fileId,
+				fileName:
+					caption.file?.fileName ||
+					`${caption.language?.code ?? 'caption'}_${release.video?.isrc ?? ''}.srt`,
+			})) ?? [];
+
+		if (captions.length) {
+			for (const [subIndex, sub] of captions.entries()) {
 				const subDestPath = path.join(
 					tempDir,
 					`sub_${sub.language}_${subIndex}.tmp`,
@@ -925,7 +934,7 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code ?? '',
+								release.priceTier?.currency?.code ?? 'USD',
 						},
 					},
 				],
@@ -945,7 +954,7 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code ?? 'USD',
 						},
 					},
 					{
@@ -963,7 +972,7 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code ?? 'USD',
 						},
 					},
 					{
@@ -1212,7 +1221,12 @@ export class ReleaseDdexService {
 						filePath: 'resources',
 						codecType: 'MP4',
 					},
-					subtitles: video.subtitles?.map((sub, subIdx) => ({
+					subtitles: (
+						release.captions?.map((caption) => ({
+							language: caption.language?.code ?? '',
+							fileId: caption.fileId,
+						})) ?? []
+					).map((sub, subIdx) => ({
 						language: sub.language,
 						fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
 						filePath: 'resources',

@@ -670,76 +670,76 @@ export class Ern43Builder2 {
 		const rg = release.ele('ResourceGroup');
 		rg.ele('SequenceNumber').txt('1');
 
-		const refList = release.ele('ReleaseResourceReferenceList');
+		// const refList = release.ele('ReleaseResourceReferenceList');
 
 		// Cover art image reference link
-		if (this.input.release.coverArt) {
-			refList
-				.ele('ReleaseResourceReference', {
-					ReleaseResourceType: 'SecondaryResource',
-				})
-				.txt(this.getImageRef());
-		}
+		// if (this.input.release.coverArt) {
+		// 	refList
+		// 		.ele('ReleaseResourceReference', {
+		// 			ReleaseResourceType: 'SecondaryResource',
+		// 		})
+		// 		.txt(this.getImageRef());
+		// }
 
-		// Sound recordings
-		for (let i = 0; i < this.input.tracks.length; i++) {
-			refList
-				.ele('ReleaseResourceReference', {
-					ReleaseResourceType: 'PrimaryResource',
-				})
-				.txt(this.getTrackRef(i));
+		// // Sound recordings
+		// for (let i = 0; i < this.input.tracks.length; i++) {
+		// 	refList
+		// 		.ele('ReleaseResourceReference', {
+		// 			ReleaseResourceType: 'PrimaryResource',
+		// 		})
+		// 		.txt(this.getTrackRef(i));
 
-			const item = rg.ele('ResourceGroupContentItem');
-			item.ele('SequenceNumber').txt(String(i + 1));
-			item.ele('ReleaseResourceReference').txt(this.getTrackRef(i));
-		}
+		// 	const item = rg.ele('ResourceGroupContentItem');
+		// 	item.ele('SequenceNumber').txt(String(i + 1));
+		// 	item.ele('ReleaseResourceReference').txt(this.getTrackRef(i));
+		// }
 
-		// Videos
-		const videoCount = this.input.videos?.length ?? 0;
-		for (let i = 0; i < videoCount; i++) {
-			refList
-				.ele('ReleaseResourceReference', {
-					ReleaseResourceType: 'PrimaryResource',
-				})
-				.txt(this.getVideoRef(i));
+		// // Videos
+		// const videoCount = this.input.videos?.length ?? 0;
+		// for (let i = 0; i < videoCount; i++) {
+		// 	refList
+		// 		.ele('ReleaseResourceReference', {
+		// 			ReleaseResourceType: 'PrimaryResource',
+		// 		})
+		// 		.txt(this.getVideoRef(i));
 
-			const item = rg.ele('ResourceGroupContentItem');
-			item.ele('SequenceNumber').txt(
-				String(this.input.tracks.length + i + 1),
-			);
-			item.ele('ReleaseResourceReference').txt(this.getVideoRef(i));
+		// 	const item = rg.ele('ResourceGroupContentItem');
+		// 	item.ele('SequenceNumber').txt(
+		// 		String(this.input.tracks.length + i + 1),
+		// 	);
+		// 	item.ele('ReleaseResourceReference').txt(this.getVideoRef(i));
 
-			// Video screen capture image link
-			if (this.input.release.coverArt) {
-				item.ele('LinkedReleaseResourceReference', {
-					LinkDescription: 'VideoScreenCapture',
-				}).txt(this.getImageRef());
-			}
+		// 	// Video screen capture image link
+		// 	if (this.input.release.coverArt) {
+		// 		item.ele('LinkedReleaseResourceReference', {
+		// 			LinkDescription: 'VideoScreenCapture',
+		// 		}).txt(this.getImageRef());
+		// 	}
 
-			// Subtitle caption file link
-			const video = this.input.videos![i];
-			if (video.subtitles) {
-				for (let j = 0; j < video.subtitles.length; j++) {
-					item.ele('LinkedReleaseResourceReference', {
-						LinkDescription: 'Caption',
-					}).txt(this.getSubtitleRef(i, j));
-				}
-			}
-		}
+		// 	// Subtitle caption file link
+		// 	const video = this.input.videos![i];
+		// 	if (video.subtitles) {
+		// 		for (let j = 0; j < video.subtitles.length; j++) {
+		// 			item.ele('LinkedReleaseResourceReference', {
+		// 				LinkDescription: 'Caption',
+		// 			}).txt(this.getSubtitleRef(i, j));
+		// 		}
+		// 	}
+		// }
 
-		// Subtitle references to main list
-		for (let i = 0; i < videoCount; i++) {
-			const video = this.input.videos![i];
-			if (video.subtitles) {
-				for (let j = 0; j < video.subtitles.length; j++) {
-					refList
-						.ele('ReleaseResourceReference', {
-							ReleaseResourceType: 'SecondaryResource',
-						})
-						.txt(this.getSubtitleRef(i, j));
-				}
-			}
-		}
+		// // Subtitle references to main list
+		// for (let i = 0; i < videoCount; i++) {
+		// 	const video = this.input.videos![i];
+		// 	if (video.subtitles) {
+		// 		for (let j = 0; j < video.subtitles.length; j++) {
+		// 			refList
+		// 				.ele('ReleaseResourceReference', {
+		// 					ReleaseResourceType: 'SecondaryResource',
+		// 				})
+		// 				.txt(this.getSubtitleRef(i, j));
+		// 		}
+		// 	}
+		// }
 
 		// Linked cover art for audio-only releases at root level
 		if (
@@ -751,15 +751,15 @@ export class Ern43Builder2 {
 		}
 
 		// Total duration
-		let totalSeconds = this.input.tracks.reduce(
-			(sum, t) => sum + this.durationToSeconds(t.duration),
-			0,
-		);
-		totalSeconds += (this.input.videos ?? []).reduce(
-			(sum, v) => sum + this.durationToSeconds(v.duration),
-			0,
-		);
-		release.ele('Duration').txt(this.secondsToIso(totalSeconds));
+		// let totalSeconds = this.input.tracks.reduce(
+		// 	(sum, t) => sum + this.durationToSeconds(t.duration),
+		// 	0,
+		// );
+		// totalSeconds += (this.input.videos ?? []).reduce(
+		// 	(sum, v) => sum + this.durationToSeconds(v.duration),
+		// 	0,
+		// );
+		// release.ele('Duration').txt(this.secondsToIso(totalSeconds));
 	}
 
 	private buildTrackRelease(
