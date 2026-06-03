@@ -13,15 +13,17 @@ export class DspReportController {
   @Get()
   async findAll(
     @Query() query: QueryGetListDspReportDto,
-  ): Promise<PageDto<DspsReportResponse>> {
+  ): Promise<ResponseSuccess<PageDto<DspsReportResponse>>> {
     const { items, totalItems } = await this.dspReportService.findAll(query);
-    return new PageDto({
-      items,
-      metadata: {
-        page: query.page,
-        pageSize: query.pageSize,
-        totalItems,
-      },
+    return new ResponseSuccess({
+      data: new PageDto({
+        items,
+        metadata: {
+          page: query.page,
+          pageSize: query.pageSize,
+          totalItems,
+        },
+      }),
     });
   }
 

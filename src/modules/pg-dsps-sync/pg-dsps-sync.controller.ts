@@ -13,15 +13,17 @@ export class PgDspsSyncController {
   @Get()
   async findAll(
     @Query() query: QueryGetListPgDspsSyncDto,
-  ): Promise<PageDto<PgDspsSyncResponse>> {
+  ): Promise<ResponseSuccess<PageDto<PgDspsSyncResponse>>> {
     const { items, totalItems } = await this.pgDspsSyncService.findAll(query);
-    return new PageDto({
-      items,
-      metadata: {
-        page: query.page,
-        pageSize: query.pageSize,
-        totalItems,
-      },
+    return new ResponseSuccess({
+      data: new PageDto({
+        items,
+        metadata: {
+          page: query.page,
+          pageSize: query.pageSize,
+          totalItems,
+        },
+      }),
     });
   }
 
