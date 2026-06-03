@@ -19,4 +19,5 @@ export const CLICKHOUSE_TABLES = {
   TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
   SALES_TER_MONTHLY: 'sales_ter_monthly_cube',
   TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
+  IMPORT_JOBS: 'import_jobs',
 } as const;

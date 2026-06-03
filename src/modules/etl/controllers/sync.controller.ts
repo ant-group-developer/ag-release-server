@@ -2,7 +2,9 @@ import { Body, Controller, Get, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { SyncService } from '../services/sync/sync.service';
 import { FtpService } from '../services/ftp/ftp.service';
-import { JobService } from '../services/job/job.service';
+import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
+import { ImportJobSourceType } from '../interfaces';
+import { User } from '../../../common/decorators/req.decorators';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -10,7 +12,7 @@ export class SyncController {
   constructor(
     private readonly syncService: SyncService,
     private readonly ftpService: FtpService,
-    private readonly jobService: JobService,
+    private readonly importJobsService: ImportJobsService,
   ) {}
 
   // ── FTP: Connection ───────────────────────────────────
@@ -35,7 +37,7 @@ export class SyncController {
   @Post('ftp/sync')
   @ApiOperation({
     summary: 'Sync a specific period from FTPS (async)',
-    description: 'Starts download+import in background. Returns a job ID to poll for status.',
+    description: 'Starts download+import in background. Returns a jobId. Poll GET /etl/jobs/:id.',
   })
   @ApiBody({
     schema: {
@@ -47,28 +49,30 @@ export class SyncController {
       required: ['period'],
     },
   })
-  async syncPeriod(@Body() body: { period: string; force?: boolean }) {
-    const jobId = this.jobService.createJob(
-      'sync',
-      { period: body.period, force: body.force || false },
-      async (_job, updateProgress) => {
-        updateProgress(0, 1, `Syncing ${body.period}...`);
-        const result = await this.syncService.syncPeriod(body.period, body.force || false);
-        updateProgress(1, 1, 'Done');
-        return result;
-      },
-    );
+  async syncPeriod(@Body() body: { period: string; force?: boolean }, @User() user: any) {
+    const job = await this.importJobsService.create({
+      sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
+      params: { period: body.period, force: body.force ?? false },
+      tenantId: user?.tenantId,
+      createdBy: user?.sub,
+      progressTotal: 1,
+    });
 
-    return { jobId, message: `Sync started for period ${body.period}. Poll GET /etl/jobs/${jobId} for status.` };
+    setImmediate(() => this.runSyncPeriodJob(job.id, body.period, body.force ?? false));
+
+    return {
+      jobId: job.id,
+      statusUrl: `/etl/jobs/${job.id}`,
+      message: `Sync started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
+    };
   }
 
   @Post('ftp/sync-all')
   @ApiOperation({
     summary: 'Sync ALL pending periods from FTPS (async)',
     description:
-      'Starts sync for all un-imported periods in background. Returns a job ID.\n' +
-      'Use `startPeriod` (YYYYMM) to skip all periods before that month.\n' +
-      'Example: startPeriod=202401 → only sync from Jan 2024 onwards.',
+      'Starts sync for all un-imported periods in background. Returns a jobId.\n' +
+      'Use `startPeriod` (YYYYMM) to skip all periods before that month.',
   })
   @ApiBody({
     schema: {
@@ -78,43 +82,31 @@ export class SyncController {
         startPeriod: {
           type: 'string',
           example: '202401',
-          description: 'Skip periods before this month (YYYYMM). E.g. 202401 = only sync from Jan 2024 onwards.',
+          description: 'Skip periods before this month (YYYYMM).',
         },
       },
     },
   })
-  async syncAll(@Body() body: { force?: boolean; startPeriod?: string }) {
-    const jobId = this.jobService.createJob(
-      'sync-all',
-      { force: body?.force || false, startPeriod: body?.startPeriod },
-      async (_job, updateProgress) => {
-        let periods = await this.ftpService.listPeriods();
+  async syncAll(
+    @Body() body: { force?: boolean; startPeriod?: string },
+    @User() user: any,
+  ) {
+    const job = await this.importJobsService.create({
+      sourceType: ImportJobSourceType.FTP_SYNC_ALL,
+      params: { force: body?.force ?? false, startPeriod: body?.startPeriod ?? null },
+      tenantId: user?.tenantId,
+      createdBy: user?.sub,
+    });
 
-        // Filter periods if startPeriod is provided (skip earlier periods)
-        const startPeriod = body?.startPeriod;
-        if (startPeriod) {
-          periods = periods.filter((p) => p >= startPeriod);
-        }
-
-        updateProgress(0, periods.length, 'Listing periods...');
-
-        const results = [];
-        for (let i = 0; i < periods.length; i++) {
-          updateProgress(i, periods.length, `Syncing ${periods[i]}...`);
-          try {
-            const result = await this.syncService.syncPeriod(periods[i], body?.force || false);
-            results.push(result);
-          } catch (err) {
-            results.push({ period: periods[i], error: err.message });
-          }
-        }
-
-        updateProgress(periods.length, periods.length, 'Done');
-        return results;
-      },
+    setImmediate(() =>
+      this.runSyncAllJob(job.id, body?.force ?? false, body?.startPeriod),
     );
 
-    return { jobId, message: `Sync-all started. Poll GET /etl/jobs/${jobId} for status.` };
+    return {
+      jobId: job.id,
+      statusUrl: `/etl/jobs/${job.id}`,
+      message: `Sync-all started. Poll GET /etl/jobs/${job.id} for status.`,
+    };
   }
 
   @Post('ftp/retry')
@@ -125,25 +117,26 @@ export class SyncController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: {
-        period: { type: 'string', example: '202401' },
-      },
+      properties: { period: { type: 'string', example: '202401' } },
       required: ['period'],
     },
   })
-  async retryImport(@Body() body: { period: string }) {
-    const jobId = this.jobService.createJob(
-      'retry',
-      { period: body.period },
-      async (_job, updateProgress) => {
-        updateProgress(0, 1, `Retrying ${body.period}...`);
-        const result = await this.syncService.syncPeriod(body.period, true);
-        updateProgress(1, 1, 'Done');
-        return result;
-      },
-    );
+  async retryImport(@Body() body: { period: string }, @User() user: any) {
+    const job = await this.importJobsService.create({
+      sourceType: ImportJobSourceType.FTP_RETRY,
+      params: { period: body.period, force: true },
+      tenantId: user?.tenantId,
+      createdBy: user?.sub,
+      progressTotal: 1,
+    });
 
-    return { jobId, message: `Retry started for period ${body.period}. Poll GET /etl/jobs/${jobId} for status.` };
+    setImmediate(() => this.runSyncPeriodJob(job.id, body.period, true));
+
+    return {
+      jobId: job.id,
+      statusUrl: `/etl/jobs/${job.id}`,
+      message: `Retry started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
+    };
   }
 
   // ── FTP: Status & History ─────────────────────────────
@@ -170,30 +163,103 @@ export class SyncController {
   // ── Sync Config ───────────────────────────────────────
 
   @Get('sync-config')
-  @ApiOperation({
-    summary: 'Get current sync configuration',
-    description: 'Returns sync mode (manual/auto) and cron expression',
-  })
+  @ApiOperation({ summary: 'Get current sync configuration' })
   async getSyncConfig() {
     return this.syncService.getSyncConfig();
   }
 
   @Put('sync-config')
-  @ApiOperation({
-    summary: 'Update sync configuration',
-    description: 'Switch between manual and auto sync mode',
-  })
+  @ApiOperation({ summary: 'Update sync configuration' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         mode: { type: 'string', enum: ['manual', 'auto'], example: 'auto' },
-        cron: { type: 'string', example: '0 2 * * *', description: 'Cron expression (optional)' },
+        cron: { type: 'string', example: '0 2 * * *' },
       },
       required: ['mode'],
     },
   })
   async setSyncConfig(@Body() body: { mode: string; cron?: string }) {
     return this.syncService.setSyncConfig(body.mode, body.cron);
+  }
+
+  // ─────────────────────────────────────────────────────
+  // Job runners — chạy nền, không throw ra ngoài
+  // ─────────────────────────────────────────────────────
+
+  private async runSyncPeriodJob(jobId: string, period: string, force: boolean): Promise<void> {
+    try {
+      await this.importJobsService.markProcessing(jobId);
+      await this.importJobsService.updateProgress(
+        jobId,
+        { progressTotal: 1, progressCurrent: 0, progressLabel: `Syncing ${period}` },
+        true,
+      );
+      const result = await this.syncService.syncPeriod(period, force);
+      await this.importJobsService.updateProgress(
+        jobId,
+        { progressTotal: 1, progressCurrent: 1, progressLabel: 'Done' },
+        true,
+      );
+      await this.importJobsService.markCompleted(jobId, result as unknown as Record<string, unknown>);
+    } catch (err) {
+      await this.importJobsService.markFailed(jobId, err);
+    }
+  }
+
+  private async runSyncAllJob(
+    jobId: string,
+    force: boolean,
+    startPeriod?: string,
+  ): Promise<void> {
+    try {
+      await this.importJobsService.markProcessing(jobId);
+      await this.importJobsService.updateProgress(
+        jobId,
+        { progressLabel: 'Listing periods...' },
+        true,
+      );
+
+      let periods = await this.ftpService.listPeriods();
+      if (startPeriod) periods = periods.filter((p) => p >= startPeriod);
+
+      await this.importJobsService.updateProgress(
+        jobId,
+        {
+          progressTotal: periods.length,
+          progressCurrent: 0,
+          progressLabel: `Found ${periods.length} periods`,
+        },
+        true,
+      );
+
+      const results: unknown[] = [];
+      for (let i = 0; i < periods.length; i++) {
+        await this.importJobsService.updateProgress(
+          jobId,
+          { progressCurrent: i, progressLabel: `Syncing ${periods[i]}...` },
+          true,
+        );
+        try {
+          const result = await this.syncService.syncPeriod(periods[i], force);
+          results.push(result);
+        } catch (err) {
+          results.push({ period: periods[i], error: err.message });
+        }
+      }
+
+      await this.importJobsService.updateProgress(
+        jobId,
+        { progressCurrent: periods.length, progressLabel: 'Done' },
+        true,
+      );
+      await this.importJobsService.markCompleted(jobId, {
+        totalPeriods: periods.length,
+        results,
+      });
+    } catch (err) {
+      await this.importJobsService.markFailed(jobId, err);
+    }
   }
 }

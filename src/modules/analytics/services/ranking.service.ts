@@ -28,15 +28,29 @@ export class RankingService {
 
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
+  // System-tenant không có sub-filter → bỏ JOIN pg_tracks_sync
+  // để thống kê TẤT CẢ ISRCs trong ClickHouse
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
     query: RankingQueryDto,
-  ): { filterSql: string; params: Record<string, any> } {
+  ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
 
-    if (!checkIsSystemTenant(tenantId)) {
+    const isSystem = checkIsSystemTenant(tenantId);
+    const hasSubFilter = !!query.labelId;
+
+    // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
+    if (isSystem && !hasSubFilter) {
+      return { joinSql: '', filterSql: '', params };
+    }
+
+    // All other cases: JOIN pg_tracks_sync for tenant/label filtering
+    const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+    filterSql += ' AND t.is_deleted = 0';
+
+    if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
     }
@@ -46,7 +60,7 @@ export class RankingService {
       params.labelId = query.labelId;
     }
 
-    return { filterSql, params };
+    return { joinSql, filterSql, params };
   }
 
   // ═══════════════════════════════════════════════════════
@@ -57,7 +71,7 @@ export class RankingService {
     query: RankingQueryDto,
   ): Promise<PageDto<TrackRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -74,8 +88,8 @@ export class RankingService {
     const countSql = `
       SELECT uniq(s.isrc) AS total
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -100,8 +114,8 @@ export class RankingService {
         s.isrc AS isrc,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}

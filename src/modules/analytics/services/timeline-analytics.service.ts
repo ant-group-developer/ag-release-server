@@ -18,15 +18,29 @@ export class TimelineAnalyticsService {
 
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
+  // System-tenant không có sub-filter → bỏ JOIN pg_tracks_sync
+  // để thống kê TẤT CẢ ISRCs trong ClickHouse
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
     query: TimelineQueryDto,
-  ): { filterSql: string; params: Record<string, any> } {
+  ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
 
-    if (!checkIsSystemTenant(tenantId)) {
+    const isSystem = checkIsSystemTenant(tenantId);
+    const hasSubFilter = !!(query.labelId || query.releaseId);
+
+    // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
+    if (isSystem && !hasSubFilter) {
+      return { joinSql: '', filterSql: '', params };
+    }
+
+    // All other cases: JOIN pg_tracks_sync for tenant/label/release filtering
+    const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+    filterSql += ' AND t.is_deleted = 0';
+
+    if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
     }
@@ -41,7 +55,7 @@ export class TimelineAnalyticsService {
       params.releaseId = query.releaseId;
     }
 
-    return { filterSql, params };
+    return { joinSql, filterSql, params };
   }
 
   // ═══════════════════════════════════════════════════════
@@ -52,7 +66,7 @@ export class TimelineAnalyticsService {
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
     const { fromDate, toDate, topN = 5, includeOther = true } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -71,9 +85,9 @@ export class TimelineAnalyticsService {
         ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
@@ -108,9 +122,9 @@ export class TimelineAnalyticsService {
         ${dspExpr},
         sum(s.total_quantity) AS sales_views
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${whereDsp}
@@ -150,7 +164,7 @@ export class TimelineAnalyticsService {
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
     const { fromDate, toDate, topN = 5, includeOther = true } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -169,9 +183,9 @@ export class TimelineAnalyticsService {
         ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
@@ -206,9 +220,9 @@ export class TimelineAnalyticsService {
         ${dspExpr},
         sum(s.total_quantity) AS trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${whereDsp}
@@ -247,7 +261,7 @@ export class TimelineAnalyticsService {
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
     const { fromDate, toDate, topN = 5, includeOther = true } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -266,9 +280,9 @@ export class TimelineAnalyticsService {
         ${resolvedDspName} AS dsp_name,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
         ${filterSql}
@@ -303,9 +317,9 @@ export class TimelineAnalyticsService {
         ${dspExpr},
         sum(s.total_quantity) AS trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      ${joinSql}
       ${joinExpr}
-      WHERE t.is_deleted = 0
+      WHERE 1=1
         AND s.reporting_date >= toDate({from:String})
         AND s.reporting_date <= toDate({to:String})
         ${whereDsp}
@@ -344,7 +358,7 @@ export class TimelineAnalyticsService {
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
     const { fromDate, toDate, topN = 5, includeOther = true } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -354,8 +368,8 @@ export class TimelineAnalyticsService {
         s.territory_code AS territory,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
@@ -388,8 +402,8 @@ export class TimelineAnalyticsService {
         ${terExpr} AS ter_name,
         sum(s.total_quantity) AS sales_views
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${whereTer}
@@ -428,7 +442,7 @@ export class TimelineAnalyticsService {
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
     const { fromDate, toDate, topN = 5, includeOther = true } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
@@ -438,8 +452,8 @@ export class TimelineAnalyticsService {
         s.territory_code AS territory,
         sum(s.total_quantity) AS views
       FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
@@ -472,8 +486,8 @@ export class TimelineAnalyticsService {
         ${terExpr} AS ter_name,
         sum(s.total_quantity) AS trend_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
-      WHERE t.is_deleted = 0
+      ${joinSql}
+      WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${whereTer}

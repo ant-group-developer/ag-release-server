@@ -76,7 +76,7 @@ export class PgDspsSyncService {
     );
 
     return {
-      items: rows.map(mapRawPgPgDspsSync => mapRawPgDspsSync(mapRawPgPgDspsSync)),
+      items: rows.map(mapRawPgDspsSync),
       totalItems,
     };
   }
