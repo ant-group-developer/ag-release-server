@@ -81,7 +81,7 @@ export class DspMappingService {
 
     const newRecord: Record<string, unknown> = {
       id_dsps_report: idDspsReport,
-      pg_uuid: null,
+      pg_uuid: '',
       dsp_name: dspName,
       source: source,
       created_at: now,

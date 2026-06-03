@@ -3,51 +3,45 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
 
-export interface DspsReport {
-  id_dsps_report: string;
-  pg_uuid: string | null;
-  dsp_name: string;
+export interface DspsReportResponse {
+  idDspsReport: string;
+  pgUuid: string | null;
+  dspName: string;
   source: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   pgDspsSync?: {
-    pg_uuid: string;
-    dsp_code: string;
-    dsp_name: string;
-    dsp_ci_code: string;
-    created_at: string;
-    updated_at: string;
-  } | null;
-  pg_dsps_sync?: {
-    pg_uuid: string;
-    dsp_code: string;
-    dsp_name: string;
-    dsp_ci_code: string;
-    created_at: string;
-    updated_at: string;
+    pgUuid: string;
+    dspCode: string;
+    dspName: string;
+    dspCiCode: string;
+    picture: string;
+    createdAt: string;
+    updatedAt: string;
   } | null;
 }
 
-export function mapRawDspsReport(row: any): DspsReport {
+export function mapRawDspsReport(row: any): DspsReportResponse {
   const pgDspsSync = row.pg_dsps_sync_pg_uuid
     ? {
-        pg_uuid: row.pg_dsps_sync_pg_uuid,
-        dsp_code: row.pg_dsps_sync_dsp_code,
-        dsp_name: row.pg_dsps_sync_dsp_name,
-        dsp_ci_code: row.pg_dsps_sync_dsp_ci_code,
-        created_at: row.pg_dsps_sync_created_at,
-        updated_at: row.pg_dsps_sync_updated_at,
+        pgUuid: row.pg_dsps_sync_pg_uuid,
+        dspCode: row.pg_dsps_sync_dsp_code,
+        dspName: row.pg_dsps_sync_dsp_name,
+        dspCiCode: row.pg_dsps_sync_dsp_ci_code,
+        picture: row.pg_dsps_sync_picture || '',
+        createdAt: row.pg_dsps_sync_created_at,
+        updatedAt: row.pg_dsps_sync_updated_at,
       }
     : null;
 
   return {
-    id_dsps_report: row.id_dsps_report,
-    pg_uuid: row.pg_uuid || null,
-    dsp_name: row.dsp_name,
+    idDspsReport: row.id_dsps_report,
+    pgUuid: row.pg_uuid || null,
+    dspName: row.dsp_name,
     source: row.source,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    pg_dsps_sync: pgDspsSync,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    pgDspsSync,
   };
 }
 
@@ -58,9 +52,46 @@ export class DspReportService {
   constructor(private readonly clickHouseService: ClickHouseService) {}
 
   /**
-   * Get all dsps_report records
+   * Get paginated dsps_report records with optional filtering
    */
-  async findAll(): Promise<DspsReport[]> {
+  async findAll(query: {
+    page?: number;
+    pageSize?: number;
+    keyword?: string;
+    status?: string;
+  }): Promise<{ items: DspsReportResponse[]; totalItems: number }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    // Status filter
+    if (query.status === 'assigned') {
+      conditions.push(`r.pg_uuid != ''`);
+    } else if (query.status === 'unassigned') {
+      conditions.push(`r.pg_uuid = ''`);
+    }
+
+    // Keyword search (search in dsp_name and source)
+    if (query.keyword) {
+      conditions.push(`(lower(r.dsp_name) LIKE {kw: String} OR lower(r.source) LIKE {kw: String})`);
+      params.kw = `%${query.keyword.toLowerCase()}%`;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count query
+    const countRows = await this.clickHouseService.query<{ c: string }>(
+      `SELECT count() AS c
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
+       ${whereClause}`,
+      params,
+    );
+    const totalItems = Number(countRows[0]?.c ?? 0);
+
+    // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -73,19 +104,27 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
        LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
-       ORDER BY r.created_at DESC`
+       ${whereClause}
+       ORDER BY r.created_at DESC
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      params,
     );
-    return rows.map(mapRawDspsReport);
+
+    return {
+      items: rows.map(mapRawDspsReport),
+      totalItems,
+    };
   }
 
   /**
    * Get dsps_report by id
    */
-  async findById(id: string): Promise<DspsReport | null> {
+  async findById(id: string): Promise<DspsReportResponse | null> {
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -98,6 +137,7 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
@@ -108,11 +148,10 @@ export class DspReportService {
     return rows.length > 0 ? mapRawDspsReport(rows[0]) : null;
   }
 
-
   /**
    * Get dsps_reports by pg_uuid
    */
-  async findByPgUuid(pgUuid: string): Promise<DspsReport[]> {
+  async findByPgUuid(pgUuid: string): Promise<DspsReportResponse[]> {
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -125,6 +164,7 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
@@ -139,13 +179,13 @@ export class DspReportService {
   /**
    * Create new dsps_report
    */
-  async create(dspName: string, source: string): Promise<DspsReport> {
+  async create(dspName: string, source: string): Promise<DspsReportResponse> {
     const idDspsReport = uuidv4();
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     const newRecord: Record<string, unknown> = {
       id_dsps_report: idDspsReport,
-      pg_uuid: null,
+      pg_uuid: '',
       dsp_name: dspName,
       source: source,
       created_at: now,
@@ -154,7 +194,16 @@ export class DspReportService {
 
     await this.clickHouseService.insert(CLICKHOUSE_TABLES.DSPS_REPORT, [newRecord]);
     this.logger.log(`Created dsps_report: ${idDspsReport} - ${dspName}`);
-    return newRecord as unknown as DspsReport;
+
+    return {
+      idDspsReport,
+      pgUuid: null,
+      dspName,
+      source,
+      createdAt: now,
+      updatedAt: now,
+      pgDspsSync: null,
+    };
   }
 
   /**
@@ -173,7 +222,7 @@ export class DspReportService {
    */
   async unassign(idDspsReport: string): Promise<void> {
     await this.clickHouseService.query(
-      `ALTER TABLE ${CLICKHOUSE_TABLES.DSPS_REPORT} UPDATE pg_uuid = NULL WHERE id_dsps_report = {id: String}`,
+      `ALTER TABLE ${CLICKHOUSE_TABLES.DSPS_REPORT} UPDATE pg_uuid = '' WHERE id_dsps_report = {id: String}`,
       { id: idDspsReport }
     );
     this.logger.log(`Unassigned dsps_report ${idDspsReport}`);

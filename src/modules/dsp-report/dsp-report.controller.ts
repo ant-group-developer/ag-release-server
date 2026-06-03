@@ -1,29 +1,9 @@
 import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { DspReportService, DspsReport } from './dsp-report.service';
-
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
-
-class CreateDspReportDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  dspName: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  source: string;
-}
-
-class AssignDspReportDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  pgUuid: string;
-}
+import { DspReportService, DspsReportResponse } from './dsp-report.service';
+import { QueryGetListDspReportDto, CreateDspReportDto, AssignDspReportDto } from './dto/dsp-report.dto';
 
 @ApiTags('dsp-report')
 @Controller('dsp-report')
@@ -31,20 +11,30 @@ export class DspReportController {
   constructor(private readonly dspReportService: DspReportService) {}
 
   @Get()
-  async findAll(): Promise<ResponseSuccess<DspsReport[]>> {
-    const result = await this.dspReportService.findAll();
-    return new ResponseSuccess({ data: result });
+  async findAll(
+    @Query() query: QueryGetListDspReportDto,
+  ): Promise<ResponseSuccess<PageDto<DspsReportResponse>>> {
+    const { items, totalItems } = await this.dspReportService.findAll(query);
+    return new ResponseSuccess({
+      data: new PageDto({
+        items,
+        metadata: {
+          page: query.page,
+          pageSize: query.pageSize,
+          totalItems,
+        },
+      }),
+    });
   }
 
-
   @Get(':id')
-  async findById(@Param('id') id: string): Promise<ResponseSuccess<DspsReport | null>> {
+  async findById(@Param('id') id: string): Promise<ResponseSuccess<DspsReportResponse | null>> {
     const result = await this.dspReportService.findById(id);
     return new ResponseSuccess({ data: result });
   }
 
   @Post()
-  async create(@Body() dto: CreateDspReportDto): Promise<ResponseSuccess<DspsReport>> {
+  async create(@Body() dto: CreateDspReportDto): Promise<ResponseSuccess<DspsReportResponse>> {
     const result = await this.dspReportService.create(dto.dspName, dto.source);
     return new ResponseSuccess({ data: result });
   }

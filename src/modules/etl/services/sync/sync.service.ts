@@ -48,6 +48,8 @@ export interface ImportHistoryRow {
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private readonly tempBaseDir = path.join(os.tmpdir(), 'etl-import');
+  /** Cache: folder name (lowercase) → dsps_report UUID, cleared per syncPeriod call */
+  private dspIdCache = new Map<string, string>();
 
   constructor(
     private readonly ftpService: FtpService,
@@ -144,6 +146,7 @@ export class SyncService {
   /**
    * Delete fact data for a specific (period, category, dsp_folder) combination.
    * This allows precise re-import without affecting other folders.
+   * Runs fact + cube deletions in parallel for speed.
    */
   private async deleteFolderData(period: string, category: string, dspFolder: string): Promise<void> {
     const periodStart = `${period.substring(0, 4)}-${period.substring(4, 6)}-01`;
@@ -151,7 +154,29 @@ export class SyncService {
       ? dspFolder.split('-').slice(1).join('-')
       : dspFolder;
 
-    // Sales data goes to fact_sales_report; everything else to fact_dsp
+    // Resolve UUID for this dspFolder from dsps_report (use cache to avoid repeated queries)
+    let resolvedDspId = this.dspIdCache.get(dspFolder.toLowerCase()) ?? '';
+    if (!resolvedDspId) {
+      try {
+        const rows = await this.clickHouseService.query<{ id_dsps_report: string }>(
+          `SELECT id_dsps_report FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} WHERE lower(dsp_name) = {folder: String} LIMIT 1`,
+          { folder: dspFolder.toLowerCase() }
+        );
+        if (rows.length > 0) {
+          resolvedDspId = rows[0].id_dsps_report;
+          this.dspIdCache.set(dspFolder.toLowerCase(), resolvedDspId);
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to resolve dsp_id UUID for folder ${dspFolder}: ${err.message}`);
+      }
+    }
+
+    // Build unique list of possible dsp_id values (legacy name, short name, UUID)
+    const ids = new Set([dspFolder]);
+    if (dspName) ids.add(dspName);
+    if (resolvedDspId) ids.add(resolvedDspId);
+    const dspIdsInSql = [...ids].map((id) => `'${id}'`).join(', ');
+
     const table = category === 'sales'
       ? CLICKHOUSE_TABLES.FACT_SALES_REPORT
       : CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT;
@@ -159,15 +184,35 @@ export class SyncService {
     const catFilter = category === 'sales' ? ''
       : `AND source_category = '${category === 'illegitimate_activity' ? 'illegitimate' : category}' `;
 
+    const dateRange = `>= '${periodStart}' AND ${dateCol} < addMonths(toDate('${periodStart}'), 1)`;
+
     try {
-      await this.clickHouseService.execute(
-        `ALTER TABLE ${table} DELETE ` +
-        `WHERE ${dateCol} >= '${periodStart}' ` +
-        `AND ${dateCol} < addMonths(toDate('${periodStart}'), 1) ` +
-        catFilter +
-        `AND dsp_id = '${dspName}'`,
-      );
-      this.logger.log(`  🗑️ Deleted old data for ${category}/${dspFolder} in ${period}`);
+      // Run fact table + cube deletions in parallel (all are independent mutations)
+      const deletePromises: Promise<unknown>[] = [
+        this.clickHouseService.execute(
+          `ALTER TABLE ${table} DELETE WHERE ${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
+        ),
+      ];
+
+      if (category !== 'sales') {
+        deletePromises.push(
+          this.clickHouseService.execute(
+            `ALTER TABLE music_analytics.trends_dsp_monthly_cube DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
+          ),
+          this.clickHouseService.execute(
+            `ALTER TABLE music_analytics.trends_dsp_daily_cube DELETE WHERE reporting_date ${dateRange.replace(dateCol, 'reporting_date')} AND dsp_id IN (${dspIdsInSql})`,
+          ),
+        );
+      } else {
+        deletePromises.push(
+          this.clickHouseService.execute(
+            `ALTER TABLE music_analytics.sales_dsp_monthly_cube DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
+          ),
+        );
+      }
+
+      await Promise.all(deletePromises);
+      this.logger.log(`  🗑️ Deleted old data for ${category}/${dspFolder} in ${period} (including cubes)`);
     } catch (err) {
       this.logger.warn(`  Failed to delete old data for ${category}/${dspFolder}: ${err.message}`);
     }
@@ -188,28 +233,46 @@ export class SyncService {
     const startTime = Date.now();
     const batchId = uuidv4();
 
+    // Clear UUID lookup cache for this sync batch
+    this.dspIdCache.clear();
+
     // Get detailed import history (includes files_list for change detection)
     const importedDetails = force ? new Map() : await this.getImportedDetails();
 
     this.logger.log(`Syncing period ${period} (force=${force}), batch ${batchId}`);
 
-    // If force=true, delete ALL data for this period from BOTH tables
+    // If force=true, drop entire partition (instant metadata-only op, ~0ms)
+    // instead of ALTER TABLE DELETE (slow row-level mutation)
     if (force) {
-      const periodStart = `${period.substring(0, 4)}-${period.substring(4, 6)}-01`;
+      const partitionId = period; // YYYYMM matches toYYYYMM() partition key
       try {
-        await this.clickHouseService.execute(
-          `ALTER TABLE ${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT} DELETE ` +
-          `WHERE reporting_period >= '${periodStart}' ` +
-          `AND reporting_period < addMonths(toDate('${periodStart}'), 1)`,
+        // All tables are partitioned by toYYYYMM(date_col),
+        // so DROP PARTITION is an O(1) filesystem operation — no row scanning needed.
+        const allTables = [
+          CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
+          CLICKHOUSE_TABLES.FACT_SALES_REPORT,
+          'trends_dsp_monthly_cube',
+          'sales_dsp_monthly_cube',
+          'trends_dsp_daily_cube',
+          'trends_isrc_daily_cube',
+          'sales_ter_monthly_cube',
+          'trends_ter_monthly_cube',
+        ];
+
+        await Promise.all(
+          allTables.map((table) =>
+            this.clickHouseService.execute(
+              `ALTER TABLE music_analytics.${table} DROP PARTITION '${partitionId}'`,
+            ).catch((err) => {
+              // Partition may not exist — that's fine, skip silently
+              this.logger.debug(`DROP PARTITION ${partitionId} on ${table}: ${err.message}`);
+            }),
+          ),
         );
-        await this.clickHouseService.execute(
-          `ALTER TABLE ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} DELETE ` +
-          `WHERE reporting_period_start >= '${periodStart}' ` +
-          `AND reporting_period_start < addMonths(toDate('${periodStart}'), 1)`,
-        );
-        this.logger.log(`Deleted ALL data for period ${period} before re-import`);
+
+        this.logger.log(`Dropped partition ${partitionId} from all tables (including cubes) before re-import`);
       } catch (err) {
-        this.logger.warn(`Failed to delete old data for ${period}: ${err.message}`);
+        this.logger.warn(`Failed to drop partition for ${period}: ${err.message}`);
       }
     }
 
