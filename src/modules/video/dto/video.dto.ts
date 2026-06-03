@@ -11,7 +11,7 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
-import { VideoAiContent } from '../entities/video.entity';
+import { VideoAiContent, VideoMadeForKids } from '../entities/video.entity';
 
 export class CreateVideoDto {
 	@ApiProperty({ format: 'uuid' })
@@ -58,10 +58,13 @@ export class CreateVideoDto {
 	@IsString({ each: true })
 	keywords?: string[] | null;
 
-	@ApiPropertyOptional({ default: false })
+	@ApiPropertyOptional({
+		enum: VideoMadeForKids,
+		default: VideoMadeForKids.CHANNEL_DEFAULT,
+	})
 	@IsOptional()
-	@IsBoolean()
-	isKids?: boolean;
+	@IsEnum(VideoMadeForKids)
+	madeForKids?: VideoMadeForKids;
 
 	@ApiPropertyOptional({ default: false })
 	@IsOptional()

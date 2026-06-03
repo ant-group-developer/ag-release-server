@@ -468,7 +468,7 @@ export class Ern43Builder2 {
 
 		const textNode = parent.ele('Text');
 		textNode.ele('ResourceReference').txt(ref);
-		textNode.ele('Type').txt('Caption');
+		textNode.ele('Type').txt(this.getTextType(sub));
 
 		const techDetails = textNode.ele('TechnicalDetails');
 		techDetails.ele('TechnicalResourceDetailsReference').txt(techRef);
@@ -479,6 +479,7 @@ export class Ern43Builder2 {
 			? `${sub.filePath}/${sub.fileName}`
 			: sub.fileName;
 		file.ele('URI').txt(uri);
+		techDetails.ele('IsProvidedInDelivery').txt('true');
 
 		textNode.ele('LanguageOfText').txt(sub.language);
 	}
@@ -578,7 +579,7 @@ export class Ern43Builder2 {
 			this.buildTrackRelease(releaseList, i);
 		}
 
-		// Video track releases (R_V1, R_V2, ...)
+		// Video track releases (R1/R2 after audio tracks)
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
 			this.buildVideoTrackRelease(releaseList, i);
@@ -698,8 +699,9 @@ export class Ern43Builder2 {
 
 			const video = this.input.videos![i];
 			for (let j = 0; j < (video.subtitles?.length ?? 0); j++) {
+				const sub = video.subtitles![j];
 				item.ele('LinkedReleaseResourceReference', {
-					LinkDescription: 'Caption',
+					LinkDescription: this.getTextLinkDescription(sub),
 				}).txt(this.getSubtitleRef(i, j));
 			}
 		}
@@ -773,7 +775,6 @@ export class Ern43Builder2 {
 			ApplicableTerritoryCode: 'Worldwide',
 		}).txt(this.getPartyRef(this.input.release.labelName));
 
-		// Genre
 		const genre = tr.ele('Genre', {
 			ApplicableTerritoryCode: 'Worldwide',
 		});
@@ -784,7 +785,6 @@ export class Ern43Builder2 {
 				.txt(video.subGenre || this.input.release.subGenre!);
 		}
 
-		// Visibility reference
 		tr.ele('ReleaseVisibilityReference').txt(
 			`V${this.input.tracks.length + index + 1}`,
 		);
@@ -1013,7 +1013,7 @@ export class Ern43Builder2 {
 			v.ele('TrackListingPreviewStartDateTime').txt(startDate);
 		}
 
-		// Video visibilities (V_V1, V_V2, ...)
+		// Video visibilities
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
 			const v = dealList.ele('TrackReleaseVisibility');
@@ -1037,6 +1037,16 @@ export class Ern43Builder2 {
 			return `PT${hours}H${minutes}M${seconds}S`;
 		}
 		return duration;
+	}
+
+	private getTextType(sub: ErnSubtitleInput): 'Caption' | 'SubTitle' {
+		return sub.type === 'SubTitle' ? 'SubTitle' : 'Caption';
+	}
+
+	private getTextLinkDescription(
+		sub: ErnSubtitleInput,
+	): 'Caption' | 'SubTitle' {
+		return this.getTextType(sub);
 	}
 
 	private durationToSeconds(duration: string | number): number {
@@ -1070,9 +1080,16 @@ export class Ern43Builder2 {
 
 		priceInfo
 			.ele('SuggestedRetailPrice', {
-				CurrencyCode: deal.price.currencyCode,
+				CurrencyCode: this.normalizeCurrencyCode(
+					deal.price.currencyCode,
+				),
 			})
 			.txt(amount);
+	}
+
+	private normalizeCurrencyCode(value?: string): string {
+		const normalized = value?.trim().toUpperCase();
+		return normalized || 'USD';
 	}
 
 	private normalizePriceValue(value: number | string): string {

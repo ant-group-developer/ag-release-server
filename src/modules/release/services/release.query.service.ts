@@ -363,7 +363,7 @@ export class ReleaseQueryService {
 				'video.channel',
 				'video.description',
 				'video.keywords',
-				'video.isKids',
+				'video.madeForKids',
 				'video.isUnlisted',
 				'video.contentProvider',
 				'video.copyrightOwner',

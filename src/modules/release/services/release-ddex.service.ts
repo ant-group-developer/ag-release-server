@@ -18,6 +18,7 @@ import {
 	ManifestInput2,
 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { ErnService2 } from 'src/modules/ern2/services/ern.service';
+import { ReleaseCaptionType } from 'src/modules/release-caption/entities/release-caption.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import {
 	genBatchId,
@@ -93,8 +94,6 @@ export class ReleaseDdexService {
 			path.join(os.tmpdir(), `release-${release.id}-${Date.now()}-`),
 		);
 
-		console.log(`Temp dir created: ${tempDir}`);
-
 		try {
 			if (release.type === 'video') {
 				const { videoFile, subtitleFiles, coverImage } =
@@ -161,7 +160,7 @@ export class ReleaseDdexService {
 			return { outputDir: outputRoot, outputRoot, batchId, xml };
 		} finally {
 			// Xóa file tạm dù thành công hay throw
-			await fs.promises.rm(tempDir, { recursive: true, force: true });
+			// await fs.promises.rm(tempDir, { recursive: true, force: true });
 		}
 	}
 
@@ -487,6 +486,7 @@ export class ReleaseDdexService {
 			fileName: string;
 			extension: string;
 			language: string;
+			type?: ReleaseCaptionType;
 		}[];
 		coverImage: CoverImageInfo;
 	}> {
@@ -529,6 +529,7 @@ export class ReleaseDdexService {
 			release.captions?.map((caption) => ({
 				language: caption.language?.code ?? '',
 				fileId: caption.fileId,
+				type: caption.type,
 				fileName:
 					caption.file?.fileName ||
 					`${caption.language?.code ?? 'caption'}_${release.video?.isrc ?? ''}.srt`,
@@ -549,6 +550,7 @@ export class ReleaseDdexService {
 					fileName: sub.fileName || `sub_${sub.language}.srt`,
 					extension: subFileDb.extension,
 					language: sub.language,
+					type: sub.type,
 				});
 			}
 		}
@@ -640,6 +642,7 @@ export class ReleaseDdexService {
 			fileName: string;
 			extension: string;
 			language: string;
+			type?: ReleaseCaptionType;
 		}[];
 		outputDir: string;
 		isrc: string;
@@ -828,7 +831,7 @@ export class ReleaseDdexService {
 					price: {
 						priceType: 'StandardRetailPrice',
 						value: track.priceTier?.amount ?? 0,
-						currencyCode: track.priceTier?.currency.code ?? '',
+						currencyCode: track.priceTier?.currency?.code || 'USD',
 					},
 
 					genre:
@@ -934,7 +937,7 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code ?? 'USD',
+								release.priceTier?.currency?.code || 'USD',
 						},
 					},
 				],
@@ -954,7 +957,7 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? 'USD',
+									?.code || 'USD',
 						},
 					},
 					{
@@ -972,7 +975,7 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? 'USD',
+									?.code || 'USD',
 						},
 					},
 					{
@@ -990,7 +993,7 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code || 'USD',
 						},
 					},
 				],
@@ -1225,15 +1228,20 @@ export class ReleaseDdexService {
 						release.captions?.map((caption) => ({
 							language: caption.language?.code ?? '',
 							fileId: caption.fileId,
+							type: caption.type,
 						})) ?? []
 					).map((sub, subIdx) => ({
 						language: sub.language,
 						fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
 						filePath: 'resources',
+						type:
+							sub.type === ReleaseCaptionType.SUBTITLE
+								? 'SubTitle'
+								: 'Caption',
 					})),
 					channel: video.channel ?? undefined,
 					description: video.description || undefined,
-					isKids: video.isKids ?? undefined,
+					madeForKids: video.madeForKids ?? undefined,
 					isUnlisted: video.isUnlisted ?? undefined,
 					partnerCustomId1: video.partnerCustomId1 || undefined,
 					partnerCustomId2: video.partnerCustomId2 || undefined,
@@ -1258,7 +1266,7 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code ?? '',
+								release.priceTier?.currency?.code || 'USD',
 						},
 					},
 				],

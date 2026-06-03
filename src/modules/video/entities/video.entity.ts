@@ -14,6 +14,12 @@ export enum VideoAiContent {
 	UNDETERMINED = 'UNDETERMINED',
 }
 
+export enum VideoMadeForKids {
+	YES = 'YES',
+	NO = 'NO',
+	CHANNEL_DEFAULT = 'CHANNEL_DEFAULT',
+}
+
 export enum VideoVisibility {
 	DEFAULT = 'DEFAULT',
 	UNLISTED_ON_YOUTUBE = 'UNLISTED_ON_YOUTUBE',
@@ -108,14 +114,15 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	keywords: string[] | null;
 
 	@Column({
-		type: 'boolean',
+		type: 'varchar',
+		length: 20,
 		nullable: true,
-		default: false,
+		default: VideoMadeForKids.CHANNEL_DEFAULT,
 		comment:
-			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube' +
+			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube: YES, NO, CHANNEL_DEFAULT' +
 			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	isKids: boolean | null;
+	madeForKids: VideoMadeForKids | null;
 
 	@Column({
 		type: 'boolean',
