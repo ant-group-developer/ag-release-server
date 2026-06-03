@@ -11,6 +11,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
+import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
 
 // So ban ghi xu ly moi lan quet outbox
 const OUTBOX_BATCH_SIZE = 200;
@@ -36,6 +37,17 @@ interface TrackSyncRow {
   updated_at: string;
 }
 
+interface DspSyncRow {
+  [key: string]: any;
+  pg_uuid: string;
+  dsp_code: string;
+  dsp_name: string;
+  dsp_ci_code: string;
+  picture: string;
+  created_at: string;
+  updated_at: string;
+}
+
 @Injectable()
 export class ClickHouseSyncService
   implements OnModuleInit, OnModuleDestroy
@@ -49,6 +61,7 @@ export class ClickHouseSyncService
     private readonly entityManager: EntityManager,
     private readonly clickHouseService: ClickHouseService,
     private readonly configService: ConfigService,
+    private readonly seedingService: DspSeedingService,
   ) {}
 
   // ======================================================
@@ -58,14 +71,27 @@ export class ClickHouseSyncService
   async onModuleInit() {
     this.logger.log('Initializing ClickHouse sync service...');
 
-    // 1. Dong bo du lieu lich su (neu can)
+    // 1. Sync dsps from PostgreSQL to ClickHouse pg_dsps_sync on startup
+    await this.syncDspsOnStartup();
+
+    // 2. Dong bo du lieu lich su (neu can)
     await this.runInitialSyncIfNeeded();
 
-    // 2. Quet bu outbox (truong hop server chet truoc do)
+    // 3. Quet bu outbox (truong hop server chet truoc do)
     await this.processOutboxQueue();
 
-    // 3. Bat dau lang nghe thoi gian thuc
+    // 4. Bat dau lang nghe thoi gian thuc
     await this.startListening();
+  }
+
+  private async syncDspsOnStartup() {
+    try {
+      this.logger.log('Refreshing pg_dsps_sync table from PostgreSQL dsps...');
+      const count = await this.seedingService.resyncAll();
+      this.logger.log(`DSP seeding completed, synced ${count} records`);
+    } catch (err: any) {
+      this.logger.error(`DSP seeding on startup failed: ${err.message}`);
+    }
   }
 
   // ======================================================
@@ -281,6 +307,10 @@ export class ClickHouseSyncService
       .filter((j) => j.entity_name === 'releases' && j.action !== 'DELETE')
       .map((j) => j.entity_id);
 
+    const dspUpsertIds = jobs
+      .filter((j) => j.entity_name === 'dsps' && j.action !== 'DELETE')
+      .map((j) => j.entity_id);
+
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     // 1. Xu ly INSERT/UPDATE cho tracks
@@ -360,6 +390,32 @@ export class ClickHouseSyncService
         }));
         await this.clickHouseService.insert(
           CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
+          chData
+        );
+      }
+    }
+
+    // 3. Xu ly INSERT/UPDATE cho dsps
+    if (dspUpsertIds.length > 0) {
+      const rows = await this.entityManager.query(
+        `SELECT id, code, name, code_ci, picture
+         FROM dsps
+         WHERE id = ANY($1)`,
+        [dspUpsertIds]
+      );
+
+      if (rows.length > 0) {
+        const chData: DspSyncRow[] = rows.map((row: any) => ({
+          pg_uuid: row.id,
+          dsp_code: row.code ?? '',
+          dsp_name: row.name ?? '',
+          dsp_ci_code: row.code_ci ?? '',
+          picture: row.picture ?? '',
+          created_at: now,
+          updated_at: now,
+        }));
+        await this.clickHouseService.insert(
+          CLICKHOUSE_TABLES.PG_DSPS_SYNC,
           chData
         );
       }

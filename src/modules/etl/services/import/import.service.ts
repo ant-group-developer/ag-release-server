@@ -7,6 +7,7 @@ import { getParserForFolder } from '../../parsers';
 import { getSalesParserForFolder } from '../../parsers/sales';
 import { DeezerIllegitimateParser, SoundCloudIllegitimateParser, SpotifyIllegitimateParser, TiktokIllegitimateParser } from '../../parsers/illegitimate';
 import { FactDspRow, FactSalesRow } from '../../interfaces';
+import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 
 export interface ImportResult {
   batchId: string;
@@ -28,7 +29,10 @@ export interface ImportResult {
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly dspMappingService: DspMappingService,
+  ) {}
 
   /**
    * Import all DSP data from a folder structure.
@@ -58,7 +62,7 @@ export class ImportService {
       const subPath = path.join(dataPath, subDir);
       if (fs.existsSync(subPath)) {
         const folders = fs.readdirSync(subPath, { withFileTypes: true })
-          .filter((d) => d.isDirectory())
+          .filter((d) => d.isDirectory() && !d.name.startsWith('.') && !d.name.includes('.removed') && !d.name.includes('removed_at'))
           .map((d) => d.name);
         for (const folder of folders) {
           dspFoldersToProcess.push({
@@ -72,17 +76,14 @@ export class ImportService {
 
     // Strategy 2: Check root dataPath for DSP folders directly (202205 style)
     const rootFolders = fs.readdirSync(dataPath, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== 'trends' && d.name !== 'usage')
+      .filter((d) => d.isDirectory() && d.name !== 'trends' && d.name !== 'usage' && !d.name.startsWith('.') && !d.name.includes('.removed') && !d.name.includes('removed_at'))
       .map((d) => d.name);
 
     for (const folder of rootFolders) {
-      const parser = getParserForFolder(folder);
-      if (parser) {
-        dspFoldersToProcess.push({
-          path: path.join(dataPath, folder),
-          name: folder,
-        });
-      }
+      dspFoldersToProcess.push({
+        path: path.join(dataPath, folder),
+        name: folder,
+      });
     }
 
     this.logger.log(`Found ${dspFoldersToProcess.length} DSP folders to process`);
@@ -136,6 +137,9 @@ export class ImportService {
     batchId: string,
     sourceCategory: string,
   ): Promise<ImportResult['dspResults'][0] | null> {
+    // Resolve or create dsps_report for this folder
+    const dspsReport = await this.dspMappingService.resolveOrCreateDspReport(folderName, 'ftp_folder');
+
     const parser = getParserForFolder(folderName);
     if (!parser) {
       this.logger.warn(`No trends parser for folder: ${folderName}`);
@@ -152,6 +156,10 @@ export class ImportService {
         const rows = await parser.parseFile(filePath, batchId);
         if (sourceCategory) {
           for (const row of rows) row.source_category = sourceCategory;
+        }
+        // Replace dsp_id with id_dsps_report from dsps_report
+        for (const row of rows) {
+          row.dsp_id = dspsReport.id_dsps_report;
         }
         allRows.push(...rows);
       } catch (err) {
@@ -182,6 +190,9 @@ export class ImportService {
     folderName: string,
     batchId: string,
   ): Promise<ImportResult['dspResults'][0] | null> {
+    // Resolve or create dsps_report for this folder
+    const dspsReport = await this.dspMappingService.resolveOrCreateDspReport(folderName, 'ftp_folder');
+
     const parser = getSalesParserForFolder(folderName);
     if (!parser) {
       this.logger.warn(`⚠️ [UNKNOWN DSP] No sales parser found for folder: "${folderName}" — data skipped. Please add a parser for this DSP.`);
@@ -196,6 +207,10 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        // Replace dsp_id with id_dsps_report from dsps_report
+        for (const row of rows) {
+          row.dsp_id = dspsReport.id_dsps_report;
+        }
         allRows.push(...rows);
       } catch (err) {
         this.logger.error(`Error parsing sales ${path.basename(filePath)}: ${err.message}`);
@@ -236,6 +251,9 @@ export class ImportService {
       return null;
     }
 
+    // Resolve or create dsps_report for this folder
+    const dspsReport = await this.dspMappingService.resolveOrCreateDspReport(folderName, 'ftp_folder');
+
     const startTime = Date.now();
     this.logger.log(`Parsing ILLEGITIMATE folder: ${folderName}`);
     const files = this.findDataFiles(folderPath);
@@ -244,6 +262,10 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        // Replace dsp_id with id_dsps_report
+        for (const row of rows) {
+          row.dsp_id = dspsReport.id_dsps_report;
+        }
         allRows.push(...rows);
       } catch (err) {
         this.logger.error(`Error parsing illegitimate ${path.basename(filePath)}: ${err.message}`);
