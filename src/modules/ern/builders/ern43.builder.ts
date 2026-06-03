@@ -618,9 +618,16 @@ export class Ern43Builder {
 
 		priceInfo
 			.ele('SuggestedRetailPrice', {
-				CurrencyCode: track.price.currencyCode,
+				CurrencyCode: this.normalizeCurrencyCode(
+					track.price.currencyCode,
+				),
 			})
 			.txt(amount);
+	}
+
+	private normalizeCurrencyCode(value?: string): string {
+		const normalized = value?.trim().toUpperCase();
+		return normalized || 'USD';
 	}
 
 	private normalizePriceValue(value: number | string): string {

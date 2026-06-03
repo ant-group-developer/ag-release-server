@@ -20,7 +20,7 @@ import { ReleaseExecution3Service } from '../services/release-execution3.service
 export class ReleaseExecution3Controller {
 	constructor(
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
-	) { }
+	) {}
 
 	@Get()
 	async getList(@Query() query: QueryGetListReleaseExecution3Dto) {

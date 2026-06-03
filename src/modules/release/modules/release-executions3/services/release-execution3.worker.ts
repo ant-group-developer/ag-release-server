@@ -1,4 +1,3 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
@@ -206,9 +205,10 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async genIsrc({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async genIsrc(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			const trackId = step.metadata?.input?.trackId;
 
@@ -227,12 +227,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[GEN_ISRC] Track ${trackId}: ${isrc}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[GEN_ISRC] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -266,6 +270,8 @@ export class ReleaseExecution3Worker {
 					message: `[VALIDATE] Release ${releaseId} failed: ${errors
 						.map((e: any) => e.message)
 						.join(', ')}`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
 				});
 
 				return ReleaseExecutionStepStatus.FAILED;
@@ -273,12 +279,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[VALIDATE] Release ${releaseId} passed`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[VALIDATE] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -333,9 +343,10 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async createFolderDoneCi({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async createFolderDoneCi(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			// return ReleaseExecutionStepStatus.DONE;
 			const metaStep = await this.getSiblingStepByType(
@@ -374,6 +385,8 @@ export class ReleaseExecution3Worker {
 
 				this.logService.success({
 					message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
+					releaseExecutionId: context.releaseExecution.id,
+					releaseExecutionStepId: step.id,
 					data: {
 						batchId,
 						donePath,
@@ -387,6 +400,8 @@ export class ReleaseExecution3Worker {
 		} catch (err) {
 			this.logService.error({
 				message: `[CREATE_FOLDER_DONE_CI] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -534,9 +549,10 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async waitPartnerProcess({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async waitPartnerProcess(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			const scheduledAt = step.metadata?.scheduledAt;
 
@@ -564,12 +580,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.log({
 				message: `[WAIT_PARTNER_PROCESS] Resume at ${newScheduledAt.toISOString()} (+${waitMinutes}min)`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.WAITING_PARTNER;
 		} catch (err) {
 			this.logService.error({
 				message: `[WAIT_PARTNER_PROCESS] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -580,6 +600,8 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		console.log('Creating metadata on server...');
+
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
@@ -633,12 +655,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[CREATE_METADATA_ON_SERVER] DSP ${dspCode} metadata created`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[CREATE_METADATA_ON_SERVER] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -684,31 +710,27 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// Check if Vevo S3 or regular SFTP
-			if (dspCode.toUpperCase() === 'VEVO') {
-				await this.uploadFolderToVevoS3({
-					s3Config: config.sftp,
-					localDir: outputDir,
-					releaseExecution,
-				});
-			} else {
-				await this.sftpConnectService.uploadFolder({
-					sftp: config.sftp,
-					localDir: outputDir,
-					remoteDir: config.sftp.path ?? '/',
-				});
-			}
+			await this.sftpConnectService.uploadFolder({
+				sftp: config.sftp,
+				localDir: outputDir,
+				remoteDir: config.sftp.path ?? '/',
+			});
+			// }
 
 			await removeFolder(outputDir);
 
 			this.logService.success({
 				message: `[UPLOAD_METADATA_TO_SFTP] DSP ${dspCode} uploaded`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
@@ -720,83 +742,6 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		return await ReleaseExecutionStepStatus.DONE;
-	}
-
-	private async uploadFolderToVevoS3({
-		s3Config,
-		localDir,
-		releaseExecution,
-	}: {
-		s3Config: any;
-		localDir: string;
-		releaseExecution: ReleaseExecution3;
-	}): Promise<void> {
-		const upc =
-			releaseExecution.metadata?.input?.releaseSnapshot?.upc || 'new_upc';
-		const isrc =
-			releaseExecution.metadata?.input?.releaseSnapshot?.video?.isrc ||
-			'new_isrc';
-		const localReleaseDir = path.join(localDir, upc);
-
-		const allFiles = this.getAllFilesRecursive(localReleaseDir);
-		const assets = allFiles.filter((f) => !f.relativePath.endsWith('.xml'));
-		const manifest = allFiles.find((f) => f.relativePath.endsWith('.xml'));
-
-		const uniqueFolder = `${isrc}_${Date.now()}`;
-		const s3Prefix = s3Config.path || 'feed/sony/';
-
-		const s3Client = new S3Client({
-			region: s3Config.region || 'us-east-1',
-			credentials: {
-				accessKeyId: s3Config.username || '',
-				secretAccessKey: s3Config.password || '',
-			},
-			endpoint: s3Config.host ? `https://${s3Config.host}` : undefined,
-		});
-
-		// 1. Upload Assets first
-		for (const asset of assets) {
-			const s3Key = path.posix.join(
-				s3Prefix,
-				uniqueFolder,
-				asset.relativePath.replace(/\\/g, '/'),
-			);
-			const fileStream = fs.createReadStream(asset.localPath);
-
-			await s3Client.send(
-				new PutObjectCommand({
-					Bucket: s3Config.bucket || '',
-					Key: s3Key,
-					Body: fileStream,
-				}),
-			);
-			this.logService.log({
-				message: `[VEVO_S3_UPLOAD] Asset uploaded: ${s3Key}`,
-				releaseExecutionId: releaseExecution.id,
-			});
-		}
-
-		// 2. Upload Manifest XML last
-		if (manifest) {
-			const s3Key = path.posix.join(
-				s3Prefix,
-				uniqueFolder,
-				manifest.relativePath.replace(/\\/g, '/'),
-			);
-			const fileStream = fs.createReadStream(manifest.localPath);
-
-			await s3Client.send(
-				new PutObjectCommand({
-					Bucket: s3Config.bucket || '',
-					Key: s3Key,
-					Body: fileStream,
-				}),
-			);
-			this.logService.log({
-				message: `[VEVO_S3_UPLOAD] Manifest XML uploaded LAST: ${s3Key}`,
-				releaseExecutionId: releaseExecution.id,
-			});
-		}
 	}
 
 	private getAllFilesRecursive(
@@ -856,13 +801,17 @@ export class ReleaseExecution3Worker {
 				.execute();
 
 			this.logService.success({
-				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} → DISTRIBUTED`,
+				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> DISTRIBUTED`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_PARTNER] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -881,6 +830,8 @@ export class ReleaseExecution3Worker {
 
 			this.logService.log({
 				message: `[VALIDATE_QA_CI] Release: ${releaseId}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			const qaFlags = await this.releaseService.getQaFlagCi(releaseId);
@@ -909,12 +860,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[VALIDATE_QA_CI] Release ${releaseId} passed`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[VALIDATE_QA_CI] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -966,6 +921,8 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 				data: { dspStatuses: mappedStatuses },
 			});
 
@@ -973,6 +930,8 @@ export class ReleaseExecution3Worker {
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;

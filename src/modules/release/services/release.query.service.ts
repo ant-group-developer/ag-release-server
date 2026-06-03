@@ -212,6 +212,7 @@ export class ReleaseQueryService {
 			.leftJoin('release.timeZone', 'timeZone')
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
 			.leftJoin('release.video', 'video')
+			.leftJoin('video.channel', 'videoChannel')
 			.leftJoin('video.videoFile', 'videoFile')
 			.leftJoin('release.captions', 'releaseCaptions')
 			.leftJoin('releaseCaptions.file', 'releaseCaptionFile')
@@ -360,10 +361,10 @@ export class ReleaseQueryService {
 				'video.isrc',
 				'video.explicit',
 				'video.aiContent',
-				'video.channel',
+				'video.channelId',
 				'video.description',
 				'video.keywords',
-				'video.isKids',
+				'video.madeForKids',
 				'video.isUnlisted',
 				'video.contentProvider',
 				'video.copyrightOwner',
@@ -371,6 +372,7 @@ export class ReleaseQueryService {
 				'video.partnerCustomId2',
 				'video.fileId',
 			])
+			.addSelect(['videoChannel.id', 'videoChannel.name'])
 			.addSelect([
 				'videoFile.id',
 				'videoFile.fileName',
@@ -930,6 +932,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.channel', 'videoChannel')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
 			.leftJoinAndSelect('release.captions', 'releaseCaptions')
 			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
@@ -1113,6 +1116,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.priceTier', 'releasePriceTier')
 			.leftJoinAndSelect('releasePriceTier.currency', 'releaseCurrency')
 			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.channel', 'videoChannel')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
 			.leftJoinAndSelect('release.captions', 'releaseCaptions')
 			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')

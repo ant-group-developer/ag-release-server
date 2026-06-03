@@ -35,6 +35,7 @@ import { ExecutionType } from '../modules/release-submit/entities/release-submit
 import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
 import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseDdexService } from './release-ddex.service';
+import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -68,6 +69,8 @@ export class ReleaseService {
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
+
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -474,6 +477,10 @@ export class ReleaseService {
 			status: ReleaseStatus.SUBMITTED,
 			releaseEndDate: null,
 		});
+		await this.releaseDspDeliveryService.markProcessingByDspCodes(
+			id,
+			dto.code,
+		);
 
 		return this.releaseExecution3Service.newReleaseExecution({
 			release,

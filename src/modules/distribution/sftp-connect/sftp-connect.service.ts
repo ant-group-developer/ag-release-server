@@ -316,9 +316,27 @@ export class SftpConnectService {
 			throw new Error('localDir is not a directory');
 		}
 
+		// ai có tâm thì sửa lại chỗ build dir trên remote
 		if (sftp.type === StorageType.S3) {
 			const s3 = this.createS3Client(sftp);
-			await this.uploadFolderS3Recursive(s3, sftp, localDir, remoteDir);
+
+			const current = path.basename(localDir); // 20260603164430404
+			const parent = path.basename(path.dirname(localDir)); // release_parsed (bỏ qua)
+
+			// Lấy UPC folders bên trong localDir
+			const upcFolders = fs.readdirSync(localDir);
+
+			for (const upc of upcFolders) {
+				const targetRemoteDir = path.posix.join('/', current, upc);
+				const localUpcDir = path.join(localDir, upc);
+
+				await this.uploadFolderS3Recursive(
+					s3,
+					sftp,
+					localUpcDir,
+					targetRemoteDir,
+				);
+			}
 			return;
 		}
 
@@ -337,6 +355,7 @@ export class SftpConnectService {
 				remoteDir,
 				path.basename(localDir),
 			);
+
 			await this.uploadRecursive(client, localDir, targetRemoteDir);
 		} finally {
 			await client.end();
@@ -516,7 +535,14 @@ export class SftpConnectService {
 		localDir: string,
 		remoteDir: string,
 	) {
-		for (const entry of fs.readdirSync(localDir, { withFileTypes: true })) {
+		const entries = fs.readdirSync(localDir, { withFileTypes: true });
+		const sorted = [
+			...entries.filter((e) => e.isDirectory()),
+			...entries.filter((e) => e.isFile() && !e.name.endsWith('.xml')),
+			...entries.filter((e) => e.isFile() && e.name.endsWith('.xml')),
+		];
+
+		for (const entry of sorted) {
 			if (entry.isSymbolicLink()) continue;
 
 			const localPath = path.join(localDir, entry.name);
@@ -531,7 +557,6 @@ export class SftpConnectService {
 				);
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
-
 				await s3.send(
 					new PutObjectCommand({
 						Bucket: config.bucket!,

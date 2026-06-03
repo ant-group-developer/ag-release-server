@@ -169,6 +169,11 @@ export class Ern43Builder2 {
 			this.buildVideoResource(resourceList, this.input.videos![i], i);
 		}
 
+		// Cover art / video screen capture image
+		if (this.input.release.coverArt) {
+			this.buildImage(resourceList);
+		}
+
 		// Subtitles
 		for (let i = 0; i < videoCount; i++) {
 			const video = this.input.videos![i];
@@ -183,11 +188,6 @@ export class Ern43Builder2 {
 				}
 			}
 		}
-
-		// Cover art image
-		if (this.input.release.coverArt) {
-			this.buildImage(resourceList);
-		}
 	}
 
 	private getTrackRef(index: number): string {
@@ -201,7 +201,9 @@ export class Ern43Builder2 {
 
 	private getSubtitleRef(videoIndex: number, subIndex: number): string {
 		const offset =
-			this.input.tracks.length + (this.input.videos?.length ?? 0);
+			this.input.tracks.length +
+			(this.input.videos?.length ?? 0) +
+			(this.input.release.coverArt ? 1 : 0);
 		let cumIndex = 0;
 		for (let i = 0; i < videoIndex; i++) {
 			cumIndex += this.input.videos![i].subtitles?.length ?? 0;
@@ -211,18 +213,16 @@ export class Ern43Builder2 {
 
 	private getImageRef(): string {
 		const offset =
-			this.input.tracks.length +
-			(this.input.videos?.length ?? 0) +
-			this.getTotalSubtitleCount();
+			this.input.tracks.length + (this.input.videos?.length ?? 0);
 		return `A${offset + 1}`;
 	}
 
-	private getTotalSubtitleCount(): number {
-		let count = 0;
-		for (const v of this.input.videos ?? []) {
-			count += v.subtitles?.length ?? 0;
+	private getSubtitleFlatIndex(videoIndex: number, subIndex: number): number {
+		let cumIndex = 0;
+		for (let i = 0; i < videoIndex; i++) {
+			cumIndex += this.input.videos![i].subtitles?.length ?? 0;
 		}
-		return count;
+		return cumIndex + subIndex;
 	}
 
 	private buildSoundRecording(
@@ -458,14 +458,20 @@ export class Ern43Builder2 {
 		subIndex: number,
 	): void {
 		const ref = this.getSubtitleRef(videoIndex, subIndex);
-		const techRef = `T${this.input.tracks.length + (this.input.videos?.length ?? 0) + subIndex + 1}S`;
+		const techRef = `T${
+			this.input.tracks.length +
+			(this.input.videos?.length ?? 0) +
+			(this.input.release.coverArt ? 1 : 0) +
+			this.getSubtitleFlatIndex(videoIndex, subIndex) +
+			1
+		}S`;
 
 		const textNode = parent.ele('Text');
 		textNode.ele('ResourceReference').txt(ref);
-		textNode.ele('Type').txt('Caption');
+		textNode.ele('Type').txt(this.getTextType(sub));
 
 		const techDetails = textNode.ele('TechnicalDetails');
-		textNode.ele('TechnicalResourceDetailsReference').txt(techRef);
+		techDetails.ele('TechnicalResourceDetailsReference').txt(techRef);
 		techDetails.ele('TextCodecType').txt('SRT');
 
 		const file = techDetails.ele('File');
@@ -473,6 +479,7 @@ export class Ern43Builder2 {
 			? `${sub.filePath}/${sub.fileName}`
 			: sub.fileName;
 		file.ele('URI').txt(uri);
+		techDetails.ele('IsProvidedInDelivery').txt('true');
 
 		textNode.ele('LanguageOfText').txt(sub.language);
 	}
@@ -509,7 +516,7 @@ export class Ern43Builder2 {
 	private buildImage(parent: ReturnType<typeof create>): void {
 		const coverArt = this.input.release.coverArt!;
 		const ref = this.getImageRef();
-		const techRef = `T${this.input.tracks.length + (this.input.videos?.length ?? 0) + this.getTotalSubtitleCount() + 1}`;
+		const techRef = `T${this.input.tracks.length + (this.input.videos?.length ?? 0) + 1}`;
 
 		const image = parent.ele('Image');
 		image.ele('ResourceReference').txt(ref);
@@ -572,7 +579,7 @@ export class Ern43Builder2 {
 			this.buildTrackRelease(releaseList, i);
 		}
 
-		// Video track releases (R_V1, R_V2, ...)
+		// Video track releases (R1/R2 after audio tracks)
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
 			this.buildVideoTrackRelease(releaseList, i);
@@ -670,76 +677,34 @@ export class Ern43Builder2 {
 		const rg = release.ele('ResourceGroup');
 		rg.ele('SequenceNumber').txt('1');
 
-		// const refList = release.ele('ReleaseResourceReferenceList');
+		for (let i = 0; i < this.input.tracks.length; i++) {
+			const item = rg.ele('ResourceGroupContentItem');
+			item.ele('SequenceNumber').txt(String(i + 1));
+			item.ele('ReleaseResourceReference').txt(this.getTrackRef(i));
+		}
 
-		// Cover art image reference link
-		// if (this.input.release.coverArt) {
-		// 	refList
-		// 		.ele('ReleaseResourceReference', {
-		// 			ReleaseResourceType: 'SecondaryResource',
-		// 		})
-		// 		.txt(this.getImageRef());
-		// }
+		const videoCount = this.input.videos?.length ?? 0;
+		for (let i = 0; i < videoCount; i++) {
+			const item = rg.ele('ResourceGroupContentItem');
+			item.ele('SequenceNumber').txt(
+				String(this.input.tracks.length + i + 1),
+			);
+			item.ele('ReleaseResourceReference').txt(this.getVideoRef(i));
 
-		// // Sound recordings
-		// for (let i = 0; i < this.input.tracks.length; i++) {
-		// 	refList
-		// 		.ele('ReleaseResourceReference', {
-		// 			ReleaseResourceType: 'PrimaryResource',
-		// 		})
-		// 		.txt(this.getTrackRef(i));
+			if (this.input.release.coverArt) {
+				item.ele('LinkedReleaseResourceReference', {
+					LinkDescription: 'VideoScreenCapture',
+				}).txt(this.getImageRef());
+			}
 
-		// 	const item = rg.ele('ResourceGroupContentItem');
-		// 	item.ele('SequenceNumber').txt(String(i + 1));
-		// 	item.ele('ReleaseResourceReference').txt(this.getTrackRef(i));
-		// }
-
-		// // Videos
-		// const videoCount = this.input.videos?.length ?? 0;
-		// for (let i = 0; i < videoCount; i++) {
-		// 	refList
-		// 		.ele('ReleaseResourceReference', {
-		// 			ReleaseResourceType: 'PrimaryResource',
-		// 		})
-		// 		.txt(this.getVideoRef(i));
-
-		// 	const item = rg.ele('ResourceGroupContentItem');
-		// 	item.ele('SequenceNumber').txt(
-		// 		String(this.input.tracks.length + i + 1),
-		// 	);
-		// 	item.ele('ReleaseResourceReference').txt(this.getVideoRef(i));
-
-		// 	// Video screen capture image link
-		// 	if (this.input.release.coverArt) {
-		// 		item.ele('LinkedReleaseResourceReference', {
-		// 			LinkDescription: 'VideoScreenCapture',
-		// 		}).txt(this.getImageRef());
-		// 	}
-
-		// 	// Subtitle caption file link
-		// 	const video = this.input.videos![i];
-		// 	if (video.subtitles) {
-		// 		for (let j = 0; j < video.subtitles.length; j++) {
-		// 			item.ele('LinkedReleaseResourceReference', {
-		// 				LinkDescription: 'Caption',
-		// 			}).txt(this.getSubtitleRef(i, j));
-		// 		}
-		// 	}
-		// }
-
-		// // Subtitle references to main list
-		// for (let i = 0; i < videoCount; i++) {
-		// 	const video = this.input.videos![i];
-		// 	if (video.subtitles) {
-		// 		for (let j = 0; j < video.subtitles.length; j++) {
-		// 			refList
-		// 				.ele('ReleaseResourceReference', {
-		// 					ReleaseResourceType: 'SecondaryResource',
-		// 				})
-		// 				.txt(this.getSubtitleRef(i, j));
-		// 		}
-		// 	}
-		// }
+			const video = this.input.videos![i];
+			for (let j = 0; j < (video.subtitles?.length ?? 0); j++) {
+				const sub = video.subtitles![j];
+				item.ele('LinkedReleaseResourceReference', {
+					LinkDescription: this.getTextLinkDescription(sub),
+				}).txt(this.getSubtitleRef(i, j));
+			}
+		}
 
 		// Linked cover art for audio-only releases at root level
 		if (
@@ -749,17 +714,6 @@ export class Ern43Builder2 {
 		) {
 			rg.ele('LinkedReleaseResourceReference').txt(this.getImageRef());
 		}
-
-		// Total duration
-		// let totalSeconds = this.input.tracks.reduce(
-		// 	(sum, t) => sum + this.durationToSeconds(t.duration),
-		// 	0,
-		// );
-		// totalSeconds += (this.input.videos ?? []).reduce(
-		// 	(sum, v) => sum + this.durationToSeconds(v.duration),
-		// 	0,
-		// );
-		// release.ele('Duration').txt(this.secondsToIso(totalSeconds));
 	}
 
 	private buildTrackRelease(
@@ -821,7 +775,6 @@ export class Ern43Builder2 {
 			ApplicableTerritoryCode: 'Worldwide',
 		}).txt(this.getPartyRef(this.input.release.labelName));
 
-		// Genre
 		const genre = tr.ele('Genre', {
 			ApplicableTerritoryCode: 'Worldwide',
 		});
@@ -832,7 +785,6 @@ export class Ern43Builder2 {
 				.txt(video.subGenre || this.input.release.subGenre!);
 		}
 
-		// Visibility reference
 		tr.ele('ReleaseVisibilityReference').txt(
 			`V${this.input.tracks.length + index + 1}`,
 		);
@@ -1061,7 +1013,7 @@ export class Ern43Builder2 {
 			v.ele('TrackListingPreviewStartDateTime').txt(startDate);
 		}
 
-		// Video visibilities (V_V1, V_V2, ...)
+		// Video visibilities
 		const videoCount = this.input.videos?.length ?? 0;
 		for (let i = 0; i < videoCount; i++) {
 			const v = dealList.ele('TrackReleaseVisibility');
@@ -1085,6 +1037,16 @@ export class Ern43Builder2 {
 			return `PT${hours}H${minutes}M${seconds}S`;
 		}
 		return duration;
+	}
+
+	private getTextType(sub: ErnSubtitleInput): 'Caption' | 'SubTitle' {
+		return sub.type === 'SubTitle' ? 'SubTitle' : 'Caption';
+	}
+
+	private getTextLinkDescription(
+		sub: ErnSubtitleInput,
+	): 'Caption' | 'SubTitle' {
+		return this.getTextType(sub);
 	}
 
 	private durationToSeconds(duration: string | number): number {
@@ -1118,9 +1080,16 @@ export class Ern43Builder2 {
 
 		priceInfo
 			.ele('SuggestedRetailPrice', {
-				CurrencyCode: deal.price.currencyCode,
+				CurrencyCode: this.normalizeCurrencyCode(
+					deal.price.currencyCode,
+				),
 			})
 			.txt(amount);
+	}
+
+	private normalizeCurrencyCode(value?: string): string {
+		const normalized = value?.trim().toUpperCase();
+		return normalized || 'USD';
 	}
 
 	private normalizePriceValue(value: number | string): string {

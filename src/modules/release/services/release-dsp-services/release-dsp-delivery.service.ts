@@ -1,6 +1,7 @@
 // services/release-dsp-delivery.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
@@ -20,6 +21,10 @@ export class ReleaseDspDeliveryService {
 	constructor(
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly repo: Repository<ReleaseDspDelivery>,
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
+
 		private readonly queryService: ReleaseDspDeliveryQueryService,
 
 		private readonly tenantDspAgreementService: TenantDspAgreementService,
@@ -63,6 +68,26 @@ export class ReleaseDspDeliveryService {
 				['release_id', 'dsp_id'],
 			)
 			.execute();
+	}
+
+	async markProcessingByDspCodes(
+		releaseId: string,
+		dspCodes: string[],
+	): Promise<void> {
+		if (!dspCodes?.length) return;
+
+		const dsps = await this.dspRepo.find({
+			where: { code: In(dspCodes) },
+			select: ['id'],
+		});
+
+		await this.updateDeliveryStatus(
+			[releaseId],
+			dsps.map((dsp) => ({
+				dspId: dsp.id,
+				status: ReleaseDspStatus.PROCESSING,
+			})),
+		);
 	}
 
 	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {

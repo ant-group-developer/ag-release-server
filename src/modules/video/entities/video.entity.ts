@@ -1,17 +1,31 @@
 import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.constants';
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
+import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
 import { VideoContributor } from 'src/modules/video-contributor/entities/video-contributor.entity';
 import { VideoGenre } from 'src/modules/video-genre/entities/video-genre.entity';
-import { Column, Entity, JoinColumn, OneToMany, OneToOne } from 'typeorm';
+import {
+	Column,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	OneToMany,
+	OneToOne,
+} from 'typeorm';
 
 export enum VideoAiContent {
 	ALL = 'ALL',
 	PARTLY = 'PARTLY',
 	NONE = 'NONE',
 	UNDETERMINED = 'UNDETERMINED',
+}
+
+export enum VideoMadeForKids {
+	YES = 'YES',
+	NO = 'NO',
+	CHANNEL_DEFAULT = 'CHANNEL_DEFAULT',
 }
 
 export enum VideoVisibility {
@@ -80,14 +94,20 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	aiContent: VideoAiContent | null;
 
 	@Column({
-		type: 'varchar',
-		length: 150,
+		type: 'uuid',
+		name: 'channel_id',
 		nullable: true,
 		comment:
-			'Tên kênh YouTube Vevo chỉ định để đăng tải video (ví dụ: TaylorSwiftVEVO)' +
+			'Channel chi dinh de dang tai video len YouTube/Vevo' +
 			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	channel: string | null;
+	channelId: string | null;
+
+	@ManyToOne(() => Channel, (channel) => channel.videos, {
+		onDelete: 'SET NULL',
+	})
+	@JoinColumn({ name: 'channel_id' })
+	channel: Channel | null;
 
 	@Column({
 		type: 'text',
@@ -108,14 +128,15 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	keywords: string[] | null;
 
 	@Column({
-		type: 'boolean',
+		type: 'varchar',
+		length: 20,
 		nullable: true,
-		default: false,
+		default: VideoMadeForKids.CHANNEL_DEFAULT,
 		comment:
-			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube' +
+			'Đánh dấu video dành riêng cho trẻ em (Made For Kids) theo quy định của YouTube: YES, NO, CHANNEL_DEFAULT' +
 			COMMENT_FOR_NULLABLE_DRAFT,
 	})
-	isKids: boolean | null;
+	madeForKids: VideoMadeForKids | null;
 
 	@Column({
 		type: 'boolean',
