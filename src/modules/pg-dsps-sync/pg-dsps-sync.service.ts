@@ -30,15 +30,53 @@ export class PgDspsSyncService {
   constructor(private readonly clickHouseService: ClickHouseService) {}
 
   /**
-   * Get all pg_dsps_sync records
+   * Get paginated pg_dsps_sync records
    */
-  async findAll(): Promise<PgDspsSyncResponse[]> {
+  async findAll(query: {
+    page?: number;
+    pageSize?: number;
+    keyword?: string;
+  }): Promise<{ items: PgDspsSyncResponse[]; totalItems: number }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    // Keyword search (search in dsp_name, dsp_code, dsp_ci_code)
+    if (query.keyword) {
+      conditions.push(
+        `(lower(dsp_name) LIKE {kw: String} OR lower(dsp_code) LIKE {kw: String} OR lower(dsp_ci_code) LIKE {kw: String})`,
+      );
+      params.kw = `%${query.keyword.toLowerCase()}%`;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count query
+    const countRows = await this.clickHouseService.query<{ c: string }>(
+      `SELECT count() AS c
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       ${whereClause}`,
+      params,
+    );
+    const totalItems = Number(countRows[0]?.c ?? 0);
+
+    // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
-       ORDER BY dsp_name ASC`
+       ${whereClause}
+       ORDER BY dsp_name ASC
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      params,
     );
-    return rows.map(mapRawPgDspsSync);
+
+    return {
+      items: rows.map(mapRawPgDspsSync),
+      totalItems,
+    };
   }
 
   /**

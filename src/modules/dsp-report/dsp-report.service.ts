@@ -50,17 +50,46 @@ export class DspReportService {
   constructor(private readonly clickHouseService: ClickHouseService) {}
 
   /**
-   * Get all dsps_report records, optionally filtered by assignment status
-   * @param status - 'assigned' | 'unassigned' | undefined (all)
+   * Get paginated dsps_report records with optional filtering
    */
-  async findAll(status?: string): Promise<DspsReportResponse[]> {
-    let whereClause = '';
-    if (status === 'assigned') {
-      whereClause = `WHERE r.pg_uuid IS NOT NULL AND r.pg_uuid != ''`;
-    } else if (status === 'unassigned') {
-      whereClause = `WHERE (r.pg_uuid IS NULL OR r.pg_uuid = '')`;
+  async findAll(query: {
+    page?: number;
+    pageSize?: number;
+    keyword?: string;
+    status?: string;
+  }): Promise<{ items: DspsReportResponse[]; totalItems: number }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
+
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    // Status filter
+    if (query.status === 'assigned') {
+      conditions.push(`r.pg_uuid != ''`);
+    } else if (query.status === 'unassigned') {
+      conditions.push(`r.pg_uuid = ''`);
     }
 
+    // Keyword search (search in dsp_name and source)
+    if (query.keyword) {
+      conditions.push(`(lower(r.dsp_name) LIKE {kw: String} OR lower(r.source) LIKE {kw: String})`);
+      params.kw = `%${query.keyword.toLowerCase()}%`;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count query
+    const countRows = await this.clickHouseService.query<{ c: string }>(
+      `SELECT count() AS c
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
+       ${whereClause}`,
+      params,
+    );
+    const totalItems = Number(countRows[0]?.c ?? 0);
+
+    // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -78,9 +107,15 @@ export class DspReportService {
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
        LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
        ${whereClause}
-       ORDER BY r.created_at DESC`
+       ORDER BY r.created_at DESC
+       LIMIT ${pageSize} OFFSET ${offset}`,
+      params,
     );
-    return rows.map(mapRawDspsReport);
+
+    return {
+      items: rows.map(mapRawDspsReport),
+      totalItems,
+    };
   }
 
   /**

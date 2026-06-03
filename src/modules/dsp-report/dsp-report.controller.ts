@@ -1,29 +1,9 @@
 import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { PageDto } from 'src/common/dtos/common.response.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { DspReportService, DspsReportResponse } from './dsp-report.service';
-
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
-
-class CreateDspReportDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  dspName: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  source: string;
-}
-
-class AssignDspReportDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  pgUuid: string;
-}
+import { QueryGetListDspReportDto, CreateDspReportDto, AssignDspReportDto } from './dto/dsp-report.dto';
 
 @ApiTags('dsp-report')
 @Controller('dsp-report')
@@ -31,14 +11,19 @@ export class DspReportController {
   constructor(private readonly dspReportService: DspReportService) {}
 
   @Get()
-  @ApiQuery({ name: 'status', required: false, enum: ['assigned', 'unassigned'], description: 'Filter by assignment status' })
   async findAll(
-    @Query('status') status?: string,
-  ): Promise<ResponseSuccess<DspsReportResponse[]>> {
-    const result = await this.dspReportService.findAll(status);
-    return new ResponseSuccess({ data: result });
+    @Query() query: QueryGetListDspReportDto,
+  ): Promise<PageDto<DspsReportResponse>> {
+    const { items, totalItems } = await this.dspReportService.findAll(query);
+    return new PageDto({
+      items,
+      metadata: {
+        page: query.page,
+        pageSize: query.pageSize,
+        totalItems,
+      },
+    });
   }
-
 
   @Get(':id')
   async findById(@Param('id') id: string): Promise<ResponseSuccess<DspsReportResponse | null>> {

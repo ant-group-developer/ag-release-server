@@ -1,8 +1,9 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { PgDspsSyncService, PgDspsSyncResponse } from './pg-dsps-sync.service';
 import { DspsReportResponse } from '../dsp-report/dsp-report.service';
+import { QueryGetListPgDspsSyncDto } from './dto/pg-dsps-sync.dto';
 
 @ApiTags('pg-dsps-sync')
 @Controller('pg-dsps-sync')
@@ -10,9 +11,18 @@ export class PgDspsSyncController {
   constructor(private readonly pgDspsSyncService: PgDspsSyncService) {}
 
   @Get()
-  async findAll(): Promise<ResponseSuccess<PgDspsSyncResponse[]>> {
-    const result = await this.pgDspsSyncService.findAll();
-    return new ResponseSuccess({ data: result });
+  async findAll(
+    @Query() query: QueryGetListPgDspsSyncDto,
+  ): Promise<PageDto<PgDspsSyncResponse>> {
+    const { items, totalItems } = await this.pgDspsSyncService.findAll(query);
+    return new PageDto({
+      items,
+      metadata: {
+        page: query.page,
+        pageSize: query.pageSize,
+        totalItems,
+      },
+    });
   }
 
   @Get(':uuid')
