@@ -1,15 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
-import { mapRawDspsReport, DspsReport } from '../dsp-report/dsp-report.service';
+import { mapRawDspsReport, DspsReportResponse } from '../dsp-report/dsp-report.service';
 
-export interface PgDspsSync {
-  pg_uuid: string;
-  dsp_code: string;
-  dsp_name: string;
-  dsp_ci_code: string;
-  created_at: string;
-  updated_at: string;
+export interface PgDspsSyncResponse {
+  pgUuid: string;
+  dspCode: string;
+  dspName: string;
+  dspCiCode: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapRawPgDspsSync(row: any): PgDspsSyncResponse {
+  return {
+    pgUuid: row.pg_uuid,
+    dspCode: row.dsp_code,
+    dspName: row.dsp_name,
+    dspCiCode: row.dsp_ci_code,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 @Injectable()
@@ -21,31 +32,32 @@ export class PgDspsSyncService {
   /**
    * Get all pg_dsps_sync records
    */
-  async findAll(): Promise<PgDspsSync[]> {
-    return this.clickHouseService.query<PgDspsSync>(
+  async findAll(): Promise<PgDspsSyncResponse[]> {
+    const rows = await this.clickHouseService.query<any>(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
        ORDER BY dsp_name ASC`
     );
+    return rows.map(mapRawPgDspsSync);
   }
 
   /**
    * Get pg_dsps_sync by pg_uuid
    */
-  async findByUuid(pgUuid: string): Promise<PgDspsSync | null> {
-    const rows = await this.clickHouseService.query<PgDspsSync>(
+  async findByUuid(pgUuid: string): Promise<PgDspsSyncResponse | null> {
+    const rows = await this.clickHouseService.query<any>(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
        WHERE pg_uuid = {uuid: String}`,
       { uuid: pgUuid }
     );
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? mapRawPgDspsSync(rows[0]) : null;
   }
 
   /**
    * Get dsps_reports for a specific pg_uuid
    */
-  async getDspsReports(pgUuid: string): Promise<DspsReport[]> {
+  async getDspsReports(pgUuid: string): Promise<DspsReportResponse[]> {
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
