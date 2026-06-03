@@ -149,8 +149,7 @@ export class ImportJobsService implements OnModuleInit {
 
   async list(filters: ListImportJobsFilters = {}): Promise<{
     items: ImportJob[];
-    limit: number;
-    offset: number;
+    totalItems: number;
   }> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
     const offset = Math.max(filters.offset ?? 0, 0);
@@ -171,6 +170,24 @@ export class ImportJobsService implements OnModuleInit {
     }
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
+    // Query 1: Count total jobs
+    const countSql = `
+      SELECT count() AS total FROM (
+        SELECT 1 FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+        ${whereClause}
+      )
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return { items: [], totalItems: 0 };
+    }
+
+    // Query 2: Get paged jobs
     const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       ${whereClause}
@@ -178,7 +195,7 @@ export class ImportJobsService implements OnModuleInit {
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `;
     const rows = await this.clickHouseService.query<ImportJobRow>(sql, params);
-    return { items: rows.map(rowToDomain), limit, offset };
+    return { items: rows.map(rowToDomain), totalItems };
   }
 
   /**

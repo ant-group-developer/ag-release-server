@@ -1,12 +1,14 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
+import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
-import { ImportJob, ImportJobSourceType, ImportJobStatus } from '../interfaces';
+import { ImportJob } from '../interfaces';
+import { QueryGetListJobsDto } from '../dto/job-query.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 @ApiTags('ETL')
 @Controller('etl')
 export class JobController {
-  constructor(private readonly importJobsService: ImportJobsService) {}
+  constructor(private readonly importJobsService: ImportJobsService) { }
 
   @Get('jobs/:id')
   @ApiOperation({
@@ -16,42 +18,44 @@ export class JobController {
       'Job được lưu trong ClickHouse `import_jobs` (ReplacingMergeTree).',
   })
   @ApiParam({ name: 'id', description: 'Job ID returned by /etl/import/wmg or /etl/ftp/sync*' })
-  async getJobStatus(@Param('id') id: string) {
+  async getJobStatus(@Param('id') id: string): Promise<ResponseSuccess<any>> {
     const job = await this.importJobsService.findById(id);
-    if (!job) return { error: 'Job not found', id };
-    return formatJob(job);
+    if (!job) {
+      throw new NotFoundException(`Job not found: ${id}`);
+    }
+    const result = formatJob(job);
+    return new ResponseSuccess({
+      data: result
+    });
   }
 
-  @Get('jobs')
-  @ApiOperation({
-    summary: 'List recent import/sync jobs',
-    description: 'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
-  })
-  @ApiQuery({ name: 'status', required: false, enum: Object.values(ImportJobStatus) })
-  @ApiQuery({ name: 'sourceType', required: false, enum: Object.values(ImportJobSourceType) })
-  @ApiQuery({ name: 'tenantId', required: false })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
-  @ApiQuery({ name: 'offset', required: false, type: Number, example: 0 })
-  async listJobs(
-    @Query('status') status?: ImportJobStatus,
-    @Query('sourceType') sourceType?: ImportJobSourceType,
-    @Query('tenantId') tenantId?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    const result = await this.importJobsService.list({
-      status,
-      sourceType,
-      tenantId,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-    });
-    return {
+@Get('jobs')
+@ApiOperation({
+  summary: 'List recent import/sync jobs',
+  description: 'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
+})
+async listJobs(
+  @Query() query: QueryGetListJobsDto,
+): Promise < ResponseSuccess < PageDto < any >>> {
+  const { status, sourceType, tenantId, page, pageSize } = query;
+  const result = await this.importJobsService.list({
+    status,
+    sourceType,
+    tenantId,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
+  return new ResponseSuccess({
+    data: new PageDto({
       items: result.items.map(formatJob),
-      limit: result.limit,
-      offset: result.offset,
-    };
-  }
+      metadata: {
+        page,
+        pageSize,
+        totalItems: result.totalItems,
+      },
+    }),
+  });
+}
 }
 
 function formatJob(job: ImportJob) {
