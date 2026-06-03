@@ -6,11 +6,13 @@ import {
 	Param,
 	Post,
 	Put,
+	Query,
 } from '@nestjs/common';
 import {
 	ApiBody,
 	ApiOperation,
 	ApiParam,
+	ApiQuery,
 	ApiResponse,
 	ApiTags,
 } from '@nestjs/swagger';
@@ -20,6 +22,7 @@ import {
 	CreateReleaseCaptionDto,
 	UpdateReleaseCaptionDto,
 } from './dto/release-caption.dto';
+import { ReleaseCaptionType } from './entities/release-caption.entity';
 import { ReleaseCaptionService } from './release-caption.service';
 
 @ApiTags('Release Captions')
@@ -55,8 +58,12 @@ export class ReleaseCaptionController {
 	@Get(':releaseId/release-captions')
 	@ApiOperation({ summary: 'Get captions by release ID' })
 	@ApiParam({ name: 'releaseId', format: 'uuid' })
-	async findByReleaseId(@Param('releaseId') releaseId: string) {
-		const result = await this.captionService.findByReleaseId(releaseId);
+	@ApiQuery({ name: 'type', required: false, enum: ReleaseCaptionType })
+	async getList(
+		@Param('releaseId') releaseId: string,
+		@Query('type') type?: ReleaseCaptionType,
+	) {
+		const result = await this.captionService.getList(releaseId, type);
 		return new ResponseSuccess({ data: result });
 	}
 
