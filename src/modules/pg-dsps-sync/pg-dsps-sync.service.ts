@@ -8,6 +8,7 @@ export interface PgDspsSyncResponse {
   dspCode: string;
   dspName: string;
   dspCiCode: string;
+  picture: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -18,6 +19,7 @@ function mapRawPgDspsSync(row: any): PgDspsSyncResponse {
     dspCode: row.dsp_code,
     dspName: row.dsp_name,
     dspCiCode: row.dsp_ci_code,
+    picture: row.picture || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -65,7 +67,7 @@ export class PgDspsSyncService {
 
     // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
-      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
+      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, picture, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
        ${whereClause}
        ORDER BY dsp_name ASC
@@ -74,7 +76,7 @@ export class PgDspsSyncService {
     );
 
     return {
-      items: rows.map(mapRawPgDspsSync),
+      items: rows.map(mapRawPgPgDspsSync => mapRawPgDspsSync(mapRawPgPgDspsSync)),
       totalItems,
     };
   }
@@ -84,7 +86,7 @@ export class PgDspsSyncService {
    */
   async findByUuid(pgUuid: string): Promise<PgDspsSyncResponse | null> {
     const rows = await this.clickHouseService.query<any>(
-      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
+      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, picture, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
        WHERE pg_uuid = {uuid: String}`,
       { uuid: pgUuid }
@@ -108,6 +110,7 @@ export class PgDspsSyncService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r

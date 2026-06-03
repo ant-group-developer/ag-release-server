@@ -15,6 +15,7 @@ export interface DspsReportResponse {
     dspCode: string;
     dspName: string;
     dspCiCode: string;
+    picture: string;
     createdAt: string;
     updatedAt: string;
   } | null;
@@ -27,6 +28,7 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
         dspCode: row.pg_dsps_sync_dsp_code,
         dspName: row.pg_dsps_sync_dsp_name,
         dspCiCode: row.pg_dsps_sync_dsp_ci_code,
+        picture: row.pg_dsps_sync_picture || '',
         createdAt: row.pg_dsps_sync_created_at,
         updatedAt: row.pg_dsps_sync_updated_at,
       }
@@ -102,6 +104,7 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
@@ -134,6 +137,7 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
@@ -143,7 +147,6 @@ export class DspReportService {
     );
     return rows.length > 0 ? mapRawDspsReport(rows[0]) : null;
   }
-
 
   /**
    * Get dsps_reports by pg_uuid
@@ -161,6 +164,7 @@ export class DspReportService {
          p.dsp_code AS pg_dsps_sync_dsp_code,
          p.dsp_name AS pg_dsps_sync_dsp_name,
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
+         p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r

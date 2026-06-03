@@ -43,6 +43,7 @@ interface DspSyncRow {
   dsp_code: string;
   dsp_name: string;
   dsp_ci_code: string;
+  picture: string;
   created_at: string;
   updated_at: string;
 }
@@ -85,19 +86,9 @@ export class ClickHouseSyncService
 
   private async syncDspsOnStartup() {
     try {
-      // Check if pg_dsps_sync has any records
-      const result = await this.clickHouseService.query<{ c: number }>(
-        `SELECT count() as c FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}`
-      );
-      const count = result[0]?.c ?? 0;
-
-      if (count === 0) {
-        this.logger.log('pg_dsps_sync is empty, seeding from PostgreSQL dsps...');
-        await this.seedingService.seedFromDsps();
-        this.logger.log('DSP seeding completed');
-      } else {
-        this.logger.log(`pg_dsps_sync has ${count} records, skipping seeding`);
-      }
+      this.logger.log('Refreshing pg_dsps_sync table from PostgreSQL dsps...');
+      const count = await this.seedingService.resyncAll();
+      this.logger.log(`DSP seeding completed, synced ${count} records`);
     } catch (err: any) {
       this.logger.error(`DSP seeding on startup failed: ${err.message}`);
     }
@@ -407,7 +398,7 @@ export class ClickHouseSyncService
     // 3. Xu ly INSERT/UPDATE cho dsps
     if (dspUpsertIds.length > 0) {
       const rows = await this.entityManager.query(
-        `SELECT id, code, name, code_ci
+        `SELECT id, code, name, code_ci, picture
          FROM dsps
          WHERE id = ANY($1)`,
         [dspUpsertIds]
@@ -419,6 +410,7 @@ export class ClickHouseSyncService
           dsp_code: row.code ?? '',
           dsp_name: row.name ?? '',
           dsp_ci_code: row.code_ci ?? '',
+          picture: row.picture ?? '',
           created_at: now,
           updated_at: now,
         }));
