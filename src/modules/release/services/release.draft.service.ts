@@ -106,10 +106,12 @@ export class ReleaseDraftService {
 
 		// coverArt
 		await this.createSubEntities(releaseDb.id);
-		await this.updateVideoSubEntities({
-			releaseId: releaseDb.id,
-			video,
-		});
+		if (release.type === 'video') {
+			await this.updateVideoSubEntities({
+				releaseId: releaseDb.id,
+				video,
+			});
+		}
 
 		return releaseDb;
 	}

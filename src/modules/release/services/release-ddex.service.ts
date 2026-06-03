@@ -1239,7 +1239,7 @@ export class ReleaseDdexService {
 								? 'SubTitle'
 								: 'Caption',
 					})),
-					channel: video.channel ?? undefined,
+					channel: video.channel?.name ?? undefined,
 					description: video.description || undefined,
 					madeForKids: video.madeForKids ?? undefined,
 					isUnlisted: video.isUnlisted ?? undefined,

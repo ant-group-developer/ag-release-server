@@ -38,11 +38,13 @@ export class CreateVideoDto {
 	@IsEnum(VideoAiContent)
 	aiContent?: VideoAiContent;
 
-	@ApiProperty({ maxLength: 150 })
-	@IsString()
+	@ApiPropertyOptional({ format: 'uuid' })
 	@IsOptional()
-	@MaxLength(150)
-	channel?: string;
+	@IsUUID()
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	channelId?: string | null;
 
 	@ApiPropertyOptional()
 	@IsOptional()
