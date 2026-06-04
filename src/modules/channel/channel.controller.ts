@@ -28,7 +28,11 @@ export class ChannelController {
 	@ApiBody({ type: CreateChannelDto })
 	async create(@Body() dto: CreateChannelDto) {
 		const result = await this.channelService.create(dto);
-		return new ResponseSuccess({ data: result });
+		return new ResponseSuccess({
+			message: 'Channel is processing',
+			messageCode: 'common.processing',
+			data: result,
+		});
 	}
 
 	@Get()
