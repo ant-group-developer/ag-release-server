@@ -2,19 +2,29 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { IsrcResolverService } from './isrc-resolver.service';
 import { TimelineQueryDto } from '../dto/analytics-query.dto';
 import {
   DspTimelineResponse,
   DspTimelinePeriod,
   TerTimelineResponse,
   TerTimelinePeriod,
+  RevenueOverviewResponse,
+  RevenueTimelineResponse,
+  RevenueTopDspResponse,
+  RevenueTopArtistResponse,
+  RevenueTopTrackResponse,
+  RevenueTrackItem,
 } from '../interfaces/analytics.interface';
 
 @Injectable()
 export class TimelineAnalyticsService {
   private readonly logger = new Logger(TimelineAnalyticsService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) { }
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly isrcResolverService: IsrcResolverService,
+  ) { }
 
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
@@ -120,7 +130,8 @@ export class TimelineAnalyticsService {
         toStartOfMonth(s.period) AS period_date,
         formatDateTime(s.period, '%Y-%m') AS period_str,
         ${dspExpr},
-        sum(s.total_quantity) AS sales_views
+        sum(s.total_quantity) AS sales_views,
+        sum(s.total_revenue_usd) AS revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       ${joinExpr}
@@ -137,6 +148,7 @@ export class TimelineAnalyticsService {
       period_str: string;
       dsp_name: string;
       sales_views: string;
+      revenue_usd: string;
     }>(timelineSql, params);
 
     // Group ket qua
@@ -150,6 +162,7 @@ export class TimelineAnalyticsService {
       period.series.push({
         dsp: row.dsp_name,
         salesViews: Number(row.sales_views),
+        revenueUsd: Number(row.revenue_usd),
       });
     }
 
@@ -400,7 +413,8 @@ export class TimelineAnalyticsService {
         toStartOfMonth(s.period) AS period_date,
         formatDateTime(s.period, '%Y-%m') AS period_str,
         ${terExpr} AS ter_name,
-        sum(s.total_quantity) AS sales_views
+        sum(s.total_quantity) AS sales_views,
+        sum(s.total_revenue_usd) AS revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE 1=1
@@ -416,6 +430,7 @@ export class TimelineAnalyticsService {
       period_str: string;
       ter_name: string;
       sales_views: string;
+      revenue_usd: string;
     }>(timelineSql, params);
 
     const periodMap = new Map<string, TerTimelinePeriod>();
@@ -428,6 +443,7 @@ export class TimelineAnalyticsService {
       period.series.push({
         territory: row.ter_name,
         salesViews: Number(row.sales_views),
+        revenueUsd: Number(row.revenue_usd),
       });
     }
 
@@ -516,5 +532,340 @@ export class TimelineAnalyticsService {
     }
 
     return { topTerritories, items: Array.from(periodMap.values()) };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE OVERVIEW (Tổng quan doanh thu)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueOverview(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueOverviewResponse> {
+    const { fromDate, toDate } = query;
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    // Truy vấn trên SALES_TER_MONTHLY để lấy cả tổng quantity, tổng USD, và số lượng territory (vùng)
+    const sql = `
+      SELECT
+        sum(s.total_quantity)     AS total_quantity,
+        sum(s.total_revenue_usd) AS total_revenue_usd,
+        uniq(s.territory_code)   AS total_territories
+      FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+      ${joinSql}
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+    `;
+    const rows = await this.clickHouseService.query<{
+      total_quantity: string;
+      total_revenue_usd: string;
+      total_territories: string;
+    }>(sql, params);
+
+    return {
+      totalRevenueUsd: Number(rows[0]?.total_revenue_usd ?? 0),
+      totalQuantity: Number(rows[0]?.total_quantity ?? 0),
+      totalTerritories: Number(rows[0]?.total_territories ?? 0),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTimelineResponse> {
+    const { fromDate, toDate } = query;
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const sql = `
+      SELECT
+        formatDateTime(s.period, '%Y-%m') AS period_str,
+        sum(s.total_quantity) AS quantity,
+        sum(s.total_revenue_usd) AS revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+      GROUP BY period_str
+      ORDER BY period_str ASC
+    `;
+    const rows = await this.clickHouseService.query<{
+      period_str: string;
+      quantity: string;
+      revenue_usd: string;
+    }>(sql, params);
+
+    return rows.map((r) => ({
+      period: r.period_str,
+      revenueUsd: Number(r.revenue_usd),
+      quantity: Number(r.quantity),
+    }));
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TOP DSP (Top đối tác theo doanh thu)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopDsp(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTopDspResponse> {
+    const { fromDate, toDate, topN = 5 } = query;
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    // Coalesce: ưu tiên pg_dsps_sync, tiếp đến dsps_report, cuối cùng là dsp_id gốc
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const joinExpr = `
+      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    `;
+
+    const sql = `
+      SELECT
+        ${resolvedDspName} AS dsp_name,
+        sum(s.total_quantity) AS quantity,
+        sum(s.total_revenue_usd) AS revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      ${joinExpr}
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+      GROUP BY dsp_name
+      ORDER BY revenue_usd DESC
+      LIMIT ${topN}
+    `;
+    const rows = await this.clickHouseService.query<{
+      dsp_name: string;
+      quantity: string;
+      revenue_usd: string;
+    }>(sql, params);
+
+    return rows.map((r) => ({
+      dspName: r.dsp_name,
+      revenueUsd: Number(r.revenue_usd),
+      quantity: Number(r.quantity),
+    }));
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TOP ARTIST (Top nghệ sĩ theo doanh thu)
+  // Luôn JOIN pg_tracks_sync để lấy artist_ids.
+  // System-tenant: không filter tenant_id → thấy tất cả.
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopArtist(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTopArtistResponse> {
+    const { fromDate, toDate, topN = 10 } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+    if (query.labelId) {
+      filterSql += ' AND t.label_id = {labelId:String}';
+      params.labelId = query.labelId;
+    }
+    if (query.releaseId) {
+      filterSql += ' AND t.release_id = {releaseId:String}';
+      params.releaseId = query.releaseId;
+    }
+
+    const sql = `
+      SELECT
+        arrayJoin(t.artist_ids) AS artistId,
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity,
+        uniq(s.isrc) AS track_count
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+      GROUP BY artistId
+      HAVING artistId != ''
+      ORDER BY revenue_usd DESC
+      LIMIT ${topN}
+    `;
+
+    const rows = await this.clickHouseService.query<{
+      artistId: string;
+      revenue_usd: string;
+      quantity: string;
+      track_count: string;
+    }>(sql, params);
+
+    if (!rows.length) return [];
+
+    const artistIds = rows.map((r) => r.artistId);
+    const artistMappings = await this.isrcResolverService.getAllIsrcArtistMappingsForTenant(tenantId);
+    const artistMetaMap = new Map<string, { artistName: string; artistPicture: string | null }>();
+    for (const a of artistMappings) {
+      if (!artistMetaMap.has(a.artistId)) {
+        artistMetaMap.set(a.artistId, { artistName: a.artistName, artistPicture: a.artistPicture });
+      }
+    }
+
+    return rows.map((r, index) => {
+      const meta = artistMetaMap.get(r.artistId);
+      return {
+        rank: index + 1,
+        artistId: r.artistId,
+        artistName: meta?.artistName ?? 'Unknown Artist',
+        picture: meta?.artistPicture ?? null,
+        trackCount: Number(r.track_count),
+        revenueUsd: Number(r.revenue_usd),
+        quantity: Number(r.quantity),
+      };
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TOP TRACK (Top track theo doanh thu)
+  // Normal tenant: JOIN pg_tracks_sync, enrich từ Postgres.
+  // System-tenant: query tất cả ISRC trong ClickHouse,
+  //   enrich Postgres trước, ISRC thiếu fallback fact_sales_report.
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopTrack(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTopTrackResponse> {
+    const { fromDate, toDate, topN = 10 } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+
+    let joinSql = '';
+    let filterSql = '';
+
+    if (!isSystem) {
+      // Normal tenant: phải JOIN để filter
+      joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+      filterSql = 'AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+
+      if (query.labelId) {
+        filterSql += ' AND t.label_id = {labelId:String}';
+        params.labelId = query.labelId;
+      }
+      if (query.releaseId) {
+        filterSql += ' AND t.release_id = {releaseId:String}';
+        params.releaseId = query.releaseId;
+      }
+    } else {
+      // System-tenant: sub-filters vẫn có thể JOIN nếu có
+      if (query.labelId || query.releaseId) {
+        joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+        filterSql = 'AND t.is_deleted = 0';
+        if (query.labelId) {
+          filterSql += ' AND t.label_id = {labelId:String}';
+          params.labelId = query.labelId;
+        }
+        if (query.releaseId) {
+          filterSql += ' AND t.release_id = {releaseId:String}';
+          params.releaseId = query.releaseId;
+        }
+      }
+      // Không có sub-filter → không JOIN, query toàn bộ
+    }
+
+    const sql = `
+      SELECT
+        s.isrc AS isrc,
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+      GROUP BY isrc
+      ORDER BY revenue_usd DESC
+      LIMIT ${topN}
+    `;
+
+    const rows = await this.clickHouseService.query<{
+      isrc: string;
+      revenue_usd: string;
+      quantity: string;
+    }>(sql, params);
+
+    if (!rows.length) return [];
+
+    const topIsrcs = rows.map((r) => r.isrc);
+
+    // Enrich từ Postgres trước
+    const [metadataMap, artistMappings] = await Promise.all([
+      this.isrcResolverService.getTrackMetadataMap(topIsrcs),
+      this.isrcResolverService.getIsrcArtistMappings(topIsrcs),
+    ]);
+
+    const artistNameMap = new Map<string, string>();
+    for (const m of artistMappings) {
+      const cur = artistNameMap.get(m.isrc);
+      artistNameMap.set(m.isrc, cur ? `${cur}, ${m.artistName}` : m.artistName);
+    }
+
+    // Tìm ISRCs còn thiếu metadata (chỉ xảy ra với system-tenant)
+    const missingIsrcs = isSystem
+      ? topIsrcs.filter((isrc) => !metadataMap.has(isrc))
+      : [];
+
+    // Fallback: lấy track_title + artist_name từ fact_sales_report
+    const fallbackMap = new Map<string, { trackTitle: string; artistName: string }>();
+    if (missingIsrcs.length > 0) {
+      const fbParams = { isrcs: missingIsrcs };
+      const fbSql = `
+        SELECT
+          isrc,
+          any(track_title) AS track_title,
+          any(artist_name) AS artist_name
+        FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT}
+        WHERE isrc IN ({isrcs:Array(String)})
+        GROUP BY isrc
+      `;
+      const fbRows = await this.clickHouseService.query<{
+        isrc: string;
+        track_title: string;
+        artist_name: string;
+      }>(fbSql, fbParams);
+      for (const fb of fbRows) {
+        fallbackMap.set(fb.isrc, { trackTitle: fb.track_title, artistName: fb.artist_name });
+      }
+    }
+
+    return rows.map((r, index): RevenueTrackItem => {
+      const meta = metadataMap.get(r.isrc);
+      const fallback = fallbackMap.get(r.isrc);
+      return {
+        rank: index + 1,
+        isrc: r.isrc,
+        title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
+        version: meta?.trackVersion ?? null,
+        artistName: artistNameMap.get(r.isrc) ?? fallback?.artistName ?? '',
+        releaseId: meta?.releaseId ?? null,
+        releaseTitle: meta?.releaseTitle ?? null,
+        revenueUsd: Number(r.revenue_usd),
+        quantity: Number(r.quantity),
+      };
+    });
   }
 }

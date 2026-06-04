@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ImportController } from './controllers/import.controller';
 import { SyncController } from './controllers/sync.controller';
 import { JobController } from './controllers/job.controller';
+import { ExchangeRateController } from './controllers/exchange-rate.controller';
 import { WmgImportController } from './controllers/wmg-import.controller';
 import { ImportService } from './services/import/import.service';
 import { FtpService } from './services/ftp/ftp.service';
@@ -10,12 +11,13 @@ import { SchedulerService } from './services/scheduler/scheduler.service';
 import { JobService } from './services/job/job.service';
 import { WmgImportService } from './services/import/wmg-import.service';
 import { ImportJobsService } from './services/import-jobs/import-jobs.service';
+import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
 import { DspModule } from '../dsp/dsp.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 
 @Module({
   imports: [DspModule, ClickHouseModule],
-  controllers: [ImportController, SyncController, JobController, WmgImportController],
+  controllers: [ImportController, SyncController, JobController, WmgImportController, ExchangeRateController],
   providers: [
     ImportService,
     FtpService,
@@ -24,7 +26,8 @@ import { ClickHouseModule } from '../clickhouse/clickhouse.module';
     JobService, // @deprecated — giữ tạm, sẽ remove sau khi confirm không nơi khác inject
     ImportJobsService,
     WmgImportService,
+    ExchangeRateService,
   ],
-  exports: [ImportService, SyncService, ImportJobsService],
+  exports: [ImportService, SyncService, ImportJobsService, ExchangeRateService],
 })
 export class EtlModule {}

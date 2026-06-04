@@ -6,6 +6,7 @@ import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { WmgSalesParser } from '../../parsers/sales/wmg-sales.parser';
 import { FactSalesRow, ImportJob, ImportJobSourceType } from '../../interfaces';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 
 export interface WmgImportOptions {
   revenueCurrency?: string;
@@ -26,6 +27,7 @@ export class WmgImportService {
     private readonly clickHouseService: ClickHouseService,
     private readonly dspMappingService: DspMappingService,
     private readonly importJobsService: ImportJobsService,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   /**
@@ -96,9 +98,20 @@ export class WmgImportService {
       return dspsReport.id_dsps_report;
     };
 
+    const importedPeriods = new Set<string>();
+
     try {
       const parser = new WmgSalesParser();
+
       const onBatch = async (rows: FactSalesRow[]): Promise<void> => {
+        // Collect YYYY-MM periods from rows
+        for (const row of rows) {
+          const date = new Date(row.reporting_period_start);
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          importedPeriods.add(`${yyyy}-${mm}`);
+        }
+
         await this.clickHouseService.insert(
           CLICKHOUSE_TABLES.FACT_SALES_REPORT,
           rows as unknown as Record<string, unknown>[],
@@ -119,6 +132,14 @@ export class WmgImportService {
         revenueCurrency: params.revenueCurrency || 'VND',
         memberName: params.memberName || 'AMG GROUP',
       });
+
+      // Sync exchange rates cho các tháng vừa import (nếu thiếu)
+      if (importedPeriods.size > 0) {
+        this.logger.log(`Import completed. Syncing rates for periods: ${[...importedPeriods].join(', ')}`);
+        await this.exchangeRateService.syncMonthsForPeriods([...importedPeriods]);
+        // Rebuild lại các cubes để quy đổi USD chuẩn xác
+        await this.exchangeRateService.rebuildCubes();
+      }
 
       await this.importJobsService.updateProgress(
         jobId,

@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
 import { FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 
 export interface SyncPeriodResult {
   period: string;
@@ -56,6 +57,7 @@ export class SyncService {
     private readonly importService: ImportService,
     private readonly clickHouseService: ClickHouseService,
     @InjectRedis() private readonly redis: Redis,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   // ── Tracking helpers ──────────────────────────────────
@@ -206,7 +208,7 @@ export class SyncService {
       } else {
         deletePromises.push(
           this.clickHouseService.execute(
-            `ALTER TABLE music_analytics.sales_dsp_monthly_cube DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
+            `ALTER TABLE music_analytics.sales_dsp_monthly_cube_v2 DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
           ),
         );
       }
@@ -252,10 +254,10 @@ export class SyncService {
           CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
           CLICKHOUSE_TABLES.FACT_SALES_REPORT,
           'trends_dsp_monthly_cube',
-          'sales_dsp_monthly_cube',
+          'sales_dsp_monthly_cube_v2',
           'trends_dsp_daily_cube',
           'trends_isrc_daily_cube',
-          'sales_ter_monthly_cube',
+          'sales_ter_monthly_cube_v2',
           'trends_ter_monthly_cube',
         ];
 
@@ -460,7 +462,15 @@ export class SyncService {
     );
 
     // Invalidate analytics cache after successful import
+    // Sync rates and rebuild cubes if data was imported
     if (result.totalRows > 0) {
+      try {
+        this.logger.log('Import detected new rows. Syncing missing exchange rates and rebuilding cubes...');
+        await this.exchangeRateService.backfillMissingRates();
+      } catch (err) {
+        this.logger.error(`Failed to sync rates and rebuild cubes: ${err.message}`, err.stack);
+      }
+
       try {
         const keys = await this.redis.keys('analytics:*');
         if (keys.length > 0) {

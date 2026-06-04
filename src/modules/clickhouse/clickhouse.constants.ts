@@ -7,7 +7,7 @@ export const CLICKHOUSE_TABLES = {
   TRACK_MONTHLY_SUMMARY: 'track_monthly_summary',
   ETL_IMPORT_HISTORY: 'etl_import_history',
   SALES_ISRC_MONTHLY: 'sales_isrc_monthly_cube',
-  SALES_DSP_MONTHLY: 'sales_dsp_monthly_cube',
+  SALES_DSP_MONTHLY: 'sales_dsp_monthly_cube_v2',
   SALES_ISRC_DSP_MONTHLY: 'sales_isrc_dsp_monthly_cube',
   SALES_ISRC_COUNTRY_MONTHLY: 'sales_isrc_country_monthly_cube',
   TRENDS_ISRC_SUMMARY: 'trends_isrc_summary',
@@ -17,7 +17,8 @@ export const CLICKHOUSE_TABLES = {
   PG_DSPS_SYNC: 'pg_dsps_sync',
   DSPS_REPORT: 'dsps_report',
   TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
-  SALES_TER_MONTHLY: 'sales_ter_monthly_cube',
+  SALES_TER_MONTHLY: 'sales_ter_monthly_cube_v2',
   TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
   IMPORT_JOBS: 'import_jobs',
+  EXCHANGE_RATES: 'exchange_rates',
 } as const;
