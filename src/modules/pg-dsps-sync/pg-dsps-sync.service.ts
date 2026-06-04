@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
-import { mapRawDspsReport, DspsReportResponse } from '../dsp-report/dsp-report.service';
+import { mapRawDspsReport, DspsReportResponse } from '../dsp-report/services/dsp-report.service';
 
 export interface PgDspsSyncResponse {
   pgUuid: string;
@@ -29,7 +29,7 @@ function mapRawPgDspsSync(row: any): PgDspsSyncResponse {
 export class PgDspsSyncService {
   private readonly logger = new Logger(PgDspsSyncService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(private readonly clickHouseService: ClickHouseService) { }
 
   /**
    * Get paginated pg_dsps_sync records

@@ -67,13 +67,23 @@ export interface RevenueDspItem {
 
 export type RevenueTopDspResponse = RevenueDspItem[];
 
-export interface RevenueTimelineItem {
-  period: string;  // 'YYYY-MM'
+export interface RevenueTimelineDspItem {
+  dsp: string;
   revenueUsd: number;
   quantity: number;
 }
 
-export type RevenueTimelineResponse = RevenueTimelineItem[];
+export interface RevenueTimelinePeriod {
+  period: string;  // 'YYYY-MM'
+  revenueUsd: number;
+  quantity: number;
+  series: RevenueTimelineDspItem[];
+}
+
+export interface RevenueTimelineResponse {
+  topDsps: string[];
+  items: RevenueTimelinePeriod[];
+}
 
 // ═══════════════════════════════════════════════════════
 // Rankings (API 2-5 — Trends data)

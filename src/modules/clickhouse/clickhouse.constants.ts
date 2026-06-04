@@ -21,4 +21,5 @@ export const CLICKHOUSE_TABLES = {
   TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
   IMPORT_JOBS: 'import_jobs',
   EXCHANGE_RATES: 'exchange_rates',
+  FTP_EXCLUDE_PATTERNS: 'ftp_exclude_patterns',
 } as const;

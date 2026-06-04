@@ -573,42 +573,115 @@ export class TimelineAnalyticsService {
   }
 
   // ═══════════════════════════════════════════════════════
-  // REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng)
+  // REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng + Top DSPs)
   // ═══════════════════════════════════════════════════════
   async getRevenueTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTimelineResponse> {
-    const { fromDate, toDate } = query;
+    const { fromDate, toDate, topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
-    const sql = `
+    // DSP name: ưu tiên pg_dsps_sync → dsps_report → dsp_id gốc
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const dspNameExpr = `${resolvedDspName} AS dsp_name`;
+    const joinExpr = `
+      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    `;
+
+    // 1. Tìm Top N DSPs theo revenue trong khoảng thời gian
+    const topDspsSql = `
       SELECT
-        formatDateTime(s.period, '%Y-%m') AS period_str,
-        sum(s.total_quantity) AS quantity,
-        sum(s.total_revenue_usd) AS revenue_usd
+        s.dsp_id AS dsp_id,
+        ${resolvedDspName} AS dsp_name,
+        sum(s.total_revenue_usd) AS revenue
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
+      ${joinExpr}
       WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY period_str
-      ORDER BY period_str ASC
+      GROUP BY s.dsp_id, dsp_name
+      ORDER BY revenue DESC
+      LIMIT ${topN}
     `;
+    const topDspsRows = await this.clickHouseService.query<{ dsp_id: string; dsp_name: string }>(
+      topDspsSql,
+      params,
+    );
+    const topDspIds = topDspsRows.map((r) => r.dsp_id);
+    const topDsps = topDspsRows.map((r) => r.dsp_name);
+
+    if (!topDspIds.length) {
+      return { topDsps: [], items: [] };
+    }
+
+    // 2. Query monthly timeline có breakdown theo DSP
+    params.topDsps = topDspIds;
+    const dspExpr = includeOther
+      ? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
+      : dspNameExpr;
+    const whereDsp = includeOther
+      ? ''
+      : 'AND s.dsp_id IN ({topDsps:Array(String)})';
+
+    const timelineSql = `
+      SELECT
+        toStartOfMonth(s.period) AS period_date,
+        formatDateTime(s.period, '%Y-%m') AS period_str,
+        ${dspExpr},
+        sum(s.total_quantity) AS quantity,
+        sum(s.total_revenue_usd) AS revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      ${joinExpr}
+      WHERE 1=1
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${whereDsp}
+        ${filterSql}
+      GROUP BY period_date, period_str, dsp_name
+      ORDER BY period_date ASC, revenue_usd DESC
+    `;
+
     const rows = await this.clickHouseService.query<{
       period_str: string;
+      dsp_name: string;
       quantity: string;
       revenue_usd: string;
-    }>(sql, params);
+    }>(timelineSql, params);
 
-    return rows.map((r) => ({
-      period: r.period_str,
-      revenueUsd: Number(r.revenue_usd),
-      quantity: Number(r.quantity),
+    // Group kết quả: mỗi period có tổng + series DSP breakdown
+    const periodMap = new Map<string, { revenueUsd: number; quantity: number; series: { dsp: string; revenueUsd: number; quantity: number }[] }>();
+    for (const row of rows) {
+      let period = periodMap.get(row.period_str);
+      if (!period) {
+        period = { revenueUsd: 0, quantity: 0, series: [] };
+        periodMap.set(row.period_str, period);
+      }
+      const rev = Number(row.revenue_usd);
+      const qty = Number(row.quantity);
+      period.revenueUsd += rev;
+      period.quantity += qty;
+      period.series.push({
+        dsp: row.dsp_name,
+        revenueUsd: rev,
+        quantity: qty,
+      });
+    }
+
+    const items = Array.from(periodMap.entries()).map(([key, val]) => ({
+      period: key,
+      revenueUsd: val.revenueUsd,
+      quantity: val.quantity,
+      series: val.series,
     }));
+
+    return { topDsps, items };
   }
 
   // ═══════════════════════════════════════════════════════

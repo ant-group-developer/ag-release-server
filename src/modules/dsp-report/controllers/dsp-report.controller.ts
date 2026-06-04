@@ -2,13 +2,13 @@ import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { DspReportService, DspsReportResponse } from './dsp-report.service';
-import { QueryGetListDspReportDto, CreateDspReportDto, AssignDspReportDto } from './dto/dsp-report.dto';
+import { DspReportService, DspsReportResponse } from '../services/dsp-report.service';
+import { QueryGetListDspReportDto, CreateDspReportDto, AssignDspReportDto } from '../dto/dsp-report.dto';
 
 @ApiTags('dsp-report')
 @Controller('dsp-report')
 export class DspReportController {
-  constructor(private readonly dspReportService: DspReportService) {}
+  constructor(private readonly dspReportService: DspReportService) { }
 
   @Get()
   async findAll(

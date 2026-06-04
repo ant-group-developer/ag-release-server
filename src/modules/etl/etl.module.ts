@@ -14,9 +14,10 @@ import { ImportJobsService } from './services/import-jobs/import-jobs.service';
 import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
 import { DspModule } from '../dsp/dsp.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
+import { DspReportModule } from '../dsp-report/dsp-report.module';
 
 @Module({
-  imports: [DspModule, ClickHouseModule],
+  imports: [DspModule, ClickHouseModule, DspReportModule],
   controllers: [ImportController, SyncController, JobController, WmgImportController, ExchangeRateController],
   providers: [
     ImportService,

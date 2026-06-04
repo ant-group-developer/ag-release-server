@@ -8,6 +8,7 @@ import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
 import { FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
+import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 
 export interface SyncPeriodResult {
   period: string;
@@ -58,6 +59,7 @@ export class SyncService {
     private readonly clickHouseService: ClickHouseService,
     @InjectRedis() private readonly redis: Redis,
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly excludePatternService: ExcludePatternService,
   ) { }
 
   // ── Tracking helpers ──────────────────────────────────
@@ -287,7 +289,17 @@ export class SyncService {
     };
 
     for (const category of ['trends', 'usage', 'sales', 'illegitimate_activity'] as const) {
-      const dspFolders = await this.ftpService.listDspFolders(category, period);
+      const rawFolders = await this.ftpService.listDspFolders(category, period);
+
+      // Lọc folder bị exclude theo config
+      const dspFolders: string[] = [];
+      for (const f of rawFolders) {
+        if (await this.excludePatternService.shouldExclude(f, 'folder')) {
+          this.logger.log(`  ⛔ [EXCLUDED] Skip folder ${category}/${f} (matched exclude pattern)`);
+        } else {
+          dspFolders.push(f);
+        }
+      }
 
       if (dspFolders.length === 0) {
         this.logger.log(`  No ${category}/${period} on FTPS`);
