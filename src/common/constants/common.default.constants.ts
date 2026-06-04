@@ -2,7 +2,11 @@
 export const SUCCESS_STATUS_CODE_DEFAULT = 200;
 export const SUCCESS_MESSAGE_DEFAULT = 'Success';
 export const SUCCESS_MESSAGE_CODE_DEFAULT = 'common.success';
-export const DEFAULT_SENSITIVE_KEYS = [];
+export const DEFAULT_SENSITIVE_KEYS = [
+	'password',
+	'privateKey',
+	'secretAccessKey',
+];
 
 export const WARNING_MESSAGE_DEFAULT = 'No warning';
 
