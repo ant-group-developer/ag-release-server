@@ -24,7 +24,7 @@ export class CreateVevoChannelDto {
 	channelName: string;
 
 	@ApiPropertyOptional({
-		example: 'https://contentpartner.com/partners/vevo/channels/callback',
+		example: 'https://contentpartner.com/channels/vevo/callback',
 		description:
 			'Whitelisted callback URL. Uses the configured Vevo callback URL when omitted.',
 	})

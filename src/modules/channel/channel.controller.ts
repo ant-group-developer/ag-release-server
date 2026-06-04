@@ -3,14 +3,24 @@ import {
 	Controller,
 	Delete,
 	Get,
+	HttpCode,
+	HttpStatus,
 	Param,
 	ParseUUIDPipe,
 	Post,
 	Put,
 	Query,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBody,
+	ApiOperation,
+	ApiParam,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { PublicRoute } from '../auth/decorators/auth.decorator';
+import { VevoChannelCallbackDto } from '../partners-api/vevo/dtos/vevo.dto';
 import { ChannelService } from './channel.service';
 import {
 	CreateChannelDto,
@@ -33,6 +43,17 @@ export class ChannelController {
 			messageCode: 'common.processing',
 			data: result,
 		});
+	}
+
+	@PublicRoute()
+	@Post('vevo/callback')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Receive a completed Vevo channel request' })
+	@ApiBody({ type: VevoChannelCallbackDto })
+	@ApiResponse({ status: 200, description: 'Callback received' })
+	async handleVevoCallback(@Body() payload: VevoChannelCallbackDto) {
+		const result = await this.channelService.handleVevoCallback(payload);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()

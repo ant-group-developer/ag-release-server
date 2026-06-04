@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
+import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
 import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
 import { ILike, Not, Repository } from 'typeorm';
 import {
@@ -44,6 +45,24 @@ export class ChannelService {
 		});
 
 		return channel;
+	}
+
+	async handleVevoCallback(payload: VevoChannelCallbackDto) {
+		const result = await this.channelRepo.update(
+			{ name: payload.channel_name },
+			{
+				status: ChannelStatus.SUCCESS,
+				error: null,
+			},
+		);
+
+		if (!result.affected) {
+			this.logger.warn(
+				`Channel not found for Vevo callback: ${payload.channel_name}`,
+			);
+		}
+
+		return { received: true };
 	}
 
 	async getList(query: QueryGetListChannelDto) {

@@ -6,14 +6,10 @@ import {
 	Injectable,
 	Logger,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { Channel } from 'src/modules/channel/entities/channel.entity';
-import { ChannelStatus } from 'src/modules/channel/enum/channel.enum';
-import { Repository } from 'typeorm';
-import { CreateVevoChannelDto, VevoChannelCallbackDto } from '../dtos/vevo.dto';
+import { CreateVevoChannelDto } from '../dtos/vevo.dto';
 import { VevoCreateChannelResponse } from '../interfaces/vevo.interface';
 
 @Injectable()
@@ -23,8 +19,6 @@ export class VevoService {
 	constructor(
 		private readonly httpService: HttpService,
 		private readonly appConfigService: AppConfigService,
-		@InjectRepository(Channel)
-		private readonly channelRepo: Repository<Channel>,
 	) {}
 
 	async createChannel(payload: CreateVevoChannelDto) {
@@ -92,27 +86,5 @@ export class VevoService {
 
 			throw new BadGatewayException('Unable to reach Vevo API');
 		}
-	}
-
-	async handleChannelCreated(payload: VevoChannelCallbackDto) {
-		this.logger.log(
-			`Vevo channel created: ${payload.channel_name} (${payload.youtube_channel_id})`,
-		);
-
-		const result = await this.channelRepo.update(
-			{ name: payload.channel_name },
-			{
-				status: ChannelStatus.SUCCESS,
-				error: null,
-			},
-		);
-
-		if (!result.affected) {
-			this.logger.warn(
-				`Channel not found for Vevo callback: ${payload.channel_name}`,
-			);
-		}
-
-		return { received: true };
 	}
 }
