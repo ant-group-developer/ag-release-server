@@ -361,6 +361,11 @@ export class Ern43Builder2 {
 				.ele('ProprietaryId', { Namespace: 'VEVO:YouTubeUnlisted' })
 				.txt('true');
 		}
+		if (video.madeForKids && video.madeForKids !== 'CHANNEL_DEFAULT') {
+			resId
+				.ele('ProprietaryId', { Namespace: 'VEVO:MadeForKids' })
+				.txt(video.madeForKids === 'YES' ? 'true' : 'false');
+		}
 
 		// PLine
 		const pLine = video.pLine || this.input.release.pLine;
@@ -449,6 +454,10 @@ export class Ern43Builder2 {
 					this.input.release.parentalWarning ||
 					'NotExplicit',
 			);
+
+		if (video.languageOfPerformance) {
+			vNode.ele('LanguageOfPerformance').txt(video.languageOfPerformance);
+		}
 	}
 
 	private buildSubtitleResource(
@@ -704,6 +713,24 @@ export class Ern43Builder2 {
 					LinkDescription: this.getTextLinkDescription(sub),
 				}).txt(this.getSubtitleRef(i, j));
 			}
+		}
+
+		const video = this.input.videos?.[0];
+		if (video?.keywords?.length) {
+			release
+				.ele('Keywords', {
+					ApplicableTerritoryCode: 'Worldwide',
+					IsDefault: 'true',
+				})
+				.txt(video.keywords.join(','));
+		}
+		if (video?.description) {
+			release
+				.ele('Synopsis', {
+					ApplicableTerritoryCode: 'Worldwide',
+					IsDefault: 'true',
+				})
+				.txt(video.description);
 		}
 
 		// Linked cover art for audio-only releases at root level
