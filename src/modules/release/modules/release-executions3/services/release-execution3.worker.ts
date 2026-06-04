@@ -8,8 +8,6 @@ import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-c
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
-import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
-import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
@@ -773,7 +771,8 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const releaseId = this.releaseIdFromExecution(releaseExecution);
+			console.log('Syncing data from DSP...');
+
 			const parent = await this.getParentStep(step);
 
 			const dsp =
@@ -783,22 +782,91 @@ export class ReleaseExecution3Worker {
 				throw new Error('Missing dsp from step or parent step');
 			}
 
-			await this.manager
-				.createQueryBuilder()
-				.insert()
-				.into(ReleaseDspDelivery)
-				.values({
-					releaseId,
-					dspId: dsp.id,
-					isSelected: true,
-					status: ReleaseDspStatus.DISTRIBUTED,
-					lastDeliveredAt: new Date(),
-				})
-				.orUpdate(
-					['status', 'last_delivered_at', 'is_selected'],
-					['release_id', 'dsp_id'],
-				)
-				.execute();
+			if (dsp.code?.toUpperCase() === 'VEVO') {
+				const metadataStep = await this.getSiblingStepByType(
+					step,
+					ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+				);
+				const batchId = metadataStep?.metadata?.output?.batchId;
+				const upc =
+					releaseExecution.metadata.input
+						.upcAutoIfReleaseSnapshotNull ||
+					releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+				const isrc =
+					releaseExecution.metadata?.input?.releaseSnapshot?.video
+						?.isrc;
+
+				if (!batchId) {
+					throw new Error(
+						'Missing batchId from CREATE_METADATA_ON_SERVER step',
+					);
+				}
+				if (!upc) throw new Error('Missing UPC for VEVO response');
+				if (!isrc)
+					throw new Error('Missing video ISRC for VEVO response');
+
+				const config =
+					await this.dspRoutingService.resolveFullDeliveryConfig(
+						dsp.code,
+					);
+
+				const response = await this.sftpConnectService.getVevoResponse({
+					sftp: config.sftp,
+					batchId,
+					upc,
+					isrc,
+				});
+
+				if (!response) {
+					throw new Error(
+						`VEVO response not found for ISRC ${isrc} in batch ${batchId}`,
+					);
+				}
+
+				if (response.status === 'failure') {
+					step.metadata = {
+						...step.metadata,
+						output: {
+							...step.metadata?.output,
+							vevoResponseStatus: response.status,
+							vevoResponseKey: response.key,
+							vevoResponse: response.content,
+						},
+					};
+
+					await this.manager.save(ReleaseExecutionStep3, step);
+
+					this.logService.error({
+						message: `[SYNC_DATA_PARTNER] VEVO failed: ${this.getVevoResponseMessage(response.content)}`,
+						releaseExecutionId: releaseExecution.id,
+						releaseExecutionStepId: step.id,
+						data: {
+							vevoResponseKey: response.key,
+							vevoResponse: response.content,
+						},
+					});
+
+					return ReleaseExecutionStepStatus.FAILED;
+				}
+
+				step.metadata = {
+					...step.metadata,
+					output: {
+						...step.metadata?.output,
+						vevoResponseStatus: response.status,
+						vevoResponseKey: response.key,
+						vevoResponse: response.content,
+					},
+				};
+
+				this.logService.success({
+					message: `[SYNC_DATA_PARTNER] VEVO succeeded: ${this.getVevoResponseMessage(response.content)}`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+				});
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+			}
 
 			this.logService.success({
 				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> DISTRIBUTED`,
@@ -815,6 +883,21 @@ export class ReleaseExecution3Worker {
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
+	private getVevoResponseMessage(content: unknown): string {
+		if (typeof content === 'string') return content;
+		if (content && typeof content === 'object') {
+			const response = content as Record<string, unknown>;
+			const message = response.errorMessage ?? response.error;
+			if (typeof message === 'string') return message;
+		}
+
+		try {
+			return JSON.stringify(content);
+		} catch {
+			return 'Unknown VEVO response error';
 		}
 	}
 
