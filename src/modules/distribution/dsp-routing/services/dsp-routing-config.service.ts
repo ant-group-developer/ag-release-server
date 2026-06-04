@@ -308,6 +308,10 @@ export class DspRoutingConfigsService {
 		if (e.privateKey) {
 			e.privateKey = decryptSecretSafe(e.privateKey);
 		}
+
+		if (e.secretAccessKey) {
+			e.secretAccessKey = decryptSecretSafe(e.secretAccessKey);
+		}
 	}
 
 	/**

@@ -101,6 +101,12 @@ export class SftpConfigsService {
 			}
 		}
 
+		if (data.metadata?.secretAccessKey) {
+			data.metadata.secretAccessKey = encryptSecret(
+				data.metadata.secretAccessKey,
+			);
+		}
+
 		const dataDb = await repo.findOne({ where: { id: data.id } });
 
 		const entity = repo.create({
@@ -154,12 +160,18 @@ export class SftpConfigsService {
 		const { metadata } = await this.getDetail(id);
 
 		const testConfig: SftpMetadata = {
+			type: data.type ?? metadata?.type,
 			host: data.host ?? metadata?.host ?? '',
 			port: data.port ?? metadata?.port ?? 22,
 			username: data.username ?? metadata?.username ?? '',
 			password: data.password ?? metadata?.password,
 			privateKey: metadata?.privateKey,
 			path: metadata?.path,
+			bucket: data.bucket ?? metadata?.bucket,
+			region: data.region ?? metadata?.region,
+			accessKeyId: data.accessKeyId ?? metadata?.accessKeyId,
+			secretAccessKey: data.secretAccessKey ?? metadata?.secretAccessKey,
+			endpoint: data.endpoint ?? metadata?.endpoint,
 		};
 
 		return this.sftpConnectService.testConnect(testConfig);
