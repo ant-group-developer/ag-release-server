@@ -58,7 +58,7 @@ export class SyncService {
     private readonly clickHouseService: ClickHouseService,
     @InjectRedis() private readonly redis: Redis,
     private readonly exchangeRateService: ExchangeRateService,
-  ) {}
+  ) { }
 
   // ── Tracking helpers ──────────────────────────────────
 
@@ -253,12 +253,12 @@ export class SyncService {
         const allTables = [
           CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
           CLICKHOUSE_TABLES.FACT_SALES_REPORT,
-          'trends_dsp_monthly_cube',
-          'sales_dsp_monthly_cube_v2',
-          'trends_dsp_daily_cube',
-          'trends_isrc_daily_cube',
-          'sales_ter_monthly_cube_v2',
-          'trends_ter_monthly_cube',
+          CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY,
+          CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+          CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
+          CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+          CLICKHOUSE_TABLES.SALES_TER_MONTHLY,
+          CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY,
         ];
 
         await Promise.all(
