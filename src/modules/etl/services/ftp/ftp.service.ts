@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as ftp from 'basic-ftp';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 
 export interface FtpConfig {
   host: string;
@@ -19,7 +20,10 @@ export interface FtpConfig {
 export class FtpService {
   private readonly logger = new Logger(FtpService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly excludePatternService: ExcludePatternService,
+  ) { }
 
   private getConfig(): FtpConfig {
     return {
@@ -134,6 +138,7 @@ export class FtpService {
   /**
    * Recursively list all file names in a remote directory.
    * Returns file names relative to the root directory.
+   * Files matching exclude patterns (scope file/both) are omitted.
    */
   private async listFilesRecursive(client: ftp.Client, remotePath: string, prefix: string): Promise<string[]> {
     const list = await client.list(remotePath);
@@ -145,6 +150,10 @@ export class FtpService {
         const subFiles = await this.listFilesRecursive(client, `${remotePath}/${item.name}`, relativeName);
         files.push(...subFiles);
       } else if (item.isFile) {
+        if (await this.excludePatternService.shouldExclude(item.name, 'file')) {
+          this.logger.debug(`  ⛔ [EXCLUDED] Skip file ${item.name} (matched exclude pattern)`);
+          continue;
+        }
         files.push(relativeName);
       }
     }
@@ -173,6 +182,10 @@ export class FtpService {
       if (item.isDirectory) {
         fileCount += await this.downloadFolder(client, remoteItemPath, localItemPath);
       } else if (item.isFile) {
+        if (await this.excludePatternService.shouldExclude(item.name, 'file')) {
+          this.logger.debug(`  ⛔ [EXCLUDED] Skip download file ${item.name} (matched exclude pattern)`);
+          continue;
+        }
         try {
           await client.downloadTo(localItemPath, remoteItemPath);
           // Verify download: check file exists and has content

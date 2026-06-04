@@ -2,13 +2,13 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { PgDspsSyncService, PgDspsSyncResponse } from './pg-dsps-sync.service';
-import { DspsReportResponse } from '../dsp-report/dsp-report.service';
+import { DspsReportResponse } from '../dsp-report/services/dsp-report.service';
 import { QueryGetListPgDspsSyncDto } from './dto/pg-dsps-sync.dto';
 
 @ApiTags('pg-dsps-sync')
 @Controller('pg-dsps-sync')
 export class PgDspsSyncController {
-  constructor(private readonly pgDspsSyncService: PgDspsSyncService) {}
+  constructor(private readonly pgDspsSyncService: PgDspsSyncService) { }
 
   @Get()
   async findAll(

@@ -68,12 +68,15 @@ export class WmgSalesParser extends BaseSalesParser {
     const netRoyalty = this.cleanExcelQuoted(record['Net Royalty Payable'] || '0');
     const saleUnits = this.cleanExcelQuoted(record['Sale Units'] || '0');
 
+    const accountName = (record['Account Name'] || '').trim();
+    const payee = (record['Payee'] || '').trim();
+
     const row = this.createBaseRow(batchId);
     row.dsp_id = dspId;
     row.reporting_period_start = start;
     row.reporting_period_end = end;
     row.service_name = dspName;
-    row.member_name = (record['Payee'] || '').trim() || opts.memberName;
+    row.member_name = accountName || payee || opts.memberName;
     row.label_name = (record['Marketing Owner Name'] || '').trim();
     row.territory_code = this.normalizeCountryCode(record['Country'] || '');
     row.isrc = isrc;
@@ -95,7 +98,8 @@ export class WmgSalesParser extends BaseSalesParser {
       config: (record['Config'] || '').trim(),
       config_desc: (record['Config Desc'] || '').trim(),
       account: (record['Account'] || '').trim(),
-      account_name: (record['Account Name'] || '').trim(),
+      account_name: accountName,
+      payee,
       price_code: (record['Price Code'] || '').trim(),
       price_desc: (record['Price Desc'] || '').trim(),
       dist_chan_code: (record['Dist. Ch.'] || '').trim(),

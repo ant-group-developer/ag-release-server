@@ -7,6 +7,8 @@ import Redis from 'ioredis';
 import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
 import { FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
+import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 
 export interface SyncPeriodResult {
   period: string;
@@ -56,7 +58,9 @@ export class SyncService {
     private readonly importService: ImportService,
     private readonly clickHouseService: ClickHouseService,
     @InjectRedis() private readonly redis: Redis,
-  ) {}
+    private readonly exchangeRateService: ExchangeRateService,
+    private readonly excludePatternService: ExcludePatternService,
+  ) { }
 
   // ── Tracking helpers ──────────────────────────────────
 
@@ -206,7 +210,7 @@ export class SyncService {
       } else {
         deletePromises.push(
           this.clickHouseService.execute(
-            `ALTER TABLE music_analytics.sales_dsp_monthly_cube DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
+            `ALTER TABLE music_analytics.sales_dsp_monthly_cube_v2 DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
           ),
         );
       }
@@ -251,12 +255,12 @@ export class SyncService {
         const allTables = [
           CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
           CLICKHOUSE_TABLES.FACT_SALES_REPORT,
-          'trends_dsp_monthly_cube',
-          'sales_dsp_monthly_cube',
-          'trends_dsp_daily_cube',
-          'trends_isrc_daily_cube',
-          'sales_ter_monthly_cube',
-          'trends_ter_monthly_cube',
+          CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY,
+          CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+          CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
+          CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+          CLICKHOUSE_TABLES.SALES_TER_MONTHLY,
+          CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY,
         ];
 
         await Promise.all(
@@ -285,7 +289,17 @@ export class SyncService {
     };
 
     for (const category of ['trends', 'usage', 'sales', 'illegitimate_activity'] as const) {
-      const dspFolders = await this.ftpService.listDspFolders(category, period);
+      const rawFolders = await this.ftpService.listDspFolders(category, period);
+
+      // Lọc folder bị exclude theo config
+      const dspFolders: string[] = [];
+      for (const f of rawFolders) {
+        if (await this.excludePatternService.shouldExclude(f, 'folder')) {
+          this.logger.log(`  ⛔ [EXCLUDED] Skip folder ${category}/${f} (matched exclude pattern)`);
+        } else {
+          dspFolders.push(f);
+        }
+      }
 
       if (dspFolders.length === 0) {
         this.logger.log(`  No ${category}/${period} on FTPS`);
@@ -460,7 +474,15 @@ export class SyncService {
     );
 
     // Invalidate analytics cache after successful import
+    // Sync rates and rebuild cubes if data was imported
     if (result.totalRows > 0) {
+      try {
+        this.logger.log('Import detected new rows. Syncing missing exchange rates and rebuilding cubes...');
+        await this.exchangeRateService.backfillMissingRates();
+      } catch (err) {
+        this.logger.error(`Failed to sync rates and rebuild cubes: ${err.message}`, err.stack);
+      }
+
       try {
         const keys = await this.redis.keys('analytics:*');
         if (keys.length > 0) {

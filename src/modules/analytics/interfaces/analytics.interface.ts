@@ -16,6 +16,7 @@ export interface DspTimelineSeriesItem {
   dsp: string;
   salesViews?: number;
   trendViews?: number;
+  revenueUsd?: number;
 }
 
 export interface DspTimelinePeriod {
@@ -32,6 +33,7 @@ export interface TerTimelineSeriesItem {
   territory: string;  // ISO country code (e.g. 'US', 'VN')
   salesViews?: number;
   trendViews?: number;
+  revenueUsd?: number;
 }
 
 export interface TerTimelinePeriod {
@@ -42,6 +44,45 @@ export interface TerTimelinePeriod {
 export interface TerTimelineResponse {
   topTerritories: string[];
   items: TerTimelinePeriod[];
+}
+
+// ═══════════════════════════════════════════════════════
+// Revenue Analytics (POST /analytics/revenue/*)
+// ═══════════════════════════════════════════════════════
+
+export interface RevenueOverviewResponse {
+  /** Tổng doanh thu quy đổi USD trong khoảng thời gian */
+  totalRevenueUsd: number;
+  /** Tổng lượt nghe */
+  totalQuantity: number;
+  /** Tổng số vùng lãnh thổ (quốc gia) phát sinh doanh thu */
+  totalTerritories: number;
+}
+
+export interface RevenueDspItem {
+  dspName: string;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export type RevenueTopDspResponse = RevenueDspItem[];
+
+export interface RevenueTimelineDspItem {
+  dsp: string;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export interface RevenueTimelinePeriod {
+  period: string;  // 'YYYY-MM'
+  revenueUsd: number;
+  quantity: number;
+  series: RevenueTimelineDspItem[];
+}
+
+export interface RevenueTimelineResponse {
+  topDsps: string[];
+  items: RevenueTimelinePeriod[];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -119,3 +160,33 @@ export interface IsrcArtistMapping {
   artistName: string;
   artistPicture: string | null;
 }
+
+// ═══════════════════════════════════════════════════════
+// Revenue Top Artist & Track (POST /analytics/revenue/top-*)
+// ═══════════════════════════════════════════════════════
+
+export interface RevenueArtistItem {
+  rank: number;
+  artistId: string;
+  artistName: string;
+  picture: string | null;
+  trackCount: number;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export type RevenueTopArtistResponse = RevenueArtistItem[];
+
+export interface RevenueTrackItem {
+  rank: number;
+  isrc: string;
+  title: string;
+  version: string | null;
+  artistName: string;
+  releaseId: string | null;
+  releaseTitle: string | null;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export type RevenueTopTrackResponse = RevenueTrackItem[];

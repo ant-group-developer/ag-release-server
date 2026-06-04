@@ -8,6 +8,7 @@ import { getSalesParserForFolder } from '../../parsers/sales';
 import { DeezerIllegitimateParser, SoundCloudIllegitimateParser, SpotifyIllegitimateParser, TiktokIllegitimateParser } from '../../parsers/illegitimate';
 import { FactDspRow, FactSalesRow } from '../../interfaces';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
+import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 
 export interface ImportResult {
   batchId: string;
@@ -32,7 +33,8 @@ export class ImportService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly dspMappingService: DspMappingService,
-  ) {}
+    private readonly excludePatternService: ExcludePatternService,
+  ) { }
 
   /**
    * Import all DSP data from a folder structure.
@@ -61,29 +63,27 @@ export class ImportService {
     for (const subDir of ['trends', 'usage', 'sales', 'illegitimate_activity']) {
       const subPath = path.join(dataPath, subDir);
       if (fs.existsSync(subPath)) {
-        const folders = fs.readdirSync(subPath, { withFileTypes: true })
-          .filter((d) => d.isDirectory() && !d.name.startsWith('.') && !d.name.includes('.removed') && !d.name.includes('removed_at'))
-          .map((d) => d.name);
-        for (const folder of folders) {
-          dspFoldersToProcess.push({
-            path: path.join(subPath, folder),
-            name: folder,
-            category: subDir,
-          });
+        const allDirs = fs.readdirSync(subPath, { withFileTypes: true })
+          .filter((d) => d.isDirectory() && !d.name.startsWith('.'));
+        for (const d of allDirs) {
+          if (await this.excludePatternService.shouldExclude(d.name, 'folder')) {
+            this.logger.log(`  ⛔ [EXCLUDED] Skip folder ${subDir}/${d.name} (matched exclude pattern)`);
+            continue;
+          }
+          dspFoldersToProcess.push({ path: path.join(subPath, d.name), name: d.name, category: subDir });
         }
       }
     }
 
     // Strategy 2: Check root dataPath for DSP folders directly (202205 style)
-    const rootFolders = fs.readdirSync(dataPath, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== 'trends' && d.name !== 'usage' && !d.name.startsWith('.') && !d.name.includes('.removed') && !d.name.includes('removed_at'))
-      .map((d) => d.name);
-
-    for (const folder of rootFolders) {
-      dspFoldersToProcess.push({
-        path: path.join(dataPath, folder),
-        name: folder,
-      });
+    const rootDirs = fs.readdirSync(dataPath, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && d.name !== 'trends' && d.name !== 'usage' && !d.name.startsWith('.'));
+    for (const d of rootDirs) {
+      if (await this.excludePatternService.shouldExclude(d.name, 'folder')) {
+        this.logger.log(`  ⛔ [EXCLUDED] Skip folder ${d.name} (matched exclude pattern)`);
+        continue;
+      }
+      dspFoldersToProcess.push({ path: path.join(dataPath, d.name), name: d.name });
     }
 
     this.logger.log(`Found ${dspFoldersToProcess.length} DSP folders to process`);
@@ -117,15 +117,18 @@ export class ImportService {
     batchId: string,
     sourceCategory: string = '',
   ): Promise<ImportResult['dspResults'][0] | null> {
+    // Pre-load file exclude check once (avoids repeated async calls inside findDataFiles)
+    const fileExcluder = async (name: string) => this.excludePatternService.shouldExclude(name, 'file');
+
     // Route to the correct import method based on category
     if (sourceCategory === 'sales') {
-      return this.importSalesDspFolder(folderPath, folderName, batchId);
+      return this.importSalesDspFolder(folderPath, folderName, batchId, fileExcluder);
     }
     if (sourceCategory === 'illegitimate_activity') {
-      return this.importIllegitimateDspFolder(folderPath, folderName, batchId);
+      return this.importIllegitimateDspFolder(folderPath, folderName, batchId, fileExcluder);
     }
     // Default: trends / usage → existing parsers → fact_dsp
-    return this.importTrendsDspFolder(folderPath, folderName, batchId, sourceCategory);
+    return this.importTrendsDspFolder(folderPath, folderName, batchId, sourceCategory, fileExcluder);
   }
 
   /**
@@ -136,6 +139,7 @@ export class ImportService {
     folderName: string,
     batchId: string,
     sourceCategory: string,
+    fileExcluder: (name: string) => Promise<boolean>,
   ): Promise<ImportResult['dspResults'][0] | null> {
     // Resolve or create dsps_report for this folder
     const dspsReport = await this.dspMappingService.resolveOrCreateDspReport(folderName, 'ftp_folder');
@@ -148,7 +152,7 @@ export class ImportService {
 
     const startTime = Date.now();
     this.logger.log(`Parsing DSP folder: ${folderName} (${sourceCategory || 'trends'})`);
-    const files = this.findDataFiles(folderPath);
+    const files = await this.findDataFiles(folderPath, fileExcluder);
     const allRows: FactDspRow[] = [];
 
     for (const filePath of files) {
@@ -189,6 +193,7 @@ export class ImportService {
     folderPath: string,
     folderName: string,
     batchId: string,
+    fileExcluder: (name: string) => Promise<boolean>,
   ): Promise<ImportResult['dspResults'][0] | null> {
     // Resolve or create dsps_report for this folder
     const dspsReport = await this.dspMappingService.resolveOrCreateDspReport(folderName, 'ftp_folder');
@@ -201,7 +206,7 @@ export class ImportService {
 
     const startTime = Date.now();
     this.logger.log(`Parsing SALES folder: ${folderName}`);
-    const files = this.findDataFiles(folderPath);
+    const files = await this.findDataFiles(folderPath, fileExcluder);
     const allRows: FactSalesRow[] = [];
 
     for (const filePath of files) {
@@ -239,6 +244,7 @@ export class ImportService {
     folderPath: string,
     folderName: string,
     batchId: string,
+    fileExcluder: (name: string) => Promise<boolean>,
   ): Promise<ImportResult['dspResults'][0] | null> {
     const prefix = folderName.split('-')[0];
     let parser;
@@ -256,7 +262,7 @@ export class ImportService {
 
     const startTime = Date.now();
     this.logger.log(`Parsing ILLEGITIMATE folder: ${folderName}`);
-    const files = this.findDataFiles(folderPath);
+    const files = await this.findDataFiles(folderPath, fileExcluder);
     const allRows: FactDspRow[] = [];
 
     for (const filePath of files) {
@@ -310,8 +316,12 @@ export class ImportService {
    * Recursively find all data files (.csv, .tsv, .txt, + .gz variants) in a folder.
    * When both compressed (.tsv.gz) and uncompressed (.tsv) exist, prefer .gz only
    * to avoid double-importing the same data.
+   * Files matched by fileExcluder are excluded.
    */
-  private findDataFiles(dir: string): string[] {
+  private async findDataFiles(
+    dir: string,
+    fileExcluder: (name: string) => Promise<boolean>,
+  ): Promise<string[]> {
     const results: string[] = [];
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const fileNames = new Set<string>();
@@ -319,7 +329,7 @@ export class ImportService {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        results.push(...this.findDataFiles(fullPath));
+        results.push(...await this.findDataFiles(fullPath, fileExcluder));
       } else {
         const name = entry.name.toLowerCase();
         const isData =
@@ -332,6 +342,10 @@ export class ImportService {
           name.endsWith('.txt.gz');
 
         if (isData) {
+          if (await fileExcluder(entry.name)) {
+            this.logger.debug(`  ⛔ [EXCLUDED] Skip file ${entry.name} (matched exclude pattern)`);
+            continue;
+          }
           fileNames.add(entry.name);
           results.push(fullPath);
         }

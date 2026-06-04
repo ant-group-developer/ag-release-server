@@ -2,18 +2,20 @@ import {
   BadRequestException,
   Body,
   Controller,
+  HttpCode,
   Post,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { WmgImportService, WmgImportResult } from '../services/import/wmg-import.service';
+import { WmgImportService } from '../services/import/wmg-import.service';
 import { WmgImportDto } from '../dto/wmg-import.dto';
+import { User } from '../../../common/decorators/req.decorators';
 
 const UPLOAD_DIR = './uploads/wmg';
 
@@ -27,12 +29,19 @@ export class WmgImportController {
   }
 
   @Post('import/wmg')
+  @HttpCode(202)
   @ApiOperation({
-    summary: 'Import WMG partner sales CSV report',
+    summary: 'Import WMG partner sales CSV report (async)',
     description:
-      'Upload a WMG sales CSV file. Supports multi-DSP files, album-level rows (synthetic ISRC = REL-{UPC}), and Excel-quoted numeric cells. Streams data to ClickHouse in 50K-row batches. Max 500MB.',
+      'Upload a WMG sales CSV file, returns a jobId immediately (HTTP 202). ' +
+      'Worker parses + streams to ClickHouse in background. ' +
+      'Poll status at GET /etl/jobs/:id. Max file size 500MB.',
   })
   @ApiConsumes('multipart/form-data')
+  @ApiResponse({
+    status: 202,
+    description: 'Job queued. Returns { jobId, status, statusUrl }',
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -52,14 +61,32 @@ export class WmgImportController {
   async importWmg(
     @UploadedFile() file: any,
     @Body() dto: WmgImportDto,
-  ): Promise<WmgImportResult> {
+    @User() user: any,
+  ): Promise<{ jobId: string; status: string; statusUrl: string; message: string }> {
     if (!file) {
       throw new BadRequestException('Missing file. Use multipart/form-data with key = file');
     }
-    return this.wmgImportService.importFile(file.path, {
-      revenueCurrency: dto.revenueCurrency,
-      memberName: dto.memberName,
-      source: dto.source,
-    });
+
+    const job = await this.wmgImportService.enqueue(
+      file.path,
+      file.originalname,
+      file.size,
+      {
+        revenueCurrency: dto.revenueCurrency,
+        memberName: dto.memberName,
+        source: dto.source,
+      },
+      {
+        tenantId: user?.tenantId,
+        userId: user?.sub,
+      },
+    );
+
+    return {
+      jobId: job.id,
+      status: job.status,
+      statusUrl: `/etl/jobs/${job.id}`,
+      message: `WMG import queued. Poll GET /etl/jobs/${job.id} for status.`,
+    };
   }
 }
