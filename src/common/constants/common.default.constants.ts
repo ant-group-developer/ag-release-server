@@ -2,7 +2,11 @@
 export const SUCCESS_STATUS_CODE_DEFAULT = 200;
 export const SUCCESS_MESSAGE_DEFAULT = 'Success';
 export const SUCCESS_MESSAGE_CODE_DEFAULT = 'common.success';
-export const DEFAULT_SENSITIVE_KEYS = [];
+export const DEFAULT_SENSITIVE_KEYS = [
+	'password',
+	'privateKey',
+	'secretAccessKey',
+];
 
 export const WARNING_MESSAGE_DEFAULT = 'No warning';
 
@@ -37,6 +41,7 @@ export const DEFAULT_CHUNK_DURATION = 10;
 export const DEFAULT_SCORE_WARNING = 60;
 export const DEFAULT_AUTO_SCAN_TIME = '01:00';
 
+// export const DEFAULT_WAIT_MINUTES = 5; // 5 phút
 export const DEFAULT_WAIT_MINUTES = 0.1; // 5 phút
 
 export const NO_LINGUISTIC_CONTENT_LANGUAGE = 'zxx';

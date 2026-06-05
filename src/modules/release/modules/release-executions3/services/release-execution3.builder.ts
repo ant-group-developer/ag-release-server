@@ -174,7 +174,11 @@ export class ReleaseExecution3Builder {
 					{
 						type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
 						order: 4,
-						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
+						metadata: {
+							input: {
+								dsp: STEP.metadata?.input?.dsp,
+							},
+						},
 					},
 				);
 				break;
@@ -220,6 +224,11 @@ export class ReleaseExecution3Builder {
 							type: ReleaseExecutionStepType.EXPORT_CI,
 							order: 2,
 							childExecutionMode: 'parallel',
+						},
+
+						{
+							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+							order: 3,
 						},
 					);
 				}

@@ -9,6 +9,12 @@ export function decryptSecretSftpConfigSafe(e: SftpConfig) {
 	if (e.metadata?.privateKey) {
 		e.metadata.privateKey = decryptSecretSafe(e.metadata.privateKey);
 	}
+
+	if (e.metadata?.secretAccessKey) {
+		e.metadata.secretAccessKey = decryptSecretSafe(
+			e.metadata.secretAccessKey,
+		);
+	}
 }
 
 export function decryptSecretSftpConfigListSafe(listE: SftpConfig[]) {

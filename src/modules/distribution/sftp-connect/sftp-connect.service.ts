@@ -1,6 +1,8 @@
 // src/modules/distribution2/sftp/sftp.service.ts
 import {
 	DeleteObjectCommand,
+	GetObjectCommand,
+	ListObjectsV2Command,
 	PutObjectCommand,
 	S3Client,
 } from '@aws-sdk/client-s3';
@@ -10,6 +12,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
+import { Readable } from 'stream';
 import {
 	SftpMetadata,
 	StorageType,
@@ -92,8 +95,6 @@ export class SftpConnectService {
 				privateKey: config.privateKey,
 				readyTimeout: 60_000,
 			});
-
-			await client.list(config.path || '.');
 
 			return {
 				status: true,
@@ -362,6 +363,74 @@ export class SftpConnectService {
 		}
 	}
 
+	// hàm tìm file trong feed/antmusic/20260603164430404/885123456789/
+	async getVevoResponse({
+		sftp,
+		batchId,
+		upc,
+		isrc,
+	}: {
+		sftp: SftpMetadata;
+		batchId: string;
+		upc: string;
+		isrc: string;
+	}): Promise<{
+		status: 'success' | 'failure';
+		key: string;
+		content: unknown;
+	} | null> {
+		if (sftp.type !== StorageType.S3) {
+			throw new Error('Vevo response lookup requires S3 storage');
+		}
+
+		if (!sftp.bucket) {
+			throw new Error('Missing S3 bucket for Vevo response lookup');
+		}
+
+		const s3 = this.createS3Client(sftp);
+		const prefix = this.buildS3Key(sftp.path, batchId, upc);
+		const result = await s3.send(
+			new ListObjectsV2Command({
+				Bucket: sftp.bucket,
+				Prefix: `${prefix}/`,
+			}),
+		);
+
+		const failureName = `failure-${isrc}.json`;
+		const successName = `success-${isrc}.json`;
+		const responseObject =
+			result.Contents?.find(
+				(item) => path.posix.basename(item.Key ?? '') === failureName,
+			) ??
+			result.Contents?.find(
+				(item) => path.posix.basename(item.Key ?? '') === successName,
+			);
+
+		if (!responseObject?.Key) return null;
+
+		const file = await s3.send(
+			new GetObjectCommand({
+				Bucket: sftp.bucket,
+				Key: responseObject.Key,
+			}),
+		);
+		const contentText = await this.readS3Body(file.Body);
+		let content: unknown = contentText;
+
+		try {
+			content = JSON.parse(contentText);
+		} catch {}
+
+		return {
+			status:
+				path.posix.basename(responseObject.Key) === failureName
+					? 'failure'
+					: 'success',
+			key: responseObject.Key,
+			content,
+		};
+	}
+
 	async uploadFolderScp({
 		sftp,
 		localDir,
@@ -519,6 +588,19 @@ export class SftpConnectService {
 			endpoint: config.endpoint,
 			forcePathStyle: !!config.endpoint,
 		});
+	}
+
+	private async readS3Body(body: unknown): Promise<string> {
+		if (!body) return '';
+
+		const stream = body as Readable;
+		const chunks: Buffer[] = [];
+
+		for await (const chunk of stream) {
+			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+		}
+
+		return Buffer.concat(chunks).toString('utf-8');
 	}
 
 	private buildS3Key(...parts: (string | undefined)[]): string {

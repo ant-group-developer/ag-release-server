@@ -6,13 +6,11 @@ import { SftpConfig } from './entities/sftp-config.entity';
 import { SftpConfigQueryService } from './services/sftp-config.query.service';
 import { SftpConfigsService } from './services/sftp-config.service';
 import { SftpConfigsController } from './sftp-config.controller';
-import { VevoResponseScanner } from './services/vevo-response.scanner';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([SftpConfig]), SftpConnectModule],
 	controllers: [SftpConfigsController],
-	providers: [SftpConfigsService, SftpConfigQueryService, VevoResponseScanner],
-	exports: [SftpConfigsService, SftpConfigQueryService, VevoResponseScanner],
+	providers: [SftpConfigsService, SftpConfigQueryService],
+	exports: [SftpConfigsService, SftpConfigQueryService],
 })
 export class SftpConfigsModule {}
-

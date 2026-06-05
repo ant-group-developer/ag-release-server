@@ -1240,7 +1240,11 @@ export class ReleaseDdexService {
 								: 'Caption',
 					})),
 					channel: video.channel?.name ?? undefined,
+					languageOfPerformance:
+						release.releaseLanguage?.audioLanguage?.code ??
+						undefined,
 					description: video.description || undefined,
+					keywords: video.keywords ?? undefined,
 					madeForKids: video.madeForKids ?? undefined,
 					isUnlisted: video.isUnlisted ?? undefined,
 					partnerCustomId1: video.partnerCustomId1 || undefined,

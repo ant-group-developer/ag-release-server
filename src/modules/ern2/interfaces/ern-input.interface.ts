@@ -333,6 +333,7 @@ export interface ErnVideoInput2 {
 	subtitles?: ErnSubtitleInput[];
 	channel?: string;
 	description?: string;
+	keywords?: string[];
 	madeForKids?: string;
 	isUnlisted?: boolean;
 	partnerCustomId1?: string;
