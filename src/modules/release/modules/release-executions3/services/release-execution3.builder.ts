@@ -49,14 +49,19 @@ export class ReleaseExecution3Builder {
 					releaseSnapshot.tracks
 						?.filter((track) => !track.isrc)
 						.map((track) => track.id) ?? [];
+				const videoIdWithoutIsrc =
+					releaseSnapshot.video && !releaseSnapshot.video.isrc
+						? releaseSnapshot.video.id
+						: null;
 
-				if (trackIdsWithoutIsrc.length > 0) {
+				if (trackIdsWithoutIsrc.length > 0 || videoIdWithoutIsrc) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_ISRCS,
 						order: order++,
 						metadata: {
 							input: {
 								trackIds: trackIdsWithoutIsrc,
+								videoId: videoIdWithoutIsrc,
 							},
 						},
 					});
@@ -94,6 +99,16 @@ export class ReleaseExecution3Builder {
 						metadata: { input: { trackId } },
 					});
 				});
+
+				const videoId: string | null =
+					STEP.metadata?.input?.videoId ?? null;
+				if (videoId) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.GEN_ISRC,
+						order: trackIds.length + 1,
+						metadata: { input: { videoId } },
+					});
+				}
 				break;
 			}
 

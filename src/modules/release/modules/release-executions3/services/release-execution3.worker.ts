@@ -12,6 +12,7 @@ import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.se
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
+import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
 import { EntityManager, In, IsNull } from 'typeorm';
 import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
@@ -43,6 +44,7 @@ export class ReleaseExecution3Worker {
 		private readonly releaseService: ReleaseService,
 
 		private readonly trackService: TrackService,
+		private readonly videoService: VideoService,
 		private readonly ciService: CiService,
 		private readonly logService: LogsService,
 
@@ -209,12 +211,15 @@ export class ReleaseExecution3Worker {
 		const { step } = context;
 		try {
 			const trackId = step.metadata?.input?.trackId;
+			const videoId = step.metadata?.input?.videoId;
 
-			if (!trackId) {
-				throw new Error('Missing trackId in step metadata');
+			if (!trackId && !videoId) {
+				throw new Error('Missing trackId or videoId in step metadata');
 			}
 
-			const isrc = await this.trackService.genISRC(trackId);
+			const isrc = trackId
+				? await this.trackService.genISRC(trackId)
+				: await this.videoService.genISRC(videoId);
 
 			step.metadata = {
 				...step.metadata,
@@ -224,7 +229,9 @@ export class ReleaseExecution3Worker {
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			this.logService.success({
-				message: `[GEN_ISRC] Track ${trackId}: ${isrc}`,
+				message: trackId
+					? `[GEN_ISRC] Track ${trackId}: ${isrc}`
+					: `[GEN_ISRC] Video ${videoId}: ${isrc}`,
 				releaseExecutionId: context.releaseExecution.id,
 				releaseExecutionStepId: step.id,
 			});
