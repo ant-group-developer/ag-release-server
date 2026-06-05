@@ -190,3 +190,9 @@ export interface RevenueTrackItem {
 }
 
 export type RevenueTopTrackResponse = RevenueTrackItem[];
+
+export interface EntityOverviewResponse {
+  totalTrendViews: number;   // tổng lượt stream trend trong kỳ
+  totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
+  totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
+}

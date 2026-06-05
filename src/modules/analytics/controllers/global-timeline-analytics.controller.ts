@@ -2,7 +2,7 @@ import { Body, Controller, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { TimelineAnalyticsService } from '../services/timeline-analytics.service';
+import { TimelineAnalyticsService } from '../services/global-timeline.service';
 import { TimelineQueryDto } from '../dto/analytics-query.dto';
 import {
   DspTimelineResponse,
@@ -21,7 +21,7 @@ import {
 @ApiTags('Analytics')
 @Controller('analytics')
 export class TimelineAnalyticsController {
-  constructor(private readonly timelineService: TimelineAnalyticsService) {}
+  constructor(private readonly timelineService: TimelineAnalyticsService) { }
 
   // ═══════════════════════════════════════════════════════
   // DSP TIMELINE ENDPOINTS

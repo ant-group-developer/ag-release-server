@@ -10,22 +10,35 @@ import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.enti
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 
 // Controllers
-import { TimelineAnalyticsController } from './controllers/timeline-analytics.controller';
-import { RankingController } from './controllers/ranking.controller';
+import { TimelineAnalyticsController } from './controllers/global-timeline-analytics.controller';
+import { RankingController } from './controllers/global.ranking.controller';
 
 // Services
 import { IsrcResolverService } from './services/isrc-resolver.service';
-import { TimelineAnalyticsService } from './services/timeline-analytics.service';
+import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { RankingService } from './services/ranking.service';
 import { ClickHouseSyncService } from './services/clickhouse-sync.service';
 import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
+import { ReleaseAnalyticsController } from './controllers/release-analytics.controller';
+import { EntityAnalyticsService } from './services/entity-analytics.service';
+import { LabelAnalyticsController } from './controllers/label-analytics.controller';
+import { TrackAnalyticsController } from './controllers/track-analytics.controller';
+import { ArtistAnalyticsController } from './controllers/artist-analytics.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp]),
   ],
-  controllers: [TimelineAnalyticsController, RankingController],
+  controllers: [
+    TimelineAnalyticsController,
+    RankingController,
+    ReleaseAnalyticsController,
+    LabelAnalyticsController,
+    TrackAnalyticsController,
+    ArtistAnalyticsController,
+  ],
   providers: [
+    EntityAnalyticsService,
     IsrcResolverService,
     TimelineAnalyticsService,
     RankingService,
@@ -34,4 +47,4 @@ import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service'
   ],
   exports: [IsrcResolverService],
 })
-export class AnalyticsModule {}
+export class AnalyticsModule { }
