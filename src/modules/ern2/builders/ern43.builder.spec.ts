@@ -66,4 +66,38 @@ describe('Ern43Builder2 video metadata', () => {
 
 		expect(xml).not.toContain('VEVO:MadeForKids');
 	});
+
+	it('renders YouTube unlisted proprietary id from visibility', () => {
+		const input: ErnInput2 = {
+			...baseInput,
+			videos: [
+				{
+					...baseInput.videos![0],
+					visibility: 'UNLISTED_ON_YOUTUBE_VEVO',
+				},
+			],
+		};
+
+		const xml = new Ern43Builder2(input).build();
+
+		expect(xml).toContain(
+			'<ProprietaryId Namespace="VEVO:YouTubeUnlisted">true</ProprietaryId>',
+		);
+	});
+
+	it('does not render YouTube unlisted for Vevo-only unlisted visibility', () => {
+		const input: ErnInput2 = {
+			...baseInput,
+			videos: [
+				{
+					...baseInput.videos![0],
+					visibility: 'UNLISTED_ON_VEVO',
+				},
+			],
+		};
+
+		const xml = new Ern43Builder2(input).build();
+
+		expect(xml).not.toContain('VEVO:YouTubeUnlisted');
+	});
 });

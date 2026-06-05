@@ -1246,7 +1246,7 @@ export class ReleaseDdexService {
 					description: video.description || undefined,
 					keywords: video.keywords ?? undefined,
 					madeForKids: video.madeForKids ?? undefined,
-					isUnlisted: video.isUnlisted ?? undefined,
+					visibility: video.visibility ?? undefined,
 					partnerCustomId1: video.partnerCustomId1 || undefined,
 					partnerCustomId2: video.partnerCustomId2 || undefined,
 				},

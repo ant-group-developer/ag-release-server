@@ -365,7 +365,7 @@ export class ReleaseQueryService {
 				'video.description',
 				'video.keywords',
 				'video.madeForKids',
-				'video.isUnlisted',
+				'video.visibility',
 				'video.contentProvider',
 				'video.copyrightOwner',
 				'video.partnerCustomId1',

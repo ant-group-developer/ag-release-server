@@ -139,16 +139,6 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	madeForKids: VideoMadeForKids | null;
 
 	@Column({
-		type: 'boolean',
-		nullable: true,
-		default: false,
-		comment:
-			'Dang video o trang thai khong cong khai tren YouTube/Vevo' +
-			COMMENT_FOR_NULLABLE_DRAFT,
-	})
-	isUnlisted: boolean | null;
-
-	@Column({
 		name: 'visibility',
 		type: 'varchar',
 		length: 50,
