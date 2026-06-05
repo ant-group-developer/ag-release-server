@@ -17,7 +17,7 @@ interface FrankfurterRate {
 export interface ExchangeRateRow {
   rate_month: string;
   currency: string;
-  rate: number;
+  usd_to_local_rate: number;
   rate_date: string;
   is_provisional: number;
 }
@@ -63,7 +63,7 @@ export class ExchangeRateService {
     const rows: ExchangeRateRow[] = rates.map((r) => ({
       rate_month: yearMonth,
       currency: r.quote,
-      rate: r.rate,
+      usd_to_local_rate: r.rate,
       rate_date: r.date,
       is_provisional: 0,
     }));
@@ -73,7 +73,7 @@ export class ExchangeRateService {
       rows.push({
         rate_month: yearMonth,
         currency: 'USD',
-        rate: 1.0,
+        usd_to_local_rate: 1.0,
         rate_date: eomDate,
         is_provisional: 0,
       });
@@ -220,7 +220,7 @@ export class ExchangeRateService {
           f.dsp_id,
           f.isrc,
           sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.rate > 0, er.rate, 1)) AS total_revenue_usd
+          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN ${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -236,7 +236,7 @@ export class ExchangeRateService {
           f.territory_code,
           f.isrc,
           sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.rate > 0, er.rate, 1)) AS total_revenue_usd
+          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
       FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN ${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -282,7 +282,7 @@ export class ExchangeRateService {
     }
 
     return this.clickHouseService.query<ExchangeRateRow>(
-      `SELECT rate_month, currency, rate, rate_date, is_provisional
+      `SELECT rate_month, currency, usd_to_local_rate, rate_date, is_provisional
        FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES}
        ${where}
        ORDER BY rate_month DESC, currency ASC

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.fact_sales_report
     territory_code          LowCardinality(String) DEFAULT 'XX' COMMENT 'ISO-2 country code',
 
     -- ── Content ───────────────────────────────────────
-    isrc                    String                  COMMENT 'ISRC code',
+    isrc                    String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     upc                     String           DEFAULT '' COMMENT 'UPC code',
     grid                    String           DEFAULT '' COMMENT 'Global Release Identifier',
     release_id              String           DEFAULT '' COMMENT 'Release ID (platform-specific)',

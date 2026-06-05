@@ -64,7 +64,7 @@ GROUP BY period, dsp_id, isrc;
 CREATE TABLE IF NOT EXISTS music_analytics.trends_isrc_daily_cube
 (
     reporting_date      Date,
-    isrc                String,
+    isrc                String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity      UInt64,
     total_unique_users  UInt64
 )
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.trends_dsp_daily_cube
 (
     reporting_date      Date,
     dsp_id              LowCardinality(String),
-    isrc                String,
+    isrc                String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity      UInt64,
     total_unique_users  UInt64
 )

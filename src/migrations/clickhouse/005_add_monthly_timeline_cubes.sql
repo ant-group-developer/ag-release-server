@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.trends_dsp_monthly_cube
 (
     period          Date,
     dsp_id          LowCardinality(String),
-    isrc            String,
+    isrc            String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity  UInt64
 )
 ENGINE = SummingMergeTree()
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.sales_ter_monthly_cube
 (
     period            Date,
     territory_code    LowCardinality(String),
-    isrc              String,
+    isrc              String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity    UInt64
 )
 ENGINE = SummingMergeTree()
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.trends_ter_monthly_cube
 (
     period          Date,
     territory_code  LowCardinality(String),
-    isrc            String,
+    isrc            String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity  UInt64
 )
 ENGINE = SummingMergeTree()

@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.sales_dsp_monthly_cube_v2
 (
     period              Date,
     dsp_id              LowCardinality(String),
-    isrc                String,
+    isrc                String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity      UInt64,
     total_revenue_usd   Decimal128(18)
 )
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.sales_ter_monthly_cube_v2
 (
     period              Date,
     territory_code      LowCardinality(String),
-    isrc                String,
+    isrc                String                  COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     total_quantity      UInt64,
     total_revenue_usd   Decimal128(18)
 )
@@ -71,7 +71,7 @@ AS SELECT
     f.dsp_id,
     f.isrc,
     sum(f.quantity) AS total_quantity,
-    sum(f.revenue_local / if(er.rate > 0, er.rate, 1)) AS total_revenue_usd
+    sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
 FROM music_analytics.fact_sales_report f
 LEFT JOIN music_analytics.exchange_rates er
     ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -85,7 +85,7 @@ AS SELECT
     f.territory_code,
     f.isrc,
     sum(f.quantity) AS total_quantity,
-    sum(f.revenue_local / if(er.rate > 0, er.rate, 1)) AS total_revenue_usd
+    sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
 FROM music_analytics.fact_sales_report f
 LEFT JOIN music_analytics.exchange_rates er
     ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
