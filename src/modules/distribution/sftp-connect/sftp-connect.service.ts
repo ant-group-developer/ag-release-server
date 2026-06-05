@@ -368,12 +368,10 @@ export class SftpConnectService {
 		sftp,
 		batchId,
 		upc,
-		isrc,
 	}: {
 		sftp: SftpMetadata;
 		batchId: string;
 		upc: string;
-		isrc: string;
 	}): Promise<{
 		status: 'success' | 'failure';
 		key: string;
@@ -396,14 +394,12 @@ export class SftpConnectService {
 			}),
 		);
 
-		const failureName = `failure-${isrc}.json`;
-		const successName = `success-${isrc}.json`;
 		const responseObject =
-			result.Contents?.find(
-				(item) => path.posix.basename(item.Key ?? '') === failureName,
+			result.Contents?.find((item) =>
+				this.isVevoResponseFile(item.Key, 'failure'),
 			) ??
-			result.Contents?.find(
-				(item) => path.posix.basename(item.Key ?? '') === successName,
+			result.Contents?.find((item) =>
+				this.isVevoResponseFile(item.Key, 'success'),
 			);
 
 		if (!responseObject?.Key) return null;
@@ -422,10 +418,7 @@ export class SftpConnectService {
 		} catch {}
 
 		return {
-			status:
-				path.posix.basename(responseObject.Key) === failureName
-					? 'failure'
-					: 'success',
+			status: this.getVevoResponseStatus(responseObject.Key),
 			key: responseObject.Key,
 			content,
 		};
@@ -601,6 +594,24 @@ export class SftpConnectService {
 		}
 
 		return Buffer.concat(chunks).toString('utf-8');
+	}
+
+	private isVevoResponseFile(
+		key: string | undefined,
+		status: 'success' | 'failure',
+	): boolean {
+		const fileName = path.posix.basename(key ?? '').toLowerCase();
+		if (!fileName.endsWith('.json')) return false;
+
+		if (status === 'success') {
+			return fileName.startsWith('success');
+		}
+
+		return fileName.startsWith('failure') || fileName.startsWith('fail');
+	}
+
+	private getVevoResponseStatus(key: string): 'success' | 'failure' {
+		return this.isVevoResponseFile(key, 'success') ? 'success' : 'failure';
 	}
 
 	private buildS3Key(...parts: (string | undefined)[]): string {

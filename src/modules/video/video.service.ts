@@ -85,7 +85,12 @@ export class VideoService {
 		const video = await this.videoRepo.findOne({
 			where: { id },
 			relations: {
-				release: true,
+				release: {
+					releaseArtists: {
+						artist: true,
+					},
+					label: true,
+				},
 				channel: true,
 				videoFile: true,
 				videoArtists: {
@@ -148,14 +153,13 @@ export class VideoService {
 	}
 
 	async genISRC(videoId: string) {
+		// return 'QT6KL2614737';
 		const video = await this.findOne(videoId);
 
 		if (video.isrc) return video.isrc;
 
 		const mainArtistName =
-			video.videoArtists?.[0]?.artist?.name ??
-			video.release?.releaseArtists?.[0]?.artist?.name ??
-			'';
+			video.release?.releaseArtists?.[0]?.artist?.name ?? '';
 
 		if (!mainArtistName) {
 			this.releaseLogService.failed({

@@ -175,12 +175,25 @@ export class ReleaseExecution3Worker {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
 			const upc = await this.releaseService.genUpcById(releaseId);
+			if (!upc) {
+				throw new Error('Generated UPC is empty');
+			}
+
+			releaseExecution.releaseUpc = upc;
+			releaseExecution.metadata = {
+				...releaseExecution.metadata,
+				input: {
+					...releaseExecution.metadata?.input,
+					upcAutoIfReleaseSnapshotNull: upc,
+				},
+			};
 
 			step.metadata = {
 				...step.metadata,
 				output: { upc },
 			};
 
+			await this.manager.save(ReleaseExecution3, releaseExecution);
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			this.logService.success({
@@ -431,8 +444,12 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const upc =
-				releaseExecution.releaseUpc ??
+				releaseExecution.releaseUpc ||
 				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			if (!upc) {
+				throw new Error('Missing UPC from release execution');
+			}
 
 			const dsps: Dsp[] =
 				releaseExecution.metadata.input.dspAggregator?.ci?.ci ?? [];
@@ -484,8 +501,12 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const upc =
-				releaseExecution.releaseUpc ??
+				releaseExecution.releaseUpc ||
 				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			if (!upc) {
+				throw new Error('Missing UPC from release execution');
+			}
 
 			const dsps: Dsp[] = step.metadata?.input?.dsps ?? [];
 			if (!dsps.length) throw new Error('Missing dsps');
@@ -633,9 +654,27 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
+			const releaseSnapshot =
+				releaseExecution.metadata.input.releaseSnapshot;
+			const upc =
+				releaseSnapshot.upc ||
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull ||
+				releaseExecution.releaseUpc;
+			const generatedIsrcs = await this.getGeneratedIsrcs(
+				releaseExecution.id,
+			);
+
+			// Patch UPC/ISRC only on a cloned release used for metadata;
+			// releaseSnapshot must stay as the original execution input.
+			const releaseForMetadata = this.buildReleaseForMetadata({
+				releaseSnapshot,
+				upc,
+				generatedIsrcs,
+			});
+
 			const { outputDir, batchId, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
-					release: releaseExecution.metadata.input.releaseSnapshot,
+					release: releaseForMetadata,
 					ernVersion: config.ernVersion,
 					sender: config.sender,
 					recipient: config.recipient,
@@ -674,6 +713,101 @@ export class ReleaseExecution3Worker {
 
 			return ReleaseExecutionStepStatus.FAILED;
 		}
+	}
+
+	private async getGeneratedIsrcs(releaseExecutionId: string): Promise<{
+		trackById: Map<string, string>;
+		videoById: Map<string, string>;
+	}> {
+		const isrcSteps = await this.manager.find(ReleaseExecutionStep3, {
+			where: {
+				releaseExecutionId,
+				type: ReleaseExecutionStepType.GEN_ISRC,
+				status: ReleaseExecutionStepStatus.DONE,
+			},
+		});
+
+		const trackById = new Map<string, string>();
+		const videoById = new Map<string, string>();
+
+		for (const isrcStep of isrcSteps) {
+			const isrc = isrcStep.metadata?.output?.isrc;
+			if (!isrc) continue;
+
+			const trackId = isrcStep.metadata?.input?.trackId;
+			if (trackId) {
+				trackById.set(trackId, isrc);
+				continue;
+			}
+
+			const videoId = isrcStep.metadata?.input?.videoId;
+			if (videoId) {
+				videoById.set(videoId, isrc);
+			}
+		}
+
+		return { trackById, videoById };
+	}
+
+	private buildReleaseForMetadata({
+		releaseSnapshot,
+		upc,
+		generatedIsrcs,
+	}: {
+		releaseSnapshot: any;
+		upc?: string;
+		generatedIsrcs: {
+			trackById: Map<string, string>;
+			videoById: Map<string, string>;
+		};
+	}) {
+		const shouldPatchUpc = !!upc && upc !== releaseSnapshot.upc;
+		let hasPatchedTrack = false;
+		const tracks = releaseSnapshot.tracks?.map((track: any) => {
+			const isrc = generatedIsrcs.trackById.get(track.id);
+
+			if (!isrc || track.isrc) return track;
+
+			hasPatchedTrack = true;
+			return Object.assign(
+				Object.create(Object.getPrototypeOf(track)),
+				track,
+				{
+					isrc,
+				},
+			);
+		});
+		const videoIsrc = releaseSnapshot.video
+			? generatedIsrcs.videoById.get(releaseSnapshot.video.id)
+			: undefined;
+		const shouldPatchVideoIsrc =
+			!!videoIsrc && !releaseSnapshot.video?.isrc;
+
+		if (!shouldPatchUpc && !shouldPatchVideoIsrc && !hasPatchedTrack) {
+			return releaseSnapshot;
+		}
+
+		return Object.assign(
+			Object.create(Object.getPrototypeOf(releaseSnapshot)),
+			releaseSnapshot,
+			{
+				...(shouldPatchUpc ? { upc } : {}),
+				...(hasPatchedTrack ? { tracks } : {}),
+				...(shouldPatchVideoIsrc
+					? {
+							video: Object.assign(
+								Object.create(
+									Object.getPrototypeOf(
+										releaseSnapshot.video,
+									),
+								),
+								releaseSnapshot.video,
+								{ isrc: videoIsrc },
+							),
+						}
+					: {}),
+			},
+		);
 	}
 
 	private async uploadMetadataToSftp({
@@ -799,9 +933,6 @@ export class ReleaseExecution3Worker {
 					releaseExecution.metadata.input
 						.upcAutoIfReleaseSnapshotNull ||
 					releaseExecution.metadata?.input?.releaseSnapshot?.upc;
-				const isrc =
-					releaseExecution.metadata?.input?.releaseSnapshot?.video
-						?.isrc;
 
 				if (!batchId) {
 					throw new Error(
@@ -809,8 +940,6 @@ export class ReleaseExecution3Worker {
 					);
 				}
 				if (!upc) throw new Error('Missing UPC for VEVO response');
-				if (!isrc)
-					throw new Error('Missing video ISRC for VEVO response');
 
 				const config =
 					await this.dspRoutingService.resolveFullDeliveryConfig(
@@ -821,12 +950,11 @@ export class ReleaseExecution3Worker {
 					sftp: config.sftp,
 					batchId,
 					upc,
-					isrc,
 				});
 
 				if (!response) {
 					throw new Error(
-						`VEVO response not found for ISRC ${isrc} in batch ${batchId}`,
+						`VEVO response not found in batch ${batchId}`,
 					);
 				}
 
@@ -971,7 +1099,9 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const upc = releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+			const upc =
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull ||
+				releaseExecution.metadata?.input?.releaseSnapshot?.upc;
 
 			if (!upc) {
 				throw new Error('Missing UPC from release snapshot');
