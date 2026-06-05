@@ -72,6 +72,15 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	isrc: string | null;
 
 	@Column({
+		type: 'text',
+		nullable: true,
+		comment:
+			'Label text used for video releases when generating metadata' +
+			COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	label: string | null;
+
+	@Column({
 		type: 'boolean',
 		nullable: true,
 		default: false,

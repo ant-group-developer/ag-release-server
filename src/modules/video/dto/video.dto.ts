@@ -29,6 +29,14 @@ export class CreateVideoDto {
 	@MaxLength(20)
 	isrc?: string;
 
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsString()
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	label?: string | null;
+
 	@ApiPropertyOptional({ default: false })
 	@IsOptional()
 	@IsBoolean()

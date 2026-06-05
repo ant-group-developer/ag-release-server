@@ -359,6 +359,7 @@ export class ReleaseQueryService {
 				'video.id',
 				'video.releaseId',
 				'video.isrc',
+				'video.label',
 				'video.explicit',
 				'video.aiContent',
 				'video.channelId',

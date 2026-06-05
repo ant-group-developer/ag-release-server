@@ -1151,6 +1151,8 @@ export class ReleaseDdexService {
 					}));
 
 		const videoIsrc = video.isrc ?? '';
+		const videoLabelName =
+			video.label?.trim() || release.label?.name || 'label_video';
 
 		return {
 			version: ernVersion,
@@ -1169,7 +1171,7 @@ export class ReleaseDdexService {
 					: '',
 				genre: release.primaryGenre?.name ?? 'Pop',
 				subGenre: release.subGenre?.name ?? undefined,
-				labelName: release.label?.name ?? '',
+				labelName: videoLabelName,
 				artists,
 				parentalWarning: video.explicit ? 'Explicit' : 'NotExplicit',
 				pLine:

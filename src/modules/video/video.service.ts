@@ -173,7 +173,8 @@ export class VideoService {
 			});
 		}
 
-		const registrantName = video.release?.label?.name ?? '';
+		const registrantName =
+			video.label?.trim() || video.release?.label?.name || '';
 		if (!registrantName) {
 			this.releaseLogService.failed({
 				releaseId: video.releaseId,
