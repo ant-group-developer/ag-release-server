@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS music_analytics.exchange_rates (
     rate_month       String                  COMMENT 'Định dạng YYYY-MM, ví dụ: 2024-01',
     currency         LowCardinality(String)  COMMENT 'Mã tiền tệ ISO (EUR, GBP, VND, JPY...)',
-    rate             Float64                 COMMENT 'Tỷ giá: 1 USD = X ngoại tệ',
+    usd_to_local_rate Float64                COMMENT 'Exchange rate relative to USD. Specifically, 1 USD = X Local Currency units (e.g., 1 USD = 25000 VND). To convert local revenue to USD, divide by this rate: revenue_usd = revenue_local / rate.',
     rate_date        Date                    COMMENT 'Ngày chốt tỷ giá (ngày cuối tháng hoặc ngày gần nhất)',
     is_provisional   UInt8 DEFAULT 0         COMMENT '1 = tỷ giá tạm tính, 0 = EOM chính thức',
     updated_at       DateTime DEFAULT now()

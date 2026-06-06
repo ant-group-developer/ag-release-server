@@ -59,7 +59,7 @@ export class WmgSalesParser extends BaseSalesParser {
 
     const isrcRaw = this.cleanExcelQuoted(record['ISRC'] || '');
     const isAlbumLevel = !isrcRaw;
-    const isrc = isAlbumLevel ? `REL-${upc}` : isrcRaw;
+    const isrc = isAlbumLevel ? `UPC-${upc}` : isrcRaw;
 
     const { start, end } = this.monthToRange(record['Recdate Month ID'] || '');
 

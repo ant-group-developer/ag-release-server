@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.fact_dsp_comprehensive_report
     territory_code            LowCardinality(String) DEFAULT 'XX' COMMENT 'ISO-2 country code (VN, US, JP...). XX = unknown',
 
     -- ── Content Metadata ────────────────────────────────
-    isrc                      String                          COMMENT 'International Standard Recording Code — primary key for stats',
+    isrc                      String                          COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     upc                       String           DEFAULT ''   COMMENT 'Universal Product Code (album level)',
     track_title               String           DEFAULT ''   COMMENT 'Track / song title',
     artist_name               String           DEFAULT ''   COMMENT 'Primary artist name',

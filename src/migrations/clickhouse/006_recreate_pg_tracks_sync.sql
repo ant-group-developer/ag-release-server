@@ -5,7 +5,7 @@
 DROP TABLE IF EXISTS music_analytics.pg_tracks_sync;
 
 CREATE TABLE IF NOT EXISTS music_analytics.pg_tracks_sync (
-    isrc String,
+    isrc String COMMENT 'International Standard Recording Code. If it starts with ''UPC-'', it represents an album-level (UPC) record instead of a track-level ISRC.',
     tenant_id String,
     release_id String,
     label_id String,
