@@ -1343,7 +1343,9 @@ export class ReleaseSubmitService2 {
 					message: `[SYNC_DATA_DSP_CI] Fetching DSP statuses from CI for UPC: ${upc}`,
 				});
 
-				const dspStatuses = await this.ciService.getStatusDsps(upc);
+				const dspStatuses = await this.ciService.getStatusDsps({
+					upc,
+				});
 
 				// Map CI code → system code
 				const ciCodes = dspStatuses

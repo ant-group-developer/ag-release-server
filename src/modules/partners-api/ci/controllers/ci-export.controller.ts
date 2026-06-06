@@ -40,7 +40,7 @@ export class CiExportController {
 	@ApiParam({ name: 'upc', example: '850080651032' })
 	@Get('status-dsps/:upc')
 	async getStatusDsps(@Param('upc') upc: string) {
-		const result = await this.ciService.getStatusDsps(upc);
+		const result = await this.ciService.getStatusDsps({ upc });
 		return new ResponseSuccess({ data: result });
 	}
 }

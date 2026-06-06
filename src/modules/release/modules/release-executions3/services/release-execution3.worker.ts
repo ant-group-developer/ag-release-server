@@ -14,7 +14,7 @@ import { ReleaseValidateService } from 'src/modules/release/services/release.val
 import { TrackService } from 'src/modules/track/services/track.service';
 import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
-import { EntityManager, In, IsNull } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
@@ -1100,53 +1100,69 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const upc =
-				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull ||
-				releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+				releaseExecution.metadata?.input?.releaseSnapshot?.upc ||
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
 
 			if (!upc) {
 				throw new Error('Missing UPC from release snapshot');
 			}
 
-			const dspStatuses = await this.ciService.getStatusDsps(upc);
+			const dspCiCodes: string[] =
+				step.metadata?.input?.dspCiCodes ??
+				[
+					...(releaseExecution.metadata.input.dspAggregator?.ci?.ci ??
+						[]),
+					...(releaseExecution.metadata.input.dspAggregator?.ci
+						?.state51 ?? []),
+				]
+					.map((dsp) => dsp.codeCi)
+					.filter((code): code is string => !!code);
 
-			const ciCodes = dspStatuses.map((d) => d.ciCode).filter(Boolean);
-
-			const dsps =
-				ciCodes.length > 0
-					? await this.manager.find(Dsp, {
-							where: { codeCi: In(ciCodes) },
-						})
-					: [];
-
-			const ciToSystem = new Map(
-				dsps.map((d) => [d.codeCi, { code: d.code, name: d.name }]),
-			);
-
-			const mappedStatuses = dspStatuses.map((d) => ({
-				ciCode: d.ciCode,
-				code: ciToSystem.get(d.ciCode)?.code || null,
-				name: ciToSystem.get(d.ciCode)?.name || null,
-				status: d.status,
-			}));
+			const dspStatuses = await this.ciService.getStatusDsps({
+				upc,
+				dspCiCodes,
+			});
 
 			step.metadata = {
 				...step.metadata,
+				input: {
+					...step.metadata?.input,
+					upc,
+					dspCiCodes,
+				},
 				output: {
 					...step.metadata?.output,
-					result: mappedStatuses,
+					result: dspStatuses,
 				},
 			};
 
 			await this.manager.save(ReleaseExecutionStep3, step);
 
-			this.logService.success({
-				message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`,
+			const allTransferred =
+				dspStatuses.length > 0 &&
+				dspStatuses.every(
+					(item) => item.status?.toLowerCase() === 'transferred',
+				);
+
+			if (allTransferred) {
+				this.logService.success({
+					message: `[SYNC_DATA_DSP_CI] All ${dspStatuses.length} DSPs transferred`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+					data: { dspStatuses },
+				});
+
+				return ReleaseExecutionStepStatus.DONE;
+			}
+
+			this.logService.error({
+				message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
-				data: { dspStatuses: mappedStatuses },
+				data: { dspStatuses },
 			});
 
-			return ReleaseExecutionStepStatus.DONE;
+			return ReleaseExecutionStepStatus.FAILED;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,

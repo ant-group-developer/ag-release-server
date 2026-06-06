@@ -242,8 +242,17 @@ export class ReleaseExecution3Builder {
 						},
 
 						{
-							type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
+							type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
 							order: 3,
+							metadata: {
+								input: {
+									dspCiCodes: ciDsps
+										.map((dsp) => dsp.codeCi)
+										.filter(
+											(code): code is string => !!code,
+										),
+								},
+							},
 						},
 					);
 				}
