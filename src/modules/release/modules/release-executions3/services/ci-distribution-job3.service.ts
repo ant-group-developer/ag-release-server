@@ -70,7 +70,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	 */
 	// @Cron('*/5 * * * *')
 	// @Cron('* * * * *') // mỗi phút
-	@Cron('*/10 * * * * *')
+	@Cron('*/10 * * * *') // mỗi 10p
+	// @Cron('*/10 * * * * *') // mỗi 10 giây, test nhanh
 	async handleCheckCiToolJobStatus() {
 		await this.checkCiToolJobStatus();
 	}
@@ -189,8 +190,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 				await this.repo.update(
 					{ id: In(groupJobs.map((j) => j.id)) },
 					{
-						nextCiToolCheckAt: new Date(Date.now() + 1 * 60 * 1000),
-						// nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+						// nextCiToolCheckAt: new Date(Date.now() + 1 * 60 * 1000),
+						nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
 					},
 				);
 

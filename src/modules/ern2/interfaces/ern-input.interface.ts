@@ -335,7 +335,7 @@ export interface ErnVideoInput2 {
 	description?: string;
 	keywords?: string[];
 	madeForKids?: string;
-	isUnlisted?: boolean;
+	visibility?: string;
 	partnerCustomId1?: string;
 	partnerCustomId2?: string;
 }

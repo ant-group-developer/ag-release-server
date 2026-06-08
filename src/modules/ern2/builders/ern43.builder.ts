@@ -356,7 +356,7 @@ export class Ern43Builder2 {
 
 		const resId = edition.ele('ResourceId');
 		resId.ele('ISRC').txt(video.isrc);
-		if (video.isUnlisted) {
+		if (this.isYouTubeUnlisted(video)) {
 			resId
 				.ele('ProprietaryId', { Namespace: 'VEVO:YouTubeUnlisted' })
 				.txt('true');
@@ -1074,6 +1074,13 @@ export class Ern43Builder2 {
 		sub: ErnSubtitleInput,
 	): 'Caption' | 'SubTitle' {
 		return this.getTextType(sub);
+	}
+
+	private isYouTubeUnlisted(video: ErnVideoInput2): boolean {
+		return (
+			video.visibility === 'UNLISTED_ON_YOUTUBE' ||
+			video.visibility === 'UNLISTED_ON_YOUTUBE_VEVO'
+		);
 	}
 
 	private durationToSeconds(duration: string | number): number {

@@ -72,6 +72,15 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	isrc: string | null;
 
 	@Column({
+		type: 'text',
+		nullable: true,
+		comment:
+			'Label text used for video releases when generating metadata' +
+			COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	label: string | null;
+
+	@Column({
 		type: 'boolean',
 		nullable: true,
 		default: false,
@@ -137,16 +146,6 @@ export class Video extends BaseUserTrackedUUIDEntity {
 			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	madeForKids: VideoMadeForKids | null;
-
-	@Column({
-		type: 'boolean',
-		nullable: true,
-		default: false,
-		comment:
-			'Dang video o trang thai khong cong khai tren YouTube/Vevo' +
-			COMMENT_FOR_NULLABLE_DRAFT,
-	})
-	isUnlisted: boolean | null;
 
 	@Column({
 		name: 'visibility',
