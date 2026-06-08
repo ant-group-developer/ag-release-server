@@ -78,9 +78,6 @@ import { ReleaseExecutionStepEngine } from './modules/release-executions3/servic
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
-import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
-import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
-import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
 
 @Module({
 	imports: [
@@ -100,10 +97,6 @@ import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.
 			ReleaseExecution,
 			ReleaseExecutionDsp,
 			ReleaseExecutionStep,
-
-			ReleaseSubmit,
-			ReleaseSubmitStep,
-			CiDistributionJob,
 
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
