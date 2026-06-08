@@ -76,15 +76,11 @@ import { ReleaseExecution3Queue } from './modules/release-executions3/services/q
 import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
-import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
-import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
 import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
 import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
 import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
-import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
-import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
 
 @Module({
 	imports: [
@@ -162,9 +158,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 
 		ReleaseExecutionController,
 
-		ReleaseSubmitController,
-		CiDistributionJobController,
-
 		ReleaseExecution3Controller,
 		ReleaseSubmitTestController,
 		ReleaseExecutionStepTestController,
@@ -185,8 +178,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseExecutionProcessorService,
 
 		// v2
-		ReleaseSubmitService2,
-		CiDistributionJobService,
 
 		// v3
 		ReleaseExecution3Builder,

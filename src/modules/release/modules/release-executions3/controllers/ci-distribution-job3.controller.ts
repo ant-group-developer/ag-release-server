@@ -21,7 +21,6 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import {
 	BatchActionCiJob3Dto,
-	ConfirmCompletedCiJob3Dto,
 	QueryGetListCiJob3Dto,
 	QueryGroupedCiJob3Dto,
 	UpdateCiJob3Dto,
@@ -32,7 +31,7 @@ import { CiDistributionJob3Service } from '../services/ci-distribution-job3.serv
 // @Controller('ci-distribution-jobs3')
 @Controller('ci-distribution-jobs')
 export class CiDistributionJob3Controller {
-	constructor(private readonly jobService: CiDistributionJob3Service) { }
+	constructor(private readonly jobService: CiDistributionJob3Service) {}
 
 	@ApiOperation({ summary: 'Danh sách CI distribution jobs v3' })
 	@ApiQuery({ type: QueryGetListCiJob3Dto })
@@ -57,17 +56,27 @@ export class CiDistributionJob3Controller {
 		return new ResponseSuccess({ data: result });
 	}
 
-	@ApiBody({ type: BatchActionCiJob3Dto })
-	@Post('auto-send-email')
-	async autoSendEmail(@Body() body: BatchActionCiJob3Dto) {
-		const result = await this.jobService.autoSendEmail(body.ids);
-		return new ResponseSuccess({ data: result });
-	}
+	// @ApiBody({ type: BatchActionCiJob3Dto })
+	// @Post('auto-send-email')
+	// async autoSendEmail(@Body() body: BatchActionCiJob3Dto) {
+	// 	const result = await this.jobService.sendEmailToState51(body.ids);
+	// 	return new ResponseSuccess({ data: result });
+	// }
 
 	@Post('daily-send')
 	async handleDailySend() {
 		await this.jobService.handleDailySend();
 		return { message: 'Daily send executed' };
+	}
+
+	@ApiOperation({
+		summary: 'Process CI jobs by type and send them to their destination',
+	})
+	@ApiBody({ type: BatchActionCiJob3Dto })
+	@Post('process')
+	async processJobs(@Body() body: BatchActionCiJob3Dto) {
+		const result = await this.jobService.processJobs(body.ids);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@ApiBody({ type: BatchActionCiJob3Dto })
@@ -76,7 +85,7 @@ export class CiDistributionJob3Controller {
 		@Body() body: BatchActionCiJob3Dto,
 		@Res() res: Response,
 	) {
-		const { buffer, fileName } = await this.jobService.downloadExcel(
+		const { buffer, fileName } = await this.jobService.exportFileExcel(
 			body.ids,
 		);
 
@@ -90,16 +99,16 @@ export class CiDistributionJob3Controller {
 		res.end(buffer);
 	}
 
-	@ApiBody({ type: ConfirmCompletedCiJob3Dto })
-	@Post('confirm-completed')
-	async confirmCompleted(@Body() body: ConfirmCompletedCiJob3Dto) {
-		const result = await this.jobService.confirmCompleted(
-			body.ids,
-			body.exportIdFromCi,
-		);
+	// @ApiBody({ type: ConfirmCompletedCiJob3Dto })
+	// @Post('confirm-completed')
+	// async confirmCompleted(@Body() body: ConfirmCompletedCiJob3Dto) {
+	// 	const result = await this.jobService.confirmCompleted(
+	// 		body.ids,
+	// 		body.exportIdFromCi,
+	// 	);
 
-		return new ResponseSuccess({ data: result });
-	}
+	// 	return new ResponseSuccess({ data: result });
+	// }
 
 	// @ApiParam({ name: 'id', format: 'uuid' })
 	// @Post(':id/cancel')
