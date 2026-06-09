@@ -23,7 +23,7 @@ export interface GetCiDspStatusesInput {
 export class CiService {
 	private readonly logger = new Logger(CiService.name);
 
-	constructor(private readonly appConfigService: AppConfigService) { }
+	constructor(private readonly appConfigService: AppConfigService) {}
 
 	private get client(): AxiosInstance {
 		const baseUrl = this.appConfigService.getValue<string>(
@@ -239,7 +239,8 @@ export class CiService {
 			([ciCode, desire]) => ({
 				ciCode,
 				name: desire.musicService?.name || ciCode,
-				status: desire.exportBatch?.batch_transfer_status || 'unknown',
+				status:
+					desire.exportBatch?.batch_transfer_status || 'not_found',
 			}),
 		);
 

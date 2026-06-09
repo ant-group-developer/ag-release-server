@@ -207,6 +207,8 @@ export class ReleaseExecutionStepEngine {
 	}
 
 	// lưu vào db
+	// cập nhật trạng thái status của step,
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
 		status: ReleaseExecutionStepStatus,
@@ -234,6 +236,7 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
@@ -273,16 +276,20 @@ export class ReleaseExecutionStepEngine {
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
 	): ReleaseDspStatus | null {
+		// PROCESS_DSPS chỉ đánh dấu bắt đầu quá trình phân phối, cập nhật status bên release dsp delivery
+		// Step này DONE chưa có nghĩa là release đã được phân phối thành công.
 		if (step.type === ReleaseExecutionStepType.PROCESS_DSPS) {
 			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
 				? ReleaseDspStatus.PROCESSING
 				: null;
 		}
 
+		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
 			return ReleaseDspStatus.DISTRIBUTED;
 		}
 
+		// Các trạng thái kết thúc không thành công đều cần được kiểm tra/xử lý.
 		if (
 			[
 				ReleaseExecutionStepStatus.FAILED,
@@ -293,6 +300,7 @@ export class ReleaseExecutionStepEngine {
 			return ReleaseDspStatus.ISSUES;
 		}
 
+		// Các trạng thái trung gian khác không làm thay đổi delivery status.
 		return null;
 	}
 }
