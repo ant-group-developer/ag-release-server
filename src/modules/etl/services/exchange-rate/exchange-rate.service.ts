@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../../clickhouse/clickhouse.constants';
+import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
 
 /**
  * Frankfurter v2 API response format:
@@ -40,7 +41,10 @@ export class ExchangeRateService {
   private readonly API_BASE =
     process.env.FRANKFURTER_API_URL || 'http://localhost:8111/v2/rates';
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly cubeRebuildService: CubeRebuildService,
+  ) {}
 
   // ═══════════════════════════════════════════════════════
   // PUBLIC API
@@ -202,64 +206,7 @@ export class ExchangeRateService {
    * Gọi sau khi sync exchange rates hoặc khi cần refresh data.
    */
   async rebuildCubes(): Promise<{ dspRows: number; terRows: number }> {
-    this.logger.log('Rebuilding sales cubes v2...');
-
-    // Truncate cả 2 cubes
-    await this.clickHouseService.execute(
-      `TRUNCATE TABLE IF EXISTS ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}`,
-    );
-    await this.clickHouseService.execute(
-      `TRUNCATE TABLE IF EXISTS ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}`,
-    );
-
-    // Rebuild DSP cube
-    await this.clickHouseService.execute(`
-      INSERT INTO ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}
-      SELECT
-          toStartOfMonth(f.reporting_period_start) AS period,
-          f.dsp_id,
-          f.isrc,
-          sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
-      FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-      LEFT JOIN ${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
-          ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
-          AND f.revenue_currency = er.currency
-      GROUP BY period, f.dsp_id, f.isrc
-    `);
-
-    // Rebuild Territory cube
-    await this.clickHouseService.execute(`
-      INSERT INTO ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}
-      SELECT
-          toStartOfMonth(f.reporting_period_start) AS period,
-          f.territory_code,
-          f.isrc,
-          sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
-      FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-      LEFT JOIN ${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
-          ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
-          AND f.revenue_currency = er.currency
-      GROUP BY period, f.territory_code, f.isrc
-    `);
-
-    // Get counts
-    const dspCount = await this.clickHouseService.query<{ cnt: string }>(
-      `SELECT count() AS cnt FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}`,
-    );
-    const terCount = await this.clickHouseService.query<{ cnt: string }>(
-      `SELECT count() AS cnt FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}`,
-    );
-
-    const dspRows = Number(dspCount[0]?.cnt ?? 0);
-    const terRows = Number(terCount[0]?.cnt ?? 0);
-
-    this.logger.log(
-      `✅ Cubes rebuilt — DSP: ${dspRows} rows, Territory: ${terRows} rows`,
-    );
-
-    return { dspRows, terRows };
+    return this.cubeRebuildService.rebuildAllSalesCubes();
   }
 
   /**

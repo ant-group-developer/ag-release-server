@@ -158,12 +158,14 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
-        if (sourceCategory) {
-          for (const row of rows) row.source_category = sourceCategory;
-        }
-        // Replace dsp_id with id_dsps_report from dsps_report
+        const sourceFileName = path.basename(filePath);
         for (const row of rows) {
+          if (sourceCategory) {
+            row.source_category = sourceCategory;
+          }
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {
@@ -212,9 +214,12 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        const sourceFileName = path.basename(filePath);
         // Replace dsp_id with id_dsps_report from dsps_report
         for (const row of rows) {
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {
@@ -268,9 +273,12 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        const sourceFileName = path.basename(filePath);
         // Replace dsp_id with id_dsps_report
         for (const row of rows) {
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {
