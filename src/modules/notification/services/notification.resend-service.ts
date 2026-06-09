@@ -54,6 +54,7 @@ export class NotificationResendService {
 				payload.attachments = formattedAttachments;
 			}
 
+			// return true;
 			const response = await fetch('https://api.resend.com/emails', {
 				method: 'POST',
 				headers: {

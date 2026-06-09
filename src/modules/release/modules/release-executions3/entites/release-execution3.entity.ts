@@ -109,6 +109,8 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 export type ReleaseExecutionDeliveryInput = {
 	releaseId: string;
 	items: {
-		dspId: string;
+		id?: string;
+		dspId?: string;
+		dspCode?: string;
 	}[];
 };

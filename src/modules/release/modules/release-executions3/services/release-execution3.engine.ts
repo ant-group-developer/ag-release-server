@@ -102,16 +102,18 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		if (STEP.childExecutionMode === 'parallel') {
-			// await Promise.allSettled(
-			// 	STEP.childSteps!.map((child) => this.processStep({step: child, releaseExecution})),
-			// );
+			await Promise.allSettled(
+				STEP.childSteps!.map((child) =>
+					this.processStep({ step: child, releaseExecution }),
+				),
+			);
 
-			for (const child of STEP.childSteps!) {
-				await this.processStep({
-					step: child,
-					releaseExecution,
-				});
-			}
+			// for (const child of STEP.childSteps!) {
+			// 	await this.processStep({
+			// 		step: child,
+			// 		releaseExecution,
+			// 	});
+			// }
 
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
@@ -246,23 +248,25 @@ export class ReleaseExecutionStepEngine {
 		if (!deliveryStatus) return;
 
 		const delivery = step.metadata?.input?.delivery;
-		const releaseIds = [
-			...(delivery?.releaseIds ?? []),
-			...(delivery?.releaseId ? [delivery.releaseId] : []),
-		].filter(Boolean);
-		const items: { dspId: string; status: ReleaseDspStatus }[] = (
-			delivery?.items ?? []
-		)
-			.filter((item: any) => !!item.dspId)
+		const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
+		const items: {
+			id?: string;
+			dspId?: string;
+			dspCode?: string;
+			status: ReleaseDspStatus;
+		}[] = (delivery?.items ?? [])
+			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
 			.map((item: any) => ({
+				id: item.id,
 				dspId: item.dspId,
+				dspCode: item.dspCode,
 				status: deliveryStatus,
 			}));
 
-		await this.releaseDspDeliveryService.updateDeliveryStatus(
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
 			releaseIds,
 			items,
-		);
+		});
 	}
 
 	private mapStepStatusToDeliveryStatus(

@@ -2,8 +2,6 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { ReleaseExecutionStep3 } from 'src/modules/release/modules/release-executions3/entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from 'src/modules/release/modules/release-executions3/entites/release-execution3.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { ReleaseSubmitStep } from '../../release/modules/release-submit/entities/release-submit-step.entity';
-import { ReleaseSubmit } from '../../release/modules/release-submit/entities/release-submit.entity';
 
 export enum LogLevel {
 	SUCCESS = 'SUCCESS',
@@ -49,17 +47,9 @@ export class Logs extends BaseUUIDEntity {
 	@Column({ name: 'release_submit_id', type: 'uuid', nullable: true })
 	releaseSubmitId: string | null;
 
-	@ManyToOne(() => ReleaseSubmit, { onDelete: 'CASCADE', nullable: true })
-	@JoinColumn({ name: 'release_submit_id' })
-	releaseSubmit: ReleaseSubmit | null;
-
 	/** FK tới ReleaseSubmitStep — log cấp step */
 	@Column({ name: 'release_submit_step_id', type: 'uuid', nullable: true })
 	releaseSubmitStepId: string | null;
-
-	@ManyToOne(() => ReleaseSubmitStep, { onDelete: 'CASCADE', nullable: true })
-	@JoinColumn({ name: 'release_submit_step_id' })
-	releaseSubmitStep: ReleaseSubmitStep | null;
 
 	// v3
 	// relations

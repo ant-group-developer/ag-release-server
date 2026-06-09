@@ -1,5 +1,5 @@
 // services/release-dsp-delivery.service.ts
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
@@ -14,6 +14,7 @@ import {
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { ReleaseService } from '../release.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 @Injectable()
@@ -31,12 +32,23 @@ export class ReleaseDspDeliveryService {
 
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
 	) {}
 	// ==================== Delivery orchestration ====================
-	async updateDeliveryStatus(
-		releaseIds: string[],
-		items: { dspId: string; status: ReleaseDspStatus }[],
-	): Promise<void> {
+	async updateDeliveryStatus(input: {
+		releaseIds: string[];
+		items: {
+			id?: string;
+			dspId?: string;
+			dspCode?: string;
+			status: ReleaseDspStatus;
+		}[];
+	}): Promise<void> {
+		const { releaseIds } = input;
+		const items = await this.resolveDeliveryStatusItems(input.items);
+
 		if (!releaseIds.length || !items.length) return;
 
 		const now = new Date();
@@ -68,25 +80,11 @@ export class ReleaseDspDeliveryService {
 				['release_id', 'dsp_id'],
 			)
 			.execute();
-	}
 
-	async markProcessingByDspCodes(
-		releaseId: string,
-		dspCodes: string[],
-	): Promise<void> {
-		if (!dspCodes?.length) return;
-
-		const dsps = await this.dspRepo.find({
-			where: { code: In(dspCodes) },
-			select: ['id'],
-		});
-
-		await this.updateDeliveryStatus(
-			[releaseId],
-			dsps.map((dsp) => ({
-				dspId: dsp.id,
-				status: ReleaseDspStatus.PROCESSING,
-			})),
+		await Promise.all(
+			[...new Set(releaseIds)].map((releaseId) =>
+				this.releaseService.syncReleaseStatus(releaseId),
+			),
 		);
 	}
 
@@ -334,5 +332,49 @@ export class ReleaseDspDeliveryService {
 
 	protected getRepo(manager?: EntityManager) {
 		return manager ? manager.getRepository(ReleaseDspDelivery) : this.repo;
+	}
+
+	private async resolveDeliveryStatusItems(
+		items: {
+			id?: string;
+			dspId?: string;
+			dspCode?: string;
+			status: ReleaseDspStatus;
+		}[],
+	): Promise<{ dspId: string; status: ReleaseDspStatus }[]> {
+		if (!items.length) return [];
+
+		const dspCodes = [
+			...new Set(
+				items
+					.filter((item) => !item.id && !item.dspId && item.dspCode)
+					.map((item) => item.dspCode!),
+			),
+		];
+
+		const dspCodeToId = new Map<string, string>();
+		if (dspCodes.length) {
+			const dsps = await this.dspRepo.find({
+				where: { code: In(dspCodes) },
+				select: ['id', 'code'],
+			});
+
+			for (const dsp of dsps) {
+				dspCodeToId.set(dsp.code, dsp.id);
+			}
+		}
+
+		return items
+			.map((item) => ({
+				dspId:
+					item.id ??
+					item.dspId ??
+					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
+				status: item.status,
+			}))
+			.filter(
+				(item): item is { dspId: string; status: ReleaseDspStatus } =>
+					!!item.dspId,
+			);
 	}
 }

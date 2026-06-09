@@ -13,7 +13,7 @@ DROP VIEW IF EXISTS music_analytics.sales_dsp_monthly_cube_v2_mv;
 DROP VIEW IF EXISTS music_analytics.sales_ter_monthly_cube_v2_mv;
 
 -- 2. Rename column in exchange_rates
-ALTER TABLE music_analytics.exchange_rates RENAME COLUMN rate TO usd_to_local_rate;
+-- ALTER TABLE music_analytics.exchange_rates RENAME COLUMN rate TO usd_to_local_rate;
 
 -- 3. Update 'usd_to_local_rate' column comment
 ALTER TABLE music_analytics.exchange_rates COMMENT COLUMN usd_to_local_rate 'Exchange rate relative to USD. Specifically, 1 USD = X Local Currency units (e.g., 1 USD = 25000 VND). To convert local revenue to USD, divide by this rate: revenue_usd = revenue_local / usd_to_local_rate.';

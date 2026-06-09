@@ -16,7 +16,7 @@ Input chính khi submit:
 }
 ```
 
-Sau submit, `submit3()` cập nhật `release.status = submitted`, gọi `ReleaseDspDeliveryService.markProcessingByDspCodes()` để đưa các DSP được chọn sang `processing`, rồi tạo một bản ghi `release_excutions3` ở status `NEW`. Cron consumer sẽ lấy execution `NEW`, đổi sang `PROCESSING`, phân loại DSP, build cây step và đẩy một job vào queue `run_pipeline`.
+Sau submit, `submit3()` cập nhật `release.status = submitted`, gọi `ReleaseDspDeliveryService.updateDeliveryStatus()` với danh sách `dspCode` để đưa các DSP được chọn sang `processing`, rồi tạo một bản ghi `release_excutions3` ở status `NEW`. Cron consumer sẽ lấy execution `NEW`, đổi sang `PROCESSING`, phân loại DSP, build cây step và đẩy một job vào queue `run_pipeline`.
 
 DSP được phân thành 2 nhóm:
 
@@ -27,7 +27,7 @@ DSP được phân thành 2 nhóm:
 
 Status ở bảng `release_dsp_delivery` được cập nhật ngay khi submit và tiếp tục được đồng bộ theo các step có `isDeliveryStep = true`.
 
-Với các step này, `metadata.input.delivery` chứa `releaseId` và danh sách `items` theo dạng `{ dspId }`. Khi step đổi status, engine map status của step sang status của delivery, tạo lại danh sách `{ dspId, status }`, rồi gọi `ReleaseDspDeliveryService.updateDeliveryStatus(releaseIds, items)` để upsert vào bảng `release_dsp_delivery`. Vì vậy step direct có thể cập nhật từng DSP riêng lẻ, còn step aggregator có thể cập nhật cả nhóm DSP đi qua CI trong cùng một lần sync.
+Với các step này, `metadata.input.delivery` chứa `releaseId` và danh sách `items` theo dạng `{ id }`, `{ dspId }` hoặc `{ dspCode }`. Khi step đổi status, engine map status của step sang status của delivery, tạo lại danh sách `{ id | dspId | dspCode, status }`, rồi gọi `ReleaseDspDeliveryService.updateDeliveryStatus({ releaseIds, items })` để upsert vào bảng `release_dsp_delivery`. Vì vậy step direct có thể cập nhật từng DSP riêng lẻ, còn step aggregator có thể cập nhật cả nhóm DSP đi qua CI trong cùng một lần sync.
 
 ## 2. Sơ đồ nghiệp vụ
 
@@ -88,7 +88,7 @@ sequenceDiagram
 
   FE->>ReleaseSvc: submit3(releaseId, dspCodes)
   ReleaseSvc->>Release: status = submitted
-  ReleaseSvc->>Delivery: markProcessingByDspCodes(releaseId, dspCodes)
+  ReleaseSvc->>Delivery: updateDeliveryStatus({ releaseIds, items: dspCodes })
   ReleaseSvc->>ExecSvc: newReleaseExecution(release, dspCodes)
   ExecSvc->>EQ: insert status NEW
   Consumer->>EQ: scan NEW mỗi 1 phút
@@ -228,8 +228,8 @@ Mapping từ submit/step sang delivery:
 
 ```text
 submit3(dspCodes)
-  -> ReleaseDspDeliveryService.markProcessingByDspCodes()
-  -> updateDeliveryStatus([releaseId], items status=processing)
+  -> ReleaseDspDeliveryService.updateDeliveryStatus()
+  -> updateDeliveryStatus({ releaseIds: [releaseId], items status=processing })
 
 PROCESS_DSPS PROCESSING
   -> có thể re-sync processing idempotently nếu engine chạy tới step này

@@ -71,8 +71,6 @@ export class LogsService {
 	}
 
 	private saveDbAndSendNotificationToDev_Safe(data: WriteLogDto) {
-		console.log('dagdgd', data);
-
 		switch (data.level) {
 			case LogLevel.ERROR:
 				this.logger.error(data.message, data.data);
