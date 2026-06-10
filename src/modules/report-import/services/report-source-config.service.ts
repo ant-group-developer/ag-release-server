@@ -28,7 +28,23 @@ export class ReportSourceConfigService {
         messageCode: 'report.config.not.found',
       });
     }
-    return rows[0];
+    const r = rows[0];
+    return {
+      id: r.id,
+      sourceCode: r.source_code,
+      sourceName: r.source_name,
+      reportType: r.report_type,
+      folderPatterns: r.folder_patterns,
+      filePatterns: r.file_patterns,
+      requiredHeaders: r.required_headers,
+      parserCode: r.parser_code,
+      delimiter: r.delimiter,
+      defaultCurrency: r.default_currency,
+      defaultMember: r.default_member,
+      priority: Number(r.priority),
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    };
   }
 
   /**
@@ -144,19 +160,19 @@ export class ReportSourceConfigService {
     const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const row = {
       id,
-      source_code: dto.sourceCode ?? existing.source_code,
-      source_name: dto.sourceName ?? existing.source_name,
-      report_type: dto.reportType ?? existing.report_type,
-      folder_patterns: dto.folderPatterns ?? existing.folder_patterns,
-      file_patterns: dto.filePatterns ?? existing.file_patterns,
-      required_headers: dto.requiredHeaders ?? existing.required_headers,
-      parser_code: dto.parserCode ?? existing.parser_code,
+      source_code: dto.sourceCode ?? existing.sourceCode,
+      source_name: dto.sourceName ?? existing.sourceName,
+      report_type: dto.reportType ?? existing.reportType,
+      folder_patterns: dto.folderPatterns ?? existing.folderPatterns,
+      file_patterns: dto.filePatterns ?? existing.filePatterns,
+      required_headers: dto.requiredHeaders ?? existing.requiredHeaders,
+      parser_code: dto.parserCode ?? existing.parserCode,
       delimiter: dto.delimiter ?? existing.delimiter,
-      default_currency: dto.defaultCurrency ?? existing.default_currency,
-      default_member: dto.defaultMember ?? existing.default_member,
+      default_currency: dto.defaultCurrency ?? existing.defaultCurrency,
+      default_member: dto.defaultMember ?? existing.defaultMember,
       priority: dto.priority !== undefined ? Number(dto.priority) : Number(existing.priority),
       is_active: 1,
-      created_at: existing.created_at,
+      created_at: existing.createdAt,
       updated_at: nowStr,
     };
 
@@ -193,19 +209,19 @@ export class ReportSourceConfigService {
     const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
     const row = {
       id: existing.id,
-      source_code: existing.source_code,
-      source_name: existing.source_name,
-      report_type: existing.report_type,
-      folder_patterns: existing.folder_patterns,
-      file_patterns: existing.file_patterns,
-      required_headers: existing.required_headers,
-      parser_code: existing.parser_code,
+      source_code: existing.sourceCode,
+      source_name: existing.sourceName,
+      report_type: existing.reportType,
+      folder_patterns: existing.folderPatterns,
+      file_patterns: existing.filePatterns,
+      required_headers: existing.requiredHeaders,
+      parser_code: existing.parserCode,
       delimiter: existing.delimiter,
-      default_currency: existing.default_currency,
-      default_member: existing.default_member,
+      default_currency: existing.defaultCurrency,
+      default_member: existing.defaultMember,
       priority: Number(existing.priority),
       is_active: 0,
-      created_at: existing.created_at,
+      created_at: existing.createdAt,
       updated_at: nowStr,
     };
 

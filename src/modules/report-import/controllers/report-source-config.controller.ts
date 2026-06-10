@@ -27,7 +27,7 @@ export class ReportSourceConfigController {
     const result = await this.configService.create(dto);
     return new ResponseSuccess({
       data: result,
-      messageCode: 'report.config.create.success',
+      messageCode: 'common.success',
     });
   }
 
@@ -83,7 +83,7 @@ export class ReportSourceConfigController {
     const result = await this.configService.update(id, dto);
     return new ResponseSuccess({
       data: result,
-      messageCode: 'report.config.update.success',
+      messageCode: 'common.success',
     });
   }
 
@@ -100,7 +100,7 @@ export class ReportSourceConfigController {
     const result = await this.configService.delete(id);
     return new ResponseSuccess({
       data: result,
-      messageCode: 'report.config.delete.success',
+      messageCode: 'common.success',
     });
   }
 }
