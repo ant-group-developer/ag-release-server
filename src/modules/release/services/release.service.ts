@@ -476,6 +476,7 @@ export class ReleaseService {
 			status: ReleaseStatus.SUBMITTED,
 			releaseEndDate: null,
 		});
+
 		await this.releaseDspDeliveryService.updateDeliveryStatus({
 			releaseIds: [id],
 			items: dto.code.map((dspCode) => ({
@@ -496,6 +497,8 @@ export class ReleaseService {
 		await this.releaseRepo.update(id, {
 			releaseEndDate: new Date(),
 		});
+
+		await this.submit3(id, dto);
 	}
 
 	// get qa flag ci

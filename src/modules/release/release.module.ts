@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
+import { Artist } from '../artist/entities/artist.entity';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { CountryModule } from '../country/country.module';
 import { Country } from '../country/entities/country.entity';
@@ -19,6 +20,7 @@ import { Label } from '../label/entities/label.entity';
 import { NotificationModule } from '../notification/notification.module';
 import { OrmModule } from '../orm/orm.module';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
+import { ReleaseArtist } from '../release-artist/entities/release-artist.entity';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
@@ -37,6 +39,7 @@ import { ReleaseDdexService } from './services/release-ddex.service';
 import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery.controller';
 import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseReportImportService } from './services/release-report-import.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
@@ -45,6 +48,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { TrackArtist } from '../track-artist/entities/track-artist.entity';
 import { Track } from '../track/entities/track.entity';
 import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';
@@ -84,6 +88,9 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		TypeOrmModule.forFeature([
 			Release,
 			Track,
+			Artist,
+			ReleaseArtist,
+			TrackArtist,
 			AlbumFormat,
 			Genre,
 			Label,
@@ -161,6 +168,7 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseDraftService,
 		ReleaseValidateService,
 		ReleaseQueryService,
+		ReleaseReportImportService,
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,
@@ -181,6 +189,11 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
 	],
-	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
+	exports: [
+		ReleaseDdexService,
+		ReleaseQueryService,
+		ReleaseReportImportService,
+		ReleaseValidateService,
+	],
 })
 export class ReleaseModule {}

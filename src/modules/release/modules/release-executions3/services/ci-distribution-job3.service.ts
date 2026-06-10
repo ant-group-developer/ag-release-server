@@ -71,8 +71,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	 */
 	// @Cron('*/5 * * * *')
 	// @Cron('* * * * *') // mỗi phút
-	@Cron('*/10 * * * *') // mỗi 10p
-	// @Cron('*/10 * * * * *') // mỗi 10 giây, test nhanh
+	// @Cron('*/10 * * * *') // mỗi 10p
+	@Cron('*/10 * * * * *') // mỗi 10 giây, test nhanh
 	async handleCheckCiToolJobStatus() {
 		await this.checkCiToolJobStatus();
 	}
