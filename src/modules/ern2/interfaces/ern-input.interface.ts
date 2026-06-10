@@ -251,6 +251,7 @@ export interface ErnPriceInput {
 	priceType: 'StandardRetailPrice';
 	value: number;
 	currencyCode: string;
+	priceRangeType?: string;
 }
 
 // ============================================================================

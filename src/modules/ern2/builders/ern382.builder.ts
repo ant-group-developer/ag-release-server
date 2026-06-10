@@ -637,7 +637,7 @@ export class Ern382Builder2 {
 					const pi = terms.ele('PriceInformation');
 					pi.ele('PriceRangeType', {
 						Namespace: `DPID:${this.input.message.sender.partyId}`,
-					}).txt('mid');
+					}).txt(deal.price.priceRangeType || 'mid');
 				}
 
 				const validity = terms.ele('ValidityPeriod');
@@ -681,7 +681,7 @@ export class Ern382Builder2 {
 						const pi = terms.ele('PriceInformation');
 						pi.ele('PriceRangeType', {
 							Namespace: `DPID:${this.input.message.sender.partyId}`,
-						}).txt('mid');
+						}).txt(deal.price.priceRangeType || 'mid');
 					}
 
 					const validity = terms.ele('ValidityPeriod');

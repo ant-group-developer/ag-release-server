@@ -832,6 +832,7 @@ export class ReleaseDdexService {
 						priceType: 'StandardRetailPrice',
 						value: track.priceTier?.amount ?? 0,
 						currencyCode: track.priceTier?.currency?.code || 'USD',
+						priceRangeType: track.priceTier?.ciCode || 'mid',
 					},
 
 					genre:
@@ -944,6 +945,7 @@ export class ReleaseDdexService {
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
 								release.priceTier?.currency?.code || 'USD',
+							priceRangeType: release.priceTier?.ciCode || 'mid',
 						},
 					},
 				],
@@ -964,6 +966,8 @@ export class ReleaseDdexService {
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
 									?.code || 'USD',
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
 						},
 					},
 					{
@@ -982,6 +986,8 @@ export class ReleaseDdexService {
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
 									?.code || 'USD',
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
 						},
 					},
 					{
@@ -1000,6 +1006,8 @@ export class ReleaseDdexService {
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
 									?.code || 'USD',
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
 						},
 					},
 				],
@@ -1279,6 +1287,7 @@ export class ReleaseDdexService {
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
 								release.priceTier?.currency?.code || 'USD',
+							priceRangeType: release.priceTier?.ciCode || 'mid',
 						},
 					},
 				],
