@@ -569,6 +569,7 @@ export class BulkSubmitReleaseDto {
 	ids: string[];
 
 	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsOptional()
 	@IsUUID('4', { each: true })
 	idsExclude?: string[];
 
