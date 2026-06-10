@@ -7,6 +7,8 @@ import {
   IsUUID,
   Min,
   Max,
+  IsEnum,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -160,4 +162,15 @@ export class EntityOverviewQueryDto {
   @IsOptional()
   @Type(() => String)
   toDate: string;
+}
+
+export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {
+  @IsNotEmpty()
+  @IsEnum(['stream', 'revenue'])
+  @ApiProperty({
+    description: 'Type of metric: stream (quantity) or revenue (USD)',
+    enum: ['stream', 'revenue'],
+    example: 'stream',
+  })
+  type: 'stream' | 'revenue';
 }

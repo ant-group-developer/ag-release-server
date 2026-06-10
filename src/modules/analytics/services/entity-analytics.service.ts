@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import {
 	EntityOverviewQueryDto,
 	EntityTimelineQueryDto,
@@ -89,7 +90,8 @@ export class EntityAnalyticsService {
 		dto: EntityOverviewQueryDto,
 		tenantId: string,
 	): Promise<EntityOverviewResponse> {
-		const { fromDate, toDate } = dto;
+		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
@@ -143,7 +145,9 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
-		const { fromDate, toDate, topN = 5, includeOther = true } = dto;
+		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
+		const { topN = 5, includeOther = true } = dto;
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
@@ -224,7 +228,9 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
-		const { fromDate, toDate, topN = 5, includeOther = true } = dto;
+		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
+		const { topN = 5, includeOther = true } = dto;
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
@@ -389,7 +395,9 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<RevenueTimelineResponse> {
-		const { fromDate, toDate, topN = 5, includeOther = true } = dto;
+		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
+		const { topN = 5, includeOther = true } = dto;
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,

@@ -49,16 +49,34 @@ export class SyncController {
       required: ['period'],
     },
   })
-  async syncPeriod(@Body() body: { period: string; force?: boolean }, @User() user: any) {
+  async syncPeriod(
+    @Body() body: {
+      period: string;
+      force?: boolean;
+      categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
+    },
+    @User() user: any,
+  ) {
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
-      params: { period: body.period, force: body.force ?? false },
+      params: {
+        period: body.period,
+        force: body.force ?? false,
+        categories: body.categories,
+      },
       tenantId: user?.tenantId,
       createdBy: user?.sub,
       progressTotal: 1,
     });
 
-    setImmediate(() => this.runSyncPeriodJob(job.id, body.period, body.force ?? false));
+    setImmediate(() =>
+      this.runSyncPeriodJob(
+        job.id,
+        body.period,
+        body.force ?? false,
+        body.categories,
+      ),
+    );
 
     return {
       jobId: job.id,
@@ -88,18 +106,31 @@ export class SyncController {
     },
   })
   async syncAll(
-    @Body() body: { force?: boolean; startPeriod?: string },
+    @Body() body: {
+      force?: boolean;
+      startPeriod?: string;
+      categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
+    },
     @User() user: any,
   ) {
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.FTP_SYNC_ALL,
-      params: { force: body?.force ?? false, startPeriod: body?.startPeriod ?? null },
+      params: {
+        force: body?.force ?? false,
+        startPeriod: body?.startPeriod ?? null,
+        categories: body?.categories,
+      },
       tenantId: user?.tenantId,
       createdBy: user?.sub,
     });
 
     setImmediate(() =>
-      this.runSyncAllJob(job.id, body?.force ?? false, body?.startPeriod),
+      this.runSyncAllJob(
+        job.id,
+        body?.force ?? false,
+        body?.startPeriod,
+        body?.categories,
+      ),
     );
 
     return {
@@ -121,16 +152,24 @@ export class SyncController {
       required: ['period'],
     },
   })
-  async retryImport(@Body() body: { period: string }, @User() user: any) {
+  async retryImport(
+    @Body() body: {
+      period: string;
+      categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
+    },
+    @User() user: any,
+  ) {
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.FTP_RETRY,
-      params: { period: body.period, force: true },
+      params: { period: body.period, force: true, categories: body.categories },
       tenantId: user?.tenantId,
       createdBy: user?.sub,
       progressTotal: 1,
     });
 
-    setImmediate(() => this.runSyncPeriodJob(job.id, body.period, true));
+    setImmediate(() =>
+      this.runSyncPeriodJob(job.id, body.period, true, body.categories),
+    );
 
     return {
       jobId: job.id,
@@ -188,7 +227,12 @@ export class SyncController {
   // Job runners — chạy nền, không throw ra ngoài
   // ─────────────────────────────────────────────────────
 
-  private async runSyncPeriodJob(jobId: string, period: string, force: boolean): Promise<void> {
+  private async runSyncPeriodJob(
+    jobId: string,
+    period: string,
+    force: boolean,
+    categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
+  ): Promise<void> {
     try {
       await this.importJobsService.markProcessing(jobId);
       await this.importJobsService.updateProgress(
@@ -196,7 +240,7 @@ export class SyncController {
         { progressTotal: 1, progressCurrent: 0, progressLabel: `Syncing ${period}` },
         true,
       );
-      const result = await this.syncService.syncPeriod(period, force);
+      const result = await this.syncService.syncPeriod(period, force, categories);
       await this.importJobsService.updateProgress(
         jobId,
         { progressTotal: 1, progressCurrent: 1, progressLabel: 'Done' },
@@ -212,6 +256,7 @@ export class SyncController {
     jobId: string,
     force: boolean,
     startPeriod?: string,
+    categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
   ): Promise<void> {
     try {
       await this.importJobsService.markProcessing(jobId);
@@ -242,7 +287,7 @@ export class SyncController {
           true,
         );
         try {
-          const result = await this.syncService.syncPeriod(periods[i], force);
+          const result = await this.syncService.syncPeriod(periods[i], force, categories);
           results.push(result);
         } catch (err) {
           results.push({ period: periods[i], error: err.message });
