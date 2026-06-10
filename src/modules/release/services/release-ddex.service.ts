@@ -26,6 +26,10 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
+import {
+	DEFAULT_PRICE_CURRENCY_CODE,
+	DEFAULT_PRICE_RANGE_TYPE,
+} from '../constants/release.constant';
 import { Release } from '../entities/release.entity';
 
 interface AudioFileInfo {
@@ -831,8 +835,11 @@ export class ReleaseDdexService {
 					price: {
 						priceType: 'StandardRetailPrice',
 						value: track.priceTier?.amount ?? 0,
-						currencyCode: track.priceTier?.currency?.code || 'USD',
-						priceRangeType: track.priceTier?.ciCode || 'mid',
+						currencyCode:
+							track.priceTier?.currency?.code ||
+							DEFAULT_PRICE_CURRENCY_CODE,
+						priceRangeType:
+							track.priceTier?.ciCode || DEFAULT_PRICE_RANGE_TYPE,
 					},
 
 					genre:
@@ -944,8 +951,11 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code || 'USD',
-							priceRangeType: release.priceTier?.ciCode || 'mid',
+								release.priceTier?.currency?.code ||
+								DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 				],
@@ -965,9 +975,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code || 'USD',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
 							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 					{
@@ -985,9 +996,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code || 'USD',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
 							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 					{
@@ -1005,9 +1017,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code || 'USD',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
 							priceRangeType:
-								release.tracks?.[0]?.priceTier?.ciCode || 'mid',
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 				],
@@ -1286,8 +1299,11 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code || 'USD',
-							priceRangeType: release.priceTier?.ciCode || 'mid',
+								release.priceTier?.currency?.code ||
+								DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 				],
