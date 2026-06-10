@@ -22,3 +22,13 @@ export function getTimeStamp(format: DateFormat = DateFormat.YYYYMMDDHHmmss) {
 	const timestamp = dayjs().format(format);
 	return timestamp;
 }
+
+export function normalizeDateToFirstOfMonth(dateStr: string): string {
+	if (!dateStr) return dateStr;
+	const parsed = dayjs(dateStr);
+	if (parsed.isValid()) {
+		return parsed.startOf('month').format('YYYY-MM-01');
+	}
+	return dateStr;
+}
+

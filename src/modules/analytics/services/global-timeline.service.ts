@@ -4,6 +4,7 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { IsrcResolverService } from './isrc-resolver.service';
 import { TimelineQueryDto } from '../dto/analytics-query.dto';
+import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import {
   DspTimelineResponse,
   DspTimelinePeriod,
@@ -75,7 +76,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
-    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -176,7 +179,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
-    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -370,7 +375,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
-    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -457,7 +464,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
-    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -541,7 +550,8 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueOverviewResponse> {
-    const { fromDate, toDate } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -579,7 +589,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTimelineResponse> {
-    const { fromDate, toDate, topN = 5, includeOther = true } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -691,7 +703,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTopDspResponse> {
-    const { fromDate, toDate, topN = 5 } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 5 } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -741,7 +755,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTopArtistResponse> {
-    const { fromDate, toDate, topN = 10 } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 10 } = query;
     const isSystem = checkIsSystemTenant(tenantId);
 
     const params: Record<string, any> = { from: fromDate, to: toDate };
@@ -820,7 +836,9 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTopTrackResponse> {
-    const { fromDate, toDate, topN = 10 } = query;
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { topN = 10 } = query;
     const isSystem = checkIsSystemTenant(tenantId);
 
     const params: Record<string, any> = { from: fromDate, to: toDate };
