@@ -36,8 +36,9 @@ export class ReportImportController {
   ): Promise<ResponseSuccess<ReportImportPreValidateResponse>> {
     const result = await this.reportImportService.preValidate(
       body.files,
-      user?.tenantId,
+      body.tenantId || user?.tenantId,
       user?.sub,
+      body.allowedExtensions,
     );
     return new ResponseSuccess({
       data: result,

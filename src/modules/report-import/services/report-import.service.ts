@@ -25,6 +25,7 @@ export class ReportImportService {
     files: Array<{ path: string; size: number }>,
     tenantId: string,
     userId: string,
+    allowedExtensions?: string[],
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('Danh sách file trống');
@@ -44,6 +45,17 @@ export class ReportImportService {
     const jobId = uuidv4();
 
     for (const f of files) {
+      if (allowedExtensions && allowedExtensions.length > 0) {
+        const ext = path.extname(f.path).toLowerCase().replace('.', '');
+        if (!allowedExtensions.map((e) => e.toLowerCase()).includes(ext)) {
+          invalid.push({
+            path: f.path,
+            reason: `Định dạng file .${ext} không nằm trong danh sách được phép [${allowedExtensions.join(', ')}]`,
+          });
+          continue;
+        }
+      }
+
       const config = this.detectorService.detectConfig(f.path);
       if (!config) {
         invalid.push({

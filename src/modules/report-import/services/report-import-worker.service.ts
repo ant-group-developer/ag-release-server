@@ -12,6 +12,7 @@ import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ImportJobStatus, FactSalesRow, FactDspRow } from '../../etl/interfaces';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
+import { ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
 
 @Injectable()
 export class ReportImportWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -26,6 +27,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     private readonly cubeRebuildService: CubeRebuildService,
     private readonly dspMappingService: DspMappingService,
     private readonly clickHouseService: ClickHouseService,
+    private readonly reportEntityExtractorService: ReportEntityExtractorService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -68,6 +70,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
   private async processJob(jobId: string) {
     const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
     let totalProcessedRows = 0;
+    const uniqueRowsMap = new Map<string, any>(); // key: `${upc}|${isrc}`
     
     try {
       await this.importJobsService.markProcessing(jobId);
@@ -151,6 +154,26 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
                 if (r.reporting_period_start) {
                   affectedPeriods.add(r.reporting_period_start.substring(0, 7)); // YYYY-MM
                 }
+
+                // Extract & deduplicate metadata for PostgreSQL import
+                const isrc = r.isrc?.trim();
+                const upc = r.upc?.trim();
+                if (isrc && upc) {
+                  const key = `${upc}|${isrc}`;
+                  const score = (r.track_title ? 1 : 0) + (r.artist_name ? 1 : 0) + (r.album_title ? 1 : 0) + (r.label_name ? 1 : 0);
+                  const existing = uniqueRowsMap.get(key);
+                  if (!existing || score > existing.score) {
+                    uniqueRowsMap.set(key, {
+                      isrc,
+                      upc,
+                      track_title: r.track_title,
+                      artist_name: r.artist_name,
+                      album_title: r.album_title,
+                      label_name: r.label_name,
+                      score,
+                    });
+                  }
+                }
               }
 
               // Batch insert into ClickHouse
@@ -188,6 +211,28 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
         await this.r2Service.deletePrivate(file.r2Key).catch((err) => {
           this.logger.warn(`Failed to clean up R2 file ${file.r2Key}: ${err.message}`);
         });
+      }
+
+      // 3. Extract and import entities into PostgreSQL
+      if (uniqueRowsMap.size > 0) {
+        this.logger.log(`Extracting and importing ${uniqueRowsMap.size} unique entities to PostgreSQL...`);
+        await this.importJobsService.updateProgress(jobId, {
+          progressLabel: `Importing metadata to PostgreSQL...`,
+        }, true);
+
+        const rowsToImport = Array.from(uniqueRowsMap.values());
+        const entityResult = await this.reportEntityExtractorService.extractAndImport(
+          rowsToImport,
+          job.tenantId, // The default tenant ID chosen on pre-validate upload form
+        ).catch((err) => {
+          this.logger.error(`Failed to extract/import entities to PostgreSQL for job ${jobId}: ${err.message}`);
+          return { totalReleases: 0, created: 0, skipped: 0, errors: 0 };
+        });
+
+        this.logger.log(
+          `Entity import completed: ${entityResult.created} created, ` +
+          `${entityResult.skipped} skipped, ${entityResult.errors} errors.`,
+        );
       }
 
       // 3. Rebuild cubes for all affected month partitions

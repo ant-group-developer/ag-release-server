@@ -1,24 +1,39 @@
-import { IsArray, IsNotEmpty, IsNumber, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 import { ImportJob } from '../../etl/interfaces';
 import { ReportImportStartResponse, ReportImportStatusResponse } from '../interfaces/report-import.interface';
 
 export class PreValidateFileDto {
+  @ApiProperty({ description: 'Original local file path' })
   @IsNotEmpty()
   @IsString()
   path: string;
 
+  @ApiProperty({ description: 'File size in bytes' })
   @IsNotEmpty()
   @IsNumber()
   size: number;
 }
 
 export class PreValidateRequestDto {
+  @ApiProperty({ type: [PreValidateFileDto], description: 'List of files to pre-validate' })
   @IsNotEmpty()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PreValidateFileDto)
   files: PreValidateFileDto[];
+
+  @ApiProperty({ description: 'Optional default Tenant ID to assign releases to', required: false })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiProperty({ description: 'Allowed file extensions (e.g. csv, txt, xlsx)', required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedExtensions?: string[];
 }
 
 export class ReportImportStartResponseDto implements ReportImportStartResponse {

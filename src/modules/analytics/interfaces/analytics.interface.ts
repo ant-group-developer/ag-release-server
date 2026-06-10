@@ -1,3 +1,5 @@
+import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
+
 /**
  * Analytics API response interfaces & types.
  * Tất cả metadata (track, release, artist, label) lấy từ PostgreSQL.
@@ -99,6 +101,9 @@ export interface TrackRankingItem {
   releaseId: string;
   releaseTitle: string;
   totalViews: number;
+  release: {
+    coverArtThumbnails: ICoverArtThumbnails;
+  } | null;
 }
 
 export interface ReleaseRankingItem {
@@ -110,6 +115,9 @@ export interface ReleaseRankingItem {
   labelName: string | null;
   trackCount: number;
   totalViews: number;
+  release: {
+    coverArtThumbnails: ICoverArtThumbnails;
+  } | null;
 }
 
 export interface ArtistRankingItem {
@@ -117,6 +125,7 @@ export interface ArtistRankingItem {
   artistId: string;
   artistName: string;
   picture: string | null;
+  image: string | null;
   trackCount: number;
   totalViews: number;
 }
@@ -126,6 +135,7 @@ export interface LabelRankingItem {
   labelId: string;
   labelName: string;
   picture: string | null;
+  image: string | null;
   releaseCount: number;
   trackCount: number;
   totalViews: number;

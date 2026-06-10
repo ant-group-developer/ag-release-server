@@ -11,6 +11,7 @@ import {
   ArtistRankingItem,
   LabelRankingItem,
 } from '../interfaces/analytics.interface';
+import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
 /**
  * Service xếp hạng hiệu năng (Rankings) cho Tracks, Releases, Artists, Labels.
@@ -179,18 +180,38 @@ export class RankingService {
       }
     }
 
+    const releaseIds = Array.from(metadataMap.values())
+      .map((m) => m.releaseId)
+      .filter(Boolean);
+    const releaseImageMap = await this.isrcResolverService.getReleaseImages(releaseIds);
+
     const items: TrackRankingItem[] = paged.map((row, index) => {
       const meta = metadataMap.get(row.isrc);
       const fallback = fallbackMap.get(row.isrc);
+      const releaseId = meta?.releaseId ?? '';
+      
+      let releaseObj: { coverArtThumbnails: ICoverArtThumbnails } | null = null;
+      if (releaseId) {
+        const coverArtThumbnails = releaseImageMap.get(releaseId) ?? {
+          '75x75': null,
+          '100x100': null,
+          '160x160': null,
+          '300x300': null,
+          original: null,
+        };
+        releaseObj = { coverArtThumbnails };
+      }
+
       return {
         rank: query.skip + index + 1,
         isrc: row.isrc,
         title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
         version: meta?.trackVersion ?? null,
         artistName: artistNameMap.get(row.isrc) ?? fallback?.artistName ?? '',
-        releaseId: meta?.releaseId ?? '',
+        releaseId,
         releaseTitle: meta?.releaseTitle ?? fallback?.albumTitle ?? '',
         totalViews: Number(row.totalViews),
+        release: releaseObj,
       };
     });
 
@@ -265,7 +286,6 @@ export class RankingService {
       trackCount: string;
       totalViews: string;
     }>(dataSql, params);
-
     // Enrich release metadata from PostgreSQL (only enrich top N releases)
     const releasesMeta =
       await this.isrcResolverService.getAllTrackMetadataForTenant(tenantId);
@@ -274,8 +294,18 @@ export class RankingService {
       metaMap.set(m.releaseId, m);
     }
 
+    const releaseIds = paged.map((r) => r.releaseId);
+    const imageMap = await this.isrcResolverService.getReleaseImages(releaseIds);
+
     const items: ReleaseRankingItem[] = paged.map((r, index) => {
       const meta = metaMap.get(r.releaseId);
+      const coverArtThumbnails = imageMap.get(r.releaseId) ?? {
+        '75x75': null,
+        '100x100': null,
+        '160x160': null,
+        '300x300': null,
+        original: null,
+      };
       return {
         rank: query.skip + index + 1,
         releaseId: r.releaseId,
@@ -285,6 +315,9 @@ export class RankingService {
         labelName: meta?.labelName ?? null,
         trackCount: Number(r.trackCount),
         totalViews: Number(r.totalViews),
+        release: {
+          coverArtThumbnails,
+        },
       };
     });
 
@@ -361,26 +394,24 @@ export class RankingService {
       trackCount: string;
       totalViews: string;
     }>(dataSql, params);
+    // Enrich label metadata from PostgreSQL (only enrich top N labels)
+    const labelIds = paged.map((l) => l.labelId);
+    const labelsMeta = await this.isrcResolverService.getLabelMetadata(labelIds);
 
-    // Enrich label info from PostgreSQL
-    const allTracksMeta =
-      await this.isrcResolverService.getAllTrackMetadataForTenant(tenantId);
-    const labelNamesMap = new Map<string, string>();
-    for (const m of allTracksMeta) {
-      if (m.labelId) {
-        labelNamesMap.set(m.labelId, m.labelName ?? 'Unknown Label');
-      }
-    }
-
-    const items: LabelRankingItem[] = paged.map((l, index) => ({
-      rank: query.skip + index + 1,
-      labelId: l.labelId,
-      labelName: labelNamesMap.get(l.labelId) ?? 'Unknown Label',
-      picture: null,
-      releaseCount: Number(l.releaseCount),
-      trackCount: Number(l.trackCount),
-      totalViews: Number(l.totalViews),
-    }));
+    const items: LabelRankingItem[] = paged.map((l, index) => {
+      const meta = labelsMeta.get(l.labelId);
+      const pictureUrl = meta?.picture ?? null;
+      return {
+        rank: query.skip + index + 1,
+        labelId: l.labelId,
+        labelName: meta?.name ?? 'Unknown Label',
+        picture: pictureUrl,
+        image: pictureUrl,
+        releaseCount: Number(l.releaseCount),
+        trackCount: Number(l.trackCount),
+        totalViews: Number(l.totalViews),
+      };
+    });
 
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
@@ -456,24 +487,19 @@ export class RankingService {
       trackCount: string;
       totalViews: string;
     }>(dataSql, params);
-
     // Enrich artist metadata từ Postgres (chỉ enrich Top N artist đã paged)
-    const artists =
-      await this.isrcResolverService.getAllIsrcArtistMappingsForTenant(
-        tenantId,
-      );
-    const artistMetaMap = new Map<string, any>();
-    for (const a of artists) {
-      artistMetaMap.set(a.artistId, a);
-    }
+    const artistIds = paged.map((a) => a.artistId);
+    const artistMetaMap = await this.isrcResolverService.getArtistMetadata(artistIds);
 
     const items: ArtistRankingItem[] = paged.map((a, index) => {
       const meta = artistMetaMap.get(a.artistId);
+      const pictureUrl = meta?.picture ?? null;
       return {
         rank: query.skip + index + 1,
         artistId: a.artistId,
-        artistName: meta?.artistName ?? 'Unknown Artist',
-        picture: meta?.artistPicture ?? null,
+        artistName: meta?.name ?? 'Unknown Artist',
+        picture: pictureUrl,
+        image: pictureUrl,
         trackCount: Number(a.trackCount),
         totalViews: Number(a.totalViews),
       };

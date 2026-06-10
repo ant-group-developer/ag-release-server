@@ -45,6 +45,7 @@ import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 // import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
+import { ReportEntityExtractorService } from './services/report-entity-extractor.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
@@ -172,6 +173,7 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,
+		ReportEntityExtractorService,
 
 		// v1
 		ReleaseExecutionsService,
@@ -194,6 +196,7 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseQueryService,
 		ReleaseReportImportService,
 		ReleaseValidateService,
+		ReportEntityExtractorService,
 	],
 })
 export class ReleaseModule {}

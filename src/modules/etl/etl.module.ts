@@ -16,9 +16,10 @@ import { CubeRebuildService } from './services/cube-rebuild/cube-rebuild.service
 import { DspModule } from '../dsp/dsp.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 import { DspReportModule } from '../dsp-report/dsp-report.module';
+import { ReleaseModule } from '../release/release.module';
 
 @Module({
-  imports: [DspModule, ClickHouseModule, DspReportModule],
+  imports: [DspModule, ClickHouseModule, DspReportModule, ReleaseModule],
   controllers: [ImportController, SyncController, JobController, WmgImportController, ExchangeRateController],
   providers: [
     ImportService,
