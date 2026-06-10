@@ -71,6 +71,7 @@ export class RankingService {
     query: RankingQueryDto,
   ): Promise<PageDto<TrackRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
@@ -145,16 +146,50 @@ export class RankingService {
       );
     }
 
+    // Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse
+    // Chỉ xảy ra với system-tenant (query tất cả ISRCs, không giới hạn pg_tracks_sync)
+    const fallbackMap = new Map<string, { trackTitle: string; artistName: string; albumTitle: string }>();
+    if (isSystem) {
+      const missingIsrcs = topIsrcs.filter((isrc) => !metadataMap.has(isrc));
+      if (missingIsrcs.length > 0) {
+        const fbParams = { isrcs: missingIsrcs };
+        const fbSql = `
+          SELECT
+            isrc,
+            any(track_title) AS track_title,
+            any(artist_name) AS artist_name,
+            any(album_title) AS album_title
+          FROM ${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+          WHERE isrc IN ({isrcs:Array(String)})
+          GROUP BY isrc
+        `;
+        const fbRows = await this.clickHouseService.query<{
+          isrc: string;
+          track_title: string;
+          artist_name: string;
+          album_title: string;
+        }>(fbSql, fbParams);
+        for (const fb of fbRows) {
+          fallbackMap.set(fb.isrc, {
+            trackTitle: fb.track_title,
+            artistName: fb.artist_name,
+            albumTitle: fb.album_title,
+          });
+        }
+      }
+    }
+
     const items: TrackRankingItem[] = paged.map((row, index) => {
       const meta = metadataMap.get(row.isrc);
+      const fallback = fallbackMap.get(row.isrc);
       return {
         rank: query.skip + index + 1,
         isrc: row.isrc,
-        title: meta?.trackTitle ?? '',
+        title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
         version: meta?.trackVersion ?? null,
-        artistName: artistNameMap.get(row.isrc) ?? '',
+        artistName: artistNameMap.get(row.isrc) ?? fallback?.artistName ?? '',
         releaseId: meta?.releaseId ?? '',
-        releaseTitle: meta?.releaseTitle ?? '',
+        releaseTitle: meta?.releaseTitle ?? fallback?.albumTitle ?? '',
         totalViews: Number(row.totalViews),
       };
     });
