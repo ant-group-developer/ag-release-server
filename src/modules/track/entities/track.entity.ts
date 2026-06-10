@@ -165,6 +165,13 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	copyContributorsFromRelease: boolean;
 
 	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
+	@Column({
 		type: 'uuid',
 		nullable: true,
 		comment: 'Price tier áp dụng cho track ' + COMMENT_FOR_NULLABLE_DRAFT,
