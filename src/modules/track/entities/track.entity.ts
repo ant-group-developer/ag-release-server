@@ -136,6 +136,13 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	isByAi: boolean;
 
 	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Track instrumental',
+	})
+	isInstrumental: boolean;
+
+	@Column({
 		type: 'text',
 		nullable: true,
 		comment: 'Lời bài hát',

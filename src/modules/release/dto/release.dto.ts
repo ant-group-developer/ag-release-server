@@ -160,6 +160,11 @@ export class CreateReleaseDto {
 		value === undefined ? null : value,
 	)
 	priceTierId?: string | null;
+
+	@ApiProperty({ example: false, required: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
@@ -562,6 +567,10 @@ export class BulkSubmitReleaseDto {
 	@ApiProperty({ type: [String], format: 'uuid' })
 	@IsUUID('4', { each: true })
 	ids: string[];
+
+	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsUUID('4', { each: true })
+	idsExclude?: string[];
 
 	@ApiProperty({ type: [String] })
 	@IsString({ each: true })

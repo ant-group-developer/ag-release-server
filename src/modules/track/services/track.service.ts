@@ -38,6 +38,7 @@ export class TrackService {
 		// validate nonDraft
 		const trackNonDraft = this.trackQueryService.ensureNonDraftTrack({
 			...data,
+			isInstrumental: data.isInstrumental ?? false,
 			trackArtists: [],
 		});
 

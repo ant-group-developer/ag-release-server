@@ -69,6 +69,11 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	isVariousArtist?: boolean;
 
+	@ApiPropertyOptional({ example: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
+
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
 	@IsOptional()
