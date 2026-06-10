@@ -120,7 +120,9 @@ export class Ern382Builder2 {
 			refTitle.ele('SubTitle').txt(track.version);
 		}
 
-		if (track.languageOfPerformance) {
+		if (track.isInstrumental) {
+			sr.ele('IsInstrumental').txt('true');
+		} else if (track.languageOfPerformance) {
 			sr.ele('LanguageOfPerformance').txt(track.languageOfPerformance);
 		}
 

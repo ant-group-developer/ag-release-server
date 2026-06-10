@@ -852,9 +852,15 @@ export class ReleaseDdexService {
 						track.subGenre?.name ??
 						undefined,
 
-					languageOfPerformance:
-						track.trackLanguage?.audioLanguage?.code ??
-						NO_LINGUISTIC_CONTENT_LANGUAGE, // No linguistic content https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
+					...(track.isInstrumental
+						? { isInstrumental: true }
+						: {
+								// No linguistic content:
+								// https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
+								languageOfPerformance:
+									track.trackLanguage?.audioLanguage?.code ??
+									NO_LINGUISTIC_CONTENT_LANGUAGE,
+							}),
 
 					parentalWarning: normalizeParentalWarning(
 						track.trackSensitive?.code,

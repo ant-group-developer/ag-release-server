@@ -6,6 +6,7 @@ export interface ITrack {
 	version: string | null;
 	isrc: string | null;
 	iswc: string | null;
+	isInstrumental: boolean;
 	releaseId: string;
 	pLineOwner: string | null;
 	primaryGenreId: string | null;
@@ -18,6 +19,7 @@ export interface ITrackDraft {
 	version: string | null;
 	isrc: string | null;
 	iswc: string | null;
+	isInstrumental: boolean;
 	releaseId: string;
 	pLineOwner: string | null;
 	primaryGenreId: string | null;
@@ -29,6 +31,7 @@ export interface ITrackNonDraft {
 	version: string | null;
 	isrc: string | null;
 	iswc: string | null;
+	isInstrumental: boolean;
 	releaseId: string;
 	pLineOwner: string;
 	primaryGenreId: string;
@@ -46,6 +49,7 @@ export interface ICreateTrackDraft {
 	version?: string | null;
 	isrc?: string;
 	iswc?: string;
+	isInstrumental?: boolean;
 	releaseId: string;
 	pLineYear?: number | null;
 	pLineOwner?: string | null;

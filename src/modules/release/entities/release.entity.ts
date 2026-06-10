@@ -171,10 +171,24 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: false,
+		comment: 'Release instrumental',
+	})
+	isInstrumental: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
 		comment:
 			'Đánh dấu metadata đã được gửi sang CI Aggregator chung một mẻ chưa',
 	})
 	isSentMetadataCi: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
 
 	@Column({
 		type: 'enum',

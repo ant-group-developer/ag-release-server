@@ -328,6 +328,10 @@ export class Ern43Builder2 {
 			}
 		}
 
+		if (track.languageOfPerformance) {
+			sr.ele('LanguageOfPerformance').txt(track.languageOfPerformance);
+		}
+
 		// Duration
 		sr.ele('Duration').txt(this.normalizeDuration(track.duration));
 
