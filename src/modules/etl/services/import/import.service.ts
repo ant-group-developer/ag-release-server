@@ -9,6 +9,7 @@ import { DeezerIllegitimateParser, SoundCloudIllegitimateParser, SpotifyIllegiti
 import { FactDspRow, FactSalesRow } from '../../interfaces';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
 
 export interface ImportResult {
   batchId: string;
@@ -34,6 +35,7 @@ export class ImportService {
     private readonly clickHouseService: ClickHouseService,
     private readonly dspMappingService: DspMappingService,
     private readonly excludePatternService: ExcludePatternService,
+    private readonly reportEntityExtractorService: ReportEntityExtractorService,
   ) { }
 
   /**
@@ -158,12 +160,14 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
-        if (sourceCategory) {
-          for (const row of rows) row.source_category = sourceCategory;
-        }
-        // Replace dsp_id with id_dsps_report from dsps_report
+        const sourceFileName = path.basename(filePath);
         for (const row of rows) {
+          if (sourceCategory) {
+            row.source_category = sourceCategory;
+          }
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {
@@ -178,6 +182,10 @@ export class ImportService {
           allRows as unknown as Record<string, unknown>[],
           50_000,
         );
+        // Trích xuất metadata và import release/track sang PostgreSQL
+        await this.reportEntityExtractorService.extractAndImport(allRows).catch((err) => {
+          this.logger.error(`Failed to extract/import entities from comprehensive report for ${folderName}: ${err.message}`);
+        });
       } catch (err) {
         this.logger.error(`Bulk insert failed for ${folderName}: ${err.message}`);
       }
@@ -212,9 +220,12 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        const sourceFileName = path.basename(filePath);
         // Replace dsp_id with id_dsps_report from dsps_report
         for (const row of rows) {
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {
@@ -229,6 +240,10 @@ export class ImportService {
           allRows as unknown as Record<string, unknown>[],
           50_000,
         );
+        // Trích xuất metadata và import release/track sang PostgreSQL
+        await this.reportEntityExtractorService.extractAndImport(allRows).catch((err) => {
+          this.logger.error(`Failed to extract/import entities from sales report for ${folderName}: ${err.message}`);
+        });
       } catch (err) {
         this.logger.error(`Sales bulk insert failed for ${folderName}: ${err.message}`);
       }
@@ -268,9 +283,12 @@ export class ImportService {
     for (const filePath of files) {
       try {
         const rows = await parser.parseFile(filePath, batchId);
+        const sourceFileName = path.basename(filePath);
         // Replace dsp_id with id_dsps_report
         for (const row of rows) {
           row.dsp_id = dspsReport.id_dsps_report;
+          row.import_source = 'ftp';
+          row.source_file_name = sourceFileName;
         }
         allRows.push(...rows);
       } catch (err) {

@@ -12,7 +12,7 @@
 DROP VIEW IF EXISTS music_analytics.sales_dsp_monthly_cube_v2_mv;
 DROP VIEW IF EXISTS music_analytics.sales_ter_monthly_cube_v2_mv;
 
--- 2. Rename column in exchange_rates
+-- 2. Rename column in exchange_rates (Commented out because exchange_rates was already created with usd_to_local_rate)
 -- ALTER TABLE music_analytics.exchange_rates RENAME COLUMN rate TO usd_to_local_rate;
 
 -- 3. Update 'usd_to_local_rate' column comment

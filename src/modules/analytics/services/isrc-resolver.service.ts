@@ -11,6 +11,8 @@ import {
   IsrcArtistMapping,
 } from '../interfaces/analytics.interface';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { getCoverArtThumbnails } from 'src/utils/util';
+import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
 @Injectable()
 export class IsrcResolverService {
@@ -239,5 +241,69 @@ export class IsrcResolverService {
 
     const results = await qb.getRawMany<IsrcArtistMapping>();
     return results;
+  }
+
+  /**
+   * Lấy ảnh bìa (cover art) dạng thumbnails cho danh sách releaseIds từ PostgreSQL
+   */
+  async getReleaseImages(releaseIds: string[]): Promise<Map<string, ICoverArtThumbnails>> {
+    const map = new Map<string, ICoverArtThumbnails>();
+    if (!releaseIds.length) return map;
+    const releases = await this.releaseRepo.find({
+      where: { id: In(releaseIds) },
+      relations: ['releaseCoverArts'],
+    });
+
+    for (const r of releases) {
+      map.set(r.id, getCoverArtThumbnails(r.releaseCoverArts));
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin logo/ảnh đại diện cho danh sách labelIds từ PostgreSQL
+   */
+  async getLabelMetadata(labelIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+    if (!labelIds.length) return new Map();
+    const labels = await this.labelRepo.find({
+      where: { id: In(labelIds) },
+      select: ['id', 'name', 'picture'],
+    });
+
+    const map = new Map<string, { name: string; picture: string | null }>();
+    for (const l of labels) {
+      map.set(l.id, {
+        name: l.name,
+        picture: l.picture, // Tự động định dạng URL qua MediaUrlTransformer
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin ảnh đại diện cho danh sách artistIds từ PostgreSQL
+   */
+  async getArtistMetadata(artistIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+    if (!artistIds.length) return new Map();
+    const artists = await this.artistRepo.find({
+      where: { id: In(artistIds) },
+      select: ['id', 'name', 'picture'],
+    });
+
+    const map = new Map<string, { name: string; picture: string | null }>();
+    const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
+    for (const a of artists) {
+      let pictureUrl: string | null = null;
+      if (a.picture) {
+        pictureUrl = a.picture.startsWith('http')
+          ? a.picture
+          : `${domain}/${a.picture}`;
+      }
+      map.set(a.id, {
+        name: a.name,
+        picture: pictureUrl,
+      });
+    }
+    return map;
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,11 +13,19 @@ export interface DspsReport {
 }
 
 @Injectable()
-export class DspMappingService {
+export class DspMappingService implements OnModuleInit {
   private readonly logger = new Logger(DspMappingService.name);
-  private dspsReportCache: Map<string, string> = new Map(); // dsp_name (lowercase) -> id_dsps_report
+  private dspsReportCache: Map<string, DspsReport> = new Map(); // dsp_name (lowercase) -> DspsReport object
 
   constructor(private readonly clickHouseService: ClickHouseService) {}
+
+  async onModuleInit() {
+    try {
+      await this.loadCache();
+    } catch (err) {
+      this.logger.error(`Failed to load dsps_report cache during init: ${err.message}`, err.stack);
+    }
+  }
 
   /**
    * Resolve or create a dsps_report entry
@@ -31,7 +39,6 @@ export class DspMappingService {
     // Try to find existing by dsp_name
     const existing = await this.findByDspName(normalizedInput);
     if (existing) {
-      this.logger.debug(`Found existing dsps_report for '${input}': ${existing.id_dsps_report}`);
       return existing;
     }
 
@@ -46,13 +53,7 @@ export class DspMappingService {
     // Check cache first
     const cached = this.dspsReportCache.get(dspName);
     if (cached) {
-      const rows = await this.clickHouseService.query<DspsReport>(
-        `SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-         FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-         WHERE id_dsps_report = {id: String}`,
-        { id: cached }
-      );
-      return rows.length > 0 ? rows[0] : null;
+      return cached;
     }
 
     // Query by dsp_name (case-insensitive)
@@ -65,7 +66,7 @@ export class DspMappingService {
     );
 
     if (rows.length > 0) {
-      this.dspsReportCache.set(dspName, rows[0].id_dsps_report);
+      this.dspsReportCache.set(dspName, rows[0]);
       return rows[0];
     }
 
@@ -79,7 +80,7 @@ export class DspMappingService {
     const idDspsReport = uuidv4();
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    const newRecord: Record<string, unknown> = {
+    const newRecord: DspsReport = {
       id_dsps_report: idDspsReport,
       pg_uuid: '',
       dsp_name: dspName,
@@ -88,13 +89,13 @@ export class DspMappingService {
       updated_at: now,
     };
 
-    await this.clickHouseService.insert(CLICKHOUSE_TABLES.DSPS_REPORT, [newRecord]);
+    await this.clickHouseService.insert(CLICKHOUSE_TABLES.DSPS_REPORT, [newRecord as any]);
 
     // Update cache
-    this.dspsReportCache.set(dspName.toLowerCase(), idDspsReport);
+    this.dspsReportCache.set(dspName.toLowerCase(), newRecord);
 
     this.logger.log(`Created new dsps_report for '${dspName}': ${idDspsReport}`);
-    return newRecord as unknown as DspsReport;
+    return newRecord;
   }
 
   /**
@@ -182,12 +183,12 @@ export class DspMappingService {
    * Load dsps_report cache for faster lookup
    */
   async loadCache(): Promise<void> {
-    const rows = await this.clickHouseService.query<{ dsp_name: string; id_dsps_report: string }>(
-      `SELECT dsp_name, id_dsps_report FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}`
+    const rows = await this.clickHouseService.query<DspsReport>(
+      `SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}`
     );
     this.dspsReportCache.clear();
     for (const row of rows) {
-      this.dspsReportCache.set(row.dsp_name.toLowerCase(), row.id_dsps_report);
+      this.dspsReportCache.set(row.dsp_name.toLowerCase(), row);
     }
     this.logger.log(`Loaded ${this.dspsReportCache.size} dsps_report entries into cache`);
   }

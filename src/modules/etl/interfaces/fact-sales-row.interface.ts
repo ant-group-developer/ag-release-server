@@ -51,4 +51,6 @@ export interface FactSalesRow {
   // Audit
   source_category: string;
   batch_id: string;
+  import_source?: string;
+  source_file_name?: string;
 }

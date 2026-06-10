@@ -320,6 +320,8 @@ export abstract class BaseSalesParser {
       metadata: {},
       source_category: 'sales',
       batch_id: batchId,
+      import_source: '',
+      source_file_name: '',
     };
   }
 }

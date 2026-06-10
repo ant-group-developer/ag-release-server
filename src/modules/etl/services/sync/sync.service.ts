@@ -9,6 +9,7 @@ import { FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
 
 export interface SyncPeriodResult {
   period: string;
@@ -60,6 +61,7 @@ export class SyncService {
     @InjectRedis() private readonly redis: Redis,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly excludePatternService: ExcludePatternService,
+    private readonly cubeRebuildService: CubeRebuildService,
   ) { }
 
   // ── Tracking helpers ──────────────────────────────────
@@ -191,32 +193,20 @@ export class SyncService {
     const dateRange = `>= '${periodStart}' AND ${dateCol} < addMonths(toDate('${periodStart}'), 1)`;
 
     try {
-      // Run fact table + cube deletions in parallel (all are independent mutations)
-      const deletePromises: Promise<unknown>[] = [
-        this.clickHouseService.execute(
-          `ALTER TABLE ${table} DELETE WHERE ${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
-        ),
-      ];
+      // 1. Delete old data only in fact table
+      await this.clickHouseService.execute(
+        `ALTER TABLE music_analytics.${table} DELETE WHERE ${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
+      );
 
-      if (category !== 'sales') {
-        deletePromises.push(
-          this.clickHouseService.execute(
-            `ALTER TABLE music_analytics.trends_dsp_monthly_cube DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
-          ),
-          this.clickHouseService.execute(
-            `ALTER TABLE music_analytics.trends_dsp_daily_cube DELETE WHERE reporting_date ${dateRange.replace(dateCol, 'reporting_date')} AND dsp_id IN (${dspIdsInSql})`,
-          ),
-        );
+      // 2. Rebuild cubes for the period partition
+      const formattedPeriod = `${period.substring(0, 4)}-${period.substring(4, 6)}`;
+      if (category === 'sales') {
+        await this.cubeRebuildService.rebuildSalesCubesForPeriods([formattedPeriod]);
       } else {
-        deletePromises.push(
-          this.clickHouseService.execute(
-            `ALTER TABLE music_analytics.sales_dsp_monthly_cube_v2 DELETE WHERE period ${dateRange.replace(dateCol, 'period')} AND dsp_id IN (${dspIdsInSql})`,
-          ),
-        );
+        await this.cubeRebuildService.rebuildTrendsCubesForPeriods([formattedPeriod]);
       }
 
-      await Promise.all(deletePromises);
-      this.logger.log(`  🗑️ Deleted old data for ${category}/${dspFolder} in ${period} (including cubes)`);
+      this.logger.log(`  🗑️ Deleted old fact data for ${category}/${dspFolder} in ${period} and rebuilt affected cubes`);
     } catch (err) {
       this.logger.warn(`  Failed to delete old data for ${category}/${dspFolder}: ${err.message}`);
     }
