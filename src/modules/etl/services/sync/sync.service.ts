@@ -223,7 +223,11 @@ export class SyncService {
    * 3. If FTP has new files → delete old data + re-import all (prevents duplicates)
    * 4. New folders (never imported) → import normally
    */
-  async syncPeriod(period: string, force = false): Promise<SyncPeriodResult> {
+  async syncPeriod(
+    period: string,
+    force = false,
+    categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
+  ): Promise<SyncPeriodResult> {
     const startTime = Date.now();
     const batchId = uuidv4();
 
@@ -231,44 +235,9 @@ export class SyncService {
     this.dspIdCache.clear();
 
     // Get detailed import history (includes files_list for change detection)
-    const importedDetails = force ? new Map() : await this.getImportedDetails();
+    const importedDetails = await this.getImportedDetails();
 
-    this.logger.log(`Syncing period ${period} (force=${force}), batch ${batchId}`);
-
-    // If force=true, drop entire partition (instant metadata-only op, ~0ms)
-    // instead of ALTER TABLE DELETE (slow row-level mutation)
-    if (force) {
-      const partitionId = period; // YYYYMM matches toYYYYMM() partition key
-      try {
-        // All tables are partitioned by toYYYYMM(date_col),
-        // so DROP PARTITION is an O(1) filesystem operation — no row scanning needed.
-        const allTables = [
-          CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
-          CLICKHOUSE_TABLES.FACT_SALES_REPORT,
-          CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY,
-          CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
-          CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
-          CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
-          CLICKHOUSE_TABLES.SALES_TER_MONTHLY,
-          CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY,
-        ];
-
-        await Promise.all(
-          allTables.map((table) =>
-            this.clickHouseService.execute(
-              `ALTER TABLE music_analytics.${table} DROP PARTITION '${partitionId}'`,
-            ).catch((err) => {
-              // Partition may not exist — that's fine, skip silently
-              this.logger.debug(`DROP PARTITION ${partitionId} on ${table}: ${err.message}`);
-            }),
-          ),
-        );
-
-        this.logger.log(`Dropped partition ${partitionId} from all tables (including cubes) before re-import`);
-      } catch (err) {
-        this.logger.warn(`Failed to drop partition for ${period}: ${err.message}`);
-      }
-    }
+    this.logger.log(`Syncing period ${period} (force=${force}, categories=${categories?.join(',') || 'all'}), batch ${batchId}`);
 
     const result: SyncPeriodResult = {
       period,
@@ -278,7 +247,11 @@ export class SyncService {
       durationMs: 0,
     };
 
-    for (const category of ['trends', 'usage', 'sales', 'illegitimate_activity'] as const) {
+    const categoriesToSync = categories && categories.length > 0
+      ? categories
+      : (['trends', 'usage', 'sales', 'illegitimate_activity'] as const);
+
+    for (const category of categoriesToSync) {
       const rawFolders = await this.ftpService.listDspFolders(category, period);
 
       // Lọc folder bị exclude theo config
@@ -306,38 +279,43 @@ export class SyncService {
         const existing = importedDetails.get(key);
 
         // ── Change detection: compare file lists ──
-        if (existing && existing.status === 'done' && !force) {
-          // List files on FTP without downloading
-          const remoteFiles = await this.ftpService.listRemoteFiles(category, period, dspFolder);
-          const previousFiles = (existing.files_list || []).sort();
+        if (existing && existing.status === 'done') {
+          if (force) {
+            // Delete old data for this specific folder before re-import
+            await this.deleteFolderData(period, category, dspFolder);
+          } else {
+            // List files on FTP without downloading
+            const remoteFiles = await this.ftpService.listRemoteFiles(category, period, dspFolder);
+            const previousFiles = (existing.files_list || []).sort();
 
-          // Compare: if identical → skip
-          const filesMatch =
-            remoteFiles.length === previousFiles.length &&
-            remoteFiles.every((f, i) => f === previousFiles[i]);
+            // Compare: if identical → skip
+            const filesMatch =
+              remoteFiles.length === previousFiles.length &&
+              remoteFiles.every((f, i) => f === previousFiles[i]);
 
-          if (filesMatch) {
-            this.logger.log(`  ✅ ${category}/${dspFolder} — ${remoteFiles.length} files unchanged, skip`);
-            categoryResult.folders.push({
-              dsp_folder: dspFolder,
-              status: 'skipped',
-              rows: 0,
-              files: 0,
-              durationMs: 0,
-              reason: 'files unchanged',
-            });
-            continue;
+            if (filesMatch) {
+              this.logger.log(`  ✅ ${category}/${dspFolder} — ${remoteFiles.length} files unchanged, skip`);
+              categoryResult.folders.push({
+                dsp_folder: dspFolder,
+                status: 'skipped',
+                rows: 0,
+                files: 0,
+                durationMs: 0,
+                reason: 'files unchanged',
+              });
+              continue;
+            }
+
+            // Files differ → need re-sync
+            const newFiles = remoteFiles.filter((f) => !previousFiles.includes(f));
+            this.logger.log(
+              `  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
+              `(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}). Re-syncing...`,
+            );
+
+            // Delete old data for this specific folder before re-import
+            await this.deleteFolderData(period, category, dspFolder);
           }
-
-          // Files differ → need re-sync
-          const newFiles = remoteFiles.filter((f) => !previousFiles.includes(f));
-          this.logger.log(
-            `  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
-            `(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}). Re-syncing...`,
-          );
-
-          // Delete old data for this specific folder before re-import
-          await this.deleteFolderData(period, category, dspFolder);
         }
 
         // ── Download + import ──
