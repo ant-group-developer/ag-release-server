@@ -117,7 +117,14 @@ export interface PartnerSpotifyConfig {
 	token?: string;
 }
 
+export interface PartnerVevoConfig {
+	token: string;
+	baseUrl: string;
+	callbackUrl: string;
+}
+
 export interface PartnersConfig {
 	ci: PartnerCiConfig;
 	spotify: PartnerSpotifyConfig;
+	vevo: PartnerVevoConfig;
 }

@@ -20,6 +20,7 @@ import { PolicyGuard } from './modules/auth/guards/policy.guard';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
 import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
+import { ChannelModule } from './modules/channel/channel.module';
 import { ClickHouseModule } from './modules/clickhouse/clickhouse.module';
 import { CopyrightModule } from './modules/copyright/copyright.module';
 import { CountryModule } from './modules/country/country.module';
@@ -28,9 +29,8 @@ import { DatabaseModule } from './modules/database/database.module';
 import { DDEXModule } from './modules/ddex';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
-import { DspModule } from './modules/dsp/dsp.module';
 import { DspReportModule } from './modules/dsp-report/dsp-report.module';
-import { PgDspsSyncModule } from './modules/pg-dsps-sync/pg-dsps-sync.module';
+import { DspModule } from './modules/dsp/dsp.module';
 import { ErnModule } from './modules/ern/ern.module';
 import { EtlModule } from './modules/etl/etl.module';
 import { ExcelModule } from './modules/excel/excel.module';
@@ -44,6 +44,7 @@ import { LanguageModule } from './modules/language/language.module';
 import { NewsCategoryModule } from './modules/news-category/news-category.module';
 import { NewsPostModule } from './modules/news-post/news-post.module';
 import { PermissionModule } from './modules/permission/permission.module';
+import { PgDspsSyncModule } from './modules/pg-dsps-sync/pg-dsps-sync.module';
 import { PriceTierModule } from './modules/price-tiers/price-tier.module';
 import { ReleaseArtistModule } from './modules/release-artist/release-artist.module';
 import { ReleaseContributorModule } from './modules/release-contributor/release-contributor.module';
@@ -103,6 +104,7 @@ import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 		// ... other modules
 
 		CountryModule,
+		ChannelModule,
 		LanguageModule,
 
 		DspModule,

@@ -102,16 +102,18 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		if (STEP.childExecutionMode === 'parallel') {
-			// await Promise.allSettled(
-			// 	STEP.childSteps!.map((child) => this.processStep({step: child, releaseExecution})),
-			// );
+			await Promise.allSettled(
+				STEP.childSteps!.map((child) =>
+					this.processStep({ step: child, releaseExecution }),
+				),
+			);
 
-			for (const child of STEP.childSteps!) {
-				await this.processStep({
-					step: child,
-					releaseExecution,
-				});
-			}
+			// for (const child of STEP.childSteps!) {
+			// 	await this.processStep({
+			// 		step: child,
+			// 		releaseExecution,
+			// 	});
+			// }
 
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
@@ -205,6 +207,8 @@ export class ReleaseExecutionStepEngine {
 	}
 
 	// lưu vào db
+	// cập nhật trạng thái status của step,
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
 		status: ReleaseExecutionStepStatus,
@@ -232,6 +236,7 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
@@ -246,39 +251,45 @@ export class ReleaseExecutionStepEngine {
 		if (!deliveryStatus) return;
 
 		const delivery = step.metadata?.input?.delivery;
-		const releaseIds = [
-			...(delivery?.releaseIds ?? []),
-			...(delivery?.releaseId ? [delivery.releaseId] : []),
-		].filter(Boolean);
-		const items: { dspId: string; status: ReleaseDspStatus }[] = (
-			delivery?.items ?? []
-		)
-			.filter((item: any) => !!item.dspId)
+		const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
+		const items: {
+			id?: string;
+			dspId?: string;
+			dspCode?: string;
+			status: ReleaseDspStatus;
+		}[] = (delivery?.items ?? [])
+			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
 			.map((item: any) => ({
+				id: item.id,
 				dspId: item.dspId,
+				dspCode: item.dspCode,
 				status: deliveryStatus,
 			}));
 
-		await this.releaseDspDeliveryService.updateDeliveryStatus(
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
 			releaseIds,
 			items,
-		);
+		});
 	}
 
 	private mapStepStatusToDeliveryStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
 	): ReleaseDspStatus | null {
+		// PROCESS_DSPS chỉ đánh dấu bắt đầu quá trình phân phối, cập nhật status bên release dsp delivery
+		// Step này DONE chưa có nghĩa là release đã được phân phối thành công.
 		if (step.type === ReleaseExecutionStepType.PROCESS_DSPS) {
 			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
 				? ReleaseDspStatus.PROCESSING
 				: null;
 		}
 
+		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
 			return ReleaseDspStatus.DISTRIBUTED;
 		}
 
+		// Các trạng thái kết thúc không thành công đều cần được kiểm tra/xử lý.
 		if (
 			[
 				ReleaseExecutionStepStatus.FAILED,
@@ -289,6 +300,7 @@ export class ReleaseExecutionStepEngine {
 			return ReleaseDspStatus.ISSUES;
 		}
 
+		// Các trạng thái trung gian khác không làm thay đổi delivery status.
 		return null;
 	}
 }

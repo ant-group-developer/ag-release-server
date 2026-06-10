@@ -94,4 +94,70 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
  * DTO cho API Rankings (tracks, releases, artists, labels).
  * Extends BaseAnalyticsQueryDto — dùng chung page/pageSize từ BaseQueryDto.
  */
-export class RankingQueryDto extends BaseAnalyticsQueryDto {}
+export class RankingQueryDto extends BaseAnalyticsQueryDto { }
+
+export class EntityTimelineQueryDto {
+  @IsDateString()
+  @ApiPropertyOptional({
+    description: 'Start date of the filter range (inclusive)',
+    example: '2026-01-01',
+  })
+  @IsOptional()
+  @Type(() => String)
+  fromDate: string;
+  
+
+
+  @IsDateString()
+  @ApiPropertyOptional({
+    description: 'End date of the filter range (inclusive)',
+    example: '2026-06-30',
+  })
+  @IsOptional()
+  @Type(() => String)
+  toDate: string;
+  
+
+  @IsOptional() @IsInt() @Min(1) @Max(20)
+  @ApiPropertyOptional({
+    description:
+      'Number of top items to return individually. Remaining ones are grouped as "Other".',
+    minimum: 1,
+    maximum: 20,
+    default: 5,
+    example: 5,
+  })
+  @Type(() => Number)
+  topN?: number = 5;
+  
+
+  @IsOptional() @IsBoolean()
+  @ApiPropertyOptional({
+    description:
+      'Whether to group non-top items into an "Other" category',
+    default: true,
+    example: true,
+  })
+  @Type(() => Boolean)
+  includeOther?: boolean = true;
+}
+
+export class EntityOverviewQueryDto {
+  @IsDateString()
+  @ApiPropertyOptional({
+    description: 'Start date of the filter range (inclusive)',
+    example: '2026-01-01',
+  })
+  @IsOptional()
+  @Type(() => String)
+  fromDate: string;
+
+  @IsDateString()
+  @ApiPropertyOptional({
+    description: 'End date of the filter range (inclusive)',
+    example: '2026-06-30',
+  })
+  @IsOptional()
+  @Type(() => String)
+  toDate: string;
+}

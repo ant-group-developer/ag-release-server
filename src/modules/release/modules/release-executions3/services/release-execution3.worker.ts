@@ -1,4 +1,3 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
@@ -9,14 +8,13 @@ import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-c
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
-import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
-import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
+import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
-import { EntityManager, In, IsNull } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
@@ -46,6 +44,7 @@ export class ReleaseExecution3Worker {
 		private readonly releaseService: ReleaseService,
 
 		private readonly trackService: TrackService,
+		private readonly videoService: VideoService,
 		private readonly ciService: CiService,
 		private readonly logService: LogsService,
 
@@ -176,12 +175,25 @@ export class ReleaseExecution3Worker {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
 			const upc = await this.releaseService.genUpcById(releaseId);
+			if (!upc) {
+				throw new Error('Generated UPC is empty');
+			}
+
+			releaseExecution.releaseUpc = upc;
+			releaseExecution.metadata = {
+				...releaseExecution.metadata,
+				input: {
+					...releaseExecution.metadata?.input,
+					upcAutoIfReleaseSnapshotNull: upc,
+				},
+			};
 
 			step.metadata = {
 				...step.metadata,
 				output: { upc },
 			};
 
+			await this.manager.save(ReleaseExecution3, releaseExecution);
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			this.logService.success({
@@ -206,17 +218,21 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async genIsrc({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async genIsrc(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			const trackId = step.metadata?.input?.trackId;
+			const videoId = step.metadata?.input?.videoId;
 
-			if (!trackId) {
-				throw new Error('Missing trackId in step metadata');
+			if (!trackId && !videoId) {
+				throw new Error('Missing trackId or videoId in step metadata');
 			}
 
-			const isrc = await this.trackService.genISRC(trackId);
+			const isrc = trackId
+				? await this.trackService.genISRC(trackId)
+				: await this.videoService.genISRC(videoId);
 
 			step.metadata = {
 				...step.metadata,
@@ -226,13 +242,19 @@ export class ReleaseExecution3Worker {
 			await this.manager.save(ReleaseExecutionStep3, step);
 
 			this.logService.success({
-				message: `[GEN_ISRC] Track ${trackId}: ${isrc}`,
+				message: trackId
+					? `[GEN_ISRC] Track ${trackId}: ${isrc}`
+					: `[GEN_ISRC] Video ${videoId}: ${isrc}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[GEN_ISRC] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -266,6 +288,8 @@ export class ReleaseExecution3Worker {
 					message: `[VALIDATE] Release ${releaseId} failed: ${errors
 						.map((e: any) => e.message)
 						.join(', ')}`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
 				});
 
 				return ReleaseExecutionStepStatus.FAILED;
@@ -273,12 +297,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[VALIDATE] Release ${releaseId} passed`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[VALIDATE] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -333,9 +361,10 @@ export class ReleaseExecution3Worker {
 		return this.deriveStatusFromChildren(context);
 	}
 
-	private async createFolderDoneCi({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async createFolderDoneCi(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			// return ReleaseExecutionStepStatus.DONE;
 			const metaStep = await this.getSiblingStepByType(
@@ -374,6 +403,8 @@ export class ReleaseExecution3Worker {
 
 				this.logService.success({
 					message: `[CREATE_FOLDER_DONE_CI] Created: ${donePath}`,
+					releaseExecutionId: context.releaseExecution.id,
+					releaseExecutionStepId: step.id,
 					data: {
 						batchId,
 						donePath,
@@ -387,6 +418,8 @@ export class ReleaseExecution3Worker {
 		} catch (err) {
 			this.logService.error({
 				message: `[CREATE_FOLDER_DONE_CI] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -411,8 +444,12 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const upc =
-				releaseExecution.releaseUpc ??
+				releaseExecution.releaseUpc ||
 				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			if (!upc) {
+				throw new Error('Missing UPC from release execution');
+			}
 
 			const dsps: Dsp[] =
 				releaseExecution.metadata.input.dspAggregator?.ci?.ci ?? [];
@@ -464,8 +501,12 @@ export class ReleaseExecution3Worker {
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
 			const upc =
-				releaseExecution.releaseUpc ??
+				releaseExecution.releaseUpc ||
 				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
+
+			if (!upc) {
+				throw new Error('Missing UPC from release execution');
+			}
 
 			const dsps: Dsp[] = step.metadata?.input?.dsps ?? [];
 			if (!dsps.length) throw new Error('Missing dsps');
@@ -534,9 +575,10 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async waitPartnerProcess({
-		step,
-	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+	private async waitPartnerProcess(
+		context: StepTaskContext,
+	): Promise<ReleaseExecutionStepStatus> {
+		const { step } = context;
 		try {
 			const scheduledAt = step.metadata?.scheduledAt;
 
@@ -564,12 +606,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.log({
 				message: `[WAIT_PARTNER_PROCESS] Resume at ${newScheduledAt.toISOString()} (+${waitMinutes}min)`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.WAITING_PARTNER;
 		} catch (err) {
 			this.logService.error({
 				message: `[WAIT_PARTNER_PROCESS] ${err.message}`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -580,6 +626,8 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		console.log('Creating metadata on server...');
+
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
@@ -606,9 +654,27 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
+			const releaseSnapshot =
+				releaseExecution.metadata.input.releaseSnapshot;
+			const upc =
+				releaseSnapshot.upc ||
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull ||
+				releaseExecution.releaseUpc;
+			const generatedIsrcs = await this.getGeneratedIsrcs(
+				releaseExecution.id,
+			);
+
+			// Patch UPC/ISRC only on a cloned release used for metadata;
+			// releaseSnapshot must stay as the original execution input.
+			const releaseForMetadata = this.buildReleaseForMetadata({
+				releaseSnapshot,
+				upc,
+				generatedIsrcs,
+			});
+
 			const { outputDir, batchId, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
-					release: releaseExecution.metadata.input.releaseSnapshot,
+					release: releaseForMetadata,
 					ernVersion: config.ernVersion,
 					sender: config.sender,
 					recipient: config.recipient,
@@ -633,16 +699,115 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[CREATE_METADATA_ON_SERVER] DSP ${dspCode} metadata created`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[CREATE_METADATA_ON_SERVER] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
 		}
+	}
+
+	private async getGeneratedIsrcs(releaseExecutionId: string): Promise<{
+		trackById: Map<string, string>;
+		videoById: Map<string, string>;
+	}> {
+		const isrcSteps = await this.manager.find(ReleaseExecutionStep3, {
+			where: {
+				releaseExecutionId,
+				type: ReleaseExecutionStepType.GEN_ISRC,
+				status: ReleaseExecutionStepStatus.DONE,
+			},
+		});
+
+		const trackById = new Map<string, string>();
+		const videoById = new Map<string, string>();
+
+		for (const isrcStep of isrcSteps) {
+			const isrc = isrcStep.metadata?.output?.isrc;
+			if (!isrc) continue;
+
+			const trackId = isrcStep.metadata?.input?.trackId;
+			if (trackId) {
+				trackById.set(trackId, isrc);
+				continue;
+			}
+
+			const videoId = isrcStep.metadata?.input?.videoId;
+			if (videoId) {
+				videoById.set(videoId, isrc);
+			}
+		}
+
+		return { trackById, videoById };
+	}
+
+	private buildReleaseForMetadata({
+		releaseSnapshot,
+		upc,
+		generatedIsrcs,
+	}: {
+		releaseSnapshot: any;
+		upc?: string;
+		generatedIsrcs: {
+			trackById: Map<string, string>;
+			videoById: Map<string, string>;
+		};
+	}) {
+		const shouldPatchUpc = !!upc && upc !== releaseSnapshot.upc;
+		let hasPatchedTrack = false;
+		const tracks = releaseSnapshot.tracks?.map((track: any) => {
+			const isrc = generatedIsrcs.trackById.get(track.id);
+
+			if (!isrc || track.isrc) return track;
+
+			hasPatchedTrack = true;
+			return Object.assign(
+				Object.create(Object.getPrototypeOf(track)),
+				track,
+				{
+					isrc,
+				},
+			);
+		});
+		const videoIsrc = releaseSnapshot.video
+			? generatedIsrcs.videoById.get(releaseSnapshot.video.id)
+			: undefined;
+		const shouldPatchVideoIsrc =
+			!!videoIsrc && !releaseSnapshot.video?.isrc;
+
+		if (!shouldPatchUpc && !shouldPatchVideoIsrc && !hasPatchedTrack) {
+			return releaseSnapshot;
+		}
+
+		return Object.assign(
+			Object.create(Object.getPrototypeOf(releaseSnapshot)),
+			releaseSnapshot,
+			{
+				...(shouldPatchUpc ? { upc } : {}),
+				...(hasPatchedTrack ? { tracks } : {}),
+				...(shouldPatchVideoIsrc
+					? {
+							video: Object.assign(
+								Object.create(
+									Object.getPrototypeOf(
+										releaseSnapshot.video,
+									),
+								),
+								releaseSnapshot.video,
+								{ isrc: videoIsrc },
+							),
+						}
+					: {}),
+			},
+		);
 	}
 
 	private async uploadMetadataToSftp({
@@ -684,31 +849,27 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// Check if Vevo S3 or regular SFTP
-			if (dspCode.toUpperCase() === 'VEVO') {
-				await this.uploadFolderToVevoS3({
-					s3Config: config.sftp,
-					localDir: outputDir,
-					releaseExecution,
-				});
-			} else {
-				await this.sftpConnectService.uploadFolder({
-					sftp: config.sftp,
-					localDir: outputDir,
-					remoteDir: config.sftp.path ?? '/',
-				});
-			}
+			await this.sftpConnectService.uploadFolder({
+				sftp: config.sftp,
+				localDir: outputDir,
+				remoteDir: config.sftp.path ?? '/',
+			});
+			// }
 
 			await removeFolder(outputDir);
 
 			this.logService.success({
 				message: `[UPLOAD_METADATA_TO_SFTP] DSP ${dspCode} uploaded`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
@@ -720,83 +881,6 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		return await ReleaseExecutionStepStatus.DONE;
-	}
-
-	private async uploadFolderToVevoS3({
-		s3Config,
-		localDir,
-		releaseExecution,
-	}: {
-		s3Config: any;
-		localDir: string;
-		releaseExecution: ReleaseExecution3;
-	}): Promise<void> {
-		const upc =
-			releaseExecution.metadata?.input?.releaseSnapshot?.upc || 'new_upc';
-		const isrc =
-			releaseExecution.metadata?.input?.releaseSnapshot?.video?.isrc ||
-			'new_isrc';
-		const localReleaseDir = path.join(localDir, upc);
-
-		const allFiles = this.getAllFilesRecursive(localReleaseDir);
-		const assets = allFiles.filter((f) => !f.relativePath.endsWith('.xml'));
-		const manifest = allFiles.find((f) => f.relativePath.endsWith('.xml'));
-
-		const uniqueFolder = `${isrc}_${Date.now()}`;
-		const s3Prefix = s3Config.path || 'feed/sony/';
-
-		const s3Client = new S3Client({
-			region: s3Config.region || 'us-east-1',
-			credentials: {
-				accessKeyId: s3Config.username || '',
-				secretAccessKey: s3Config.password || '',
-			},
-			endpoint: s3Config.host ? `https://${s3Config.host}` : undefined,
-		});
-
-		// 1. Upload Assets first
-		for (const asset of assets) {
-			const s3Key = path.posix.join(
-				s3Prefix,
-				uniqueFolder,
-				asset.relativePath.replace(/\\/g, '/'),
-			);
-			const fileStream = fs.createReadStream(asset.localPath);
-
-			await s3Client.send(
-				new PutObjectCommand({
-					Bucket: s3Config.bucket || '',
-					Key: s3Key,
-					Body: fileStream,
-				}),
-			);
-			this.logService.log({
-				message: `[VEVO_S3_UPLOAD] Asset uploaded: ${s3Key}`,
-				releaseExecutionId: releaseExecution.id,
-			});
-		}
-
-		// 2. Upload Manifest XML last
-		if (manifest) {
-			const s3Key = path.posix.join(
-				s3Prefix,
-				uniqueFolder,
-				manifest.relativePath.replace(/\\/g, '/'),
-			);
-			const fileStream = fs.createReadStream(manifest.localPath);
-
-			await s3Client.send(
-				new PutObjectCommand({
-					Bucket: s3Config.bucket || '',
-					Key: s3Key,
-					Body: fileStream,
-				}),
-			);
-			this.logService.log({
-				message: `[VEVO_S3_UPLOAD] Manifest XML uploaded LAST: ${s3Key}`,
-				releaseExecutionId: releaseExecution.id,
-			});
-		}
 	}
 
 	private getAllFilesRecursive(
@@ -828,7 +912,8 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const releaseId = this.releaseIdFromExecution(releaseExecution);
+			console.log('Syncing data from DSP...');
+
 			const parent = await this.getParentStep(step);
 
 			const dsp =
@@ -838,34 +923,116 @@ export class ReleaseExecution3Worker {
 				throw new Error('Missing dsp from step or parent step');
 			}
 
-			await this.manager
-				.createQueryBuilder()
-				.insert()
-				.into(ReleaseDspDelivery)
-				.values({
-					releaseId,
-					dspId: dsp.id,
-					isSelected: true,
-					status: ReleaseDspStatus.DISTRIBUTED,
-					lastDeliveredAt: new Date(),
-				})
-				.orUpdate(
-					['status', 'last_delivered_at', 'is_selected'],
-					['release_id', 'dsp_id'],
-				)
-				.execute();
+			if (dsp.code?.toUpperCase() === 'VEVO') {
+				const metadataStep = await this.getSiblingStepByType(
+					step,
+					ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+				);
+				const batchId = metadataStep?.metadata?.output?.batchId;
+				const upc =
+					releaseExecution.metadata.input
+						.upcAutoIfReleaseSnapshotNull ||
+					releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+
+				if (!batchId) {
+					throw new Error(
+						'Missing batchId from CREATE_METADATA_ON_SERVER step',
+					);
+				}
+				if (!upc) throw new Error('Missing UPC for VEVO response');
+
+				const config =
+					await this.dspRoutingService.resolveFullDeliveryConfig(
+						dsp.code,
+					);
+
+				const response = await this.sftpConnectService.getVevoResponse({
+					sftp: config.sftp,
+					batchId,
+					upc,
+				});
+
+				if (!response) {
+					throw new Error(
+						`VEVO response not found in batch ${batchId}`,
+					);
+				}
+
+				if (response.status === 'failure') {
+					step.metadata = {
+						...step.metadata,
+						output: {
+							...step.metadata?.output,
+							vevoResponseStatus: response.status,
+							vevoResponseKey: response.key,
+							vevoResponse: response.content,
+						},
+					};
+
+					await this.manager.save(ReleaseExecutionStep3, step);
+
+					this.logService.error({
+						message: `[SYNC_DATA_PARTNER] VEVO failed: ${this.getVevoResponseMessage(response.content)}`,
+						releaseExecutionId: releaseExecution.id,
+						releaseExecutionStepId: step.id,
+						data: {
+							vevoResponseKey: response.key,
+							vevoResponse: response.content,
+						},
+					});
+
+					return ReleaseExecutionStepStatus.FAILED;
+				}
+
+				step.metadata = {
+					...step.metadata,
+					output: {
+						...step.metadata?.output,
+						vevoResponseStatus: response.status,
+						vevoResponseKey: response.key,
+						vevoResponse: response.content,
+					},
+				};
+
+				this.logService.success({
+					message: `[SYNC_DATA_PARTNER] VEVO succeeded: ${this.getVevoResponseMessage(response.content)}`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+				});
+
+				await this.manager.save(ReleaseExecutionStep3, step);
+			}
 
 			this.logService.success({
-				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} → DISTRIBUTED`,
+				message: `[SYNC_DATA_PARTNER] DSP ${dsp.name} -> DISTRIBUTED`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_PARTNER] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
+	private getVevoResponseMessage(content: unknown): string {
+		if (typeof content === 'string') return content;
+		if (content && typeof content === 'object') {
+			const response = content as Record<string, unknown>;
+			const message = response.errorMessage ?? response.error;
+			if (typeof message === 'string') return message;
+		}
+
+		try {
+			return JSON.stringify(content);
+		} catch {
+			return 'Unknown VEVO response error';
 		}
 	}
 
@@ -881,6 +1048,8 @@ export class ReleaseExecution3Worker {
 
 			this.logService.log({
 				message: `[VALIDATE_QA_CI] Release: ${releaseId}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			const qaFlags = await this.releaseService.getQaFlagCi(releaseId);
@@ -909,12 +1078,16 @@ export class ReleaseExecution3Worker {
 
 			this.logService.success({
 				message: `[VALIDATE_QA_CI] Release ${releaseId} passed`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[VALIDATE_QA_CI] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;
@@ -926,53 +1099,75 @@ export class ReleaseExecution3Worker {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const upc = releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+			const upc =
+				releaseExecution.metadata?.input?.releaseSnapshot?.upc ||
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
 
 			if (!upc) {
 				throw new Error('Missing UPC from release snapshot');
 			}
 
-			const dspStatuses = await this.ciService.getStatusDsps(upc);
+			const dspCiCodes: string[] =
+				step.metadata?.input?.dspCiCodes ??
+				[
+					...(releaseExecution.metadata.input.dspAggregator?.ci?.ci ??
+						[]),
+					...(releaseExecution.metadata.input.dspAggregator?.ci
+						?.state51 ?? []),
+				]
+					.map((dsp) => dsp.codeCi)
+					.filter((code): code is string => !!code);
 
-			const ciCodes = dspStatuses.map((d) => d.ciCode).filter(Boolean);
-
-			const dsps =
-				ciCodes.length > 0
-					? await this.manager.find(Dsp, {
-							where: { codeCi: In(ciCodes) },
-						})
-					: [];
-
-			const ciToSystem = new Map(
-				dsps.map((d) => [d.codeCi, { code: d.code, name: d.name }]),
-			);
-
-			const mappedStatuses = dspStatuses.map((d) => ({
-				ciCode: d.ciCode,
-				code: ciToSystem.get(d.ciCode)?.code || null,
-				name: ciToSystem.get(d.ciCode)?.name || null,
-				status: d.status,
-			}));
+			const dspStatuses = await this.ciService.getStatusDsps({
+				upc,
+				dspCiCodes,
+			});
 
 			step.metadata = {
 				...step.metadata,
+				input: {
+					...step.metadata?.input,
+					upc,
+					dspCiCodes,
+				},
 				output: {
 					...step.metadata?.output,
-					result: mappedStatuses,
+					result: dspStatuses,
 				},
 			};
 
 			await this.manager.save(ReleaseExecutionStep3, step);
 
-			this.logService.success({
-				message: `[SYNC_DATA_DSP_CI] ${mappedStatuses.length} DSPs synced`,
-				data: { dspStatuses: mappedStatuses },
+			const allTransferred =
+				dspStatuses.length > 0 &&
+				dspStatuses.every(
+					(item) => item.status?.toLowerCase() === 'transferred',
+				);
+
+			if (allTransferred) {
+				this.logService.success({
+					message: `[SYNC_DATA_DSP_CI] All ${dspStatuses.length} DSPs transferred`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+					data: { dspStatuses },
+				});
+
+				return ReleaseExecutionStepStatus.DONE;
+			}
+
+			this.logService.error({
+				message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+				data: { dspStatuses },
 			});
 
-			return ReleaseExecutionStepStatus.DONE;
+			return ReleaseExecutionStepStatus.FAILED;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
 			});
 
 			return ReleaseExecutionStepStatus.FAILED;

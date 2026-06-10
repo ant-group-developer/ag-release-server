@@ -63,7 +63,7 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.releaseExecution)
 	steps: ReleaseExecutionStep3[];
 
-	@OneToMany(() => Logs, (log) => log.releaseSubmit)
+	@OneToMany(() => Logs, (log) => log.releaseExecution)
 	logs: Logs[];
 
 	@Column({
@@ -109,6 +109,8 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 export type ReleaseExecutionDeliveryInput = {
 	releaseId: string;
 	items: {
-		dspId: string;
+		id?: string;
+		dspId?: string;
+		dspCode?: string;
 	}[];
 };

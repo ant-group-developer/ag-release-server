@@ -53,7 +53,7 @@ export class CiToolService {
 		return data;
 	}
 
-	async getExportJobStatus(jobId: string) {
+	async getExportJobStatus(jobId: string): Promise<string | null> {
 		const { data } = await firstValueFrom(
 			this.httpService.get(
 				`${process.env.CI_TOOL_URL}/api/export/job/${jobId}`,
@@ -65,6 +65,8 @@ export class CiToolService {
 			),
 		);
 
-		return data;
+		const status = data?.job?.status ?? data?.status;
+
+		return typeof status === 'string' ? status : null;
 	}
 }

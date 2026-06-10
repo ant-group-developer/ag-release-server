@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
-import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
+import {
+	DEFAULT_WAIT_MINUTES,
+	MINUTES_PER_DAY,
+} from 'src/common/constants/common.default.constants';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { EntityManager, Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
-
-/** 24 hours — CI export takes much longer than direct partner processing */
-const WAIT_CI_EXPORT_MINUTES = 1440;
 
 @Injectable()
 export class ReleaseExecution3Builder {
@@ -49,14 +49,19 @@ export class ReleaseExecution3Builder {
 					releaseSnapshot.tracks
 						?.filter((track) => !track.isrc)
 						.map((track) => track.id) ?? [];
+				const videoIdWithoutIsrc =
+					releaseSnapshot.video && !releaseSnapshot.video.isrc
+						? releaseSnapshot.video.id
+						: null;
 
-				if (trackIdsWithoutIsrc.length > 0) {
+				if (trackIdsWithoutIsrc.length > 0 || videoIdWithoutIsrc) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_ISRCS,
 						order: order++,
 						metadata: {
 							input: {
 								trackIds: trackIdsWithoutIsrc,
+								videoId: videoIdWithoutIsrc,
 							},
 						},
 					});
@@ -94,6 +99,16 @@ export class ReleaseExecution3Builder {
 						metadata: { input: { trackId } },
 					});
 				});
+
+				const videoId: string | null =
+					STEP.metadata?.input?.videoId ?? null;
+				if (videoId) {
+					stepResult.push({
+						type: ReleaseExecutionStepType.GEN_ISRC,
+						order: trackIds.length + 1,
+						metadata: { input: { videoId } },
+					});
+				}
 				break;
 			}
 
@@ -174,7 +189,11 @@ export class ReleaseExecution3Builder {
 					{
 						type: ReleaseExecutionStepType.SYNC_DATA_PARTNER,
 						order: 4,
-						metadata: { input: { dsp: STEP.metadata?.input?.dsp } },
+						metadata: {
+							input: {
+								dsp: STEP.metadata?.input?.dsp,
+							},
+						},
 					},
 				);
 				break;
@@ -220,6 +239,28 @@ export class ReleaseExecution3Builder {
 							type: ReleaseExecutionStepType.EXPORT_CI,
 							order: 2,
 							childExecutionMode: 'parallel',
+						},
+						{
+							type: ReleaseExecutionStepType.WAIT_PARTNER_PROCESS,
+							order: 3,
+							metadata: {
+								input: {
+									waitMinutes: MINUTES_PER_DAY,
+								},
+							},
+						},
+						{
+							type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
+							order: 4,
+							metadata: {
+								input: {
+									dspCiCodes: ciDsps
+										.map((dsp) => dsp.codeCi)
+										.filter(
+											(code): code is string => !!code,
+										),
+								},
+							},
 						},
 					);
 				}
@@ -332,28 +373,4 @@ export class ReleaseExecution3Builder {
 
 		return stepDb;
 	}
-
-	// async startBuildPipeline(execution: ReleaseExecution3): Promise<void> {
-	// 	const listStepsTree = this.buildStepsChild({ releaseExecution: execution });
-
-	// 	await this.manager.transaction(async (tx) => {
-	// 		await this.saveStepsRecursive(listStepsTree, tx);
-	// 	});
-	// }
-
-	// private async saveStepsRecursive(
-	// 	steps: ReleaseExecutionStep3[],
-	// 	tx: EntityManager,
-	// ): Promise<void> {
-	// 	for (const step of steps) {
-	// 		const children = step.childSteps;
-	// 		step.childSteps = undefined;
-
-	// 		await tx.save(ReleaseExecutionStep3, step);
-
-	// 		if (children?.length) {
-	// 			await this.saveStepsRecursive(children, tx);
-	// 		}
-	// 	}
-	// }
 }

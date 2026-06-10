@@ -10,6 +10,7 @@ interface DspSyncRow {
   dsp_code: string;
   dsp_name: string;
   dsp_ci_code: string;
+  picture: string;
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +45,7 @@ export class DspSeedingService {
       dsp_code: dsp.code ?? '',
       dsp_name: dsp.name ?? '',
       dsp_ci_code: dsp.codeCi ?? '',
+      picture: dsp.picture ?? '',
       created_at: now,
       updated_at: now,
     }));

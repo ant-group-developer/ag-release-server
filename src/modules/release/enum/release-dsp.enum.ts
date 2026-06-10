@@ -1,8 +1,9 @@
 export enum ReleaseDspStatus {
-	DRAFT = 'draft',
-	PROCESSING = 'processing',
-	ISSUES = 'issues',
+	// DRAFT = 'draft',
 	NEVER_DISTRIBUTED = 'never_distributed',
+	PROCESSING = 'processing',
+
+	ISSUES = 'issues',
 	DISTRIBUTED = 'distributed',
 	TAKEN_DOWN = 'taken_down',
 }

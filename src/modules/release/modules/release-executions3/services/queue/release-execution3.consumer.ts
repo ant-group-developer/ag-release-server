@@ -27,7 +27,8 @@ export class ReleaseExecution3Consumer {
 		private readonly runPipelineQueueRepo: Repository<ReleaseExecution3RunPipelineQueue>,
 	) {}
 
-	@Cron(CronExpression.EVERY_MINUTE)
+	// @Cron(CronExpression.EVERY_MINUTE)
+	@Cron(CronExpression.EVERY_10_SECONDS)
 	async consumerExecutions() {
 		if (this.isConsumingExecutions) {
 			this.logger.warn(
@@ -95,7 +96,8 @@ export class ReleaseExecution3Consumer {
 		}
 	}
 
-	@Cron(CronExpression.EVERY_30_SECONDS)
+	// @Cron(CronExpression.EVERY_30_SECONDS)
+	@Cron(CronExpression.EVERY_10_SECONDS)
 	async consumeRunPipelineQueue() {
 		if (this.isConsumingRunPipeline) {
 			this.logger.warn(

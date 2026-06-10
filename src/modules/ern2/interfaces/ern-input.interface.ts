@@ -333,8 +333,9 @@ export interface ErnVideoInput2 {
 	subtitles?: ErnSubtitleInput[];
 	channel?: string;
 	description?: string;
-	isKids?: boolean;
-	isUnlisted?: boolean;
+	keywords?: string[];
+	madeForKids?: string;
+	visibility?: string;
 	partnerCustomId1?: string;
 	partnerCustomId2?: string;
 }
@@ -351,4 +352,5 @@ export interface ErnSubtitleInput {
 	language: string;
 	fileName: string;
 	filePath?: string;
+	type?: 'Caption' | 'SubTitle';
 }

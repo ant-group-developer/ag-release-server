@@ -11,6 +11,11 @@ import {
 	OneToOne,
 } from 'typeorm';
 
+export enum ReleaseCaptionType {
+	SUBTITLE = 'SUBTITLE',
+	CAPTION = 'CAPTION',
+}
+
 @Entity('release_captions', {
 	comment:
 		'Caption/subtitle files attached to a release, unique by language and type',
@@ -68,9 +73,4 @@ export class ReleaseCaption extends BaseUUIDEntity {
 	@OneToOne(() => FileEntity)
 	@JoinColumn({ name: 'file_id' })
 	file: FileEntity;
-}
-
-export enum ReleaseCaptionType {
-	SUBTITLE = 'SUBTITLE',
-	CAPTION = 'CAPTION',
 }

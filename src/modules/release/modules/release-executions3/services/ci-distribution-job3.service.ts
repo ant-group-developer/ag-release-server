@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	forwardRef,
 	Inject,
 	Injectable,
@@ -65,12 +66,13 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	}
 
 	/**
-	 * Cron check CI Tool job status.
+	 * Cron check CI Tool job status bên tool ci.
 	 * Chạy mỗi phút, nhưng chỉ check job nào đã tới nextCiToolCheckAt.
 	 */
 	// @Cron('*/5 * * * *')
 	// @Cron('* * * * *') // mỗi phút
-	@Cron('*/10 * * * * *')
+	// @Cron('*/10 * * * *') // mỗi 10p
+	@Cron('*/10 * * * * *') // mỗi 10 giây, test nhanh
 	async handleCheckCiToolJobStatus() {
 		await this.checkCiToolJobStatus();
 	}
@@ -105,79 +107,53 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 		for (const [ciToolJobId, groupJobs] of groups) {
 			try {
-				const ciStatusResult =
+				const status =
 					await this.ciToolService.getExportJobStatus(ciToolJobId);
 
-				const status = ciStatusResult?.job?.status;
-
 				if (status === 'success') {
-					await this.repo.update(
-						{ id: In(groupJobs.map((j) => j.id)) },
-						{
-							status: CiJobStatus3.COMPLETED,
-							sentAt: new Date(),
-							nextCiToolCheckAt: null,
-						},
-					);
-
-					let totalResumed = 0;
+					const completed = await this.finalizeJobs(groupJobs, {
+						jobStatus: CiJobStatus3.COMPLETED,
+						stepStatus: ReleaseExecutionStepStatus.DONE,
+						nextCiToolCheckAt: null,
+					});
 
 					for (const job of groupJobs) {
-						// await this.releaseExecutionService.doneStep(job.stepId);
-
-						await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
-							{
-								stepId: job.stepId,
-								status: ReleaseExecutionStepStatus.DONE,
-							},
-						);
 						this.log.success({
 							releaseExecutionId: job.releaseExecutionId,
 							releaseExecutionStepId: job.stepId,
 							message: `[CiJob3] CI Tool job completed, step DONE and pipeline rerun`,
 							data: {
 								ciToolJobId,
-								ciToolResult: ciStatusResult,
+								ciToolStatus: status,
 							},
 						});
-
-						totalResumed++;
 					}
 
 					this.logger.log(
-						`[CiTool] Job completed: ${ciToolJobId}, resumed=${totalResumed}`,
+						`[CiTool] Job completed: ${ciToolJobId}, resumed=${completed.resumed}`,
 					);
 
 					continue;
 				}
 
 				if (status === 'failed') {
-					await this.repo.update(
-						{ id: In(groupJobs.map((j) => j.id)) },
-						{
-							status: CiJobStatus3.FAILED,
-							note:
-								ciStatusResult?.job?.message ||
-								'CI Tool job failed',
-							nextCiToolCheckAt: null,
-						},
-					);
+					const note = 'CI Tool job failed';
+
+					await this.finalizeJobs(groupJobs, {
+						jobStatus: CiJobStatus3.FAILED,
+						stepStatus: ReleaseExecutionStepStatus.FAILED,
+						note,
+						nextCiToolCheckAt: null,
+					});
 
 					for (const job of groupJobs) {
-						// await this.releaseExecutionService.doneStep(job.stepId);
-						await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
-							{
-								stepId: job.stepId,
-								status: ReleaseExecutionStepStatus.DONE,
-							},
-						);
 						this.log.error({
 							releaseExecutionId: job.releaseExecutionId,
 							releaseExecutionStepId: job.stepId,
 							message: `[CiJob3] CI Tool job failed, step FAILED`,
 							data: {
 								ciToolJobId,
-								ciToolResult: ciStatusResult,
+								ciToolStatus: status,
 							},
 						});
 					}
@@ -189,8 +165,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 				await this.repo.update(
 					{ id: In(groupJobs.map((j) => j.id)) },
 					{
-						nextCiToolCheckAt: new Date(Date.now() + 1 * 60 * 1000),
-						// nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+						// nextCiToolCheckAt: new Date(Date.now() + 1 * 60 * 1000),
+						nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
 					},
 				);
 
@@ -214,7 +190,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 	}
 
 	// ==========================================
-	// Cron: hẹn lịch gửi
+	// Cron: hẹn lịch gửi định kì hàng ngày theo app config
 	// ==========================================
 
 	private registerDailySendCron() {
@@ -274,27 +250,9 @@ export class CiDistributionJob3Service implements OnModuleInit {
 				return;
 			}
 
-			const emailJobIds = pendingJobs
-				.filter((j) => j.type === CiJobType3.EMAIL_STATE51)
-				.map((j) => j.id);
-
-			const adminExportJobIds = pendingJobs
-				.filter((j) => j.type === CiJobType3.ADMIN_EXPORT)
-				.map((j) => j.id);
-
-			const result: any = {
-				email: { sent: 0, resumed: 0 },
-				ciTool: { sentToCi: 0, resumed: 0 },
-			};
-
-			if (emailJobIds.length) {
-				result.email = await this.autoSendEmail(emailJobIds);
-				// console.log('Email job ids to send:', emailJobIds);
-			}
-
-			if (adminExportJobIds.length) {
-				result.ciTool = await this.sendExportToCi(adminExportJobIds);
-			}
+			const result = await this.processJobs(
+				pendingJobs.map((job) => job.id),
+			);
 
 			this.logger.log(
 				`[CRON] Daily batch result: ${JSON.stringify(result)}`,
@@ -307,44 +265,85 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		}
 	}
 
-	//
-	async sendExportToCi(ids: string[]) {
-		if (!ids?.length) throw new NotFoundException('No job ids provided');
+	// main
+	async processJobs(ids: string[]) {
+		if (!ids?.length) {
+			return {
+				email: { sent: 0, resumed: 0 },
+				ciTool: { sentToCi: 0 },
+			};
+		}
 
+		const uniqueIds = [...new Set(ids)];
 		const jobs = await this.repo.find({
-			where: { id: In(ids) },
+			where: { id: In(uniqueIds) },
 			order: { createdAt: 'ASC' },
 		});
 
 		if (!jobs.length) throw new NotFoundException('No jobs found');
 
-		const invalidType = jobs.filter(
-			(j) => j.type !== CiJobType3.ADMIN_EXPORT,
-		);
-
-		if (invalidType.length) {
-			throw new Error('Only ADMIN_EXPORT jobs can be sent to CI Tool');
+		const foundIds = new Set(jobs.map((job) => job.id));
+		const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
+		if (missingIds.length) {
+			throw new NotFoundException(
+				`CI distribution jobs not found: ${missingIds.join(', ')}`,
+			);
 		}
 
-		const invalidStatus = jobs.filter(
-			(j) => j.status !== CiJobStatus3.PENDING,
+		const invalidJobs = jobs.filter(
+			(job) => job.status !== CiJobStatus3.PENDING,
 		);
-
-		if (invalidStatus.length) {
-			throw new Error('Only PENDING jobs can be sent to CI Tool');
+		if (invalidJobs.length) {
+			throw new BadRequestException(
+				`Only PENDING jobs can be processed: ${invalidJobs
+					.map((job) => `${job.id} (${job.status})`)
+					.join(', ')}`,
+			);
 		}
 
-		const excelData = jobs.map((j) => ({
-			upc: j.upc,
-			listCodeDspCi: j.dspCiCodes,
-		}));
+		const jobsByType = new Map<CiJobType3, CiDistributionJob3[]>();
+		for (const job of jobs) {
+			const typeJobs = jobsByType.get(job.type) ?? [];
+			typeJobs.push(job);
+			jobsByType.set(job.type, typeJobs);
+		}
 
-		const buffer = await this.fileExportCiService.createFileExportCi({
-			data: excelData,
-		});
+		const unsupportedTypes = [...jobsByType.keys()].filter(
+			(type) =>
+				![CiJobType3.EMAIL_STATE51, CiJobType3.ADMIN_EXPORT].includes(
+					type,
+				),
+		);
+		if (unsupportedTypes.length) {
+			throw new BadRequestException(
+				`Unsupported CI job types: ${unsupportedTypes.join(', ')}`,
+			);
+		}
 
-		const dateStr = new Date().toISOString().slice(0, 10);
-		const fileName = `CI_Export_${dateStr}_${Date.now()}.xlsx`;
+		const result = {
+			email: { sent: 0, resumed: 0 },
+			ciTool: {
+				sentToCi: 0,
+				ciToolJobId: undefined as string | undefined,
+			},
+		};
+
+		const emailJobs = jobsByType.get(CiJobType3.EMAIL_STATE51) ?? [];
+		if (emailJobs.length) {
+			result.email = await this.sendEmailToState51(emailJobs);
+		}
+
+		const adminExportJobs = jobsByType.get(CiJobType3.ADMIN_EXPORT) ?? [];
+		if (adminExportJobs.length) {
+			result.ciTool = await this.sendExportToCi(adminExportJobs);
+		}
+
+		return result;
+	}
+
+	private async sendExportToCi(jobs: CiDistributionJob3[]) {
+		const ids = jobs.map((job) => job.id);
+		const { buffer, fileName } = await this.exportFileExcel(ids);
 
 		const ciResult = await this.ciToolService.sendFileExportToCi({
 			buffer,
@@ -378,24 +377,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		};
 	}
 
-	async autoSendEmail(ids: string[]) {
-		if (!ids?.length) return { sent: 0, resumed: 0 };
-
-		const jobs = await this.repo.find({
-			where: { id: In(ids) },
-		});
-
-		if (!jobs.length) {
-			throw new NotFoundException('No jobs found');
-		}
-
-		await this.repo.update(
-			{ id: In(ids) },
-			{
-				status: CiJobStatus3.PROCESSING,
-			},
-		);
-
+	private async sendEmailToState51(jobs: CiDistributionJob3[]) {
 		const baseDir =
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
 		const tempDir = path.join(baseDir, 'temp_exports', 'ci_batch_v3');
@@ -403,109 +385,106 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		fs.mkdirSync(tempDir, { recursive: true });
 
 		const dateStr = new Date().toISOString().slice(0, 10);
-
 		let totalSent = 0;
 		let totalResumed = 0;
+		const jobsByEmail = new Map<string, CiDistributionJob3[]>();
 
-		try {
-			const grouped = new Map<string, CiDistributionJob3[]>();
-
-			for (const job of jobs) {
-				const email = job.deliveryEmail || 'unknown';
-
-				if (!grouped.has(email)) {
-					grouped.set(email, []);
-				}
-
-				grouped.get(email)!.push(job);
+		for (const job of jobs) {
+			if (!job.deliveryEmail) {
+				this.logger.warn(
+					`Skipping CI job ${job.id}: deliveryEmail is missing`,
+				);
+				continue;
 			}
 
-			for (const [toEmail, group] of grouped) {
-				if (toEmail === 'unknown') {
-					this.logger.warn(
-						`Skipping ${group.length} jobs with no deliveryEmail`,
-					);
-					continue;
-				}
+			const emailJobs = jobsByEmail.get(job.deliveryEmail) ?? [];
+			emailJobs.push(job);
+			jobsByEmail.set(job.deliveryEmail, emailJobs);
+		}
 
-				const excelData = group.map((j) => ({
-					upc: j.upc,
-					listCodeDspCi: j.dspCiCodes,
-				}));
+		for (const [toEmail, emailJobs] of jobsByEmail) {
+			const ids = emailJobs.map((job) => job.id);
+			let filePath: string | undefined;
 
-				const buffer =
-					await this.fileExportCiService.createFileExportCi({
-						data: excelData,
-					});
-
-				const fileName = `CI_Batch_${dateStr}_${Date.now()}.xlsx`;
-				const filePath = path.join(tempDir, fileName);
+			try {
+				const { buffer, fileName } = await this.exportFileExcel(ids);
+				filePath = path.join(tempDir, fileName);
 
 				fs.writeFileSync(filePath, buffer);
 
 				const subject =
-					group[0].deliveryEmailSubject ||
+					emailJobs[0].deliveryEmailSubject ||
 					`[Distribution] CI Batch - ${dateStr}`;
+
+				await this.repo.update(
+					{ id: In(ids) },
+					{ status: CiJobStatus3.PROCESSING },
+				);
 
 				const success = await this.notificationResendService.sendEmail({
 					to: [toEmail],
 					subject,
-					html: `<p>${group.length} release(s) for distribution</p>`,
+					html: `<p>${emailJobs.length} release(s) for distribution</p>`,
 					attachments: [{ filename: fileName, path: filePath }],
 				});
 
-				if (fs.existsSync(filePath)) {
-					fs.unlinkSync(filePath);
-				}
-
 				if (!success) {
-					this.logger.error(
-						`Failed to send batch email to ${toEmail}`,
+					throw new Error(
+						`Email service failed to send batch to ${toEmail}`,
 					);
-					continue;
 				}
 
-				await this.repo.update(
-					{ id: In(group.map((j) => j.id)) },
-					{
-						status: CiJobStatus3.COMPLETED,
-						sentAt: new Date(),
-					},
+				const completed = await this.finalizeJobs(emailJobs, {
+					jobStatus: CiJobStatus3.COMPLETED,
+					stepStatus: ReleaseExecutionStepStatus.DONE,
+				});
+
+				totalSent += emailJobs.length;
+				totalResumed += completed.resumed;
+			} catch (error) {
+				const message =
+					error instanceof Error
+						? error.message
+						: 'Unknown email delivery error';
+
+				this.logger.error(
+					`Failed to process email batch for ${toEmail}: ${message}`,
+					error instanceof Error ? error.stack : undefined,
 				);
 
-				for (const job of group) {
-					// await this.releaseExecutionService.retryStep(job.stepId);
-					await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
-						{
-							stepId: job.stepId,
-							status: ReleaseExecutionStepStatus.NEW,
-						},
+				try {
+					await this.finalizeJobs(emailJobs, {
+						jobStatus: CiJobStatus3.FAILED,
+						stepStatus: ReleaseExecutionStepStatus.FAILED,
+						note: message,
+					});
+				} catch (finalizeError) {
+					this.logger.error(
+						`Failed to mark email batch as FAILED for ${toEmail}: ${
+							finalizeError instanceof Error
+								? finalizeError.message
+								: 'Unknown finalize error'
+						}`,
+						finalizeError instanceof Error
+							? finalizeError.stack
+							: undefined,
 					);
-					totalResumed++;
 				}
-
-				totalSent += group.length;
-			}
-
-			this.logger.log(
-				`[autoSendEmail] ${totalSent} sent, ${totalResumed} steps resumed`,
-			);
-
-			return {
-				sent: totalSent,
-				resumed: totalResumed,
-			};
-		} finally {
-			if (fs.existsSync(tempDir)) {
-				for (const f of fs.readdirSync(tempDir)) {
-					fs.unlinkSync(path.join(tempDir, f));
-				}
-
-				if (!fs.readdirSync(tempDir).length) {
-					fs.rmdirSync(tempDir);
+			} finally {
+				if (filePath && fs.existsSync(filePath)) {
+					fs.unlinkSync(filePath);
 				}
 			}
 		}
+
+		this.logger.log(
+			`[sendEmailToState51] ${totalSent} sent, ${totalResumed} steps resumed`,
+		);
+
+		return {
+			sent: totalSent,
+			resumed: totalResumed,
+		};
 	}
 
 	// ==========================================
@@ -673,7 +652,8 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		return job;
 	}
 
-	async downloadExcel(ids: string[]) {
+	// tạo file excel từ các jobs
+	async exportFileExcel(ids: string[]) {
 		const jobs = await this.repo.find({
 			where: { id: In(ids) },
 			order: { createdAt: 'ASC' },
@@ -690,52 +670,66 @@ export class CiDistributionJob3Service implements OnModuleInit {
 			data: excelData,
 		});
 
-		await this.repo.update(
-			{ id: In(ids) },
-			{ status: CiJobStatus3.PROCESSING },
-		);
-
 		const dateStr = new Date().toISOString().slice(0, 10);
 		const fileName = `CI_Export_${dateStr}_${Date.now()}.xlsx`;
 
 		this.logger.log(
-			`[downloadExcel] Generated Excel for ${jobs.length} jobs`,
+			`[exportFileExcel] Generated Excel for ${jobs.length} jobs`,
 		);
 
 		return { buffer: Buffer.from(buffer), fileName };
 	}
 
-	async confirmCompleted(ids: string[], exportIdFromCi?: string) {
-		if (!ids?.length) return { completed: 0, resumed: 0 };
-
-		const jobs = await this.repo.find({ where: { id: In(ids) } });
-
-		if (!jobs.length) throw new NotFoundException('No jobs found');
+	private async finalizeJobs(
+		jobs: CiDistributionJob3[],
+		options: {
+			jobStatus: CiJobStatus3.COMPLETED | CiJobStatus3.FAILED;
+			stepStatus:
+				| ReleaseExecutionStepStatus.DONE
+				| ReleaseExecutionStepStatus.FAILED;
+			note?: string | null;
+			nextCiToolCheckAt?: Date | null;
+		},
+	) {
+		if (!jobs.length) return { finalized: 0, resumed: 0 };
 
 		await this.repo.update(
-			{ id: In(jobs.map((j) => j.id)) },
-			{ status: CiJobStatus3.COMPLETED, sentAt: new Date() },
+			{ id: In(jobs.map((job) => job.id)) },
+			{
+				status: options.jobStatus,
+				sentAt:
+					options.jobStatus === CiJobStatus3.COMPLETED
+						? new Date()
+						: null,
+				...(options.note !== undefined && { note: options.note }),
+				...(options?.nextCiToolCheckAt !== undefined && {
+					nextCiToolCheckAt: options.nextCiToolCheckAt,
+				}),
+			},
 		);
 
-		const stepIds = [...new Set(jobs.map((j) => j.stepId))];
+		const stepIds = [
+			...new Set(jobs.map((job) => job.stepId).filter(Boolean)),
+		];
 		let totalResumed = 0;
 
 		for (const stepId of stepIds) {
-			// await this.releaseExecutionService.retryStep(stepId);
 			await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
 				{
 					stepId,
-					status: ReleaseExecutionStepStatus.DONE,
+					status: options.stepStatus,
 				},
 			);
+			totalResumed++;
 		}
 
 		this.logger.log(
-			`[confirmCompleted] ${jobs.length} completed, ${totalResumed} steps resumed`,
+			`[finalizeJobs] ${jobs.length} jobs marked ${options.jobStatus}, ${totalResumed} steps updated`,
 		);
-		return { completed: jobs.length, resumed: totalResumed };
+		return { finalized: jobs.length, resumed: totalResumed };
 	}
 
+	// dùng khi cần update mail, mã code vv
 	async updateJob(id: string, body: UpdateCiJob3Dto) {
 		body.status = CiJobStatus3.CANCEL;
 		const job = await this.findOne(id);

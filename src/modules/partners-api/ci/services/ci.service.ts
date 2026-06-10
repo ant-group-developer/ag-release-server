@@ -14,11 +14,16 @@ export interface CiDspStatus {
 	status: string;
 }
 
+export interface GetCiDspStatusesInput {
+	upc: string;
+	dspCiCodes?: string[];
+}
+
 @Injectable()
 export class CiService {
 	private readonly logger = new Logger(CiService.name);
 
-	constructor(private readonly appConfigService: AppConfigService) { }
+	constructor(private readonly appConfigService: AppConfigService) {}
 
 	private get client(): AxiosInstance {
 		const baseUrl = this.appConfigService.getValue<string>(
@@ -186,14 +191,16 @@ export class CiService {
 	 * Lấy trạng thái DSP từ CI theo UPC.
 	 * Flow: getExportsByGtin → deliverDesire per export → gom theo ciCode (musicService.dpc), lấy theo ngày mới nhất.
 	 */
-	async getStatusDsps(upc: string): Promise<CiDspStatus[]> {
+	async getStatusDsps({
+		upc,
+		dspCiCodes,
+	}: GetCiDspStatusesInput): Promise<CiDspStatus[]> {
 		// 1. Lấy tất cả exports theo UPC
 		const exportList = await this.getExportsByGtin(upc);
 		const exports = exportList._embedded || [];
 
 		if (exports.length === 0) {
 			this.logger.log(`[getStatusDsp] No exports found for UPC: ${upc}`);
-			return [];
 		}
 
 		// 2. Gọi deliverDesire cho từng export, gom tất cả deliver desires
@@ -227,14 +234,33 @@ export class CiService {
 		}
 
 		// 4. Map ra output
-		const result: CiDspStatus[] = Array.from(
+		const allStatuses: CiDspStatus[] = Array.from(
 			latestByDsp,
 			([ciCode, desire]) => ({
 				ciCode,
 				name: desire.musicService?.name || ciCode,
-				status: desire.exportBatch?.batch_transfer_status || 'unknown',
+				status:
+					desire.exportBatch?.batch_transfer_status || 'not_found',
 			}),
 		);
+
+		const requestedCiCodes = dspCiCodes?.filter(Boolean);
+		const result = requestedCiCodes
+			? requestedCiCodes.map((ciCode) => {
+					const found = allStatuses.find(
+						(item) =>
+							item.ciCode.toLowerCase() === ciCode.toLowerCase(),
+					);
+
+					return (
+						found ?? {
+							ciCode,
+							name: ciCode,
+							status: 'not_found',
+						}
+					);
+				})
+			: allStatuses;
 
 		this.logger.log(
 			`[getStatusDsps] UPC=${upc}: ${result.length} DSPs found`,

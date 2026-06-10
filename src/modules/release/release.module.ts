@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
+import { Artist } from '../artist/entities/artist.entity';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { CountryModule } from '../country/country.module';
 import { Country } from '../country/entities/country.entity';
@@ -19,6 +20,7 @@ import { Label } from '../label/entities/label.entity';
 import { NotificationModule } from '../notification/notification.module';
 import { OrmModule } from '../orm/orm.module';
 import { PriceTier } from '../price-tiers/entities/price-tier.entity';
+import { ReleaseArtist } from '../release-artist/entities/release-artist.entity';
 import { ReleaseArtistModule } from '../release-artist/release-artist.module';
 import { ReleaseCoverArtModule } from '../release-cover-art/release-cover-art.module';
 import { ReleaseLanguageModule } from '../release-language/release-language.module';
@@ -37,6 +39,7 @@ import { ReleaseDdexService } from './services/release-ddex.service';
 import { ReleaseDspDeliveryController } from './controllers/release-dsp-delivery.controller';
 import { ReleaseDspDeliveryQueryService } from './services/release-dsp-services/release-dsp-delivery-query.service';
 import { ReleaseDspDeliveryService } from './services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseReportImportService } from './services/release-report-import.service';
 import { ReleaseDraftService } from './services/release.draft.service';
 import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
@@ -45,6 +48,7 @@ import { ReleaseValidateService } from './services/release.validate.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { TrackArtist } from '../track-artist/entities/track-artist.entity';
 import { Track } from '../track/entities/track.entity';
 import { ReleaseExecutionController } from './modules/release-executions/controllers/release-execution.controller';
 import { ReleaseExecutionDsp } from './modules/release-executions/entities/release-execution-dsp.entity';
@@ -76,21 +80,17 @@ import { ReleaseExecution3Queue } from './modules/release-executions3/services/q
 import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
-import { CiDistributionJobController } from './modules/release-submit/controllers/ci-distribution-job.controller';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
-import { ReleaseSubmitController } from './modules/release-submit/controllers/release-submit.controller';
-import { CiDistributionJob } from './modules/release-submit/entities/ci-distribution-job.entity';
-import { ReleaseSubmitStep } from './modules/release-submit/entities/release-submit-step.entity';
-import { ReleaseSubmit } from './modules/release-submit/entities/release-submit.entity';
-import { CiDistributionJobService } from './modules/release-submit/services/ci-distribution-job.service';
-import { ReleaseSubmitService2 } from './modules/release-submit/services/release-submit2.service';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([
 			Release,
 			Track,
+			Artist,
+			ReleaseArtist,
+			TrackArtist,
 			AlbumFormat,
 			Genre,
 			Label,
@@ -104,10 +104,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 			ReleaseExecution,
 			ReleaseExecutionDsp,
 			ReleaseExecutionStep,
-
-			ReleaseSubmit,
-			ReleaseSubmitStep,
-			CiDistributionJob,
 
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
@@ -162,9 +158,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 
 		ReleaseExecutionController,
 
-		ReleaseSubmitController,
-		CiDistributionJobController,
-
 		ReleaseExecution3Controller,
 		ReleaseSubmitTestController,
 		ReleaseExecutionStepTestController,
@@ -175,6 +168,7 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseDraftService,
 		ReleaseValidateService,
 		ReleaseQueryService,
+		ReleaseReportImportService,
 		ReleaseDdexService,
 		ReleaseDspDeliveryService,
 		ReleaseDspDeliveryQueryService,
@@ -185,8 +179,6 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseExecutionProcessorService,
 
 		// v2
-		ReleaseSubmitService2,
-		CiDistributionJobService,
 
 		// v3
 		ReleaseExecution3Builder,
@@ -197,6 +189,11 @@ import { ReleaseSubmitService2 } from './modules/release-submit/services/release
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
 	],
-	exports: [ReleaseDdexService, ReleaseQueryService, ReleaseValidateService],
+	exports: [
+		ReleaseDdexService,
+		ReleaseQueryService,
+		ReleaseReportImportService,
+		ReleaseValidateService,
+	],
 })
 export class ReleaseModule {}

@@ -43,7 +43,7 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.parentStep)
 	childSteps?: ReleaseExecutionStep3[];
 
-	@OneToMany(() => Logs, (log) => log.releaseSubmitStep)
+	@OneToMany(() => Logs, (log) => log.releaseExecutionStep)
 	logs: Logs[];
 
 	@Column({ type: 'varchar', length: 50 })
@@ -62,13 +62,6 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	metadata: Record<string, any> | null;
 
 	@Column({
-		name: 'is_delivery_step',
-		type: 'boolean',
-		default: false,
-	})
-	isDeliveryStep: boolean;
-
-	@Column({
 		name: 'started_at',
 		type: 'timestamp with time zone',
 		nullable: true,
@@ -83,9 +76,19 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	completedAt: Date | null;
 
 	@Column({
+		name: 'is_delivery_step',
+		type: 'boolean',
+		default: false,
+		comment: 'Đánh dấu step trả về kết quả cho bảng release_dsp_delivery',
+	})
+	isDeliveryStep: boolean;
+
+	@Column({
 		name: 'child_execution_mode',
 		type: 'varchar',
 		default: 'sequential',
+		comment:
+			'Chế độ thực thi các step con: sequential (tuần tự) hoặc parallel (song song)',
 	})
 	childExecutionMode: 'sequential' | 'parallel';
 

@@ -1,4 +1,6 @@
 export { BaseSalesParser } from './base-sales.parser';
+export { WmgSalesParser } from './wmg-sales.parser';
+export type { WmgStreamingOpts, WmgStreamingResult } from './wmg-sales.parser';
 
 // Group A: Standard Merlin CSV
 export { AudiomackSalesParser, JooxSalesParser, RessoSalesParser, TrebelSalesParser, TencentSalesParser, TaobaoSalesParser, NeteaseSalesParser, SoundtrackSalesParser, KkboxSalesParser } from './group-a-parsers';

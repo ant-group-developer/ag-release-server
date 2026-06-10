@@ -48,9 +48,9 @@ export class ReleaseCaptionService {
 		return result;
 	}
 
-	async findByReleaseId(releaseId: string) {
+	async getList(releaseId: string, type?: ReleaseCaptionType) {
 		return this.captionRepo.find({
-			where: { releaseId },
+			where: { releaseId, ...(type ? { type } : {}) },
 			relations: { file: true, language: true },
 			order: { language: { code: 'ASC' } },
 		});
@@ -70,7 +70,10 @@ export class ReleaseCaptionService {
 	}
 
 	async update(id: string, dto: UpdateReleaseCaptionDto) {
-		const caption = await this.findOne(id);
+		const caption = await this.captionRepo.findOne({ where: { id } });
+		if (!caption) {
+			throw new NotFoundException('Release caption not found');
+		}
 
 		if (dto.fileId && dto.fileId !== caption.fileId) {
 			await this.ensureFile(dto.fileId);
@@ -83,10 +86,12 @@ export class ReleaseCaptionService {
 
 		Object.assign(caption, {
 			...dto,
+			languageId: dto.languageId ?? caption.languageId,
 			type: dto.type ?? caption.type,
 		});
 
-		return this.captionRepo.save(caption);
+		const updated = await this.captionRepo.save(caption);
+		return this.findOne(updated.id);
 	}
 
 	async remove(id: string) {

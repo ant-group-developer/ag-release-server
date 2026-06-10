@@ -94,5 +94,10 @@ export const appConfigDefault: AppConfigShape = {
 			clientSecret: '',
 			token: '',
 		},
+		vevo: {
+			token: '',
+			baseUrl: 'https://api.vevo.com/graphql',
+			callbackUrl: '',
+		},
 	},
 };

@@ -1,57 +1,91 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
-import { JobService } from '../services/job/job.service';
+import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
+import { ImportJob } from '../interfaces';
+import { QueryGetListJobsDto } from '../dto/job-query.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 @ApiTags('ETL')
 @Controller('etl')
 export class JobController {
-  constructor(private readonly jobService: JobService) {}
+  constructor(private readonly importJobsService: ImportJobsService) { }
 
   @Get('jobs/:id')
   @ApiOperation({
-    summary: 'Get job status by ID',
-    description: 'Poll this endpoint to track sync progress. Status: pending → running → done | error',
+    summary: 'Get import/sync job status by ID',
+    description:
+      'Poll this endpoint to track progress. Status: PENDING → PROCESSING → COMPLETED | FAILED | CANCELLED. ' +
+      'Job được lưu trong ClickHouse `import_jobs` (ReplacingMergeTree).',
   })
-  @ApiParam({ name: 'id', description: 'Job ID returned by sync/sync-all/retry' })
-  async getJobStatus(@Param('id') id: string) {
-    const job = this.jobService.getJob(id);
+  @ApiParam({ name: 'id', description: 'Job ID returned by /etl/import/wmg or /etl/ftp/sync*' })
+  async getJobStatus(@Param('id') id: string): Promise<ResponseSuccess<any>> {
+    const job = await this.importJobsService.findById(id);
     if (!job) {
-      return { error: 'Job not found', id };
+      throw new NotFoundException(`Job not found: ${id}`);
     }
-
-    return {
-      id: job.id,
-      type: job.type,
-      status: job.status,
-      progress: job.progress,
-      params: job.params,
-      result: job.status === 'done' ? job.result : undefined,
-      error: job.error || undefined,
-      createdAt: job.createdAt,
-      startedAt: job.startedAt,
-      completedAt: job.completedAt,
-      durationMs: job.completedAt && job.startedAt
-        ? job.completedAt.getTime() - job.startedAt.getTime()
-        : job.startedAt
-          ? Date.now() - job.startedAt.getTime()
-          : undefined,
-    };
+    const result = formatJob(job);
+    return new ResponseSuccess({
+      data: result
+    });
   }
 
-  @Get('jobs')
-  @ApiOperation({
-    summary: 'List all recent jobs',
-    description: 'Returns last 50 jobs sorted by most recent',
-  })
-  async listJobs() {
-    return this.jobService.getAllJobs().map((job) => ({
-      id: job.id,
-      type: job.type,
-      status: job.status,
-      progress: job.progress,
-      params: job.params,
-      createdAt: job.createdAt,
-      completedAt: job.completedAt,
-    }));
-  }
+@Get('jobs')
+@ApiOperation({
+  summary: 'List recent import/sync jobs',
+  description: 'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
+})
+async listJobs(
+  @Query() query: QueryGetListJobsDto,
+): Promise < ResponseSuccess < PageDto < any >>> {
+  const { status, sourceType, tenantId, page, pageSize } = query;
+  const result = await this.importJobsService.list({
+    status,
+    sourceType,
+    tenantId,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
+  return new ResponseSuccess({
+    data: new PageDto({
+      items: result.items.map(formatJob),
+      metadata: {
+        page,
+        pageSize,
+        totalItems: result.totalItems,
+      },
+    }),
+  });
+}
+}
+
+function formatJob(job: ImportJob) {
+  return {
+    id: job.id,
+    sourceType: job.sourceType,
+    status: job.status,
+    progress: {
+      current: job.progressCurrent,
+      total: job.progressTotal,
+      label: job.progressLabel,
+    },
+    rows: {
+      total: job.totalRows,
+      processed: job.processedRows,
+      skipped: job.skippedRows,
+      errors: job.errorRows,
+    },
+    file: job.fileName
+      ? { name: job.fileName, sizeBytes: job.fileSizeBytes, hash: job.fileHash || null }
+      : null,
+    params: job.params,
+    result: job.result,
+    error: job.errorMessage || null,
+    batchId: job.batchId || null,
+    tenantId: job.tenantId || null,
+    createdBy: job.createdBy || null,
+    createdAt: job.createdAt,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    durationMs: job.durationMs,
+  };
 }

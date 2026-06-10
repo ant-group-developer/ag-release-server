@@ -59,9 +59,9 @@ export class ReleaseExecution3Service {
 
 	// lấy ra các bản ghi đang ở WAITING_PARTNER đã tới giờ xử lí, worker sẽ update trạng thái
 	// @Cron('* * * * * *') // 1s
-	@Cron('*/10 * * * * *') // 10s
+	// @Cron('*/10 * * * * *') // 10s
 	// @Cron('*/3 * * * *') // 3 phut
-	// @Cron('* * * * *') // mỗi 1 phút
+	@Cron('* * * * *') // mỗi 1 phút
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
@@ -92,6 +92,7 @@ export class ReleaseExecution3Service {
 		}
 	}
 
+	// main
 	async startProcessing(id: string): Promise<void> {
 		const execution = await this.findOne(id);
 
