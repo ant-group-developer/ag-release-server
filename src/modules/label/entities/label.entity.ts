@@ -54,6 +54,13 @@ export class Label extends BaseUserTrackedCustomIDEntity {
 	})
 	description: string | null;
 
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
 	@OneToMany(() => Release, (release) => release.label)
 	releases: Release[];
 

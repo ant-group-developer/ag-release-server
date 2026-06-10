@@ -177,6 +177,13 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	isSentMetadataCi: boolean;
 
 	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
+	@Column({
 		type: 'enum',
 		enum: ReleaseTimeMode,
 		default: ReleaseTimeMode.GLOBAL_MIDNIGHT,

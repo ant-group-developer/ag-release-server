@@ -104,6 +104,13 @@ export class Artist extends BaseUserTrackedCustomIDEntity {
 	})
 	isScanned: boolean;
 
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
 	@OneToMany(() => ReleaseArtist, (releaseArtist) => releaseArtist.artist)
 	releaseArtists: ReleaseArtist[];
 
