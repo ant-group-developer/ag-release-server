@@ -22,4 +22,5 @@ export const CLICKHOUSE_TABLES = {
   IMPORT_JOBS: 'import_jobs',
   EXCHANGE_RATES: 'exchange_rates',
   FTP_EXCLUDE_PATTERNS: 'ftp_exclude_patterns',
+  REPORT_SOURCE_CONFIGS: 'report_source_configs',
 } as const;

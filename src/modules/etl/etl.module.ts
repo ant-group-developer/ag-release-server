@@ -12,12 +12,14 @@ import { JobService } from './services/job/job.service';
 import { WmgImportService } from './services/import/wmg-import.service';
 import { ImportJobsService } from './services/import-jobs/import-jobs.service';
 import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
+import { CubeRebuildService } from './services/cube-rebuild/cube-rebuild.service';
 import { DspModule } from '../dsp/dsp.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 import { DspReportModule } from '../dsp-report/dsp-report.module';
+import { ReleaseModule } from '../release/release.module';
 
 @Module({
-  imports: [DspModule, ClickHouseModule, DspReportModule],
+  imports: [DspModule, ClickHouseModule, DspReportModule, ReleaseModule],
   controllers: [ImportController, SyncController, JobController, WmgImportController, ExchangeRateController],
   providers: [
     ImportService,
@@ -28,7 +30,8 @@ import { DspReportModule } from '../dsp-report/dsp-report.module';
     ImportJobsService,
     WmgImportService,
     ExchangeRateService,
+    CubeRebuildService,
   ],
-  exports: [ImportService, SyncService, ImportJobsService, ExchangeRateService],
+  exports: [ImportService, SyncService, ImportJobsService, ExchangeRateService, CubeRebuildService],
 })
 export class EtlModule {}

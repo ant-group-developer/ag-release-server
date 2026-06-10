@@ -79,6 +79,7 @@ import { UserModule } from './modules/user/user.module';
 import { VideoArtistModule } from './modules/video-artist/video-artist.module';
 import { VideoContributorModule } from './modules/video-contributor/video-contributor.module';
 import { VideoGenreModule } from './modules/video-genre/video-genre.module';
+import { ReportImportModule } from './modules/report-import/report-import.module';
 
 @Module({
 	imports: [
@@ -101,6 +102,7 @@ import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 		DatabaseModule,
 		ClickHouseModule,
 		EtlModule,
+		ReportImportModule,
 		// ... other modules
 
 		CountryModule,

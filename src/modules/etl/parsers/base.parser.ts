@@ -346,6 +346,8 @@ export abstract class BaseParser {
       metadata: {},
       source_category: '',
       batch_id: batchId,
+      import_source: '',
+      source_file_name: '',
     };
   }
 }

@@ -37,7 +37,7 @@ export class LabelAnalyticsController {
 	@Post('trend-view/dsp/timeline')
 	@ApiOperation({ summary: 'Trend view DSP timeline for a label (monthly)' })
 	async trendViewTimeline(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
@@ -54,7 +54,7 @@ export class LabelAnalyticsController {
 	@Post('sales-view/dsp/timeline')
 	@ApiOperation({ summary: 'Sales view DSP timeline for a label (monthly)' })
 	async salesViewTimeline(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
@@ -71,7 +71,7 @@ export class LabelAnalyticsController {
 	@Post('trend-view/dsp/timeline/daily')
 	@ApiOperation({ summary: 'Trend view DSP daily timeline for a label' })
 	async trendViewDailyTimeline(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
@@ -90,7 +90,7 @@ export class LabelAnalyticsController {
 		summary: 'Revenue timeline for a label (monthly, DSP breakdown)',
 	})
 	async revenueTimeline(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
