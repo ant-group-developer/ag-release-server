@@ -22,6 +22,7 @@ export class LabelQueryService {
 		const {
 			keyword,
 			tenantIds,
+			isImportedFromReport,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -62,6 +63,13 @@ export class LabelQueryService {
 			queryBuilder.andWhere('label.tenantId IN (:...tenantIds)', {
 				tenantIds,
 			});
+		}
+
+		if (isImportedFromReport !== undefined) {
+			queryBuilder.andWhere(
+				'label.isImportedFromReport = :isImportedFromReport',
+				{ isImportedFromReport },
+			);
 		}
 
 		// group for aggregates

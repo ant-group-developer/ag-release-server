@@ -35,7 +35,7 @@ export class ReleaseExecution3Builder {
 			case undefined: {
 				let order = 1;
 
-				if (!releaseSnapshot.upc) {
+				if (!releaseSnapshot.upc && releaseSnapshot.type !== 'video') {
 					stepResult.push({
 						type: ReleaseExecutionStepType.GEN_UPC,
 						order: order++,
@@ -49,6 +49,7 @@ export class ReleaseExecution3Builder {
 					releaseSnapshot.tracks
 						?.filter((track) => !track.isrc)
 						.map((track) => track.id) ?? [];
+
 				const videoIdWithoutIsrc =
 					releaseSnapshot.video && !releaseSnapshot.video.isrc
 						? releaseSnapshot.video.id

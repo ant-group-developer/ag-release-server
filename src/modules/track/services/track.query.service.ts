@@ -66,7 +66,8 @@ export class TrackQueryService {
 	}
 
 	async getListSimple(query: QueryGetListTrackDto) {
-		const { idInclude, page, pageSize, keyword } = query;
+		const { idInclude, page, pageSize, keyword, isImportedFromReport } =
+			query;
 
 		const trackInclude = idInclude?.length
 			? await this.trackRepo.find({
@@ -80,6 +81,9 @@ export class TrackQueryService {
 			where: {
 				...(keyword && keyword.length > 0 && keyword[0]
 					? { title: ILike(`%${keyword[0]}%`) }
+					: {}),
+				...(isImportedFromReport !== undefined
+					? { isImportedFromReport }
 					: {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
@@ -516,6 +520,7 @@ export class TrackQueryService {
 		const qb = this.createBaseQb();
 
 		this.leftJoinRelation(qb);
+
 		this.applyFilter({ qb, filter });
 
 		this.addSelectReleaseSimple(qb);
@@ -537,11 +542,6 @@ export class TrackQueryService {
 		this.addSelectTrackType(qb);
 		this.addSelectTrackOriginType(qb);
 		this.addSelectTrackSensitive(qb);
-
-		qb.addOrderBy('trackArtist.createdAt', 'ASC');
-		qb.addOrderBy('trackContributor.createdAt', 'ASC');
-		qb.addOrderBy('artistProfileDsp.name', 'ASC');
-		qb.addOrderBy('artistContributorProfileDsp.name', 'ASC');
 
 		return qb;
 	}
@@ -618,6 +618,7 @@ export class TrackQueryService {
 			labelId,
 			scanCopyrightStatus,
 			primaryGenreId,
+			isImportedFromReport,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -676,6 +677,12 @@ export class TrackQueryService {
 		if (primaryGenreId?.length) {
 			qb.andWhere('track.primaryGenreId IN (:...primaryGenreId)', {
 				primaryGenreId,
+			});
+		}
+
+		if (isImportedFromReport !== undefined) {
+			qb.andWhere('track.isImportedFromReport = :isImportedFromReport', {
+				isImportedFromReport,
 			});
 		}
 

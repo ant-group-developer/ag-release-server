@@ -112,7 +112,14 @@ export class ReleaseQueryService {
 	}
 
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
-		const { idInclude, page, pageSize, keyword, type } = query;
+		const {
+			idInclude,
+			page,
+			pageSize,
+			keyword,
+			type,
+			isImportedFromReport,
+		} = query;
 
 		const releaseInclude = idInclude?.length
 			? await this.releaseRepo.find({
@@ -132,6 +139,9 @@ export class ReleaseQueryService {
 			where: {
 				...(keyword ? { title: ILike(`%${keyword}%`) } : {}),
 				...(type ? { type } : {}),
+				...(isImportedFromReport !== undefined
+					? { isImportedFromReport }
+					: {}),
 				...(idInclude?.length ? { id: Not(In(idInclude)) } : {}),
 			},
 			order: { title: 'ASC' },
@@ -490,6 +500,7 @@ export class ReleaseQueryService {
 			labelId,
 			artistId,
 			isVariousArtist,
+			isImportedFromReport,
 			tenantIds,
 
 			fieldOrder,
@@ -601,6 +612,13 @@ export class ReleaseQueryService {
 				{
 					isVariousArtist,
 				},
+			);
+		}
+
+		if (isImportedFromReport !== undefined) {
+			queryBuilder.andWhere(
+				'release.isImportedFromReport = :isImportedFromReport',
+				{ isImportedFromReport },
 			);
 		}
 
