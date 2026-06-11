@@ -35,6 +35,8 @@ export class ReportEntityExtractorService {
     skipped: number;
     errors: number;
   }> {
+    const resolvedTenantId = tenantId === 'system-tenant' ? undefined : tenantId;
+
     if (!rows || rows.length === 0) {
       return { totalReleases: 0, created: 0, skipped: 0, errors: 0 };
     }
@@ -92,7 +94,7 @@ export class ReportEntityExtractorService {
 
       inputs.push({
         upc,
-        tenantId: tenantId || undefined,
+        tenantId: resolvedTenantId || undefined,
         labelName: representativeRow.label_name?.trim() || undefined,
         title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${upc}`,
         artistName: representativeRow.artist_name?.trim() || 'Unknown Artist',
