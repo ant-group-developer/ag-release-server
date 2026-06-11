@@ -7,6 +7,8 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { Release } from 'src/modules/release/entities/release.entity';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import {
@@ -39,6 +41,7 @@ export class ReleaseExecution3Service {
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 		private readonly dspRoutingService: DspRoutingConfigsService,
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
 		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
@@ -307,6 +310,44 @@ export class ReleaseExecution3Service {
 		}
 
 		await this.executionRepo.save(execution);
+		await this.syncDeliveryStatusByExecutionStatus(execution, status);
+	}
+
+	private async syncDeliveryStatusByExecutionStatus(
+		execution: ReleaseExecution3,
+		executionStatus: ReleaseExecutionStatus,
+	): Promise<void> {
+		const delivery = execution.metadata?.input?.delivery?.all;
+		if (!delivery?.releaseId || !delivery.items?.length) return;
+
+		const status = this.mapExecutionStatusToDeliveryStatus(executionStatus);
+
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
+			releaseIds: [delivery.releaseId],
+			items: delivery.items.map((item) => ({
+				...item,
+				status,
+			})),
+		});
+	}
+
+	private mapExecutionStatusToDeliveryStatus(
+		status: ReleaseExecutionStatus,
+	): ReleaseDspStatus {
+		if (status === ReleaseExecutionStatus.DONE) {
+			return ReleaseDspStatus.DISTRIBUTED;
+		}
+
+		if (
+			[
+				ReleaseExecutionStatus.FAILED,
+				ReleaseExecutionStatus.CANCELLED,
+			].includes(status)
+		) {
+			return ReleaseDspStatus.ISSUES;
+		}
+
+		return ReleaseDspStatus.PROCESSING;
 	}
 
 	private isFinalExecutionStatus(status: ReleaseExecutionStatus): boolean {
@@ -314,7 +355,6 @@ export class ReleaseExecution3Service {
 			ReleaseExecutionStatus.DONE,
 			ReleaseExecutionStatus.FAILED,
 			ReleaseExecutionStatus.CANCELLED,
-			ReleaseExecutionStatus.PARTIAL_DONE,
 		].includes(status);
 	}
 
@@ -347,14 +387,6 @@ export class ReleaseExecution3Service {
 
 		if (statuses.every((s) => s === ReleaseExecutionStepStatus.DONE)) {
 			return ReleaseExecutionStatus.DONE;
-		}
-
-		if (
-			statuses.includes(ReleaseExecutionStepStatus.DONE) &&
-			(statuses.includes(ReleaseExecutionStepStatus.FAILED) ||
-				statuses.includes(ReleaseExecutionStepStatus.CANCELLED))
-		) {
-			return ReleaseExecutionStatus.PARTIAL_DONE;
 		}
 
 		if (statuses.every((s) => s === ReleaseExecutionStepStatus.FAILED)) {
