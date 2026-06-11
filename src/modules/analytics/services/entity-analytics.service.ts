@@ -45,7 +45,7 @@ export class EntityAnalyticsService {
 			};
 		}
 
-		const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 		let filterSql = 'AND t.is_deleted = 0';
 
 		if (!isSystem) {
@@ -75,8 +75,8 @@ export class EntityAnalyticsService {
 	// DSP name resolution constants (dùng lại pattern từ global-timeline.service)
 	private readonly resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 	private readonly dspNameJoin = `
-    LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-    LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+    LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+    LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
   `;
 
 	// ─────────────────────────────────────────────────────

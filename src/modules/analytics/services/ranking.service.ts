@@ -48,7 +48,7 @@ export class RankingService {
     }
 
     // All other cases: JOIN pg_tracks_sync for tenant/label filtering
-    const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+    const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
     filterSql += ' AND t.is_deleted = 0';
 
     if (!isSystem) {
@@ -242,7 +242,7 @@ export class RankingService {
     const countSql = `
       SELECT uniq(t.release_id) AS total
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -270,7 +270,7 @@ export class RankingService {
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
         AND t.release_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -348,7 +348,7 @@ export class RankingService {
     const countSql = `
       SELECT uniq(t.label_id) AS total
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
         AND t.label_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -377,7 +377,7 @@ export class RankingService {
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
         AND t.label_id != ''
         AND s.${dateCol} >= toDate({from:String})
@@ -442,7 +442,7 @@ export class RankingService {
       FROM (
         SELECT arrayJoin(t.artist_ids) AS artistId
         FROM ${table} s
-        INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         WHERE t.is_deleted = 0
           AND s.${dateCol} >= toDate({from:String})
           AND s.${dateCol} <= toDate({to:String})
@@ -471,7 +471,7 @@ export class RankingService {
         uniq(s.isrc) AS trackCount,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})

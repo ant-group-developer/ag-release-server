@@ -13,6 +13,7 @@ import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ImportJobStatus, FactSalesRow, FactDspRow } from '../../etl/interfaces';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
+import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
 
 @Injectable()
 export class ReportImportWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -28,6 +29,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     private readonly dspMappingService: DspMappingService,
     private readonly clickHouseService: ClickHouseService,
     private readonly reportEntityExtractorService: ReportEntityExtractorService,
+    private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -238,8 +240,17 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
       // 3. Rebuild cubes for all affected month partitions
       if (affectedPeriods.size > 0) {
         const periods = Array.from(affectedPeriods);
-        this.logger.log(`Rebuilding cubes for affected periods: ${periods.join(', ')}`);
         
+        // Auto-sync missing exchange rates before rebuilding cubes
+        this.logger.log(`Syncing missing exchange rates for periods: ${periods.join(', ')}`);
+        await this.importJobsService.updateProgress(jobId, {
+          progressLabel: `Syncing exchange rates...`,
+        }, true);
+        await this.exchangeRateService.syncMonthsForPeriods(periods).catch((err) => {
+          this.logger.error(`Failed to sync exchange rates for periods: ${err.message}`);
+        });
+
+        this.logger.log(`Rebuilding cubes for affected periods: ${periods.join(', ')}`);
         await this.importJobsService.updateProgress(jobId, {
           progressLabel: `Rebuilding Cubes...`,
         }, true);

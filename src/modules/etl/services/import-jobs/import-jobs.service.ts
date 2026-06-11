@@ -10,6 +10,7 @@ import {
   ListImportJobsFilters,
   UpdateProgressPatch,
 } from '../../interfaces';
+import { JobEventsGateway } from './job-events.gateway';
 
 /**
  * ImportJobsService — quản lý vòng đời job import / sync, lưu vào
@@ -29,7 +30,10 @@ export class ImportJobsService implements OnModuleInit {
   private readonly lastFlushAt = new Map<string, number>();
   private static readonly PROGRESS_FLUSH_MS = 1000;
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly jobEvents: JobEventsGateway,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     try {
@@ -245,6 +249,45 @@ export class ImportJobsService implements OnModuleInit {
       [domainToRow(job)] as unknown as Record<string, unknown>[],
     );
     this.lastFlushAt.set(job.id, Date.now());
+
+    this.jobEvents.emit({
+      jobId: job.id,
+      type: job.status === ImportJobStatus.COMPLETED
+        ? 'completed'
+        : job.status === ImportJobStatus.FAILED
+        ? 'failed'
+        : 'progress',
+      data: {
+        id: job.id,
+        sourceType: job.sourceType,
+        status: job.status,
+        progress: {
+          current: job.progressCurrent,
+          total: job.progressTotal,
+          label: job.progressLabel,
+        },
+        rows: {
+          total: job.totalRows,
+          processed: job.processedRows,
+          skipped: job.skippedRows,
+          errors: job.errorRows,
+        },
+        file: job.fileName
+          ? { name: job.fileName, sizeBytes: job.fileSizeBytes, hash: job.fileHash || null }
+          : null,
+        params: job.params,
+        result: job.result,
+        error: job.errorMessage || null,
+        batchId: job.batchId || null,
+        tenantId: job.tenantId || null,
+        createdBy: job.createdBy || null,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        durationMs: job.durationMs,
+      },
+      timestamp: job.updatedAt,
+    });
   }
 
   private async requireSnapshot(id: string): Promise<ImportJob> {

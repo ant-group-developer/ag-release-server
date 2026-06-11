@@ -16,7 +16,7 @@ export class QueryGetListJobsDto extends BaseQueryDto {
   @ApiPropertyOptional({
     description: 'Filter jobs by source type',
     enum: ImportJobSourceType,
-    example: ImportJobSourceType.WMG_UPLOAD,
+    example: ImportJobSourceType.REPORT_UPLOAD,
   })
   @IsOptional()
   @IsEnum(ImportJobSourceType)
