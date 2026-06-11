@@ -3,6 +3,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
 	Matches,
 	MaxLength,
 } from 'class-validator';
@@ -23,6 +24,13 @@ export class CreateChannelDto {
 			'name must contain only alphanumeric characters and end with VEVO',
 	})
 	name: string;
+
+	@ApiProperty({
+		format: 'uuid',
+		description: 'Tenant that owns the channel',
+	})
+	@IsUUID('4')
+	tenantId: string;
 }
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
@@ -31,4 +39,6 @@ export class QueryGetListChannelDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	fieldOrder: string = 'name';
+
+	tenantId?: string;
 }

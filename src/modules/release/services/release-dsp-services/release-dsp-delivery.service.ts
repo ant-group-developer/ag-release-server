@@ -42,7 +42,7 @@ export class ReleaseDspDeliveryService {
 		items: {
 			id?: string;
 			dspId?: string;
-			dspCode?: string;
+			dspCode: string;
 			status?: ReleaseDspStatus;
 		}[];
 	}): Promise<void> {
@@ -83,7 +83,7 @@ export class ReleaseDspDeliveryService {
 
 		await Promise.all(
 			[...new Set(releaseIds)].map((releaseId) =>
-				this.releaseService.syncReleaseStatus(releaseId),
+				this.releaseService.syncReleaseStatus(releaseId, input.items),
 			),
 		);
 	}

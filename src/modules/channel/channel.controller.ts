@@ -10,6 +10,7 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 } from '@nestjs/common';
 import {
 	ApiBody,
@@ -18,9 +19,14 @@ import {
 	ApiResponse,
 	ApiTags,
 } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { PublicRoute } from '../auth/decorators/auth.decorator';
+import {
+	PublicRoute,
+	SystemAdminOnly,
+} from '../auth/decorators/auth.decorator';
 import { VevoChannelCallbackDto } from '../partners-api/vevo/dtos/vevo.dto';
+import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
 import { ChannelService } from './channel.service';
 import {
 	CreateChannelDto,
@@ -33,6 +39,7 @@ import {
 export class ChannelController {
 	constructor(private readonly channelService: ChannelService) {}
 
+	@SystemAdminOnly()
 	@Post()
 	@ApiOperation({ summary: 'Create channel' })
 	@ApiBody({ type: CreateChannelDto })
@@ -58,15 +65,28 @@ export class ChannelController {
 
 	@Get()
 	@ApiOperation({ summary: 'Get channels' })
-	async getList(@Query() query: QueryGetListChannelDto) {
+	async getList(@Query() query: QueryGetListChannelDto, @Req() req: Request) {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantId = tenantId;
+		}
+
 		const result = await this.channelService.getList(query);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get('simple')
 	@ApiOperation({ summary: 'Get simple channel list' })
-	async getListSimple() {
-		const result = await this.channelService.getListSimple();
+	async getListSimple(
+		@Query() query: QueryGetListChannelDto,
+		@Req() req: Request,
+	) {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantId = tenantId;
+		}
+
+		const result = await this.channelService.getListSimple(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -78,6 +98,7 @@ export class ChannelController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@SystemAdminOnly()
 	@Put(':id')
 	@ApiOperation({ summary: 'Update channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })

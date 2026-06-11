@@ -111,6 +111,6 @@ export type ReleaseExecutionDeliveryInput = {
 	items: {
 		id?: string;
 		dspId?: string;
-		dspCode?: string;
+		dspCode: string;
 	}[];
 };
