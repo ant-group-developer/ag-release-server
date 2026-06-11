@@ -56,7 +56,7 @@ export class ReportImportService {
         }
       }
 
-      const config = this.detectorService.detectConfig(f.path);
+      const config = await this.detectorService.detectConfig(f.path);
       if (!config) {
         invalid.push({
           path: f.path,

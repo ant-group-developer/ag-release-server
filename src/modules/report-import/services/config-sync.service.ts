@@ -10,13 +10,19 @@ export class ConfigSyncService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      // Check if table has rows first
+      const countResult = await this.clickHouseService.query<{ total: string }>(
+        'SELECT count() AS total FROM music_analytics.report_source_configs',
+      );
+      const total = Number(countResult[0]?.total ?? 0);
+
+      if (total > 0) {
+        this.logger.log('Report source configs table already contains data. Skipping initial sync.');
+        return;
+      }
+
       this.logger.log('Syncing report source configs to ClickHouse...');
       
-      // Truncate table first to clean up old configs
-      await this.clickHouseService.execute(
-        'TRUNCATE TABLE IF EXISTS music_analytics.report_source_configs',
-      );
-
       const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
       const rows = ReportSourceConfigs.map((c) => ({
