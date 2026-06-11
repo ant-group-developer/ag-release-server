@@ -14,8 +14,9 @@ export class ReportImportQueueService {
    * Push a jobId to the import queue
    */
   async pushJob(jobId: string): Promise<void> {
-    this.logger.log(`Enqueueing job ${jobId} to Redis...`);
-    await this.redis.lpush(this.QUEUE_NAME, jobId);
+    this.logger.log(`Enqueueing job ${jobId} to Redis queue: ${this.QUEUE_NAME}...`);
+    const len = await this.redis.lpush(this.QUEUE_NAME, jobId);
+    this.logger.log(`Successfully enqueued job ${jobId}. Queue length is now: ${len}`);
   }
 
   /**
@@ -24,6 +25,9 @@ export class ReportImportQueueService {
    */
   async popJob(): Promise<string | null> {
     const jobId = await this.redis.rpoplpush(this.QUEUE_NAME, this.PROCESSING_QUEUE_NAME);
+    if (jobId) {
+      this.logger.log(`Popped job ${jobId} from ${this.QUEUE_NAME} to ${this.PROCESSING_QUEUE_NAME}`);
+    }
     return jobId || null;
   }
 

@@ -65,6 +65,7 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
   file: string;
   error: string | null;
   result: any;
+  createdAt: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   durationMs: number;
@@ -86,8 +87,23 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
     this.file = job.fileName;
     this.error = job.errorMessage || null;
     this.result = job.result;
-    this.startedAt = job.startedAt;
-    this.finishedAt = job.finishedAt;
+    this.createdAt = toVN(job.createdAt);
+    this.startedAt = toVN(job.startedAt);
+    this.finishedAt = toVN(job.finishedAt);
     this.durationMs = job.durationMs;
+  }
+}
+
+function toVN(dt: string | null): string | null {
+  if (!dt) return null;
+  try {
+    const utc = new Date(dt.replace(' ', 'T') + 'Z');
+    if (isNaN(utc.getTime())) return dt;
+    const vn = new Date(utc.getTime() + 7 * 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ms = String(vn.getUTCMilliseconds()).padStart(3, '0');
+    return `${vn.getUTCFullYear()}-${pad(vn.getUTCMonth() + 1)}-${pad(vn.getUTCDate())}T${pad(vn.getUTCHours())}:${pad(vn.getUTCMinutes())}:${pad(vn.getUTCSeconds())}.${ms}+07:00`;
+  } catch {
+    return dt;
   }
 }

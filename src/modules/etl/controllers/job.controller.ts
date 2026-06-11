@@ -146,9 +146,29 @@ function formatJob(job: ImportJob) {
     batchId: job.batchId || null,
     tenantId: job.tenantId || null,
     createdBy: job.createdBy || null,
-    createdAt: job.createdAt,
-    startedAt: job.startedAt,
-    finishedAt: job.finishedAt,
+    createdAt: toVN(job.createdAt),
+    startedAt: toVN(job.startedAt),
+    finishedAt: toVN(job.finishedAt),
     durationMs: job.durationMs,
   };
+}
+
+/**
+ * Convert ClickHouse DateTime64 string (UTC) to Vietnam timezone (UTC+7) ISO string.
+ * Input format:  "2026-06-11 07:28:00.000" (UTC)
+ * Output format: "2026-06-11T14:28:00.000+07:00"
+ */
+function toVN(dt: string | null): string | null {
+  if (!dt) return null;
+  try {
+    const utc = new Date(dt.replace(' ', 'T') + 'Z');
+    if (isNaN(utc.getTime())) return dt;
+    // Shift +7 hours for display
+    const vn = new Date(utc.getTime() + 7 * 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ms = String(vn.getUTCMilliseconds()).padStart(3, '0');
+    return `${vn.getUTCFullYear()}-${pad(vn.getUTCMonth() + 1)}-${pad(vn.getUTCDate())}T${pad(vn.getUTCHours())}:${pad(vn.getUTCMinutes())}:${pad(vn.getUTCSeconds())}.${ms}+07:00`;
+  } catch {
+    return dt;
+  }
 }

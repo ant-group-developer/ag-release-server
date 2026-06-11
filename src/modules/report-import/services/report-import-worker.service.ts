@@ -76,7 +76,10 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     
     try {
       await this.importJobsService.markProcessing(jobId);
-      const job = await this.importJobsService.findById(jobId);
+      let job = this.importJobsService.getSnapshot(jobId);
+      if (!job) {
+        job = await this.importJobsService.findById(jobId);
+      }
       if (!job) {
         throw new Error(`Job ${jobId} not found in database.`);
       }

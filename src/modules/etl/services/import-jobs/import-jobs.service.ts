@@ -140,6 +140,15 @@ export class ImportJobsService implements OnModuleInit {
     await this.persist(job);
   }
 
+  /**
+   * Get in-memory snapshot of a job (no ClickHouse query).
+   * Used to avoid ReplacingMergeTree eventual-consistency race conditions
+   * when a job was just created and might not be visible via FINAL query yet.
+   */
+  getSnapshot(id: string): ImportJob | null {
+    return this.snapshots.get(id) ?? null;
+  }
+
   async findById(id: string): Promise<ImportJob | null> {
     const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
