@@ -306,10 +306,10 @@ export class ReleaseController {
 		@Req() req: Request,
 		@Body() dto: SubmitReleaseDto,
 	) {
-		const userId = req.user!.sub;
-		await this.releaseService.submit(id, dto);
+		const result = await this.releaseService.submit3(id, dto);
 
 		return new ResponseSuccess({
+			data: result,
 			messageCode: 'common.processing',
 		});
 	}

@@ -25,8 +25,10 @@ import { Metadata, PageDto } from 'src/common/dtos/common.response.dto';
 // }
 
 export class ReleaseExecutionResultDto {
+	id?: string;
+	dspId?: string;
 	dspCode: string;
-	status: string;
+	status?: ReleaseDspStatus;
 }
 
 export class ReleaseExecutionMetadata extends Metadata {
@@ -60,6 +62,7 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import {
 	ExecutionType,
 	ReleaseExecutionStepStatus,

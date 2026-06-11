@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { Repository } from 'typeorm';
+import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
-import { ReleaseExecutionStepStatus } from '../enums/release-execution3.enum';
+import { ReleaseExecution3 } from '../entites/release-execution3.entity';
+import {
+	ReleaseExecutionStatus,
+	ReleaseExecutionStepStatus,
+	ReleaseExecutionStepType,
+} from '../enums/release-execution3.enum';
 import { ReleaseExecution3Worker } from './release-execution3.worker';
 
 @Injectable()
@@ -11,182 +19,147 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 
+		@InjectRepository(ReleaseExecution3)
+		private readonly executionRepo: Repository<ReleaseExecution3>,
+
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	// main
-	async processStep(
-		step: ReleaseExecutionStep3,
-	): Promise<ReleaseExecutionStepStatus> {
-		if (!step.childSteps?.length) {
+	async processStep({
+		step: STEP,
+		releaseExecution,
+	}: {
+		step: ReleaseExecutionStep3;
+		releaseExecution: ReleaseExecution3;
+	}): Promise<ReleaseExecutionStepStatus> {
+		// Do not start another step after the execution has been cancelled.
+
+		const hasChildren = !!STEP.childSteps?.length;
+
+		// ===== STEP LÁ =====
+		if (!hasChildren) {
+			if (await this.isExecutionCancelled(releaseExecution.id)) {
+				return ReleaseExecutionStepStatus.CANCELLED;
+			}
+
+			// Skip nếu đã ở trạng thái cuối
+			if (
+				[
+					ReleaseExecutionStepStatus.DONE,
+					ReleaseExecutionStepStatus.FAILED,
+					ReleaseExecutionStepStatus.CANCELLED,
+					ReleaseExecutionStepStatus.SKIPPED,
+					ReleaseExecutionStepStatus.WAITING_ACTION,
+				].includes(STEP.status)
+			) {
+				return STEP.status;
+			}
+
+			// Skip nếu đang chờ partner và chưa đến giờ
+			if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+				const scheduledAt = STEP.metadata?.scheduledAt;
+				if (scheduledAt && new Date(scheduledAt) > new Date()) {
+					return ReleaseExecutionStepStatus.WAITING_PARTNER;
+				}
+				// Đã đến giờ → chạy tiếp xuống dưới
+			}
+
+			// Chạy task
+			await this.updateStepStatus(
+				STEP,
+				ReleaseExecutionStepStatus.PROCESSING,
+			);
+
 			const status = await this.releaseExecution3Worker.dispatchStepTask({
-				step,
-				releaseExecution: step.releaseExecution,
+				step: STEP,
+				releaseExecution,
 			});
-			await this.updateStepStatus(step, status);
+
+			// Cancellation may happen while the worker is running. Keep the
+			// PROCESSING step cancelled and do not overwrite it with DONE.
+			// if (await this.isExecutionCancelled(releaseExecution.id)) {
+			// 	return this.cancelStep(STEP);
+			// }
+
+			await this.updateStepStatus(STEP, status);
 			return status;
-		} else if (step.childExecutionMode === 'sequential') {
-			for (const childStep of step.childSteps) {
-				const childStatus = await this.processStep(childStep);
+		}
+
+		// ===== STEP CHA =====
+
+		// Check WAITING_PARTNER trước khi chạy vào children
+		if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
+			const scheduledAt = STEP.metadata?.scheduledAt;
+			if (scheduledAt && new Date(scheduledAt) > new Date()) {
+				return ReleaseExecutionStepStatus.WAITING_PARTNER;
+			}
+			// Đã đến giờ → chạy tiếp
+		}
+
+		await this.updateStepStatus(
+			STEP,
+			ReleaseExecutionStepStatus.PROCESSING,
+		);
+
+		if (STEP.childExecutionMode === 'sequential') {
+			for (const childStep of STEP.childSteps!) {
+				const childStatus = await this.processStep({
+					step: childStep,
+					releaseExecution,
+				});
 
 				if (this.shouldStopSequential(childStatus)) {
-					await this.setRemaining(
-						childStep,
-						step.childSteps,
-						childStatus,
-					);
-					return this.resolveAndUpdateParentStatus(step);
+					return this.resolveStatusByChild_AndUpdateDb(STEP);
 				}
 			}
 
-			return this.resolveAndUpdateParentStatus(step);
-		} else if (step.childExecutionMode === 'parallel') {
-			// await Promise.allSettled(
-			// 	step.childSteps.map((child) => this.processStep(child)),
-			// );
+			return this.resolveStatusByChild_AndUpdateDb(STEP);
+		}
 
-			for (const child of step.childSteps) {
-				await this.processStep(child);
-			}
+		if (STEP.childExecutionMode === 'parallel') {
+			await Promise.allSettled(
+				STEP.childSteps!.map((child) =>
+					this.processStep({ step: child, releaseExecution }),
+				),
+			);
 
-			return this.resolveAndUpdateParentStatus(step);
+			// for (const child of STEP.childSteps!) {
+			// 	await this.processStep({
+			// 		step: child,
+			// 		releaseExecution,
+			// 	});
+			// }
+
+			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
 		throw new Error(
-			`Unknown childExecutionMode: ${step.childExecutionMode}`,
+			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
 		);
 	}
 
-	private async resolveAndUpdateParentStatus(
+	private async isExecutionCancelled(executionId: string): Promise<boolean> {
+		// TODO: Read execution status from cache to avoid recursive N+1 queries.
+		return this.executionRepo.exists({
+			where: {
+				id: executionId,
+				status: ReleaseExecutionStatus.CANCELLED,
+			},
+		});
+	}
+
+	// tính toán status cha dựa vào con, lưu db
+	private async resolveStatusByChild_AndUpdateDb(
 		step: ReleaseExecutionStep3,
 	): Promise<ReleaseExecutionStepStatus> {
-		const status = this.resolveParentStatus(step);
+		const status = this.resolveStatusByChild(step);
 		await this.updateStepStatus(step, status);
 		return status;
 	}
 
-	async runByStepId(stepId: string) {
-		const rootStep = await this.stepRepo.findOne({
-			where: { id: stepId },
-		});
-
-		if (!rootStep) {
-			throw new NotFoundException('Step not found');
-		}
-
-		const allSteps = await this.stepRepo.find({
-			where: {
-				releaseExecutionId: rootStep.releaseExecutionId,
-			},
-			order: {
-				order: 'ASC',
-			},
-		});
-
-		const tree = this.buildStepTree(allSteps, stepId);
-
-		if (!tree) {
-			throw new NotFoundException('Step tree not found');
-		}
-
-		const status = await this.processStep(tree);
-
-		return {
-			stepId: tree.id,
-			type: tree.type,
-			status,
-		};
-	}
-
-	async runByExecutionId(executionId: string) {
-		const steps = await this.stepRepo.find({
-			where: { releaseExecutionId: executionId },
-			order: { order: 'ASC' },
-		});
-
-		const roots = this.buildStepTrees(steps);
-
-		for (const root of roots) {
-			await this.processStep(root);
-		}
-
-		return {
-			executionId,
-			status: roots.map((step) => ({
-				stepId: step.id,
-				type: step.type,
-				status: step.status,
-			})),
-		};
-	}
-
-	private buildStepTrees(
-		steps: ReleaseExecutionStep3[],
-	): ReleaseExecutionStep3[] {
-		const stepMap = new Map<string, ReleaseExecutionStep3>();
-		const roots: ReleaseExecutionStep3[] = [];
-
-		for (const step of steps) {
-			step.childSteps = [];
-			stepMap.set(step.id, step);
-		}
-
-		for (const step of steps) {
-			if (!step.parentStepId) {
-				roots.push(step);
-				continue;
-			}
-
-			const parent = stepMap.get(step.parentStepId);
-
-			if (!parent) {
-				continue;
-			}
-
-			step.parentStep = parent;
-			parent.childSteps?.push(step);
-		}
-
-		for (const step of steps) {
-			step.childSteps?.sort((a, b) => a.order - b.order);
-		}
-
-		return roots.sort((a, b) => a.order - b.order);
-	}
-
-	private buildStepTree(
-		steps: ReleaseExecutionStep3[],
-		rootStepId: string,
-	): ReleaseExecutionStep3 | null {
-		const stepMap = new Map<string, ReleaseExecutionStep3>();
-
-		for (const step of steps) {
-			step.childSteps = [];
-			stepMap.set(step.id, step);
-		}
-
-		for (const step of steps) {
-			if (!step.parentStepId) {
-				continue;
-			}
-
-			const parent = stepMap.get(step.parentStepId);
-
-			if (!parent) {
-				continue;
-			}
-
-			step.parentStep = parent;
-			parent.childSteps?.push(step);
-		}
-
-		for (const step of steps) {
-			step.childSteps?.sort((a, b) => a.order - b.order);
-		}
-
-		return stepMap.get(rootStepId) || null;
-	}
-
+	// các trạng thái dừng của sequential
 	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
 		return [
 			ReleaseExecutionStepStatus.FAILED,
@@ -196,7 +169,7 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	private resolveParentStatus(
+	resolveStatusByChild(
 		step: ReleaseExecutionStep3,
 	): ReleaseExecutionStepStatus {
 		const children = step.childSteps || [];
@@ -233,18 +206,11 @@ export class ReleaseExecutionStepEngine {
 
 		// ===== CANCELLED =====
 		if (
-			children.every(
+			children.some(
 				(c) => c.status === ReleaseExecutionStepStatus.CANCELLED,
 			)
 		) {
 			return ReleaseExecutionStepStatus.CANCELLED;
-		}
-
-		// ===== DONE =====
-		if (
-			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
-		) {
-			return ReleaseExecutionStepStatus.DONE;
 		}
 
 		// ===== PROCESSING =====
@@ -256,56 +222,20 @@ export class ReleaseExecutionStepEngine {
 			return ReleaseExecutionStepStatus.PROCESSING;
 		}
 
+		// ===== DONE =====
+		if (
+			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+		) {
+			return ReleaseExecutionStepStatus.DONE;
+		}
+
 		// ===== DEFAULT =====
 		return ReleaseExecutionStepStatus.NEW;
 	}
 
-	// đánh dấu tất cả các bước còn lại (chưa được xử lý)
-	private async setRemaining(
-		currentStep: ReleaseExecutionStep3,
-		allSiblings: ReleaseExecutionStep3[],
-		targetStatus: ReleaseExecutionStepStatus,
-	): Promise<void> {
-		const currentIndex = allSiblings.findIndex(
-			(sibling) => sibling.id === currentStep.id,
-		);
-
-		if (currentIndex === -1) {
-			return;
-		}
-
-		const remainingSteps = allSiblings.slice(currentIndex + 1);
-
-		for (const sibling of remainingSteps) {
-			await this.setStepAndChildrenStatus(sibling, targetStatus);
-		}
-	}
-
-	private async setStepAndChildrenStatus(
-		step: ReleaseExecutionStep3,
-		targetStatus: ReleaseExecutionStepStatus,
-	): Promise<void> {
-		if (this.canOverrideStatus(step.status)) {
-			step.status = targetStatus;
-			step.completedAt = new Date();
-		}
-
-		if (step.childSteps?.length) {
-			for (const child of step.childSteps) {
-				await this.setStepAndChildrenStatus(child, targetStatus);
-			}
-		}
-
-		await this.stepRepo.save(step);
-	}
-
-	private canOverrideStatus(status: ReleaseExecutionStepStatus): boolean {
-		return [
-			ReleaseExecutionStepStatus.NEW,
-			ReleaseExecutionStepStatus.PROCESSING,
-		].includes(status);
-	}
-
+	// lưu vào db
+	// cập nhật trạng thái status của step,
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
 		status: ReleaseExecutionStepStatus,
@@ -321,13 +251,156 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		await this.stepRepo.save(step);
+		await this.syncDeliveryStatusByStepStatus(step, status);
 	}
 
-	private isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
+	isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
 		return [
 			ReleaseExecutionStepStatus.DONE,
 			ReleaseExecutionStepStatus.FAILED,
 			ReleaseExecutionStepStatus.CANCELLED,
+			ReleaseExecutionStepStatus.SKIPPED,
 		].includes(status);
+	}
+
+	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
+	private async syncDeliveryStatusByStepStatus(
+		step: ReleaseExecutionStep3,
+		stepStatus: ReleaseExecutionStepStatus,
+	): Promise<void> {
+		if (!step.isDeliveryStep) return;
+
+		const deliveryStatus = this.mapStepStatusToDeliveryStatus(
+			step,
+			stepStatus,
+		);
+
+		if (!deliveryStatus) return;
+
+		// const delivery = step.metadata?.input?.delivery;
+		// const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
+		// const items: {
+		// 	id?: string;
+		// 	dspId?: string;
+		// 	dspCode?: string;
+		// 	status: ReleaseDspStatus;
+		// }[] = (delivery?.items ?? [])
+		// 	.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
+		// 	.map((item: any) => ({
+		// 		id: item.id,
+		// 		dspId: item.dspId,
+		// 		dspCode: item.dspCode,
+		// 		status: deliveryStatus,
+		// 	}));
+
+		// await this.releaseDspDeliveryService.updateDeliveryStatus({
+		// 	releaseIds,
+		// 	items,
+		// });
+
+		// lấy các dsp cần xử lí của step
+		const delivery = step.metadata?.input?.delivery;
+		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
+			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
+			.map((item: any) => ({
+				id: item.id,
+				dspId: item.dspId,
+				dspCode: item.dspCode,
+				status: deliveryStatus,
+			}));
+
+		// lưu vào exe, đồng bộ lại vào release dsp delivery
+		await this.updateExecutionOutputResult({
+			executionId: step.releaseExecutionId,
+			results,
+		});
+	}
+
+	private async updateExecutionOutputResult({
+		executionId,
+		results,
+	}: {
+		executionId: string;
+		results: ReleaseExecutionResultDto[];
+	}): Promise<void> {
+		const execution = await this.executionRepo.findOne({
+			where: { id: executionId },
+		});
+
+		if (!execution) return;
+
+		const currentResults = execution.metadata?.output?.result ?? [];
+
+		const mergedResults = [...currentResults];
+
+		for (const result of results) {
+			const index = mergedResults.findIndex(
+				(item) =>
+					(item.id && item.id === result.id) ||
+					(item.dspId && item.dspId === result.dspId) ||
+					(item.dspCode && item.dspCode === result.dspCode),
+			);
+
+			if (index >= 0) {
+				mergedResults[index] = {
+					...mergedResults[index],
+					...result,
+				};
+			} else {
+				mergedResults.push(result);
+			}
+		}
+
+		execution.metadata = {
+			...(execution.metadata ?? {}),
+			output: {
+				...(execution.metadata?.output ?? {}),
+				result: mergedResults,
+			},
+		};
+
+		await this.executionRepo.save(execution);
+		await this.syncExecutionOutputToReleaseDeliveryDsp(execution);
+	}
+
+	async syncExecutionOutputToReleaseDeliveryDsp(
+		execution: ReleaseExecution3,
+	) {
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
+			releaseIds: [execution.releaseId],
+			items: execution.metadata.output.result,
+		});
+	}
+
+	private mapStepStatusToDeliveryStatus(
+		step: ReleaseExecutionStep3,
+		stepStatus: ReleaseExecutionStepStatus,
+	): ReleaseDspStatus | null {
+		// PROCESS_DSPS chỉ đánh dấu bắt đầu quá trình phân phối, cập nhật status bên release dsp delivery
+		// Step này DONE chưa có nghĩa là release đã được phân phối thành công.
+		if (step.type === ReleaseExecutionStepType.PROCESS_DSPS) {
+			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
+				? ReleaseDspStatus.PROCESSING
+				: null;
+		}
+
+		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
+		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
+			return ReleaseDspStatus.DISTRIBUTED;
+		}
+
+		// Các trạng thái kết thúc không thành công đều cần được kiểm tra/xử lý.
+		if (
+			[
+				ReleaseExecutionStepStatus.FAILED,
+				ReleaseExecutionStepStatus.CANCELLED,
+				ReleaseExecutionStepStatus.SKIPPED,
+			].includes(stepStatus)
+		) {
+			return ReleaseDspStatus.ISSUES;
+		}
+
+		// Các trạng thái trung gian khác không làm thay đổi delivery status.
+		return null;
 	}
 }

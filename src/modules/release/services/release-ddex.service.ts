@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
-
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { CountryService } from 'src/modules/country/services/country.service';
 import { AggregatorCode } from 'src/modules/distribution/aggregator/enum/distribution.enum';
@@ -18,6 +18,7 @@ import {
 	ManifestInput2,
 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { ErnService2 } from 'src/modules/ern2/services/ern.service';
+import { ReleaseCaptionType } from 'src/modules/release-caption/entities/release-caption.entity';
 import { DistributionType } from 'src/modules/release-territory/enum/release-dsp.enum';
 import {
 	genBatchId,
@@ -25,17 +26,23 @@ import {
 	resizeCoverImageTo3000x3000,
 } from 'src/utils/util';
 import { GENRE_MAPPING } from '../../distribution/file-metadata/ci/const';
+import {
+	DEFAULT_PRICE_CURRENCY_CODE,
+	DEFAULT_PRICE_RANGE_TYPE,
+} from '../constants/release.constant';
 import { Release } from '../entities/release.entity';
 
 interface AudioFileInfo {
-	buffer: Buffer;
+	// buffer: Buffer;
+	filePath: string;
 	extension: string;
 	isrc: string;
 	trackNo: number;
 }
 
 interface CoverImageInfo {
-	buffer: Buffer;
+	// buffer: Buffer;
+	filePath: string;
 	extension: string;
 }
 
@@ -62,17 +69,13 @@ export class ReleaseDdexService {
 		ernVersion,
 		recipient,
 		sender,
+		dspCode,
 	}: {
 		release: Release;
 		ernVersion: ErnVersion2;
-		sender: {
-			partyId: string;
-			name: string;
-		};
-		recipient: {
-			partyId: string;
-			name: string;
-		};
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
+		dspCode?: string;
 	}) {
 		const batchId = genBatchId();
 
@@ -81,64 +84,91 @@ export class ReleaseDdexService {
 			throw new Error('Không tìm thấy mã UPC của release');
 		}
 
-		// 1. Setup folder structure
-		// release_parsed/20251120151606392/00850080651001/
 		const baseDir =
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
-
 		const outputRoot = path.join(baseDir, batchId);
-		// const outputRoot = path.resolve('release_parsed', batchId);
 		const releaseDir = path.join(outputRoot, upc);
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
 
-		// 2. Fetch files from bucket
-		const { audioFiles, coverImage } =
-			await this.fetchAudioAndImageReleaseFromBucket(release);
+		// Tạo tempDir riêng để chứa file tải từ bucket
+		// Sẽ bị xóa trong finally dù thành công hay lỗi
+		const tempDir = await fs.promises.mkdtemp(
+			path.join(os.tmpdir(), `release-${release.id}-${Date.now()}-`),
+		);
 
-		// 3. Process and save cover image
-		await this.processCoverImage({
-			coverImage,
-			outputDir: resourcesDir,
-			upc,
-		});
+		try {
+			if (release.type === 'video') {
+				const { videoFile, subtitleFiles, coverImage } =
+					await this.fetchVideoAndImageReleaseFromBucket(
+						release,
+						tempDir,
+					);
 
-		// 4. Process and save audio files
-		this.processAudioFiles({ audioFiles, outputDir: resourcesDir });
+				await this.processCoverImage({
+					coverImage,
+					outputDir: resourcesDir,
+					upc,
+				});
 
-		// 5. DDEX file
-		const xml = await this.createErnFile({
-			release,
-			outputDir: releaseDir,
-			ernVersion,
-			recipient,
-			sender,
-		});
+				await this.processVideoAndSubtitleFiles({
+					videoFile,
+					subtitleFiles,
+					outputDir: resourcesDir,
+					isrc: release.video!.isrc ?? '',
+				});
+			} else {
+				const { audioFiles, coverImage } =
+					await this.fetchAudioAndImageReleaseFromBucket(
+						release,
+						tempDir,
+					);
 
-		this.createManifestFile({
-			batchId,
-			upc,
-			outputRoot,
-			sender,
-			recipient,
-		});
+				await this.processCoverImage({
+					coverImage,
+					outputDir: resourcesDir,
+					upc,
+				});
 
-		this.logger.log({
-			releaseId: release.id,
-			step: 'createMetadataOnServer',
-			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
-		});
+				await this.processAudioFiles({
+					audioFiles,
+					outputDir: resourcesDir,
+				});
+			}
 
-		return {
-			outputDir: outputRoot,
-			outputRoot,
-			batchId,
-			xml,
-		};
+			const xml = this.createErnFile({
+				release,
+				outputDir: releaseDir,
+				ernVersion,
+				recipient,
+				sender,
+			});
+
+			if (dspCode?.toUpperCase() !== 'VEVO') {
+				this.createManifestFile({
+					batchId,
+					upc,
+					outputRoot,
+					sender,
+					recipient,
+				});
+			}
+
+			this.logger.log({
+				releaseId: release.id,
+				step: 'createMetadataOnServer',
+				message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
+			});
+
+			return { outputDir: outputRoot, outputRoot, batchId, xml };
+		} finally {
+			// Xóa file tạm dù thành công hay throw
+			await fs.promises.rm(tempDir, { recursive: true, force: true });
+		}
 	}
 
-	async createErnFile({
+	createErnFile({
 		release,
 		outputDir,
 		ernVersion,
@@ -183,8 +213,7 @@ export class ReleaseDdexService {
 
 		const input: ErnInput2 = this.parseErnInputFromRelease({
 			release,
-			ernVersion:
-				ernVersion || (config.ernVersion as unknown as ErnVersion2),
+			ernVersion: ernVersion || config.ernVersion,
 			sender: config.sender,
 			recipient: config.recipient,
 		});
@@ -323,15 +352,77 @@ export class ReleaseDdexService {
 	/**
 	 * Fetch audio and image files from bucket
 	 */
+	// private async fetchAudioAndImageReleaseFromBucket(
+	// 	release: Release,
+	// ): Promise<{
+	// 	audioFiles: AudioFileInfo[];
+	// 	coverImage: CoverImageInfo;
+	// }> {
+	// 	const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
+
+	// 	// Fetch audio files
+	// 	const tracksWithAudio = tracks.filter(
+	// 		(
+	// 			track,
+	// 		): track is typeof track & {
+	// 			audioFile: NonNullable<typeof track.audioFile>;
+	// 		} => !!track.audioFile,
+	// 	);
+	// 	const fileIds = tracksWithAudio.map((track) => track.audioFile.fileId);
+	// 	const fileBuffers = await this.bucket2Sv.getListFileBuffers(fileIds);
+
+	// 	// Map theo fileId để tránh lệch thứ tự
+	// 	const fileBufferMap = new Map(
+	// 		fileBuffers.map((item) => [item.fileDb.id, item]),
+	// 	);
+
+	// 	const audioFiles = tracksWithAudio.map((track, index) => {
+	// 		const originalIndex = tracks.indexOf(track);
+	// 		const { fileBuffer, fileDb } = fileBufferMap.get(
+	// 			track.audioFile.fileId,
+	// 		)!;
+	// 		return {
+	// 			buffer: fileBuffer,
+	// 			extension: fileDb.extension,
+	// 			isrc:
+	// 				track.isrc ||
+	// 				`TEMP${String(originalIndex + 1).padStart(4, '0')}`,
+	// 			trackNo: originalIndex + 1,
+	// 		};
+	// 	});
+
+	// 	// Fetch cover image
+	// 	const coverArt = release.releaseCoverArts?.find(
+	// 		(art) => art.type === 'original',
+	// 	);
+
+	// 	if (!coverArt) {
+	// 		throw new Error(
+	// 			'Bản phát hành không có ảnh bìa gốc (original cover)',
+	// 		);
+	// 	}
+
+	// 	const { fileBuffer: coverBuffer, fileDb: coverDb } =
+	// 		await this.bucket2Sv.getFileBuffer(coverArt.fileId);
+
+	// 	return {
+	// 		audioFiles,
+	// 		coverImage: {
+	// 			buffer: coverBuffer,
+	// 			extension: coverDb.extension,
+	// 		},
+	// 	};
+	// }
+
 	private async fetchAudioAndImageReleaseFromBucket(
 		release: Release,
+		tempDir: string,
 	): Promise<{
 		audioFiles: AudioFileInfo[];
 		coverImage: CoverImageInfo;
 	}> {
 		const tracks = [...release.tracks].sort((a, b) => a.order - b.order);
 
-		// Fetch audio files
 		const tracksWithAudio = tracks.filter(
 			(
 				track,
@@ -339,30 +430,31 @@ export class ReleaseDdexService {
 				audioFile: NonNullable<typeof track.audioFile>;
 			} => !!track.audioFile,
 		);
-		const fileIds = tracksWithAudio.map((track) => track.audioFile.fileId);
-		const fileBuffers = await this.bucket2Sv.getListFileBuffers(fileIds);
 
-		// Map theo fileId để tránh lệch thứ tự
-		const fileBufferMap = new Map(
-			fileBuffers.map((item) => [item.fileDb.id, item]),
-		);
+		const audioFiles: AudioFileInfo[] = [];
 
-		const audioFiles = tracksWithAudio.map((track, index) => {
+		for (const track of tracksWithAudio) {
 			const originalIndex = tracks.indexOf(track);
-			const { fileBuffer, fileDb } = fileBufferMap.get(
-				track.audioFile.fileId,
-			)!;
-			return {
-				buffer: fileBuffer,
+			const destPath = path.join(
+				tempDir,
+				`track_${String(originalIndex + 1).padStart(3, '0')}.tmp`,
+			);
+
+			const fileDb = await this.bucket2Sv.streamFileToPath({
+				fileId: track.audioFile.fileId,
+				destPath,
+			});
+
+			audioFiles.push({
+				filePath: destPath,
 				extension: fileDb.extension,
 				isrc:
 					track.isrc ||
 					`TEMP${String(originalIndex + 1).padStart(4, '0')}`,
 				trackNo: originalIndex + 1,
-			};
-		});
+			});
+		}
 
-		// Fetch cover image
 		const coverArt = release.releaseCoverArts?.find(
 			(art) => art.type === 'original',
 		);
@@ -373,13 +465,109 @@ export class ReleaseDdexService {
 			);
 		}
 
-		const { fileBuffer: coverBuffer, fileDb: coverDb } =
-			await this.bucket2Sv.getFileBuffer(coverArt.fileId);
+		const coverPath = path.join(tempDir, 'cover.tmp');
+		const coverDb = await this.bucket2Sv.streamFileToPath({
+			fileId: coverArt.fileId,
+			destPath: coverPath,
+		});
 
 		return {
 			audioFiles,
 			coverImage: {
-				buffer: coverBuffer,
+				filePath: coverPath,
+				extension: coverDb.extension,
+			},
+		};
+	}
+
+	private async fetchVideoAndImageReleaseFromBucket(
+		release: Release,
+		tempDir: string,
+	): Promise<{
+		videoFile: { filePath: string; fileName: string; extension: string };
+		subtitleFiles: {
+			filePath: string;
+			fileName: string;
+			extension: string;
+			language: string;
+			type?: ReleaseCaptionType;
+		}[];
+		coverImage: CoverImageInfo;
+	}> {
+		if (!release.video) {
+			throw new Error(
+				'Release type is video but no video metadata is linked',
+			);
+		}
+
+		// Fetch Video file
+		const videoFileId = release.video.fileId;
+		if (!videoFileId) {
+			throw new Error('Video record found but has no file associated');
+		}
+		const videoDestPath = path.join(
+			tempDir,
+			`video_${release.video.isrc ?? ''}.tmp`,
+		);
+		const videoFileDb = await this.bucket2Sv.streamFileToPath({
+			fileId: videoFileId,
+			destPath: videoDestPath,
+		});
+
+		// Fetch Cover image (Thumbnail)
+		const coverArt = release.releaseCoverArts?.find(
+			(art) => art.type === 'original',
+		);
+		if (!coverArt) {
+			throw new Error('Video release has no original cover/thumbnail');
+		}
+		const coverPath = path.join(tempDir, 'cover.tmp');
+		const coverDb = await this.bucket2Sv.streamFileToPath({
+			fileId: coverArt.fileId,
+			destPath: coverPath,
+		});
+
+		// Fetch caption/subtitle files from the release_captions relation.
+		const subtitleFiles = [];
+		const captions =
+			release.captions?.map((caption) => ({
+				language: caption.language?.code ?? '',
+				fileId: caption.fileId,
+				type: caption.type,
+				fileName:
+					caption.file?.fileName ||
+					`${caption.language?.code ?? 'caption'}_${release.video?.isrc ?? ''}.srt`,
+			})) ?? [];
+
+		if (captions.length) {
+			for (const [subIndex, sub] of captions.entries()) {
+				const subDestPath = path.join(
+					tempDir,
+					`sub_${sub.language}_${subIndex}.tmp`,
+				);
+				const subFileDb = await this.bucket2Sv.streamFileToPath({
+					fileId: sub.fileId,
+					destPath: subDestPath,
+				});
+				subtitleFiles.push({
+					filePath: subDestPath,
+					fileName: sub.fileName || `sub_${sub.language}.srt`,
+					extension: subFileDb.extension,
+					language: sub.language,
+					type: sub.type,
+				});
+			}
+		}
+
+		return {
+			videoFile: {
+				filePath: videoDestPath,
+				fileName: `${release.video.isrc ?? ''}.mp4`,
+				extension: videoFileDb.extension,
+			},
+			subtitleFiles,
+			coverImage: {
+				filePath: coverPath,
 				extension: coverDb.extension,
 			},
 		};
@@ -398,8 +586,9 @@ export class ReleaseDdexService {
 		outputDir: string;
 		upc: string;
 	}): Promise<void> {
+		const buffer = await fs.promises.readFile(coverImage.filePath);
 		const img = await resizeCoverImageTo3000x3000({
-			buffer: coverImage.buffer,
+			buffer,
 		});
 
 		const ext = this.normalizeImageExtension(coverImage.extension);
@@ -407,8 +596,6 @@ export class ReleaseDdexService {
 		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
-
-		// this.logger.log(`[COVER_SAVED] ${fileName}`);
 	}
 
 	/**
@@ -416,21 +603,75 @@ export class ReleaseDdexService {
 	 * Format: resources/{ISRC}_T{trackNo}S.{ext}
 	 * Example: resources/QT6KL2500010_T1S.wav
 	 */
-	private processAudioFiles({
+	private async processAudioFiles({
 		audioFiles,
 		outputDir,
 	}: {
 		audioFiles: AudioFileInfo[];
 		outputDir: string;
-	}) {
+	}): Promise<void> {
 		for (const [index, audio] of audioFiles.entries()) {
 			const ext = this.normalizeAudioExtension(audio.extension);
-			const trackNoStr = String(index).padStart(1, '0'); // T0S, T1S, ...
+			const trackNoStr = String(index).padStart(1, '0');
 			const fileName = `${audio.isrc}_T${trackNoStr}S${ext}`;
-			const filePath = path.join(outputDir, fileName);
+			const destPath = path.join(outputDir, fileName);
 
-			fs.writeFileSync(filePath, audio.buffer);
+			// Rename thay vì copy nếu tempDir và outputDir cùng filesystem
+			// (nhanh hơn, không tốn thêm disk I/O)
+			await fs.promises
+				.rename(audio.filePath, destPath)
+				.catch(async () => {
+					// Fallback: khác filesystem (tmpfs → disk) thì copy
+					await fs.promises.copyFile(audio.filePath, destPath);
+				});
+
 			this.logger.log(`[AUDIO_SAVED] ${fileName}`);
+		}
+	}
+
+	/**
+	 * Process video and subtitle files - save to resources folder
+	 * Format: resources/{ISRC}_T1V.{ext} for video
+	 * Format: resources/{ISRC}_T{index}S.srt for subtitles
+	 */
+	private async processVideoAndSubtitleFiles({
+		videoFile,
+		subtitleFiles,
+		outputDir,
+		isrc,
+	}: {
+		videoFile: { filePath: string; fileName: string; extension: string };
+		subtitleFiles: {
+			filePath: string;
+			fileName: string;
+			extension: string;
+			language: string;
+			type?: ReleaseCaptionType;
+		}[];
+		outputDir: string;
+		isrc: string;
+	}): Promise<void> {
+		// 1. Process Video
+		const ext = this.normalizeVideoExtension(videoFile.extension);
+		const videoFileName = `${isrc}_T1V${ext}`;
+		const videoDestPath = path.join(outputDir, videoFileName);
+		await fs.promises
+			.rename(videoFile.filePath, videoDestPath)
+			.catch(async () => {
+				await fs.promises.copyFile(videoFile.filePath, videoDestPath);
+			});
+		this.logger.log(`[VIDEO_SAVED] ${videoFileName}`);
+
+		// 2. Process Subtitles
+		for (const [subIndex, sub] of subtitleFiles.entries()) {
+			const subFileName = `${isrc}_T${subIndex + 1}S.srt`;
+			const subDestPath = path.join(outputDir, subFileName);
+			await fs.promises
+				.rename(sub.filePath, subDestPath)
+				.catch(async () => {
+					await fs.promises.copyFile(sub.filePath, subDestPath);
+				});
+			this.logger.log(`[SUBTITLE_SAVED] ${subFileName}`);
 		}
 	}
 
@@ -457,6 +698,14 @@ export class ReleaseDdexService {
 			name: string;
 		};
 	}): ErnInput2 {
+		if (release.type === 'video') {
+			return this.parseErnInputFromVideo({
+				release,
+				ernVersion,
+				sender,
+				recipient,
+			});
+		}
 		const normalizeParentalWarning = (code?: string) => {
 			switch (code) {
 				case 'Explicit':
@@ -586,7 +835,11 @@ export class ReleaseDdexService {
 					price: {
 						priceType: 'StandardRetailPrice',
 						value: track.priceTier?.amount ?? 0,
-						currencyCode: track.priceTier?.currency.code ?? '',
+						currencyCode:
+							track.priceTier?.currency?.code ||
+							DEFAULT_PRICE_CURRENCY_CODE,
+						priceRangeType:
+							track.priceTier?.ciCode || DEFAULT_PRICE_RANGE_TYPE,
 					},
 
 					genre:
@@ -607,9 +860,15 @@ export class ReleaseDdexService {
 						track.subGenre?.name ??
 						undefined,
 
-					languageOfPerformance:
-						track.trackLanguage?.audioLanguage?.code ??
-						NO_LINGUISTIC_CONTENT_LANGUAGE, // No linguistic content https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
+					...(track.isInstrumental
+						? { isInstrumental: true }
+						: {
+								// No linguistic content:
+								// https://service.ddex.net/dd/DD-AVS-002.old/dd/avs_ZXX_Language.html
+								languageOfPerformance:
+									track.trackLanguage?.audioLanguage?.code ??
+									NO_LINGUISTIC_CONTENT_LANGUAGE,
+							}),
 
 					parentalWarning: normalizeParentalWarning(
 						track.trackSensitive?.code,
@@ -692,7 +951,11 @@ export class ReleaseDdexService {
 							priceType: 'StandardRetailPrice',
 							value: release.priceTier?.amount ?? 0,
 							currencyCode:
-								release.priceTier?.currency?.code ?? '',
+								release.priceTier?.currency?.code ||
+								DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 				],
@@ -712,7 +975,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 					{
@@ -730,7 +996,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 					{
@@ -748,7 +1017,10 @@ export class ReleaseDdexService {
 							value: release.tracks?.[0]?.priceTier?.amount ?? 0,
 							currencyCode:
 								release.tracks?.[0]?.priceTier?.currency
-									?.code ?? '',
+									?.code || DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.tracks?.[0]?.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
 						},
 					},
 				],
@@ -850,6 +1122,193 @@ export class ReleaseDdexService {
 	private normalizeAudioExtension(ext: string): string {
 		const normalized = ext.toLowerCase().replace(/^\./, '');
 		return `.${normalized}`;
+	}
+
+	/**
+	 * Normalize video extension
+	 */
+	private normalizeVideoExtension(ext: string): string {
+		const normalized = ext.toLowerCase().replace(/^\./, '');
+		return `.${normalized}`;
+	}
+
+	private parseErnInputFromVideo({
+		release,
+		ernVersion,
+		sender,
+		recipient,
+	}: {
+		release: Release;
+		ernVersion: ErnVersion2;
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
+	}): ErnInput2 {
+		const cover = release.releaseCoverArts?.[0];
+		const coverExt = cover
+			? this.normalizeImageExtension(cover.file?.extension ?? 'jpg')
+			: '.jpg';
+
+		const territories = this.getTerritoriesFromRelease(release);
+
+		const video = release.video;
+		if (!video) {
+			throw new Error('Video metadata not found for video release');
+		}
+
+		const artists =
+			video.videoArtists?.length > 0
+				? video.videoArtists.map((va) => ({
+						name: va.artist?.name ?? '',
+						role: 'MainArtist',
+					}))
+				: release.releaseArtists.map((ra) => ({
+						name: ra.artist?.name ?? '',
+						role: 'MainArtist',
+					}));
+
+		const contributors =
+			video.videoContributors?.length > 0
+				? video.videoContributors.map((c) => ({
+						name: c.artist?.name ?? '',
+						role: c.artistRole?.code ?? 'Composer',
+					}))
+				: release.releaseContributors?.map((c) => ({
+						name: c.artist?.name ?? '',
+						role: c.artistRole?.code ?? 'Composer',
+					}));
+
+		const videoIsrc = video.isrc ?? '';
+		const videoLabelName =
+			video.label?.trim() || release.label?.name || 'label_video';
+
+		return {
+			version: ernVersion,
+			message: {
+				id: release.upc ?? release.id,
+				sender,
+				recipient,
+			},
+			release: {
+				upc: release.upc ?? '',
+				title: release.title ?? '',
+				version: release.version ?? undefined,
+				type: 'VideoSingle',
+				releaseDate: release.releaseDate
+					? this.formatDateTime(release.releaseDate)
+					: '',
+				genre: release.primaryGenre?.name ?? 'Pop',
+				subGenre: release.subGenre?.name ?? undefined,
+				labelName: videoLabelName,
+				artists,
+				parentalWarning: video.explicit ? 'Explicit' : 'NotExplicit',
+				pLine:
+					release.pLineYear && release.pLineOwner
+						? {
+								year: release.pLineYear,
+								text: `${release.pLineYear} ${release.pLineOwner}`,
+							}
+						: undefined,
+				cLine:
+					release.cLineYear && release.cLineOwner
+						? {
+								year: release.cLineYear,
+								text: `${release.cLineYear} ${release.cLineOwner}`,
+							}
+						: undefined,
+				territories,
+				coverArt: cover
+					? {
+							fileName: `${release.upc}${coverExt}`,
+							filePath: 'resources',
+							codecType: 'image/jpeg',
+							width: cover.width,
+							height: cover.height,
+						}
+					: undefined,
+			},
+			tracks: [],
+			videos: [
+				{
+					isrc: videoIsrc,
+					title: release.title ?? '',
+					version: release.version ?? undefined,
+					duration: 300, // Default duration if not specified
+					order: 1,
+					genre: release.primaryGenre?.name ?? 'Pop',
+					subGenre: release.subGenre?.name ?? undefined,
+					parentalWarning: video.explicit
+						? 'Explicit'
+						: 'NotExplicit',
+					artists,
+					contributors,
+					pLine:
+						release.pLineYear && release.pLineOwner
+							? {
+									year: release.pLineYear,
+									text: `${release.pLineYear} ${release.pLineOwner}`,
+								}
+							: undefined,
+					videoFile: {
+						fileName: `${videoIsrc}_T1V${this.normalizeVideoExtension(video.videoFile?.extension ?? 'mp4')}`,
+						filePath: 'resources',
+						codecType: 'MP4',
+					},
+					subtitles: (
+						release.captions?.map((caption) => ({
+							language: caption.language?.code ?? '',
+							fileId: caption.fileId,
+							type: caption.type,
+						})) ?? []
+					).map((sub, subIdx) => ({
+						language: sub.language,
+						fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
+						filePath: 'resources',
+						type:
+							sub.type === ReleaseCaptionType.SUBTITLE
+								? 'SubTitle'
+								: 'Caption',
+					})),
+					channel: video.channel?.name ?? undefined,
+					languageOfPerformance:
+						release.releaseLanguage?.audioLanguage?.code ??
+						undefined,
+					description: video.description || undefined,
+					keywords: video.keywords ?? undefined,
+					madeForKids: video.madeForKids ?? undefined,
+					visibility: video.visibility ?? undefined,
+					partnerCustomId1: video.partnerCustomId1 || undefined,
+					partnerCustomId2: video.partnerCustomId2 || undefined,
+				},
+			],
+			deals: {
+				release: [
+					{
+						territories,
+						startDate: release.releaseDate
+							? this.formatDateTime(release.releaseDate)
+							: '',
+						endDate: release.releaseEndDate
+							? this.formatDateTime(release.releaseEndDate)
+							: '',
+						commercialModels: [
+							'SubscriptionModel',
+							'AdvertisementSupportedModel',
+						],
+						useTypes: ['Stream'],
+						price: {
+							priceType: 'StandardRetailPrice',
+							value: release.priceTier?.amount ?? 0,
+							currencyCode:
+								release.priceTier?.currency?.code ||
+								DEFAULT_PRICE_CURRENCY_CODE,
+							priceRangeType:
+								release.priceTier?.ciCode ||
+								DEFAULT_PRICE_RANGE_TYPE,
+						},
+					},
+				],
+			},
+		};
 	}
 
 	private getSha1Base64(filePath: string): string {

@@ -160,6 +160,19 @@ export class QueryGetListDspDto extends BaseQueryDto {
 
 	@IsOptional()
 	aggregatorCode?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter DSPs by active status',
+		type: Boolean,
+	})
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === 'true') return true;
+		if (value === 'false') return false;
+		return value;
+	})
+	@IsBoolean()
+	isActive?: boolean;
 }
 
 // DTO for tenant-dsp agreement

@@ -1,0 +1,19 @@
+export const CLICKHOUSE_CLIENT = 'CLICKHOUSE_CLIENT';
+
+export const CLICKHOUSE_TABLES = {
+  FACT_DSP_COMPREHENSIVE_REPORT: 'fact_dsp_comprehensive_report',
+  FACT_SALES_REPORT: 'fact_sales_report',
+  SALES_ISRC_MONTHLY: 'sales_dsp_monthly_cube_v2',
+  SALES_DSP_MONTHLY: 'sales_dsp_monthly_cube_v2',
+  TRENDS_ISRC_DAILY_CUBE: 'trends_isrc_daily_cube',
+  TRENDS_DSP_DAILY_CUBE: 'trends_dsp_daily_cube',
+  PG_TRACKS_SYNC: 'pg_tracks_sync',
+  PG_DSPS_SYNC: 'pg_dsps_sync',
+  DSPS_REPORT: 'dsps_report',
+  TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
+  SALES_TER_MONTHLY: 'sales_ter_monthly_cube_v2',
+  TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
+  IMPORT_JOBS: 'import_jobs',
+  EXCHANGE_RATES: 'exchange_rates',
+  FTP_EXCLUDE_PATTERNS: 'ftp_exclude_patterns',
+} as const;

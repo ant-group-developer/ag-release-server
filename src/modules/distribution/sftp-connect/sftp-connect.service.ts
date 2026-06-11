@@ -1,11 +1,22 @@
 // src/modules/distribution2/sftp/sftp.service.ts
+import {
+	DeleteObjectCommand,
+	GetObjectCommand,
+	ListObjectsV2Command,
+	PutObjectCommand,
+	S3Client,
+} from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import SftpClient, { FileInfo } from 'ssh2-sftp-client';
-import { SftpMetadata } from '../sftp-configs/type/sftp-config.type';
+import { Readable } from 'stream';
+import {
+	SftpMetadata,
+	StorageType,
+} from '../sftp-configs/type/sftp-config.type';
 
 @Injectable()
 export class SftpConnectService {
@@ -15,17 +26,65 @@ export class SftpConnectService {
 		return new SftpClient();
 	}
 
-	/**
-	 * Test connect only
-	 * DÙNG CHO: testConnectById
-	 */
 	async testConnect(config: SftpMetadata): Promise<{
 		status: boolean;
 		latencyMs?: number;
 		error?: any;
 	}> {
-		const client = this.createClient();
 		const start = Date.now();
+
+		if (config.type === StorageType.S3) {
+			try {
+				const s3 = new S3Client({
+					region: config.region || 'us-east-1',
+					credentials: {
+						accessKeyId: config.accessKeyId!,
+						secretAccessKey: config.secretAccessKey!,
+					},
+					endpoint: config.endpoint,
+					forcePathStyle: !!config.endpoint,
+				});
+
+				const testKey =
+					`${config.path || ''}/_connection_test_${Date.now()}.txt`
+						.replace(/^\/+/, '')
+						.replace(/\/+/g, '/');
+
+				await s3.send(
+					new PutObjectCommand({
+						Bucket: config.bucket!,
+						Key: testKey,
+						Body: Buffer.from('connection test'),
+						ContentType: 'text/plain',
+					}),
+				);
+
+				// Có thể không có quyền delete
+				try {
+					await s3.send(
+						new DeleteObjectCommand({
+							Bucket: config.bucket!,
+							Key: testKey,
+						}),
+					);
+				} catch {}
+
+				return {
+					status: true,
+					latencyMs: Date.now() - start,
+				};
+			} catch (err: any) {
+				this.logger.error('S3 testConnect failed', err);
+
+				return {
+					status: false,
+					error:
+						err?.message || err?.Code || err?.name || String(err),
+				};
+			}
+		}
+
+		const client = this.createClient();
 
 		try {
 			await client.connect({
@@ -34,11 +93,8 @@ export class SftpConnectService {
 				username: config.username,
 				password: config.password,
 				privateKey: config.privateKey,
-				readyTimeout: 10_000 * 6,
+				readyTimeout: 60_000,
 			});
-
-			// test nhẹ
-			await client.list('.');
 
 			return {
 				status: true,
@@ -46,9 +102,10 @@ export class SftpConnectService {
 			};
 		} catch (err: any) {
 			this.logger.error('SFTP testConnect failed', err);
+
 			return {
 				status: false,
-				error: err?.message || String(err),
+				error: err?.message || err?.code || err?.name || String(err),
 			};
 		} finally {
 			await client.end();
@@ -98,28 +155,88 @@ export class SftpConnectService {
 		}
 	}
 
+	// async uploadFile({
+	// 	sftp,
+	// 	localFile,
+	// 	remoteDir,
+	// }: {
+	// 	sftp: {
+	// 		host: string;
+	// 		port?: number;
+	// 		username: string;
+	// 		password?: string;
+	// 		privateKey?: string | Buffer;
+	// 	};
+	// 	localFile: string;
+	// 	remoteDir: string;
+	// }) {
+	// 	const client = new SftpClient();
+
+	// 	try {
+	// 		if (!fs.statSync(localFile).isFile()) {
+	// 			throw new Error('localFile is not a file');
+	// 		}
+
+	// 		await client.connect({
+	// 			host: sftp.host,
+	// 			port: sftp.port ?? 22,
+	// 			username: sftp.username,
+	// 			password: sftp.password,
+	// 			privateKey: sftp.privateKey,
+	// 			readyTimeout: 60_000,
+	// 		});
+
+	// 		try {
+	// 			await client.mkdir(remoteDir, true);
+	// 		} catch (e: any) {
+	// 			if (e.code !== 4) throw e;
+	// 		}
+
+	// 		const remotePath = path.posix.join(
+	// 			remoteDir,
+	// 			path.basename(localFile),
+	// 		);
+
+	// 		await client.put(localFile, remotePath);
+	// 	} finally {
+	// 		await client.end();
+	// 	}
+	// }
+
 	async uploadFile({
 		sftp,
 		localFile,
 		remoteDir,
 	}: {
-		sftp: {
-			host: string;
-			port?: number;
-			username: string;
-			password?: string;
-			privateKey?: string | Buffer;
-		};
+		sftp: SftpMetadata;
 		localFile: string;
 		remoteDir: string;
 	}) {
+		if (!fs.statSync(localFile).isFile()) {
+			throw new Error('localFile is not a file');
+		}
+
+		if (sftp.type === StorageType.S3) {
+			const s3 = this.createS3Client(sftp);
+			const key = this.buildS3Key(
+				sftp.path,
+				remoteDir,
+				path.basename(localFile),
+			);
+
+			await s3.send(
+				new PutObjectCommand({
+					Bucket: sftp.bucket!,
+					Key: key,
+					Body: fs.createReadStream(localFile),
+				}),
+			);
+
+			return;
+		}
+
 		const client = new SftpClient();
-
 		try {
-			if (!fs.statSync(localFile).isFile()) {
-				throw new Error('localFile is not a file');
-			}
-
 			await client.connect({
 				host: sftp.host,
 				port: sftp.port ?? 22,
@@ -139,35 +256,93 @@ export class SftpConnectService {
 				remoteDir,
 				path.basename(localFile),
 			);
-
 			await client.put(localFile, remotePath);
 		} finally {
 			await client.end();
 		}
 	}
 
+	// async uploadFolder({
+	// 	sftp,
+	// 	localDir,
+	// 	remoteDir,
+	// }: {
+	// 	sftp: {
+	// 		host: string;
+	// 		port?: number;
+	// 		username: string;
+	// 		password?: string;
+	// 		privateKey?: string | Buffer;
+	// 	};
+	// 	localDir: string;
+	// 	remoteDir: string;
+	// }) {
+	// 	const client = new SftpClient();
+
+	// 	try {
+	// 		if (!fs.statSync(localDir).isDirectory()) {
+	// 			throw new Error('localDir is not a directory');
+	// 		}
+
+	// 		await client.connect({
+	// 			host: sftp.host,
+	// 			port: sftp.port ?? 22,
+	// 			username: sftp.username,
+	// 			password: sftp.password,
+	// 			privateKey: sftp.privateKey,
+	// 			readyTimeout: 60_000,
+	// 		});
+
+	// 		// Lấy tên thư mục cần upload
+	// 		const folderName = path.basename(localDir);
+	// 		// Tạo đường dẫn remote mới bao gồm tên thư mục
+	// 		const targetRemoteDir = path.posix.join(remoteDir, folderName);
+
+	// 		await this.uploadRecursive(client, localDir, targetRemoteDir);
+	// 	} finally {
+	// 		await client.end();
+	// 	}
+	// }
+
 	async uploadFolder({
 		sftp,
 		localDir,
 		remoteDir,
 	}: {
-		sftp: {
-			host: string;
-			port?: number;
-			username: string;
-			password?: string;
-			privateKey?: string | Buffer;
-		};
+		sftp: SftpMetadata;
 		localDir: string;
 		remoteDir: string;
 	}) {
-		const client = new SftpClient();
+		if (!fs.statSync(localDir).isDirectory()) {
+			throw new Error('localDir is not a directory');
+		}
 
-		try {
-			if (!fs.statSync(localDir).isDirectory()) {
-				throw new Error('localDir is not a directory');
+		// ai có tâm thì sửa lại chỗ build dir trên remote
+		if (sftp.type === StorageType.S3) {
+			const s3 = this.createS3Client(sftp);
+
+			const current = path.basename(localDir); // 20260603164430404
+			const parent = path.basename(path.dirname(localDir)); // release_parsed (bỏ qua)
+
+			// Lấy UPC folders bên trong localDir
+			const upcFolders = fs.readdirSync(localDir);
+
+			for (const upc of upcFolders) {
+				const targetRemoteDir = path.posix.join('/', current, upc);
+				const localUpcDir = path.join(localDir, upc);
+
+				await this.uploadFolderS3Recursive(
+					s3,
+					sftp,
+					localUpcDir,
+					targetRemoteDir,
+				);
 			}
+			return;
+		}
 
+		const client = new SftpClient();
+		try {
 			await client.connect({
 				host: sftp.host,
 				port: sftp.port ?? 22,
@@ -177,15 +352,76 @@ export class SftpConnectService {
 				readyTimeout: 60_000,
 			});
 
-			// Lấy tên thư mục cần upload
-			const folderName = path.basename(localDir);
-			// Tạo đường dẫn remote mới bao gồm tên thư mục
-			const targetRemoteDir = path.posix.join(remoteDir, folderName);
+			const targetRemoteDir = path.posix.join(
+				remoteDir,
+				path.basename(localDir),
+			);
 
 			await this.uploadRecursive(client, localDir, targetRemoteDir);
 		} finally {
 			await client.end();
 		}
+	}
+
+	// hàm tìm file trong feed/antmusic/20260603164430404/885123456789/
+	async getVevoResponse({
+		sftp,
+		batchId,
+		upc,
+	}: {
+		sftp: SftpMetadata;
+		batchId: string;
+		upc: string;
+	}): Promise<{
+		status: 'success' | 'failure';
+		key: string;
+		content: unknown;
+	} | null> {
+		if (sftp.type !== StorageType.S3) {
+			throw new Error('Vevo response lookup requires S3 storage');
+		}
+
+		if (!sftp.bucket) {
+			throw new Error('Missing S3 bucket for Vevo response lookup');
+		}
+
+		const s3 = this.createS3Client(sftp);
+		const prefix = this.buildS3Key(sftp.path, batchId, upc);
+		const result = await s3.send(
+			new ListObjectsV2Command({
+				Bucket: sftp.bucket,
+				Prefix: `${prefix}/`,
+			}),
+		);
+
+		const responseObject =
+			result.Contents?.find((item) =>
+				this.isVevoResponseFile(item.Key, 'failure'),
+			) ??
+			result.Contents?.find((item) =>
+				this.isVevoResponseFile(item.Key, 'success'),
+			);
+
+		if (!responseObject?.Key) return null;
+
+		const file = await s3.send(
+			new GetObjectCommand({
+				Bucket: sftp.bucket,
+				Key: responseObject.Key,
+			}),
+		);
+		const contentText = await this.readS3Body(file.Body);
+		let content: unknown = contentText;
+
+		try {
+			content = JSON.parse(contentText);
+		} catch {}
+
+		return {
+			status: this.getVevoResponseStatus(responseObject.Key),
+			key: responseObject.Key,
+			content,
+		};
 	}
 
 	async uploadFolderScp({
@@ -331,6 +567,96 @@ export class SftpConnectService {
 			} else if (entry.isFile()) {
 				await client.put(lp, rp);
 				onFileUploaded?.(lp);
+			}
+		}
+	}
+
+	private createS3Client(config: SftpMetadata): S3Client {
+		return new S3Client({
+			region: config.region || 'us-east-1',
+			credentials: {
+				accessKeyId: config.accessKeyId!,
+				secretAccessKey: config.secretAccessKey!,
+			},
+			endpoint: config.endpoint,
+			forcePathStyle: !!config.endpoint,
+		});
+	}
+
+	private async readS3Body(body: unknown): Promise<string> {
+		if (!body) return '';
+
+		const stream = body as Readable;
+		const chunks: Buffer[] = [];
+
+		for await (const chunk of stream) {
+			chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+		}
+
+		return Buffer.concat(chunks).toString('utf-8');
+	}
+
+	private isVevoResponseFile(
+		key: string | undefined,
+		status: 'success' | 'failure',
+	): boolean {
+		const fileName = path.posix.basename(key ?? '').toLowerCase();
+		if (!fileName.endsWith('.json')) return false;
+
+		if (status === 'success') {
+			return fileName.startsWith('success');
+		}
+
+		return fileName.startsWith('failure') || fileName.startsWith('fail');
+	}
+
+	private getVevoResponseStatus(key: string): 'success' | 'failure' {
+		return this.isVevoResponseFile(key, 'success') ? 'success' : 'failure';
+	}
+
+	private buildS3Key(...parts: (string | undefined)[]): string {
+		return parts
+			.filter(Boolean)
+			.join('/')
+			.replace(/\/+/g, '/')
+			.replace(/^\/+/, '');
+	}
+
+	private async uploadFolderS3Recursive(
+		s3: S3Client,
+		config: SftpMetadata,
+		localDir: string,
+		remoteDir: string,
+	) {
+		const entries = fs.readdirSync(localDir, { withFileTypes: true });
+		const sorted = [
+			...entries.filter((e) => e.isDirectory()),
+			...entries.filter((e) => e.isFile() && !e.name.endsWith('.xml')),
+			...entries.filter((e) => e.isFile() && e.name.endsWith('.xml')),
+		];
+
+		for (const entry of sorted) {
+			if (entry.isSymbolicLink()) continue;
+
+			const localPath = path.join(localDir, entry.name);
+			const remotePath = path.posix.join(remoteDir, entry.name);
+
+			if (entry.isDirectory()) {
+				await this.uploadFolderS3Recursive(
+					s3,
+					config,
+					localPath,
+					remotePath,
+				);
+			} else if (entry.isFile()) {
+				const key = this.buildS3Key(config.path, remotePath);
+				await s3.send(
+					new PutObjectCommand({
+						Bucket: config.bucket!,
+						Key: key,
+						Body: fs.createReadStream(localPath),
+					}),
+				);
 			}
 		}
 	}

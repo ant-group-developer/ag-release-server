@@ -120,7 +120,9 @@ export class Ern382Builder2 {
 			refTitle.ele('SubTitle').txt(track.version);
 		}
 
-		if (track.languageOfPerformance) {
+		if (track.isInstrumental) {
+			sr.ele('IsInstrumental').txt('true');
+		} else if (track.languageOfPerformance) {
 			sr.ele('LanguageOfPerformance').txt(track.languageOfPerformance);
 		}
 
@@ -635,7 +637,7 @@ export class Ern382Builder2 {
 					const pi = terms.ele('PriceInformation');
 					pi.ele('PriceRangeType', {
 						Namespace: `DPID:${this.input.message.sender.partyId}`,
-					}).txt('mid');
+					}).txt(deal.price.priceRangeType || 'mid');
 				}
 
 				const validity = terms.ele('ValidityPeriod');
@@ -679,7 +681,7 @@ export class Ern382Builder2 {
 						const pi = terms.ele('PriceInformation');
 						pi.ele('PriceRangeType', {
 							Namespace: `DPID:${this.input.message.sender.partyId}`,
-						}).txt('mid');
+						}).txt(deal.price.priceRangeType || 'mid');
 					}
 
 					const validity = terms.ele('ValidityPeriod');

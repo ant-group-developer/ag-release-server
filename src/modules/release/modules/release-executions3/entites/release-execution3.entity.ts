@@ -63,7 +63,7 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.releaseExecution)
 	steps: ReleaseExecutionStep3[];
 
-	@OneToMany(() => Logs, (log) => log.releaseSubmit)
+	@OneToMany(() => Logs, (log) => log.releaseExecution)
 	logs: Logs[];
 
 	@Column({
@@ -80,7 +80,13 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 				ci: {
 					ci: Dsp[];
 					state51: Dsp[];
+					primaryDsp?: Dsp | null;
 				};
+			};
+			delivery?: {
+				all?: ReleaseExecutionDeliveryInput;
+				directByDspId?: Record<string, ReleaseExecutionDeliveryInput>;
+				aggCi?: ReleaseExecutionDeliveryInput;
 			};
 			upcAutoIfReleaseSnapshotNull?: string;
 		};
@@ -99,3 +105,12 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 		}
 	}
 }
+
+export type ReleaseExecutionDeliveryInput = {
+	releaseId: string;
+	items: {
+		id?: string;
+		dspId?: string;
+		dspCode: string;
+	}[];
+};

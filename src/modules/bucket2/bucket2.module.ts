@@ -9,6 +9,6 @@ import { BucketService2 } from './services/bucket2.service';
 	imports: [TypeOrmModule.forFeature([FileEntity])],
 	providers: [BucketService2, BucketFileService2, BucketR2Service],
 	controllers: [BucketController2],
-	exports: [BucketService2],
+	exports: [BucketService2, BucketR2Service],
 })
 export class BucketModule2 {}
