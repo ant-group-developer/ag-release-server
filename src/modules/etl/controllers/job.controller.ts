@@ -1,14 +1,21 @@
-import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Query, NotFoundException, Sse, MessageEvent } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
 import { ImportJob } from '../interfaces';
 import { QueryGetListJobsDto } from '../dto/job-query.dto';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { Observable, from, of, concat, merge, interval } from 'rxjs';
+import { map, takeWhile, switchMap } from 'rxjs/operators';
+import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
+import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 
 @ApiTags('ETL')
 @Controller('etl')
 export class JobController {
-  constructor(private readonly importJobsService: ImportJobsService) { }
+  constructor(
+    private readonly importJobsService: ImportJobsService,
+    private readonly jobEvents: JobEventsGateway,
+  ) { }
 
   @Get('jobs/:id')
   @ApiOperation({
@@ -27,6 +34,62 @@ export class JobController {
     return new ResponseSuccess({
       data: result
     });
+  }
+
+  @SystemAdminOnly()
+  @Sse('jobs/:id/events')
+  @ApiOperation({
+    summary: 'Stream job progress/status via Server-Sent Events',
+    description: 'Auto-closes on completed or failed status. Pass token in query param: ?token=xxx',
+  })
+  @ApiParam({ name: 'id', description: 'Job ID to stream status for' })
+  streamJobEvents(@Param('id') id: string): Observable<MessageEvent> {
+    const updates$ = this.jobEvents.subscribe(id).pipe(
+      map((evt) => ({
+        type: evt.type,
+        data: evt.data,
+      } as MessageEvent)),
+    );
+
+    const heartbeat$ = interval(20000).pipe(
+      map(() => ({
+        type: 'heartbeat',
+        data: {},
+      } as MessageEvent)),
+    );
+
+    const initial$ = from(this.importJobsService.findById(id)).pipe(
+      switchMap((job) => {
+        if (!job) {
+          throw new NotFoundException(`Job not found: ${id}`);
+        }
+
+        const snapshotEvt: MessageEvent = {
+          type: 'snapshot',
+          data: formatJob(job),
+        };
+
+        if (
+          job.status === 'COMPLETED' ||
+          job.status === 'FAILED' ||
+          job.status === 'CANCELLED'
+        ) {
+          return of(snapshotEvt);
+        }
+
+        return concat(of(snapshotEvt), updates$);
+      }),
+    );
+
+    return merge(initial$, heartbeat$).pipe(
+      takeWhile((evt) => {
+        return (
+          evt.type !== 'completed' &&
+          evt.type !== 'failed' &&
+          evt.type !== 'cancelled'
+        );
+      }, true),
+    );
   }
 
 @Get('jobs')
