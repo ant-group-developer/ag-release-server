@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
 import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
 import {
@@ -200,15 +201,72 @@ export class ImportJobsService implements OnModuleInit {
       return { items: [], totalItems: 0 };
     }
 
+    const allowedSortFields = ['id', 'source_type', 'status', 'created_at', 'started_at', 'finished_at'];
+    let fieldOrder = 'created_at';
+    if (filters.fieldOrder) {
+      const snakeMap: Record<string, string> = {
+        id: 'id',
+        sourceType: 'source_type',
+        status: 'status',
+        createdAt: 'created_at',
+        startedAt: 'started_at',
+        finishedAt: 'finished_at',
+      };
+      const mapped = snakeMap[filters.fieldOrder] || filters.fieldOrder;
+      if (allowedSortFields.includes(mapped)) {
+        fieldOrder = mapped;
+      }
+    }
+
+    let direction = 'DESC';
+    if (filters.orderBy && ['ASC', 'DESC'].includes(filters.orderBy.toUpperCase())) {
+      direction = filters.orderBy.toUpperCase();
+    }
+
     // Query 2: Get paged jobs
     const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       ${whereClause}
-      ORDER BY created_at DESC
+      ORDER BY ${fieldOrder} ${direction}
       LIMIT {limit:UInt32} OFFSET {offset:UInt32}
     `;
     const rows = await this.clickHouseService.query<ImportJobRow>(sql, params);
     return { items: rows.map(rowToDomain), totalItems };
+  }
+
+  @Cron('*/1 * * * *') // every 1 minute
+  async checkPendingTimeout(): Promise<void> {
+    const sql = `
+      SELECT id, created_at FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE status = {status:String}
+    `;
+    const pending = await this.clickHouseService.query<{
+      id: string;
+      created_at: string;
+    }>(sql, { status: ImportJobStatus.PENDING });
+
+    if (!pending.length) return;
+
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    const timedOutIds: string[] = [];
+
+    for (const p of pending) {
+      const createdAtMs = new Date(p.created_at.replace(' ', 'T') + 'Z').getTime();
+      if (createdAtMs < tenMinutesAgo) {
+        timedOutIds.push(p.id);
+      }
+    }
+
+    if (!timedOutIds.length) return;
+    this.logger.warn(`Found ${timedOutIds.length} PENDING job(s) timed out. Marking as FAILED.`);
+
+    for (const id of timedOutIds) {
+      try {
+        await this.markFailed(id, 'Job pending timeout (10 minutes limit exceeded)');
+      } catch (err) {
+        this.logger.error(`Failed to mark timeout job ${id} as failed: ${err.message}`);
+      }
+    }
   }
 
   /**

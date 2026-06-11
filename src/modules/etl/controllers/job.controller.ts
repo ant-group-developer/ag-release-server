@@ -91,34 +91,35 @@ export class JobController {
       }, true),
     );
   }
-
-@Get('jobs')
-@ApiOperation({
-  summary: 'List recent import/sync jobs',
-  description: 'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
-})
-async listJobs(
-  @Query() query: QueryGetListJobsDto,
-): Promise < ResponseSuccess < PageDto < any >>> {
-  const { status, sourceType, tenantId, page, pageSize } = query;
-  const result = await this.importJobsService.list({
-    status,
-    sourceType,
-    tenantId,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
-  return new ResponseSuccess({
-    data: new PageDto({
-      items: result.items.map(formatJob),
-      metadata: {
-        page,
-        pageSize,
-        totalItems: result.totalItems,
-      },
-    }),
-  });
-}
+  @Get('jobs')
+  @ApiOperation({
+    summary: 'List recent import/sync jobs',
+    description: 'Filter by status / sourceType / tenantId. Sorted by createdAt DESC.',
+  })
+  async listJobs(
+    @Query() query: QueryGetListJobsDto,
+  ): Promise<ResponseSuccess<PageDto<any>>> {
+    const { status, sourceType, tenantId, page, pageSize, fieldOrder, orderBy } = query;
+    const result = await this.importJobsService.list({
+      status,
+      sourceType,
+      tenantId,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      fieldOrder,
+      orderBy: orderBy as any,
+    });
+    return new ResponseSuccess({
+      data: new PageDto({
+        items: result.items.map(formatJob),
+        metadata: {
+          page,
+          pageSize,
+          totalItems: result.totalItems,
+        },
+      }),
+    });
+  }
 }
 
 function formatJob(job: ImportJob) {

@@ -42,9 +42,16 @@ export class ReportEntityExtractorService {
     const upcMap = new Map<string, Map<string, ExtractedRow>>();
 
     for (const row of rows) {
-      const isrc = row.isrc?.trim();
-      const upc = row.upc?.trim();
-      if (!isrc || !upc) continue;
+      let isrc = row.isrc?.trim() || '';
+      let upc = row.upc?.trim() || '';
+      
+      // Chỉ bỏ qua khi thiếu cả hai
+      if (!isrc && !upc) continue;
+
+      // Nếu thiếu upc nhưng có isrc: sinh upc dạng ISRC-mã_isrc
+      if (!upc && isrc) {
+        upc = `ISRC-${isrc}`;
+      }
 
       if (!upcMap.has(upc)) {
         upcMap.set(upc, new Map());
@@ -70,17 +77,17 @@ export class ReportEntityExtractorService {
 
       // Filter: pgTracks (real ISRCs) vs upcTracks (temporary album-level ISRC in format UPC-xxx)
       const pgTracks = bestRows
-        .filter((r) => !r.isrc!.toUpperCase().startsWith('UPC-'))
+        .filter((r) => !r.isrc || !r.isrc.trim().toUpperCase().startsWith('UPC-'))
         .map((r) => ({
-          title: r.track_title?.trim() || `Track ${r.isrc!}`,
-          isrc: r.isrc!.trim(),
+          title: r.track_title?.trim() || `Track ${r.isrc?.trim() || ''}`,
+          isrc: r.isrc?.trim() || '',
         }));
 
       const upcTracks = bestRows
-        .filter((r) => r.isrc!.toUpperCase().startsWith('UPC-'))
+        .filter((r) => r.isrc && r.isrc.trim().toUpperCase().startsWith('UPC-'))
         .map((r) => ({
-          title: r.track_title?.trim() || `Track ${r.isrc!}`,
-          isrc: r.isrc!.trim(),
+          title: r.track_title?.trim() || `Track ${r.isrc?.trim() || ''}`,
+          isrc: r.isrc?.trim() || '',
         }));
 
       inputs.push({

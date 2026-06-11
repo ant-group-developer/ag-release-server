@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, HttpException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { ReportDetectorService } from './report-detector.service';
@@ -189,6 +189,13 @@ export class ReportImportService {
       return job;
     } catch (err) {
       this.logger.error(`Error in startJob for Job ID ${jobId}: ${err.message}`, err.stack);
+      
+      // If it is a known client/validation HTTP exception (e.g. status !== PENDING or NotFound),
+      // we do NOT mark the job as FAILED to prevent overwriting processing/completed states.
+      if (err instanceof HttpException) {
+        throw err;
+      }
+
       // Attempt to log error message to the job status in ClickHouse so UI can display it
       await this.importJobsService.markFailed(jobId, `startJob 500 error: ${err.message}`).catch((dbErr) => {
         this.logger.error(`Failed to update job status to FAILED in ClickHouse: ${dbErr.message}`);
