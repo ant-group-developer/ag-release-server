@@ -411,6 +411,20 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	isVariousArtist?: boolean;
 
 	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the release was imported from a report',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isImportedFromReport?: boolean;
+
+	@ApiPropertyOptional({
 		type: [String],
 		description: 'Tenant IDs',
 	})

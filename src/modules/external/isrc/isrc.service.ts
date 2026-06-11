@@ -48,7 +48,7 @@ export class IsrcService implements OnModuleInit {
 	}
 
 	async create(payload: CreateIsrc) {
-		return { data: { code: 'QT6KL2614737' } };
+		// return { data: { code: 'QT6KL2614737' } };
 		return firstValueFrom(
 			this.grpcService
 				.createIsrc(payload, this.buildMetadata())
