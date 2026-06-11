@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ReleaseExecution3 } from '../../entites/release-execution3.entity';
 import {
 	ReleaseExecution3RunPipelineQueue,
@@ -10,6 +10,9 @@ import {
 } from '../../entites/release-execution3.queue.entity';
 import { ReleaseExecutionStatus } from '../../enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../release-execution3.service';
+
+const DEFAULT_TRACK_DISK_BYTES = 30 * 1024 * 1024;
+const MAX_PIPELINE_DISK_BYTES = 5 * 1024 * 1024 * 1024;
 
 @Injectable()
 export class ReleaseExecution3Consumer {
@@ -62,9 +65,13 @@ export class ReleaseExecution3Consumer {
 			const toCancel = executions.filter((e) => !selectedIds.has(e.id));
 
 			if (toCancel.length > 0) {
-				await this.executionRepo.update(
-					toCancel.map((e) => e.id),
-					{ status: ReleaseExecutionStatus.CANCELLED },
+				await Promise.all(
+					[...latestByRelease.values()].map((execution) =>
+						this.executionService.cancelPendingExecutions({
+							releaseId: execution.releaseId,
+							excludeExecutionId: execution.id,
+						}),
+					),
 				);
 				this.logger.log(
 					`Cancelled ${toCancel.length} duplicate executions`,
@@ -79,11 +86,11 @@ export class ReleaseExecution3Consumer {
 
 			for (const execution of selected) {
 				try {
-					this.logger.log(
-						`Start processing execution ${execution.id}`,
-					);
+					// this.logger.log(
+					// 	`Start processing execution ${execution.id}`,
+					// );
 					await this.executionService.startProcessing(execution.id);
-					this.logger.log(`Finished execution ${execution.id}`);
+					// this.logger.log(`Finished execution ${execution.id}`);
 				} catch (error) {
 					this.logger.error(
 						`Failed processing execution ${execution.id}`,
@@ -148,50 +155,152 @@ export class ReleaseExecution3Consumer {
 				);
 			}
 
-			const selected = [...latestByExecution.values()];
-			this.logger.log(`Found ${selected.length} run pipeline jobs`);
+			// Lấy execution snapshot để ước tính dung lượng audio của từng job.
+			const candidates = [...latestByExecution.values()];
+			const executions = await this.executionRepo.find({
+				where: {
+					id: In(candidates.map((job) => job.releaseExecutionId)),
+				},
+			});
+			const executionById = new Map(
+				executions.map((execution) => [execution.id, execution]),
+			);
 
-			for (const job of selected) {
-				try {
-					await this.runPipelineQueueRepo.update(job.id, {
-						status: RunPipelineQueueStatus.PROCESSING,
-						startedAt: new Date(),
-					});
+			// Chọn nhiều job nhất có thể nhưng tổng dung lượng ước tính
+			// của batch không vượt quá giới hạn disk.
+			const { selected, oversized } = this.selectPipelineBatch({
+				jobs: candidates,
+				executionById,
+			});
 
-					this.logger.log(
-						`Start processing execution ${job.releaseExecutionId}`,
-					);
-
-					await this.executionService.runPipeline(
-						job.releaseExecutionId,
-					);
-
-					await this.runPipelineQueueRepo.update(job.id, {
-						status: RunPipelineQueueStatus.DONE,
-						completedAt: new Date(),
-					});
-
-					this.logger.log(
-						`Finished execution ${job.releaseExecutionId}`,
-					);
-				} catch (error) {
-					await this.runPipelineQueueRepo.update(job.id, {
+			// Job đơn lẻ đã vượt giới hạn sẽ không bao giờ vừa batch,
+			// nên đánh dấu FAILED để tránh bị giữ ở trạng thái NEW mãi.
+			if (oversized.length > 0) {
+				await this.runPipelineQueueRepo.update(
+					oversized.map((item) => item.job.id),
+					{
 						status: RunPipelineQueueStatus.FAILED,
-						error:
-							error instanceof Error
-								? error.message
-								: String(error),
+						error: 'Estimated disk usage exceeds the 10 GiB limit',
 						completedAt: new Date(),
-					});
-
-					this.logger.error(
-						`Failed execution ${job.releaseExecutionId}`,
-						error as Error,
-					);
-				}
+					},
+				);
 			}
+
+			// Ghi lại kế hoạch sử dụng disk của batch trước khi thực thi.
+			const estimatedBytes = selected.reduce(
+				(total, item) => total + item.estimatedBytes,
+				0,
+			);
+			this.logger.log(
+				`Processing ${selected.length}/${candidates.length} pipeline jobs concurrently, estimated disk ${this.formatBytes(estimatedBytes)}`,
+			);
+
+			// Các job trong batch chạy đồng thời; lỗi của một job không làm
+			// dừng hoặc reject toàn bộ các job còn lại.
+			await Promise.allSettled(
+				selected.map(({ job }) => this.processRunPipelineJob(job)),
+			);
 		} finally {
 			this.isConsumingRunPipeline = false;
 		}
+	}
+
+	private selectPipelineBatch({
+		jobs,
+		executionById,
+	}: {
+		jobs: ReleaseExecution3RunPipelineQueue[];
+		executionById: Map<string, ReleaseExecution3>;
+	}) {
+		// Ưu tiên release nhỏ để chạy đồng thời được nhiều release nhất,
+		// nhưng tổng dung lượng tạm ước tính không vượt giới hạn disk.
+		const estimatedJobs = jobs
+			.map((job) => ({
+				job,
+				estimatedBytes: this.estimateExecutionDiskBytes(
+					executionById.get(job.releaseExecutionId),
+				),
+			}))
+			.sort(
+				(a, b) =>
+					a.estimatedBytes - b.estimatedBytes ||
+					a.job.createdAt.getTime() - b.job.createdAt.getTime(),
+			);
+
+		const oversized = estimatedJobs.filter(
+			(item) => item.estimatedBytes > MAX_PIPELINE_DISK_BYTES,
+		);
+		const selected: typeof estimatedJobs = [];
+		let totalBytes = 0;
+
+		for (const item of estimatedJobs) {
+			if (item.estimatedBytes > MAX_PIPELINE_DISK_BYTES) continue;
+			if (totalBytes + item.estimatedBytes > MAX_PIPELINE_DISK_BYTES) {
+				break;
+			}
+
+			selected.push(item);
+			totalBytes += item.estimatedBytes;
+		}
+
+		return { selected, oversized };
+	}
+
+	private estimateExecutionDiskBytes(execution?: ReleaseExecution3): number {
+		// Ưu tiên dung lượng file thực tế; snapshot cũ hoặc thiếu dữ liệu
+		// sẽ dùng dung lượng trung bình mặc định cho mỗi track.
+		const tracks =
+			execution?.metadata?.input?.releaseSnapshot?.tracks ?? [];
+
+		if (tracks.length === 0) return DEFAULT_TRACK_DISK_BYTES;
+
+		return tracks.reduce((total, track) => {
+			const fileSize = Number(track.audioFile?.file?.fileSize);
+			return (
+				total +
+				(Number.isFinite(fileSize) && fileSize > 0
+					? fileSize
+					: DEFAULT_TRACK_DISK_BYTES)
+			);
+		}, 0);
+	}
+
+	private async processRunPipelineJob(
+		job: ReleaseExecution3RunPipelineQueue,
+	): Promise<void> {
+		// Tách xử lý từng job để các job chạy song song tự quản lý trạng thái
+		// thành công/thất bại mà không ảnh hưởng các job còn lại.
+		try {
+			await this.runPipelineQueueRepo.update(job.id, {
+				status: RunPipelineQueueStatus.PROCESSING,
+				startedAt: new Date(),
+			});
+
+			this.logger.log(
+				`Start processing execution ${job.releaseExecutionId}`,
+			);
+			await this.executionService.runPipeline(job.releaseExecutionId);
+
+			await this.runPipelineQueueRepo.update(job.id, {
+				status: RunPipelineQueueStatus.DONE,
+				completedAt: new Date(),
+			});
+			this.logger.log(`Finished execution ${job.releaseExecutionId}`);
+		} catch (error) {
+			await this.runPipelineQueueRepo.update(job.id, {
+				status: RunPipelineQueueStatus.FAILED,
+				error: error instanceof Error ? error.message : String(error),
+				completedAt: new Date(),
+			});
+			this.logger.error(
+				`Failed execution ${job.releaseExecutionId}`,
+				error as Error,
+			);
+		}
+	}
+
+	private formatBytes(bytes: number): string {
+		// Chỉ dùng để hiển thị dung lượng dễ đọc trong log.
+		return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GiB`;
 	}
 }
