@@ -161,9 +161,9 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
                 }
 
                 // Extract & deduplicate metadata for PostgreSQL import
-                const isrc = r.isrc?.trim();
-                const upc = r.upc?.trim();
-                if (isrc && upc) {
+                const isrc = r.isrc?.trim() || '';
+                const upc = r.upc?.trim() || '';
+                if (isrc || upc) {
                   const key = `${upc}|${isrc}`;
                   const score = (r.track_title ? 1 : 0) + (r.artist_name ? 1 : 0) + (r.album_title ? 1 : 0) + (r.label_name ? 1 : 0);
                   const existing = uniqueRowsMap.get(key);
