@@ -117,4 +117,6 @@ export interface ListImportJobsFilters {
   tenantId?: string;
   limit?: number;
   offset?: number;
+  fieldOrder?: string;
+  orderBy?: 'ASC' | 'DESC';
 }
