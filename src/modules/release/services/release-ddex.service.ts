@@ -164,7 +164,7 @@ export class ReleaseDdexService {
 			return { outputDir: outputRoot, outputRoot, batchId, xml };
 		} finally {
 			// Xóa file tạm dù thành công hay throw
-			// await fs.promises.rm(tempDir, { recursive: true, force: true });
+			await fs.promises.rm(tempDir, { recursive: true, force: true });
 		}
 	}
 

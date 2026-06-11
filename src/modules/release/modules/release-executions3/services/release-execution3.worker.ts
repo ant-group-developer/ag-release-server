@@ -626,8 +626,6 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		console.log('Creating metadata on server...');
-
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {

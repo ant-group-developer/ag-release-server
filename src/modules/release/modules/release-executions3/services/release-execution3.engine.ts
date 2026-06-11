@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
@@ -16,6 +17,9 @@ export class ReleaseExecutionStepEngine {
 	constructor(
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
+
+		@InjectRepository(ReleaseExecution3)
+		private readonly executionRepo: Repository<ReleaseExecution3>,
 
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
@@ -29,10 +33,16 @@ export class ReleaseExecutionStepEngine {
 		step: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
 	}): Promise<ReleaseExecutionStepStatus> {
+		// Do not start another step after the execution has been cancelled.
+
 		const hasChildren = !!STEP.childSteps?.length;
 
 		// ===== STEP LÁ =====
 		if (!hasChildren) {
+			if (await this.isExecutionCancelled(releaseExecution.id)) {
+				return ReleaseExecutionStepStatus.CANCELLED;
+			}
+
 			// Skip nếu đã ở trạng thái cuối
 			if (
 				[
@@ -65,6 +75,12 @@ export class ReleaseExecutionStepEngine {
 				step: STEP,
 				releaseExecution,
 			});
+
+			// Cancellation may happen while the worker is running. Keep the
+			// PROCESSING step cancelled and do not overwrite it with DONE.
+			// if (await this.isExecutionCancelled(releaseExecution.id)) {
+			// 	return this.cancelStep(STEP);
+			// }
 
 			await this.updateStepStatus(STEP, status);
 			return status;
@@ -121,6 +137,16 @@ export class ReleaseExecutionStepEngine {
 		throw new Error(
 			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
 		);
+	}
+
+	private async isExecutionCancelled(executionId: string): Promise<boolean> {
+		// TODO: Read execution status from cache to avoid recursive N+1 queries.
+		return this.executionRepo.exists({
+			where: {
+				id: executionId,
+				status: ReleaseExecutionStatus.CANCELLED,
+			},
+		});
 	}
 
 	// tính toán status cha dựa vào con, lưu db

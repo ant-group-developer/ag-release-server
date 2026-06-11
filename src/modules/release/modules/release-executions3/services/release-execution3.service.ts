@@ -464,7 +464,7 @@ export class ReleaseExecution3Service {
 		return roots;
 	}
 
-	private async cancelPendingExecutions({
+	async cancelPendingExecutions({
 		releaseId,
 		excludeExecutionId,
 	}: {
@@ -507,6 +507,7 @@ export class ReleaseExecution3Service {
 
 		const executionIds = pendingExecutions.map((e) => e.id);
 
+		// cacncel execution
 		await this.executionRepo
 			.createQueryBuilder()
 			.update()
@@ -517,6 +518,7 @@ export class ReleaseExecution3Service {
 			.where('id IN (:...ids)', { ids: executionIds })
 			.execute();
 
+		// cancel step
 		await this.step3Repo
 			.createQueryBuilder()
 			.update()
@@ -532,7 +534,7 @@ export class ReleaseExecution3Service {
 				],
 			})
 			.execute();
-
+		// cancel ci job
 		await this.manager
 			.createQueryBuilder()
 			.update(CiDistributionJob3)
