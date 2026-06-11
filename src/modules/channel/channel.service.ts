@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
 import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
-import { ILike, Not, Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import {
 	CreateChannelDto,
 	QueryGetListChannelDto,
@@ -66,14 +66,25 @@ export class ChannelService {
 	}
 
 	async getList(query: QueryGetListChannelDto) {
-		const [items, totalItems] = await this.channelRepo.findAndCount({
-			where: query.keyword
-				? { name: ILike(`%${query.keyword}%`) }
-				: undefined,
-			order: { [query.fieldOrder || 'name']: query.orderBy },
-			skip: query.skip,
-			take: query.limit,
-		});
+		const qb = this.createDetailQuery();
+
+		if (query.keyword) {
+			qb.andWhere('channel.name ILIKE :keyword', {
+				keyword: `%${query.keyword}%`,
+			});
+		}
+
+		if (query.tenantId) {
+			qb.andWhere('channel.tenantId = :tenantId', {
+				tenantId: query.tenantId,
+			});
+		}
+
+		qb.orderBy(`channel.${query.fieldOrder || 'name'}`, query.orderBy)
+			.skip(query.skip)
+			.take(query.limit);
+
+		const [items, totalItems] = await qb.getManyAndCount();
 
 		return new PageDto({
 			items,
@@ -85,18 +96,21 @@ export class ChannelService {
 		});
 	}
 
-	async getListSimple() {
+	async getListSimple(query: QueryGetListChannelDto) {
 		return this.channelRepo.find({
 			select: {
 				id: true,
 				name: true,
 			},
+			where: query.tenantId ? { tenantId: query.tenantId } : undefined,
 			order: { name: 'ASC' },
 		});
 	}
 
 	async findOne(id: string) {
-		const channel = await this.channelRepo.findOne({ where: { id } });
+		const channel = await this.createDetailQuery()
+			.where('channel.id = :id', { id })
+			.getOne();
 		if (!channel) throw new NotFoundException('Channel not found');
 		return channel;
 	}
@@ -107,8 +121,12 @@ export class ChannelService {
 			await this.ensureNameUnique(dto.name, id);
 		}
 
-		Object.assign(channel, dto);
-		return this.channelRepo.save(channel);
+		await this.channelRepo.update(id, {
+			...(dto.name !== undefined ? { name: dto.name } : {}),
+			...(dto.tenantId !== undefined ? { tenantId: dto.tenantId } : {}),
+		});
+
+		return this.findOne(id);
 	}
 
 	async remove(id: string) {
@@ -128,6 +146,18 @@ export class ChannelService {
 		if (exists) {
 			throw new ConflictException('Channel name already exists');
 		}
+	}
+
+	private createDetailQuery() {
+		return this.channelRepo
+			.createQueryBuilder('channel')
+			.leftJoin('channel.tenant', 'tenant')
+			.addSelect([
+				'tenant.id',
+				'tenant.name',
+				'tenant.title',
+				'tenant.logo',
+			]);
 	}
 
 	private async processVevoChannel(channelId: string, channelName: string) {

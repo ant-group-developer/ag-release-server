@@ -253,6 +253,7 @@ export class ReleaseExecution3Service {
 				.filter((dsp) => !!dsp.id)
 				.map((dsp) => ({
 					dspId: dsp.id,
+					dspCode: dsp.code,
 				})),
 		};
 	}
@@ -337,6 +338,7 @@ export class ReleaseExecution3Service {
 			releaseIds: [delivery.releaseId],
 			items: delivery.items.map((item) => ({
 				...item,
+				dspCode: item.dspCode,
 				status,
 			})),
 		});

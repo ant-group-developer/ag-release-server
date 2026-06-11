@@ -26,11 +26,11 @@ import {
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
-import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
@@ -463,7 +463,11 @@ export class ReleaseService {
 	}
 
 	async bulkSubmit(dto: BulkSubmitReleaseDto) {
+		const idsExclude = new Set(dto.idsExclude ?? []);
+
 		for (const id of dto.ids) {
+			if (idsExclude.has(id)) continue;
+
 			await this.submit3(id, { code: dto.codes });
 		}
 	}
@@ -520,13 +524,17 @@ export class ReleaseService {
 	}
 
 	/** Sync lại release status từ DSP deliveries */
-	async syncReleaseStatus(releaseId: string) {
+	async syncReleaseStatus(
+		releaseId: string,
+		dataDsp?: ReleaseExecutionResultDto[],
+	) {
 		const release = await this.releaseRepo
 			.createQueryBuilder('release')
 			.leftJoinAndSelect(
 				'release.releaseDspDeliveries',
 				'releaseDspDelivery',
 			)
+			.leftJoinAndSelect('releaseDspDelivery.dsp', 'dsp')
 			.where('release.id = :releaseId', { releaseId })
 			.getOne();
 
@@ -534,20 +542,29 @@ export class ReleaseService {
 			throw new ResponseError({ message: 'Release not found' });
 		}
 
-		const newStatus = this.resolveReleaseStatusByDspDeliveries(release);
+		const newStatus = this.resolveReleaseStatusByDspDeliveries(
+			release,
+			dataDsp,
+		);
 
 		await this.releaseRepo.update(releaseId, { status: newStatus });
 		return { releaseId, status: newStatus };
 	}
 
 	private resolveReleaseStatusByDspDeliveries(
-		release: Pick<Release, 'status'> & {
-			releaseDspDeliveries?: Pick<ReleaseDspDelivery, 'status'>[];
-		},
+		release: Release,
+
+		dataDsp?: ReleaseExecutionResultDto[],
 	): ReleaseStatus {
-		const statuses =
-			release.releaseDspDeliveries?.map((delivery) => delivery.status) ??
-			[];
+		const statuses = dataDsp
+			? (release.releaseDspDeliveries
+					?.filter((delivery) =>
+						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
+					)
+					.map((delivery) => delivery.status) ?? [])
+			: (release.releaseDspDeliveries?.map(
+					(delivery) => delivery.status,
+				) ?? []);
 
 		if (!statuses.length) {
 			return release.status;
