@@ -145,6 +145,9 @@ export class ReleaseExecution3Service {
 
 		// xử lý status sau khi các step đã xử lí
 		await this.refreshExecutionStatus(execution);
+
+		// cập nhật exe.output vào release delivery dsp sau khi pipeline chạy xong
+		await this.engine.syncExecutionOutputToReleaseDeliveryDsp(execution);
 	}
 
 	private async parseMetadata(execution: ReleaseExecution3): Promise<void> {
@@ -213,6 +216,14 @@ export class ReleaseExecution3Service {
 				execution.metadata.input.releaseSnapshot.id,
 				ciDsps,
 			),
+		};
+
+		execution.metadata.output = {
+			result: allDeliveryDsps.map((dsp) => ({
+				dspId: dsp.id,
+				dspCode: dsp.code,
+				status: undefined,
+			})),
 		};
 
 		for (const dsp of ciDsps) {

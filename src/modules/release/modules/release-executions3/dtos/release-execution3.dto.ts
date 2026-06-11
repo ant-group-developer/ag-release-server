@@ -25,8 +25,10 @@ import { Metadata, PageDto } from 'src/common/dtos/common.response.dto';
 // }
 
 export class ReleaseExecutionResultDto {
+	id?: string;
+	dspId?: string;
 	dspCode: string;
-	status: ReleaseDspStatus;
+	status?: ReleaseDspStatus;
 }
 
 export class ReleaseExecutionMetadata extends Metadata {
