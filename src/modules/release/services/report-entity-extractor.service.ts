@@ -97,7 +97,7 @@ export class ReportEntityExtractorService {
         tenantId: resolvedTenantId || undefined,
         labelName: representativeRow.label_name?.trim() || undefined,
         title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${upc}`,
-        artistName: representativeRow.artist_name?.trim() || '',
+        artistName: representativeRow.artist_name?.trim() || undefined,
         tracks: pgTracks,
         upcTracks,
       });
