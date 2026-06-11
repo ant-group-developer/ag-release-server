@@ -103,12 +103,13 @@ export class ReportImportService {
     }
 
     const totalSizeBytes = matched.reduce((acc, f) => acc + f.size, 0);
+    const fileNames = matched.map((m) => path.basename(m.path));
 
     // Create the PENDING ImportJob to track this upload folder batch
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.REPORT_UPLOAD,
       params: { files: matched },
-      fileName: `Upload: ${matched.length} file(s)`,
+      fileName: fileNames.join(', '),
       fileSizeBytes: totalSizeBytes,
       progressTotal: matched.length,
       tenantId,
@@ -130,39 +131,69 @@ export class ReportImportService {
    * Verify uploaded files in R2 and start worker processing ngầm via Redis Queue
    */
   async startJob(jobId: string): Promise<ImportJob> {
-    const job = await this.importJobsService.findById(jobId);
-    if (!job) {
-      throw new NotFoundException(`Không tìm thấy Job ID: ${jobId}`);
-    }
-
-    if (job.status !== ImportJobStatus.PENDING) {
-      throw new BadRequestException(`Job đang ở trạng thái ${job.status}, không thể bắt đầu lại.`);
-    }
-
-    const files = (job.params?.files as Array<{ r2Key: string; path: string }>) || [];
-    if (files.length === 0) {
-      throw new BadRequestException('Không có file nào để import trong Job này.');
-    }
-
-    const bucketName = this.r2Service.getBucketName({ isPublic: false });
-
-    // Verify all matched files exist in R2
-    for (const file of files) {
-      try {
-        await this.r2Service.findOne({
-          bucketName,
-          key: file.r2Key,
-        });
-      } catch (err) {
-        throw new BadRequestException(
-          `File chưa được upload lên Cloudflare R2 hoặc bị thiếu: ${path.basename(file.path)}`,
-        );
+    try {
+      // Use in-memory snapshot first, fallback to ClickHouse query
+      // This avoids the ReplacingMergeTree eventual-consistency race condition
+      // where a freshly-created job might not be visible via FINAL query yet.
+      let job = this.importJobsService.getSnapshot(jobId);
+      if (!job) {
+        job = await this.importJobsService.findById(jobId);
       }
+      if (!job) {
+        throw new NotFoundException(`Không tìm thấy Job ID: ${jobId}`);
+      }
+
+      if (job.status !== ImportJobStatus.PENDING) {
+        throw new BadRequestException(`Job đang ở trạng thái ${job.status}, không thể bắt đầu lại.`);
+      }
+
+      const files = (job.params?.files as Array<{ r2Key: string; path: string }>) || [];
+      if (files.length === 0) {
+        throw new BadRequestException('Không có file nào để import trong Job này.');
+      }
+
+      const bucketName = this.r2Service.getBucketName({ isPublic: false });
+
+      // Verify all matched files exist in R2
+      const missingFiles: string[] = [];
+      for (const file of files) {
+        try {
+          await this.r2Service.findOne({
+            bucketName,
+            key: file.r2Key,
+          });
+        } catch (err) {
+          const fileName = path.basename(file.path);
+          this.logger.error(`R2 verification failed for ${fileName}: ${err.message}`);
+          missingFiles.push(fileName);
+        }
+      }
+
+      if (missingFiles.length > 0) {
+        const errorMsg = `File chưa được upload lên R2 hoặc bị thiếu: ${missingFiles.join(', ')}`;
+        // Log lỗi vào job record để có thể debug trên production
+        await this.importJobsService.markFailed(jobId, errorMsg).catch(() => {});
+        throw new BadRequestException(errorMsg);
+      }
+
+      // Push jobId to Redis Queue
+      try {
+        await this.queueService.pushJob(job.id);
+      } catch (err) {
+        const errorMsg = `Không thể đẩy job vào Redis Queue: ${err.message}`;
+        this.logger.error(errorMsg);
+        await this.importJobsService.markFailed(jobId, errorMsg).catch(() => {});
+        throw new BadRequestException(errorMsg);
+      }
+
+      return job;
+    } catch (err) {
+      this.logger.error(`Error in startJob for Job ID ${jobId}: ${err.message}`, err.stack);
+      // Attempt to log error message to the job status in ClickHouse so UI can display it
+      await this.importJobsService.markFailed(jobId, `startJob 500 error: ${err.message}`).catch((dbErr) => {
+        this.logger.error(`Failed to update job status to FAILED in ClickHouse: ${dbErr.message}`);
+      });
+      throw err;
     }
-
-    // Push jobId to Redis Queue
-    await this.queueService.pushJob(job.id);
-
-    return job;
   }
 }
