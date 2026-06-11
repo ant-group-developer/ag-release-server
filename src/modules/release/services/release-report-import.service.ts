@@ -30,7 +30,7 @@ export interface ReleaseReportImportInput {
 
 	title: string;
 
-	artistName: string;
+	artistName?: string;
 
 	tracks: {
 		title: string;
@@ -84,10 +84,13 @@ export class ReleaseReportImportService {
 
 			// Dùng lại artist cùng tên nếu đã có; chỉ artist mới được tạo bởi
 			// report mới mang cờ isImportedFromReport.
-			const artist = await this.findOrCreateArtist(
-				manager,
-				input.artistName,
-			);
+			let artist: Artist | null = null;
+			if (input.artistName && input.artistName.trim()) {
+				artist = await this.findOrCreateArtist(
+					manager,
+					input.artistName,
+				);
+			}
 
 			// Release và toàn bộ dữ liệu quan hệ được tạo trong cùng transaction
 			// để tránh dữ liệu import dở dang khi một bước phía sau thất bại.
@@ -104,15 +107,18 @@ export class ReleaseReportImportService {
 
 			// Artist chính của report được gắn ở cấp release và tự động kế thừa
 			// xuống các track được tạo bên dưới.
-			const releaseArtist = await manager.save(
-				ReleaseArtist,
-				manager.create(ReleaseArtist, {
-					releaseId: release.id,
-					artistId: artist.id,
-					addArtistToTracks: true,
-					isImportedFromReport: true,
-				}),
-			);
+			let releaseArtist: ReleaseArtist | null = null;
+			if (artist) {
+				releaseArtist = await manager.save(
+					ReleaseArtist,
+					manager.create(ReleaseArtist, {
+						releaseId: release.id,
+						artistId: artist.id,
+						addArtistToTracks: true,
+						isImportedFromReport: true,
+					}),
+				);
+			}
 
 			// Giữ nguyên thứ tự track trong report, bắt đầu từ order = 1.
 			const tracks = await manager.save(
@@ -131,18 +137,20 @@ export class ReleaseReportImportService {
 
 			// Liên kết cùng artist chính với từng track và tham chiếu quan hệ
 			// release_artist để các thao tác đồng bộ artist sau này hoạt động đúng.
-			await manager.save(
-				TrackArtist,
-				tracks.map((track) =>
-					manager.create(TrackArtist, {
-						trackId: track.id,
-						artistId: artist.id,
-						releaseArtistId: releaseArtist.id,
-						isFromReleaseAction: true,
-						isImportedFromReport: true,
-					}),
-				),
-			);
+			if (artist && releaseArtist) {
+				await manager.save(
+					TrackArtist,
+					tracks.map((track) =>
+						manager.create(TrackArtist, {
+							trackId: track.id,
+							artistId: artist.id,
+							releaseArtistId: releaseArtist.id,
+							isFromReleaseAction: true,
+							isImportedFromReport: true,
+						}),
+					),
+				);
+			}
 
 			return release;
 		});

@@ -45,6 +45,15 @@ export class SyncController {
       properties: {
         period: { type: 'string', example: '202401', description: 'YYYYMM format' },
         force: { type: 'boolean', example: false, description: 'Force re-import even if already done' },
+        categories: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['trends', 'usage', 'sales', 'illegitimate_activity'],
+          },
+          description: 'Filter specific categories to sync',
+          example: ['sales', 'trends'],
+        },
       },
       required: ['period'],
     },
@@ -102,6 +111,15 @@ export class SyncController {
           example: '202401',
           description: 'Skip periods before this month (YYYYMM).',
         },
+        categories: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['trends', 'usage', 'sales', 'illegitimate_activity'],
+          },
+          description: 'Filter specific categories to sync',
+          example: ['sales', 'trends'],
+        },
       },
     },
   })
@@ -148,7 +166,18 @@ export class SyncController {
   @ApiBody({
     schema: {
       type: 'object',
-      properties: { period: { type: 'string', example: '202401' } },
+      properties: {
+        period: { type: 'string', example: '202401' },
+        categories: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['trends', 'usage', 'sales', 'illegitimate_activity'],
+          },
+          description: 'Filter specific categories to sync',
+          example: ['sales', 'trends'],
+        },
+      },
       required: ['period'],
     },
   })
