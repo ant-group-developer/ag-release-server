@@ -48,7 +48,7 @@ export class TimelineAnalyticsService {
     }
 
     // All other cases: JOIN pg_tracks_sync for tenant/label/release filtering
-    const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+    const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
     filterSql += ' AND t.is_deleted = 0';
 
     if (!isSystem) {
@@ -87,8 +87,8 @@ export class TimelineAnalyticsService {
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
     const dspNameExpr = `${resolvedDspName} AS dsp_name`;
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     // 1. Tim Top N DSPs dua tren views cua tenant
@@ -190,8 +190,8 @@ export class TimelineAnalyticsService {
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
     const dspNameExpr = `${resolvedDspName} AS dsp_name`;
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     // 1. Tim Top N DSPs trends
@@ -284,8 +284,8 @@ export class TimelineAnalyticsService {
     params.to = toDate;
 
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
@@ -600,8 +600,8 @@ export class TimelineAnalyticsService {
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
     const dspNameExpr = `${resolvedDspName} AS dsp_name`;
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     // 1. Tìm Top N DSPs theo revenue trong khoảng thời gian
@@ -713,8 +713,8 @@ export class TimelineAnalyticsService {
     // Coalesce: ưu tiên pg_dsps_sync, tiếp đến dsps_report, cuối cùng là dsp_id gốc
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     const sql = `
@@ -783,7 +783,7 @@ export class TimelineAnalyticsService {
         sum(s.total_quantity) AS quantity,
         uniq(s.isrc) AS track_count
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE 1=1
         AND s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
@@ -848,7 +848,7 @@ export class TimelineAnalyticsService {
 
     if (!isSystem) {
       // Normal tenant: phải JOIN để filter
-      joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+      joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
       filterSql = 'AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
 
@@ -863,7 +863,7 @@ export class TimelineAnalyticsService {
     } else {
       // System-tenant: sub-filters vẫn có thể JOIN nếu có
       if (query.labelId || query.releaseId) {
-        joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+        joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
         filterSql = 'AND t.is_deleted = 0';
         if (query.labelId) {
           filterSql += ' AND t.label_id = {labelId:String}';

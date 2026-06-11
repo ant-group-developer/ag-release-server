@@ -32,7 +32,7 @@ export class DashboardAnalyticsService {
       return { joinSql: '', filterSql: '', params };
     }
 
-    const joinSql = `INNER JOIN ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc`;
+    const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
     filterSql += ' AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
     params.tenantId = tenantId;
 
@@ -48,8 +48,8 @@ export class DashboardAnalyticsService {
 
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
     const joinExpr = `
-      LEFT JOIN music_analytics.dsps_report r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN music_analytics.pg_dsps_sync p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
     `;
 
     const table = query.type === 'stream'
@@ -95,7 +95,7 @@ export class DashboardAnalyticsService {
         topItems.push({ name: 'Other', value: otherValue });
       }
     }
-    return topItems;
+    return topItems.sort((a, b) => b.value - a.value);
   }
 
   /**
@@ -121,7 +121,7 @@ export class DashboardAnalyticsService {
           t.label_id AS labelId,
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-        INNER JOIN music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         WHERE t.is_deleted = 0 AND t.label_id != ''
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
@@ -136,7 +136,7 @@ export class DashboardAnalyticsService {
           t.label_id AS labelId,
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
-        INNER JOIN music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         WHERE t.is_deleted = 0 AND t.label_id != ''
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
@@ -174,7 +174,7 @@ export class DashboardAnalyticsService {
         result.push({ name: 'Other', value: otherValue });
       }
     }
-    return result;
+    return result.sort((a, b) => b.value - a.value);
   }
 
   /**
@@ -200,7 +200,7 @@ export class DashboardAnalyticsService {
           arrayJoin(t.artist_ids) AS artistId,
           sum(s.total_quantity) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} s
-        INNER JOIN music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         WHERE t.is_deleted = 0 AND artistId != ''
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
@@ -215,7 +215,7 @@ export class DashboardAnalyticsService {
           arrayJoin(t.artist_ids) AS artistId,
           sum(s.total_revenue_usd) AS value
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_ISRC_MONTHLY} s
-        INNER JOIN music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} t ON s.isrc = t.isrc
+        INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
         WHERE t.is_deleted = 0 AND artistId != ''
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
@@ -253,6 +253,6 @@ export class DashboardAnalyticsService {
         result.push({ name: 'Other', value: otherValue });
       }
     }
-    return result;
+    return result.sort((a, b) => b.value - a.value);
   }
 }
