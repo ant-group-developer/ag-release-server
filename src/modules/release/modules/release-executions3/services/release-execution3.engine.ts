@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { Repository } from 'typeorm';
+import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
@@ -276,14 +277,30 @@ export class ReleaseExecutionStepEngine {
 
 		if (!deliveryStatus) return;
 
+		// const delivery = step.metadata?.input?.delivery;
+		// const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
+		// const items: {
+		// 	id?: string;
+		// 	dspId?: string;
+		// 	dspCode?: string;
+		// 	status: ReleaseDspStatus;
+		// }[] = (delivery?.items ?? [])
+		// 	.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
+		// 	.map((item: any) => ({
+		// 		id: item.id,
+		// 		dspId: item.dspId,
+		// 		dspCode: item.dspCode,
+		// 		status: deliveryStatus,
+		// 	}));
+
+		// await this.releaseDspDeliveryService.updateDeliveryStatus({
+		// 	releaseIds,
+		// 	items,
+		// });
+
+		// lấy các dsp cần xử lí của step
 		const delivery = step.metadata?.input?.delivery;
-		const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
-		const items: {
-			id?: string;
-			dspId?: string;
-			dspCode?: string;
-			status: ReleaseDspStatus;
-		}[] = (delivery?.items ?? [])
+		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
 			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
 			.map((item: any) => ({
 				id: item.id,
@@ -292,9 +309,66 @@ export class ReleaseExecutionStepEngine {
 				status: deliveryStatus,
 			}));
 
+		// lưu vào exe, đồng bộ lại vào release dsp delivery
+		await this.updateExecutionOutputResult({
+			executionId: step.releaseExecutionId,
+			results,
+		});
+	}
+
+	private async updateExecutionOutputResult({
+		executionId,
+		results,
+	}: {
+		executionId: string;
+		results: ReleaseExecutionResultDto[];
+	}): Promise<void> {
+		const execution = await this.executionRepo.findOne({
+			where: { id: executionId },
+		});
+
+		if (!execution) return;
+
+		const currentResults = execution.metadata?.output?.result ?? [];
+
+		const mergedResults = [...currentResults];
+
+		for (const result of results) {
+			const index = mergedResults.findIndex(
+				(item) =>
+					(item.id && item.id === result.id) ||
+					(item.dspId && item.dspId === result.dspId) ||
+					(item.dspCode && item.dspCode === result.dspCode),
+			);
+
+			if (index >= 0) {
+				mergedResults[index] = {
+					...mergedResults[index],
+					...result,
+				};
+			} else {
+				mergedResults.push(result);
+			}
+		}
+
+		execution.metadata = {
+			...(execution.metadata ?? {}),
+			output: {
+				...(execution.metadata?.output ?? {}),
+				result: mergedResults,
+			},
+		};
+
+		await this.executionRepo.save(execution);
+		await this.syncExecutionOutputToReleaseDeliveryDsp(execution);
+	}
+
+	async syncExecutionOutputToReleaseDeliveryDsp(
+		execution: ReleaseExecution3,
+	) {
 		await this.releaseDspDeliveryService.updateDeliveryStatus({
-			releaseIds,
-			items,
+			releaseIds: [execution.releaseId],
+			items: execution.metadata.output.result,
 		});
 	}
 
