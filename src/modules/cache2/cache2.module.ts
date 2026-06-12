@@ -1,7 +1,8 @@
 // cache/cache.module.ts
 
-import { RedisModule } from '@nestjs-modules/ioredis';
-import { Global, Module } from '@nestjs/common';
+import { RedisModule, InjectRedis } from '@nestjs-modules/ioredis';
+import { Global, Module, Logger } from '@nestjs/common';
+import Redis from 'ioredis';
 import { Cache2Controller } from './cache2.controller';
 import { Cache2Service } from './cache2.service';
 
@@ -22,4 +23,15 @@ import { Cache2Service } from './cache2.service';
 	providers: [Cache2Service],
 	exports: [Cache2Service],
 })
-export class Cache2Module {}
+export class Cache2Module {
+	private readonly logger = new Logger(Cache2Module.name);
+
+	constructor(
+		@InjectRedis()
+		private readonly redis: Redis,
+	) {
+		this.redis.on('error', (err) => {
+			this.logger.error(`Redis (ioredis) connection error: ${err.message}`);
+		});
+	}
+}
