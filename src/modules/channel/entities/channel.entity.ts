@@ -1,6 +1,5 @@
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Video } from 'src/modules/video/entities/video.entity';
 import {
@@ -10,7 +9,6 @@ import {
 	JoinColumn,
 	ManyToOne,
 	OneToMany,
-	OneToOne,
 } from 'typeorm';
 import { ChannelStatus } from '../enum/channel.enum';
 import { ChannelHistory } from './channel-history.entity';
@@ -52,15 +50,12 @@ export class Channel extends BaseUUIDEntity {
 	youtubeChannelId: string | null;
 
 	@Column({
-		type: 'uuid',
+		type: 'varchar',
+		length: 500,
 		nullable: true,
-		comment: 'ID file thumbnail cua channel',
+		comment: 'Public thumbnail URL cua channel',
 	})
-	thumbId: string | null;
-
-	@OneToOne(() => FileEntity, { nullable: true })
-	@JoinColumn({ name: 'thumb_id' })
-	thumb: FileEntity | null;
+	thumbUrl: string | null;
 
 	@Column({
 		type: 'uuid',
