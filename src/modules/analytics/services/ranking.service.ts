@@ -10,6 +10,7 @@ import {
   ReleaseRankingItem,
   ArtistRankingItem,
   LabelRankingItem,
+  TenantRankingItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
@@ -502,6 +503,95 @@ export class RankingService {
         image: pictureUrl,
         trackCount: Number(a.trackCount),
         totalViews: Number(a.totalViews),
+      };
+    });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 5. TOP TENANTS RANKING (Trend play counts)
+  // ═══════════════════════════════════════════════════════
+  async getTopTenants(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<TenantRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
+    if (query.dspId) params.dspId = query.dspId;
+
+    const table = query.dspId
+      ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
+      : CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Count query
+    const countSql = `
+      SELECT uniq(t.tenant_id) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.tenant_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Data query
+    const dataSql = `
+      SELECT
+        t.tenant_id AS tenantId,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.tenant_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+      GROUP BY tenantId
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      tenantId: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const tenantIds = paged.map((t) => t.tenantId);
+    const tenantMetaMap = await this.isrcResolverService.getTenantMetadata(tenantIds);
+
+    const items: TenantRankingItem[] = paged.map((r, index) => {
+      const meta = tenantMetaMap.get(r.tenantId);
+      return {
+        rank: query.skip + index + 1,
+        tenantId: r.tenantId,
+        tenantName: meta?.title ?? 'Unknown Tenant',
+        logo: meta?.logo ?? null,
+        totalViews: Number(r.totalViews),
       };
     });
 

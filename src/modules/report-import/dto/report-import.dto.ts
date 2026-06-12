@@ -2,6 +2,7 @@ import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } f
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { ImportJob } from '../../etl/interfaces';
+import { computeProgressDetail } from '../../etl/services/import-jobs/import-jobs.service';
 import { ReportImportStartResponse, ReportImportStatusResponse } from '../interfaces/report-import.interface';
 
 export class PreValidateFileDto {
@@ -55,6 +56,7 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
     current: number;
     total: number;
     label: string;
+    detail?: any;
   };
   rows: {
     total: number;
@@ -74,9 +76,10 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
     this.id = job.id;
     this.status = job.status;
     this.progress = {
-      current: job.progressCurrent,
+      current: job.status === 'COMPLETED' ? job.progressTotal : job.progressCurrent,
       total: job.progressTotal,
-      label: job.progressLabel,
+      label: job.status === 'COMPLETED' ? 'Done' : job.progressLabel,
+      detail: computeProgressDetail(job),
     };
     this.rows = {
       total: job.totalRows,

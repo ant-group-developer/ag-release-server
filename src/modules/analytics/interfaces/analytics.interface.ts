@@ -206,3 +206,39 @@ export interface EntityOverviewResponse {
   totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
   totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
 }
+
+export interface RevenueLabelItem {
+  rank: number;
+  labelId: string;
+  labelName: string;
+  picture: string | null;
+  releaseCount?: number;
+  trackCount?: number;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export interface RevenueTenantItem {
+  rank: number;
+  tenantId: string;
+  tenantName: string;
+  logo: string | null;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export interface OverviewTrendsResponse {
+  totalViews: number;
+  totalDsps: number;
+  totalTracks: number;
+  totalArtists: number;
+  totalLabels: number;
+}
+
+export interface TenantRankingItem {
+  rank: number;
+  tenantId: string;
+  tenantName: string;
+  logo: string | null;
+  totalViews: number;
+}

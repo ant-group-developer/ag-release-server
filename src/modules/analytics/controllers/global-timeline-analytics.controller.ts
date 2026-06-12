@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
+import { ResponseSuccess, PageDto } from 'src/common/dtos/common.response.dto';
 import { TimelineAnalyticsService } from '../services/global-timeline.service';
 import { TimelineQueryDto } from '../dto/analytics-query.dto';
 import {
@@ -9,9 +9,12 @@ import {
   TerTimelineResponse,
   RevenueOverviewResponse,
   RevenueTimelineResponse,
-  RevenueTopDspResponse,
-  RevenueTopArtistResponse,
-  RevenueTopTrackResponse,
+  RevenueDspItem,
+  RevenueArtistItem,
+  RevenueTrackItem,
+  RevenueLabelItem,
+  RevenueTenantItem,
+  OverviewTrendsResponse,
 } from '../interfaces/analytics.interface';
 
 /**
@@ -183,7 +186,7 @@ export class TimelineAnalyticsController {
   @ApiOperation({
     summary: 'Get top DSPs by revenue for tenant',
     description:
-      'Returns top N DSPs sorted by USD revenue. Maps DSP name from pg_dsps_sync first, ' +
+      'Returns top DSPs sorted by USD revenue. Maps DSP name from pg_dsps_sync first, ' +
       'falling back to dsps_report, and finally native ID.',
   })
   @ApiResponse({
@@ -193,7 +196,7 @@ export class TimelineAnalyticsController {
   async getRevenueTopDsp(
     @Req() req: Request,
     @Body() query: TimelineQueryDto,
-  ): Promise<ResponseSuccess<RevenueTopDspResponse>> {
+  ): Promise<ResponseSuccess<PageDto<RevenueDspItem>>> {
     const data = await this.timelineService.getRevenueTopDsp(
       req.user!.tenantId,
       query,
@@ -205,7 +208,7 @@ export class TimelineAnalyticsController {
   @ApiOperation({
     summary: 'Get top artists by revenue for tenant',
     description:
-      'Returns top N artists sorted by USD revenue. ' +
+      'Returns top artists sorted by USD revenue. ' +
       'Groups by artist_ids from pg_tracks_sync. System-tenant sees all data.',
   })
   @ApiResponse({
@@ -215,7 +218,7 @@ export class TimelineAnalyticsController {
   async getRevenueTopArtist(
     @Req() req: Request,
     @Body() query: TimelineQueryDto,
-  ): Promise<ResponseSuccess<RevenueTopArtistResponse>> {
+  ): Promise<ResponseSuccess<PageDto<RevenueArtistItem>>> {
     const data = await this.timelineService.getRevenueTopArtist(
       req.user!.tenantId,
       query,
@@ -227,7 +230,7 @@ export class TimelineAnalyticsController {
   @ApiOperation({
     summary: 'Get top tracks by revenue for tenant',
     description:
-      'Returns top N tracks sorted by USD revenue. ' +
+      'Returns top tracks sorted by USD revenue. ' +
       'Normal tenant filters by pg_tracks_sync. ' +
       'System-tenant queries all ISRCs in ClickHouse; metadata missing from Postgres is resolved from fact_sales_report.',
   })
@@ -238,8 +241,73 @@ export class TimelineAnalyticsController {
   async getRevenueTopTrack(
     @Req() req: Request,
     @Body() query: TimelineQueryDto,
-  ): Promise<ResponseSuccess<RevenueTopTrackResponse>> {
+  ): Promise<ResponseSuccess<PageDto<RevenueTrackItem>>> {
     const data = await this.timelineService.getRevenueTopTrack(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/top-label')
+  @ApiOperation({
+    summary: 'Get top labels by revenue for tenant',
+    description:
+      'Returns top labels sorted by USD revenue. ' +
+      'Always filtered by logged-in user\'s tenant.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Top labels by revenue retrieved successfully.',
+  })
+  async getRevenueTopLabel(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<PageDto<RevenueLabelItem>>> {
+    const data = await this.timelineService.getRevenueTopLabel(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/top-tenant')
+  @ApiOperation({
+    summary: 'Get top tenants by revenue',
+    description:
+      'Returns top tenants sorted by USD revenue. System-tenant sees all, normal tenant sees only self.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Top tenants by revenue retrieved successfully.',
+  })
+  async getRevenueTopTenant(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<PageDto<RevenueTenantItem>>> {
+    const data = await this.timelineService.getRevenueTopTenant(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('trend-view/summary')
+  @ApiOperation({
+    summary: 'Get trend view overview statistics for tenant',
+    description:
+      'Returns total views (quantity), distinct DSPs, tracks, artists, and labels. ' +
+      'System-tenant sees all data; normal tenant sees only their own.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trend view overview statistics retrieved successfully.',
+  })
+  async getTrendsOverview(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<OverviewTrendsResponse>> {
+    const data = await this.timelineService.getTrendsOverview(
       req.user!.tenantId,
       query,
     );

@@ -60,7 +60,7 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
     description:
       'Number of top items to return individually. Remaining ones are grouped as "Other".',
     minimum: 1,
-    maximum: 20,
+    maximum: 100,
     default: 5,
     example: 5,
   })
@@ -68,8 +68,8 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(20)
-  topN?: number = 5;
+  @Max(100)
+  topN?: number;
 
   @ApiPropertyOptional({
     description:
