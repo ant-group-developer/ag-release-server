@@ -328,10 +328,6 @@ export class Ern43Builder2 {
 			}
 		}
 
-		if (track.languageOfPerformance) {
-			sr.ele('LanguageOfPerformance').txt(track.languageOfPerformance);
-		}
-
 		// Duration
 		sr.ele('Duration').txt(this.normalizeDuration(track.duration));
 
@@ -341,6 +337,10 @@ export class Ern43Builder2 {
 				this.input.release.parentalWarning ||
 				'NotExplicit',
 		);
+
+		if (track.languageOfPerformance) {
+			sr.ele('LanguageOfPerformance').txt(track.languageOfPerformance);
+		}
 	}
 
 	private buildVideoResource(
