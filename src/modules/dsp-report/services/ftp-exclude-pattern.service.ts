@@ -42,6 +42,7 @@ export class ExcludePatternService {
 
   /** In-memory cache, cleared on any write */
   private cachedMatchers: CompiledMatcher[] | null = null;
+  private excludeEnabledCache: boolean | null = null;
   private cacheLoadedAt = 0;
   private readonly CACHE_TTL_MS = 30_000;
 
@@ -184,11 +185,18 @@ export class ExcludePatternService {
 
   // ── Matching ───────────────────────────────────────────
 
-  /**
-   * Kiểm tra tên folder/file có bị exclude không.
-   * kind: 'folder' | 'file'
-   */
   async shouldExclude(name: string, kind: 'folder' | 'file'): Promise<boolean> {
+    const now = Date.now();
+    if (this.excludeEnabledCache === null || now - this.cacheLoadedAt >= this.CACHE_TTL_MS) {
+      const configRows = await this.clickHouseService.query<{ value: string }>(
+        `SELECT value FROM etl_config FINAL WHERE key = 'sync_exclude_enabled' LIMIT 1`
+      );
+      this.excludeEnabledCache = configRows.length > 0 ? configRows[0].value !== 'false' : true;
+    }
+    if (!this.excludeEnabledCache) {
+      return false;
+    }
+
     const matchers = await this.getCompiledMatchers();
     for (const m of matchers) {
       if (m.scope !== kind && m.scope !== 'both') continue;
@@ -239,6 +247,7 @@ export class ExcludePatternService {
 
   clearCache(): void {
     this.cachedMatchers = null;
+    this.excludeEnabledCache = null;
     this.cacheLoadedAt = 0;
   }
 
