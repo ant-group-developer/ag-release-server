@@ -242,3 +242,25 @@ export interface TenantRankingItem {
   logo: string | null;
   totalViews: number;
 }
+
+export interface DspRankingItem {
+  rank: number;
+  dspId: string;
+  dspName: string;
+  totalViews: number;
+}
+
+export interface RevenueReleaseItem {
+  rank: number;
+  releaseId: string;
+  title: string;
+  upc: string | null;
+  labelId: string | null;
+  labelName: string | null;
+  trackCount: number;
+  revenueUsd: number;
+  quantity: number;
+  release: {
+    coverArtThumbnails: ICoverArtThumbnails;
+  } | null;
+}

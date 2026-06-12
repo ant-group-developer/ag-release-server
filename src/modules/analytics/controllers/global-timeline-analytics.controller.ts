@@ -15,6 +15,7 @@ import {
   RevenueLabelItem,
   RevenueTenantItem,
   OverviewTrendsResponse,
+  RevenueReleaseItem,
 } from '../interfaces/analytics.interface';
 
 /**
@@ -286,6 +287,28 @@ export class TimelineAnalyticsController {
     @Body() query: TimelineQueryDto,
   ): Promise<ResponseSuccess<PageDto<RevenueTenantItem>>> {
     const data = await this.timelineService.getRevenueTopTenant(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/top-release')
+  @ApiOperation({
+    summary: 'Get top releases by revenue for tenant',
+    description:
+      'Returns top releases sorted by USD revenue. ' +
+      'Always filtered by logged-in user\'s tenant.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Top releases by revenue retrieved successfully.',
+  })
+  async getRevenueTopRelease(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<PageDto<RevenueReleaseItem>>> {
+    const data = await this.timelineService.getRevenueTopRelease(
       req.user!.tenantId,
       query,
     );
