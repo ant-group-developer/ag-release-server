@@ -59,7 +59,7 @@ export class PgDspsSyncService {
     // Count query
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        ${whereClause}`,
       params,
     );
@@ -68,7 +68,7 @@ export class PgDspsSyncService {
     // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, picture, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        ${whereClause}
        ORDER BY dsp_name ASC
        LIMIT ${pageSize} OFFSET ${offset}`,
@@ -87,7 +87,7 @@ export class PgDspsSyncService {
   async findByUuid(pgUuid: string): Promise<PgDspsSyncResponse | null> {
     const rows = await this.clickHouseService.query<any>(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, picture, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        WHERE pg_uuid = {uuid: String}`,
       { uuid: pgUuid }
     );
@@ -114,7 +114,7 @@ export class PgDspsSyncService {
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        WHERE r.pg_uuid = {uuid: String}
        ORDER BY r.created_at DESC`,
       { uuid: pgUuid }

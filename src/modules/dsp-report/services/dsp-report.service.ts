@@ -89,7 +89,7 @@ export class DspReportService {
     // Count query
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
        ${whereClause}`,
       params,
     );
@@ -111,8 +111,8 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        ${whereClause}
        ORDER BY r.created_at DESC
        LIMIT ${pageSize} OFFSET ${offset}`,
@@ -144,8 +144,8 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        WHERE r.id_dsps_report = {id: String}`,
       { id }
     );
@@ -171,8 +171,8 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        WHERE r.pg_uuid = {pgUuid: String}
        ORDER BY r.created_at DESC`,
       { pgUuid }
