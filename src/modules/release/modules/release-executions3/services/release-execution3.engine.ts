@@ -277,27 +277,6 @@ export class ReleaseExecutionStepEngine {
 
 		if (!deliveryStatus) return;
 
-		// const delivery = step.metadata?.input?.delivery;
-		// const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
-		// const items: {
-		// 	id?: string;
-		// 	dspId?: string;
-		// 	dspCode?: string;
-		// 	status: ReleaseDspStatus;
-		// }[] = (delivery?.items ?? [])
-		// 	.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
-		// 	.map((item: any) => ({
-		// 		id: item.id,
-		// 		dspId: item.dspId,
-		// 		dspCode: item.dspCode,
-		// 		status: deliveryStatus,
-		// 	}));
-
-		// await this.releaseDspDeliveryService.updateDeliveryStatus({
-		// 	releaseIds,
-		// 	items,
-		// });
-
 		// lấy các dsp cần xử lí của step
 		const delivery = step.metadata?.input?.delivery;
 		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])

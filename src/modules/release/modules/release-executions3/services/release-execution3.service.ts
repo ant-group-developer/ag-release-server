@@ -123,31 +123,36 @@ export class ReleaseExecution3Service {
 	}
 
 	async runPipeline(id: string): Promise<void> {
-		// lấy exe, lấy xử lý từng job theo đồng bộ
 		const execution = await this.findOne(id);
 		const steps = execution.steps || [];
 
-		// xử lý từng step
-		for (const step of steps) {
-			const statusStep = await this.engine.processStep({
-				step,
-				releaseExecution: execution,
-			});
-
-			if (this.shouldStopSequential(statusStep)) {
-				await this.updateExecutionStatus({
-					execution,
-					status: this.mapStepStatusToExecutionStatus(statusStep),
+		try {
+			for (const step of steps) {
+				const statusStep = await this.engine.processStep({
+					step,
+					releaseExecution: execution,
 				});
-				return;
+
+				if (this.shouldStopSequential(statusStep)) {
+					await this.updateExecutionStatus({
+						execution,
+						status: this.mapStepStatusToExecutionStatus(statusStep),
+					});
+					return;
+				}
 			}
+
+			await this.refreshExecutionStatus(execution);
+		} finally {
+			// Luôn sync output kể cả khi pipeline return sớm hoặc phát sinh lỗi.
+			await this.engine.syncExecutionOutputToReleaseDeliveryDsp(
+				execution,
+			);
 		}
+	}
 
-		// xử lý status, dựa vào status của các step sau khi các step đã xử lí
-		await this.refreshExecutionStatus(execution);
-
-		// cập nhật exe.output vào release delivery dsp sau khi pipeline chạy xong
-		await this.engine.syncExecutionOutputToReleaseDeliveryDsp(execution);
+	async syncExecutionOutputToReleaseDeliveryDsp(id: string) {
+		await this.engine.syncExecutionOutputToReleaseDeliveryDsp({ id });
 	}
 
 	private async parseMetadata(execution: ReleaseExecution3): Promise<void> {
