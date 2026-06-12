@@ -5,6 +5,8 @@ import { FtpService } from '../services/ftp/ftp.service';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
 import { ImportJobSourceType } from '../interfaces';
 import { User } from '../../../common/decorators/req.decorators';
+import { SchedulerService } from '../services/scheduler/scheduler.service';
+import { UpdateSyncConfigDto } from '../dto/sync-config.dto';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -13,6 +15,7 @@ export class SyncController {
     private readonly syncService: SyncService,
     private readonly ftpService: FtpService,
     private readonly importJobsService: ImportJobsService,
+    private readonly schedulerService: SchedulerService,
   ) {}
 
   // ── FTP: Connection ───────────────────────────────────
@@ -238,18 +241,12 @@ export class SyncController {
 
   @Put('sync-config')
   @ApiOperation({ summary: 'Update sync configuration' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        mode: { type: 'string', enum: ['manual', 'auto'], example: 'auto' },
-        cron: { type: 'string', example: '0 2 * * *' },
-      },
-      required: ['mode'],
-    },
-  })
-  async setSyncConfig(@Body() body: { mode: string; cron?: string }) {
-    return this.syncService.setSyncConfig(body.mode, body.cron);
+  async setSyncConfig(@Body() body: UpdateSyncConfigDto) {
+    const updatedConfig = await this.syncService.setSyncConfig(body);
+    if (body.cron) {
+      await this.schedulerService.rescheduleAutoSync(body.cron);
+    }
+    return updatedConfig;
   }
 
   // ─────────────────────────────────────────────────────

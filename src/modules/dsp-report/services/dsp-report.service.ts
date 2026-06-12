@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
+import { DspMappingService } from 'src/modules/dsp/services/dsp-mapping.service';
 
 export interface DspsReportResponse {
   idDspsReport: string;
@@ -49,7 +50,10 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
 export class DspReportService {
   private readonly logger = new Logger(DspReportService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly dspMappingService: DspMappingService,
+  ) {}
 
   /**
    * Get paginated dsps_report records with optional filtering
@@ -226,5 +230,17 @@ export class DspReportService {
       { id: idDspsReport }
     );
     this.logger.log(`Unassigned dsps_report ${idDspsReport}`);
+  }
+
+  /**
+   * Delete dsps_report by id
+   */
+  async delete(idDspsReport: string): Promise<void> {
+    await this.clickHouseService.query(
+      `ALTER TABLE ${CLICKHOUSE_TABLES.DSPS_REPORT} DELETE WHERE id_dsps_report = {id: String}`,
+      { id: idDspsReport }
+    );
+    this.logger.log(`Deleted dsps_report ${idDspsReport}`);
+    await this.dspMappingService.loadCache();
   }
 }
