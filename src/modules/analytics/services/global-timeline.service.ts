@@ -22,6 +22,7 @@ import {
   RevenueLabelItem,
   RevenueTenantItem,
   OverviewTrendsResponse,
+  RevenueReleaseItem,
 } from '../interfaces/analytics.interface';
 
 @Injectable()
@@ -1459,5 +1460,135 @@ export class TimelineAnalyticsService {
       totalArtists: Number(artistResult[0]?.total_artists ?? 0),
       totalLabels: Number(mainResult[0]?.total_labels ?? 0),
     };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TOP RELEASE (Top releases by revenue)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopRelease(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueReleaseItem>> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { limit, offset, page, pageSize } = this.getPaginationParams(query);
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+    if (query.labelId) {
+      filterSql += ' AND t.label_id = {labelId:String}';
+      params.labelId = query.labelId;
+    }
+    if (query.releaseId) {
+      filterSql += ' AND t.release_id = {releaseId:String}';
+      params.releaseId = query.releaseId;
+    }
+
+    // Count query
+    const countSql = `
+      SELECT uniq(t.release_id) AS total
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.release_id != ''
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(countSql, params);
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    // Data query
+    const sql = `
+      SELECT
+        t.release_id AS releaseId,
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.release_id != ''
+        AND s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+      GROUP BY releaseId
+      ORDER BY revenue_usd DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const rows = await this.clickHouseService.query<{
+      releaseId: string;
+      revenue_usd: string;
+      quantity: string;
+    }>(sql, params);
+
+    const items: RevenueReleaseItem[] = [];
+
+    if (rows.length > 0) {
+      const releaseIds = rows.map((r) => r.releaseId);
+      const releasesMeta = await this.isrcResolverService.getReleaseMetadata(releaseIds);
+
+      rows.forEach((r, index) => {
+        const meta = releasesMeta.get(r.releaseId);
+        items.push({
+          rank: offset + index + 1,
+          releaseId: r.releaseId,
+          title: meta?.title ?? 'Unknown Release',
+          upc: meta?.upc ?? null,
+          labelId: meta?.labelId ?? null,
+          labelName: meta?.labelName ?? null,
+          trackCount: meta?.trackCount ?? 0,
+          revenueUsd: Number(r.revenue_usd),
+          quantity: Number(r.quantity),
+          release: meta ? { coverArtThumbnails: meta.coverArtThumbnails } : null,
+        });
+      });
+
+      if (query.includeOther) {
+        const totalSql = `
+          SELECT
+            sum(s.total_quantity) AS total_qty,
+            sum(s.total_revenue_usd) AS total_rev
+          FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+          INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+          WHERE t.is_deleted = 0
+            AND t.release_id != ''
+            AND s.period >= toDate({from:String})
+            AND s.period <= toDate({to:String})
+            ${filterSql}
+        `;
+        const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
+        const totalQty = Number(totalResult[0]?.total_qty ?? 0);
+        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+
+        const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
+        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+
+        const otherQty = totalQty - itemsQtySum;
+        const otherRev = totalRev - itemsRevSum;
+
+        if (otherQty > 0 || otherRev > 0) {
+          items.push({
+            rank: items.length + 1,
+            releaseId: 'other',
+            title: 'Other',
+            upc: null,
+            labelId: null,
+            labelName: null,
+            trackCount: 0,
+            revenueUsd: otherRev > 0 ? otherRev : 0,
+            quantity: otherQty > 0 ? otherQty : 0,
+            release: null,
+          });
+        }
+      }
+    }
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 }

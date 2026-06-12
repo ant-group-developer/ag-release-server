@@ -11,6 +11,7 @@ import {
   ArtistRankingItem,
   LabelRankingItem,
   TenantRankingItem,
+  DspRankingItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
@@ -594,6 +595,90 @@ export class RankingService {
         totalViews: Number(r.totalViews),
       };
     });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 6. TOP DSPS RANKING (Trend play counts/views)
+  // ═══════════════════════════════════════════════════════
+  async getTopDsps(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<DspRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Coalesce: ưu tiên pg_dsps_sync, tiếp đến dsps_report, cuối cùng là dsp_id gốc
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const joinExpr = `
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+    `;
+
+    // Count query
+    const countSql = `
+      SELECT uniq(${resolvedDspName}) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${joinExpr}
+      WHERE t.is_deleted = 0
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Data query
+    const dataSql = `
+      SELECT
+        s.dsp_id AS dspId,
+        ${resolvedDspName} AS dspName,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${joinExpr}
+      WHERE t.is_deleted = 0
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${filterSql}
+      GROUP BY dspId, dspName
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      dspId: string;
+      dspName: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const items: DspRankingItem[] = paged.map((r, index) => ({
+      rank: query.skip + index + 1,
+      dspId: r.dspId,
+      dspName: r.dspName,
+      totalViews: Number(r.totalViews),
+    }));
 
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }

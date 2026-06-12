@@ -330,4 +330,43 @@ export class IsrcResolverService {
     }
     return map;
   }
+
+  /**
+   * Lấy thông tin chi tiết cho danh sách releaseIds từ PostgreSQL (cho Top Releases)
+   */
+  async getReleaseMetadata(
+    releaseIds: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        title: string;
+        upc: string | null;
+        labelId: string | null;
+        labelName: string | null;
+        trackCount: number;
+        coverArtThumbnails: ICoverArtThumbnails;
+      }
+    >
+  > {
+    const map = new Map<string, any>();
+    if (!releaseIds.length) return map;
+
+    const releases = await this.releaseRepo.find({
+      where: { id: In(releaseIds) },
+      relations: ['label', 'tracks', 'releaseCoverArts'],
+    });
+
+    for (const r of releases) {
+      map.set(r.id, {
+        title: r.title,
+        upc: r.upc,
+        labelId: r.labelId,
+        labelName: r.label?.name || null,
+        trackCount: r.tracks?.length ?? 0,
+        coverArtThumbnails: getCoverArtThumbnails(r.releaseCoverArts),
+      });
+    }
+    return map;
+  }
 }
