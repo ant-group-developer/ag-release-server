@@ -22,6 +22,17 @@ export class ReleaseExecution3Controller {
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
 	) {}
 
+	@Get('sync-output/:id')
+	async syncExecutionOutputToReleaseDeliveryDsp(
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.releaseExecution3Service.syncExecutionOutputToReleaseDeliveryDsp(
+			id,
+		);
+
+		return new ResponseSuccess({ data: true });
+	}
+
 	@Get()
 	async getList(@Query() query: QueryGetListReleaseExecution3Dto) {
 		const result = await this.releaseExecution3Service.getList(query);

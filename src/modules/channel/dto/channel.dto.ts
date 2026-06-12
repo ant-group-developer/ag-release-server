@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
 	IsNotEmpty,
 	IsOptional,
@@ -31,6 +31,23 @@ export class CreateChannelDto {
 	})
 	@IsUUID('4')
 	tenantId: string;
+
+	@ApiPropertyOptional({
+		example: 'UCabcdefghijklmnopqrstuvw',
+		description: 'YouTube channel ID',
+	})
+	@IsOptional()
+	@IsString()
+	@MaxLength(100)
+	youtubeChannelId?: string;
+
+	@ApiPropertyOptional({
+		format: 'uuid',
+		description: 'Thumbnail file ID in the bucket files table',
+	})
+	@IsOptional()
+	@IsUUID('4')
+	thumbId?: string;
 }
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}

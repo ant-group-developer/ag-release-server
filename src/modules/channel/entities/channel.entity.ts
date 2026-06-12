@@ -1,5 +1,6 @@
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Video } from 'src/modules/video/entities/video.entity';
 import {
@@ -9,8 +10,10 @@ import {
 	JoinColumn,
 	ManyToOne,
 	OneToMany,
+	OneToOne,
 } from 'typeorm';
 import { ChannelStatus } from '../enum/channel.enum';
+import { ChannelHistory } from './channel-history.entity';
 
 @Entity('channels', {
 	comment: 'Danh muc channel dung cho video distribution',
@@ -41,6 +44,25 @@ export class Channel extends BaseUUIDEntity {
 	error: string | null;
 
 	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'YouTube channel ID returned by Vevo',
+	})
+	youtubeChannelId: string | null;
+
+	@Column({
+		type: 'uuid',
+		nullable: true,
+		comment: 'ID file thumbnail cua channel',
+	})
+	thumbId: string | null;
+
+	@OneToOne(() => FileEntity, { nullable: true })
+	@JoinColumn({ name: 'thumb_id' })
+	thumb: FileEntity | null;
+
+	@Column({
 		type: 'uuid',
 		nullable: true,
 		comment: 'ID tenant so huu channel',
@@ -53,4 +75,7 @@ export class Channel extends BaseUUIDEntity {
 
 	@OneToMany(() => Video, (video) => video.channel)
 	videos: Video[];
+
+	@OneToMany(() => ChannelHistory, (history) => history.channelEntity)
+	histories: ChannelHistory[];
 }
