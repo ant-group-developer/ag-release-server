@@ -12,7 +12,7 @@ import { ReleaseExecutionStatus } from '../../enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../release-execution3.service';
 
 const DEFAULT_TRACK_DISK_BYTES = 30 * 1024 * 1024;
-const MAX_PIPELINE_DISK_BYTES = 5 * 1024 * 1024 * 1024;
+const MAX_PIPELINE_DISK_BYTES = 25 * 1024 * 1024 * 1024;
 
 @Injectable()
 export class ReleaseExecution3Consumer {

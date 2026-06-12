@@ -277,27 +277,6 @@ export class ReleaseExecutionStepEngine {
 
 		if (!deliveryStatus) return;
 
-		// const delivery = step.metadata?.input?.delivery;
-		// const releaseIds = delivery?.releaseId ? [delivery.releaseId] : [];
-		// const items: {
-		// 	id?: string;
-		// 	dspId?: string;
-		// 	dspCode?: string;
-		// 	status: ReleaseDspStatus;
-		// }[] = (delivery?.items ?? [])
-		// 	.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
-		// 	.map((item: any) => ({
-		// 		id: item.id,
-		// 		dspId: item.dspId,
-		// 		dspCode: item.dspCode,
-		// 		status: deliveryStatus,
-		// 	}));
-
-		// await this.releaseDspDeliveryService.updateDeliveryStatus({
-		// 	releaseIds,
-		// 	items,
-		// });
-
 		// lấy các dsp cần xử lí của step
 		const delivery = step.metadata?.input?.delivery;
 		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
@@ -323,52 +302,76 @@ export class ReleaseExecutionStepEngine {
 		executionId: string;
 		results: ReleaseExecutionResultDto[];
 	}): Promise<void> {
-		const execution = await this.executionRepo.findOne({
-			where: { id: executionId },
+		if (!results.length) return;
+
+		// Các delivery step có thể chạy parallel và cùng cập nhật metadata.output.result.
+		// Lock execution trong transaction để tránh các step đọc cùng dữ liệu cũ rồi ghi đè kết quả của nhau.
+		await this.executionRepo.manager.transaction(async (manager) => {
+			const executionRepo = manager.getRepository(ReleaseExecution3);
+			const execution = await executionRepo.findOne({
+				where: { id: executionId },
+				lock: { mode: 'pessimistic_write' },
+			});
+
+			if (!execution) return;
+
+			const mergedResults = [
+				...(execution.metadata?.output?.result ?? []),
+			];
+
+			// Tìm DSP đã tồn tại theo định danh ưu tiên có sẵn, sau đó cập nhật status
+			// thay vì thêm bản ghi trùng cho cùng một DSP.
+			for (const result of results) {
+				const index = mergedResults.findIndex(
+					(item) =>
+						(item.id && item.id === result.id) ||
+						(item.dspId && item.dspId === result.dspId) ||
+						(item.dspCode && item.dspCode === result.dspCode),
+				);
+
+				if (index >= 0) {
+					mergedResults[index] = {
+						...mergedResults[index],
+						...result,
+					};
+				} else {
+					mergedResults.push(result);
+				}
+			}
+
+			// Chỉ thay output.result, giữ nguyên input và các output khác trong metadata.
+			execution.metadata = {
+				...(execution.metadata ?? {}),
+				output: {
+					...(execution.metadata?.output ?? {}),
+					result: mergedResults,
+				},
+			};
+
+			await executionRepo.save(execution);
 		});
 
-		if (!execution) return;
-
-		const currentResults = execution.metadata?.output?.result ?? [];
-
-		const mergedResults = [...currentResults];
-
-		for (const result of results) {
-			const index = mergedResults.findIndex(
-				(item) =>
-					(item.id && item.id === result.id) ||
-					(item.dspId && item.dspId === result.dspId) ||
-					(item.dspCode && item.dspCode === result.dspCode),
-			);
-
-			if (index >= 0) {
-				mergedResults[index] = {
-					...mergedResults[index],
-					...result,
-				};
-			} else {
-				mergedResults.push(result);
-			}
-		}
-
-		execution.metadata = {
-			...(execution.metadata ?? {}),
-			output: {
-				...(execution.metadata?.output ?? {}),
-				result: mergedResults,
-			},
-		};
-
-		await this.executionRepo.save(execution);
-		await this.syncExecutionOutputToReleaseDeliveryDsp(execution);
+		// Chỉ sync delivery sau khi transaction commit để luôn đọc được kết quả merge mới nhất.
+		await this.syncExecutionOutputToReleaseDeliveryDsp({ id: executionId });
 	}
 
 	async syncExecutionOutputToReleaseDeliveryDsp(
-		execution: ReleaseExecution3,
+		execution: Pick<ReleaseExecution3, 'id'>,
 	) {
+		// Đọc lại execution thay vì dùng snapshot cũ của pipeline, vì các delivery step
+		// có thể vừa cập nhật metadata.output.result trong những transaction khác.
+		const latestExecution = await this.executionRepo.findOne({
+			where: { id: execution.id },
+		});
+		const results = latestExecution?.metadata?.output?.result ?? [];
+
+		if (!latestExecution || !results.length) return;
+
+		// Đồng bộ toàn bộ kết quả hiện tại. Status undefined vẫn được service phía dưới
+		// chuyển thành ISSUES theo nghiệp vụ.
 		await this.releaseDspDeliveryService.updateDeliveryStatus({
-			releaseIds: [execution.releaseId],
-			items: execution.metadata.output.result,
+			releaseIds: [latestExecution.releaseId],
+			items: results,
 		});
 	}
 

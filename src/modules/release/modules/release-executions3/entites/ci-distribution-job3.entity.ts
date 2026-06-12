@@ -25,7 +25,6 @@ export enum CiJobStatus3 {
 // 	CANCEL = 'cancel',
 // }
 
-
 @Entity('ci_distribution_jobs3')
 export class CiDistributionJob3 extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 30 })
@@ -87,7 +86,7 @@ export class CiDistributionJob3 extends BaseUUIDEntity {
 	@Column({
 		name: 'ci_tool_job_id',
 		nullable: true,
-		type: 'varchar'
+		type: 'varchar',
 	})
 	ciToolJobId: string | null;
 
