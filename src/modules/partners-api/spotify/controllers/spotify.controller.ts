@@ -6,8 +6,8 @@ import { SpotifyService2 } from '../services/spotify2.service';
 import { MetadataEnrichmentService } from '../services/metadata-enrichment.service';
 import { MetadataScanService } from '../services/metadata-scan.service';
 
-@ApiTags('Partners API - Spotify')
-@Controller('partners/spotify')
+@ApiTags('Partners API')
+@Controller('partners')
 export class SpotifyController {
 	private readonly logger = new Logger(SpotifyController.name);
 
@@ -18,12 +18,12 @@ export class SpotifyController {
 		private readonly metadataScanService: MetadataScanService,
 	) {}
 
-	@Post('token')
+	@Post('spotify/token')
 	async getToken(@Body() body: { clientId?: string; clientSecret?: string }) {
 		return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
 	}
 
-	@Get('artists/:id')
+	@Get('spotify/artists/:id')
 	async getArtistDetail(@Param('id') id: string) {
 		return this.spotifyService2.getArtistDetail(id);
 	}

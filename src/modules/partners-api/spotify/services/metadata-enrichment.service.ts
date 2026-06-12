@@ -49,32 +49,32 @@ export class MetadataEnrichmentService {
 	// PUBLIC API
 	// ─────────────────────────────────────────────────────
 
-	/**
-	 * Look up an ISRC via Spotify first; if Spotify returns nothing
-	 * or throws, fall back to the Deezer public API.
-	 */
 	async enrichByIsrc(isrc: string): Promise<EnrichedMetadata | null> {
 		if (!isrc?.trim()) return null;
 		const normalizedIsrc = isrc.trim().toUpperCase();
 
-		// 1) Try Spotify
-		try {
-			const result = await this.enrichFromSpotify(normalizedIsrc);
-			if (result) return result;
-		} catch (err) {
-			this.logger.warn(
-				`Spotify lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
-			);
-		}
+		// Call both Spotify and Deezer APIs in parallel
+		const [spotifyResult, deezerResult] = await Promise.all([
+			this.enrichFromSpotify(normalizedIsrc).catch((err) => {
+				this.logger.warn(
+					`Spotify lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
+				);
+				return null;
+			}),
+			this.enrichFromDeezer(normalizedIsrc).catch((err) => {
+				this.logger.warn(
+					`Deezer lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
+				);
+				return null;
+			}),
+		]);
 
-		// 2) Fallback: Deezer (no auth required)
-		try {
-			const result = await this.enrichFromDeezer(normalizedIsrc);
-			if (result) return result;
-		} catch (err) {
-			this.logger.warn(
-				`Deezer lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
-			);
+		// Prioritize Spotify first, then fall back to Deezer
+		if (spotifyResult) {
+			return spotifyResult;
+		}
+		if (deezerResult) {
+			return deezerResult;
 		}
 
 		return null;
