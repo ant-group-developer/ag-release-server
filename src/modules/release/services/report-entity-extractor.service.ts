@@ -253,8 +253,8 @@ export class ReportEntityExtractorService {
 
     try {
       return await this.metadataEnrichmentService.enrichBatch(isrcsToEnrich, {
-        concurrency: 3,
-        delayMs: 250,
+        concurrency: 10,
+        delayMs: 100,
       });
     } catch (err) {
       this.logger.error(
@@ -294,11 +294,10 @@ export class ReportEntityExtractorService {
 
     // ─── Resolve UPC ─────────────────────────────────
     let resolvedUpc = currentUpc;
-    const isPlaceholder = currentUpc.toUpperCase().startsWith('ISRC-');
-    if (isPlaceholder && enriched.upc) {
+    if (enriched.upc && currentUpc !== enriched.upc) {
       resolvedUpc = enriched.upc;
       this.logger.log(
-        `✅ Enrichment: Resolved placeholder UPC ${currentUpc} → real UPC ${resolvedUpc} (via ${enriched.source})`,
+        `✅ Enrichment: Resolved UPC ${currentUpc} → real UPC ${resolvedUpc} (via ${enriched.source})`,
       );
     }
 

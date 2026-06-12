@@ -22,14 +22,12 @@ export class SpotifyService {
 			bodyClientId ||
 			this.appConfigService.getValue<string>(
 				'config.partners.spotify.clientId',
-			) ||
-			process.env.SPOTIFY_CLIENT_ID;
+			);
 		const clientSecret =
 			bodyClientSecret ||
 			this.appConfigService.getValue<string>(
 				'config.partners.spotify.clientSecret',
-			) ||
-			process.env.SPOTIFY_CLIENT_SECRET;
+			);
 
 		if (!clientId || !clientSecret) {
 			throw new Error('Spotify credentials not configured');
@@ -67,6 +65,10 @@ export class SpotifyService {
 			this.tokenTimeout = setTimeout(() => {
 				this.resToken = { access_token: '', expires_in: 0 };
 			}, timeoutMs);
+
+			this.logger.log(
+				`token spotify: ${data.access_token}`,
+			);
 
 			return data;
 		} catch (error: any) {
