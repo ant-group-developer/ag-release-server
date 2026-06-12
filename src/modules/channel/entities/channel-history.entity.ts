@@ -1,5 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Channel } from './channel.entity';
 
 @Entity('channel_histories', {
@@ -24,4 +24,8 @@ export class ChannelHistory extends BaseUUIDEntity {
 		comment: 'Snapshot channel truoc khi thay doi',
 	})
 	channel: Channel;
+
+	@ManyToOne(() => Channel, (channel) => channel.histories)
+	@JoinColumn({ name: 'channel_id' })
+	channelEntity: Channel;
 }

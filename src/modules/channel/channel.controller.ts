@@ -81,6 +81,20 @@ export class ChannelController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('video-options')
+	@ApiOperation({ summary: 'Get channels for creating a video' })
+	async getListForVideo(
+		@Query() query: QueryGetListChannelDto,
+		@Req() req: Request,
+	) {
+		const result = await this.channelService.getList(
+			query,
+			req.user!.tenantId,
+			true,
+		);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get channel by ID' })
 	@ApiParam({ name: 'id', format: 'uuid' })

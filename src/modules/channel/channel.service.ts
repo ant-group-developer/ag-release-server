@@ -7,6 +7,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
+import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
 import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
@@ -34,6 +35,7 @@ export class ChannelService {
 		private readonly dataSource: DataSource,
 		private readonly vevoService: VevoService,
 		private readonly tenantService: TenantService,
+		private readonly bucketService: BucketService2,
 	) {}
 
 	async create(dto: CreateChannelDto) {
@@ -62,6 +64,7 @@ export class ChannelService {
 			{
 				status: ChannelStatus.SUCCESS,
 				error: null,
+				youtubeChannelId: payload.youtube_channel_id,
 			},
 		);
 
@@ -74,11 +77,17 @@ export class ChannelService {
 		return { received: true };
 	}
 
-	async getList(query: QueryGetListChannelDto, actorTenantId: string) {
-		const qb = this.createDetailQuery();
+	async getList(
+		query: QueryGetListChannelDto,
+		actorTenantId: string,
+		onlyActorTenant = false,
+	) {
+		const qb = this.createDetailQuery(true);
 		// Tenant thuong chi duoc xem channel cua chinh no va toan bo tenant con.
 		// System tenant nhan undefined de khong ap dung bo loc tenant.
-		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		const tenantIds = onlyActorTenant
+			? undefined
+			: await this.getAccessibleTenantIds(actorTenantId);
 
 		if (query.keyword) {
 			qb.andWhere('channel.name ILIKE :keyword', {
@@ -86,7 +95,11 @@ export class ChannelService {
 			});
 		}
 
-		if (query.tenantId) {
+		if (onlyActorTenant) {
+			qb.andWhere('channel.tenantId = :actorTenantId', {
+				actorTenantId,
+			});
+		} else if (query.tenantId) {
 			this.ensureTenantAccessible(query.tenantId, tenantIds);
 			qb.andWhere('channel.tenantId = :tenantId', {
 				tenantId: query.tenantId,
@@ -164,6 +177,10 @@ export class ChannelService {
 		const hasImportantChange =
 			(dto.name !== undefined && dto.name !== channel.name) ||
 			(dto.tenantId !== undefined && dto.tenantId !== channel.tenantId);
+		const oldThumbId =
+			dto.thumbId !== undefined && dto.thumbId !== channel.thumbId
+				? channel.thumbId
+				: null;
 
 		// Snapshot channel cu va update phai thanh cong/that bai cung nhau.
 		await this.dataSource.transaction(async (manager) => {
@@ -183,8 +200,16 @@ export class ChannelService {
 				...(dto.tenantId !== undefined
 					? { tenantId: dto.tenantId }
 					: {}),
+				...(dto.youtubeChannelId !== undefined
+					? { youtubeChannelId: dto.youtubeChannelId }
+					: {}),
+				...(dto.thumbId !== undefined ? { thumbId: dto.thumbId } : {}),
 			});
 		});
+
+		if (oldThumbId) {
+			await this.bucketService.deleteSafe(oldThumbId);
+		}
 
 		return this.findOne(id, actorTenantId);
 	}
@@ -192,6 +217,9 @@ export class ChannelService {
 	async remove(id: string, actorTenantId: string) {
 		const channel = await this.findOne(id, actorTenantId);
 		await this.channelRepo.remove(channel);
+		if (channel.thumbId) {
+			await this.bucketService.deleteSafe(channel.thumbId);
+		}
 		return { success: true };
 	}
 
@@ -228,16 +256,26 @@ export class ChannelService {
 		}
 	}
 
-	private createDetailQuery() {
-		return this.channelRepo
+	private createDetailQuery(includeHistories = false) {
+		const qb = this.channelRepo
 			.createQueryBuilder('channel')
 			.leftJoin('channel.tenant', 'tenant')
+			.leftJoinAndSelect('channel.thumb', 'thumb')
 			.addSelect([
 				'tenant.id',
 				'tenant.name',
 				'tenant.title',
 				'tenant.logo',
 			]);
+
+		if (includeHistories) {
+			qb.leftJoinAndSelect('channel.histories', 'history').addOrderBy(
+				'history.createdAt',
+				'DESC',
+			);
+		}
+
+		return qb;
 	}
 
 	private async processVevoChannel(channelId: string, channelName: string) {
