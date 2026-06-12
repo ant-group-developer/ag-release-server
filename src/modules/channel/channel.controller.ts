@@ -26,7 +26,6 @@ import {
 	SystemAdminOnly,
 } from '../auth/decorators/auth.decorator';
 import { VevoChannelCallbackDto } from '../partners-api/vevo/dtos/vevo.dto';
-import { checkIsNotSystemTenant } from '../user/utils/user-type.util';
 import { ChannelService } from './channel.service';
 import {
 	CreateChannelDto,
@@ -67,11 +66,7 @@ export class ChannelController {
 	@ApiOperation({ summary: 'Get channels' })
 	async getList(@Query() query: QueryGetListChannelDto, @Req() req: Request) {
 		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId)) {
-			query.tenantId = tenantId;
-		}
-
-		const result = await this.channelService.getList(query);
+		const result = await this.channelService.getList(query, tenantId);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -82,23 +77,21 @@ export class ChannelController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		if (checkIsNotSystemTenant(tenantId)) {
-			query.tenantId = tenantId;
-		}
-
-		const result = await this.channelService.getListSimple(query);
+		const result = await this.channelService.getListSimple(query, tenantId);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Get channel by ID' })
 	@ApiParam({ name: 'id', format: 'uuid' })
-	async findOne(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.channelService.findOne(id);
+	async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+		const result = await this.channelService.findOne(
+			id,
+			req.user!.tenantId,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
-	@SystemAdminOnly()
 	@Put(':id')
 	@ApiOperation({ summary: 'Update channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })
@@ -106,16 +99,22 @@ export class ChannelController {
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() dto: UpdateChannelDto,
+		@Req() req: Request,
 	) {
-		const result = await this.channelService.update(id, dto);
+		const result = await this.channelService.update(
+			id,
+			dto,
+			req.user!.tenantId,
+			req.user!.sub,
+		);
 		return new ResponseSuccess({ data: result });
 	}
 
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })
-	async remove(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.channelService.remove(id);
+	async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+		const result = await this.channelService.remove(id, req.user!.tenantId);
 		return new ResponseSuccess({ data: result });
 	}
 }

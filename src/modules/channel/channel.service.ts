@@ -4,16 +4,20 @@ import {
 	Logger,
 	NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AuthMessages } from 'src/modules/auth/constants/messages';
 import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
 import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
-import { Not, Repository } from 'typeorm';
+import { TenantService } from 'src/modules/tenant/tenant.service';
+import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import {
 	CreateChannelDto,
 	QueryGetListChannelDto,
 	UpdateChannelDto,
 } from './dto/channel.dto';
+import { ChannelHistory } from './entities/channel-history.entity';
 import { Channel } from './entities/channel.entity';
 import { ChannelStatus } from './enum/channel.enum';
 
@@ -24,7 +28,12 @@ export class ChannelService {
 	constructor(
 		@InjectRepository(Channel)
 		private readonly channelRepo: Repository<Channel>,
+		@InjectRepository(ChannelHistory)
+		private readonly channelHistoryRepo: Repository<ChannelHistory>,
+		@InjectDataSource()
+		private readonly dataSource: DataSource,
 		private readonly vevoService: VevoService,
+		private readonly tenantService: TenantService,
 	) {}
 
 	async create(dto: CreateChannelDto) {
@@ -65,8 +74,11 @@ export class ChannelService {
 		return { received: true };
 	}
 
-	async getList(query: QueryGetListChannelDto) {
+	async getList(query: QueryGetListChannelDto, actorTenantId: string) {
 		const qb = this.createDetailQuery();
+		// Tenant thuong chi duoc xem channel cua chinh no va toan bo tenant con.
+		// System tenant nhan undefined de khong ap dung bo loc tenant.
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
 
 		if (query.keyword) {
 			qb.andWhere('channel.name ILIKE :keyword', {
@@ -75,9 +87,12 @@ export class ChannelService {
 		}
 
 		if (query.tenantId) {
+			this.ensureTenantAccessible(query.tenantId, tenantIds);
 			qb.andWhere('channel.tenantId = :tenantId', {
 				tenantId: query.tenantId,
 			});
+		} else if (tenantIds) {
+			qb.andWhere('channel.tenantId IN (:...tenantIds)', { tenantIds });
 		}
 
 		qb.orderBy(`channel.${query.fieldOrder || 'name'}`, query.orderBy)
@@ -96,43 +111,108 @@ export class ChannelService {
 		});
 	}
 
-	async getListSimple(query: QueryGetListChannelDto) {
+	async getListSimple(query: QueryGetListChannelDto, actorTenantId: string) {
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		if (query.tenantId) {
+			this.ensureTenantAccessible(query.tenantId, tenantIds);
+		}
+
 		return this.channelRepo.find({
 			select: {
 				id: true,
 				name: true,
 			},
-			where: query.tenantId ? { tenantId: query.tenantId } : undefined,
+			where: query.tenantId
+				? { tenantId: query.tenantId }
+				: tenantIds
+					? { tenantId: In(tenantIds) }
+					: undefined,
 			order: { name: 'ASC' },
 		});
 	}
 
-	async findOne(id: string) {
+	async findOne(id: string, actorTenantId?: string) {
 		const channel = await this.createDetailQuery()
 			.where('channel.id = :id', { id })
 			.getOne();
 		if (!channel) throw new NotFoundException('Channel not found');
+		if (actorTenantId) {
+			const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+			this.ensureTenantAccessible(channel.tenantId, tenantIds);
+		}
 		return channel;
 	}
 
-	async update(id: string, dto: UpdateChannelDto) {
-		const channel = await this.findOne(id);
+	async update(
+		id: string,
+		dto: UpdateChannelDto,
+		actorTenantId: string,
+		userId: string,
+	) {
+		// Kiem tra channel hien tai nam trong cay tenant ma nguoi dung quan ly.
+		const channel = await this.findOne(id, actorTenantId);
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		if (dto.tenantId !== undefined) {
+			// Khong cho chuyen channel ra ngoai nhanh tenant hien tai.
+			this.ensureTenantAccessible(dto.tenantId, tenantIds);
+		}
+
 		if (dto.name && dto.name !== channel.name) {
 			await this.ensureNameUnique(dto.name, id);
 		}
 
-		await this.channelRepo.update(id, {
-			...(dto.name !== undefined ? { name: dto.name } : {}),
-			...(dto.tenantId !== undefined ? { tenantId: dto.tenantId } : {}),
+		const hasImportantChange =
+			(dto.name !== undefined && dto.name !== channel.name) ||
+			(dto.tenantId !== undefined && dto.tenantId !== channel.tenantId);
+
+		// Snapshot channel cu va update phai thanh cong/that bai cung nhau.
+		await this.dataSource.transaction(async (manager) => {
+			if (hasImportantChange) {
+				await manager.save(
+					ChannelHistory,
+					this.channelHistoryRepo.create({
+						userId,
+						channelId: channel.id,
+						channel,
+					}),
+				);
+			}
+
+			await manager.update(Channel, id, {
+				...(dto.name !== undefined ? { name: dto.name } : {}),
+				...(dto.tenantId !== undefined
+					? { tenantId: dto.tenantId }
+					: {}),
+			});
 		});
 
-		return this.findOne(id);
+		return this.findOne(id, actorTenantId);
 	}
 
-	async remove(id: string) {
-		const channel = await this.findOne(id);
+	async remove(id: string, actorTenantId: string) {
+		const channel = await this.findOne(id, actorTenantId);
 		await this.channelRepo.remove(channel);
 		return { success: true };
+	}
+
+	private async getAccessibleTenantIds(actorTenantId: string) {
+		// System tenant co quyen tren tat ca tenant; tenant thuong co quyen de quy
+		// tren chinh no, con, chau va cac cap ben duoi.
+		if (!checkIsNotSystemTenant(actorTenantId)) return undefined;
+		return this.tenantService.getDescendantIds(actorTenantId);
+	}
+
+	/** Dam bao tenant so huu channel nam trong pham vi actor duoc quan ly. */
+	private ensureTenantAccessible(
+		tenantId: string | null,
+		accessibleTenantIds?: string[],
+	) {
+		if (
+			accessibleTenantIds &&
+			(!tenantId || !accessibleTenantIds.includes(tenantId))
+		) {
+			throw new ResponseError(AuthMessages.FORBIDDEN);
+		}
 	}
 
 	private async ensureNameUnique(name: string, idIgnore?: string) {
