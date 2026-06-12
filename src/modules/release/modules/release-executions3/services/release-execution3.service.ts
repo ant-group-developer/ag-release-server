@@ -616,10 +616,7 @@ export class ReleaseExecution3Service {
 			}),
 			metadata:
 				targetStatus === ReleaseExecutionStepStatus.NEW
-					? {
-							...step.metadata,
-							output: null,
-						}
+					? this.resetStepMetadataForRetry(step.metadata)
 					: step.metadata,
 		});
 
@@ -635,6 +632,18 @@ export class ReleaseExecution3Service {
 				targetStatus,
 			});
 		}
+	}
+
+	private resetStepMetadataForRetry(
+		metadata: Record<string, any> | null,
+	): Record<string, any> {
+		const retryMetadata = { ...(metadata ?? {}) };
+		delete retryMetadata.scheduledAt;
+
+		return {
+			...retryMetadata,
+			output: null,
+		};
 	}
 
 	private getCompletedAtByStatus({
