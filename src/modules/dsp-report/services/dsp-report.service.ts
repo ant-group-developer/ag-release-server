@@ -63,6 +63,8 @@ export class DspReportService {
     pageSize?: number;
     keyword?: string;
     status?: string;
+    fieldOrder?: string;
+    orderBy?: string;
   }): Promise<{ items: DspsReportResponse[]; totalItems: number }> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
@@ -95,6 +97,25 @@ export class DspReportService {
     );
     const totalItems = Number(countRows[0]?.c ?? 0);
 
+    // Sorting options (default to dsp_name ASC)
+    const allowedSortFields: Record<string, string> = {
+      name: 'r.dsp_name',
+      dspName: 'r.dsp_name',
+      source: 'r.source',
+      createdAt: 'r.created_at',
+      created_at: 'r.created_at',
+      updatedAt: 'r.updated_at',
+      updated_at: 'r.updated_at',
+    };
+
+    const fieldOrder = query.fieldOrder && allowedSortFields[query.fieldOrder]
+      ? allowedSortFields[query.fieldOrder]
+      : 'r.dsp_name';
+
+    const orderBy = query.orderBy && ['ASC', 'DESC'].includes(query.orderBy.toUpperCase())
+      ? query.orderBy.toUpperCase()
+      : 'ASC';
+
     // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
       `SELECT
@@ -114,7 +135,7 @@ export class DspReportService {
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
        LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        ${whereClause}
-       ORDER BY r.created_at DESC
+       ORDER BY ${fieldOrder} ${orderBy}
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );

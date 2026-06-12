@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query, Patch, BadRequestException } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { SyncService } from '../services/sync/sync.service';
 import { FtpService } from '../services/ftp/ftp.service';
@@ -42,14 +42,15 @@ export class SyncController {
 
   @Post('ftp/sync')
   @ApiOperation({
-    summary: 'Sync a specific period from FTPS (async)',
-    description: 'Starts download+import in background. Returns a jobId. Poll GET /etl/jobs/:id.',
+    summary: 'Sync a range of periods from FTPS (async)',
+    description: 'Starts download+import for a month range in background. Returns a jobId. Poll GET /etl/jobs/:id.',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        period: { type: 'string', example: '202401', description: 'YYYYMM format' },
+        month_start: { type: 'string', example: '202401', description: 'YYYYMM format' },
+        month_end: { type: 'string', example: '202409', description: 'YYYYMM format' },
         force: { type: 'boolean', example: false, description: 'Force re-import even if already done' },
         categories: {
           type: 'array',
@@ -61,33 +62,52 @@ export class SyncController {
           example: ['sales', 'trends'],
         },
       },
-      required: ['period'],
+      required: ['month_start', 'month_end'],
     },
   })
   async syncPeriod(
     @Body() body: {
-      period: string;
+      month_start: string;
+      month_end: string;
       force?: boolean;
       categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
     },
     @User() user: any,
   ) {
+    const validatePeriod = (p: string) => {
+      if (!p || !/^\d{6}$/.test(p)) return false;
+      const month = parseInt(p.substring(4, 6), 10);
+      return month >= 1 && month <= 12;
+    };
+
+    if (!validatePeriod(body.month_start) || !validatePeriod(body.month_end)) {
+      throw new BadRequestException('month_start and month_end must be in YYYYMM format (e.g. 202401)');
+    }
+
+    if (parseInt(body.month_start, 10) > parseInt(body.month_end, 10)) {
+      throw new BadRequestException('month_start must be less than or equal to month_end');
+    }
+
+    const periods = this.getPeriodsInRange(body.month_start, body.month_end);
+
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
       params: {
-        period: body.period,
+        month_start: body.month_start,
+        month_end: body.month_end,
+        periods,
         force: body.force ?? false,
         categories: body.categories,
       },
       tenantId: user?.tenantId,
       createdBy: user?.sub,
-      progressTotal: 1,
+      progressTotal: periods.length,
     });
 
     setImmediate(() =>
-      this.runSyncPeriodJob(
+      this.runSyncRangeJob(
         job.id,
-        body.period,
+        periods,
         body.force ?? false,
         body.categories,
       ),
@@ -97,73 +117,7 @@ export class SyncController {
       data: {
         jobId: job.id,
         statusUrl: `/etl/jobs/${job.id}`,
-        message: `Sync started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
-      },
-    });
-  }
-
-  @Post('ftp/sync-all')
-  @ApiOperation({
-    summary: 'Sync ALL pending periods from FTPS (async)',
-    description:
-      'Starts sync for all un-imported periods in background. Returns a jobId.\n' +
-      'Use `startPeriod` (YYYYMM) to skip all periods before that month.',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        force: { type: 'boolean', example: false, description: 'Force re-import all' },
-        startPeriod: {
-          type: 'string',
-          example: '202401',
-          description: 'Skip periods before this month (YYYYMM).',
-        },
-        categories: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['trends', 'usage', 'sales', 'illegitimate_activity'],
-          },
-          description: 'Filter specific categories to sync',
-          example: ['sales', 'trends'],
-        },
-      },
-    },
-  })
-  async syncAll(
-    @Body() body: {
-      force?: boolean;
-      startPeriod?: string;
-      categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
-    },
-    @User() user: any,
-  ) {
-    const job = await this.importJobsService.create({
-      sourceType: ImportJobSourceType.FTP_SYNC_ALL,
-      params: {
-        force: body?.force ?? false,
-        startPeriod: body?.startPeriod ?? null,
-        categories: body?.categories,
-      },
-      tenantId: user?.tenantId,
-      createdBy: user?.sub,
-    });
-
-    setImmediate(() =>
-      this.runSyncAllJob(
-        job.id,
-        body?.force ?? false,
-        body?.startPeriod,
-        body?.categories,
-      ),
-    );
-
-    return new ResponseSuccess({
-      data: {
-        jobId: job.id,
-        statusUrl: `/etl/jobs/${job.id}`,
-        message: `Sync-all started. Poll GET /etl/jobs/${job.id} for status.`,
+        message: `Sync started for range ${body.month_start} - ${body.month_end} (${periods.length} periods). Poll GET /etl/jobs/${job.id} for status.`,
       },
     });
   }
@@ -261,6 +215,16 @@ export class SyncController {
     return new ResponseSuccess({ data: updatedConfig });
   }
 
+  @Patch('sync-config')
+  @ApiOperation({ summary: 'Patch sync configuration' })
+  async patchSyncConfig(@Body() body: UpdateSyncConfigDto) {
+    const updatedConfig = await this.syncService.setSyncConfig(body);
+    if (body.cron) {
+      await this.schedulerService.rescheduleAutoSync(body.cron);
+    }
+    return new ResponseSuccess({ data: updatedConfig });
+  }
+
   // ─────────────────────────────────────────────────────
   // Job runners — chạy nền, không throw ra ngoài
   // ─────────────────────────────────────────────────────
@@ -290,45 +254,41 @@ export class SyncController {
     }
   }
 
-  private async runSyncAllJob(
+  private async runSyncRangeJob(
     jobId: string,
+    periods: string[],
     force: boolean,
-    startPeriod?: string,
     categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
   ): Promise<void> {
     try {
       await this.importJobsService.markProcessing(jobId);
       await this.importJobsService.updateProgress(
         jobId,
-        { progressLabel: 'Listing periods...' },
-        true,
-      );
-
-      let periods = await this.ftpService.listPeriods();
-      if (startPeriod) periods = periods.filter((p) => p >= startPeriod);
-
-      await this.importJobsService.updateProgress(
-        jobId,
         {
           progressTotal: periods.length,
           progressCurrent: 0,
-          progressLabel: `Found ${periods.length} periods`,
+          progressLabel: `Starting sync for ${periods.length} period(s)...`,
         },
         true,
       );
 
       const results: unknown[] = [];
+      let totalRows = 0;
       for (let i = 0; i < periods.length; i++) {
+        const period = periods[i];
         await this.importJobsService.updateProgress(
           jobId,
-          { progressCurrent: i, progressLabel: `Syncing ${periods[i]}...` },
+          { progressCurrent: i, progressLabel: `Syncing ${period} (${i + 1}/${periods.length})...` },
           true,
         );
         try {
-          const result = await this.syncService.syncPeriod(periods[i], force, categories);
+          const result = await this.syncService.syncPeriod(period, force, categories);
           results.push(result);
+          if (result && typeof (result as any).totalRows === 'number') {
+            totalRows += (result as any).totalRows;
+          }
         } catch (err) {
-          results.push({ period: periods[i], error: err.message });
+          results.push({ period, error: err.message });
         }
       }
 
@@ -339,10 +299,34 @@ export class SyncController {
       );
       await this.importJobsService.markCompleted(jobId, {
         totalPeriods: periods.length,
+        totalRows,
         results,
       });
     } catch (err) {
       await this.importJobsService.markFailed(jobId, err);
     }
+  }
+
+  private getPeriodsInRange(start: string, end: string): string[] {
+    const periods: string[] = [];
+    let currentYear = parseInt(start.substring(0, 4), 10);
+    let currentMonth = parseInt(start.substring(4, 6), 10);
+    const endYear = parseInt(end.substring(0, 4), 10);
+    const endMonth = parseInt(end.substring(4, 6), 10);
+
+    while (
+      currentYear < endYear ||
+      (currentYear === endYear && currentMonth <= endMonth)
+    ) {
+      const monthStr = currentMonth.toString().padStart(2, '0');
+      periods.push(`${currentYear}${monthStr}`);
+
+      currentMonth++;
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+      }
+    }
+    return periods;
   }
 }

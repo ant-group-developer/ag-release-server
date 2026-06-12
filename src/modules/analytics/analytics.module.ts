@@ -8,6 +8,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 
 // Controllers
 import { TimelineAnalyticsController } from './controllers/global-timeline-analytics.controller';
@@ -29,7 +30,7 @@ import { DashboardAnalyticsService } from './services/dashboard-analytics.servic
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp]),
+    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp, Tenant]),
   ],
   controllers: [
     TimelineAnalyticsController,

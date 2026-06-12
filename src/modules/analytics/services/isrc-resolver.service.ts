@@ -6,6 +6,7 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import {
   TrackMetadata,
   IsrcArtistMapping,
@@ -29,6 +30,8 @@ export class IsrcResolverService {
     private readonly artistRepo: Repository<Artist>,
     @InjectRepository(TrackArtist)
     private readonly trackArtistRepo: Repository<TrackArtist>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
   /**
@@ -302,6 +305,66 @@ export class IsrcResolverService {
       map.set(a.id, {
         name: a.name,
         picture: pictureUrl,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin logo/ảnh đại diện cho danh sách tenantIds từ PostgreSQL
+   */
+  async getTenantMetadata(tenantIds: string[]): Promise<Map<string, { name: string; title: string; logo: string | null }>> {
+    if (!tenantIds.length) return new Map();
+    const tenants = await this.tenantRepo.find({
+      where: { id: In(tenantIds) },
+      select: ['id', 'name', 'title', 'logo'],
+    });
+
+    const map = new Map<string, { name: string; title: string; logo: string | null }>();
+    for (const t of tenants) {
+      map.set(t.id, {
+        name: t.name,
+        title: t.title || t.name,
+        logo: t.logo || null,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin chi tiết cho danh sách releaseIds từ PostgreSQL (cho Top Releases)
+   */
+  async getReleaseMetadata(
+    releaseIds: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        title: string;
+        upc: string | null;
+        labelId: string | null;
+        labelName: string | null;
+        trackCount: number;
+        coverArtThumbnails: ICoverArtThumbnails;
+      }
+    >
+  > {
+    const map = new Map<string, any>();
+    if (!releaseIds.length) return map;
+
+    const releases = await this.releaseRepo.find({
+      where: { id: In(releaseIds) },
+      relations: ['label', 'tracks', 'releaseCoverArts'],
+    });
+
+    for (const r of releases) {
+      map.set(r.id, {
+        title: r.title,
+        upc: r.upc,
+        labelId: r.labelId,
+        labelName: r.label?.name || null,
+        trackCount: r.tracks?.length ?? 0,
+        coverArtThumbnails: getCoverArtThumbnails(r.releaseCoverArts),
       });
     }
     return map;

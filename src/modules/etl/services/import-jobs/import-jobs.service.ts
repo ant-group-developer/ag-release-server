@@ -118,6 +118,36 @@ export class ImportJobsService implements OnModuleInit {
     job.result = result;
     job.finishedAt = nowDt64();
     job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
+    job.progressLabel = 'Done';
+    job.progressCurrent = job.progressTotal;
+
+    if (result) {
+      const rowsCount = typeof result.totalProcessedRows === 'number'
+        ? result.totalProcessedRows
+        : typeof result.totalRows === 'number'
+        ? result.totalRows
+        : undefined;
+
+      if (rowsCount !== undefined) {
+        if (job.totalRows === 0) job.totalRows = rowsCount;
+        if (job.processedRows === 0) job.processedRows = rowsCount;
+      }
+
+      if (typeof result.processedRows === 'number') {
+        job.processedRows = result.processedRows;
+      }
+      if (typeof result.skippedRows === 'number') {
+        job.skippedRows = result.skippedRows;
+      }
+      if (typeof result.errorRows === 'number') {
+        job.errorRows = result.errorRows;
+      }
+    }
+
+    if (job.totalRows === 0 && job.processedRows > 0) {
+      job.totalRows = job.processedRows;
+    }
+
     await this.persist(job);
     this.cleanup(id);
     this.logger.log(`Job ${id} COMPLETED in ${job.durationMs}ms`);
@@ -129,6 +159,7 @@ export class ImportJobsService implements OnModuleInit {
     job.errorMessage = error instanceof Error ? error.message : String(error);
     job.finishedAt = nowDt64();
     job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
+    job.progressLabel = 'Failed';
     await this.persist(job);
     this.cleanup(id);
     this.logger.error(`Job ${id} FAILED: ${job.errorMessage}`);
@@ -139,6 +170,87 @@ export class ImportJobsService implements OnModuleInit {
     if (!job) return;
     job.batchId = batchId;
     await this.persist(job);
+  }
+
+  async backfillRowCountsFromResults(): Promise<{ updatedCount: number }> {
+    const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE (total_rows = 0 OR processed_rows = 0 OR progress_label != 'Done' OR progress_current != progress_total)
+        AND status = 'COMPLETED'
+    `;
+    const rows = await this.clickHouseService.query<ImportJobRow>(sql);
+    if (!rows.length) {
+      return { updatedCount: 0 };
+    }
+
+    const updatedRows: ImportJobRow[] = [];
+    const now = nowDt64();
+
+    for (const r of rows) {
+      const job = rowToDomain(r);
+      let modified = false;
+
+      if (job.progressLabel !== 'Done') {
+        job.progressLabel = 'Done';
+        modified = true;
+      }
+      if (job.progressCurrent !== job.progressTotal) {
+        job.progressCurrent = job.progressTotal;
+        modified = true;
+      }
+
+      const result = job.result;
+      if (result) {
+        const rowsCount = typeof result.totalProcessedRows === 'number'
+          ? result.totalProcessedRows
+          : typeof result.totalRows === 'number'
+          ? result.totalRows
+          : undefined;
+
+        if (rowsCount !== undefined) {
+          if (job.totalRows === 0) {
+            job.totalRows = rowsCount;
+            modified = true;
+          }
+          if (job.processedRows === 0) {
+            job.processedRows = rowsCount;
+            modified = true;
+          }
+        }
+
+        if (typeof result.processedRows === 'number' && job.processedRows === 0) {
+          job.processedRows = result.processedRows;
+          modified = true;
+        }
+        if (typeof result.skippedRows === 'number' && job.skippedRows === 0) {
+          job.skippedRows = result.skippedRows;
+          modified = true;
+        }
+        if (typeof result.errorRows === 'number' && job.errorRows === 0) {
+          job.errorRows = result.errorRows;
+          modified = true;
+        }
+      }
+
+      if (job.totalRows === 0 && job.processedRows > 0) {
+        job.totalRows = job.processedRows;
+        modified = true;
+      }
+
+      if (modified) {
+        job.updatedAt = now;
+        updatedRows.push(domainToRow(job));
+      }
+    }
+
+    if (updatedRows.length > 0) {
+      await this.clickHouseService.insert(
+        CLICKHOUSE_TABLES.IMPORT_JOBS,
+        updatedRows as unknown as Record<string, unknown>[],
+      );
+    }
+
+    return { updatedCount: updatedRows.length };
   }
 
   /**
@@ -454,4 +566,106 @@ function safeJsonParse(s: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+export function computeProgressDetail(job: ImportJob) {
+  const status = job.status;
+  const progressCurrent = job.progressCurrent;
+  const progressTotal = job.progressTotal;
+  const progressLabel = job.progressLabel || '';
+
+  // Get file list from params or filename
+  let files: Array<{ path: string }> = [];
+  if (job.params && Array.isArray(job.params.files)) {
+    files = job.params.files;
+  } else if (job.fileName) {
+    files = job.fileName.split(', ').map(f => ({ path: f.trim() })).filter(f => f.path);
+  }
+
+  const fileStatuses: Array<{ name: string; status: 'pending' | 'processing' | 'done' | 'failed' }> = [];
+  let currentFile: string | null = null;
+  let stage = 'pending';
+
+  if (status === 'COMPLETED') {
+    stage = 'completed';
+    for (const f of files) {
+      fileStatuses.push({ name: f.path, status: 'done' });
+    }
+  } else if (status === 'FAILED') {
+    stage = 'failed';
+    const failIdx = progressCurrent;
+    for (let idx = 0; idx < files.length; idx++) {
+      if (idx < failIdx) {
+        fileStatuses.push({ name: files[idx].path, status: 'done' });
+      } else if (idx === failIdx) {
+        fileStatuses.push({ name: files[idx].path, status: 'failed' });
+        currentFile = files[idx].path;
+      } else {
+        fileStatuses.push({ name: files[idx].path, status: 'pending' });
+      }
+    }
+  } else {
+    // PENDING or PROCESSING
+    if (progressLabel.startsWith('Downloading:')) {
+      stage = 'downloading';
+      const activeIdx = progressCurrent;
+      for (let idx = 0; idx < files.length; idx++) {
+        if (idx < activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'done' });
+        } else if (idx === activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'processing' });
+          currentFile = files[idx].path;
+        } else {
+          fileStatuses.push({ name: files[idx].path, status: 'pending' });
+        }
+      }
+    } else if (progressLabel.startsWith('Importing:')) {
+      stage = 'importing';
+      const activeIdx = progressCurrent;
+      for (let idx = 0; idx < files.length; idx++) {
+        if (idx < activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'done' });
+        } else if (idx === activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'processing' });
+          currentFile = files[idx].path;
+        } else {
+          fileStatuses.push({ name: files[idx].path, status: 'pending' });
+        }
+      }
+    } else if (progressLabel.includes('PostgreSQL')) {
+      stage = 'metadata_sync';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'done' });
+      }
+    } else if (progressLabel.includes('exchange rates')) {
+      stage = 'exchange_rate_sync';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'done' });
+      }
+    } else if (progressLabel.includes('Cubes')) {
+      stage = 'rebuilding_cubes';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'done' });
+      }
+    } else {
+      stage = 'processing';
+      const activeIdx = progressCurrent;
+      for (let idx = 0; idx < files.length; idx++) {
+        if (idx < activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'done' });
+        } else if (idx === activeIdx) {
+          fileStatuses.push({ name: files[idx].path, status: 'processing' });
+          currentFile = files[idx].path;
+        } else {
+          fileStatuses.push({ name: files[idx].path, status: 'pending' });
+        }
+      }
+    }
+  }
+
+  return {
+    currentFile,
+    status: stage,
+    files: fileStatuses,
+  };
 }
