@@ -7,6 +7,7 @@ import { ImportJobSourceType } from '../interfaces';
 import { User } from '../../../common/decorators/req.decorators';
 import { SchedulerService } from '../services/scheduler/scheduler.service';
 import { UpdateSyncConfigDto } from '../dto/sync-config.dto';
+import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -23,7 +24,8 @@ export class SyncController {
   @Get('ftp/test')
   @ApiOperation({ summary: 'Test FTPS connection' })
   async testFtpConnection() {
-    return this.ftpService.testConnection();
+    const result = await this.ftpService.testConnection();
+    return new ResponseSuccess({ data: result });
   }
 
   @Get('ftp/periods')
@@ -32,7 +34,8 @@ export class SyncController {
     description: 'Lists all YYYYMM folders found in trends/ and usage/ on the FTPS server',
   })
   async listFtpPeriods() {
-    return this.ftpService.listPeriods();
+    const result = await this.ftpService.listPeriods();
+    return new ResponseSuccess({ data: result });
   }
 
   // ── FTP: Async Sync (returns job ID) ──────────────────
@@ -90,11 +93,13 @@ export class SyncController {
       ),
     );
 
-    return {
-      jobId: job.id,
-      statusUrl: `/etl/jobs/${job.id}`,
-      message: `Sync started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
-    };
+    return new ResponseSuccess({
+      data: {
+        jobId: job.id,
+        statusUrl: `/etl/jobs/${job.id}`,
+        message: `Sync started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
+      },
+    });
   }
 
   @Post('ftp/sync-all')
@@ -154,11 +159,13 @@ export class SyncController {
       ),
     );
 
-    return {
-      jobId: job.id,
-      statusUrl: `/etl/jobs/${job.id}`,
-      message: `Sync-all started. Poll GET /etl/jobs/${job.id} for status.`,
-    };
+    return new ResponseSuccess({
+      data: {
+        jobId: job.id,
+        statusUrl: `/etl/jobs/${job.id}`,
+        message: `Sync-all started. Poll GET /etl/jobs/${job.id} for status.`,
+      },
+    });
   }
 
   @Post('ftp/retry')
@@ -203,11 +210,13 @@ export class SyncController {
       this.runSyncPeriodJob(job.id, body.period, true, body.categories),
     );
 
-    return {
-      jobId: job.id,
-      statusUrl: `/etl/jobs/${job.id}`,
-      message: `Retry started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
-    };
+    return new ResponseSuccess({
+      data: {
+        jobId: job.id,
+        statusUrl: `/etl/jobs/${job.id}`,
+        message: `Retry started for period ${body.period}. Poll GET /etl/jobs/${job.id} for status.`,
+      },
+    });
   }
 
   // ── FTP: Status & History ─────────────────────────────
@@ -218,7 +227,8 @@ export class SyncController {
     description: 'Shows which periods/DSP folders are imported, pending, or errored',
   })
   async getStatus() {
-    return this.syncService.getStatus();
+    const result = await this.syncService.getStatus();
+    return new ResponseSuccess({ data: result });
   }
 
   @Get('ftp/history')
@@ -228,7 +238,8 @@ export class SyncController {
   })
   @ApiQuery({ name: 'period', required: false, description: 'Filter by period (YYYYMM)' })
   async getHistory(@Query('period') period?: string) {
-    return this.syncService.getImportHistory(period);
+    const result = await this.syncService.getImportHistory(period);
+    return new ResponseSuccess({ data: result });
   }
 
   // ── Sync Config ───────────────────────────────────────
@@ -236,7 +247,8 @@ export class SyncController {
   @Get('sync-config')
   @ApiOperation({ summary: 'Get current sync configuration' })
   async getSyncConfig() {
-    return this.syncService.getSyncConfig();
+    const result = await this.syncService.getSyncConfig();
+    return new ResponseSuccess({ data: result });
   }
 
   @Put('sync-config')
@@ -246,7 +258,7 @@ export class SyncController {
     if (body.cron) {
       await this.schedulerService.rescheduleAutoSync(body.cron);
     }
-    return updatedConfig;
+    return new ResponseSuccess({ data: updatedConfig });
   }
 
   // ─────────────────────────────────────────────────────
