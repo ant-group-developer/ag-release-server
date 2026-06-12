@@ -28,6 +28,7 @@ export interface ReportImportStatusResponse {
     current: number;
     total: number;
     label: string;
+    detail?: any;
   };
   rows: {
     total: number;

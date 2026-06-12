@@ -11,6 +11,7 @@ import {
 	OneToMany,
 } from 'typeorm';
 import { ChannelStatus } from '../enum/channel.enum';
+import { ChannelHistory } from './channel-history.entity';
 
 @Entity('channels', {
 	comment: 'Danh muc channel dung cho video distribution',
@@ -41,6 +42,22 @@ export class Channel extends BaseUUIDEntity {
 	error: string | null;
 
 	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'YouTube channel ID returned by Vevo',
+	})
+	youtubeChannelId: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 500,
+		nullable: true,
+		comment: 'Public thumbnail URL cua channel',
+	})
+	thumbUrl: string | null;
+
+	@Column({
 		type: 'uuid',
 		nullable: true,
 		comment: 'ID tenant so huu channel',
@@ -53,4 +70,7 @@ export class Channel extends BaseUUIDEntity {
 
 	@OneToMany(() => Video, (video) => video.channel)
 	videos: Video[];
+
+	@OneToMany(() => ChannelHistory, (history) => history.channelEntity)
+	histories: ChannelHistory[];
 }

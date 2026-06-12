@@ -10,6 +10,17 @@ import { ImportService } from '../import/import.service';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
+import { UpdateSyncConfigDto } from '../../dto/sync-config.dto';
+
+export interface SyncConfig {
+  mode: string;
+  cron: string;
+  startPeriod?: string;
+  categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>;
+  force: boolean;
+  excludeEnabled: boolean;
+  maxRetries?: number;
+}
 
 export interface SyncPeriodResult {
   period: string;
@@ -225,11 +236,18 @@ export class SyncService {
    */
   async syncPeriod(
     period: string,
-    force = false,
+    force?: boolean,
     categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
   ): Promise<SyncPeriodResult> {
-    const startTime = Date.now();
+    const config = await this.getSyncConfig();
+    const resolvedForce = force ?? config.force;
+    const resolvedCategories = categories && categories.length > 0
+      ? categories
+      : (config.categories || ['trends', 'usage', 'sales', 'illegitimate_activity']);
+
     const batchId = uuidv4();
+    const startTime = Date.now();
+    this.logger.log(`Starting FTPS period sync for ${period}, batch ${batchId}`);
 
     // Clear UUID lookup cache for this sync batch
     this.dspIdCache.clear();
@@ -237,7 +255,7 @@ export class SyncService {
     // Get detailed import history (includes files_list for change detection)
     const importedDetails = await this.getImportedDetails();
 
-    this.logger.log(`Syncing period ${period} (force=${force}, categories=${categories?.join(',') || 'all'}), batch ${batchId}`);
+    this.logger.log(`Syncing period ${period} (force=${resolvedForce}, categories=${resolvedCategories.join(',')}), batch ${batchId}`);
 
     const result: SyncPeriodResult = {
       period,
@@ -247,9 +265,7 @@ export class SyncService {
       durationMs: 0,
     };
 
-    const categoriesToSync = categories && categories.length > 0
-      ? categories
-      : (['trends', 'usage', 'sales', 'illegitimate_activity'] as const);
+    const categoriesToSync = resolvedCategories;
 
     for (const category of categoriesToSync) {
       const rawFolders = await this.ftpService.listDspFolders(category, period);
@@ -280,7 +296,7 @@ export class SyncService {
 
         // ── Change detection: compare file lists ──
         if (existing && existing.status === 'done') {
-          if (force) {
+          if (resolvedForce) {
             // Delete old data for this specific folder before re-import
             await this.deleteFolderData(period, category, dspFolder);
           } else {
@@ -469,12 +485,26 @@ export class SyncService {
    * Sync ALL periods from FTPS.
    * Each period is checked for new files — no data is missed even for "done" periods.
    */
-  async syncAll(force = false): Promise<SyncPeriodResult[]> {
+  async syncAll(
+    force?: boolean,
+    categories?: Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>,
+  ): Promise<SyncPeriodResult[]> {
+    const config = await this.getSyncConfig();
     const periods = await this.ftpService.listPeriods();
-    const results: SyncPeriodResult[] = [];
 
-    for (const period of periods) {
-      const result = await this.syncPeriod(period, force);
+    let filteredPeriods = periods;
+    const startPeriod = config.startPeriod;
+    if (startPeriod) {
+      filteredPeriods = periods.filter((p) => p >= startPeriod);
+      this.logger.log(`Filtering periods starting from ${startPeriod}. Remaining periods: ${filteredPeriods.join(', ')}`);
+    }
+
+    const results: SyncPeriodResult[] = [];
+    const resolvedForce = force ?? config.force;
+    const resolvedCategories = categories && categories.length > 0 ? categories : config.categories;
+
+    for (const period of filteredPeriods) {
+      const result = await this.syncPeriod(period, resolvedForce, resolvedCategories);
       results.push(result);
     }
 
@@ -535,8 +565,16 @@ export class SyncService {
 
   // ── Config management ─────────────────────────────────
 
-  async getSyncConfig(): Promise<{ mode: string; cron: string }> {
-    const sql = `SELECT key, value FROM etl_config FINAL WHERE key IN ('sync_mode', 'sync_cron')`;
+  async getSyncConfig(): Promise<SyncConfig> {
+    const sql = `SELECT key, value FROM etl_config FINAL WHERE key IN (
+      'sync_mode',
+      'sync_cron',
+      'sync_start_period',
+      'sync_categories',
+      'sync_force',
+      'sync_exclude_enabled',
+      'sync_max_retries'
+    )`;
     const rows = await this.clickHouseService.query<{ key: string; value: string }>(sql);
 
     const config: Record<string, string> = {};
@@ -544,25 +582,52 @@ export class SyncService {
       config[r.key] = r.value;
     }
 
+    const categoriesRaw = config.sync_categories || '';
+    const categories = categoriesRaw
+      ? (categoriesRaw.split(',').filter(Boolean) as Array<'trends' | 'usage' | 'sales' | 'illegitimate_activity'>)
+      : undefined;
+
     return {
       mode: config.sync_mode || process.env.FTP_SYNC_MODE || 'manual',
       cron: config.sync_cron || process.env.FTP_SYNC_CRON || '0 2 * * *',
+      startPeriod: config.sync_start_period || undefined,
+      categories,
+      force: config.sync_force === 'true',
+      excludeEnabled: config.sync_exclude_enabled !== 'false',
+      maxRetries: config.sync_max_retries ? parseInt(config.sync_max_retries, 10) : undefined,
     };
   }
 
-  async setSyncConfig(mode: string, cron?: string): Promise<{ mode: string; cron: string }> {
+  async setSyncConfig(dto: UpdateSyncConfigDto): Promise<SyncConfig> {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const rows: Array<Record<string, unknown>> = [];
 
-    const rows: Array<Record<string, unknown>> = [
-      { key: 'sync_mode', value: mode, updated_at: now },
-    ];
-
-    if (cron) {
-      rows.push({ key: 'sync_cron', value: cron, updated_at: now });
+    if (dto.mode !== undefined) {
+      rows.push({ key: 'sync_mode', value: dto.mode, updated_at: now });
+    }
+    if (dto.cron !== undefined) {
+      rows.push({ key: 'sync_cron', value: dto.cron, updated_at: now });
+    }
+    if (dto.startPeriod !== undefined) {
+      rows.push({ key: 'sync_start_period', value: dto.startPeriod, updated_at: now });
+    }
+    if (dto.categories !== undefined) {
+      rows.push({ key: 'sync_categories', value: dto.categories.join(','), updated_at: now });
+    }
+    if (dto.force !== undefined) {
+      rows.push({ key: 'sync_force', value: dto.force ? 'true' : 'false', updated_at: now });
+    }
+    if (dto.excludeEnabled !== undefined) {
+      rows.push({ key: 'sync_exclude_enabled', value: dto.excludeEnabled ? 'true' : 'false', updated_at: now });
+    }
+    if (dto.maxRetries !== undefined) {
+      rows.push({ key: 'sync_max_retries', value: String(dto.maxRetries), updated_at: now });
     }
 
-    await this.clickHouseService.insert('etl_config', rows);
-    this.logger.log(`Sync config updated: mode=${mode}, cron=${cron || '(unchanged)'}`);
+    if (rows.length > 0) {
+      await this.clickHouseService.insert('etl_config', rows);
+      this.logger.log(`Sync config updated: ${JSON.stringify(dto)}`);
+    }
 
     return this.getSyncConfig();
   }

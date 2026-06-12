@@ -38,7 +38,7 @@ export class CubeRebuildService {
               sum(f.quantity) AS total_quantity,
               sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-          LEFT JOIN music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
+          LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
@@ -55,7 +55,7 @@ export class CubeRebuildService {
               sum(f.quantity) AS total_quantity,
               sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-          LEFT JOIN music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
+          LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
@@ -179,7 +179,7 @@ export class CubeRebuildService {
           sum(f.quantity) AS total_quantity,
           sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-      LEFT JOIN music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
       GROUP BY period, f.dsp_id, f.isrc
@@ -194,7 +194,7 @@ export class CubeRebuildService {
           sum(f.quantity) AS total_quantity,
           sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
-      LEFT JOIN music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} er
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
       GROUP BY period, f.territory_code, f.isrc

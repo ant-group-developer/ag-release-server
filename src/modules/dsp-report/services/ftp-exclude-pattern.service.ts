@@ -9,7 +9,7 @@ export interface ExcludePatternRecord {
   id: string;
   pattern: string;
   patternType: string;
-  scope: string;
+  scope: string[];
   isActive: number;
   description: string;
   isDeleted: number;
@@ -23,11 +23,17 @@ type CompiledMatcher = {
 };
 
 function mapRow(row: any): ExcludePatternRecord {
+  let scopeArr: string[] = [];
+  if (Array.isArray(row.scope)) {
+    scopeArr = row.scope;
+  } else if (typeof row.scope === 'string') {
+    scopeArr = row.scope.split(',').map((s: string) => s.trim()).filter(Boolean);
+  }
   return {
     id: row.id,
     pattern: row.pattern,
     patternType: row.pattern_type,
-    scope: row.scope,
+    scope: scopeArr,
     isActive: Number(row.is_active),
     description: row.description ?? '',
     isDeleted: Number(row.is_deleted),
@@ -42,6 +48,7 @@ export class ExcludePatternService {
 
   /** In-memory cache, cleared on any write */
   private cachedMatchers: CompiledMatcher[] | null = null;
+  private excludeEnabledCache: boolean | null = null;
   private cacheLoadedAt = 0;
   private readonly CACHE_TTL_MS = 30_000;
 
@@ -50,7 +57,7 @@ export class ExcludePatternService {
   // ── CRUD ───────────────────────────────────────────────
 
   async findAll(query: QueryExcludePatternDto): Promise<PageDto<ExcludePatternRecord>> {
-    const { page, pageSize, keyword, scope, patternType, isActive } = query;
+    const { page, pageSize, keyword, patternType, isActive, scope } = query;
     const offset = (page - 1) * pageSize;
     const conditions: string[] = ['is_deleted = 0'];
     const params: Record<string, unknown> = {};
@@ -59,10 +66,6 @@ export class ExcludePatternService {
       conditions.push('(lower(pattern) LIKE {kw:String} OR lower(description) LIKE {kw:String})');
       params.kw = `%${keyword.toLowerCase()}%`;
     }
-    if (scope) {
-      conditions.push('scope = {scope:String}');
-      params.scope = scope;
-    }
     if (patternType) {
       conditions.push('pattern_type = {patternType:String}');
       params.patternType = patternType;
@@ -70,6 +73,10 @@ export class ExcludePatternService {
     if (isActive !== undefined) {
       conditions.push('is_active = {isActive:UInt8}');
       params.isActive = isActive;
+    }
+    if (scope && scope.length > 0) {
+      conditions.push('hasAll(splitByChar(\',\', scope), {scopeArr:Array(String)})');
+      params.scopeArr = scope;
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
@@ -112,7 +119,7 @@ export class ExcludePatternService {
       id: uuidv4(),
       pattern: dto.pattern,
       pattern_type: dto.patternType,
-      scope: dto.scope,
+      scope: (dto.scope ?? []).join(','),
       is_active: dto.isActive !== false ? 1 : 0,
       description: dto.description ?? '',
       is_deleted: 0,
@@ -122,7 +129,7 @@ export class ExcludePatternService {
 
     await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_EXCLUDE_PATTERNS, [record]);
     this.clearCache();
-    this.logger.log(`Created exclude pattern: ${record.id} — ${dto.patternType}:"${dto.pattern}" scope=${dto.scope}`);
+    this.logger.log(`Created exclude pattern: ${record.id} — ${dto.patternType}:"${dto.pattern}" scope=${record.scope}`);
 
     return mapRow({ ...record, is_active: record.is_active, is_deleted: 0 });
   }
@@ -135,6 +142,7 @@ export class ExcludePatternService {
 
     const newPatternType = dto.patternType ?? existing.patternType;
     const newPattern = dto.pattern ?? existing.pattern;
+    const newScope = dto.scope !== undefined ? dto.scope.join(',') : existing.scope.join(',');
     if (newPatternType === 'regex') {
       this.validateRegex(newPattern);
     }
@@ -144,7 +152,7 @@ export class ExcludePatternService {
       id,
       pattern: newPattern,
       pattern_type: newPatternType,
-      scope: dto.scope ?? existing.scope,
+      scope: newScope,
       is_active: dto.isActive !== undefined ? (dto.isActive ? 1 : 0) : existing.isActive,
       description: dto.description !== undefined ? dto.description : existing.description,
       is_deleted: 0,
@@ -171,7 +179,7 @@ export class ExcludePatternService {
       id,
       pattern: existing.pattern,
       pattern_type: existing.patternType,
-      scope: existing.scope,
+      scope: existing.scope.join(','),
       is_active: existing.isActive,
       description: existing.description,
       is_deleted: 1,
@@ -184,14 +192,22 @@ export class ExcludePatternService {
 
   // ── Matching ───────────────────────────────────────────
 
-  /**
-   * Kiểm tra tên folder/file có bị exclude không.
-   * kind: 'folder' | 'file'
-   */
   async shouldExclude(name: string, kind: 'folder' | 'file'): Promise<boolean> {
+    const now = Date.now();
+    if (this.excludeEnabledCache === null || now - this.cacheLoadedAt >= this.CACHE_TTL_MS) {
+      const configRows = await this.clickHouseService.query<{ value: string }>(
+        `SELECT value FROM etl_config FINAL WHERE key = 'sync_exclude_enabled' LIMIT 1`
+      );
+      this.excludeEnabledCache = configRows.length > 0 ? configRows[0].value !== 'false' : true;
+    }
+    if (!this.excludeEnabledCache) {
+      return false;
+    }
+
     const matchers = await this.getCompiledMatchers();
     for (const m of matchers) {
-      if (m.scope !== kind && m.scope !== 'both') continue;
+      const scopes = m.scope.split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (!scopes.includes(kind)) continue;
       if (m.match(name)) return true;
     }
     return false;
@@ -239,6 +255,7 @@ export class ExcludePatternService {
 
   clearCache(): void {
     this.cachedMatchers = null;
+    this.excludeEnabledCache = null;
     this.cacheLoadedAt = 0;
   }
 

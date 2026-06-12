@@ -1,23 +1,71 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
 import { SyncService } from '../sync/sync.service';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
 import { ImportJobSourceType } from '../../interfaces';
 
 @Injectable()
-export class SchedulerService {
+export class SchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SchedulerService.name);
 
   constructor(
     private readonly syncService: SyncService,
     private readonly importJobsService: ImportJobsService,
+    private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const config = await this.syncService.getSyncConfig();
+      if (config.cron) {
+        this.logger.log(`Initializing auto-sync schedule with cron: ${config.cron}`);
+        await this.rescheduleAutoSync(config.cron);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to initialize auto-sync cron: ${err.message}`, err.stack);
+    }
+  }
+
+  /**
+   * Reschedule the auto-sync cron job dynamically.
+   */
+  async rescheduleAutoSync(cronExpr: string): Promise<void> {
+    const jobName = 'ftp-auto-sync';
+    try {
+      const jobs = this.schedulerRegistry.getCronJobs();
+      if (jobs.has(jobName)) {
+        this.schedulerRegistry.deleteCronJob(jobName);
+        this.logger.log(`Deleted existing cron job: ${jobName}`);
+      }
+
+      const newJob = new CronJob(
+        cronExpr,
+        () => {
+          this.logger.log(`Executing scheduled auto-sync task...`);
+          this.handleAutoSync().catch((err) => {
+            this.logger.error(`Scheduled auto-sync run failed: ${err.message}`, err.stack);
+          });
+        },
+        null,
+        false,
+        'Asia/Ho_Chi_Minh',
+      );
+
+      this.schedulerRegistry.addCronJob(jobName, newJob);
+      newJob.start();
+      this.logger.log(`Rescheduled cron job [${jobName}] to: ${cronExpr}`);
+    } catch (err) {
+      this.logger.error(
+        `Failed to reschedule cron job [${jobName}] with expression "${cronExpr}": ${err.message}`,
+      );
+    }
+  }
 
   /**
    * Auto-sync cron job. Runs daily at 2:00 AM by default.
    * Only executes if sync_mode is 'auto'. Tạo ImportJob row để có audit log.
    */
-  @Cron('0 2 * * *', { name: 'ftp-auto-sync' })
   async handleAutoSync() {
     const config = await this.syncService.getSyncConfig();
 
@@ -30,7 +78,7 @@ export class SchedulerService {
 
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.FTP_AUTO_CRON,
-      params: { trigger: 'cron', cronExpr: '0 2 * * *' },
+      params: { trigger: 'cron', cronExpr: config.cron || '0 2 * * *' },
     });
 
     try {

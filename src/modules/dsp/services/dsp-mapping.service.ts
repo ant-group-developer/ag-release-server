@@ -161,7 +161,7 @@ export class DspMappingService implements OnModuleInit {
   async getPgDspsSyncByUuid(pgUuid: string): Promise<Record<string, unknown> | null> {
     const rows = await this.clickHouseService.query(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        WHERE pg_uuid = {uuid: String}`,
       { uuid: pgUuid }
     );
@@ -174,7 +174,7 @@ export class DspMappingService implements OnModuleInit {
   async getAllPgDspsSync(): Promise<Record<string, unknown>[]> {
     return this.clickHouseService.query(
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC}
+       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        ORDER BY dsp_name ASC`
     );
   }
@@ -184,7 +184,7 @@ export class DspMappingService implements OnModuleInit {
    */
   async loadCache(): Promise<void> {
     const rows = await this.clickHouseService.query<DspsReport>(
-      `SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}`
+      `SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL`
     );
     this.dspsReportCache.clear();
     for (const row of rows) {

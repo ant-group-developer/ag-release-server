@@ -230,7 +230,7 @@ export class ExchangeRateService {
 
     return this.clickHouseService.query<ExchangeRateRow>(
       `SELECT rate_month, currency, usd_to_local_rate, rate_date, is_provisional
-       FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES}
+       FROM ${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL
        ${where}
        ORDER BY rate_month DESC, currency ASC
        LIMIT 1000`,

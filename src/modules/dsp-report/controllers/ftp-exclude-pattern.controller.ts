@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess, PageDto } from 'src/common/dtos/common.response.dto';
 import { ExcludePatternService, ExcludePatternRecord } from '../services/ftp-exclude-pattern.service';
@@ -28,7 +28,7 @@ export class FtpExcludePatternController {
   @Post()
   @ApiOperation({
     summary: 'Create FTP exclude pattern',
-    description: 'Tạo pattern chặn folder/file khi sync FTP. patternType: contains (chứa chuỗi) hoặc regex. scope: folder | file | both.',
+    description: 'Tạo pattern chặn folder/file khi sync FTP. patternType: contains (chứa chuỗi) hoặc regex. scope: mảng các giá trị [\'folder\', \'file\'].',
   })
   async create(@Body() dto: CreateExcludePatternDto): Promise<ResponseSuccess<ExcludePatternRecord>> {
     const data = await this.svc.create(dto);
@@ -38,6 +38,16 @@ export class FtpExcludePatternController {
   @Put(':id')
   @ApiOperation({ summary: 'Update FTP exclude pattern' })
   async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateExcludePatternDto,
+  ): Promise<ResponseSuccess<ExcludePatternRecord>> {
+    const data = await this.svc.update(id, dto);
+    return new ResponseSuccess({ data });
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Patch FTP exclude pattern properties' })
+  async patch(
     @Param('id') id: string,
     @Body() dto: UpdateExcludePatternDto,
   ): Promise<ResponseSuccess<ExcludePatternRecord>> {

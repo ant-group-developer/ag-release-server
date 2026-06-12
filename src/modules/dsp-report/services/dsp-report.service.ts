@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
+import { DspMappingService } from 'src/modules/dsp/services/dsp-mapping.service';
 
 export interface DspsReportResponse {
   idDspsReport: string;
@@ -49,7 +50,10 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
 export class DspReportService {
   private readonly logger = new Logger(DspReportService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly dspMappingService: DspMappingService,
+  ) {}
 
   /**
    * Get paginated dsps_report records with optional filtering
@@ -59,6 +63,8 @@ export class DspReportService {
     pageSize?: number;
     keyword?: string;
     status?: string;
+    fieldOrder?: string;
+    orderBy?: string;
   }): Promise<{ items: DspsReportResponse[]; totalItems: number }> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
@@ -85,11 +91,30 @@ export class DspReportService {
     // Count query
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
        ${whereClause}`,
       params,
     );
     const totalItems = Number(countRows[0]?.c ?? 0);
+
+    // Sorting options (default to dsp_name ASC)
+    const allowedSortFields: Record<string, string> = {
+      name: 'r.dsp_name',
+      dspName: 'r.dsp_name',
+      source: 'r.source',
+      createdAt: 'r.created_at',
+      created_at: 'r.created_at',
+      updatedAt: 'r.updated_at',
+      updated_at: 'r.updated_at',
+    };
+
+    const fieldOrder = query.fieldOrder && allowedSortFields[query.fieldOrder]
+      ? allowedSortFields[query.fieldOrder]
+      : 'r.dsp_name';
+
+    const orderBy = query.orderBy && ['ASC', 'DESC'].includes(query.orderBy.toUpperCase())
+      ? query.orderBy.toUpperCase()
+      : 'ASC';
 
     // Data query with pagination
     const rows = await this.clickHouseService.query<any>(
@@ -107,10 +132,10 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        ${whereClause}
-       ORDER BY r.created_at DESC
+       ORDER BY ${fieldOrder} ${orderBy}
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );
@@ -140,8 +165,8 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        WHERE r.id_dsps_report = {id: String}`,
       { id }
     );
@@ -167,8 +192,8 @@ export class DspReportService {
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
          p.updated_at AS pg_dsps_sync_updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r
-       LEFT JOIN ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} p ON r.pg_uuid = p.pg_uuid
+       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        WHERE r.pg_uuid = {pgUuid: String}
        ORDER BY r.created_at DESC`,
       { pgUuid }
@@ -226,5 +251,17 @@ export class DspReportService {
       { id: idDspsReport }
     );
     this.logger.log(`Unassigned dsps_report ${idDspsReport}`);
+  }
+
+  /**
+   * Delete dsps_report by id
+   */
+  async delete(idDspsReport: string): Promise<void> {
+    await this.clickHouseService.query(
+      `ALTER TABLE ${CLICKHOUSE_TABLES.DSPS_REPORT} DELETE WHERE id_dsps_report = {id: String}`,
+      { id: idDspsReport }
+    );
+    this.logger.log(`Deleted dsps_report ${idDspsReport}`);
+    await this.dspMappingService.loadCache();
   }
 }

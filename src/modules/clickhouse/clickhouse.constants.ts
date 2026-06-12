@@ -16,4 +16,5 @@ export const CLICKHOUSE_TABLES = {
   IMPORT_JOBS: 'import_jobs',
   EXCHANGE_RATES: 'exchange_rates',
   FTP_EXCLUDE_PATTERNS: 'ftp_exclude_patterns',
+  METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',
 } as const;

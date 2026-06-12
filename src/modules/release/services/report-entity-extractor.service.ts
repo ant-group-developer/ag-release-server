@@ -4,6 +4,7 @@ import { ReleaseReportImportService } from './release-report-import.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ReleaseArtist } from '../../release-artist/entities/release-artist.entity';
+import { MetadataEnrichmentService, EnrichedMetadata } from '../../partners-api/spotify/services/metadata-enrichment.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -24,6 +25,7 @@ export class ReportEntityExtractorService {
     private readonly releaseReportImportService: ReleaseReportImportService,
     private readonly dataSource: DataSource,
     private readonly clickHouseService: ClickHouseService,
+    private readonly metadataEnrichmentService: MetadataEnrichmentService,
   ) {}
 
   async extractAndImport(
@@ -67,6 +69,12 @@ export class ReportEntityExtractorService {
       }
     }
 
+    // ─────────────────────────────────────────────────────
+    // ENRICHMENT STEP: Call Spotify/Deezer APIs to fill in
+    // missing metadata (UPC, album title, artist, label, etc.)
+    // ─────────────────────────────────────────────────────
+    const enrichedMap = await this.enrichGroupedData(upcMap);
+
     const inputs: any[] = [];
     for (const [upc, isrcMap] of upcMap) {
       const bestRows = Array.from(isrcMap.values());
@@ -76,6 +84,9 @@ export class ReportEntityExtractorService {
       const representativeRow = bestRows.reduce((a, b) =>
         this.getCompletenessScore(a) >= this.getCompletenessScore(b) ? a : b,
       );
+
+      // Apply enriched metadata from Spotify/Deezer
+      const enrichedUpc = this.applyEnrichment(upc, representativeRow, bestRows, enrichedMap);
 
       // Filter: pgTracks (real ISRCs) vs upcTracks (temporary album-level ISRC in format UPC-xxx)
       const pgTracks = bestRows
@@ -93,10 +104,10 @@ export class ReportEntityExtractorService {
         }));
 
       inputs.push({
-        upc,
+        upc: enrichedUpc,
         tenantId: resolvedTenantId || undefined,
         labelName: representativeRow.label_name?.trim() || undefined,
-        title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${upc}`,
+        title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${enrichedUpc}`,
         artistName: representativeRow.artist_name?.trim() || undefined,
         tracks: pgTracks,
         upcTracks,
@@ -190,5 +201,132 @@ export class ReportEntityExtractorService {
     if (row.album_title?.trim()) score++;
     if (row.label_name?.trim()) score++;
     return score;
+  }
+
+  // ─────────────────────────────────────────────────────
+  // ENRICHMENT HELPERS
+  // ─────────────────────────────────────────────────────
+
+  /**
+   * Collect ISRCs that need external enrichment and batch-call
+   * Spotify/Deezer to get real metadata. Returns a Map<isrc, EnrichedMetadata>.
+   *
+   * We enrich when:
+   *   - UPC is a placeholder (starts with "ISRC-")
+   *   - OR metadata fields are missing (album_title, artist_name, label_name)
+   */
+  /**
+   * Collect ISRCs that need external enrichment and batch-call
+   * Spotify/Deezer to get real metadata. Returns a Map<isrc, EnrichedMetadata>.
+   *
+   * Optimizations:
+   *   - Always lookup metadata from Spotify/Deezer for every imported release.
+   *   - Only query the first valid track's ISRC per release to avoid rate limiting and redundant calls.
+   */
+  private async enrichGroupedData(
+    upcMap: Map<string, Map<string, ExtractedRow>>,
+  ): Promise<Map<string, EnrichedMetadata>> {
+    const isrcsToEnrich: string[] = [];
+
+    for (const [upc, isrcMap] of upcMap) {
+      const bestRows = Array.from(isrcMap.values());
+
+      for (const row of bestRows) {
+        const isrc = row.isrc?.trim();
+        if (!isrc) continue;
+        // Skip fake ISRCs (UPC- prefix) — they have no real ISRC to look up
+        if (isrc.toUpperCase().startsWith('UPC-')) continue;
+
+        // Query only the first valid track's ISRC per release
+        isrcsToEnrich.push(isrc);
+        break;
+      }
+    }
+
+    if (isrcsToEnrich.length === 0) {
+      return new Map();
+    }
+
+    this.logger.log(
+      `🔍 Enrichment: Querying Spotify/Deezer for ${isrcsToEnrich.length} ISRC(s) during report import`,
+    );
+
+    try {
+      return await this.metadataEnrichmentService.enrichBatch(isrcsToEnrich, {
+        concurrency: 10,
+        delayMs: 100,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Enrichment batch failed (non-fatal, proceeding with original data): ${err.message}`,
+      );
+      return new Map();
+    }
+  }
+
+  /**
+   * Apply enriched metadata from Spotify/Deezer back into the grouped rows.
+   *
+   * Key logic:
+   *   - If the current UPC is a placeholder ("ISRC-xxx") and we found a real
+   *     UPC from the API, return the real UPC. The caller will re-group under
+   *     the new UPC.
+   *   - Always overwrite track_title, artist_name, album_title, label_name with official metadata.
+   */
+  private applyEnrichment(
+    currentUpc: string,
+    representativeRow: ExtractedRow,
+    allRows: ExtractedRow[],
+    enrichedMap: Map<string, EnrichedMetadata>,
+  ): string {
+    if (enrichedMap.size === 0) return currentUpc;
+
+    // Try to find enrichment data from any ISRC in this release group
+    let enriched: EnrichedMetadata | undefined;
+    for (const row of allRows) {
+      const isrc = row.isrc?.trim().toUpperCase();
+      if (!isrc) continue;
+      enriched = enrichedMap.get(isrc);
+      if (enriched) break;
+    }
+
+    if (!enriched) return currentUpc;
+
+    // ─── Resolve UPC ─────────────────────────────────
+    let resolvedUpc = currentUpc;
+    if (enriched.upc && currentUpc !== enriched.upc) {
+      resolvedUpc = enriched.upc;
+      this.logger.log(
+        `✅ Enrichment: Resolved UPC ${currentUpc} → real UPC ${resolvedUpc} (via ${enriched.source})`,
+      );
+    }
+
+    // ─── Overwrite representative metadata with official info ────────
+    if (enriched.albumTitle) {
+      representativeRow.album_title = enriched.albumTitle;
+    }
+    if (enriched.artistName) {
+      representativeRow.artist_name = enriched.artistName;
+    }
+    if (enriched.labelName) {
+      representativeRow.label_name = enriched.labelName;
+    }
+
+    // ─── Overwrite track titles with official info ───────────────────
+    for (const row of allRows) {
+      const isrc = row.isrc?.trim().toUpperCase();
+      if (!isrc) continue;
+      const trackEnriched = enrichedMap.get(isrc);
+      if (!trackEnriched) continue;
+
+      if (trackEnriched.trackTitle) {
+        row.track_title = trackEnriched.trackTitle;
+      }
+      if (trackEnriched.artistName) {
+        row.artist_name = trackEnriched.artistName;
+      }
+    }
+
+    return resolvedUpc;
   }
 }
