@@ -7,7 +7,6 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
-import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
 import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
@@ -35,7 +34,6 @@ export class ChannelService {
 		private readonly dataSource: DataSource,
 		private readonly vevoService: VevoService,
 		private readonly tenantService: TenantService,
-		private readonly bucketService: BucketService2,
 	) {}
 
 	async create(dto: CreateChannelDto) {
@@ -177,10 +175,6 @@ export class ChannelService {
 		const hasImportantChange =
 			(dto.name !== undefined && dto.name !== channel.name) ||
 			(dto.tenantId !== undefined && dto.tenantId !== channel.tenantId);
-		const oldThumbId =
-			dto.thumbId !== undefined && dto.thumbId !== channel.thumbId
-				? channel.thumbId
-				: null;
 
 		// Snapshot channel cu va update phai thanh cong/that bai cung nhau.
 		await this.dataSource.transaction(async (manager) => {
@@ -203,13 +197,11 @@ export class ChannelService {
 				...(dto.youtubeChannelId !== undefined
 					? { youtubeChannelId: dto.youtubeChannelId }
 					: {}),
-				...(dto.thumbId !== undefined ? { thumbId: dto.thumbId } : {}),
+				...(dto.thumbUrl !== undefined
+					? { thumbUrl: dto.thumbUrl }
+					: {}),
 			});
 		});
-
-		if (oldThumbId) {
-			await this.bucketService.deleteSafe(oldThumbId);
-		}
 
 		return this.findOne(id, actorTenantId);
 	}
@@ -217,9 +209,6 @@ export class ChannelService {
 	async remove(id: string, actorTenantId: string) {
 		const channel = await this.findOne(id, actorTenantId);
 		await this.channelRepo.remove(channel);
-		if (channel.thumbId) {
-			await this.bucketService.deleteSafe(channel.thumbId);
-		}
 		return { success: true };
 	}
 
@@ -260,7 +249,6 @@ export class ChannelService {
 		const qb = this.channelRepo
 			.createQueryBuilder('channel')
 			.leftJoin('channel.tenant', 'tenant')
-			.leftJoinAndSelect('channel.thumb', 'thumb')
 			.addSelect([
 				'tenant.id',
 				'tenant.name',

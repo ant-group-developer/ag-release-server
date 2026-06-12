@@ -22,7 +22,6 @@ export enum UploadPurpose {
 	RELEASE_COVER_ART = 'release_cover_art',
 	VIDEO_FILE = 'video_file',
 	VIDEO_CAPTION = 'video_caption',
-	CHANNEL_THUMB = 'channel_thumb',
 
 	// metadata
 	release_metadata_ci = 'release_metadata_ci',

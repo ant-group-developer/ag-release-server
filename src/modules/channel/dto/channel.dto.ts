@@ -3,6 +3,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUrl,
 	IsUUID,
 	Matches,
 	MaxLength,
@@ -42,12 +43,13 @@ export class CreateChannelDto {
 	youtubeChannelId?: string;
 
 	@ApiPropertyOptional({
-		format: 'uuid',
-		description: 'Thumbnail file ID in the bucket files table',
+		example: 'https://storage.googleapis.com/bucket/channel-thumb.jpg',
+		description: 'Public thumbnail URL',
 	})
 	@IsOptional()
-	@IsUUID('4')
-	thumbId?: string;
+	@IsUrl()
+	@MaxLength(500)
+	thumbUrl?: string;
 }
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
