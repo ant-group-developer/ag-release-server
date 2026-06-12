@@ -847,12 +847,11 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			await this.sftpConnectService.uploadFolder({
-				sftp: config.sftp,
-				localDir: outputDir,
-				remoteDir: config.sftp.path ?? '/',
-			});
-			// }
+			// await this.sftpConnectService.uploadFolder({
+			// 	sftp: config.sftp,
+			// 	localDir: outputDir,
+			// 	remoteDir: config.sftp.path ?? '/',
+			// });
 
 			await removeFolder(outputDir);
 
@@ -1038,7 +1037,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		// return ReleaseExecutionStepStatus.FAILED;
+		return ReleaseExecutionStepStatus.FAILED;
 		// return ReleaseExecutionStepStatus.DONE;
 
 		try {

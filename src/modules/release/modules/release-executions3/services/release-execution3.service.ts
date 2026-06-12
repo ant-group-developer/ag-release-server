@@ -129,21 +129,21 @@ export class ReleaseExecution3Service {
 
 		// xử lý từng step
 		for (const step of steps) {
-			const status = await this.engine.processStep({
+			const statusStep = await this.engine.processStep({
 				step,
 				releaseExecution: execution,
 			});
 
-			if (this.shouldStopSequential(status)) {
+			if (this.shouldStopSequential(statusStep)) {
 				await this.updateExecutionStatus({
 					execution,
-					status: this.mapStepStatusToExecutionStatus(status),
+					status: this.mapStepStatusToExecutionStatus(statusStep),
 				});
 				return;
 			}
 		}
 
-		// xử lý status sau khi các step đã xử lí
+		// xử lý status, dựa vào status của các step sau khi các step đã xử lí
 		await this.refreshExecutionStatus(execution);
 
 		// cập nhật exe.output vào release delivery dsp sau khi pipeline chạy xong
@@ -294,6 +294,7 @@ export class ReleaseExecution3Service {
 	private async refreshExecutionStatus(
 		execution: ReleaseExecution3,
 	): Promise<ReleaseExecutionStatus> {
+		// từ trạng thái của các step => status của exe
 		const status = this.deriveExecutionStatusFromSteps(execution);
 
 		await this.updateExecutionStatus({ execution, status });
@@ -321,7 +322,13 @@ export class ReleaseExecution3Service {
 			execution.completedAt = new Date();
 		}
 
-		await this.executionRepo.save(execution);
+		// Chỉ update các cột trạng thái; không dùng save(execution) vì snapshot
+		// metadata cũ có thể ghi đè output.result vừa được các step cập nhật.
+		await this.executionRepo.update(execution.id, {
+			status: execution.status,
+			completedAt: execution.completedAt,
+			...(summary !== undefined && { summary: execution.summary }),
+		});
 		await this.syncDeliveryStatusByExecutionStatus(execution, status);
 	}
 
@@ -440,6 +447,18 @@ export class ReleaseExecution3Service {
 		if (query.status) {
 			qb.andWhere('execution.status = :status', {
 				status: query.status,
+			});
+		}
+
+		if (query.startCreatedAt) {
+			qb.andWhere('execution.createdAt >= :startCreatedAt', {
+				startCreatedAt: query.startCreatedAt,
+			});
+		}
+
+		if (query.endCreatedAt) {
+			qb.andWhere('execution.createdAt <= :endCreatedAt', {
+				endCreatedAt: query.endCreatedAt,
 			});
 		}
 
