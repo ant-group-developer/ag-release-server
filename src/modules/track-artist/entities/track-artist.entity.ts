@@ -43,6 +43,13 @@ export class TrackArtist extends BaseUUIDEntity {
 	})
 	isFromTrackAction: boolean;
 
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
 	@ManyToOne(() => Artist)
 	@JoinColumn({ name: 'artist_id' })
 	artist: Artist;

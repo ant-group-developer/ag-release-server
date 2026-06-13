@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+	Controller,
+	Get,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
@@ -6,8 +13,8 @@ import { ReleaseExecution3Service } from '../services/release-execution3.service
 // import { ReleaseSubmitService } from './services/release-submit.service';
 
 @ApiTags('Release Submits')
-@Controller('release-submits')
-// @Controller('release-submits-test')
+// @Controller('release-submits')
+@Controller('release-submits-disable')
 export class ReleaseSubmitTestController {
 	constructor(
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
@@ -25,6 +32,15 @@ export class ReleaseSubmitTestController {
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.releaseExecution3Service.findOne(id);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Post(':id/start-processing')
+	async startProcessing(@Param('id') id: string) {
+		await this.releaseExecution3Service.startProcessing(id);
+
+		return new ResponseSuccess({
+			message: 'Start processing successfully',
+		});
 	}
 
 	// /** Xem steps đang chờ CRON resume của 1 submit cụ thể */

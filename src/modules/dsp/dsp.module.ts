@@ -12,6 +12,9 @@ import { Dsp } from './entities/dsp.entity';
 import { TenantDspAgreementService } from './services/dsp-tenant.service';
 import { DspQueryService } from './services/dsp.query.service';
 import { DspService } from './services/dsp.service';
+import { DspMappingService } from './services/dsp-mapping.service';
+import { DspSeedingService } from './services/dsp-seeding.service';
+import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 
 @Module({
 	imports: [
@@ -20,9 +23,10 @@ import { DspService } from './services/dsp.service';
 		DspActionModule,
 		DspRoutingConfigsModule,
 		SftpConfigsModule,
+		ClickHouseModule,
 	],
 	controllers: [DspController, TenantDspAgreementController],
-	providers: [DspService, DspQueryService, TenantDspAgreementService],
-	exports: [DspService, DspQueryService, TenantDspAgreementService],
+	providers: [DspService, DspQueryService, TenantDspAgreementService, DspMappingService, DspSeedingService],
+	exports: [DspService, DspQueryService, TenantDspAgreementService, DspMappingService, DspSeedingService],
 })
 export class DspModule {}

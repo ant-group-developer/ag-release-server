@@ -20,6 +20,8 @@ export const FolderBucketMap: Record<
 	[UploadPurpose.TRACK_AUDIO]: 'tracks',
 	[UploadPurpose.PEAK_AUDIO]: 'tracks',
 	[UploadPurpose.RELEASE_COVER_ART]: 'release_cover_art',
+	[UploadPurpose.VIDEO_FILE]: 'videos',
+	[UploadPurpose.VIDEO_CAPTION]: 'videos/captions',
 	[UploadPurpose.release_metadata_ci]: 'release_metadata_ci',
 	[UploadPurpose.release_metadata_spotify]: 'release_metadata_spotify',
 	[UploadPurpose.release_template_file]: 'release_template_file',

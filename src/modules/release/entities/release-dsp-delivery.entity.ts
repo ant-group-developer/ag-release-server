@@ -23,10 +23,9 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	@Column({
 		type: 'enum',
 		enum: ReleaseDspStatus,
-		default: ReleaseDspStatus.DRAFT,
+		default: ReleaseDspStatus.NEVER_DISTRIBUTED,
 		comment: `
 			Trạng thái phân phối release lên DSP:
-			- draft: chưa phát hành
 			- processing: đang xử lý phân phối
 			- issues: có lỗi khi phân phối
 			- never_distributed: chưa từng phân phối lần nào

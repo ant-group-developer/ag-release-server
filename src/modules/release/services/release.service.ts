@@ -27,14 +27,16 @@ import {
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
+import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
+import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
-import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
-import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
 import { enhanceReleasesDetails } from '../utils/release.utils';
 import { ReleaseDdexService } from './release-ddex.service';
+import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -61,13 +63,13 @@ export class ReleaseService {
 		// partners api
 		private readonly ciService: CiService,
 
-		@Inject(forwardRef(() => ReleaseSubmitService2))
-		private readonly releaseSubmitService2: ReleaseSubmitService2,
-
 		private readonly releaseDdexService: ReleaseDdexService,
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
+
+		@Inject(forwardRef(() => ReleaseDspDeliveryService))
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -396,7 +398,7 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
-		// return '123456789012';
+		// return '0850080651804';
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -461,8 +463,12 @@ export class ReleaseService {
 	}
 
 	async bulkSubmit(dto: BulkSubmitReleaseDto) {
+		const idsExclude = new Set(dto.idsExclude ?? []);
+
 		for (const id of dto.ids) {
-			await this.submit(id, { code: dto.codes });
+			if (idsExclude.has(id)) continue;
+
+			await this.submit3(id, { code: dto.codes });
 		}
 	}
 
@@ -475,22 +481,16 @@ export class ReleaseService {
 			releaseEndDate: null,
 		});
 
-		return this.releaseExecution3Service.submit({
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
+			releaseIds: [id],
+			items: dto.code.map((dspCode) => ({
+				dspCode,
+				status: ReleaseDspStatus.PROCESSING,
+			})),
+		});
+
+		return this.releaseExecution3Service.newReleaseExecution({
 			release,
-			dspCodes: dto.code,
-			type: ExecutionType.INITIAL_RELEASE,
-		});
-	}
-
-	async submit(id: string, dto: SubmitReleaseDto) {
-		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.SUBMITTED,
-			releaseEndDate: null,
-		});
-
-		return this.releaseSubmitService2.submit({
-			releaseId: id,
 			dspCodes: dto.code,
 			type: ExecutionType.INITIAL_RELEASE,
 		});
@@ -501,11 +501,8 @@ export class ReleaseService {
 		await this.releaseRepo.update(id, {
 			releaseEndDate: new Date(),
 		});
-		return this.releaseSubmitService2.submit({
-			releaseId: id,
-			dspCodes: dto.code,
-			type: ExecutionType.TAKEDOWN,
-		});
+
+		await this.submit3(id, dto);
 	}
 
 	// get qa flag ci
@@ -527,13 +524,89 @@ export class ReleaseService {
 	}
 
 	/** Sync lại release status từ DSP deliveries */
-	async syncReleaseStatus(releaseId: string) {
-		await this.releaseQueryService.findOne(releaseId);
-		const newStatus =
-			await this.releaseSubmitService2.deriveAndUpdateReleaseStatus(
-				releaseId,
-			);
+	async syncReleaseStatus(
+		releaseId: string,
+		dataDsp?: ReleaseExecutionResultDto[],
+	) {
+		const release = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect(
+				'release.releaseDspDeliveries',
+				'releaseDspDelivery',
+			)
+			.leftJoinAndSelect('releaseDspDelivery.dsp', 'dsp')
+			.where('release.id = :releaseId', { releaseId })
+			.getOne();
+
+		if (!release) {
+			throw new ResponseError({ message: 'Release not found' });
+		}
+
+		const newStatus = this.resolveReleaseStatusByDspDeliveries(
+			release,
+			dataDsp,
+		);
+
+		await this.releaseRepo.update(releaseId, { status: newStatus });
 		return { releaseId, status: newStatus };
+	}
+
+	private resolveReleaseStatusByDspDeliveries(
+		release: Release,
+
+		dataDsp?: ReleaseExecutionResultDto[],
+	): ReleaseStatus {
+		const statuses = dataDsp
+			? (release.releaseDspDeliveries
+					?.filter((delivery) =>
+						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
+					)
+					.map((delivery) => delivery.status) ?? [])
+			: (release.releaseDspDeliveries?.map(
+					(delivery) => delivery.status,
+				) ?? []);
+
+		if (!statuses.length) {
+			return release.status;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.PROCESSING)) {
+			return ReleaseStatus.PROCESSING;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.ISSUES)) {
+			return ReleaseStatus.FAILED;
+		}
+
+		if (
+			statuses.every((status) => status === ReleaseDspStatus.DISTRIBUTED)
+		) {
+			return ReleaseStatus.DISTRIBUTED;
+		}
+
+		if (
+			statuses.every((status) => status === ReleaseDspStatus.TAKEN_DOWN)
+		) {
+			return ReleaseStatus.TAKEN_DOWN;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.DISTRIBUTED)) {
+			return ReleaseStatus.DISTRIBUTED;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.TAKEN_DOWN)) {
+			return ReleaseStatus.TAKEN_DOWN;
+		}
+
+		if (
+			statuses.every(
+				(status) => status === ReleaseDspStatus.NEVER_DISTRIBUTED,
+			)
+		) {
+			return release.status;
+		}
+
+		return release.status;
 	}
 
 	async getReleaseXml(id: string, code: string, ernVersion?: ErnVersion2) {

@@ -3,6 +3,9 @@ import {
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
 
+export const DEFAULT_PRICE_CURRENCY_CODE = 'USD';
+export const DEFAULT_PRICE_RANGE_TYPE = 'mid';
+
 export class ReleaseSuccess {
 	static CREATE<T>(data?: T) {
 		return new ResponseSuccess<T>({

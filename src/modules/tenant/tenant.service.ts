@@ -48,6 +48,24 @@ export class TenantService {
 		}
 	}
 
+	async getDescendantIds(tenantId: string): Promise<string[]> {
+		const tenant = await this.tenantTreeRepo.findOne({
+			where: { id: tenantId },
+		});
+
+		if (!tenant) {
+			throw new ResponseError({
+				...TenantMessages.NOT_FOUND,
+				data: tenantId,
+			});
+		}
+
+		// Closure tree tra ve ca node goc, nen ket qua bao gom tenant hien tai
+		// cung tat ca con/chau theo de quy.
+		const descendants = await this.tenantTreeRepo.findDescendants(tenant);
+		return descendants.map((item) => item.id);
+	}
+
 	async findAll(
 		query: FindTenantsDto,
 		tenantId: string,

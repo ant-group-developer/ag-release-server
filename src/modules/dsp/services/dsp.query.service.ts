@@ -94,6 +94,7 @@ export class DspQueryService {
 		const {
 			keyword,
 			aggregatorCode,
+			isActive,
 
 			startCreatedAt,
 			endCreatedAt,
@@ -117,6 +118,10 @@ export class DspQueryService {
 			queryBuilder.andWhere('dsp.name ILIKE :keyword', {
 				keyword: `%${keyword}%`,
 			});
+		}
+
+		if (isActive !== undefined) {
+			queryBuilder.andWhere('dsp.isActive = :isActive', { isActive });
 		}
 
 		if (startCreatedAt && endCreatedAt) {

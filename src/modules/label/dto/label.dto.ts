@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -78,4 +79,18 @@ export class QueryGetListLabelDto extends BaseQueryDto {
 	})
 	@CsvUuidArray()
 	tenantIds?: string[];
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the label was imported from a report',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isImportedFromReport?: boolean;
 }

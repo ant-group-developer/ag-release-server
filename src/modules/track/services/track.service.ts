@@ -38,6 +38,7 @@ export class TrackService {
 		// validate nonDraft
 		const trackNonDraft = this.trackQueryService.ensureNonDraftTrack({
 			...data,
+			isInstrumental: data.isInstrumental ?? false,
 			trackArtists: [],
 		});
 
@@ -116,6 +117,25 @@ export class TrackService {
 
 	// enhance
 	private enhanceDetailsOne(track: Track) {
+		track.trackArtists?.sort(
+			(a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+		);
+		track.trackContributors?.sort(
+			(a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+		);
+
+		for (const trackArtist of track.trackArtists ?? []) {
+			trackArtist.artist?.artistProfiles?.sort((a, b) =>
+				(a.dsp?.name ?? '').localeCompare(b.dsp?.name ?? ''),
+			);
+		}
+
+		for (const trackContributor of track.trackContributors ?? []) {
+			trackContributor.artist?.artistProfiles?.sort((a, b) =>
+				(a.dsp?.name ?? '').localeCompare(b.dsp?.name ?? ''),
+			);
+		}
+
 		track.release.coverArtThumbnails = getCoverArtThumbnails(
 			track.release.releaseCoverArts,
 		);
@@ -155,6 +175,7 @@ export class TrackService {
 	}
 
 	async genISRC(trackId: string) {
+		// return 'QT6KL2614737';
 		const track = await this.trackQueryService.getDetailOne(trackId);
 
 		// Nếu đã có ISRC thì tuỳ bạn: return luôn hoặc throw
@@ -256,6 +277,7 @@ export class TrackService {
 		// -------- Call gRPC tạo ISRC --------
 		// token: tuỳ bạn lấy ở đâu (service-to-service thì có thể dùng internal token)
 		// const token = await this.getInternalToken(); // bạn tự implement
+
 		const res = await this.isrcService.create(payload);
 		// created giả định có created.isrc (bạn sửa theo response thật)
 		const newIsrc = res.data.code;

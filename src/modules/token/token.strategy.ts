@@ -53,7 +53,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 		};
 
 		super({
-			jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+			jwtFromRequest: ExtractJwt.fromExtractors([
+				ExtractJwt.fromAuthHeaderAsBearerToken(),
+				ExtractJwt.fromUrlQueryParameter('token'),
+			]),
 			secretOrKeyProvider: keyProvider,
 			issuer: cfg.get<string>('JWT_ISSUER'),
 			audience: cfg.get<string>('JWT_AUDIENCE'),

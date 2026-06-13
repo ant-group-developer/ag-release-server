@@ -80,19 +80,29 @@ export class StatisticsService {
 	}
 
 	async getOverviewCounts(filter: QueryGetOverviewCountDto) {
-		const [releasesCount, tracksCount, labelsCount, artistsCount] =
-			await Promise.all([
-				this.getReleasesCount(filter),
-				this.getTracksCount(filter),
-				this.getLabelsCount(filter),
-				this.getArtistsCount(filter),
-			]);
+		const [
+			releasesCount,
+			tracksCount,
+			labelsCount,
+			artistsCount,
+			releasesImportCount,
+			tracksImportCount,
+		] = await Promise.all([
+			this.getReleasesCount(filter),
+			this.getTracksCount(filter),
+			this.getLabelsCount(filter),
+			this.getArtistsCount(filter),
+			this.getReleasesImportCount(filter),
+			this.getTracksImportCount(filter),
+		]);
 
 		return {
 			releasesCount,
 			tracksCount,
 			labelsCount,
 			artistsCount,
+			releasesImportCount,
+			tracksImportCount,
 		};
 	}
 
@@ -113,10 +123,30 @@ export class StatisticsService {
 		});
 	}
 
+	async getReleasesImportCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+		return await this.releaseRepo.count({
+			where: {
+				...this.buildDateFilter({ startDate, endDate }),
+				isImportedFromReport: true,
+			},
+		});
+	}
+
 	async getTracksCount(filter: BaseQueryStatisticsDto) {
 		const { startDate, endDate } = filter;
 		return await this.trackRepo.count({
 			where: this.buildDateFilter({ startDate, endDate }),
+		});
+	}
+
+	async getTracksImportCount(filter: BaseQueryStatisticsDto) {
+		const { startDate, endDate } = filter;
+		return await this.trackRepo.count({
+			where: {
+				...this.buildDateFilter({ startDate, endDate }),
+				isImportedFromReport: true,
+			},
 		});
 	}
 

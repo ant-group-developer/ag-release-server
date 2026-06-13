@@ -10,7 +10,13 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBody,
+	ApiOperation,
+	ApiParam,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
@@ -64,6 +70,12 @@ export class ReleaseDraftController {
 
 	@RequirePermissions(Permission.RELEASE.CREATE)
 	@Post()
+	@ApiOperation({ summary: 'Create a draft release' })
+	@ApiBody({ type: CreateReleaseDraftDto })
+	@ApiResponse({
+		status: 201,
+		description: 'Draft release created successfully',
+	})
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
 		const tenantId = req.user!.tenantId;
 
@@ -127,6 +139,13 @@ export class ReleaseDraftController {
 
 	@RequirePermissions(Permission.RELEASE.UPDATE)
 	@Put(':id')
+	@ApiOperation({ summary: 'Update a draft release' })
+	@ApiParam({ name: 'id', format: 'uuid', description: 'Release ID' })
+	@ApiBody({ type: UpdateReleaseDraftDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Draft release updated successfully',
+	})
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,

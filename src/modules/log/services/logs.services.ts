@@ -16,6 +16,9 @@ type WriteLogDto = {
 
 	releaseSubmitId?: string;
 	releaseSubmitStepId?: string;
+
+	releaseExecutionId?: string;
+	releaseExecutionStepId?: string;
 };
 
 @Injectable()
@@ -68,8 +71,6 @@ export class LogsService {
 	}
 
 	private saveDbAndSendNotificationToDev_Safe(data: WriteLogDto) {
-		// console.log(data);
-
 		switch (data.level) {
 			case LogLevel.ERROR:
 				this.logger.error(data.message, data.data);
