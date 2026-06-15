@@ -248,23 +248,12 @@ export class MetadataEnrichmentService {
 		if (!albumDetail || albumDetail.error) return null;
 
 		const artist = albumDetail.artist;
-		const trackItems = albumDetail.tracks?.data || [];
 
-		const tracksWithIsrc: any[] = [];
-		const trackPromises = trackItems.slice(0, 50).map(async (t: any) => {
-			try {
-				const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
-				if (tRes.data && !tRes.data.error) {
-					tracksWithIsrc.push(tRes.data);
-				}
-			} catch (err) {
-				// ignore
-			}
-		});
+		// Step 2: Fetch ALL tracks (Deezer paginates at 25 per page)
+		const allTrackItems = await this.fetchAllDeezerAlbumTracks(albumDetail);
 
-		await Promise.all(trackPromises);
-
-		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
+		// Step 3: Fetch full track details (with ISRC) in chunks
+		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
 
 		const primaryIsrc = tracksWithIsrc[0]?.isrc || '';
 
@@ -507,22 +496,11 @@ export class MetadataEnrichmentService {
 
 		const upc = albumDetail?.upc || '';
 
-		// Fetch full track details to get ISRCs
-		const trackItems = albumDetail?.tracks?.data || [];
-		const tracksWithIsrc: any[] = [];
-		const trackPromises = trackItems.slice(0, 50).map(async (t: any) => {
-			try {
-				const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
-				if (tRes.data && !tRes.data.error) {
-					tracksWithIsrc.push(tRes.data);
-				}
-			} catch (err) {
-				// ignore
-			}
-		});
+		// Fetch ALL tracks (Deezer paginates at 25 per page)
+		const allTrackItems = albumDetail ? await this.fetchAllDeezerAlbumTracks(albumDetail) : [];
 
-		await Promise.all(trackPromises);
-		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
+		// Fetch full track details (with ISRC) in chunks
+		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
 
 		// Extract genres from album detail
 		const genres = albumDetail?.genres?.data?.map((g: any) => g.name).filter(Boolean) || [];
@@ -569,6 +547,62 @@ export class MetadataEnrichmentService {
 	// ─────────────────────────────────────────────────────
 	// UTILS
 	// ─────────────────────────────────────────────────────
+
+	/**
+	 * Deezer album API paginates tracks at 25 per page.
+	 * This helper follows `tracks.next` to collect ALL track items.
+	 */
+	private async fetchAllDeezerAlbumTracks(albumDetail: any): Promise<any[]> {
+		const allTracks: any[] = [...(albumDetail.tracks?.data || [])];
+		let nextUrl: string | undefined = albumDetail.tracks?.next;
+
+		while (nextUrl) {
+			try {
+				const res = await axios.get(nextUrl, { timeout: 15000 });
+				if (res.data?.data) {
+					allTracks.push(...res.data.data);
+				}
+				nextUrl = res.data?.next;
+			} catch (err) {
+				this.logger.warn(`Deezer album tracks pagination failed: ${err.message}`);
+				break;
+			}
+		}
+
+		return allTracks;
+	}
+
+	/**
+	 * Fetch full track details (with ISRC) from Deezer for a list of track items.
+	 * Processes in chunks of 10 with a 300ms delay between chunks to avoid rate limiting.
+	 */
+	private async fetchDeezerTrackDetails(trackItems: any[]): Promise<any[]> {
+		const tracksWithIsrc: any[] = [];
+		const chunkSize = 10;
+
+		for (let i = 0; i < trackItems.length; i += chunkSize) {
+			const chunk = trackItems.slice(i, i + chunkSize);
+			const promises = chunk.map(async (t: any) => {
+				try {
+					const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
+					if (tRes.data && !tRes.data.error) {
+						tracksWithIsrc.push(tRes.data);
+					}
+				} catch (err) {
+					this.logger.warn(`Deezer track detail fetch failed for track ${t.id}: ${err.message}`);
+				}
+			});
+			await Promise.all(promises);
+
+			// Delay between chunks to respect Deezer rate limits
+			if (i + chunkSize < trackItems.length) {
+				await this.sleep(300);
+			}
+		}
+
+		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
+		return tracksWithIsrc;
+	}
 
 	private sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
