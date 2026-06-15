@@ -43,10 +43,10 @@ VALUES
   ('Release Viewer','Read-only access to releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release.viewer'),
 
   -- Release Video
-  ('Release Video Admin','Full control over release videos.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.admin'),
-  ('Release Video Creator','Create release videos.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.creator'),
-  ('Release Video Editor','Edit release videos.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.editor'),
-  ('Release Video Viewer','Read-only access to release videos.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.viewer'),
+  ('Release Video Admin','Full control over release videos.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.admin'),
+  ('Release Video Creator','Create release videos.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.creator'),
+  ('Release Video Editor','Edit release videos.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.editor'),
+  ('Release Video Viewer','Read-only access to release videos.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.viewer'),
 
   -- Revenue
   ('Revenue Admin','Full control over revenue.','#22C55E', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'revenue.admin'),
