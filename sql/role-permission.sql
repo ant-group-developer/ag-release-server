@@ -81,6 +81,21 @@ WITH map(role_code, permission_code) AS (
     ('release.admin', 'release.review'),
     ('release.admin', 'release.take_down'),
 
+    -- Release Video
+    ('release_video.viewer', 'release_video.read'),
+    ('release_video.creator', 'release_video.read'),
+    ('release_video.creator', 'release_video.create'),
+    ('release_video.editor', 'release_video.read'),
+    ('release_video.editor', 'release_video.create'),
+    ('release_video.editor', 'release_video.update'),
+    ('release_video.editor', 'release_video.review'),
+    ('release_video.admin', 'release_video.read'),
+    ('release_video.admin', 'release_video.create'),
+    ('release_video.admin', 'release_video.update'),
+    ('release_video.admin', 'release_video.review'),
+    ('release_video.admin', 'release_video.take_down'),
+    ('release_video.admin', 'release_video.delete'),
+
     -- Revenue
     ('revenue.viewer', 'revenue.read'),
     ('revenue.creator', 'revenue.read'),
