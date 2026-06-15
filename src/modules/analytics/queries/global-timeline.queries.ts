@@ -532,7 +532,9 @@ export function getRevenueTopLabelQuery(
     SELECT
       t.label_id AS labelId,
       sum(s.total_revenue_usd) AS revenue_usd,
-      sum(s.total_quantity) AS quantity
+      sum(s.total_quantity) AS quantity,
+      uniq(t.release_id) AS release_count,
+      uniq(t.isrc) AS track_count
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE t.is_deleted = 0

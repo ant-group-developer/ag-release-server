@@ -5,6 +5,7 @@ import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ReleaseArtist } from '../../release-artist/entities/release-artist.entity';
 import { MetadataEnrichmentService, EnrichedMetadata } from '../../partners-api/spotify/services/metadata-enrichment.service';
+import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -96,6 +97,28 @@ export class ReportEntityExtractorService {
           isrc: r.isrc?.trim() || '',
         }));
 
+      // Merge remaining tracks of the album from Spotify/Deezer if successfully enriched
+      let enriched: EnrichedMetadata | undefined;
+      for (const row of bestRows) {
+        const isrc = row.isrc?.trim().toUpperCase();
+        if (!isrc) continue;
+        enriched = enrichedMap.get(isrc);
+        if (enriched) break;
+      }
+
+      if (enriched && enriched.tracks && enriched.tracks.length > 0) {
+        for (const apiTrack of enriched.tracks) {
+          if (!apiTrack.isrc) continue;
+          const exists = pgTracks.some((t) => t.isrc.trim().toUpperCase() === apiTrack.isrc.trim().toUpperCase());
+          if (!exists) {
+            pgTracks.push({
+              title: apiTrack.title,
+              isrc: apiTrack.isrc,
+            });
+          }
+        }
+      }
+
       const upcTracks = bestRows
         .filter((r) => r.isrc && r.isrc.trim().toUpperCase().startsWith('UPC-'))
         .map((r) => ({
@@ -111,6 +134,7 @@ export class ReportEntityExtractorService {
         artistName: representativeRow.artist_name?.trim() || undefined,
         tracks: pgTracks,
         upcTracks,
+        bestRows,
       });
     }
 
@@ -122,6 +146,40 @@ export class ReportEntityExtractorService {
       try {
         // Import release and real tracks into PostgreSQL
         const release = await this.releaseReportImportService.importRelease(input);
+
+        // Check and save ReleaseEnrichment status if enrichment was attempted during import
+        let enriched: EnrichedMetadata | undefined;
+        let triedEnrichment = false;
+        if (input.bestRows) {
+          for (const row of input.bestRows) {
+            const isrc = row.isrc?.trim();
+            if (!isrc) continue;
+            if (isrc.toUpperCase().startsWith('UPC-')) continue;
+            triedEnrichment = true;
+            enriched = enrichedMap.get(isrc);
+            if (enriched) break;
+          }
+        }
+
+        if (triedEnrichment) {
+          try {
+            const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+            let reRecord = await enrichmentRepo.findOne({ where: { releaseId: release.id } });
+            if (!reRecord) {
+              reRecord = enrichmentRepo.create({ releaseId: release.id });
+            }
+            reRecord.status = enriched ? ReleaseEnrichmentStatus.SUCCESS : ReleaseEnrichmentStatus.NOT_FOUND;
+            reRecord.lastScannedAt = new Date();
+            reRecord.lastScanId = 'import-job';
+            reRecord.errorMessage = null;
+            reRecord.enrichmentSource = enriched?.source || null;
+
+            await enrichmentRepo.save(reRecord);
+            this.logger.log(`Saved ReleaseEnrichment status ${reRecord.status} for release ${release.id} during import`);
+          } catch (reErr) {
+            this.logger.warn(`Failed to save ReleaseEnrichment record for release ${release.id}: ${reErr.message}`);
+          }
+        }
 
         // Directly insert temporary UPC- ISRCs into pg_tracks_sync ClickHouse table
         if (input.upcTracks && input.upcTracks.length > 0) {

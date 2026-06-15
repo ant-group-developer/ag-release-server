@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SpotifyService } from '../services/spotify.service';
 import { SpotifyService2 } from '../services/spotify2.service';
 import { MetadataEnrichmentService } from '../services/metadata-enrichment.service';
@@ -20,12 +21,14 @@ export class SpotifyController {
 
 	@Post('spotify/token')
 	async getToken(@Body() body: { clientId?: string; clientSecret?: string }) {
-		return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
+		const data = await this.spotifyService.getToken(body?.clientId, body?.clientSecret);
+		return new ResponseSuccess({ data });
 	}
 
 	@Get('spotify/artists/:id')
 	async getArtistDetail(@Param('id') id: string) {
-		return this.spotifyService2.getArtistDetail(id);
+		const data = await this.spotifyService2.getArtistDetail(id);
+		return new ResponseSuccess({ data });
 	}
 
 	// ─── ENRICHMENT ENDPOINTS ────────────────────────────
@@ -34,11 +37,13 @@ export class SpotifyController {
 	@ApiOperation({ summary: 'Look up a single ISRC via Spotify/Deezer and return enriched metadata' })
 	async enrichByIsrc(@Param('isrc') isrc: string) {
 		const result = await this.metadataEnrichmentService.enrichByIsrc(isrc);
-		return {
-			isrc,
-			found: !!result,
-			data: result,
-		};
+		return new ResponseSuccess({
+			data: {
+				isrc,
+				found: !!result,
+				data: result,
+			},
+		});
 	}
 
 	@Post('enrich/scan')
@@ -61,32 +66,30 @@ export class SpotifyController {
 		const isDryRun = dryRun === 'true';
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
 		const isForce = force === 'true';
+		const scanId = uuidv4();
 
-		if (parsedLimit === undefined) {
-			const scanId = uuidv4();
-			this.metadataScanService
-				.scanAndEnrichAll({
-					dryRun: isDryRun,
-					limit: undefined,
-					scanId,
-					force: isForce,
-				})
-				.catch((err) => {
-					this.logger.error(`Background scan failed: ${err.message}`, err.stack);
-				});
+		// Always run the scan asynchronously in the background
+		this.metadataScanService
+			.scanAndEnrichAll({
+				dryRun: isDryRun,
+				limit: parsedLimit,
+				scanId,
+				force: isForce,
+			})
+			.catch((err) => {
+				this.logger.error(`Background scan failed: ${err.message}`, err.stack);
+			});
 
-			return {
-				message: 'Scan started in the background (scanning ALL releases)',
+		const summary = await this.metadataScanService.getEnrichmentSummary();
+		return new ResponseSuccess({
+			data: {
+				message: 'Scan started in the background',
 				scanId,
 				dryRun: isDryRun,
 				force: isForce,
-			};
-		}
-
-		return this.metadataScanService.scanAndEnrichAll({
-			dryRun: isDryRun,
-			limit: parsedLimit,
-			force: isForce,
+				limit: parsedLimit,
+				summary,
+			},
 		});
 	}
 
@@ -105,12 +108,20 @@ export class SpotifyController {
 		@Query('releaseId') releaseId?: string,
 		@Query('limit') limit?: string,
 	) {
-		return this.metadataScanService.getChangeHistory({
-			scanId,
-			isrc,
-			releaseId,
-			limit: limit ? parseInt(limit, 10) : 100,
+		const [items, summary] = await Promise.all([
+			this.metadataScanService.getChangeHistory({
+				scanId,
+				isrc,
+				releaseId,
+				limit: limit ? parseInt(limit, 10) : 100,
+			}),
+			this.metadataScanService.getEnrichmentSummary(),
+		]);
+		return new ResponseSuccess({
+			data: {
+				summary,
+				items,
+			},
 		});
 	}
 }
-

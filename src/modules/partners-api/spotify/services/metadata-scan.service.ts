@@ -249,89 +249,16 @@ export class MetadataScanService {
 
 							// ─── Create/Save Tracks ──────────────────
 							if (primaryEnriched.tracks && primaryEnriched.tracks.length > 0) {
-								this.logger.log(`Creating ${primaryEnriched.tracks.length} track(s) for release ${pr.release.id} from UPC lookup`);
-								
-								// Fetch artists for link
-								let releaseArtists: ReleaseArtist[] = [];
-								try {
-									releaseArtists = await this.dataSource.getRepository(ReleaseArtist).find({
-										where: { releaseId: pr.release.id },
-										relations: ['artist'],
-									});
-								} catch (err) {
-									this.logger.warn(`Failed to fetch release artists: ${err.message}`);
-								}
-
-								for (const apiTrack of primaryEnriched.tracks) {
-									if (!apiTrack.isrc) continue;
-
-									// Check if track already exists in Postgres
-									let existingTrack = await trackRepo.findOne({
-										where: { isrc: apiTrack.isrc },
-									});
-
-									if (!existingTrack) {
-										if (!dryRun) {
-											existingTrack = await trackRepo.save(
-												trackRepo.create({
-													releaseId: pr.release.id,
-													isrc: apiTrack.isrc,
-													title: apiTrack.title,
-													order: apiTrack.trackNumber || 1,
-													isImportedFromReport: true,
-												})
-											);
-
-											// Link track to artists
-											const trackArtistRepo = this.dataSource.getRepository(TrackArtist);
-											for (const ra of releaseArtists) {
-												await trackArtistRepo.save(
-													trackArtistRepo.create({
-														trackId: existingTrack!.id,
-														artistId: ra.artistId,
-														releaseArtistId: ra.id,
-														isFromReleaseAction: true,
-														isImportedFromReport: true,
-													})
-												);
-											}
-										}
-										changes.push(`Track[${apiTrack.isrc}]: created "${apiTrack.title}"`);
-										chunkChangeLogs.push(
-											this.buildLogEntry(scanId, now, dryRun, {
-												entityType: 'track',
-												entityId: existingTrack?.id || uuidv4(),
-												releaseId: pr.release.id,
-												isrc: apiTrack.isrc,
-												upc,
-												fieldName: 'create_track',
-												oldValue: '',
-												newValue: apiTrack.title,
-												changeType: 'create',
-												enriched: primaryEnriched,
-											}),
-										);
-
-										// Sync new track to ClickHouse pg_tracks_sync
-										try {
-											const artistIds = releaseArtists.map((ra) => ra.artistId).filter(Boolean);
-											await this.clickHouseService.insert(
-												CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
-												[{
-													isrc: apiTrack.isrc,
-													tenant_id: pr.release.tenantId || '',
-													release_id: pr.release.id,
-													label_id: pr.release.labelId || '',
-													artist_ids: artistIds,
-													is_deleted: 0,
-													updated_at: now,
-												}],
-											);
-										} catch (chErr) {
-											this.logger.error(`Failed to insert track ${apiTrack.isrc} into pg_tracks_sync: ${chErr.message}`);
-										}
-									}
-								}
+								await this.syncReleaseTracks(
+									pr.release,
+									primaryEnriched.tracks,
+									dryRun,
+									primaryEnriched,
+									now,
+									scanId,
+									chunkChangeLogs,
+									changes,
+								);
 							}
 
 							if (changes.length > 0) {
@@ -539,7 +466,7 @@ export class MetadataScanService {
 												label_id: existing.labelId || '',
 												artist_ids: artistIds,
 												is_deleted: 0,
-												updated_at: now,
+												updated_at: now.slice(0, 19),
 											}],
 										);
 									} catch (chErr) {
@@ -596,7 +523,7 @@ export class MetadataScanService {
 											label_id: release.labelId || '',
 											artist_ids: artistIds,
 											is_deleted: 0,
-											updated_at: now,
+											updated_at: now.slice(0, 19),
 										}],
 									);
 								} catch (chErr) {
@@ -685,6 +612,20 @@ export class MetadataScanService {
 									}),
 								);
 							}
+						}
+
+						// ─── Create/Save Tracks ──────────────────
+						if (primaryEnriched.tracks && primaryEnriched.tracks.length > 0) {
+							await this.syncReleaseTracks(
+								release,
+								primaryEnriched.tracks,
+								dryRun,
+								primaryEnriched,
+								now,
+								scanId,
+								chunkChangeLogs,
+								changes,
+							);
 						}
 
 						// ─── Artist ──────────────────────────────
@@ -843,6 +784,56 @@ export class MetadataScanService {
 		);
 	}
 
+	/**
+	 * Get general statistics summary of enrichment progress
+	 */
+	async getEnrichmentSummary() {
+		const releaseRepo = this.dataSource.getRepository(Release);
+		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+
+		const totalReleases = await releaseRepo.count({
+			where: { isImportedFromReport: true },
+		});
+
+		const counts = await enrichmentRepo
+			.createQueryBuilder('re')
+			.select('re.status', 'status')
+			.addSelect('COUNT(re.id)', 'count')
+			.groupBy('re.status')
+			.getRawMany();
+
+		let successCount = 0;
+		let failedCount = 0;
+		let notFoundCount = 0;
+		let pendingCount = 0;
+
+		for (const row of counts) {
+			const countVal = parseInt(row.count, 10) || 0;
+			if (row.status === ReleaseEnrichmentStatus.SUCCESS) {
+				successCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.FAILED) {
+				failedCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.NOT_FOUND) {
+				notFoundCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.PENDING) {
+				pendingCount = countVal;
+			}
+		}
+
+		const totalDone = successCount + failedCount + notFoundCount;
+		const totalRemaining = Math.max(0, totalReleases - totalDone);
+
+		return {
+			totalReleases,
+			totalDone,
+			totalRemaining,
+			successCount,
+			failedCount,
+			notFoundCount,
+			pendingCount,
+		};
+	}
+
 	// ─────────────────────────────────────────────────────
 	// PRIVATE HELPERS
 	// ─────────────────────────────────────────────────────
@@ -941,6 +932,157 @@ export class MetadataScanService {
 							isImportedFromReport: true,
 						}),
 					);
+				}
+			}
+		}
+	}
+
+	private async syncReleaseTracks(
+		release: Release,
+		apiTracks: Array<{ isrc: string; title: string; duration?: number; trackNumber?: number; spotifyId?: string; deezerId?: string }>,
+		dryRun: boolean,
+		primaryEnriched: EnrichedMetadata,
+		now: string,
+		scanId: string,
+		chunkChangeLogs: any[],
+		changes: string[],
+	): Promise<void> {
+		const trackRepo = this.dataSource.getRepository(Track);
+		const trackArtistRepo = this.dataSource.getRepository(TrackArtist);
+
+		this.logger.log(`Syncing ${apiTracks.length} track(s) for release ${release.id}`);
+
+		// 1. Fetch artists for link
+		let releaseArtists: ReleaseArtist[] = [];
+		try {
+			releaseArtists = await this.dataSource.getRepository(ReleaseArtist).find({
+				where: { releaseId: release.id },
+				relations: ['artist'],
+			});
+		} catch (err) {
+			this.logger.warn(`Failed to fetch release artists: ${err.message}`);
+		}
+
+		// 2. Fetch existing tracks in DB for this release
+		const dbTracks = await trackRepo.find({
+			where: { releaseId: release.id },
+		});
+
+		// 3. Move existing track orders to a temporary high range to avoid UQ_tracks_release_id_order conflicts
+		if (!dryRun) {
+			for (const track of dbTracks) {
+				await trackRepo.update({ id: track.id }, { order: track.order + 10000 });
+			}
+		}
+
+		const usedOrders = new Set<number>();
+
+		// 4. Upsert/Create tracks
+		for (const apiTrack of apiTracks) {
+			if (!apiTrack.isrc) continue;
+
+			const targetOrder = apiTrack.trackNumber || 1;
+			usedOrders.add(targetOrder);
+
+			// Find if this ISRC already exists in our db tracks
+			const existingTrack = dbTracks.find(
+				(t) => t.isrc?.trim().toUpperCase() === apiTrack.isrc.trim().toUpperCase()
+			);
+
+			if (existingTrack) {
+				// Update existing track to its official order and title if changed
+				if (!dryRun) {
+					await trackRepo.update(
+						{ id: existingTrack.id },
+						{
+							title: apiTrack.title,
+							order: targetOrder,
+						}
+					);
+				}
+				
+				const hasChanges = existingTrack.title !== apiTrack.title || existingTrack.order !== targetOrder;
+				if (hasChanges) {
+					changes.push(`Track[${apiTrack.isrc}] updated: "${apiTrack.title}" (order: ${targetOrder})`);
+				}
+			} else {
+				// Create new track
+				let newTrack: Track | undefined;
+				if (!dryRun) {
+					newTrack = await trackRepo.save(
+						trackRepo.create({
+							releaseId: release.id,
+							isrc: apiTrack.isrc,
+							title: apiTrack.title,
+							order: targetOrder,
+							isImportedFromReport: true,
+						})
+					);
+
+					// Link track to artists
+					for (const ra of releaseArtists) {
+						await trackArtistRepo.save(
+							trackArtistRepo.create({
+								trackId: newTrack!.id,
+								artistId: ra.artistId,
+								releaseArtistId: ra.id,
+								isFromReleaseAction: true,
+								isImportedFromReport: true,
+							})
+						);
+					}
+				}
+
+				changes.push(`Track[${apiTrack.isrc}]: created "${apiTrack.title}"`);
+				chunkChangeLogs.push(
+					this.buildLogEntry(scanId, now, dryRun, {
+						entityType: 'track',
+						entityId: newTrack?.id || uuidv4(),
+						releaseId: release.id,
+						isrc: apiTrack.isrc,
+						upc: release.upc || '',
+						fieldName: 'create_track',
+						oldValue: '',
+						newValue: apiTrack.title,
+						changeType: 'create',
+						enriched: primaryEnriched,
+					}),
+				);
+
+				// Sync new track to ClickHouse pg_tracks_sync
+				try {
+					const artistIds = releaseArtists.map((ra) => ra.artistId).filter(Boolean);
+					await this.clickHouseService.insert(
+						CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
+						[{
+							isrc: apiTrack.isrc,
+							tenant_id: release.tenantId || '',
+							release_id: release.id,
+							label_id: release.labelId || '',
+							artist_ids: artistIds,
+							is_deleted: 0,
+							updated_at: now.slice(0, 19),
+						}],
+					);
+				} catch (chErr) {
+					this.logger.error(`Failed to insert track ${apiTrack.isrc} into pg_tracks_sync: ${chErr.message}`);
+				}
+			}
+		}
+
+		// 5. Restore any remaining db tracks that were NOT updated to their final order
+		if (!dryRun) {
+			const finalDbTracks = await trackRepo.find({
+				where: { releaseId: release.id },
+			});
+			for (const track of finalDbTracks) {
+				if (track.order >= 10000) {
+					let restoreOrder = track.order - 10000;
+					while (usedOrders.has(restoreOrder)) {
+						restoreOrder++;
+					}
+					await trackRepo.update({ id: track.id }, { order: restoreOrder });
+					usedOrders.add(restoreOrder);
 				}
 			}
 		}

@@ -400,6 +400,37 @@ export class MetadataEnrichmentService {
 
 		const upc = albumDetail?.external_ids?.upc || '';
 
+		// Step 3: Fetch full track details to get ISRCs
+		const tracksWithIsrc: any[] = [];
+		const trackItems = albumDetail?.tracks?.items || [];
+		const trackIds = trackItems.map((t: any) => t.id).filter(Boolean);
+		if (trackIds.length > 0) {
+			try {
+				const chunks = [];
+				for (let i = 0; i < trackIds.length; i += 50) {
+					chunks.push(trackIds.slice(i, i + 50));
+				}
+
+				for (const chunk of chunks) {
+					const tracksRes = await axios.get(
+						'https://api.spotify.com/v1/tracks',
+						{
+							params: { ids: chunk.join(',') },
+							headers: { Authorization: `Bearer ${token}` },
+							timeout: 15000,
+						},
+					);
+					if (tracksRes.data?.tracks) {
+						tracksWithIsrc.push(...tracksRes.data.tracks);
+					}
+				}
+			} catch (err) {
+				this.logger.warn(
+					`Spotify tracks detail fetch failed for album ${album.id}: ${err.message}`,
+				);
+			}
+		}
+
 		return {
 			source: 'spotify',
 			isrc,
@@ -430,6 +461,15 @@ export class MetadataEnrichmentService {
 				type: c.type,
 			})),
 			genres: albumDetail?.genres,
+
+			// Track list
+			tracks: tracksWithIsrc.map((t) => ({
+				isrc: t.external_ids?.isrc || '',
+				title: t.name || '',
+				duration: t.duration_ms,
+				trackNumber: t.track_number,
+				spotifyId: t.id,
+			})),
 		};
 	}
 
@@ -467,6 +507,23 @@ export class MetadataEnrichmentService {
 
 		const upc = albumDetail?.upc || '';
 
+		// Fetch full track details to get ISRCs
+		const trackItems = albumDetail?.tracks?.data || [];
+		const tracksWithIsrc: any[] = [];
+		const trackPromises = trackItems.slice(0, 50).map(async (t: any) => {
+			try {
+				const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
+				if (tRes.data && !tRes.data.error) {
+					tracksWithIsrc.push(tRes.data);
+				}
+			} catch (err) {
+				// ignore
+			}
+		});
+
+		await Promise.all(trackPromises);
+		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
+
 		// Extract genres from album detail
 		const genres = albumDetail?.genres?.data?.map((g: any) => g.name).filter(Boolean) || [];
 
@@ -497,6 +554,15 @@ export class MetadataEnrichmentService {
 			labelName: albumDetail?.label,
 			copyrights: albumDetail?.copyrights || undefined,
 			genres,
+
+			// Track list
+			tracks: tracksWithIsrc.map((t) => ({
+				isrc: t.isrc || '',
+				title: t.title_short || t.title || '',
+				duration: t.duration ? t.duration * 1000 : undefined,
+				trackNumber: t.track_position,
+				deezerId: t.id?.toString(),
+			})),
 		};
 	}
 
