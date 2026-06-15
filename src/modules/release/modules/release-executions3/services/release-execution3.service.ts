@@ -68,22 +68,31 @@ export class ReleaseExecution3Service {
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
-		const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
-			where: {
-				status: ReleaseExecutionStepStatus.WAITING_PARTNER,
-			},
-		});
+		const waitingSteps = await this.stepRepo
+			.createQueryBuilder('step')
+			.innerJoin(
+				ReleaseExecution3,
+				'execution',
+				'execution.id = step.releaseExecutionId',
+			)
+			.where('step.status = :stepStatus', {
+				stepStatus: ReleaseExecutionStepStatus.WAITING_PARTNER,
+			})
+			.andWhere("step.metadata->>'scheduledAt' IS NOT NULL")
+			.andWhere("(step.metadata->>'scheduledAt')::timestamptz <= :now", {
+				now,
+			})
+			.andWhere('execution.status IN (:...executionStatuses)', {
+				executionStatuses: [
+					ReleaseExecutionStatus.PROCESSING,
+					ReleaseExecutionStatus.WAITING_PARTNER,
+				],
+			})
+			.getMany();
 
 		// Group theo executionId, chỉ resume 1 lần mỗi execution
 		const executionIds = [
-			...new Set(
-				waitingSteps
-					.filter((step) => {
-						const scheduledAt = step.metadata?.scheduledAt;
-						return scheduledAt && new Date(scheduledAt) <= now;
-					})
-					.map((step) => step.releaseExecutionId),
-			),
+			...new Set(waitingSteps.map((step) => step.releaseExecutionId)),
 		];
 
 		console.log(
@@ -599,10 +608,13 @@ export class ReleaseExecution3Service {
 			.andWhere('status IN (:...stepStatuses)', {
 				stepStatuses: [
 					ReleaseExecutionStepStatus.NEW,
+					ReleaseExecutionStepStatus.PROCESSING,
 					ReleaseExecutionStepStatus.WAITING_ACTION,
+					ReleaseExecutionStepStatus.WAITING_PARTNER,
 				],
 			})
 			.execute();
+
 		// cancel ci job
 		await this.manager
 			.createQueryBuilder()

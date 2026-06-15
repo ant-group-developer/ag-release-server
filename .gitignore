@@ -14,6 +14,7 @@
 /download_unzip
 /src/modules/access-bomb/file
 /release_download_bucket
+/~
 # Logs
 logs
 *.log

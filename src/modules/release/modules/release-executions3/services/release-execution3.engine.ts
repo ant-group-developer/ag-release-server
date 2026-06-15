@@ -23,6 +23,7 @@ export class ReleaseExecutionStepEngine {
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 

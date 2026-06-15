@@ -45,7 +45,6 @@ import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 // import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
-import { ReportEntityExtractorService } from './services/report-entity-extractor.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
@@ -58,6 +57,7 @@ import { ReleaseExecution } from './modules/release-executions/entities/release-
 import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
+import { ReportEntityExtractorService } from './services/report-entity-extractor.service';
 
 import { ReleaseExecution3Controller } from './modules/release-executions3/controllers/release-execution3.controller';
 import { ReleaseExecutionStepTestController } from './modules/release-executions3/controllers/release-execution3.engine.controller';
@@ -83,6 +83,7 @@ import { ReleaseExecutionStepEngine } from './modules/release-executions3/servic
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
+import { ReleaseExecution3WorkerTest } from './modules/release-executions3/services/release-execution3-test.worker';
 
 @Module({
 	imports: [
@@ -190,6 +191,7 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseExecution3Consumer,
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
+		ReleaseExecution3WorkerTest,
 	],
 	exports: [
 		ReleaseDdexService,
