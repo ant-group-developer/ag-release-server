@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, ILike } from 'typeorm';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
@@ -368,5 +368,48 @@ export class IsrcResolverService {
       });
     }
     return map;
+  }
+
+  async getArtistIdsByKeyword(keyword: string): Promise<string[]> {
+    const artists = await this.artistRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return artists.map((a) => a.id);
+  }
+
+  async getLabelIdsByKeyword(keyword: string): Promise<string[]> {
+    const labels = await this.labelRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return labels.map((l) => l.id);
+  }
+
+  async getTenantIdsByKeyword(keyword: string): Promise<string[]> {
+    const tenants = await this.tenantRepo.find({
+      where: [
+        { name: ILike(`%${keyword}%`) },
+        { title: ILike(`%${keyword}%`) },
+      ],
+      select: ['id'],
+    });
+    return tenants.map((t) => t.id);
+  }
+
+  async getReleaseIdsByKeyword(keyword: string): Promise<string[]> {
+    const releases = await this.releaseRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return releases.map((r) => r.id);
+  }
+
+  async getIsrcsByTrackTitleKeyword(keyword: string): Promise<string[]> {
+    const tracks = await this.trackRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['isrc'],
+    });
+    return tracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc);
   }
 }
