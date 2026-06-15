@@ -26,10 +26,15 @@ export class TencentParser extends BaseParser {
     batchId: string,
     filePath: string,
   ): FactDspRow | null {
-    const isrc = record['isrc'] || '';
+    let isrc = record['isrc']?.trim() || '';
+    const upc = record['upc']?.trim() || '';
     const streams = this.safeInt(record['stream']);
 
-    if (!isrc || streams === 0) return null;
+    if ((!isrc && !upc) || streams === 0) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     // Determine sub-platform from filename or record
     const platform = record['platform'] || this.extractPlatformFromFilename(filePath);

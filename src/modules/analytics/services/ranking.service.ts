@@ -103,6 +103,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
+        AND s.isrc NOT LIKE 'UPC-%'
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -129,6 +130,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
+        AND s.isrc NOT LIKE 'UPC-%'
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}

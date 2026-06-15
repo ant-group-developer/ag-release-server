@@ -216,7 +216,7 @@ export class TimelineAnalyticsService {
       filterSql,
       dspExpr,
       whereDsp,
-    );
+  )
 
     const rows = await this.clickHouseService.query<{
       period_str: string;
@@ -1374,7 +1374,7 @@ export class TimelineAnalyticsService {
     const grandTotal = Number(totalResult[0]?.total_views ?? 0);
 
     // Step 2: Get top 5 DSPs
-    const sql = queries.getTrendViewDspBarChartQuery(joinExpr, filterSql, resolvedDspName);
+    const sql = queries.getTrendViewDspBarChartQuery(filterSql, resolvedDspName, joinExpr);
     const rows = await this.clickHouseService.query<{
       dsp_name: string;
       total_views: string;

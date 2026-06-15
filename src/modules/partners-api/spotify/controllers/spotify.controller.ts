@@ -52,12 +52,15 @@ export class SpotifyController {
 	})
 	@ApiQuery({ name: 'dryRun', required: false, type: Boolean, description: 'Preview changes without writing to DB' })
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max releases to process (omit to run ALL in background)' })
+	@ApiQuery({ name: 'force', required: false, type: Boolean, description: 'Force re-scan already enriched releases' })
 	async scanAndEnrich(
 		@Query('dryRun') dryRun?: string,
 		@Query('limit') limit?: string,
+		@Query('force') force?: string,
 	) {
 		const isDryRun = dryRun === 'true';
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+		const isForce = force === 'true';
 
 		if (parsedLimit === undefined) {
 			const scanId = uuidv4();
@@ -66,6 +69,7 @@ export class SpotifyController {
 					dryRun: isDryRun,
 					limit: undefined,
 					scanId,
+					force: isForce,
 				})
 				.catch((err) => {
 					this.logger.error(`Background scan failed: ${err.message}`, err.stack);
@@ -75,12 +79,14 @@ export class SpotifyController {
 				message: 'Scan started in the background (scanning ALL releases)',
 				scanId,
 				dryRun: isDryRun,
+				force: isForce,
 			};
 		}
 
 		return this.metadataScanService.scanAndEnrichAll({
 			dryRun: isDryRun,
 			limit: parsedLimit,
+			force: isForce,
 		});
 	}
 

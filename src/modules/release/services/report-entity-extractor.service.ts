@@ -114,23 +114,6 @@ export class ReportEntityExtractorService {
       });
     }
 
-    // Log inputs to analytics JSON files
-    try {
-      const logDir = 'd:\\ANT_1\\ag-release-server\\analytics';
-      if (fs.existsSync(logDir)) {
-        const timestamp = Date.now();
-        const detailFile = path.join(logDir, `imported_entities_${timestamp}.json`);
-        const latestFile = path.join(logDir, 'latest_imported_metadata.json');
-        const jsonContent = JSON.stringify(inputs, null, 2);
-        
-        fs.writeFileSync(detailFile, jsonContent, 'utf-8');
-        fs.writeFileSync(latestFile, jsonContent, 'utf-8');
-        this.logger.log(`Logged Postgres import payload to ${detailFile} and ${latestFile}`);
-      }
-    } catch (logErr) {
-      this.logger.error(`Failed to log Postgres import data to file: ${logErr.message}`);
-    }
-
     let created = 0;
     let skipped = 0;
     let errors = 0;
