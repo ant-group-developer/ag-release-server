@@ -238,8 +238,13 @@ export class FacebookParser extends BaseParser {
         record[h.trim()] = (values[idx] || '').trim();
       });
 
-      const isrc = record['isrc'];
-      if (!isrc) continue;
+      let isrc = record['isrc']?.trim() || '';
+      const upc = record['upc']?.trim() || record['product_code']?.trim() || '';
+      if (!isrc && !upc) continue;
+
+      if (!isrc && upc) {
+        isrc = `UPC-${upc}`;
+      }
 
       const row = this.createBaseRow(batchId);
       row.reporting_period = this.extractDateFromFilename(filename);
@@ -292,8 +297,13 @@ export class FacebookParser extends BaseParser {
         record[h.trim()] = (values[idx] || '').trim();
       });
 
-      const isrc = record['isrc'];
-      if (!isrc) continue;
+      let isrc = record['isrc']?.trim() || '';
+      const upc = record['upc']?.trim() || record['product_code']?.trim() || '';
+      if (!isrc && !upc) continue;
+
+      if (!isrc && upc) {
+        isrc = `UPC-${upc}`;
+      }
 
       const product = record['product'] || '';
       const isFb = product.startsWith('FB_');
@@ -343,8 +353,13 @@ export class FacebookParser extends BaseParser {
         record[h.trim()] = (values[idx] || '').trim();
       });
 
-      const isrc = record['isrc'];
-      if (!isrc) continue;
+      let isrc = record['isrc']?.trim() || '';
+      const upc = record['upc']?.trim() || record['product_code']?.trim() || '';
+      if (!isrc && !upc) continue;
+
+      if (!isrc && upc) {
+        isrc = `UPC-${upc}`;
+      }
 
       const product = record['product'] || '';
       const isFb = product.startsWith('FB_');
@@ -385,8 +400,13 @@ export class FacebookParser extends BaseParser {
     // Only handle Usage-Report files here (usage/ folder)
     if (!basename.includes('Usage-Report')) return null;
 
-    const isrc = record['elected_isrc'] || record['isrcs'];
-    if (!isrc) return null;
+    let isrc = record['elected_isrc']?.trim() || record['isrcs']?.trim() || '';
+    const upc = record['upc']?.trim() || record['product_code']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     const row = this.createBaseRow(batchId);
     row.reporting_period = this.normalizeDate(record['start_date']);

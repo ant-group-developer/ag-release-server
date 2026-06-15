@@ -13,12 +13,21 @@ import { MetadataEnrichmentService } from './services/metadata-enrichment.servic
 import { MetadataScanService } from './services/metadata-scan.service';
 import { SpotifyService } from './services/spotify.service';
 import { SpotifyService2 } from './services/spotify2.service';
+import { ReleaseEnrichment } from 'src/modules/release/entities/release-enrichment.entity';
 
 @Module({
 	imports: [
 		AppConfigModule,
 		ClickHouseModule,
-		TypeOrmModule.forFeature([Release, Track, Artist, ReleaseArtist, TrackArtist, Label]),
+		TypeOrmModule.forFeature([
+			Release,
+			Track,
+			Artist,
+			ReleaseArtist,
+			TrackArtist,
+			Label,
+			ReleaseEnrichment,
+		]),
 	],
 	controllers: [SpotifyController],
 	providers: [SpotifyService, SpotifyService2, MetadataEnrichmentService, MetadataScanService],

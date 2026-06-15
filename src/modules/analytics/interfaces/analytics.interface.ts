@@ -264,3 +264,27 @@ export interface RevenueReleaseItem {
     coverArtThumbnails: ICoverArtThumbnails;
   } | null;
 }
+
+// ═══════════════════════════════════════════════════════
+// Chart APIs (line-chart / bar-chart)
+// ═══════════════════════════════════════════════════════
+
+/** Một điểm trên line-chart trend-view theo tháng */
+export interface TrendViewLineChartItem {
+  period: string; // 'YYYY-MM'
+  totalViews: number;
+}
+
+/** Một cột trong bar-chart DSP (top 5 + Other) */
+export interface DspBarChartItem {
+  dspName: string;
+  totalViews?: number;
+  revenueUsd?: number;
+}
+
+/** Một điểm trên line-chart revenue theo tháng */
+export interface RevenueLineChartItem {
+  period: string; // 'YYYY-MM'
+  revenueUsd: number;
+  quantity: number;
+}

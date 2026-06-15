@@ -80,10 +80,16 @@ export class DspReportService {
       conditions.push(`r.pg_uuid = ''`);
     }
 
-    // Keyword search (search in dsp_name and source)
+    // Keyword search (search in dsps_report and assigned pg_dsps_sync fields)
     if (query.keyword) {
-      conditions.push(`(lower(r.dsp_name) LIKE {kw: String} OR lower(r.source) LIKE {kw: String})`);
-      params.kw = `%${query.keyword.toLowerCase()}%`;
+      conditions.push(`(
+        r.dsp_name ILIKE {kw:String}
+        OR r.source ILIKE {kw:String}
+        OR p.dsp_name ILIKE {kw:String}
+        OR p.dsp_code ILIKE {kw:String}
+        OR p.dsp_ci_code ILIKE {kw:String}
+      )`);
+      params.kw = `%${query.keyword}%`;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -92,6 +98,7 @@ export class DspReportService {
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
        ${whereClause}`,
       params,
     );
