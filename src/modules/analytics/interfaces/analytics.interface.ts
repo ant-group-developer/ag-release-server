@@ -206,3 +206,85 @@ export interface EntityOverviewResponse {
   totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
   totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
 }
+
+export interface RevenueLabelItem {
+  rank: number;
+  labelId: string;
+  labelName: string;
+  picture: string | null;
+  releaseCount?: number;
+  trackCount?: number;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export interface RevenueTenantItem {
+  rank: number;
+  tenantId: string;
+  tenantName: string;
+  logo: string | null;
+  revenueUsd: number;
+  quantity: number;
+}
+
+export interface OverviewTrendsResponse {
+  totalViews: number;
+  totalDsps: number;
+  totalTracks: number;
+  totalArtists: number;
+  totalLabels: number;
+}
+
+export interface TenantRankingItem {
+  rank: number;
+  tenantId: string;
+  tenantName: string;
+  logo: string | null;
+  totalViews: number;
+}
+
+export interface DspRankingItem {
+  rank: number;
+  dspId: string;
+  dspName: string;
+  totalViews: number;
+}
+
+export interface RevenueReleaseItem {
+  rank: number;
+  releaseId: string;
+  title: string;
+  upc: string | null;
+  labelId: string | null;
+  labelName: string | null;
+  trackCount: number;
+  revenueUsd: number;
+  quantity: number;
+  release: {
+    coverArtThumbnails: ICoverArtThumbnails;
+  } | null;
+}
+
+// ═══════════════════════════════════════════════════════
+// Chart APIs (line-chart / bar-chart)
+// ═══════════════════════════════════════════════════════
+
+/** Một điểm trên line-chart trend-view theo tháng */
+export interface TrendViewLineChartItem {
+  period: string; // 'YYYY-MM'
+  totalViews: number;
+}
+
+/** Một cột trong bar-chart DSP (top 5 + Other) */
+export interface DspBarChartItem {
+  dspName: string;
+  totalViews?: number;
+  revenueUsd?: number;
+}
+
+/** Một điểm trên line-chart revenue theo tháng */
+export interface RevenueLineChartItem {
+  period: string; // 'YYYY-MM'
+  revenueUsd: number;
+  quantity: number;
+}

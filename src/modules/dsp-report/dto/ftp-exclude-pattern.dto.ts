@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 export enum PatternType {
@@ -11,7 +11,6 @@ export enum PatternType {
 export enum PatternScope {
   FOLDER = 'folder',
   FILE = 'file',
-  BOTH = 'both',
 }
 
 export class CreateExcludePatternDto {
@@ -23,9 +22,15 @@ export class CreateExcludePatternDto {
   @IsEnum(PatternType)
   patternType: PatternType;
 
-  @ApiProperty({ enum: PatternScope, description: "'folder' | 'file' | 'both'" })
-  @IsEnum(PatternScope)
-  scope: PatternScope;
+  @ApiProperty({
+    enum: PatternScope,
+    isArray: true,
+    description: "Mảng scope áp dụng: 'folder' hoặc 'file' hoặc cả hai",
+    example: ['folder', 'file'],
+  })
+  @IsArray()
+  @IsEnum(PatternScope, { each: true })
+  scope: PatternScope[];
 
   @ApiPropertyOptional({ description: 'Bật/tắt pattern ngay khi tạo', default: true })
   @IsOptional()
@@ -49,10 +54,16 @@ export class UpdateExcludePatternDto {
   @IsEnum(PatternType)
   patternType?: PatternType;
 
-  @ApiPropertyOptional({ enum: PatternScope })
+  @ApiPropertyOptional({
+    enum: PatternScope,
+    isArray: true,
+    description: "Mảng scope áp dụng: 'folder' hoặc 'file' hoặc cả hai",
+    example: ['folder', 'file'],
+  })
   @IsOptional()
-  @IsEnum(PatternScope)
-  scope?: PatternScope;
+  @IsArray()
+  @IsEnum(PatternScope, { each: true })
+  scope?: PatternScope[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -66,11 +77,6 @@ export class UpdateExcludePatternDto {
 }
 
 export class QueryExcludePatternDto extends BaseQueryDto {
-  @ApiPropertyOptional({ enum: PatternScope })
-  @IsOptional()
-  @IsEnum(PatternScope)
-  scope?: PatternScope;
-
   @ApiPropertyOptional({ enum: PatternType })
   @IsOptional()
   @IsEnum(PatternType)
@@ -82,4 +88,19 @@ export class QueryExcludePatternDto extends BaseQueryDto {
   @IsInt()
   @Min(0)
   isActive?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: "Lọc theo scope: 'folder' hoặc 'file'. Truyền nhiều giá trị phân tách bằng dấu phẩy, ví dụ: 'folder,file'",
+    example: 'folder,file',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    return String(value).split(',').map(v => v.trim()).filter(Boolean);
+  })
+  @IsArray()
+  @IsEnum(PatternScope, { each: true })
+  scope?: PatternScope[];
 }

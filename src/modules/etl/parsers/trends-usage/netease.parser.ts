@@ -19,11 +19,16 @@ export class NeteaseParser extends BaseParser {
     batchId: string,
     filePath: string,
   ): FactDspRow | null {
-    const isrc = record['ISRC'] || '';
+    let isrc = record['ISRC']?.trim() || '';
+    const upc = record['UPC']?.trim() || '';
     const streams = this.safeInt(record['Streams Last 7 Days']);
     const downloads = this.safeInt(record['Downloads']);
 
-    if (!isrc || (streams === 0 && downloads === 0)) return null;
+    if ((!isrc && !upc) || (streams === 0 && downloads === 0)) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     // Use Start Date as reporting period, fallback to Report Date, then filename
     const reportDate =

@@ -19,8 +19,13 @@ export class AwaParser extends BaseParser {
     record: Record<string, string>,
     batchId: string,
   ): FactDspRow | null {
-    const isrc = record['isrc'];
-    if (!isrc) return null;
+    let isrc = record['isrc']?.trim() || '';
+    const upc = record['upc']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     const row = this.createBaseRow(batchId);
     row.reporting_period = this.normalizeDate(record['dt']); // YYYYMMDD

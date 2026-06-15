@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -55,6 +55,14 @@ export class DspReportController {
     await this.dspReportService.unassign(id);
     return new ResponseSuccess({
       data: { success: true, message: `dsps_report ${id} unassigned` },
+    });
+  }
+
+  @Delete(':id')
+  async delete(@Param('id') id: string): Promise<ResponseSuccess<{ success: boolean; message: string }>> {
+    await this.dspReportService.delete(id);
+    return new ResponseSuccess({
+      data: { success: true, message: `dsps_report ${id} deleted` },
     });
   }
 }

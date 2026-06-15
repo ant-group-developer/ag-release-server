@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, ILike } from 'typeorm';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import {
   TrackMetadata,
   IsrcArtistMapping,
@@ -29,6 +30,8 @@ export class IsrcResolverService {
     private readonly artistRepo: Repository<Artist>,
     @InjectRepository(TrackArtist)
     private readonly trackArtistRepo: Repository<TrackArtist>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
   ) {}
 
   /**
@@ -178,6 +181,7 @@ export class IsrcResolverService {
     return results;
   }
 
+
   /**
    * Lấy full track metadata cho tenant (bao gồm release, label info).
    * Dùng cho ranking Release/Label khi cần aggregate toàn bộ ISRCs.
@@ -305,5 +309,108 @@ export class IsrcResolverService {
       });
     }
     return map;
+  }
+
+  /**
+   * Lấy thông tin logo/ảnh đại diện cho danh sách tenantIds từ PostgreSQL
+   */
+  async getTenantMetadata(tenantIds: string[]): Promise<Map<string, { name: string; title: string; logo: string | null }>> {
+    if (!tenantIds.length) return new Map();
+    const tenants = await this.tenantRepo.find({
+      where: { id: In(tenantIds) },
+      select: ['id', 'name', 'title', 'logo'],
+    });
+
+    const map = new Map<string, { name: string; title: string; logo: string | null }>();
+    for (const t of tenants) {
+      map.set(t.id, {
+        name: t.name,
+        title: t.title || t.name,
+        logo: t.logo || null,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin chi tiết cho danh sách releaseIds từ PostgreSQL (cho Top Releases)
+   */
+  async getReleaseMetadata(
+    releaseIds: string[],
+  ): Promise<
+    Map<
+      string,
+      {
+        title: string;
+        upc: string | null;
+        labelId: string | null;
+        labelName: string | null;
+        trackCount: number;
+        coverArtThumbnails: ICoverArtThumbnails;
+      }
+    >
+  > {
+    const map = new Map<string, any>();
+    if (!releaseIds.length) return map;
+
+    const releases = await this.releaseRepo.find({
+      where: { id: In(releaseIds) },
+      relations: ['label', 'tracks', 'releaseCoverArts'],
+    });
+
+    for (const r of releases) {
+      map.set(r.id, {
+        title: r.title,
+        upc: r.upc,
+        labelId: r.labelId,
+        labelName: r.label?.name || null,
+        trackCount: r.tracks?.length ?? 0,
+        coverArtThumbnails: getCoverArtThumbnails(r.releaseCoverArts),
+      });
+    }
+    return map;
+  }
+
+  async getArtistIdsByKeyword(keyword: string): Promise<string[]> {
+    const artists = await this.artistRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return artists.map((a) => a.id);
+  }
+
+  async getLabelIdsByKeyword(keyword: string): Promise<string[]> {
+    const labels = await this.labelRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return labels.map((l) => l.id);
+  }
+
+  async getTenantIdsByKeyword(keyword: string): Promise<string[]> {
+    const tenants = await this.tenantRepo.find({
+      where: [
+        { name: ILike(`%${keyword}%`) },
+        { title: ILike(`%${keyword}%`) },
+      ],
+      select: ['id'],
+    });
+    return tenants.map((t) => t.id);
+  }
+
+  async getReleaseIdsByKeyword(keyword: string): Promise<string[]> {
+    const releases = await this.releaseRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return releases.map((r) => r.id);
+  }
+
+  async getIsrcsByTrackTitleKeyword(keyword: string): Promise<string[]> {
+    const tracks = await this.trackRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['isrc'],
+    });
+    return tracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc);
   }
 }

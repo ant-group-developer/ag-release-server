@@ -77,3 +77,5 @@ secrets
 debug-create-release-dto.json
 
 analytics/*
+
+scratch/*

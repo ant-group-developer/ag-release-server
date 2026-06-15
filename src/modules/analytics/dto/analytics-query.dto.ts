@@ -60,7 +60,7 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
     description:
       'Number of top items to return individually. Remaining ones are grouped as "Other".',
     minimum: 1,
-    maximum: 20,
+    maximum: 100,
     default: 5,
     example: 5,
   })
@@ -68,8 +68,8 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(20)
-  topN?: number = 5;
+  @Max(100)
+  topN?: number;
 
   @ApiPropertyOptional({
     description:
@@ -80,7 +80,7 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
-  includeOther?: boolean = true;
+  includeOther?: boolean;
 
   @ApiPropertyOptional({
     description: 'Filter analytics by specific Release ID',
@@ -97,6 +97,41 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
  * Extends BaseAnalyticsQueryDto — dùng chung page/pageSize từ BaseQueryDto.
  */
 export class RankingQueryDto extends BaseAnalyticsQueryDto { }
+
+/**
+ * DTO cho các Chart APIs (line-chart, bar-chart).
+ * Chỉ cần fromDate / toDate, không cần pagination.
+ */
+export class ChartQueryDto {
+  @ApiProperty({
+    description: 'Start date of the filter range (inclusive)',
+    example: '2026-01-01',
+  })
+  @IsDateString()
+  fromDate: string;
+
+  @ApiProperty({
+    description: 'End date of the filter range (inclusive)',
+    example: '2026-06-30',
+  })
+  @IsDateString()
+  toDate: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter analytics by specific Label ID',
+  })
+  @IsOptional()
+  @IsString()
+  labelId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter analytics by specific Release ID',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsString()
+  releaseId?: string;
+}
 
 export class EntityTimelineQueryDto {
   @IsDateString()

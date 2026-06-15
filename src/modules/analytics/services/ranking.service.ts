@@ -10,6 +10,8 @@ import {
   ReleaseRankingItem,
   ArtistRankingItem,
   LabelRankingItem,
+  TenantRankingItem,
+  DspRankingItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
@@ -73,12 +75,21 @@ export class RankingService {
   ): Promise<PageDto<TrackRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
     const isSystem = checkIsSystemTenant(tenantId);
-    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    let { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
+
+    if (query.keyword) {
+      let matchedIsrcs = await this.isrcResolverService.getIsrcsByTrackTitleKeyword(query.keyword);
+      if (matchedIsrcs.length === 0) {
+        matchedIsrcs = ['__none__'];
+      }
+      filterSql += ' AND s.isrc IN ({matchedIsrcs:Array(String)})';
+      params.matchedIsrcs = matchedIsrcs;
+    }
 
     const table = query.dspId
       ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
@@ -92,6 +103,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
+        AND s.isrc NOT LIKE 'UPC-%'
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -118,6 +130,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
+        AND s.isrc NOT LIKE 'UPC-%'
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -226,12 +239,21 @@ export class RankingService {
     query: RankingQueryDto,
   ): Promise<PageDto<ReleaseRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    let { filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
+
+    if (query.keyword) {
+      let matchedReleaseIds = await this.isrcResolverService.getReleaseIdsByKeyword(query.keyword);
+      if (matchedReleaseIds.length === 0) {
+        matchedReleaseIds = ['__none__'];
+      }
+      filterSql += ' AND t.release_id IN ({matchedReleaseIds:Array(String)})';
+      params.matchedReleaseIds = matchedReleaseIds;
+    }
 
     const table = query.dspId
       ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
@@ -332,12 +354,21 @@ export class RankingService {
     query: RankingQueryDto,
   ): Promise<PageDto<LabelRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    let { filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
+
+    if (query.keyword) {
+      let matchedLabelIds = await this.isrcResolverService.getLabelIdsByKeyword(query.keyword);
+      if (matchedLabelIds.length === 0) {
+        matchedLabelIds = ['__none__'];
+      }
+      filterSql += ' AND t.label_id IN ({matchedLabelIds:Array(String)})';
+      params.matchedLabelIds = matchedLabelIds;
+    }
 
     const table = query.dspId
       ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
@@ -424,12 +455,21 @@ export class RankingService {
     query: RankingQueryDto,
   ): Promise<PageDto<ArtistRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
-    const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    let { filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
+
+    if (query.keyword) {
+      let matchedArtistIds = await this.isrcResolverService.getArtistIdsByKeyword(query.keyword);
+      if (matchedArtistIds.length === 0) {
+        matchedArtistIds = ['__none__'];
+      }
+      filterSql += ' AND hasAny(t.artist_ids, {matchedArtistIds:Array(String)})';
+      params.matchedArtistIds = matchedArtistIds;
+    }
 
     const table = query.dspId
       ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
@@ -449,7 +489,7 @@ export class RankingService {
           ${dspFilter}
           ${filterSql}
       )
-      WHERE artistId != ''
+      WHERE artistId != '' ${query.keyword ? `AND artistId IN ({matchedArtistIds:Array(String)})` : ''}
     `;
     const countResult = await this.clickHouseService.query<{ total: string }>(
       countSql,
@@ -478,7 +518,7 @@ export class RankingService {
         ${dspFilter}
         ${filterSql}
       GROUP BY artistId
-      HAVING artistId != ''
+      HAVING artistId != '' ${query.keyword ? `AND artistId IN ({matchedArtistIds:Array(String)})` : ''}
       ORDER BY totalViews DESC
       LIMIT ${query.limit} OFFSET ${query.skip}
     `;
@@ -504,6 +544,193 @@ export class RankingService {
         totalViews: Number(a.totalViews),
       };
     });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 5. TOP TENANTS RANKING (Trend play counts)
+  // ═══════════════════════════════════════════════════════
+  async getTopTenants(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<TenantRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    if (query.keyword) {
+      let matchedTenantIds = await this.isrcResolverService.getTenantIdsByKeyword(query.keyword);
+      if (matchedTenantIds.length === 0) {
+        matchedTenantIds = ['__none__'];
+      }
+      filterSql += ' AND t.tenant_id IN ({matchedTenantIds:Array(String)})';
+      params.matchedTenantIds = matchedTenantIds;
+    }
+
+    const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
+    if (query.dspId) params.dspId = query.dspId;
+
+    const table = query.dspId
+      ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
+      : CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Count query
+    const countSql = `
+      SELECT uniq(t.tenant_id) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.tenant_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Data query
+    const dataSql = `
+      SELECT
+        t.tenant_id AS tenantId,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.tenant_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+      GROUP BY tenantId
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      tenantId: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const tenantIds = paged.map((t) => t.tenantId);
+    const tenantMetaMap = await this.isrcResolverService.getTenantMetadata(tenantIds);
+
+    const items: TenantRankingItem[] = paged.map((r, index) => {
+      const meta = tenantMetaMap.get(r.tenantId);
+      return {
+        rank: query.skip + index + 1,
+        tenantId: r.tenantId,
+        tenantName: meta?.title ?? 'Unknown Tenant',
+        logo: meta?.logo ?? null,
+        totalViews: Number(r.totalViews),
+      };
+    });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 6. TOP DSPS RANKING (Trend play counts/views)
+  // ═══════════════════════════════════════════════════════
+  async getTopDsps(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<DspRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Coalesce: ưu tiên pg_dsps_sync, tiếp đến dsps_report, cuối cùng là dsp_id gốc
+    const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+    const joinExpr = `
+      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+    `;
+
+    if (query.keyword) {
+      filterSql += ` AND ${resolvedDspName} ILIKE {keyword:String}`;
+      params.keyword = `%${query.keyword}%`;
+    }
+
+    // Count query
+    const countSql = `
+      SELECT uniq(${resolvedDspName}) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${joinExpr}
+      WHERE t.is_deleted = 0
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Data query
+    const dataSql = `
+      SELECT
+        s.dsp_id AS dspId,
+        ${resolvedDspName} AS dspName,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      ${joinExpr}
+      WHERE t.is_deleted = 0
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${filterSql}
+      GROUP BY dspId, dspName
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      dspId: string;
+      dspName: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const items: DspRankingItem[] = paged.map((r, index) => ({
+      rank: query.skip + index + 1,
+      dspId: r.dspId,
+      dspName: r.dspName,
+      totalViews: Number(r.totalViews),
+    }));
 
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }

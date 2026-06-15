@@ -33,8 +33,10 @@ export class ClickHouseMigrationService implements OnModuleInit {
       await this.ensureMigrationsTable();
       await this.runPendingMigrations();
     } catch (error) {
-      this.logger.error(`Migration failed: ${error.message}`, error.stack);
-      throw error; // Crash app on migration failure — must be fixed before restart
+      this.logger.error(
+        `ClickHouse connection or migration failed. ClickHouse features will be unavailable. Error: ${error.message}`,
+        error.stack,
+      );
     }
   }
 

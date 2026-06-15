@@ -12,6 +12,8 @@ import {
   ReleaseRankingItem,
   ArtistRankingItem,
   LabelRankingItem,
+  TenantRankingItem,
+  DspRankingItem,
 } from '../interfaces/analytics.interface';
 
 /**
@@ -121,6 +123,56 @@ export class RankingController {
     @Body() query: RankingQueryDto,
   ): Promise<ResponseSuccess<PageDto<LabelRankingItem>>> {
     const data = await this.rankingService.getTopLabels(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  /**
+   * Top Tenants theo lượt nghe (Trend play counts).
+   * POST /analytics/ranking/tenants
+   */
+  @Post('tenants')
+  @ApiOperation({
+    summary: 'Get top tenants ranking',
+    description:
+      'Returns the most played tenants based on near real-time daily play counts (Trend views).',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tenants ranking retrieved successfully.',
+  })
+  async getTopTenants(
+    @Req() req: Request,
+    @Body() query: RankingQueryDto,
+  ): Promise<ResponseSuccess<PageDto<TenantRankingItem>>> {
+    const data = await this.rankingService.getTopTenants(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  /**
+   * Top DSPs theo lượt nghe (Trend play counts).
+   * POST /analytics/ranking/dsp
+   */
+  @Post('dsp')
+  @ApiOperation({
+    summary: 'Get top DSPs ranking',
+    description:
+      'Returns the most played DSPs based on near real-time daily play counts (Trend views).',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'DSPs ranking retrieved successfully.',
+  })
+  async getTopDsps(
+    @Req() req: Request,
+    @Body() query: RankingQueryDto,
+  ): Promise<ResponseSuccess<PageDto<DspRankingItem>>> {
+    const data = await this.rankingService.getTopDsps(
       req.user!.tenantId,
       query,
     );

@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Query, NotFoundException, Sse, MessageEvent } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, NotFoundException, Sse, MessageEvent } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
-import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
+import { ImportJobsService, computeProgressDetail } from '../services/import-jobs/import-jobs.service';
 import { ImportJob } from '../interfaces';
 import { QueryGetListJobsDto } from '../dto/job-query.dto';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -120,6 +120,16 @@ export class JobController {
       }),
     });
   }
+
+  @Post('jobs/backfill')
+  @ApiOperation({
+    summary: 'Backfill row counts from result JSON for all completed jobs',
+    description: 'Scans ClickHouse for completed jobs with 0 rows and extracts total_rows/processed_rows from result.',
+  })
+  async backfillJobs(): Promise<ResponseSuccess<{ updatedCount: number }>> {
+    const result = await this.importJobsService.backfillRowCountsFromResults();
+    return new ResponseSuccess({ data: result });
+  }
 }
 
 function formatJob(job: ImportJob) {
@@ -128,9 +138,10 @@ function formatJob(job: ImportJob) {
     sourceType: job.sourceType,
     status: job.status,
     progress: {
-      current: job.progressCurrent,
+      current: job.status === 'COMPLETED' ? job.progressTotal : job.progressCurrent,
       total: job.progressTotal,
-      label: job.progressLabel,
+      label: job.status === 'COMPLETED' ? 'Done' : job.progressLabel,
+      detail: computeProgressDetail(job),
     },
     rows: {
       total: job.totalRows,
