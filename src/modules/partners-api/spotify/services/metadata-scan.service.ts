@@ -11,6 +11,8 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { MetadataEnrichmentService, EnrichedMetadata } from './metadata-enrichment.service';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
+import { MetadataScanSession, ScanSessionStatus } from 'src/modules/release/entities/metadata-scan-session.entity';
+import { EnrichEventsGateway } from './enrich-events.gateway';
 
 /** Single field-level change logged to ClickHouse */
 interface ChangeLogEntry {
@@ -61,6 +63,7 @@ export class MetadataScanService {
 		private readonly dataSource: DataSource,
 		private readonly metadataEnrichmentService: MetadataEnrichmentService,
 		private readonly clickHouseService: ClickHouseService,
+		private readonly enrichEventsGateway: EnrichEventsGateway,
 	) {}
 
 	/**
@@ -81,16 +84,33 @@ export class MetadataScanService {
 		const scanId = options?.scanId ?? uuidv4();
 		const force = options?.force ?? false;
 
-		const result: ScanResult = {
-			scanId,
-			totalScanned: 0,
-			enriched: 0,
-			upcResolved: 0,
-			metadataUpdated: 0,
-			errors: 0,
-			changesLogged: 0,
-			details: [],
-		};
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const session = sessionRepo.create({
+			id: scanId,
+			status: ScanSessionStatus.PROCESSING,
+			totalReleases: 0,
+			processedReleases: 0,
+			successCount: 0,
+			failedCount: 0,
+			notFoundCount: 0,
+			dryRun,
+			force,
+			limitCount: limit,
+			startedAt: new Date(),
+		});
+		await sessionRepo.save(session);
+
+		try {
+			const result: ScanResult = {
+				scanId,
+				totalScanned: 0,
+				enriched: 0,
+				upcResolved: 0,
+				metadataUpdated: 0,
+				errors: 0,
+				changesLogged: 0,
+				details: [],
+			};
 
 		const changeLogs: ChangeLogEntry[] = [];
 		const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
@@ -128,6 +148,60 @@ export class MetadataScanService {
 		}
 		const allReleases = await queryBuilder.getMany();
 
+		session.totalReleases = allReleases.length;
+		await sessionRepo.save(session);
+
+		this.enrichEventsGateway.emit({
+			scanId,
+			type: 'progress',
+			timestamp: new Date().toISOString(),
+			data: {
+				status: session.status,
+				totalReleases: session.totalReleases,
+				processedReleases: session.processedReleases,
+				successCount: session.successCount,
+				failedCount: session.failedCount,
+				notFoundCount: session.notFoundCount,
+			},
+		});
+
+		const countedReleaseIds = new Set<string>();
+		let liveProcessedReleases = session.processedReleases;
+		let liveSuccessCount = session.successCount;
+		let liveFailedCount = session.failedCount;
+		let liveNotFoundCount = session.notFoundCount;
+
+		const emitProgress = () => {
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'progress',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: liveProcessedReleases,
+					successCount: liveSuccessCount,
+					failedCount: liveFailedCount,
+					notFoundCount: liveNotFoundCount,
+				},
+			});
+		};
+
+		const markReleaseProgress = (
+			releaseId: string,
+			status: 'success' | 'failed' | 'not_found',
+		) => {
+			if (countedReleaseIds.has(releaseId)) return;
+			countedReleaseIds.add(releaseId);
+
+			liveProcessedReleases++;
+			if (status === 'success') liveSuccessCount++;
+			if (status === 'failed') liveFailedCount++;
+			if (status === 'not_found') liveNotFoundCount++;
+
+			emitProgress();
+		};
+
 		this.logger.log(`Found ${allReleases.length} releases to scan (limit=${limit ?? 'ALL'})`);
 
 		const chunkSize = 50;
@@ -150,6 +224,7 @@ export class MetadataScanService {
 			}));
 
 			const chunkChangeLogs: ChangeLogEntry[] = [];
+			const chunkFailedReleases = new Set<string>();
 
 			// Collect releases that have NO real tracks, so we can try UPC lookup on them
 			const releasesForUpcLookup = pendingReleases.filter(pr => {
@@ -162,6 +237,8 @@ export class MetadataScanService {
 				this.logger.log(`Performing UPC-based metadata lookup for ${releasesForUpcLookup.length} release(s)...`);
 				for (const pr of releasesForUpcLookup) {
 					try {
+						// Throttle to respect API rate limits
+						await new Promise((resolve) => setTimeout(resolve, 300));
 						const upc = pr.release.upc!.trim();
 						this.logger.log(`Querying Spotify/Deezer for UPC ${upc}...`);
 						const enriched = await this.metadataEnrichmentService.enrichByUpc(upc);
@@ -280,16 +357,19 @@ export class MetadataScanService {
 								source: primaryEnriched.source,
 								dryRun,
 							});
+							markReleaseProgress(pr.release.id, 'success');
 						} else {
 							this.logger.warn(`UPC ${upc} enrichment returned no metadata.`);
 						}
 					} catch (err) {
 						result.errors++;
+						chunkFailedReleases.add(pr.release.id);
 						this.logger.error(`Failed to update release ${pr.release.id} via UPC: ${err.message}`);
 						await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.FAILED, scanId, {
 							errorMessage: err.message,
 							dryRun,
 						});
+						markReleaseProgress(pr.release.id, 'failed');
 					}
 				}
 			}
@@ -323,8 +403,8 @@ export class MetadataScanService {
 				this.logger.log(`Querying Spotify/Deezer for ${isrcs.length} ISRCs (batch trial)...`);
 
 				const enrichedMap = await this.metadataEnrichmentService.enrichBatch(isrcs, {
-					concurrency: 3,
-					delayMs: 300,
+					concurrency: 1,
+					delayMs: 500,
 				});
 
 				// Group results by release
@@ -481,6 +561,7 @@ export class MetadataScanService {
 									// Mark resolved and continue
 									const pending = pendingReleases.find(pr => pr.release.id === releaseId);
 									if (pending) pending.resolved = true;
+									markReleaseProgress(releaseId, 'success');
 									continue;
 								}
 							} else {
@@ -677,14 +758,17 @@ export class MetadataScanService {
 							source: primaryEnriched.source,
 							dryRun,
 						});
+						markReleaseProgress(releaseId, 'success');
 
 					} catch (err) {
 						result.errors++;
+						chunkFailedReleases.add(releaseId);
 						this.logger.error(`Failed to update release ${releaseId}: ${err.message}`);
 						await this.updateEnrichmentStatus(release.id, ReleaseEnrichmentStatus.FAILED, scanId, {
 							errorMessage: err.message,
 							dryRun,
 						});
+						markReleaseProgress(releaseId, 'failed');
 					}
 				}
 
@@ -704,11 +788,12 @@ export class MetadataScanService {
 
 			// For releases that were NOT enriched (resolved = false), mark as NOT_FOUND
 			for (const pr of pendingReleases) {
-				if (!pr.resolved) {
+				if (!pr.resolved && !chunkFailedReleases.has(pr.release.id)) {
 					await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.NOT_FOUND, scanId, {
 						dryRun,
 					});
 					this.logger.log(`⚠️ Release ${pr.release.id} could not be resolved (marked NOT_FOUND)`);
+					markReleaseProgress(pr.release.id, 'not_found');
 				}
 			}
 
@@ -727,7 +812,62 @@ export class MetadataScanService {
 					this.logger.error(`Failed to log chunk changes to ClickHouse: ${err.message}`);
 				}
 			}
+
+			// Update the session progress
+			let chunkSuccess = 0;
+			let chunkFailed = 0;
+			let chunkNotFound = 0;
+
+			for (const pr of pendingReleases) {
+				if (pr.resolved) {
+					chunkSuccess++;
+				} else if (chunkFailedReleases.has(pr.release.id)) {
+					chunkFailed++;
+				} else {
+					chunkNotFound++;
+				}
+			}
+
+			result.totalScanned += pendingReleases.length;
+
+			session.processedReleases += pendingReleases.length;
+			session.successCount += chunkSuccess;
+			session.failedCount += chunkFailed;
+			session.notFoundCount += chunkNotFound;
+			await sessionRepo.save(session);
+
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'progress',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: session.processedReleases,
+					successCount: session.successCount,
+					failedCount: session.failedCount,
+					notFoundCount: session.notFoundCount,
+				},
+			});
 		}
+
+		session.status = ScanSessionStatus.COMPLETED;
+		session.finishedAt = new Date();
+		await sessionRepo.save(session);
+
+		this.enrichEventsGateway.emit({
+			scanId,
+			type: 'completed',
+			timestamp: new Date().toISOString(),
+			data: {
+				status: session.status,
+				totalReleases: session.totalReleases,
+				processedReleases: session.processedReleases,
+				successCount: session.successCount,
+				failedCount: session.failedCount,
+				notFoundCount: session.notFoundCount,
+			},
+		});
 
 		this.logger.log(
 			`🏁 Scan complete (scanId=${scanId}): ${result.totalScanned} scanned, ` +
@@ -737,6 +877,23 @@ export class MetadataScanService {
 		);
 
 		return result;
+		} catch (err) {
+			session.status = ScanSessionStatus.FAILED;
+			session.errorMessage = err.message;
+			session.finishedAt = new Date();
+			await sessionRepo.save(session);
+
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'failed',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					errorMessage: err.message,
+				},
+			});
+			throw err;
+		}
 	}
 
 	/**
@@ -1115,5 +1272,36 @@ export class MetadataScanService {
 		enrichment.errorMessage = options?.errorMessage || null;
 
 		await enrichmentRepo.save(enrichment);
+	}
+
+	/**
+	 * List recent metadata scan sessions
+	 */
+	async listScanSessions(query: {
+		page?: number;
+		pageSize?: number;
+	}): Promise<{ items: MetadataScanSession[]; totalItems: number }> {
+		const page = query.page ?? 1;
+		const pageSize = query.pageSize ?? 10;
+
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const [items, totalItems] = await sessionRepo.findAndCount({
+			order: { createdAt: 'DESC' },
+			skip: (page - 1) * pageSize,
+			take: pageSize,
+		});
+
+		return {
+			items,
+			totalItems,
+		};
+	}
+
+	/**
+	 * Find a metadata scan session by ID
+	 */
+	async findScanSessionById(id: string): Promise<MetadataScanSession | null> {
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		return sessionRepo.findOne({ where: { id } });
 	}
 }

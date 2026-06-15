@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
+import { DataSource, ILike } from 'typeorm';
 import { SpotifyService } from './spotify.service';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 
 /**
  * Enriched metadata returned from Spotify or Deezer APIs for a given ISRC.
  */
 export interface EnrichedMetadata {
-	/** Source of the metadata: 'spotify' or 'deezer' */
-	source: 'spotify' | 'deezer';
+	/** Source of the metadata: 'spotify', 'deezer', or 'local' (from existing DB data) */
+	source: 'spotify' | 'deezer' | 'local';
 
 	// ─── Track-Level ─────────────────────────────────────
 	isrc: string;
@@ -49,11 +52,48 @@ export interface EnrichedMetadata {
 	}>;
 }
 
+const sleepHelper = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function requestWithRetry<T>(
+	fn: () => Promise<T>,
+	logger: Logger,
+	retries = 5,
+	delayMs = 1000,
+): Promise<T> {
+	try {
+		return await fn();
+	} catch (err) {
+		const axiosError = err as AxiosError;
+		if (axiosError.response?.status === 429) {
+			if (retries <= 0) throw err;
+			const retryAfterHeader = axiosError.response.headers?.['retry-after'];
+			const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader as string, 10) : 0;
+			const waitTime = retryAfterSec > 0 ? (retryAfterSec * 1000 + 500) : delayMs;
+
+			logger.warn(`[Spotify API] 429 Too Many Requests. Retrying after ${waitTime}ms (remaining retries: ${retries})...`);
+			await sleepHelper(waitTime);
+			return requestWithRetry(fn, logger, retries - 1, delayMs * 2);
+		}
+
+		if (retries > 0 && (!axiosError.response || axiosError.response.status >= 500)) {
+			logger.warn(`[Spotify API] Request failed (${axiosError.response?.status || 'network error'}). Retrying in ${delayMs}ms...`);
+			await sleepHelper(delayMs);
+			return requestWithRetry(fn, logger, retries - 1, delayMs * 2);
+		}
+
+		throw err;
+	}
+}
+
 @Injectable()
 export class MetadataEnrichmentService {
 	private readonly logger = new Logger(MetadataEnrichmentService.name);
 
-	constructor(private readonly spotifyService: SpotifyService) {}
+
+	constructor(
+		private readonly spotifyService: SpotifyService,
+		private readonly dataSource: DataSource,
+	) {}
 
 	// ─────────────────────────────────────────────────────
 	// PUBLIC API
@@ -62,6 +102,13 @@ export class MetadataEnrichmentService {
 	async enrichByIsrc(isrc: string): Promise<EnrichedMetadata | null> {
 		if (!isrc?.trim()) return null;
 		const normalizedIsrc = isrc.trim().toUpperCase();
+
+		// ─── Local-first: check if ISRC already exists in DB ───
+		const localResult = await this.findLocalByIsrc(normalizedIsrc);
+		if (localResult) {
+			this.logger.log(`[Local Cache] Found ISRC ${normalizedIsrc} in local DB, skipping external API call`);
+			return localResult;
+		}
 
 		// Call both Spotify and Deezer APIs in parallel
 		const [spotifyResult, deezerResult] = await Promise.all([
@@ -94,6 +141,13 @@ export class MetadataEnrichmentService {
 		if (!upc?.trim()) return null;
 		const normalizedUpc = upc.trim();
 
+		// ─── Local-first: check if UPC already exists in DB ───
+		const localResult = await this.findLocalByUpc(normalizedUpc);
+		if (localResult) {
+			this.logger.log(`[Local Cache] Found UPC ${normalizedUpc} in local DB, skipping external API call`);
+			return localResult;
+		}
+
 		// Call both Spotify and Deezer APIs in parallel
 		const [spotifyResult, deezerResult] = await Promise.all([
 			this.enrichFromSpotifyByUpc(normalizedUpc).catch((err) => {
@@ -124,13 +178,15 @@ export class MetadataEnrichmentService {
 		const token = await this.spotifyService.getCacheToken();
 
 		// Step 1: Search album by UPC
-		const searchRes = await axios.get(
-			'https://api.spotify.com/v1/search',
-			{
-				params: { type: 'album', q: `upc:${upc}` },
-				headers: { Authorization: `Bearer ${token}` },
-				timeout: 15000,
-			},
+		const searchRes = await this.spotifyService.enqueue(() =>
+			requestWithRetry(() => axios.get(
+				'https://api.spotify.com/v1/search',
+				{
+					params: { type: 'album', q: `upc:${upc}` },
+					headers: { Authorization: `Bearer ${token}` },
+					timeout: 15000,
+				},
+			), this.logger)
 		);
 
 		const items = searchRes.data?.albums?.items;
@@ -142,12 +198,14 @@ export class MetadataEnrichmentService {
 		let albumDetail: any = null;
 		if (album?.id) {
 			try {
-				const albumRes = await axios.get(
-					`https://api.spotify.com/v1/albums/${album.id}`,
-					{
-						headers: { Authorization: `Bearer ${token}` },
-						timeout: 15000,
-					},
+				const albumRes = await this.spotifyService.enqueue(() =>
+					requestWithRetry(() => axios.get(
+						`https://api.spotify.com/v1/albums/${album.id}`,
+						{
+							headers: { Authorization: `Bearer ${token}` },
+							timeout: 15000,
+						},
+					), this.logger)
 				);
 				albumDetail = albumRes.data;
 			} catch (err) {
@@ -174,13 +232,15 @@ export class MetadataEnrichmentService {
 				}
 
 				for (const chunk of chunks) {
-					const tracksRes = await axios.get(
-						'https://api.spotify.com/v1/tracks',
-						{
-							params: { ids: chunk.join(',') },
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
+					const tracksRes = await this.spotifyService.enqueue(() =>
+						requestWithRetry(() => axios.get(
+							'https://api.spotify.com/v1/tracks',
+							{
+								params: { ids: chunk.join(',') },
+								headers: { Authorization: `Bearer ${token}` },
+								timeout: 15000,
+							},
+						), this.logger)
 					);
 					if (tracksRes.data?.tracks) {
 						tracksWithIsrc.push(...tracksRes.data.tracks);
@@ -308,6 +368,7 @@ export class MetadataEnrichmentService {
 		const delayMs = options?.delayMs ?? 200;
 		const results = new Map<string, EnrichedMetadata>();
 		const unique = [...new Set(isrcs.map((i) => i.trim().toUpperCase()).filter(Boolean))];
+		const batchCache = new Map<string, EnrichedMetadata>();
 
 		this.logger.log(`Enriching ${unique.length} unique ISRCs (concurrency=${concurrency})...`);
 
@@ -315,15 +376,34 @@ export class MetadataEnrichmentService {
 		for (let i = 0; i < unique.length; i += concurrency) {
 			const batch = unique.slice(i, i + concurrency);
 			const promises = batch.map(async (isrc) => {
+				const cached = batchCache.get(isrc);
+				if (cached) {
+					results.set(isrc, cached);
+					this.logger.log(`[Batch Cache] Found ISRC ${isrc} in current enrichment batch, skipping external API call`);
+					return;
+				}
+
 				try {
 					const meta = await this.enrichByIsrc(isrc);
-					if (meta) results.set(isrc, meta);
+					if (meta) {
+						this.cacheBatchMetadata(batchCache, isrc, meta);
+						results.set(isrc, batchCache.get(isrc) ?? this.buildMetadataForIsrc(meta, isrc));
+					}
 				} catch (err) {
 					this.logger.warn(`Failed to enrich ISRC ${isrc}: ${err.message}`);
 				}
 			});
 
 			await Promise.all(promises);
+
+			for (const isrc of batch) {
+				if (!results.has(isrc)) {
+					const cached = batchCache.get(isrc);
+					if (cached) {
+						results.set(isrc, cached);
+					}
+				}
+			}
 
 			// Log progress periodically (every 50 batches / 150 ISRCs)
 			const processedCount = i + batch.length;
@@ -348,17 +428,67 @@ export class MetadataEnrichmentService {
 	// SPOTIFY
 	// ─────────────────────────────────────────────────────
 
+	private cacheBatchMetadata(
+		cache: Map<string, EnrichedMetadata>,
+		lookupIsrc: string,
+		meta: EnrichedMetadata,
+	): void {
+		const normalizedLookup = this.normalizeIsrc(lookupIsrc);
+		if (normalizedLookup) {
+			cache.set(normalizedLookup, this.buildMetadataForIsrc(meta, normalizedLookup));
+		}
+
+		const primaryIsrc = this.normalizeIsrc(meta.isrc);
+		if (primaryIsrc) {
+			cache.set(primaryIsrc, this.buildMetadataForIsrc(meta, primaryIsrc));
+		}
+
+		for (const track of meta.tracks ?? []) {
+			const trackIsrc = this.normalizeIsrc(track.isrc);
+			if (!trackIsrc) continue;
+			cache.set(trackIsrc, this.buildMetadataForIsrc(meta, trackIsrc));
+		}
+	}
+
+	private buildMetadataForIsrc(meta: EnrichedMetadata, isrc: string): EnrichedMetadata {
+		const normalizedIsrc = this.normalizeIsrc(isrc);
+		const matchedTrack = (meta.tracks ?? []).find(
+			(track) => this.normalizeIsrc(track.isrc) === normalizedIsrc,
+		);
+
+		if (!matchedTrack) {
+			return {
+				...meta,
+				isrc: normalizedIsrc || meta.isrc,
+			};
+		}
+
+		return {
+			...meta,
+			isrc: matchedTrack.isrc,
+			trackTitle: matchedTrack.title || meta.trackTitle,
+			trackSpotifyId: matchedTrack.spotifyId || meta.trackSpotifyId,
+			trackDuration: matchedTrack.duration ?? meta.trackDuration,
+		};
+	}
+
+	private normalizeIsrc(isrc?: string): string {
+		return isrc?.trim().toUpperCase() || '';
+	}
+
 	private async enrichFromSpotify(isrc: string): Promise<EnrichedMetadata | null> {
 		const token = await this.spotifyService.getCacheToken();
 
 		// Step 1: Search track by ISRC
-		const searchRes = await axios.get(
-			'https://api.spotify.com/v1/search',
-			{
-				params: { type: 'track', q: `isrc:${isrc}` },
-				headers: { Authorization: `Bearer ${token}` },
-				timeout: 15000,
-			},
+		const searchRes = await this.spotifyService.enqueue(() =>
+			requestWithRetry(() => axios.get(
+				'https://api.spotify.com/v1/search',
+				{
+					params: { type: 'track', q: `isrc:${isrc}` },
+					headers: { Authorization: `Bearer ${token}` },
+					timeout: 15000,
+				},
+			), this.logger)
 		);
 
 		const items = searchRes.data?.tracks?.items;
@@ -372,12 +502,14 @@ export class MetadataEnrichmentService {
 		let albumDetail: any = null;
 		if (album?.id) {
 			try {
-				const albumRes = await axios.get(
-					`https://api.spotify.com/v1/albums/${album.id}`,
-					{
-						headers: { Authorization: `Bearer ${token}` },
-						timeout: 15000,
-					},
+				const albumRes = await this.spotifyService.enqueue(() =>
+					requestWithRetry(() => axios.get(
+						`https://api.spotify.com/v1/albums/${album.id}`,
+						{
+							headers: { Authorization: `Bearer ${token}` },
+							timeout: 15000,
+						},
+					), this.logger)
 				);
 				albumDetail = albumRes.data;
 			} catch (err) {
@@ -401,13 +533,15 @@ export class MetadataEnrichmentService {
 				}
 
 				for (const chunk of chunks) {
-					const tracksRes = await axios.get(
-						'https://api.spotify.com/v1/tracks',
-						{
-							params: { ids: chunk.join(',') },
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
+					const tracksRes = await this.spotifyService.enqueue(() =>
+						requestWithRetry(() => axios.get(
+							'https://api.spotify.com/v1/tracks',
+							{
+								params: { ids: chunk.join(',') },
+								headers: { Authorization: `Bearer ${token}` },
+								timeout: 15000,
+							},
+						), this.logger)
 					);
 					if (tracksRes.data?.tracks) {
 						tracksWithIsrc.push(...tracksRes.data.tracks);
@@ -606,5 +740,97 @@ export class MetadataEnrichmentService {
 
 	private sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	// ─────────────────────────────────────────────────────
+	// LOCAL DB LOOKUP (cache-first)
+	// ─────────────────────────────────────────────────────
+
+	/**
+	 * Check if a track with this ISRC already exists in the local DB.
+	 * If found, construct EnrichedMetadata from the release + tracks data.
+	 */
+	private async findLocalByIsrc(isrc: string): Promise<EnrichedMetadata | null> {
+		try {
+			const trackRepo = this.dataSource.getRepository(Track);
+			const track = await trackRepo.findOne({
+				where: { isrc: ILike(isrc) },
+				relations: ['release', 'release.releaseArtists', 'release.releaseArtists.artist', 'release.label', 'release.tracks'],
+			});
+
+			if (!track?.release) return null;
+
+			const release = track.release;
+
+			// Only use local data if it has real metadata (not just a placeholder)
+			if (!release.upc || release.upc.trim().toUpperCase().startsWith('ISRC-')) {
+				return null;
+			}
+
+			return this.buildLocalEnrichedMetadata(release, isrc);
+		} catch (err) {
+			this.logger.warn(`[Local Cache] Failed to query local DB for ISRC ${isrc}: ${err.message}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Check if a release with this UPC already exists in the local DB.
+	 * If found, construct EnrichedMetadata from the release data.
+	 */
+	private async findLocalByUpc(upc: string): Promise<EnrichedMetadata | null> {
+		try {
+			const releaseRepo = this.dataSource.getRepository(Release);
+			const release = await releaseRepo.findOne({
+				where: { upc: ILike(upc) },
+				relations: ['releaseArtists', 'releaseArtists.artist', 'label', 'tracks'],
+			});
+
+			if (!release) return null;
+
+			// Only use local data if title is present (not empty placeholder)
+			if (!release.title?.trim()) {
+				return null;
+			}
+
+			const primaryIsrc = (release.tracks || [])
+				.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
+				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0]?.isrc || '';
+
+			return this.buildLocalEnrichedMetadata(release, primaryIsrc);
+		} catch (err) {
+			this.logger.warn(`[Local Cache] Failed to query local DB for UPC ${upc}: ${err.message}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Build EnrichedMetadata from a local Release entity.
+	 */
+	private buildLocalEnrichedMetadata(release: Release, primaryIsrc: string): EnrichedMetadata {
+		const primaryArtist = (release.releaseArtists || [])
+			.find(ra => ra.artist)?.artist;
+
+		const tracks = (release.tracks || [])
+			.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
+			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+			.map(t => ({
+				isrc: t.isrc!,
+				title: t.title || '',
+				trackNumber: t.order,
+			}));
+
+		return {
+			source: 'local',
+			isrc: primaryIsrc,
+			trackTitle: tracks[0]?.title || '',
+			artistName: primaryArtist?.name || '',
+			upc: release.upc || '',
+			albumTitle: release.title || '',
+			releaseDate: release.releaseDate ? new Date(release.releaseDate).toISOString().slice(0, 10) : undefined,
+			totalTracks: tracks.length || undefined,
+			labelName: release.label?.name,
+			tracks,
+		};
 	}
 }
