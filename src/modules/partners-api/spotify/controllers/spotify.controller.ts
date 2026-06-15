@@ -12,7 +12,7 @@ import { map, takeWhile, switchMap } from 'rxjs/operators';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 
 @ApiTags('Partners API')
-@ApiBearerAuth()
+@ApiBearerAuth('token')
 @Controller('partners')
 export class SpotifyController {
 	private readonly logger = new Logger(SpotifyController.name);
