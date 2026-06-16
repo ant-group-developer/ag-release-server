@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { DataSource, ILike } from 'typeorm';
 import { SpotifyService } from './spotify.service';
 import { Release } from 'src/modules/release/entities/release.entity';
+import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 
 /**
@@ -52,6 +53,10 @@ export interface EnrichedMetadata {
 	}>;
 }
 
+interface EnrichmentLookupOptions {
+	forceExternal?: boolean;
+}
+
 const sleepHelper = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function requestWithRetry<T>(
@@ -99,15 +104,20 @@ export class MetadataEnrichmentService {
 	// PUBLIC API
 	// ─────────────────────────────────────────────────────
 
-	async enrichByIsrc(isrc: string): Promise<EnrichedMetadata | null> {
+	async enrichByIsrc(
+		isrc: string,
+		options?: EnrichmentLookupOptions,
+	): Promise<EnrichedMetadata | null> {
 		if (!isrc?.trim()) return null;
 		const normalizedIsrc = isrc.trim().toUpperCase();
 
 		// ─── Local-first: check if ISRC already exists in DB ───
-		const localResult = await this.findLocalByIsrc(normalizedIsrc);
-		if (localResult) {
-			this.logger.log(`[Local Cache] Found ISRC ${normalizedIsrc} in local DB, skipping external API call`);
-			return localResult;
+		if (!options?.forceExternal) {
+			const localResult = await this.findLocalByIsrc(normalizedIsrc);
+			if (localResult) {
+				this.logger.log(`[Local Cache] Found enriched ISRC ${normalizedIsrc} in local DB, skipping external API call`);
+				return localResult;
+			}
 		}
 
 		// Call both Spotify and Deezer APIs in parallel
@@ -137,15 +147,20 @@ export class MetadataEnrichmentService {
 		return null;
 	}
 
-	async enrichByUpc(upc: string): Promise<EnrichedMetadata | null> {
+	async enrichByUpc(
+		upc: string,
+		options?: EnrichmentLookupOptions,
+	): Promise<EnrichedMetadata | null> {
 		if (!upc?.trim()) return null;
 		const normalizedUpc = upc.trim();
 
 		// ─── Local-first: check if UPC already exists in DB ───
-		const localResult = await this.findLocalByUpc(normalizedUpc);
-		if (localResult) {
-			this.logger.log(`[Local Cache] Found UPC ${normalizedUpc} in local DB, skipping external API call`);
-			return localResult;
+		if (!options?.forceExternal) {
+			const localResult = await this.findLocalByUpc(normalizedUpc);
+			if (localResult) {
+				this.logger.log(`[Local Cache] Found enriched UPC ${normalizedUpc} in local DB, skipping external API call`);
+				return localResult;
+			}
 		}
 
 		// Call both Spotify and Deezer APIs in parallel
@@ -362,7 +377,7 @@ export class MetadataEnrichmentService {
 	 */
 	async enrichBatch(
 		isrcs: string[],
-		options?: { concurrency?: number; delayMs?: number },
+		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean },
 	): Promise<Map<string, EnrichedMetadata>> {
 		const concurrency = options?.concurrency ?? 3;
 		const delayMs = options?.delayMs ?? 200;
@@ -384,7 +399,9 @@ export class MetadataEnrichmentService {
 				}
 
 				try {
-					const meta = await this.enrichByIsrc(isrc);
+					const meta = await this.enrichByIsrc(isrc, {
+						forceExternal: options?.forceExternal,
+					});
 					if (meta) {
 						this.cacheBatchMetadata(batchCache, isrc, meta);
 						results.set(isrc, batchCache.get(isrc) ?? this.buildMetadataForIsrc(meta, isrc));
@@ -762,8 +779,11 @@ export class MetadataEnrichmentService {
 
 			const release = track.release;
 
-			// Only use local data if it has real metadata (not just a placeholder)
-			if (!release.upc || release.upc.trim().toUpperCase().startsWith('ISRC-')) {
+			// Only use local data if it has a real UPC/EAN, not a report/internal code.
+			if (!this.isValidStandardUpc(release.upc)) {
+				return null;
+			}
+			if (!(await this.hasSuccessfulEnrichment(release.id))) {
 				return null;
 			}
 
@@ -788,8 +808,11 @@ export class MetadataEnrichmentService {
 
 			if (!release) return null;
 
-			// Only use local data if title is present (not empty placeholder)
-			if (!release.title?.trim()) {
+			// Only use local data if UPC is a real UPC/EAN and title is present.
+			if (!this.isValidStandardUpc(release.upc) || !release.title?.trim()) {
+				return null;
+			}
+			if (!(await this.hasSuccessfulEnrichment(release.id))) {
 				return null;
 			}
 
@@ -832,5 +855,20 @@ export class MetadataEnrichmentService {
 			labelName: release.label?.name,
 			tracks,
 		};
+	}
+
+	private isValidStandardUpc(upc?: string | null): boolean {
+		const normalized = upc?.trim() || '';
+		return /^\d{10,14}$/.test(normalized);
+	}
+
+	private async hasSuccessfulEnrichment(releaseId: string): Promise<boolean> {
+		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+		return enrichmentRepo.exists({
+			where: {
+				releaseId,
+				status: ReleaseEnrichmentStatus.SUCCESS,
+			},
+		});
 	}
 }

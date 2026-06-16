@@ -241,7 +241,9 @@ export class MetadataScanService {
 						await new Promise((resolve) => setTimeout(resolve, 300));
 						const upc = pr.release.upc!.trim();
 						this.logger.log(`Querying Spotify/Deezer for UPC ${upc}...`);
-						const enriched = await this.metadataEnrichmentService.enrichByUpc(upc);
+						const enriched = await this.metadataEnrichmentService.enrichByUpc(upc, {
+							forceExternal: force,
+						});
 						if (enriched) {
 							const primaryEnriched = enriched;
 							const changes: string[] = [];
@@ -405,6 +407,7 @@ export class MetadataScanService {
 				const enrichedMap = await this.metadataEnrichmentService.enrichBatch(isrcs, {
 					concurrency: 1,
 					delayMs: 500,
+					forceExternal: force,
 				});
 
 				// Group results by release
