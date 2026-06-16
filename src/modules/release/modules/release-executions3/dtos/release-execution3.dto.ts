@@ -60,7 +60,15 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 	}
 }
 
-import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+	IsArray,
+	IsBoolean,
+	IsEnum,
+	IsOptional,
+	IsString,
+	IsUUID,
+} from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import {
@@ -89,4 +97,13 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsEnum(ReleaseExecutionStepStatus)
 	status?: ReleaseExecutionStepStatus;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === true || value === 'true') return true;
+		if (value === false || value === 'false') return false;
+		return value;
+	})
+	@IsBoolean()
+	latestOnly?: boolean;
 }

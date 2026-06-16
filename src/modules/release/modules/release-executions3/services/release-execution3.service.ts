@@ -9,7 +9,7 @@ import { LogsService } from 'src/modules/log/services/logs.services';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
-import { EntityManager, In, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import {
 	CiDistributionJob3,
@@ -452,6 +452,19 @@ export class ReleaseExecution3Service {
 			.skip((page - 1) * pageSize)
 			.take(pageSize);
 
+		if (query.latestOnly) {
+			const latestExecutionSubQuery = this.executionRepo
+				.createQueryBuilder('latestExecution')
+				.select('latestExecution.id')
+				.distinctOn(['latestExecution.releaseId'])
+				.orderBy('latestExecution.releaseId', 'ASC')
+				.addOrderBy('latestExecution.createdAt', 'DESC')
+				.addOrderBy('latestExecution.id', 'DESC')
+				.getQuery();
+
+			qb.andWhere(`execution.id IN (${latestExecutionSubQuery})`);
+		}
+
 		if (query.releaseId) {
 			qb.andWhere('execution.releaseId = :releaseId', {
 				releaseId: query.releaseId,
@@ -474,6 +487,31 @@ export class ReleaseExecution3Service {
 			qb.andWhere('execution.createdAt <= :endCreatedAt', {
 				endCreatedAt: query.endCreatedAt,
 			});
+		}
+
+		const keywords = [...(query.keyword ?? [])].filter(
+			(keyword) => !!keyword?.trim(),
+		);
+
+		if (keywords.length) {
+			qb.andWhere(
+				new Brackets((keywordQb) => {
+					keywords.forEach((keyword, index) => {
+						const paramKey = `keyword${index}`;
+						const condition = `(
+							execution.release_upc ILIKE :${paramKey}
+							OR execution.release_title ILIKE :${paramKey}
+						)`;
+						const params = { [paramKey]: `%${keyword}%` };
+
+						if (index === 0) {
+							keywordQb.where(condition, params);
+						} else {
+							keywordQb.orWhere(condition, params);
+						}
+					});
+				}),
+			);
 		}
 
 		const [items, total] = await qb.getManyAndCount();
