@@ -199,6 +199,13 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/status-dsps-ci')
+	async getStatusDspsCi(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.getStatusDspsCi(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	// @Get(':id/test-status')
 	// async testSyncStatus(@Param('id', ParseUUIDPipe) id: string) {
 	// 	const result = await this.releaseService.testSyncReleaseStatus(id);

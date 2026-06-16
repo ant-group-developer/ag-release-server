@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { GetCiReleasesDto } from '../dtos/ci.dto';
+import { GetCiQaFlagsDto, GetCiReleaseFormatsDto } from '../dtos/ci.dto';
 
 @Injectable()
-export class CiService {
-	private readonly logger = new Logger(CiService.name);
+export class CiReleaseService {
+	private readonly logger = new Logger(CiReleaseService.name);
 
 	constructor(private readonly appConfigService: AppConfigService) {}
 
@@ -51,57 +51,39 @@ export class CiService {
 		return searchParams;
 	}
 
-	async getReleaseDetail(releaseId: string): Promise<any> {
+	async getReleaseFormats(params?: GetCiReleaseFormatsDto): Promise<any> {
 		try {
-			const endpoint = `/releases/v1/organisations/${this.organisationId}/releases/${releaseId}`;
-			const response = await this.client.get(endpoint);
-			return response.data;
-		} catch (error) {
-			this.logger.error(
-				`Error getReleaseDetail at ${releaseId}`,
-				error?.message || error,
-			);
-			throw error;
-		}
-	}
-
-	async getReleases(params?: GetCiReleasesDto): Promise<any> {
-		try {
-			const endpoint = `/releases/v1/organisations/${this.organisationId}/releases`;
+			const endpoint = `/releases/v1/organisations/${this.organisationId}/releaseformats`;
 			const response = await this.client.get(endpoint, {
 				params: this.buildParams(params),
 			});
 			return response.data;
 		} catch (error) {
-			this.logger.error(`Error getReleases`, error?.message || error);
-			throw error;
-		}
-	}
-
-	async getReleaseQaFlags(releaseId: string): Promise<any> {
-		try {
-			const endpoint = `/releases/v1/organisations/${this.organisationId}/releases/${releaseId}/metadata/qa_flags`;
-			const response = await this.client.get(endpoint);
-			return response.data;
-		} catch (error) {
 			this.logger.error(
-				`Error getReleaseQaFlags at ${releaseId}`,
+				`Error getReleaseFormats`,
 				error?.message || error,
 			);
 			throw error;
 		}
 	}
 
-	async getImportDetail(batchId: string): Promise<any> {
+	async getReleaseFormatOne(
+		params?: GetCiReleaseFormatsDto,
+	): Promise<any | null> {
+		const releaseFormats = await this.getReleaseFormats(params);
+		return releaseFormats?._embedded?.[0] ?? null;
+	}
+
+	async getQaFlags(params: GetCiQaFlagsDto): Promise<any> {
 		try {
-			const endpoint = `/imports/v1/organisations/${this.organisationId}/batch/${batchId}`;
-			const response = await this.client.get(endpoint);
+			const { releaseFormatsId, ...query } = params;
+			const endpoint = `/releases/v1/organisations/${this.organisationId}/releaseformats/${releaseFormatsId}/qaflags`;
+			const response = await this.client.get(endpoint, {
+				params: this.buildParams(query),
+			});
 			return response.data;
 		} catch (error) {
-			this.logger.error(
-				`Error getImportDetail at ${batchId}`,
-				error?.message || error,
-			);
+			this.logger.error(`Error getQaFlags`, error?.message || error);
 			throw error;
 		}
 	}

@@ -184,6 +184,14 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	isSentMetadataCi: boolean;
 
 	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'CI release format ID',
+	})
+	releaseFormatsIdCi: string | null;
+
+	@Column({
 		type: 'boolean',
 		default: false,
 		comment: 'Được tạo từ luồng import release report',
