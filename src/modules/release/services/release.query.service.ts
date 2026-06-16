@@ -17,6 +17,7 @@ import {
 	QueryGetListReleaseDto2,
 } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
+import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import {
 	ReleaseStatus,
 	VirtualColumnRelease,
@@ -501,6 +502,7 @@ export class ReleaseQueryService {
 			artistId,
 			isVariousArtist,
 			isImportedFromReport,
+			isEnrich,
 			tenantIds,
 
 			fieldOrder,
@@ -619,6 +621,21 @@ export class ReleaseQueryService {
 			queryBuilder.andWhere(
 				'release.isImportedFromReport = :isImportedFromReport',
 				{ isImportedFromReport },
+			);
+		}
+
+		if (isEnrich !== undefined) {
+			queryBuilder.leftJoin(
+				ReleaseEnrichment,
+				'releaseEnrichmentFilter',
+				'releaseEnrichmentFilter.releaseId = release.id AND releaseEnrichmentFilter.status = :successfulEnrichmentStatus',
+				{ successfulEnrichmentStatus: ReleaseEnrichmentStatus.SUCCESS },
+			);
+
+			queryBuilder.andWhere(
+				isEnrich
+					? 'releaseEnrichmentFilter.id IS NOT NULL'
+					: 'releaseEnrichmentFilter.id IS NULL',
 			);
 		}
 

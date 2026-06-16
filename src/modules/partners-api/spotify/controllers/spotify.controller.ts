@@ -65,14 +65,18 @@ export class SpotifyController {
 	@ApiQuery({ name: 'dryRun', required: false, type: Boolean, description: 'Preview changes without writing to DB' })
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max releases to process (omit to run ALL in background)' })
 	@ApiQuery({ name: 'force', required: false, type: Boolean, description: 'Force re-scan already enriched releases' })
+	@ApiQuery({ name: 'isImportedFromReport', required: false, type: Boolean, description: 'true: full report-import enrichment, false: links only' })
 	async scanAndEnrich(
 		@Query('dryRun') dryRun?: string,
 		@Query('limit') limit?: string,
 		@Query('force') force?: string,
+		@Query('isImportedFromReport') isImportedFromReport?: string,
 	) {
 		const isDryRun = dryRun === 'true';
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
 		const isForce = force === 'true';
+		const parsedIsImportedFromReport =
+			this.parseOptionalBoolean(isImportedFromReport) ?? true;
 		const scanId = uuidv4();
 
 		// Always run the scan asynchronously in the background
@@ -82,6 +86,7 @@ export class SpotifyController {
 				limit: parsedLimit,
 				scanId,
 				force: isForce,
+				isImportedFromReport: parsedIsImportedFromReport,
 			})
 			.catch((err) => {
 				this.logger.error(`Background scan failed: ${err.message}`, err.stack);
@@ -95,6 +100,7 @@ export class SpotifyController {
 				dryRun: isDryRun,
 				force: isForce,
 				limit: parsedLimit,
+				isImportedFromReport: parsedIsImportedFromReport,
 				summary,
 			},
 		});
@@ -227,5 +233,12 @@ export class SpotifyController {
 				);
 			}, true),
 		);
+	}
+
+	private parseOptionalBoolean(value?: string): boolean | undefined {
+		if (value === undefined) return undefined;
+		if (value === 'true') return true;
+		if (value === 'false') return false;
+		return undefined;
 	}
 }

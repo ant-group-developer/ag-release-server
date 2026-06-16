@@ -350,6 +350,42 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	metadataSpotify: {
 		folderBucket: string | null;
 		folderServer: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			spotifyId?: string | null;
+			spotifyUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata deezer',
+	})
+	metadataDeezer: {
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			deezerId?: string | null;
+			deezerUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
 	} | null;
 
 	@OneToMany(() => ReleaseLog, (rL) => rL.release)

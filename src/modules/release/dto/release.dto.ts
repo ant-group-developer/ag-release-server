@@ -425,6 +425,20 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	isImportedFromReport?: boolean;
 
 	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the release has been successfully enriched',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isEnrich?: boolean;
+
+	@ApiPropertyOptional({
 		type: [String],
 		description: 'Tenant IDs',
 	})
