@@ -10,6 +10,7 @@ import { FactDspRow, FactSalesRow } from '../../interfaces';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
+import { normalizeFactRows } from '../../utils/fact-row-normalizer.util';
 
 export interface ImportResult {
   batchId: string;
@@ -168,6 +169,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {
@@ -226,6 +228,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {
@@ -289,6 +292,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {

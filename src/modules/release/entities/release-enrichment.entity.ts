@@ -4,6 +4,7 @@ import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 
 export enum ReleaseEnrichmentStatus {
 	PENDING = 'PENDING',
+	PROCESSING = 'PROCESSING',
 	SUCCESS = 'SUCCESS',
 	FAILED = 'FAILED',
 	NOT_FOUND = 'NOT_FOUND',

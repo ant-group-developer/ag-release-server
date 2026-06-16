@@ -112,6 +112,65 @@ export class ClickHouseService implements OnModuleDestroy {
   }
 
   /**
+   * Wait for async ALTER DELETE/UPDATE mutations before re-importing data.
+   */
+  async waitForTableMutations(
+    table: string,
+    options?: {
+      database?: string;
+      timeoutMs?: number;
+      pollMs?: number;
+      commandContains?: string;
+    },
+  ): Promise<void> {
+    const database = options?.database ?? 'music_analytics';
+    const timeoutMs = options?.timeoutMs ?? Number(process.env.CLICKHOUSE_DELETE_MUTATION_TIMEOUT_MS ?? 900000);
+    const pollMs = options?.pollMs ?? Number(process.env.CLICKHOUSE_DELETE_MUTATION_POLL_MS ?? 5000);
+    const startedAt = Date.now();
+
+    await this.sleep(500);
+
+    while (true) {
+      const rows = await this.query<{ mutation_id: string; command: string; latest_fail_reason: string }>(
+        `
+          SELECT mutation_id, command, latest_fail_reason
+          FROM system.mutations
+          WHERE database = {database: String}
+            AND table = {table: String}
+            AND is_done = 0
+            ${options?.commandContains ? 'AND position(command, {commandContains: String}) > 0' : ''}
+        `,
+        {
+          database,
+          table,
+          ...(options?.commandContains ? { commandContains: options.commandContains } : {}),
+        },
+      );
+
+      if (rows.length === 0) return;
+
+      const failed = rows.find((row) => row.latest_fail_reason);
+      if (failed) {
+        throw new Error(
+          `ClickHouse mutation ${failed.mutation_id} failed for ${database}.${table}: ${failed.latest_fail_reason}`,
+        );
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new Error(
+          `Timed out waiting for ${rows.length} ClickHouse mutation(s) on ${database}.${table}`,
+        );
+      }
+
+      await this.sleep(pollMs);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
    * Health check — ping ClickHouse server.
    */
   async healthCheck(): Promise<{

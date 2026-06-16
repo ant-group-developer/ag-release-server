@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
-import { DataSource, ILike } from 'typeorm';
+import { DataSource, ILike, In } from 'typeorm';
 import { SpotifyService } from './spotify.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 
 /**
  * Enriched metadata returned from Spotify or Deezer APIs for a given ISRC.
@@ -17,6 +18,9 @@ export interface EnrichedMetadata {
 	isrc: string;
 	trackTitle: string;
 	trackSpotifyId?: string;
+	trackDeezerId?: string;
+	trackSpotifyUrl?: string;
+	trackDeezerUrl?: string;
 	trackDuration?: number; // ms
 
 	// ─── Artist-Level ────────────────────────────────────
@@ -32,10 +36,19 @@ export interface EnrichedMetadata {
 	albumTitle: string;
 	albumSpotifyId?: string;
 	albumDeezerId?: string;
+	albumSpotifyUrl?: string;
+	albumDeezerUrl?: string;
 	releaseDate?: string; // 'YYYY-MM-DD'
 	albumType?: string; // 'album' | 'single' | 'compilation'
 	totalTracks?: number;
 	albumCoverUrl?: string;
+	albumCoverImages?: Array<{
+		url: string;
+		width?: number | null;
+		height?: number | null;
+		size?: string | null;
+		source?: 'spotify' | 'deezer';
+	}>;
 
 	// ─── Label & Copyright ───────────────────────────────
 	labelName?: string;
@@ -50,6 +63,8 @@ export interface EnrichedMetadata {
 		trackNumber?: number;
 		spotifyId?: string;
 		deezerId?: string;
+		spotifyUrl?: string;
+		deezerUrl?: string;
 	}>;
 }
 
@@ -136,9 +151,8 @@ export class MetadataEnrichmentService {
 			}),
 		]);
 
-		// Prioritize Spotify first, then fall back to Deezer
 		if (spotifyResult) {
-			return spotifyResult;
+			return this.mergeProviderMetadata(spotifyResult, deezerResult);
 		}
 		if (deezerResult) {
 			return deezerResult;
@@ -152,7 +166,7 @@ export class MetadataEnrichmentService {
 		options?: EnrichmentLookupOptions,
 	): Promise<EnrichedMetadata | null> {
 		if (!upc?.trim()) return null;
-		const normalizedUpc = upc.trim();
+		const normalizedUpc = normalizeUpc(upc);
 
 		// ─── Local-first: check if UPC already exists in DB ───
 		if (!options?.forceExternal) {
@@ -180,13 +194,67 @@ export class MetadataEnrichmentService {
 		]);
 
 		if (spotifyResult) {
-			return spotifyResult;
+			return this.mergeProviderMetadata(spotifyResult, deezerResult);
 		}
 		if (deezerResult) {
 			return deezerResult;
 		}
 
 		return null;
+	}
+
+	private mergeProviderMetadata(
+		primary: EnrichedMetadata,
+		secondary: EnrichedMetadata | null,
+	): EnrichedMetadata {
+		if (!secondary) return primary;
+
+		const tracksByIsrc = new Map<string, NonNullable<EnrichedMetadata['tracks']>[number]>();
+		for (const track of primary.tracks || []) {
+			const key = this.normalizeIsrc(track.isrc);
+			if (key) tracksByIsrc.set(key, { ...track });
+		}
+
+		for (const track of secondary.tracks || []) {
+			const key = this.normalizeIsrc(track.isrc);
+			if (!key) continue;
+			const current = tracksByIsrc.get(key) || { isrc: track.isrc, title: track.title };
+			tracksByIsrc.set(key, {
+				...current,
+				title: current.title || track.title,
+				duration: current.duration ?? track.duration,
+				trackNumber: current.trackNumber ?? track.trackNumber,
+				spotifyId: current.spotifyId || track.spotifyId,
+				deezerId: current.deezerId || track.deezerId,
+				spotifyUrl: current.spotifyUrl || track.spotifyUrl,
+				deezerUrl: current.deezerUrl || track.deezerUrl,
+			});
+		}
+
+		const coverImages = [
+			...(primary.albumCoverImages || []),
+			...(secondary.albumCoverImages || []),
+		].filter((image, index, all) => {
+			return image.url && all.findIndex((item) => item.url === image.url) === index;
+		});
+
+		return {
+			...primary,
+			trackDeezerId: primary.trackDeezerId || secondary.trackDeezerId,
+			trackDeezerUrl: primary.trackDeezerUrl || secondary.trackDeezerUrl,
+			trackSpotifyId: primary.trackSpotifyId || secondary.trackSpotifyId,
+			trackSpotifyUrl: primary.trackSpotifyUrl || secondary.trackSpotifyUrl,
+			artistDeezerId: primary.artistDeezerId || secondary.artistDeezerId,
+			artistDeezerUrl: primary.artistDeezerUrl || secondary.artistDeezerUrl,
+			artistSpotifyId: primary.artistSpotifyId || secondary.artistSpotifyId,
+			artistSpotifyUrl: primary.artistSpotifyUrl || secondary.artistSpotifyUrl,
+			albumDeezerId: primary.albumDeezerId || secondary.albumDeezerId,
+			albumDeezerUrl: primary.albumDeezerUrl || secondary.albumDeezerUrl,
+			albumSpotifyId: primary.albumSpotifyId || secondary.albumSpotifyId,
+			albumSpotifyUrl: primary.albumSpotifyUrl || secondary.albumSpotifyUrl,
+			albumCoverImages: coverImages,
+			tracks: Array.from(tracksByIsrc.values()),
+		};
 	}
 
 	private async enrichFromSpotifyByUpc(upc: string): Promise<EnrichedMetadata | null> {
@@ -277,6 +345,7 @@ export class MetadataEnrichmentService {
 			// Track
 			trackTitle: tracksWithIsrc[0]?.name || '',
 			trackSpotifyId: tracksWithIsrc[0]?.id,
+			trackSpotifyUrl: tracksWithIsrc[0]?.external_urls?.spotify,
 			trackDuration: tracksWithIsrc[0]?.duration_ms,
 
 			// Artist
@@ -288,10 +357,12 @@ export class MetadataEnrichmentService {
 			upc,
 			albumTitle: albumDetail.name || '',
 			albumSpotifyId: albumDetail.id,
+			albumSpotifyUrl: albumDetail.external_urls?.spotify || album.external_urls?.spotify,
 			releaseDate: albumDetail.release_date,
 			albumType: albumDetail.album_type,
 			totalTracks: albumDetail.total_tracks,
 			albumCoverUrl: albumDetail.images?.[0]?.url,
+			albumCoverImages: this.buildSpotifyCoverImages(albumDetail.images),
 
 			// Label & Copyright
 			labelName: albumDetail.label,
@@ -308,6 +379,7 @@ export class MetadataEnrichmentService {
 				duration: t.duration_ms,
 				trackNumber: t.track_number,
 				spotifyId: t.id,
+				spotifyUrl: t.external_urls?.spotify,
 			})),
 		};
 	}
@@ -338,6 +410,8 @@ export class MetadataEnrichmentService {
 
 			// Track
 			trackTitle: tracksWithIsrc[0]?.title_short || tracksWithIsrc[0]?.title || '',
+			trackDeezerId: tracksWithIsrc[0]?.id?.toString(),
+			trackDeezerUrl: tracksWithIsrc[0]?.link,
 			trackDuration: tracksWithIsrc[0]?.duration ? tracksWithIsrc[0]?.duration * 1000 : undefined,
 
 			// Artist
@@ -350,10 +424,12 @@ export class MetadataEnrichmentService {
 			upc,
 			albumTitle: albumDetail.title || '',
 			albumDeezerId: albumDetail.id?.toString(),
+			albumDeezerUrl: albumDetail.link,
 			releaseDate: albumDetail.release_date,
 			albumType: albumDetail.record_type,
 			totalTracks: albumDetail.nb_tracks,
 			albumCoverUrl: albumDetail.cover_big || albumDetail.cover_xl,
+			albumCoverImages: this.buildDeezerCoverImages(albumDetail),
 
 			// Label & Copyright
 			labelName: albumDetail.label,
@@ -367,6 +443,7 @@ export class MetadataEnrichmentService {
 				duration: t.duration ? t.duration * 1000 : undefined,
 				trackNumber: t.track_position,
 				deezerId: t.id?.toString(),
+				deezerUrl: t.link,
 			})),
 		};
 	}
@@ -485,12 +562,51 @@ export class MetadataEnrichmentService {
 			isrc: matchedTrack.isrc,
 			trackTitle: matchedTrack.title || meta.trackTitle,
 			trackSpotifyId: matchedTrack.spotifyId || meta.trackSpotifyId,
+			trackDeezerId: matchedTrack.deezerId || meta.trackDeezerId,
+			trackSpotifyUrl: matchedTrack.spotifyUrl || meta.trackSpotifyUrl,
+			trackDeezerUrl: matchedTrack.deezerUrl || meta.trackDeezerUrl,
 			trackDuration: matchedTrack.duration ?? meta.trackDuration,
 		};
 	}
 
 	private normalizeIsrc(isrc?: string): string {
 		return isrc?.trim().toUpperCase() || '';
+	}
+
+	private buildSpotifyCoverImages(images?: any[]): EnrichedMetadata['albumCoverImages'] {
+		return (images || [])
+			.filter((image) => image?.url)
+			.map((image) => ({
+				url: image.url,
+				width: image.width ?? null,
+				height: image.height ?? null,
+				size: image.width && image.height ? `${image.width}x${image.height}` : null,
+				source: 'spotify' as const,
+			}));
+	}
+
+	private buildDeezerCoverImages(album?: any): EnrichedMetadata['albumCoverImages'] {
+		const sizeMap: Array<[string, string, number | null]> = [
+			['small', 'cover_small', 56],
+			['medium', 'cover_medium', 250],
+			['big', 'cover_big', 500],
+			['xl', 'cover_xl', 1000],
+		];
+
+		const images: NonNullable<EnrichedMetadata['albumCoverImages']> = [];
+		for (const [size, key, dimension] of sizeMap) {
+				const url = album?.[key];
+				if (!url) continue;
+				images.push({
+					url,
+					width: dimension,
+					height: dimension,
+					size,
+					source: 'deezer' as const,
+				});
+		}
+
+		return images;
 	}
 
 	private async enrichFromSpotify(isrc: string): Promise<EnrichedMetadata | null> {
@@ -578,6 +694,7 @@ export class MetadataEnrichmentService {
 			// Track
 			trackTitle: track.name || '',
 			trackSpotifyId: track.id,
+			trackSpotifyUrl: track.external_urls?.spotify,
 			trackDuration: track.duration_ms,
 
 			// Artist
@@ -589,10 +706,12 @@ export class MetadataEnrichmentService {
 			upc,
 			albumTitle: albumDetail?.name || album?.name || '',
 			albumSpotifyId: album?.id,
+			albumSpotifyUrl: albumDetail?.external_urls?.spotify || album?.external_urls?.spotify,
 			releaseDate: albumDetail?.release_date || album?.release_date,
 			albumType: albumDetail?.album_type || album?.album_type,
 			totalTracks: albumDetail?.total_tracks || album?.total_tracks,
 			albumCoverUrl: (albumDetail?.images || album?.images)?.[0]?.url,
+			albumCoverImages: this.buildSpotifyCoverImages(albumDetail?.images || album?.images),
 
 			// Label & Copyright
 			labelName: albumDetail?.label,
@@ -609,6 +728,7 @@ export class MetadataEnrichmentService {
 				duration: t.duration_ms,
 				trackNumber: t.track_number,
 				spotifyId: t.id,
+				spotifyUrl: t.external_urls?.spotify,
 			})),
 		};
 	}
@@ -662,6 +782,8 @@ export class MetadataEnrichmentService {
 
 			// Track
 			trackTitle: trackData.title_short || trackData.title || '',
+			trackDeezerId: trackData.id?.toString(),
+			trackDeezerUrl: trackData.link,
 			trackDuration: trackData.duration ? trackData.duration * 1000 : undefined, // Deezer returns seconds
 
 			// Artist
@@ -674,10 +796,12 @@ export class MetadataEnrichmentService {
 			upc,
 			albumTitle: albumDetail?.title || albumRef?.title || '',
 			albumDeezerId: albumRef?.id?.toString(),
+			albumDeezerUrl: albumDetail?.link || albumRef?.link,
 			releaseDate: albumDetail?.release_date || trackData.release_date,
 			albumType: albumDetail?.record_type,
 			totalTracks: albumDetail?.nb_tracks,
 			albumCoverUrl: albumRef?.cover_big || albumRef?.cover_xl,
+			albumCoverImages: this.buildDeezerCoverImages(albumDetail || albumRef),
 
 			// Label & Copyright
 			labelName: albumDetail?.label,
@@ -691,6 +815,7 @@ export class MetadataEnrichmentService {
 				duration: t.duration ? t.duration * 1000 : undefined,
 				trackNumber: t.track_position,
 				deezerId: t.id?.toString(),
+				deezerUrl: t.link,
 			})),
 		};
 	}
@@ -802,7 +927,7 @@ export class MetadataEnrichmentService {
 		try {
 			const releaseRepo = this.dataSource.getRepository(Release);
 			const release = await releaseRepo.findOne({
-				where: { upc: ILike(upc) },
+				where: { upc: In(buildEquivalentUpcs(upc)) },
 				relations: ['releaseArtists', 'releaseArtists.artist', 'label', 'tracks'],
 			});
 
@@ -848,7 +973,7 @@ export class MetadataEnrichmentService {
 			isrc: primaryIsrc,
 			trackTitle: tracks[0]?.title || '',
 			artistName: primaryArtist?.name || '',
-			upc: release.upc || '',
+			upc: normalizeUpc(release.upc),
 			albumTitle: release.title || '',
 			releaseDate: release.releaseDate ? new Date(release.releaseDate).toISOString().slice(0, 10) : undefined,
 			totalTracks: tracks.length || undefined,
@@ -858,7 +983,7 @@ export class MetadataEnrichmentService {
 	}
 
 	private isValidStandardUpc(upc?: string | null): boolean {
-		const normalized = upc?.trim() || '';
+		const normalized = normalizeUpc(upc);
 		return /^\d{10,14}$/.test(normalized);
 	}
 
