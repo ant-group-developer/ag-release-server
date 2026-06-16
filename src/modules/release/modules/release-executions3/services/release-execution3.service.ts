@@ -494,6 +494,8 @@ export class ReleaseExecution3Service {
 			});
 		}
 
+		this.applyStepFilter(qb, query);
+
 		if (query.startCreatedAt) {
 			qb.andWhere('execution.createdAt >= :startCreatedAt', {
 				startCreatedAt: query.startCreatedAt,
@@ -539,6 +541,48 @@ export class ReleaseExecution3Service {
 			metadata: { totalItems: total, page, pageSize },
 			items,
 		});
+	}
+
+	private applyStepFilter(
+		qb: ReturnType<Repository<ReleaseExecution3>['createQueryBuilder']>,
+		query: QueryGetListReleaseExecution3Dto,
+	) {
+		const stepFilters = (query.steps ?? []).filter(
+			(step) => step?.type || step?.status,
+		);
+
+		if (!stepFilters.length) return;
+
+		const params: Record<string, string> = {};
+
+		stepFilters.forEach((step, index) => {
+			const conditions: string[] = [];
+
+			if (step.type) {
+				const paramKey = `stepType${index}`;
+				conditions.push(`stepFilter.type = :${paramKey}`);
+				params[paramKey] = step.type;
+			}
+
+			if (step.status) {
+				const paramKey = `stepStatus${index}`;
+				conditions.push(`stepFilter.status = :${paramKey}`);
+				params[paramKey] = step.status;
+			}
+
+			const existsOperator = step.exclude ? 'NOT EXISTS' : 'EXISTS';
+
+			qb.andWhere(
+				`${existsOperator} (
+					SELECT 1
+					FROM release_execution_steps3 stepFilter
+					WHERE stepFilter.release_execution_id = execution.id
+					AND ${conditions.join(' AND ')}
+				)`,
+			);
+		});
+
+		qb.setParameters(params);
 	}
 
 	private async resolveReleaseExecutionReleaseIds(

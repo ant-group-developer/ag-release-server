@@ -76,6 +76,8 @@ import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import {
 	ExecutionType,
 	ReleaseExecutionStatus,
+	ReleaseExecutionStepStatus,
+	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 
 export enum FieldOrderReleaseExecution3 {
@@ -97,6 +99,25 @@ export class CreateReleaseExecution3Dto {
 	@IsOptional()
 	@IsEnum(ExecutionType)
 	type?: ExecutionType;
+}
+
+export class QueryReleaseExecutionStepDto {
+	@IsOptional()
+	@IsEnum(ReleaseExecutionStepType)
+	type?: ReleaseExecutionStepType;
+
+	@IsOptional()
+	@IsEnum(ReleaseExecutionStepStatus)
+	status?: ReleaseExecutionStepStatus;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === true || value === 'true') return true;
+		if (value === false || value === 'false') return false;
+		return value;
+	})
+	@IsBoolean()
+	exclude?: boolean;
 }
 
 export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
@@ -125,6 +146,18 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 			.split(',')
 			.map((item) => item.trim());
 	})
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
 	@IsEnum(ReleaseExecutionStatus, { each: true })
 	@IsArray()
 	status?: ReleaseExecutionStatus[];
@@ -137,6 +170,23 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 	})
 	@IsBoolean()
 	latestOnly?: boolean;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		if (typeof value === 'object') return [value];
+
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) ? parsed : [parsed];
+		} catch {
+			return [];
+		}
+	})
+	@ValidateNested({ each: true })
+	@Type(() => QueryReleaseExecutionStepDto)
+	steps?: QueryReleaseExecutionStepDto[];
 
 	@IsOptional()
 	@ValidateNested()
