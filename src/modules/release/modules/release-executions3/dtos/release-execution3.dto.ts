@@ -60,7 +60,7 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 	}
 }
 
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
@@ -68,13 +68,25 @@ import {
 	IsOptional,
 	IsString,
 	IsUUID,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import {
 	ExecutionType,
+	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
+	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
+
+export enum FieldOrderReleaseExecution3 {
+	execution_createdAt = 'execution.createdAt',
+	execution_type = 'execution.type',
+	execution_releaseTitle = 'execution.releaseTitle',
+	execution_releaseUpc = 'execution.releaseUpc',
+	execution_status = 'execution.status',
+}
 
 export class CreateReleaseExecution3Dto {
 	@IsUUID()
@@ -89,10 +101,10 @@ export class CreateReleaseExecution3Dto {
 	type?: ExecutionType;
 }
 
-export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
+export class QueryReleaseExecutionStepDto {
 	@IsOptional()
-	@IsUUID()
-	releaseId?: string;
+	@IsEnum(ReleaseExecutionStepType)
+	type?: ReleaseExecutionStepType;
 
 	@IsOptional()
 	@IsEnum(ReleaseExecutionStepStatus)
@@ -105,5 +117,79 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 		return value;
 	})
 	@IsBoolean()
+	exclude?: boolean;
+}
+
+export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
+	@IsOptional()
+	@IsEnum(FieldOrderReleaseExecution3)
+	fieldOrder: FieldOrderReleaseExecution3 =
+		FieldOrderReleaseExecution3.execution_createdAt;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseIds?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsEnum(ReleaseExecutionStatus, { each: true })
+	@IsArray()
+	status?: ReleaseExecutionStatus[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === true || value === 'true') return true;
+		if (value === false || value === 'false') return false;
+		return value;
+	})
+	@IsBoolean()
 	latestOnly?: boolean;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		if (typeof value === 'object') return [value];
+
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) ? parsed : [parsed];
+		} catch {
+			return [];
+		}
+	})
+	@ValidateNested({ each: true })
+	@Type(() => QueryReleaseExecutionStepDto)
+	steps?: QueryReleaseExecutionStepDto[];
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => QueryGetListReleaseDto)
+	queryListReleases?: QueryGetListReleaseDto;
 }
