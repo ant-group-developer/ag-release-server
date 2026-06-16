@@ -60,7 +60,7 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 	}
 }
 
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
@@ -68,13 +68,23 @@ import {
 	IsOptional,
 	IsString,
 	IsUUID,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
+import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import {
 	ExecutionType,
-	ReleaseExecutionStepStatus,
+	ReleaseExecutionStatus,
 } from '../enums/release-execution3.enum';
+
+export enum FieldOrderReleaseExecution3 {
+	execution_createdAt = 'execution.createdAt',
+	execution_type = 'execution.type',
+	execution_releaseTitle = 'execution.releaseTitle',
+	execution_releaseUpc = 'execution.releaseUpc',
+	execution_status = 'execution.status',
+}
 
 export class CreateReleaseExecution3Dto {
 	@IsUUID()
@@ -91,12 +101,33 @@ export class CreateReleaseExecution3Dto {
 
 export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 	@IsOptional()
-	@IsUUID()
-	releaseId?: string;
+	@IsEnum(FieldOrderReleaseExecution3)
+	fieldOrder: FieldOrderReleaseExecution3 =
+		FieldOrderReleaseExecution3.execution_createdAt;
 
 	@IsOptional()
-	@IsEnum(ReleaseExecutionStepStatus)
-	status?: ReleaseExecutionStepStatus;
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsUUID('4', { each: true })
+	@IsArray()
+	releaseIds?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsEnum(ReleaseExecutionStatus, { each: true })
+	@IsArray()
+	status?: ReleaseExecutionStatus[];
 
 	@IsOptional()
 	@Transform(({ value }) => {
@@ -106,4 +137,9 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 	})
 	@IsBoolean()
 	latestOnly?: boolean;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => QueryGetListReleaseDto)
+	queryListReleases?: QueryGetListReleaseDto;
 }

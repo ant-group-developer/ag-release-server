@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+	Inject,
+	Injectable,
+	NotFoundException,
+	forwardRef,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
@@ -6,9 +11,12 @@ import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-r
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseService } from 'src/modules/release/services/release.service';
 import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import {
@@ -42,6 +50,9 @@ export class ReleaseExecution3Service {
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 		private readonly dspRoutingService: DspRoutingConfigsService,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
 
 		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
@@ -445,12 +456,18 @@ export class ReleaseExecution3Service {
 	async getList(query: QueryGetListReleaseExecution3Dto) {
 		const page = query.page || 1;
 		const pageSize = query.pageSize || 10;
+		const releaseIds = await this.resolveReleaseExecutionReleaseIds(query);
 
-		const qb = this.executionRepo
-			.createQueryBuilder('execution')
-			.orderBy('execution.createdAt', 'DESC')
-			.skip((page - 1) * pageSize)
-			.take(pageSize);
+		query.releaseIds = releaseIds;
+
+		if (query.queryListReleases && !releaseIds.length) {
+			return new PageDto({
+				metadata: { totalItems: 0, page, pageSize },
+				items: [],
+			});
+		}
+
+		const qb = this.executionRepo.createQueryBuilder('execution');
 
 		if (query.latestOnly) {
 			const latestExecutionSubQuery = this.executionRepo
@@ -465,15 +482,15 @@ export class ReleaseExecution3Service {
 			qb.andWhere(`execution.id IN (${latestExecutionSubQuery})`);
 		}
 
-		if (query.releaseId) {
-			qb.andWhere('execution.releaseId = :releaseId', {
-				releaseId: query.releaseId,
+		if (releaseIds.length) {
+			qb.andWhere('execution.releaseId IN (:...releaseIds)', {
+				releaseIds,
 			});
 		}
 
-		if (query.status) {
-			qb.andWhere('execution.status = :status', {
-				status: query.status,
+		if (query.status?.length) {
+			qb.andWhere('execution.status IN (:...statuses)', {
+				statuses: query.status,
 			});
 		}
 
@@ -514,12 +531,54 @@ export class ReleaseExecution3Service {
 			);
 		}
 
+		orderAndPaging2({ qb, filter: query });
+
 		const [items, total] = await qb.getManyAndCount();
 
 		return new PageDto({
 			metadata: { totalItems: total, page, pageSize },
 			items,
 		});
+	}
+
+	private async resolveReleaseExecutionReleaseIds(
+		query: QueryGetListReleaseExecution3Dto,
+	): Promise<string[]> {
+		const explicitReleaseIds = [...(query.releaseIds ?? [])].filter(
+			Boolean,
+		);
+		const uniqueExplicitReleaseIds = [...new Set(explicitReleaseIds)];
+
+		if (!query.queryListReleases) {
+			return uniqueExplicitReleaseIds;
+		}
+
+		const releaseQuery = Object.assign(
+			new QueryGetListReleaseDto(),
+			query.queryListReleases,
+			{
+				page: 1,
+				pageSize: 100000,
+			},
+		);
+
+		const releases = await this.releaseService.getList(releaseQuery);
+		const queriedReleaseIds = [
+			...new Set(
+				releases.items
+					.map((release) => (release as { id?: string }).id)
+					.filter((id): id is string => !!id),
+			),
+		];
+
+		if (!uniqueExplicitReleaseIds.length) {
+			return queriedReleaseIds ?? [];
+		}
+
+		const queriedReleaseIdSet = new Set(queriedReleaseIds);
+		return uniqueExplicitReleaseIds.filter((releaseId) =>
+			queriedReleaseIdSet.has(releaseId),
+		);
 	}
 
 	async findOne(id: string) {
