@@ -24,6 +24,7 @@ import {
 	ScanSessionStatus,
 } from 'src/modules/release/entities/metadata-scan-session.entity';
 import { EnrichEventsGateway } from './enrich-events.gateway';
+import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 
 /** Single field-level change logged to ClickHouse */
 interface ChangeLogEntry {
@@ -576,8 +577,8 @@ export class MetadataScanService implements OnModuleInit {
 						}
 
 						// ─── UPC Resolution ──────────────────────
-						const currentUpc = release.upc?.trim();
-						const apiUpc = primaryEnriched.upc?.trim();
+						const currentUpc = normalizeUpc(release.upc);
+						const apiUpc = normalizeUpc(primaryEnriched.upc);
 
 						const needsUpcUpdate =
 							!currentUpc ||
@@ -586,7 +587,7 @@ export class MetadataScanService implements OnModuleInit {
 
 						if (needsUpcUpdate && apiUpc) {
 							const existing = await releaseRepo.findOne({
-								where: { upc: apiUpc },
+								where: { upc: In(buildEquivalentUpcs(apiUpc)) },
 							});
 
 							if (existing) {

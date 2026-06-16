@@ -6,6 +6,8 @@ import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { ReleaseArtist } from '../../release-artist/entities/release-artist.entity';
 import { MetadataEnrichmentService, EnrichedMetadata } from '../../partners-api/spotify/services/metadata-enrichment.service';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
+import { hasMeaningfulText } from '../../etl/utils/fact-row-normalizer.util';
+import { normalizeUpc } from 'src/utils/upc.util';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,6 +34,7 @@ export class ReportEntityExtractorService {
   async extractAndImport(
     rows: ExtractedRow[],
     tenantId?: string,
+    labelId?: string,
   ): Promise<{
     totalReleases: number;
     created: number;
@@ -47,8 +50,8 @@ export class ReportEntityExtractorService {
     const upcMap = new Map<string, Map<string, ExtractedRow>>();
 
     for (const row of rows) {
-      let isrc = row.isrc?.trim() || '';
-      let upc = row.upc?.trim() || '';
+      let isrc = this.cleanMeaningfulText(row.isrc);
+      let upc = normalizeUpc(this.cleanMeaningfulText(row.upc));
       
       // Chỉ bỏ qua khi thiếu cả hai
       if (!isrc && !upc) continue;
@@ -92,7 +95,7 @@ export class ReportEntityExtractorService {
       const resolvedIsrcMap = resolvedUpcMap.get(enrichedUpc)!;
 
       for (const row of bestRows) {
-        const isrc = row.isrc?.trim() || '';
+        const isrc = this.cleanMeaningfulText(row.isrc);
         const key = isrc || `UPC-${enrichedUpc}`;
         const existing = resolvedIsrcMap.get(key);
         if (!existing || this.getCompletenessScore(row) > this.getCompletenessScore(existing)) {
@@ -113,16 +116,16 @@ export class ReportEntityExtractorService {
 
       // Filter: pgTracks (real ISRCs) vs upcTracks (temporary album-level ISRC in format UPC-xxx)
       const pgTracks = bestRows
-        .filter((r) => !r.isrc || !r.isrc.trim().toUpperCase().startsWith('UPC-'))
+        .filter((r) => !this.cleanMeaningfulText(r.isrc).toUpperCase().startsWith('UPC-'))
         .map((r) => ({
-          title: r.track_title?.trim() || `Track ${r.isrc?.trim() || ''}`,
-          isrc: r.isrc?.trim() || '',
+          title: hasMeaningfulText(r.track_title) ? r.track_title!.trim() : `Track ${this.cleanMeaningfulText(r.isrc)}`,
+          isrc: this.cleanMeaningfulText(r.isrc),
         }));
 
       // Merge remaining tracks of the album from Spotify/Deezer if successfully enriched
       let enriched: EnrichedMetadata | undefined;
       for (const row of bestRows) {
-        const isrc = row.isrc?.trim().toUpperCase();
+        const isrc = this.cleanMeaningfulText(row.isrc).toUpperCase();
         if (!isrc) continue;
         enriched = enrichedMap.get(isrc);
         if (enriched) break;
@@ -142,18 +145,26 @@ export class ReportEntityExtractorService {
       }
 
       const upcTracks = bestRows
-        .filter((r) => r.isrc && r.isrc.trim().toUpperCase().startsWith('UPC-'))
+        .filter((r) => this.cleanMeaningfulText(r.isrc).toUpperCase().startsWith('UPC-'))
         .map((r) => ({
-          title: r.track_title?.trim() || `Track ${r.isrc?.trim() || ''}`,
-          isrc: r.isrc?.trim() || '',
+          title: hasMeaningfulText(r.track_title) ? r.track_title!.trim() : `Track ${this.cleanMeaningfulText(r.isrc)}`,
+          isrc: this.cleanMeaningfulText(r.isrc),
         }));
+      const apiLabelName = hasMeaningfulText(enriched?.labelName)
+        ? enriched!.labelName!.trim()
+        : undefined;
 
       inputs.push({
         upc,
         tenantId: resolvedTenantId || undefined,
-        labelName: representativeRow.label_name?.trim() || undefined,
-        title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${upc}`,
-        artistName: representativeRow.artist_name?.trim() || undefined,
+        labelId: apiLabelName ? undefined : labelId?.trim() || undefined,
+        labelName: apiLabelName,
+        title: hasMeaningfulText(representativeRow.album_title)
+          ? representativeRow.album_title!.trim()
+          : hasMeaningfulText(representativeRow.track_title)
+          ? representativeRow.track_title!.trim()
+          : `Release ${upc}`,
+        artistName: hasMeaningfulText(representativeRow.artist_name) ? representativeRow.artist_name!.trim() : undefined,
         tracks: pgTracks,
         upcTracks,
         bestRows,
@@ -174,7 +185,7 @@ export class ReportEntityExtractorService {
         let triedEnrichment = false;
         if (input.bestRows) {
           for (const row of input.bestRows) {
-            const isrc = row.isrc?.trim();
+            const isrc = this.cleanMeaningfulText(row.isrc);
             if (!isrc) continue;
             if (isrc.toUpperCase().startsWith('UPC-')) continue;
             triedEnrichment = true;
@@ -259,11 +270,15 @@ export class ReportEntityExtractorService {
 
   private getCompletenessScore(row: ExtractedRow): number {
     let score = 0;
-    if (row.track_title?.trim()) score++;
-    if (row.artist_name?.trim()) score++;
-    if (row.album_title?.trim()) score++;
-    if (row.label_name?.trim()) score++;
+    if (hasMeaningfulText(row.track_title)) score++;
+    if (hasMeaningfulText(row.artist_name)) score++;
+    if (hasMeaningfulText(row.album_title)) score++;
+    if (hasMeaningfulText(row.label_name)) score++;
     return score;
+  }
+
+  private cleanMeaningfulText(value: string | null | undefined): string {
+    return hasMeaningfulText(value) ? value!.trim() : '';
   }
 
   // ─────────────────────────────────────────────────────
@@ -295,7 +310,7 @@ export class ReportEntityExtractorService {
       const bestRows = Array.from(isrcMap.values());
 
       for (const row of bestRows) {
-        const isrc = row.isrc?.trim();
+        const isrc = this.cleanMeaningfulText(row.isrc);
         if (!isrc) continue;
         // Skip fake ISRCs (UPC- prefix) — they have no real ISRC to look up
         if (isrc.toUpperCase().startsWith('UPC-')) continue;
@@ -347,7 +362,7 @@ export class ReportEntityExtractorService {
     // Try to find enrichment data from any ISRC in this release group
     let enriched: EnrichedMetadata | undefined;
     for (const row of allRows) {
-      const isrc = row.isrc?.trim().toUpperCase();
+      const isrc = this.cleanMeaningfulText(row.isrc).toUpperCase();
       if (!isrc) continue;
       enriched = enrichedMap.get(isrc);
       if (enriched) break;
@@ -356,9 +371,10 @@ export class ReportEntityExtractorService {
     if (!enriched) return currentUpc;
 
     // ─── Resolve UPC ─────────────────────────────────
-    let resolvedUpc = currentUpc;
-    if (enriched.upc && currentUpc !== enriched.upc) {
-      resolvedUpc = enriched.upc;
+    let resolvedUpc = normalizeUpc(currentUpc);
+    const enrichedUpc = normalizeUpc(enriched.upc);
+    if (enrichedUpc && resolvedUpc !== enrichedUpc) {
+      resolvedUpc = enrichedUpc;
       this.logger.log(
         `✅ Enrichment: Resolved UPC ${currentUpc} → real UPC ${resolvedUpc} (via ${enriched.source})`,
       );
@@ -377,7 +393,7 @@ export class ReportEntityExtractorService {
 
     // ─── Overwrite track titles with official info ───────────────────
     for (const row of allRows) {
-      const isrc = row.isrc?.trim().toUpperCase();
+      const isrc = this.cleanMeaningfulText(row.isrc).toUpperCase();
       if (!isrc) continue;
       const trackEnriched = enrichedMap.get(isrc);
       if (!trackEnriched) continue;

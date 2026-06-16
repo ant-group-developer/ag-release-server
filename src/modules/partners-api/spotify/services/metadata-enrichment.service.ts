@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
-import { DataSource, ILike } from 'typeorm';
+import { DataSource, ILike, In } from 'typeorm';
 import { SpotifyService } from './spotify.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 
 /**
  * Enriched metadata returned from Spotify or Deezer APIs for a given ISRC.
@@ -165,7 +166,7 @@ export class MetadataEnrichmentService {
 		options?: EnrichmentLookupOptions,
 	): Promise<EnrichedMetadata | null> {
 		if (!upc?.trim()) return null;
-		const normalizedUpc = upc.trim();
+		const normalizedUpc = normalizeUpc(upc);
 
 		// ─── Local-first: check if UPC already exists in DB ───
 		if (!options?.forceExternal) {
@@ -926,7 +927,7 @@ export class MetadataEnrichmentService {
 		try {
 			const releaseRepo = this.dataSource.getRepository(Release);
 			const release = await releaseRepo.findOne({
-				where: { upc: ILike(upc) },
+				where: { upc: In(buildEquivalentUpcs(upc)) },
 				relations: ['releaseArtists', 'releaseArtists.artist', 'label', 'tracks'],
 			});
 
@@ -972,7 +973,7 @@ export class MetadataEnrichmentService {
 			isrc: primaryIsrc,
 			trackTitle: tracks[0]?.title || '',
 			artistName: primaryArtist?.name || '',
-			upc: release.upc || '',
+			upc: normalizeUpc(release.upc),
 			albumTitle: release.title || '',
 			releaseDate: release.releaseDate ? new Date(release.releaseDate).toISOString().slice(0, 10) : undefined,
 			totalTracks: tracks.length || undefined,
@@ -982,7 +983,7 @@ export class MetadataEnrichmentService {
 	}
 
 	private isValidStandardUpc(upc?: string | null): boolean {
-		const normalized = upc?.trim() || '';
+		const normalized = normalizeUpc(upc);
 		return /^\d{10,14}$/.test(normalized);
 	}
 

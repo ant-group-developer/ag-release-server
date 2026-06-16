@@ -792,6 +792,41 @@ export function getRevenueLineChartQuery(
   `;
 }
 
+export function getTrendViewTerritoryBarChartTotalQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT sum(s.total_quantity) AS total_views
+    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getTrendViewTerritoryBarChartQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT
+      s.territory_code AS territory,
+      sum(s.total_quantity) AS total_views
+    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY territory
+    ORDER BY total_views DESC
+    LIMIT 5
+  `;
+}
+
 export function getRevenueDspBarChartTotalQuery(
   joinSql: string,
   filterSql: string,
@@ -825,6 +860,41 @@ export function getRevenueDspBarChartQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY dsp_name
+    ORDER BY revenue_usd DESC
+    LIMIT 5
+  `;
+}
+
+export function getRevenueTerritoryBarChartTotalQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTerritoryBarChartQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT
+      s.territory_code AS territory,
+      sum(s.total_revenue_usd) AS revenue_usd
+    FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+    ${joinSql}
+    WHERE 1=1
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY territory
     ORDER BY revenue_usd DESC
     LIMIT 5
   `;

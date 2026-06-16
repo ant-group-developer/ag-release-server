@@ -7,6 +7,7 @@ import * as os from 'os';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AdmZip = require('adm-zip');
 import { FactSalesRow } from '../../interfaces';
+import { normalizeTextValue } from '../../utils/fact-row-normalizer.util';
 
 /**
  * Abstract base parser for all DSP sales data files.
@@ -257,10 +258,14 @@ export abstract class BaseSalesParser {
   }
 
   protected normalizeCountryCode(code: string): string {
-    if (!code || code === 'N/A' || code === 'Unknown' || code === '' || code === 'ZZ') return 'XX';
+    if (!code || code === 'N/A' || code === 'Unknown' || code === '' || code === 'ZZ') return 'N/A';
     const cleaned = code.trim().toUpperCase();
     if (cleaned.length === 2 && /^[A-Z]{2}$/.test(cleaned)) return cleaned;
-    return 'XX';
+    return 'N/A';
+  }
+
+  protected normalizeText(value: string | null | undefined): string {
+    return normalizeTextValue(value);
   }
 
   protected safeInt(val: string, defaultVal = 0): number {
@@ -292,31 +297,31 @@ export abstract class BaseSalesParser {
       reporting_period_start: '1970-01-01',
       reporting_period_end: '1970-01-01',
       dsp_id: this.dspId,
-      service_name: '',
-      dpid: '',
-      member_name: '',
-      label_name: '',
-      territory_code: 'XX',
-      isrc: '',
-      upc: '',
-      grid: '',
-      release_id: '',
-      track_title: '',
-      artist_name: '',
-      album_title: '',
-      composer_name: '',
-      genre: '',
+      service_name: 'N/A',
+      dpid: 'N/A',
+      member_name: 'N/A',
+      label_name: 'N/A',
+      territory_code: 'N/A',
+      isrc: 'N/A',
+      upc: 'N/A',
+      grid: 'N/A',
+      release_id: 'N/A',
+      track_title: 'N/A',
+      artist_name: 'N/A',
+      album_title: 'N/A',
+      composer_name: 'N/A',
+      genre: 'N/A',
       quantity: 0,
       quantity_creations: 0,
       quantity_views: 0,
       revenue_usd: '0',
       revenue_local: '0',
       revenue_currency: 'USD',
-      usage_type: '',
-      monetisation_type: '',
-      service_tier: '',
-      plan_name: '',
-      commercial_model: '',
+      usage_type: 'N/A',
+      monetisation_type: 'N/A',
+      service_tier: 'N/A',
+      plan_name: 'N/A',
+      commercial_model: 'N/A',
       metadata: {},
       source_category: 'sales',
       batch_id: batchId,

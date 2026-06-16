@@ -283,6 +283,12 @@ export interface DspBarChartItem {
 }
 
 /** Một điểm trên line-chart revenue theo tháng */
+export interface TerritoryBarChartItem {
+  territory: string;
+  totalViews?: number;
+  revenueUsd?: number;
+}
+
 export interface RevenueLineChartItem {
   period: string; // 'YYYY-MM'
   revenueUsd: number;

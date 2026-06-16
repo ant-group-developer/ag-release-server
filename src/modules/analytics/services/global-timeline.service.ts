@@ -23,6 +23,7 @@ import {
   RevenueReleaseItem,
   TrendViewLineChartItem,
   DspBarChartItem,
+  TerritoryBarChartItem,
   RevenueLineChartItem,
 } from '../interfaces/analytics.interface';
 
@@ -42,7 +43,7 @@ export class TimelineAnalyticsService {
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
-    query: TimelineQueryDto,
+    query: { labelId?: string; releaseId?: string },
   ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
@@ -1401,6 +1402,40 @@ export class TimelineAnalyticsService {
   // Vì dữ liệu sales đã aggregate theo tháng, nên lấy
   // từ đầu tháng fromDate đến cuối tháng toDate.
   // ═══════════════════════════════════════════════════════
+  async getTrendViewTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const totalSql = queries.getTrendViewTerritoryBarChartTotalQuery(joinSql, filterSql);
+    const totalResult = await this.clickHouseService.query<{ total_views: string }>(totalSql, params);
+    const grandTotal = Number(totalResult[0]?.total_views ?? 0);
+
+    const sql = queries.getTrendViewTerritoryBarChartQuery(joinSql, filterSql);
+    const rows = await this.clickHouseService.query<{
+      territory: string;
+      total_views: string;
+    }>(sql, params);
+
+    const items: TerritoryBarChartItem[] = rows.map((r) => ({
+      territory: r.territory,
+      totalViews: Number(r.total_views),
+    }));
+
+    const top5Total = items.reduce((acc, it) => acc + (it.totalViews ?? 0), 0);
+    const otherViews = grandTotal - top5Total;
+    if (otherViews > 0) {
+      items.push({ territory: 'Other', totalViews: otherViews });
+    }
+
+    return items;
+  }
+
   async getRevenueLineChart(
     tenantId: string,
     query: ChartQueryDto,
@@ -1509,6 +1544,40 @@ export class TimelineAnalyticsService {
     const otherRev = grandTotal - top5Total;
     if (otherRev > 0) {
       items.push({ dspName: 'Other', revenueUsd: otherRev });
+    }
+
+    return items;
+  }
+
+  async getRevenueTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const totalSql = queries.getRevenueTerritoryBarChartTotalQuery(joinSql, filterSql);
+    const totalResult = await this.clickHouseService.query<{ total_rev: string }>(totalSql, params);
+    const grandTotal = Number(totalResult[0]?.total_rev ?? 0);
+
+    const sql = queries.getRevenueTerritoryBarChartQuery(joinSql, filterSql);
+    const rows = await this.clickHouseService.query<{
+      territory: string;
+      revenue_usd: string;
+    }>(sql, params);
+
+    const items: TerritoryBarChartItem[] = rows.map((r) => ({
+      territory: r.territory,
+      revenueUsd: Number(r.revenue_usd),
+    }));
+
+    const top5Total = items.reduce((acc, it) => acc + (it.revenueUsd ?? 0), 0);
+    const otherRev = grandTotal - top5Total;
+    if (otherRev > 0) {
+      items.push({ territory: 'Other', revenueUsd: otherRev });
     }
 
     return items;

@@ -7,6 +7,7 @@ import * as os from 'os';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AdmZip = require('adm-zip');
 import { FactDspRow } from '../interfaces';
+import { normalizeTextValue } from '../utils/fact-row-normalizer.util';
 
 /**
  * Abstract base parser for all DSP data files.
@@ -291,13 +292,17 @@ export abstract class BaseParser {
    */
   protected normalizeCountryCode(code: string): string {
     if (!code || code === 'N/A' || code === 'Unknown' || code === '' || code === 'ZZ') {
-      return 'XX';
+      return 'N/A';
     }
     const cleaned = code.trim().toUpperCase();
     if (cleaned.length === 2 && /^[A-Z]{2}$/.test(cleaned)) {
       return cleaned;
     }
-    return 'XX';
+    return 'N/A';
+  }
+
+  protected normalizeText(value: string | null | undefined): string {
+    return normalizeTextValue(value);
   }
 
   /**
@@ -325,26 +330,26 @@ export abstract class BaseParser {
     return {
       reporting_period: '1970-01-01',
       dsp_id: this.dspId,
-      partner_id: '',
-      account_identifier: '',
-      licensor: '',
-      label_name: '',
-      territory_code: 'XX',
-      isrc: '',
-      upc: '',
-      track_title: '',
-      artist_name: '',
-      album_title: '',
-      composer_name: '',
-      track_id_internal: '',
+      partner_id: 'N/A',
+      account_identifier: 'N/A',
+      licensor: 'N/A',
+      label_name: 'N/A',
+      territory_code: 'N/A',
+      isrc: 'N/A',
+      upc: 'N/A',
+      track_title: 'N/A',
+      artist_name: 'N/A',
+      album_title: 'N/A',
+      composer_name: 'N/A',
+      track_id_internal: 'N/A',
       quantity_total: 0,
       quantity_unique_users: 0,
       quantity_invalid: 0,
-      usage_type: '',
-      monetisation_type: '',
-      track_classification: '',
+      usage_type: 'N/A',
+      monetisation_type: 'N/A',
+      track_classification: 'N/A',
       metadata: {},
-      source_category: '',
+      source_category: 'N/A',
       batch_id: batchId,
       import_source: '',
       source_file_name: '',
