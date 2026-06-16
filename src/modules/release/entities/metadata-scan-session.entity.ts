@@ -1,11 +1,17 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { MetadataScanSchedule } from './metadata-scan-schedule.entity';
 
 export enum ScanSessionStatus {
 	PENDING = 'PENDING',
 	PROCESSING = 'PROCESSING',
 	COMPLETED = 'COMPLETED',
 	FAILED = 'FAILED',
+}
+
+export enum MetadataScanTriggerType {
+	MANUAL = 'MANUAL',
+	CRON = 'CRON',
 }
 
 @Entity('metadata_scan_sessions', {
@@ -77,6 +83,31 @@ export class MetadataScanSession extends BaseUUIDEntity {
 	force: boolean;
 
 	@Column({
+		name: 'trigger_type',
+		type: 'varchar',
+		length: 20,
+		default: MetadataScanTriggerType.MANUAL,
+		comment: 'Nguồn kích hoạt scan: MANUAL hoặc CRON',
+	})
+	triggerType: MetadataScanTriggerType;
+
+	@Column({
+		name: 'schedule_id',
+		type: 'uuid',
+		nullable: true,
+		comment: 'ID lịch cron tạo scan, null nếu scan tay',
+	})
+	scheduleId: string | null;
+
+	@Column({
+		name: 'is_imported_from_report',
+		type: 'boolean',
+		nullable: true,
+		comment: 'Nguồn data được quét trong session',
+	})
+	isImportedFromReport: boolean | null;
+
+	@Column({
 		name: 'limit_count',
 		type: 'integer',
 		nullable: true,
@@ -107,4 +138,11 @@ export class MetadataScanSession extends BaseUUIDEntity {
 		comment: 'Thời điểm hoàn thành hoặc thất bại',
 	})
 	finishedAt: Date;
+
+	@ManyToOne(() => MetadataScanSchedule, (schedule) => schedule.sessions, {
+		nullable: true,
+		onDelete: 'SET NULL',
+	})
+	@JoinColumn({ name: 'schedule_id' })
+	schedule: MetadataScanSchedule | null;
 }

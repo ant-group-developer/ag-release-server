@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Logger, Sse, MessageEvent, NotFoundException, Header } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Logger, Sse, MessageEvent, NotFoundException, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -6,10 +6,16 @@ import { SpotifyService } from '../services/spotify.service';
 import { SpotifyService2 } from '../services/spotify2.service';
 import { MetadataEnrichmentService } from '../services/metadata-enrichment.service';
 import { MetadataScanService } from '../services/metadata-scan.service';
+import { MetadataScanScheduleService } from '../services/metadata-scan-schedule.service';
 import { EnrichEventsGateway } from '../services/enrich-events.gateway';
 import { Observable, from, of, concat, merge, interval } from 'rxjs';
 import { map, takeWhile, switchMap } from 'rxjs/operators';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
+import {
+	CreateMetadataScanScheduleDto,
+	QueryMetadataScanSessionsDto,
+	UpdateMetadataScanScheduleDto,
+} from '../dtos/metadata-scan-schedule.dto';
 
 @ApiTags('Partners API')
 @ApiBearerAuth('token')
@@ -22,6 +28,7 @@ export class SpotifyController {
 		private readonly spotifyService2: SpotifyService2,
 		private readonly metadataEnrichmentService: MetadataEnrichmentService,
 		private readonly metadataScanService: MetadataScanService,
+		private readonly metadataScanScheduleService: MetadataScanScheduleService,
 		private readonly enrichEvents: EnrichEventsGateway,
 	) {}
 
@@ -106,6 +113,49 @@ export class SpotifyController {
 		});
 	}
 
+	@Get('enrich/scan/schedules')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Get metadata scan schedules' })
+	async listScanSchedules() {
+		const items = await this.metadataScanScheduleService.list();
+		return new ResponseSuccess({ data: { items } });
+	}
+
+	@Post('enrich/scan/schedules')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Create metadata scan schedule' })
+	async createScanSchedule(@Body() body: CreateMetadataScanScheduleDto) {
+		const schedule = await this.metadataScanScheduleService.create(body);
+		return new ResponseSuccess({ data: schedule });
+	}
+
+	@Put('enrich/scan/schedules/:id')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Update metadata scan schedule' })
+	async updateScanSchedule(
+		@Param('id') id: string,
+		@Body() body: UpdateMetadataScanScheduleDto,
+	) {
+		const schedule = await this.metadataScanScheduleService.update(id, body);
+		return new ResponseSuccess({ data: schedule });
+	}
+
+	@Delete('enrich/scan/schedules/:id')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Delete metadata scan schedule' })
+	async deleteScanSchedule(@Param('id') id: string) {
+		await this.metadataScanScheduleService.remove(id);
+		return new ResponseSuccess({ data: { deleted: true } });
+	}
+
+	@Post('enrich/scan/schedules/:id/run-now')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Run metadata scan schedule now' })
+	async runScanScheduleNow(@Param('id') id: string) {
+		const result = await this.metadataScanScheduleService.runNow(id);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get('enrich/history')
 	@SystemAdminOnly()
 	@ApiOperation({
@@ -147,16 +197,25 @@ export class SpotifyController {
 	})
 	@ApiQuery({ name: 'page', required: false, type: Number, description: 'Page index' })
 	@ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Page size' })
+	@ApiQuery({ name: 'scheduleId', required: false, type: String, description: 'Filter by scan schedule ID' })
+	@ApiQuery({ name: 'triggerType', required: false, type: String, description: 'MANUAL or CRON' })
+	@ApiQuery({ name: 'isImportedFromReport', required: false, type: Boolean, description: 'Filter by data source' })
+	@ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by scan status' })
 	async getScanSessions(
-		@Query('page') page?: string,
-		@Query('pageSize') pageSize?: string,
+		@Query() query: QueryMetadataScanSessionsDto,
 	) {
-		const parsedPage = page ? parseInt(page, 10) : 1;
-		const parsedPageSize = pageSize ? parseInt(pageSize, 10) : 10;
+		const parsedPage = query.page ? Number(query.page) : 1;
+		const parsedPageSize = query.pageSize ? Number(query.pageSize) : 10;
 
 		const result = await this.metadataScanService.listScanSessions({
 			page: parsedPage,
 			pageSize: parsedPageSize,
+			scheduleId: query.scheduleId,
+			triggerType: query.triggerType,
+			isImportedFromReport: this.parseOptionalBoolean(
+				query.isImportedFromReport as unknown as string,
+			),
+			status: query.status,
 		});
 
 		return new ResponseSuccess({
@@ -235,10 +294,10 @@ export class SpotifyController {
 		);
 	}
 
-	private parseOptionalBoolean(value?: string): boolean | undefined {
+	private parseOptionalBoolean(value?: string | boolean): boolean | undefined {
 		if (value === undefined) return undefined;
-		if (value === 'true') return true;
-		if (value === 'false') return false;
+		if (value === true || value === 'true') return true;
+		if (value === false || value === 'false') return false;
 		return undefined;
 	}
 }

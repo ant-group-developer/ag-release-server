@@ -38,7 +38,10 @@ import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/r
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
-import { enhanceReleasesDetails } from '../utils/release.utils';
+import {
+	enhanceReleasesDetails,
+	normalizeMetadataExternal,
+} from '../utils/release.utils';
 import { ReleaseDdexService } from './release-ddex.service';
 import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
@@ -84,10 +87,10 @@ export class ReleaseService {
 
 		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
-		return {
+		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		};
+		}) as IReleaseDetail;
 	}
 
 	async findOneFull(id: string) {
@@ -99,10 +102,10 @@ export class ReleaseService {
 
 		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
-		return {
+		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		};
+		});
 	}
 
 	async getList(
@@ -130,7 +133,7 @@ export class ReleaseService {
 			await this.releaseQueryService.getListFull(query);
 
 		return new PageDto({
-			items,
+			items: items.map((item) => normalizeMetadataExternal(item)),
 			metadata: {
 				...query,
 				totalItems,

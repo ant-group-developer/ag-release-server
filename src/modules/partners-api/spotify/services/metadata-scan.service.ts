@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DataSource, Like, ILike, In } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, Like, ILike, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
@@ -18,7 +18,11 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { MetadataEnrichmentService, EnrichedMetadata } from './metadata-enrichment.service';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
-import { MetadataScanSession, ScanSessionStatus } from 'src/modules/release/entities/metadata-scan-session.entity';
+import {
+	MetadataScanSession,
+	MetadataScanTriggerType,
+	ScanSessionStatus,
+} from 'src/modules/release/entities/metadata-scan-session.entity';
 import { EnrichEventsGateway } from './enrich-events.gateway';
 
 /** Single field-level change logged to ClickHouse */
@@ -133,12 +137,16 @@ export class MetadataScanService implements OnModuleInit {
 		scanId?: string;
 		force?: boolean;
 		isImportedFromReport?: boolean;
+		triggerType?: MetadataScanTriggerType;
+		scheduleId?: string;
 	}): Promise<ScanResult> {
 		const limit = options?.limit;
 		const dryRun = options?.dryRun ?? false;
 		const scanId = options?.scanId ?? uuidv4();
 		const force = options?.force ?? false;
 		const isImportedFromReport = options?.isImportedFromReport ?? true;
+		const triggerType = options?.triggerType ?? MetadataScanTriggerType.MANUAL;
+		const scheduleId = options?.scheduleId ?? null;
 		const excludedStatuses = force
 			? [ReleaseEnrichmentStatus.PROCESSING]
 			: [
@@ -158,6 +166,9 @@ export class MetadataScanService implements OnModuleInit {
 			notFoundCount: 0,
 			dryRun,
 			force,
+			triggerType,
+			scheduleId,
+			isImportedFromReport,
 			limitCount: limit,
 			startedAt: new Date(),
 		});
@@ -590,13 +601,19 @@ export class MetadataScanService implements OnModuleInit {
 											const trackRepoTx = manager.getRepository(Track);
 											const releaseArtistRepoTx = manager.getRepository(ReleaseArtist);
 
-											// 1. Relink tracks
-											const existingTracks = await trackRepoTx.find({
+											// 1. Relink tracks, or merge when the target UPC already has the same ISRC.
+											const targetTracks = await trackRepoTx.find({
 												where: { releaseId: existing.id },
 												order: { order: 'DESC' },
-												take: 1,
 											});
-											const maxOrder = existingTracks.length > 0 ? (existingTracks[0].order ?? 0) : 0;
+											const maxOrder = targetTracks.length > 0 ? (targetTracks[0].order ?? 0) : 0;
+											const targetTrackByIsrc = new Map<string, Track>();
+											for (const targetTrack of targetTracks) {
+												const normalizedIsrc = targetTrack.isrc?.trim().toUpperCase();
+												if (normalizedIsrc) {
+													targetTrackByIsrc.set(normalizedIsrc, targetTrack);
+												}
+											}
 
 											const duplicateTracks = await trackRepoTx.find({
 												where: { releaseId: release.id },
@@ -605,6 +622,44 @@ export class MetadataScanService implements OnModuleInit {
 
 											let currentOrder = maxOrder + 1;
 											for (const track of duplicateTracks) {
+												const normalizedIsrc = track.isrc?.trim().toUpperCase();
+												const targetTrack = normalizedIsrc
+													? targetTrackByIsrc.get(normalizedIsrc)
+													: null;
+
+												if (targetTrack) {
+													await this.mergeDuplicateTrackRowsWithManager(
+														manager,
+														targetTrack.id,
+														[track.id],
+													);
+
+													changes.push(
+														`Track[${track.isrc}] already exists on target release ${existing.id}; merged duplicate track ${track.id} into ${targetTrack.id}`,
+													);
+													chunkChangeLogs.push(
+														this.buildLogEntry(scanId, now, dryRun, {
+															entityType: 'track',
+															entityId: track.id,
+															releaseId: existing.id,
+															isrc: track.isrc || '',
+															upc: apiUpc,
+															fieldName: 'duplicate_isrc_target_upc_merge',
+															oldValue: release.id,
+															newValue: targetTrack.id,
+															changeType: 'merge',
+															enriched: this.buildLogMetadataForTrack(
+																track.isrc || '',
+																primaryEnriched.tracks?.find(
+																	(apiTrack) =>
+																		apiTrack.isrc?.trim().toUpperCase() === normalizedIsrc,
+																),
+															),
+														}),
+													);
+													continue;
+												}
+
 												await trackRepoTx.update(
 													{ id: track.id },
 													{
@@ -612,6 +667,10 @@ export class MetadataScanService implements OnModuleInit {
 														order: currentOrder++,
 													},
 												);
+												if (normalizedIsrc) {
+													track.releaseId = existing.id;
+													targetTrackByIsrc.set(normalizedIsrc, track);
+												}
 											}
 
 											// 2. Relink or merge release artists
@@ -1607,16 +1666,30 @@ export class MetadataScanService implements OnModuleInit {
 		duplicateTrackIds: string[],
 	): Promise<void> {
 		await this.dataSource.transaction(async (manager) => {
-			await manager.update(TrackRevenue, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
-			await manager.update(TrackScanHistory, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
-			await manager.delete(TrackLanguage, { trackId: In(duplicateTrackIds) });
-			await manager.delete(TrackArtist, { trackId: In(duplicateTrackIds) });
-			await manager.delete(TrackContributor, { trackId: In(duplicateTrackIds) });
-			await manager.delete(TrackLocalize, { trackId: In(duplicateTrackIds) });
-			await manager.delete(AudioFile, { trackId: In(duplicateTrackIds) });
-			await manager.delete(TrackPolicy, { trackId: In(duplicateTrackIds) });
-			await manager.delete(Track, { id: In(duplicateTrackIds) });
+			await this.mergeDuplicateTrackRowsWithManager(
+				manager,
+				canonicalTrackId,
+				duplicateTrackIds,
+			);
 		});
+	}
+
+	private async mergeDuplicateTrackRowsWithManager(
+		manager: EntityManager,
+		canonicalTrackId: string,
+		duplicateTrackIds: string[],
+	): Promise<void> {
+		if (duplicateTrackIds.length === 0) return;
+
+		await manager.update(TrackRevenue, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
+		await manager.update(TrackScanHistory, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
+		await manager.delete(TrackLanguage, { trackId: In(duplicateTrackIds) });
+		await manager.delete(TrackArtist, { trackId: In(duplicateTrackIds) });
+		await manager.delete(TrackContributor, { trackId: In(duplicateTrackIds) });
+		await manager.delete(TrackLocalize, { trackId: In(duplicateTrackIds) });
+		await manager.delete(AudioFile, { trackId: In(duplicateTrackIds) });
+		await manager.delete(TrackPolicy, { trackId: In(duplicateTrackIds) });
+		await manager.delete(Track, { id: In(duplicateTrackIds) });
 	}
 
 	private buildLogMetadataForTrack(
@@ -2066,12 +2139,24 @@ export class MetadataScanService implements OnModuleInit {
 	async listScanSessions(query: {
 		page?: number;
 		pageSize?: number;
+		scheduleId?: string;
+		triggerType?: MetadataScanTriggerType;
+		isImportedFromReport?: boolean;
+		status?: ScanSessionStatus;
 	}): Promise<{ items: MetadataScanSession[]; totalItems: number }> {
 		const page = query.page ?? 1;
 		const pageSize = query.pageSize ?? 10;
+		const where: FindOptionsWhere<MetadataScanSession> = {};
+		if (query.scheduleId) where.scheduleId = query.scheduleId;
+		if (query.triggerType) where.triggerType = query.triggerType;
+		if (query.isImportedFromReport !== undefined) {
+			where.isImportedFromReport = query.isImportedFromReport;
+		}
+		if (query.status) where.status = query.status;
 
 		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
 		const [items, totalItems] = await sessionRepo.findAndCount({
+			where,
 			order: { createdAt: 'DESC' },
 			skip: (page - 1) * pageSize,
 			take: pageSize,

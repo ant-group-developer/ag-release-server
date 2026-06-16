@@ -15,7 +15,9 @@ import { SpotifyService } from './services/spotify.service';
 import { SpotifyService2 } from './services/spotify2.service';
 import { ReleaseEnrichment } from 'src/modules/release/entities/release-enrichment.entity';
 import { MetadataScanSession } from 'src/modules/release/entities/metadata-scan-session.entity';
+import { MetadataScanSchedule } from 'src/modules/release/entities/metadata-scan-schedule.entity';
 import { EnrichEventsGateway } from './services/enrich-events.gateway';
+import { MetadataScanScheduleService } from './services/metadata-scan-schedule.service';
 
 @Module({
 	imports: [
@@ -30,11 +32,26 @@ import { EnrichEventsGateway } from './services/enrich-events.gateway';
 			Label,
 			ReleaseEnrichment,
 			MetadataScanSession,
+			MetadataScanSchedule,
 		]),
 	],
 	controllers: [SpotifyController],
-	providers: [SpotifyService, SpotifyService2, MetadataEnrichmentService, MetadataScanService, EnrichEventsGateway],
-	exports: [SpotifyService, SpotifyService2, MetadataEnrichmentService, MetadataScanService, EnrichEventsGateway],
+	providers: [
+		SpotifyService,
+		SpotifyService2,
+		MetadataEnrichmentService,
+		MetadataScanService,
+		MetadataScanScheduleService,
+		EnrichEventsGateway,
+	],
+	exports: [
+		SpotifyService,
+		SpotifyService2,
+		MetadataEnrichmentService,
+		MetadataScanService,
+		MetadataScanScheduleService,
+		EnrichEventsGateway,
+	],
 })
 export class SpotifyModule {}
 
