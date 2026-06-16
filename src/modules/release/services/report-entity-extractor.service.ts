@@ -76,8 +76,33 @@ export class ReportEntityExtractorService {
     // ─────────────────────────────────────────────────────
     const enrichedMap = await this.enrichGroupedData(upcMap);
 
-    const inputs: any[] = [];
+    const resolvedUpcMap = new Map<string, Map<string, ExtractedRow>>();
     for (const [upc, isrcMap] of upcMap) {
+      const bestRows = Array.from(isrcMap.values());
+      if (bestRows.length === 0) continue;
+
+      const representativeRow = bestRows.reduce((a, b) =>
+        this.getCompletenessScore(a) >= this.getCompletenessScore(b) ? a : b,
+      );
+      const enrichedUpc = this.applyEnrichment(upc, representativeRow, bestRows, enrichedMap);
+
+      if (!resolvedUpcMap.has(enrichedUpc)) {
+        resolvedUpcMap.set(enrichedUpc, new Map());
+      }
+      const resolvedIsrcMap = resolvedUpcMap.get(enrichedUpc)!;
+
+      for (const row of bestRows) {
+        const isrc = row.isrc?.trim() || '';
+        const key = isrc || `UPC-${enrichedUpc}`;
+        const existing = resolvedIsrcMap.get(key);
+        if (!existing || this.getCompletenessScore(row) > this.getCompletenessScore(existing)) {
+          resolvedIsrcMap.set(key, row);
+        }
+      }
+    }
+
+    const inputs: any[] = [];
+    for (const [upc, isrcMap] of resolvedUpcMap) {
       const bestRows = Array.from(isrcMap.values());
       if (bestRows.length === 0) continue;
 
@@ -85,9 +110,6 @@ export class ReportEntityExtractorService {
       const representativeRow = bestRows.reduce((a, b) =>
         this.getCompletenessScore(a) >= this.getCompletenessScore(b) ? a : b,
       );
-
-      // Apply enriched metadata from Spotify/Deezer
-      const enrichedUpc = this.applyEnrichment(upc, representativeRow, bestRows, enrichedMap);
 
       // Filter: pgTracks (real ISRCs) vs upcTracks (temporary album-level ISRC in format UPC-xxx)
       const pgTracks = bestRows
@@ -127,10 +149,10 @@ export class ReportEntityExtractorService {
         }));
 
       inputs.push({
-        upc: enrichedUpc,
+        upc,
         tenantId: resolvedTenantId || undefined,
         labelName: representativeRow.label_name?.trim() || undefined,
-        title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${enrichedUpc}`,
+        title: representativeRow.album_title?.trim() || representativeRow.track_title?.trim() || `Release ${upc}`,
         artistName: representativeRow.artist_name?.trim() || undefined,
         tracks: pgTracks,
         upcTracks,
@@ -294,7 +316,7 @@ export class ReportEntityExtractorService {
 
     try {
       return await this.metadataEnrichmentService.enrichBatch(isrcsToEnrich, {
-        concurrency: 10,
+        concurrency: 1,
         delayMs: 100,
       });
     } catch (err) {

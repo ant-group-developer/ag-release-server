@@ -32,6 +32,7 @@ import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { Release } from './entities/release.entity';
 import { ReleaseEnrichment } from './entities/release-enrichment.entity';
+import { MetadataScanSession } from './entities/metadata-scan-session.entity';
 import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
 import { ReleaseLogModule } from './modules/release-log/release-log.module';
 import { ReleaseDdexService } from './services/release-ddex.service';
@@ -104,6 +105,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			ReleaseDspDelivery,
 			ReleaseLog,
 			ReleaseEnrichment,
+			MetadataScanSession,
 
 			ReleaseExecution,
 			ReleaseExecutionDsp,
