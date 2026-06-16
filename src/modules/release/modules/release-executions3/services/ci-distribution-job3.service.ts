@@ -343,38 +343,63 @@ export class CiDistributionJob3Service implements OnModuleInit {
 
 	private async sendExportToCi(jobs: CiDistributionJob3[]) {
 		const ids = jobs.map((job) => job.id);
-		const { buffer, fileName } = await this.exportFileExcel(ids);
 
-		const ciResult = await this.ciToolService.sendFileExportToCi({
-			buffer,
-			originalname: fileName,
-			mimetype:
-				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-		});
+		try {
+			const { buffer, fileName } = await this.exportFileExcel(ids);
 
-		const ciToolJobId = ciResult?.jobId;
+			const ciResult = await this.ciToolService.sendFileExportToCi({
+				buffer,
+				originalname: fileName,
+				mimetype:
+					'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			});
 
-		if (!ciToolJobId) {
-			throw new Error('CI Tool did not return a jobId');
-		}
+			const ciToolJobId = ciResult?.jobId;
 
-		await this.repo.update(
-			{ id: In(ids) },
-			{
-				status: CiJobStatus3.PROCESSING,
+			if (!ciToolJobId) {
+				throw new Error('CI Tool did not return a jobId');
+			}
+
+			await this.repo.update(
+				{ id: In(ids) },
+				{
+					status: CiJobStatus3.PROCESSING,
+					ciToolJobId,
+					nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
+				},
+			);
+
+			this.logger.log(
+				`[sendExportToCi] Sent ${jobs.length} jobs to CI Tool, ciToolJobId=${ciToolJobId}`,
+			);
+
+			return {
+				sentToCi: jobs.length,
 				ciToolJobId,
-				nextCiToolCheckAt: new Date(Date.now() + 5 * 60 * 1000),
-			},
-		);
+			};
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: 'Unknown CI Tool export error';
 
-		this.logger.log(
-			`[sendExportToCi] Sent ${jobs.length} jobs to CI Tool, ciToolJobId=${ciToolJobId}`,
-		);
+			this.logger.error(
+				`Failed to send export batch to CI Tool: ${message}`,
+				error instanceof Error ? error.stack : undefined,
+			);
 
-		return {
-			sentToCi: jobs.length,
-			ciToolJobId,
-		};
+			await this.finalizeJobs(jobs, {
+				jobStatus: CiJobStatus3.FAILED,
+				stepStatus: ReleaseExecutionStepStatus.FAILED,
+				note: message,
+				nextCiToolCheckAt: null,
+			});
+
+			return {
+				sentToCi: 0,
+				ciToolJobId: undefined,
+			};
+		}
 	}
 
 	private async sendEmailToState51(jobs: CiDistributionJob3[]) {

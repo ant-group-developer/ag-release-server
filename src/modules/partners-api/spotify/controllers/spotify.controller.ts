@@ -1,12 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Query, Logger, Sse, MessageEvent, NotFoundException, Header } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { v4 as uuidv4 } from 'uuid';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SpotifyService } from '../services/spotify.service';
 import { SpotifyService2 } from '../services/spotify2.service';
 import { MetadataEnrichmentService } from '../services/metadata-enrichment.service';
 import { MetadataScanService } from '../services/metadata-scan.service';
+import { EnrichEventsGateway } from '../services/enrich-events.gateway';
+import { Observable, from, of, concat, merge, interval } from 'rxjs';
+import { map, takeWhile, switchMap } from 'rxjs/operators';
+import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 
 @ApiTags('Partners API')
+@ApiBearerAuth('token')
 @Controller('partners')
 export class SpotifyController {
 	private readonly logger = new Logger(SpotifyController.name);
@@ -16,16 +22,19 @@ export class SpotifyController {
 		private readonly spotifyService2: SpotifyService2,
 		private readonly metadataEnrichmentService: MetadataEnrichmentService,
 		private readonly metadataScanService: MetadataScanService,
+		private readonly enrichEvents: EnrichEventsGateway,
 	) {}
 
 	@Post('spotify/token')
 	async getToken(@Body() body: { clientId?: string; clientSecret?: string }) {
-		return this.spotifyService.getToken(body?.clientId, body?.clientSecret);
+		const data = await this.spotifyService.getToken(body?.clientId, body?.clientSecret);
+		return new ResponseSuccess({ data });
 	}
 
 	@Get('spotify/artists/:id')
 	async getArtistDetail(@Param('id') id: string) {
-		return this.spotifyService2.getArtistDetail(id);
+		const data = await this.spotifyService2.getArtistDetail(id);
+		return new ResponseSuccess({ data });
 	}
 
 	// ─── ENRICHMENT ENDPOINTS ────────────────────────────
@@ -34,14 +43,17 @@ export class SpotifyController {
 	@ApiOperation({ summary: 'Look up a single ISRC via Spotify/Deezer and return enriched metadata' })
 	async enrichByIsrc(@Param('isrc') isrc: string) {
 		const result = await this.metadataEnrichmentService.enrichByIsrc(isrc);
-		return {
-			isrc,
-			found: !!result,
-			data: result,
-		};
+		return new ResponseSuccess({
+			data: {
+				isrc,
+				found: !!result,
+				data: result,
+			},
+		});
 	}
 
 	@Post('enrich/scan')
+	@SystemAdminOnly()
 	@ApiOperation({
 		summary: 'Scan report-imported releases and enrich metadata via Spotify/Deezer',
 		description:
@@ -52,39 +64,44 @@ export class SpotifyController {
 	})
 	@ApiQuery({ name: 'dryRun', required: false, type: Boolean, description: 'Preview changes without writing to DB' })
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max releases to process (omit to run ALL in background)' })
+	@ApiQuery({ name: 'force', required: false, type: Boolean, description: 'Force re-scan already enriched releases' })
 	async scanAndEnrich(
 		@Query('dryRun') dryRun?: string,
 		@Query('limit') limit?: string,
+		@Query('force') force?: string,
 	) {
 		const isDryRun = dryRun === 'true';
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+		const isForce = force === 'true';
+		const scanId = uuidv4();
 
-		if (parsedLimit === undefined) {
-			const scanId = uuidv4();
-			this.metadataScanService
-				.scanAndEnrichAll({
-					dryRun: isDryRun,
-					limit: undefined,
-					scanId,
-				})
-				.catch((err) => {
-					this.logger.error(`Background scan failed: ${err.message}`, err.stack);
-				});
+		// Always run the scan asynchronously in the background
+		this.metadataScanService
+			.scanAndEnrichAll({
+				dryRun: isDryRun,
+				limit: parsedLimit,
+				scanId,
+				force: isForce,
+			})
+			.catch((err) => {
+				this.logger.error(`Background scan failed: ${err.message}`, err.stack);
+			});
 
-			return {
-				message: 'Scan started in the background (scanning ALL releases)',
+		const summary = await this.metadataScanService.getEnrichmentSummary();
+		return new ResponseSuccess({
+			data: {
+				message: 'Scan started in the background',
 				scanId,
 				dryRun: isDryRun,
-			};
-		}
-
-		return this.metadataScanService.scanAndEnrichAll({
-			dryRun: isDryRun,
-			limit: parsedLimit,
+				force: isForce,
+				limit: parsedLimit,
+				summary,
+			},
 		});
 	}
 
 	@Get('enrich/history')
+	@SystemAdminOnly()
 	@ApiOperation({
 		summary: 'Query enrichment change history from ClickHouse',
 		description: 'View all changes logged during enrichment scans.',
@@ -99,12 +116,116 @@ export class SpotifyController {
 		@Query('releaseId') releaseId?: string,
 		@Query('limit') limit?: string,
 	) {
-		return this.metadataScanService.getChangeHistory({
-			scanId,
-			isrc,
-			releaseId,
-			limit: limit ? parseInt(limit, 10) : 100,
+		const [items, summary] = await Promise.all([
+			this.metadataScanService.getChangeHistory({
+				scanId,
+				isrc,
+				releaseId,
+				limit: limit ? parseInt(limit, 10) : 100,
+			}),
+			this.metadataScanService.getEnrichmentSummary(),
+		]);
+		return new ResponseSuccess({
+			data: {
+				summary,
+				items,
+			},
 		});
 	}
-}
 
+	@Get('enrich/scan/sessions')
+	@SystemAdminOnly()
+	@ApiOperation({
+		summary: 'Get list of metadata scan sessions (scan execution history)',
+		description: 'Returns paged history of scan runs with their stats and status.',
+	})
+	@ApiQuery({ name: 'page', required: false, type: Number, description: 'Page index' })
+	@ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Page size' })
+	async getScanSessions(
+		@Query('page') page?: string,
+		@Query('pageSize') pageSize?: string,
+	) {
+		const parsedPage = page ? parseInt(page, 10) : 1;
+		const parsedPageSize = pageSize ? parseInt(pageSize, 10) : 10;
+
+		const result = await this.metadataScanService.listScanSessions({
+			page: parsedPage,
+			pageSize: parsedPageSize,
+		});
+
+		return new ResponseSuccess({
+			data: new PageDto({
+				items: result.items,
+				metadata: {
+					page: parsedPage,
+					pageSize: parsedPageSize,
+					totalItems: result.totalItems,
+				},
+			}),
+		});
+	}
+
+	@Sse('enrich/scan/:scanId/events')
+	@SystemAdminOnly()
+	@Header('Cache-Control', 'no-cache, no-transform')
+	@Header('Connection', 'keep-alive')
+	@Header('X-Accel-Buffering', 'no')
+	@ApiOperation({
+		summary: 'Stream scan progress/status via Server-Sent Events',
+		description: 'Auto-closes on completed or failed status. Use Authorization: Bearer <accessToken>.',
+	})
+	streamScanEvents(@Param('scanId') scanId: string): Observable<MessageEvent> {
+		const updates$ = this.enrichEvents.subscribe(scanId).pipe(
+			map((evt) => ({
+				type: evt.type,
+				data: evt.data,
+			} as MessageEvent)),
+		);
+
+		const heartbeat$ = interval(20000).pipe(
+			map(() => ({
+				type: 'heartbeat',
+				data: {},
+			} as MessageEvent)),
+		);
+
+		const initial$ = from(this.metadataScanService.findScanSessionById(scanId)).pipe(
+			switchMap((session) => {
+				if (!session) {
+					throw new NotFoundException(`Scan session not found: ${scanId}`);
+				}
+
+				const snapshotEvt: MessageEvent = {
+					type: 'snapshot',
+					data: {
+						status: session.status,
+						totalReleases: session.totalReleases,
+						processedReleases: session.processedReleases,
+						successCount: session.successCount,
+						failedCount: session.failedCount,
+						notFoundCount: session.notFoundCount,
+						errorMessage: session.errorMessage,
+					},
+				};
+
+				if (
+					session.status === 'COMPLETED' ||
+					session.status === 'FAILED'
+				) {
+					return of(snapshotEvt);
+				}
+
+				return concat(of(snapshotEvt), updates$);
+			}),
+		);
+
+		return merge(initial$, heartbeat$).pipe(
+			takeWhile((evt) => {
+				return (
+					evt.type !== 'completed' &&
+					evt.type !== 'failed'
+				);
+			}, true),
+		);
+	}
+}

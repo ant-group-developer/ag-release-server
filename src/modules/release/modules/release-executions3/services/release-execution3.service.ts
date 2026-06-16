@@ -9,7 +9,7 @@ import { LogsService } from 'src/modules/log/services/logs.services';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
-import { EntityManager, In, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, Repository } from 'typeorm';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import {
 	CiDistributionJob3,
@@ -68,22 +68,31 @@ export class ReleaseExecution3Service {
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
-		const waitingSteps = await this.manager.find(ReleaseExecutionStep3, {
-			where: {
-				status: ReleaseExecutionStepStatus.WAITING_PARTNER,
-			},
-		});
+		const waitingSteps = await this.stepRepo
+			.createQueryBuilder('step')
+			.innerJoin(
+				ReleaseExecution3,
+				'execution',
+				'execution.id = step.releaseExecutionId',
+			)
+			.where('step.status = :stepStatus', {
+				stepStatus: ReleaseExecutionStepStatus.WAITING_PARTNER,
+			})
+			.andWhere("step.metadata->>'scheduledAt' IS NOT NULL")
+			.andWhere("(step.metadata->>'scheduledAt')::timestamptz <= :now", {
+				now,
+			})
+			.andWhere('execution.status IN (:...executionStatuses)', {
+				executionStatuses: [
+					ReleaseExecutionStatus.PROCESSING,
+					ReleaseExecutionStatus.WAITING_PARTNER,
+				],
+			})
+			.getMany();
 
 		// Group theo executionId, chỉ resume 1 lần mỗi execution
 		const executionIds = [
-			...new Set(
-				waitingSteps
-					.filter((step) => {
-						const scheduledAt = step.metadata?.scheduledAt;
-						return scheduledAt && new Date(scheduledAt) <= now;
-					})
-					.map((step) => step.releaseExecutionId),
-			),
+			...new Set(waitingSteps.map((step) => step.releaseExecutionId)),
 		];
 
 		console.log(
@@ -443,6 +452,19 @@ export class ReleaseExecution3Service {
 			.skip((page - 1) * pageSize)
 			.take(pageSize);
 
+		if (query.latestOnly) {
+			const latestExecutionSubQuery = this.executionRepo
+				.createQueryBuilder('latestExecution')
+				.select('latestExecution.id')
+				.distinctOn(['latestExecution.releaseId'])
+				.orderBy('latestExecution.releaseId', 'ASC')
+				.addOrderBy('latestExecution.createdAt', 'DESC')
+				.addOrderBy('latestExecution.id', 'DESC')
+				.getQuery();
+
+			qb.andWhere(`execution.id IN (${latestExecutionSubQuery})`);
+		}
+
 		if (query.releaseId) {
 			qb.andWhere('execution.releaseId = :releaseId', {
 				releaseId: query.releaseId,
@@ -465,6 +487,31 @@ export class ReleaseExecution3Service {
 			qb.andWhere('execution.createdAt <= :endCreatedAt', {
 				endCreatedAt: query.endCreatedAt,
 			});
+		}
+
+		const keywords = [...(query.keyword ?? [])].filter(
+			(keyword) => !!keyword?.trim(),
+		);
+
+		if (keywords.length) {
+			qb.andWhere(
+				new Brackets((keywordQb) => {
+					keywords.forEach((keyword, index) => {
+						const paramKey = `keyword${index}`;
+						const condition = `(
+							execution.release_upc ILIKE :${paramKey}
+							OR execution.release_title ILIKE :${paramKey}
+						)`;
+						const params = { [paramKey]: `%${keyword}%` };
+
+						if (index === 0) {
+							keywordQb.where(condition, params);
+						} else {
+							keywordQb.orWhere(condition, params);
+						}
+					});
+				}),
+			);
 		}
 
 		const [items, total] = await qb.getManyAndCount();
@@ -599,10 +646,13 @@ export class ReleaseExecution3Service {
 			.andWhere('status IN (:...stepStatuses)', {
 				stepStatuses: [
 					ReleaseExecutionStepStatus.NEW,
+					ReleaseExecutionStepStatus.PROCESSING,
 					ReleaseExecutionStepStatus.WAITING_ACTION,
+					ReleaseExecutionStepStatus.WAITING_PARTNER,
 				],
 			})
 			.execute();
+
 		// cancel ci job
 		await this.manager
 			.createQueryBuilder()

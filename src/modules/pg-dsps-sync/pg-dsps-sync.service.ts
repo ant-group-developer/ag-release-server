@@ -49,9 +49,9 @@ export class PgDspsSyncService {
     // Keyword search (search in dsp_name, dsp_code, dsp_ci_code)
     if (query.keyword) {
       conditions.push(
-        `(lower(dsp_name) LIKE {kw: String} OR lower(dsp_code) LIKE {kw: String} OR lower(dsp_ci_code) LIKE {kw: String})`,
+        `(dsp_name ILIKE {kw:String} OR dsp_code ILIKE {kw:String} OR dsp_ci_code ILIKE {kw:String})`,
       );
-      params.kw = `%${query.keyword.toLowerCase()}%`;
+      params.kw = `%${query.keyword}%`;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -70,7 +70,7 @@ export class PgDspsSyncService {
       `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, picture, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        ${whereClause}
-       ORDER BY dsp_name ASC
+       ORDER BY lower(substring(dsp_name, 1, 1)) ASC, lower(dsp_name) ASC, dsp_name ASC
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );

@@ -10,6 +10,9 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { MetadataEnrichmentService, EnrichedMetadata } from './metadata-enrichment.service';
+import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
+import { MetadataScanSession, ScanSessionStatus } from 'src/modules/release/entities/metadata-scan-session.entity';
+import { EnrichEventsGateway } from './enrich-events.gateway';
 
 /** Single field-level change logged to ClickHouse */
 interface ChangeLogEntry {
@@ -60,6 +63,7 @@ export class MetadataScanService {
 		private readonly dataSource: DataSource,
 		private readonly metadataEnrichmentService: MetadataEnrichmentService,
 		private readonly clickHouseService: ClickHouseService,
+		private readonly enrichEventsGateway: EnrichEventsGateway,
 	) {}
 
 	/**
@@ -73,43 +77,130 @@ export class MetadataScanService {
 		limit?: number;
 		dryRun?: boolean;
 		scanId?: string;
+		force?: boolean;
 	}): Promise<ScanResult> {
 		const limit = options?.limit;
 		const dryRun = options?.dryRun ?? false;
 		const scanId = options?.scanId ?? uuidv4();
+		const force = options?.force ?? false;
 
-		const result: ScanResult = {
-			scanId,
-			totalScanned: 0,
-			enriched: 0,
-			upcResolved: 0,
-			metadataUpdated: 0,
-			errors: 0,
-			changesLogged: 0,
-			details: [],
-		};
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const session = sessionRepo.create({
+			id: scanId,
+			status: ScanSessionStatus.PROCESSING,
+			totalReleases: 0,
+			processedReleases: 0,
+			successCount: 0,
+			failedCount: 0,
+			notFoundCount: 0,
+			dryRun,
+			force,
+			limitCount: limit,
+			startedAt: new Date(),
+		});
+		await sessionRepo.save(session);
+
+		try {
+			const result: ScanResult = {
+				scanId,
+				totalScanned: 0,
+				enriched: 0,
+				upcResolved: 0,
+				metadataUpdated: 0,
+				errors: 0,
+				changesLogged: 0,
+				details: [],
+			};
 
 		const changeLogs: ChangeLogEntry[] = [];
 		const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
 
 		this.logger.log(
-			`🚀 Starting metadata scan (scanId=${scanId}, limit=${limit ?? 'ALL'}, dryRun=${dryRun})...`,
+			`🚀 Starting metadata scan (scanId=${scanId}, limit=${limit ?? 'ALL'}, dryRun=${dryRun}, force=${force})...`,
 		);
 
 		// ─── 1) Find releases to enrich ──────────────────
 		const releaseRepo = this.dataSource.getRepository(Release);
 		const trackRepo = this.dataSource.getRepository(Track);
 
-		// Find all releases imported from reports, ordered by creation date
-		const findOptions: any = {
-			where: { isImportedFromReport: true },
-			relations: ['tracks', 'releaseArtists', 'releaseArtists.artist'],
-			order: { createdAt: 'DESC' },
-		};
-		if (limit !== undefined) {
-			findOptions.take = limit;
+		// Find releases imported from reports
+		const queryBuilder = releaseRepo.createQueryBuilder('release')
+			.leftJoinAndSelect('release.tracks', 'track')
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
+			.leftJoinAndSelect('releaseArtist.artist', 'artist')
+			.where('release.isImportedFromReport = :isImported', { isImported: true });
+
+		// If not forced, only include releases without a successful or not_found enrichment record
+		if (!force) {
+			queryBuilder.leftJoin(ReleaseEnrichment, 're', 're.releaseId = release.id')
+				.andWhere(new Brackets((qb) => {
+					qb.where('re.id IS NULL')
+						.orWhere('re.status NOT IN (:...excludedStatuses)', {
+							excludedStatuses: [ReleaseEnrichmentStatus.SUCCESS, ReleaseEnrichmentStatus.NOT_FOUND],
+						});
+				}));
 		}
-		const allReleases = await releaseRepo.find(findOptions);
+
+		queryBuilder.orderBy('release.createdAt', 'DESC');
+
+		if (limit !== undefined) {
+			queryBuilder.take(limit);
+		}
+		const allReleases = await queryBuilder.getMany();
+
+		session.totalReleases = allReleases.length;
+		await sessionRepo.save(session);
+
+		this.enrichEventsGateway.emit({
+			scanId,
+			type: 'progress',
+			timestamp: new Date().toISOString(),
+			data: {
+				status: session.status,
+				totalReleases: session.totalReleases,
+				processedReleases: session.processedReleases,
+				successCount: session.successCount,
+				failedCount: session.failedCount,
+				notFoundCount: session.notFoundCount,
+			},
+		});
+
+		const countedReleaseIds = new Set<string>();
+		let liveProcessedReleases = session.processedReleases;
+		let liveSuccessCount = session.successCount;
+		let liveFailedCount = session.failedCount;
+		let liveNotFoundCount = session.notFoundCount;
+
+		const emitProgress = () => {
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'progress',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: liveProcessedReleases,
+					successCount: liveSuccessCount,
+					failedCount: liveFailedCount,
+					notFoundCount: liveNotFoundCount,
+				},
+			});
+		};
+
+		const markReleaseProgress = (
+			releaseId: string,
+			status: 'success' | 'failed' | 'not_found',
+		) => {
+			if (countedReleaseIds.has(releaseId)) return;
+			countedReleaseIds.add(releaseId);
+
+			liveProcessedReleases++;
+			if (status === 'success') liveSuccessCount++;
+			if (status === 'failed') liveFailedCount++;
+			if (status === 'not_found') liveNotFoundCount++;
+
+			emitProgress();
+		};
 
 		this.logger.log(`Found ${allReleases.length} releases to scan (limit=${limit ?? 'ALL'})`);
 
@@ -133,6 +224,157 @@ export class MetadataScanService {
 			}));
 
 			const chunkChangeLogs: ChangeLogEntry[] = [];
+			const chunkFailedReleases = new Set<string>();
+
+			// Collect releases that have NO real tracks, so we can try UPC lookup on them
+			const releasesForUpcLookup = pendingReleases.filter(pr => {
+				const tracks = pr.release.tracks || [];
+				const hasRealTracks = tracks.some(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'));
+				return !hasRealTracks && pr.release.upc && !pr.release.upc.trim().toUpperCase().startsWith('ISRC-');
+			});
+
+			if (releasesForUpcLookup.length > 0) {
+				this.logger.log(`Performing UPC-based metadata lookup for ${releasesForUpcLookup.length} release(s)...`);
+				for (const pr of releasesForUpcLookup) {
+					try {
+						// Throttle to respect API rate limits
+						await new Promise((resolve) => setTimeout(resolve, 300));
+						const upc = pr.release.upc!.trim();
+						this.logger.log(`Querying Spotify/Deezer for UPC ${upc}...`);
+						const enriched = await this.metadataEnrichmentService.enrichByUpc(upc, {
+							forceExternal: force,
+						});
+						if (enriched) {
+							const primaryEnriched = enriched;
+							const changes: string[] = [];
+
+							// ─── Release Title ───────────────────────
+							const currentTitle = pr.release.title?.trim();
+							const apiTitle = primaryEnriched.albumTitle?.trim();
+							if (apiTitle && currentTitle !== apiTitle) {
+								if (!dryRun) {
+									await releaseRepo.update(pr.release.id, { title: apiTitle });
+								}
+								changes.push(`Title: "${pr.release.title}" → "${apiTitle}"`);
+								chunkChangeLogs.push(
+									this.buildLogEntry(scanId, now, dryRun, {
+										entityType: 'release',
+										entityId: pr.release.id,
+										releaseId: pr.release.id,
+										isrc: primaryEnriched.isrc || `UPC-${upc}`,
+										upc,
+										fieldName: 'title',
+										oldValue: pr.release.title || '',
+										newValue: apiTitle,
+										changeType: 'update',
+										enriched: primaryEnriched,
+									}),
+								);
+							}
+
+							// ─── Release Date ────────────────────────
+							const apiReleaseDateStr = primaryEnriched.releaseDate ? new Date(primaryEnriched.releaseDate!).toISOString().slice(0, 10) : '';
+							const currentReleaseDateStr = pr.release.releaseDate ? new Date(pr.release.releaseDate).toISOString().slice(0, 10) : '';
+
+							if (apiReleaseDateStr && currentReleaseDateStr !== apiReleaseDateStr) {
+								if (!dryRun) {
+									await releaseRepo.update(pr.release.id, {
+										releaseDate: new Date(primaryEnriched.releaseDate!),
+									});
+								}
+								changes.push(`ReleaseDate: ${pr.release.releaseDate ? currentReleaseDateStr : 'null'} → ${apiReleaseDateStr}`);
+								chunkChangeLogs.push(
+									this.buildLogEntry(scanId, now, dryRun, {
+										entityType: 'release',
+										entityId: pr.release.id,
+										releaseId: pr.release.id,
+										isrc: primaryEnriched.isrc || `UPC-${upc}`,
+										upc,
+										fieldName: 'release_date',
+										oldValue: pr.release.releaseDate ? currentReleaseDateStr : '',
+										newValue: apiReleaseDateStr,
+										changeType: 'update',
+										enriched: primaryEnriched,
+									}),
+								);
+							}
+
+							// ─── Artist ──────────────────────────────
+							if (primaryEnriched.artistName) {
+								const hasExactArtist = (pr.release.releaseArtists || []).some(
+									(ra) => ra.artist?.name?.trim()?.toLowerCase() === primaryEnriched.artistName?.trim()?.toLowerCase()
+								);
+								if (!hasExactArtist) {
+									if (!dryRun) {
+										await this.ensureArtistLink(pr.release, primaryEnriched.artistName);
+									}
+									changes.push(`Artist: added "${primaryEnriched.artistName}"`);
+									chunkChangeLogs.push(
+										this.buildLogEntry(scanId, now, dryRun, {
+											entityType: 'artist',
+											entityId: pr.release.id,
+											releaseId: pr.release.id,
+											isrc: primaryEnriched.isrc || `UPC-${upc}`,
+											upc,
+											fieldName: 'artist_name',
+											oldValue: (pr.release.releaseArtists || []).map(ra => ra.artist?.name).filter(Boolean).join(', '),
+											newValue: primaryEnriched.artistName,
+											changeType: 'create',
+											enriched: primaryEnriched,
+										}),
+									);
+								}
+							}
+
+							// ─── Create/Save Tracks ──────────────────
+							if (primaryEnriched.tracks && primaryEnriched.tracks.length > 0) {
+								await this.syncReleaseTracks(
+									pr.release,
+									primaryEnriched.tracks,
+									dryRun,
+									primaryEnriched,
+									now,
+									scanId,
+									chunkChangeLogs,
+									changes,
+								);
+							}
+
+							if (changes.length > 0) {
+								result.enriched++;
+								result.metadataUpdated += changes.length;
+								this.logger.log(
+									`✅ Release ${pr.release.id} (UPC ${upc}): ${changes.join(' | ')} (via ${primaryEnriched.source})`,
+								);
+								result.details.push({
+									isrc: primaryEnriched.isrc || `UPC-${upc}`,
+									action: 'upc_metadata_updated',
+									source: primaryEnriched.source,
+									newUpc: upc,
+								});
+							}
+
+							pr.resolved = true;
+							await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.SUCCESS, scanId, {
+								source: primaryEnriched.source,
+								dryRun,
+							});
+							markReleaseProgress(pr.release.id, 'success');
+						} else {
+							this.logger.warn(`UPC ${upc} enrichment returned no metadata.`);
+						}
+					} catch (err) {
+						result.errors++;
+						chunkFailedReleases.add(pr.release.id);
+						this.logger.error(`Failed to update release ${pr.release.id} via UPC: ${err.message}`);
+						await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.FAILED, scanId, {
+							errorMessage: err.message,
+							dryRun,
+						});
+						markReleaseProgress(pr.release.id, 'failed');
+					}
+				}
+			}
 
 			while (pendingReleases.some(pr => !pr.resolved && pr.currentTrackIndex < (pr.release.tracks?.length ?? 0))) {
 				// Collect one ISRC per pending/unresolved release
@@ -163,8 +405,9 @@ export class MetadataScanService {
 				this.logger.log(`Querying Spotify/Deezer for ${isrcs.length} ISRCs (batch trial)...`);
 
 				const enrichedMap = await this.metadataEnrichmentService.enrichBatch(isrcs, {
-					concurrency: 3,
-					delayMs: 300,
+					concurrency: 1,
+					delayMs: 500,
+					forceExternal: force,
 				});
 
 				// Group results by release
@@ -306,16 +549,22 @@ export class MetadataScanService {
 												label_id: existing.labelId || '',
 												artist_ids: artistIds,
 												is_deleted: 0,
-												updated_at: now,
+												updated_at: now.slice(0, 19),
 											}],
 										);
 									} catch (chErr) {
 										this.logger.error(`Failed to insert resolved UPC mapping to ClickHouse: ${chErr.message}`);
 									}
 
+									await this.updateEnrichmentStatus(existing.id, ReleaseEnrichmentStatus.SUCCESS, scanId, {
+										source: primaryEnriched.source,
+										dryRun,
+									});
+
 									// Mark resolved and continue
 									const pending = pendingReleases.find(pr => pr.release.id === releaseId);
 									if (pending) pending.resolved = true;
+									markReleaseProgress(releaseId, 'success');
 									continue;
 								}
 							} else {
@@ -358,7 +607,7 @@ export class MetadataScanService {
 											label_id: release.labelId || '',
 											artist_ids: artistIds,
 											is_deleted: 0,
-											updated_at: now,
+											updated_at: now.slice(0, 19),
 										}],
 									);
 								} catch (chErr) {
@@ -449,6 +698,20 @@ export class MetadataScanService {
 							}
 						}
 
+						// ─── Create/Save Tracks ──────────────────
+						if (primaryEnriched.tracks && primaryEnriched.tracks.length > 0) {
+							await this.syncReleaseTracks(
+								release,
+								primaryEnriched.tracks,
+								dryRun,
+								primaryEnriched,
+								now,
+								scanId,
+								chunkChangeLogs,
+								changes,
+							);
+						}
+
 						// ─── Artist ──────────────────────────────
 						if (primaryEnriched.artistName) {
 							const hasExactArtist = (release.releaseArtists || []).some(
@@ -494,9 +757,21 @@ export class MetadataScanService {
 						const pending = pendingReleases.find(pr => pr.release.id === releaseId);
 						if (pending) pending.resolved = true;
 
+						await this.updateEnrichmentStatus(release.id, ReleaseEnrichmentStatus.SUCCESS, scanId, {
+							source: primaryEnriched.source,
+							dryRun,
+						});
+						markReleaseProgress(releaseId, 'success');
+
 					} catch (err) {
 						result.errors++;
+						chunkFailedReleases.add(releaseId);
 						this.logger.error(`Failed to update release ${releaseId}: ${err.message}`);
+						await this.updateEnrichmentStatus(release.id, ReleaseEnrichmentStatus.FAILED, scanId, {
+							errorMessage: err.message,
+							dryRun,
+						});
+						markReleaseProgress(releaseId, 'failed');
 					}
 				}
 
@@ -511,6 +786,17 @@ export class MetadataScanService {
 							}
 						}
 					}
+				}
+			}
+
+			// For releases that were NOT enriched (resolved = false), mark as NOT_FOUND
+			for (const pr of pendingReleases) {
+				if (!pr.resolved && !chunkFailedReleases.has(pr.release.id)) {
+					await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.NOT_FOUND, scanId, {
+						dryRun,
+					});
+					this.logger.log(`⚠️ Release ${pr.release.id} could not be resolved (marked NOT_FOUND)`);
+					markReleaseProgress(pr.release.id, 'not_found');
 				}
 			}
 
@@ -529,7 +815,62 @@ export class MetadataScanService {
 					this.logger.error(`Failed to log chunk changes to ClickHouse: ${err.message}`);
 				}
 			}
+
+			// Update the session progress
+			let chunkSuccess = 0;
+			let chunkFailed = 0;
+			let chunkNotFound = 0;
+
+			for (const pr of pendingReleases) {
+				if (pr.resolved) {
+					chunkSuccess++;
+				} else if (chunkFailedReleases.has(pr.release.id)) {
+					chunkFailed++;
+				} else {
+					chunkNotFound++;
+				}
+			}
+
+			result.totalScanned += pendingReleases.length;
+
+			session.processedReleases += pendingReleases.length;
+			session.successCount += chunkSuccess;
+			session.failedCount += chunkFailed;
+			session.notFoundCount += chunkNotFound;
+			await sessionRepo.save(session);
+
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'progress',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: session.processedReleases,
+					successCount: session.successCount,
+					failedCount: session.failedCount,
+					notFoundCount: session.notFoundCount,
+				},
+			});
 		}
+
+		session.status = ScanSessionStatus.COMPLETED;
+		session.finishedAt = new Date();
+		await sessionRepo.save(session);
+
+		this.enrichEventsGateway.emit({
+			scanId,
+			type: 'completed',
+			timestamp: new Date().toISOString(),
+			data: {
+				status: session.status,
+				totalReleases: session.totalReleases,
+				processedReleases: session.processedReleases,
+				successCount: session.successCount,
+				failedCount: session.failedCount,
+				notFoundCount: session.notFoundCount,
+			},
+		});
 
 		this.logger.log(
 			`🏁 Scan complete (scanId=${scanId}): ${result.totalScanned} scanned, ` +
@@ -539,6 +880,23 @@ export class MetadataScanService {
 		);
 
 		return result;
+		} catch (err) {
+			session.status = ScanSessionStatus.FAILED;
+			session.errorMessage = err.message;
+			session.finishedAt = new Date();
+			await sessionRepo.save(session);
+
+			this.enrichEventsGateway.emit({
+				scanId,
+				type: 'failed',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					errorMessage: err.message,
+				},
+			});
+			throw err;
+		}
 	}
 
 	/**
@@ -584,6 +942,56 @@ export class MetadataScanService {
 			 ${limitClause}`,
 			params,
 		);
+	}
+
+	/**
+	 * Get general statistics summary of enrichment progress
+	 */
+	async getEnrichmentSummary() {
+		const releaseRepo = this.dataSource.getRepository(Release);
+		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+
+		const totalReleases = await releaseRepo.count({
+			where: { isImportedFromReport: true },
+		});
+
+		const counts = await enrichmentRepo
+			.createQueryBuilder('re')
+			.select('re.status', 'status')
+			.addSelect('COUNT(re.id)', 'count')
+			.groupBy('re.status')
+			.getRawMany();
+
+		let successCount = 0;
+		let failedCount = 0;
+		let notFoundCount = 0;
+		let pendingCount = 0;
+
+		for (const row of counts) {
+			const countVal = parseInt(row.count, 10) || 0;
+			if (row.status === ReleaseEnrichmentStatus.SUCCESS) {
+				successCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.FAILED) {
+				failedCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.NOT_FOUND) {
+				notFoundCount = countVal;
+			} else if (row.status === ReleaseEnrichmentStatus.PENDING) {
+				pendingCount = countVal;
+			}
+		}
+
+		const totalDone = successCount + failedCount + notFoundCount;
+		const totalRemaining = Math.max(0, totalReleases - totalDone);
+
+		return {
+			totalReleases,
+			totalDone,
+			totalRemaining,
+			successCount,
+			failedCount,
+			notFoundCount,
+			pendingCount,
+		};
 	}
 
 	// ─────────────────────────────────────────────────────
@@ -687,5 +1095,216 @@ export class MetadataScanService {
 				}
 			}
 		}
+	}
+
+	private async syncReleaseTracks(
+		release: Release,
+		apiTracks: Array<{ isrc: string; title: string; duration?: number; trackNumber?: number; spotifyId?: string; deezerId?: string }>,
+		dryRun: boolean,
+		primaryEnriched: EnrichedMetadata,
+		now: string,
+		scanId: string,
+		chunkChangeLogs: any[],
+		changes: string[],
+	): Promise<void> {
+		const trackRepo = this.dataSource.getRepository(Track);
+		const trackArtistRepo = this.dataSource.getRepository(TrackArtist);
+
+		this.logger.log(`Syncing ${apiTracks.length} track(s) for release ${release.id}`);
+
+		// 1. Fetch artists for link
+		let releaseArtists: ReleaseArtist[] = [];
+		try {
+			releaseArtists = await this.dataSource.getRepository(ReleaseArtist).find({
+				where: { releaseId: release.id },
+				relations: ['artist'],
+			});
+		} catch (err) {
+			this.logger.warn(`Failed to fetch release artists: ${err.message}`);
+		}
+
+		// 2. Fetch existing tracks in DB for this release
+		const dbTracks = await trackRepo.find({
+			where: { releaseId: release.id },
+		});
+
+		// 3. Move existing track orders to a temporary high range to avoid UQ_tracks_release_id_order conflicts
+		if (!dryRun) {
+			for (const track of dbTracks) {
+				await trackRepo.update({ id: track.id }, { order: track.order + 10000 });
+			}
+		}
+
+		const usedOrders = new Set<number>();
+
+		// 4. Upsert/Create tracks
+		for (const apiTrack of apiTracks) {
+			if (!apiTrack.isrc) continue;
+
+			const targetOrder = apiTrack.trackNumber || 1;
+			usedOrders.add(targetOrder);
+
+			// Find if this ISRC already exists in our db tracks
+			const existingTrack = dbTracks.find(
+				(t) => t.isrc?.trim().toUpperCase() === apiTrack.isrc.trim().toUpperCase()
+			);
+
+			if (existingTrack) {
+				// Update existing track to its official order and title if changed
+				if (!dryRun) {
+					await trackRepo.update(
+						{ id: existingTrack.id },
+						{
+							title: apiTrack.title,
+							order: targetOrder,
+						}
+					);
+				}
+				
+				const hasChanges = existingTrack.title !== apiTrack.title || existingTrack.order !== targetOrder;
+				if (hasChanges) {
+					changes.push(`Track[${apiTrack.isrc}] updated: "${apiTrack.title}" (order: ${targetOrder})`);
+				}
+			} else {
+				// Create new track
+				let newTrack: Track | undefined;
+				if (!dryRun) {
+					newTrack = await trackRepo.save(
+						trackRepo.create({
+							releaseId: release.id,
+							isrc: apiTrack.isrc,
+							title: apiTrack.title,
+							order: targetOrder,
+							isImportedFromReport: true,
+						})
+					);
+
+					// Link track to artists
+					for (const ra of releaseArtists) {
+						await trackArtistRepo.save(
+							trackArtistRepo.create({
+								trackId: newTrack!.id,
+								artistId: ra.artistId,
+								releaseArtistId: ra.id,
+								isFromReleaseAction: true,
+								isImportedFromReport: true,
+							})
+						);
+					}
+				}
+
+				changes.push(`Track[${apiTrack.isrc}]: created "${apiTrack.title}"`);
+				chunkChangeLogs.push(
+					this.buildLogEntry(scanId, now, dryRun, {
+						entityType: 'track',
+						entityId: newTrack?.id || uuidv4(),
+						releaseId: release.id,
+						isrc: apiTrack.isrc,
+						upc: release.upc || '',
+						fieldName: 'create_track',
+						oldValue: '',
+						newValue: apiTrack.title,
+						changeType: 'create',
+						enriched: primaryEnriched,
+					}),
+				);
+
+				// Sync new track to ClickHouse pg_tracks_sync
+				try {
+					const artistIds = releaseArtists.map((ra) => ra.artistId).filter(Boolean);
+					await this.clickHouseService.insert(
+						CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
+						[{
+							isrc: apiTrack.isrc,
+							tenant_id: release.tenantId || '',
+							release_id: release.id,
+							label_id: release.labelId || '',
+							artist_ids: artistIds,
+							is_deleted: 0,
+							updated_at: now.slice(0, 19),
+						}],
+					);
+				} catch (chErr) {
+					this.logger.error(`Failed to insert track ${apiTrack.isrc} into pg_tracks_sync: ${chErr.message}`);
+				}
+			}
+		}
+
+		// 5. Restore any remaining db tracks that were NOT updated to their final order
+		if (!dryRun) {
+			const finalDbTracks = await trackRepo.find({
+				where: { releaseId: release.id },
+			});
+			for (const track of finalDbTracks) {
+				if (track.order >= 10000) {
+					let restoreOrder = track.order - 10000;
+					while (usedOrders.has(restoreOrder)) {
+						restoreOrder++;
+					}
+					await trackRepo.update({ id: track.id }, { order: restoreOrder });
+					usedOrders.add(restoreOrder);
+				}
+			}
+		}
+	}
+
+	private async updateEnrichmentStatus(
+		releaseId: string,
+		status: ReleaseEnrichmentStatus,
+		scanId: string,
+		options?: {
+			source?: string;
+			errorMessage?: string;
+			dryRun?: boolean;
+		},
+	): Promise<void> {
+		const dryRun = options?.dryRun ?? false;
+		if (dryRun) return;
+
+		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+		let enrichment = await enrichmentRepo.findOne({ where: { releaseId } });
+
+		if (!enrichment) {
+			enrichment = enrichmentRepo.create({ releaseId });
+		}
+
+		enrichment.status = status;
+		enrichment.lastScannedAt = new Date();
+		enrichment.lastScanId = scanId;
+		enrichment.enrichmentSource = options?.source || null;
+		enrichment.errorMessage = options?.errorMessage || null;
+
+		await enrichmentRepo.save(enrichment);
+	}
+
+	/**
+	 * List recent metadata scan sessions
+	 */
+	async listScanSessions(query: {
+		page?: number;
+		pageSize?: number;
+	}): Promise<{ items: MetadataScanSession[]; totalItems: number }> {
+		const page = query.page ?? 1;
+		const pageSize = query.pageSize ?? 10;
+
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const [items, totalItems] = await sessionRepo.findAndCount({
+			order: { createdAt: 'DESC' },
+			skip: (page - 1) * pageSize,
+			take: pageSize,
+		});
+
+		return {
+			items,
+			totalItems,
+		};
+	}
+
+	/**
+	 * Find a metadata scan session by ID
+	 */
+	async findScanSessionById(id: string): Promise<MetadataScanSession | null> {
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		return sessionRepo.findOne({ where: { id } });
 	}
 }

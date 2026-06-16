@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
@@ -31,7 +33,7 @@ type StepTaskContext = {
 };
 
 @Injectable()
-export class ReleaseExecution3Worker {
+export class ReleaseExecution3WorkerTest {
 	constructor(
 		@InjectEntityManager()
 		private readonly manager: EntityManager,
@@ -113,7 +115,7 @@ export class ReleaseExecution3Worker {
 				return this.sendEmailState51(context);
 
 			case ReleaseExecutionStepType.SYNC_DATA_DSP_CI:
-				return this.syncDataStatusDspCi(context);
+				return this.syncDataDspCi(context);
 
 			case ReleaseExecutionStepType.WAIT_PARTNER_PROCESS:
 				return this.waitPartnerProcess(context);
@@ -366,7 +368,7 @@ export class ReleaseExecution3Worker {
 	): Promise<ReleaseExecutionStepStatus> {
 		const { step } = context;
 		try {
-			// return ReleaseExecutionStepStatus.DONE;
+			return ReleaseExecutionStepStatus.DONE;
 			const metaStep = await this.getSiblingStepByType(
 				step,
 				ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
@@ -626,6 +628,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
@@ -812,6 +815,7 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			if (!step.parentStepId) {
 				throw new Error(
@@ -1092,7 +1096,7 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async syncDataStatusDspCi({
+	private async syncDataDspCi({
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
