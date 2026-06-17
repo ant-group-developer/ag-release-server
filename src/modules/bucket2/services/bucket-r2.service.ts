@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Readable } from 'stream';
 import { BucketException } from '../constants/bucket.response';
@@ -85,6 +86,29 @@ export class BucketR2Service {
 		return getSignedUrl(this.client, command, {
 			expiresIn: 60 * 60,
 		});
+	}
+
+	async uploadFileFromPath(data: {
+		key: string;
+		filePath: string;
+		contentType: string;
+		isPublic?: boolean;
+	}): Promise<{ bucketName: string; key: string }> {
+		const { key, filePath, contentType, isPublic = false } = data;
+		const bucketName = this.getBucketName({ isPublic });
+		const stat = await fs.promises.stat(filePath);
+
+		await this.client.send(
+			new PutObjectCommand({
+				Bucket: bucketName,
+				Key: key,
+				Body: fs.createReadStream(filePath),
+				ContentType: contentType,
+				ContentLength: stat.size,
+			}),
+		);
+
+		return { bucketName, key };
 	}
 
 	async getSignedUrlRead(data: IGetSignedUrlRead): Promise<string> {

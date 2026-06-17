@@ -66,9 +66,7 @@ export class SpotifyService {
 				this.resToken = { access_token: '', expires_in: 0 };
 			}, timeoutMs);
 
-			this.logger.log(
-				`token spotify: ${data.access_token}`,
-			);
+			this.logger.log('Spotify access token refreshed');
 
 			return data;
 		} catch (error: any) {
