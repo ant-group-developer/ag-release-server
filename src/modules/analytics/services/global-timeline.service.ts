@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
@@ -26,6 +27,7 @@ import {
   TerritoryBarChartItem,
   RevenueLineChartItem,
 } from '../interfaces/analytics.interface';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class TimelineAnalyticsService {
@@ -34,6 +36,8 @@ export class TimelineAnalyticsService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
+    @InjectEntityManager()
+    private readonly entityManager: EntityManager,
   ) { }
 
   private revenueNumber(value?: string | null): number {
@@ -1496,7 +1500,7 @@ export class TimelineAnalyticsService {
       items.push({ territory: 'Other', totalViews: otherViews });
     }
 
-    return items;
+    return this.mapTerritoryCodesToCountryNames(items);
   }
 
   async getRevenueLineChart(
@@ -1648,6 +1652,48 @@ export class TimelineAnalyticsService {
       items.push({ territory: 'Other', revenueUsd: otherRev, revenueUsdExact: otherRevExact });
     }
 
-    return items;
+    return this.mapTerritoryCodesToCountryNames(items);
+  }
+
+  private async mapTerritoryCodesToCountryNames(
+    items: TerritoryBarChartItem[],
+  ): Promise<TerritoryBarChartItem[]> {
+    const iso2Codes = Array.from(
+      new Set(
+        items
+          .map((item) => item.territory?.trim().toUpperCase())
+          .filter((territory): territory is string =>
+            !!territory && territory !== 'OTHER',
+          ),
+      ),
+    );
+
+    if (!iso2Codes.length) return items;
+
+    const countries = (await this.entityManager.query(
+      `
+        SELECT UPPER(iso2) AS iso2, name
+        FROM countries
+        WHERE UPPER(iso2) = ANY($1)
+      `,
+      [iso2Codes],
+    )) as Array<{
+      iso2: string;
+      name: string;
+    }>;
+    const countryNameByIso2 = new Map(
+      countries.map((country) => [country.iso2, country.name]),
+    );
+
+    return items.map((item) => {
+      const iso2 = item.territory?.trim().toUpperCase();
+      return {
+        ...item,
+        territory:
+          iso2 && iso2 !== 'OTHER'
+            ? countryNameByIso2.get(iso2) ?? item.territory
+            : item.territory,
+      };
+    });
   }
 }
