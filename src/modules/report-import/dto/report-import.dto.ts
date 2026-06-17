@@ -52,7 +52,9 @@ export class ReportImportStartResponseDto implements ReportImportStartResponse {
   constructor(job: ImportJob) {
     this.jobId = job.id;
     this.status = job.status;
-    this.message = 'Job processing has been started.';
+    this.message = job.status === 'QUEUED'
+      ? 'Job has been queued for background processing.'
+      : 'Job processing has been started.';
   }
 }
 

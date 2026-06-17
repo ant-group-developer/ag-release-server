@@ -14,9 +14,23 @@ export class ReportImportQueueService {
    * Push a jobId to the import queue
    */
   async pushJob(jobId: string): Promise<void> {
+    if (await this.hasJob(jobId)) {
+      this.logger.log(`Job ${jobId} is already queued or processing. Skip duplicate enqueue.`);
+      return;
+    }
+
     this.logger.log(`Enqueueing job ${jobId} to Redis queue: ${this.QUEUE_NAME}...`);
     const len = await this.redis.lpush(this.QUEUE_NAME, jobId);
     this.logger.log(`Successfully enqueued job ${jobId}. Queue length is now: ${len}`);
+  }
+
+  async hasJob(jobId: string): Promise<boolean> {
+    const [queued, processing] = await Promise.all([
+      this.redis.lrange(this.QUEUE_NAME, 0, -1),
+      this.redis.lrange(this.PROCESSING_QUEUE_NAME, 0, -1),
+    ]);
+
+    return queued.includes(jobId) || processing.includes(jobId);
   }
 
   /**
