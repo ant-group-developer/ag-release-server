@@ -154,6 +154,12 @@ export class ReleaseExecution3QueryService {
 			});
 		}
 
+		if (query.type?.length) {
+			qb.andWhere('execution.type IN (:...types)', {
+				types: query.type,
+			});
+		}
+
 		return qb;
 	}
 

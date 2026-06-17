@@ -140,6 +140,18 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 
 	@IsOptional()
 	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsEnum(ExecutionType, { each: true })
+	@IsArray()
+	type?: ExecutionType[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
 		if (value === true || value === 'true') return true;
 		if (value === false || value === 'false') return false;
 		return value;
