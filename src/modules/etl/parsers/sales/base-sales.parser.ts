@@ -7,7 +7,10 @@ import * as os from 'os';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const AdmZip = require('adm-zip');
 import { FactSalesRow } from '../../interfaces';
-import { normalizeTextValue } from '../../utils/fact-row-normalizer.util';
+import {
+  normalizeFactRows,
+  normalizeTextValue,
+} from '../../utils/fact-row-normalizer.util';
 
 /**
  * Abstract base parser for all DSP sales data files.
@@ -141,9 +144,9 @@ export abstract class BaseSalesParser {
         const parsed = this.parseRow(record, batchId, filePath);
         if (parsed) {
           if (Array.isArray(parsed)) {
-            rows.push(...parsed);
+            rows.push(...this.normalizeParsedRows(parsed));
           } else {
-            rows.push(parsed);
+            rows.push(...this.normalizeParsedRows([parsed]));
           }
         }
       } catch (err) {
@@ -172,6 +175,10 @@ export abstract class BaseSalesParser {
     batchId: string,
     filePath: string,
   ): FactSalesRow | FactSalesRow[] | null;
+
+  protected normalizeParsedRows(rows: FactSalesRow[]): FactSalesRow[] {
+    return normalizeFactRows(rows);
+  }
 
   // ── Delimiter & line parsing (same as BaseParser) ──
 

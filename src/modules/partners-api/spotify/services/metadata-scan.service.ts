@@ -25,6 +25,7 @@ import {
 } from 'src/modules/release/entities/metadata-scan-session.entity';
 import { EnrichEventsGateway } from './enrich-events.gateway';
 import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import { stringToCode } from 'src/utils/util';
 
 /** Single field-level change logged to ClickHouse */
 interface ChangeLogEntry {
@@ -412,6 +413,20 @@ export class MetadataScanService implements OnModuleInit {
 							}
 
 							// ─── Artist ──────────────────────────────
+							await this.syncReleaseLabelFromEnriched(
+								pr.release,
+								primaryEnriched,
+								dryRun,
+								now,
+								scanId,
+								chunkChangeLogs,
+								changes,
+								{
+									isrc: primaryEnriched.isrc || `UPC-${upc}`,
+									upc,
+								},
+							);
+
 							if (primaryEnriched.artistName) {
 								const hasExactArtist = (pr.release.releaseArtists || []).some(
 									(ra) => ra.artist?.name?.trim()?.toLowerCase() === primaryEnriched.artistName?.trim()?.toLowerCase()
@@ -866,6 +881,20 @@ export class MetadataScanService implements OnModuleInit {
 						}
 
 						// ─── Track Titles ────────────────────────
+						await this.syncReleaseLabelFromEnriched(
+							release,
+							primaryEnriched,
+							dryRun,
+							now,
+							scanId,
+							chunkChangeLogs,
+							changes,
+							{
+								isrc: primaryEnriched.isrc,
+								upc: release.upc || '',
+							},
+						);
+
 						for (const { track, enriched } of enrichedTracks) {
 							const currentTrackTitle = track.title?.trim();
 							const apiTrackTitle = enriched.trackTitle?.trim();
@@ -1494,6 +1523,84 @@ export class MetadataScanService implements OnModuleInit {
 		apiTrack: NonNullable<EnrichedMetadata['tracks']>[number],
 	): boolean {
 		return Boolean(apiTrack.deezerId || apiTrack.deezerUrl || enriched.albumDeezerId || enriched.albumDeezerUrl);
+	}
+
+	private async syncReleaseLabelFromEnriched(
+		release: Release,
+		enriched: EnrichedMetadata,
+		dryRun: boolean,
+		now: string,
+		scanId: string,
+		changeLogs: ChangeLogEntry[],
+		changes: string[],
+		identifiers: { isrc?: string; upc?: string },
+	): Promise<void> {
+		const labelName = enriched.labelName?.trim();
+		if (!labelName || labelName.toUpperCase() === 'N/A') return;
+
+		const label = await this.resolveOrCreateApiLabel(release.tenantId, labelName);
+		if (!label || release.labelId === label.id) return;
+
+		const oldLabelId = release.labelId || '';
+		const oldLabelName = release.label?.name?.trim();
+		const oldValue = oldLabelName ? `${oldLabelId} (${oldLabelName})` : oldLabelId;
+		const newValue = `${label.id} (${label.name})`;
+
+		if (!dryRun) {
+			await this.dataSource.getRepository(Release).update(release.id, {
+				labelId: label.id,
+			});
+			release.labelId = label.id;
+			release.label = label;
+		}
+
+		changes.push(`Label: "${oldValue || 'null'}" -> "${label.name}"`);
+		changeLogs.push(
+			this.buildLogEntry(scanId, now, dryRun, {
+				entityType: 'release',
+				entityId: release.id,
+				releaseId: release.id,
+				isrc: identifiers.isrc || enriched.isrc || '',
+				upc: identifiers.upc || release.upc || '',
+				fieldName: 'label_id',
+				oldValue,
+				newValue,
+				changeType: 'update',
+				enriched,
+			}),
+		);
+	}
+
+	private async resolveOrCreateApiLabel(
+		tenantId: string | null | undefined,
+		labelName: string,
+	): Promise<Label | null> {
+		const name = labelName.trim();
+		if (!tenantId || !name) return null;
+
+		const labelRepo = this.dataSource.getRepository(Label);
+		const existing = await labelRepo.findOne({
+			where: { tenantId, name: ILike(name) },
+			order: { createdAt: 'ASC' },
+		});
+		if (existing) return existing;
+
+		const { nanoid } = await import('nanoid');
+		const baseCode = stringToCode(name) || `API_${nanoid(6)}`;
+		let code = baseCode;
+
+		while (await labelRepo.exists({ where: { tenantId, code } })) {
+			code = `${baseCode}_${nanoid(6)}`;
+		}
+
+		return labelRepo.save(
+			labelRepo.create({
+				name,
+				code,
+				tenantId,
+				isImportedFromReport: true,
+			}),
+		);
 	}
 
 	private normalizeIsrc(isrc?: string | null): string {

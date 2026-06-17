@@ -169,6 +169,7 @@ export class WmgSalesParser extends BaseSalesParser {
           continue;
         }
 
+        this.normalizeParsedRows([parsed]);
         buffer.push(parsed);
         totalRows++;
         if (dspName) uniqueDsps.add(dspName);
