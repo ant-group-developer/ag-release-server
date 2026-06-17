@@ -163,6 +163,10 @@ export class ReportImportService {
         throw new NotFoundException(`Không tìm thấy Job ID: ${jobId}`);
       }
 
+      if (job.status === ImportJobStatus.QUEUED) {
+        return job;
+      }
+
       if (job.status !== ImportJobStatus.PENDING) {
         throw new BadRequestException(`Job đang ở trạng thái ${job.status}, không thể bắt đầu lại.`);
       }
@@ -199,6 +203,7 @@ export class ReportImportService {
       // Push jobId to Redis Queue
       try {
         await this.queueService.pushJob(job.id);
+        job = await this.importJobsService.markQueued(job.id);
       } catch (err) {
         const errorMsg = `Không thể đẩy job vào Redis Queue: ${err.message}`;
         this.logger.error(errorMsg);

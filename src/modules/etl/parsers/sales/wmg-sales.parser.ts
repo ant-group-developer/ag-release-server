@@ -80,7 +80,6 @@ export class WmgSalesParser extends BaseSalesParser {
     row.reporting_period_end = end;
     row.service_name = dspName;
     row.member_name = this.normalizeText(accountName || payee || opts.memberName);
-    row.label_name = this.normalizeText(record['Marketing Owner Name']);
     row.territory_code = this.normalizeCountryCode(record['Country'] || '');
     row.isrc = isrc;
     row.upc = upc;
@@ -169,6 +168,7 @@ export class WmgSalesParser extends BaseSalesParser {
           continue;
         }
 
+        this.normalizeParsedRows([parsed]);
         buffer.push(parsed);
         totalRows++;
         if (dspName) uniqueDsps.add(dspName);

@@ -86,6 +86,14 @@ export class ImportJobsService implements OnModuleInit {
     await this.persist(job);
   }
 
+  async markQueued(id: string): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.status = ImportJobStatus.QUEUED;
+    job.progressLabel = 'Queued';
+    await this.persist(job);
+    return job;
+  }
+
   /**
    * Update progress fields. Throttle 1s/job để tránh spam ClickHouse insert.
    * `force=true` flush ngay (dùng khi đổi step lớn / kết thúc job).
@@ -605,8 +613,13 @@ export function computeProgressDetail(job: ImportJob) {
       }
     }
   } else {
-    // PENDING or PROCESSING
-    if (progressLabel.startsWith('Downloading:')) {
+    // PENDING, QUEUED or PROCESSING
+    if (status === ImportJobStatus.QUEUED) {
+      stage = 'queued';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'pending' });
+      }
+    } else if (progressLabel.startsWith('Downloading:')) {
       stage = 'downloading';
       const activeIdx = progressCurrent;
       for (let idx = 0; idx < files.length; idx++) {

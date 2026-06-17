@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { pipeline } from 'stream/promises';
+import { Repository } from 'typeorm';
 import { ReportImportQueueService } from './report-import-queue.service';
 import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
@@ -15,6 +17,8 @@ import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
 import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
 import { hasMeaningfulText, normalizeFactRows } from '../../etl/utils/fact-row-normalizer.util';
+import { MetadataEnrichmentService } from '../../partners-api/spotify/services/metadata-enrichment.service';
+import { Label } from '../../label/entities/label.entity';
 
 @Injectable()
 export class ReportImportWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -31,6 +35,9 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     private readonly clickHouseService: ClickHouseService,
     private readonly reportEntityExtractorService: ReportEntityExtractorService,
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly metadataEnrichmentService: MetadataEnrichmentService,
+    @InjectRepository(Label)
+    private readonly labelRepo: Repository<Label>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -70,12 +77,70 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     }
   }
 
+  private async resolveFallbackLabelName(labelId?: string): Promise<string | undefined> {
+    if (!labelId?.trim()) return undefined;
+
+    const label = await this.labelRepo.findOne({
+      where: { id: labelId.trim() },
+    });
+
+    return hasMeaningfulText(label?.name) ? label!.name.trim() : undefined;
+  }
+
+  private async applyWmgLabelNames(
+    rows: FactSalesRow[],
+    fallbackLabelName: string | undefined,
+    labelCacheByUpc: Map<string, string | null>,
+  ): Promise<void> {
+    const upcsToResolve = [
+      ...new Set(
+        rows
+          .map((row) => row.upc?.trim())
+          .filter((upc): upc is string => hasMeaningfulText(upc) && !labelCacheByUpc.has(upc)),
+      ),
+    ];
+
+    for (const upc of upcsToResolve) {
+      labelCacheByUpc.set(upc, await this.resolveApiLabelNameByUpc(upc));
+    }
+
+    for (const row of rows) {
+      const apiLabelName = labelCacheByUpc.get(row.upc?.trim() || '') || undefined;
+      row.label_name = apiLabelName || fallbackLabelName || 'N/A';
+    }
+  }
+
+  private async resolveApiLabelNameByUpc(upc: string): Promise<string | null> {
+    try {
+      const enriched = await this.metadataEnrichmentService.enrichByUpc(upc, {
+        forceExternal: true,
+      });
+      return hasMeaningfulText(enriched?.labelName)
+        ? enriched!.labelName!.trim()
+        : null;
+    } catch (err) {
+      this.logger.warn(`Failed to resolve WMG label by UPC ${upc}: ${err.message}`);
+      return null;
+    }
+  }
+
   private async processJob(jobId: string) {
     const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
     let totalProcessedRows = 0;
     const uniqueRowsMap = new Map<string, any>(); // key: `${upc}|${isrc}`
     
     try {
+      const currentJob = this.importJobsService.getSnapshot(jobId) ?? await this.importJobsService.findById(jobId);
+      if (
+        currentJob &&
+        currentJob.status !== ImportJobStatus.PENDING &&
+        currentJob.status !== ImportJobStatus.QUEUED
+      ) {
+        this.logger.warn(`Skipping queued job ${jobId} because current status is ${currentJob.status}.`);
+        await this.queueService.ackJob(jobId);
+        return;
+      }
+
       await this.importJobsService.markProcessing(jobId);
       let job = this.importJobsService.getSnapshot(jobId);
       if (!job) {
@@ -90,6 +155,8 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
       const files = (job.params?.files as any[]) || [];
       const labelIdParam = job.params?.labelId;
       const labelId = typeof labelIdParam === 'string' ? labelIdParam : undefined;
+      const fallbackLabelName = await this.resolveFallbackLabelName(labelId);
+      const wmgLabelCache = new Map<string, string | null>();
       const affectedPeriods = new Set<string>();
 
       for (let i = 0; i < files.length; i++) {
@@ -152,6 +219,8 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
             localFilePath,
             jobId,
             async (batch: FactSalesRow[]) => {
+              await this.applyWmgLabelNames(batch, fallbackLabelName, wmgLabelCache);
+
               // Populate audit fields on the batch rows
               for (const r of batch) {
                 r.import_source = importSource;

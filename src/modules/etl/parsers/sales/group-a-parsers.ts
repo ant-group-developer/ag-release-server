@@ -157,6 +157,7 @@ export class TencentSalesParser extends BaseSalesParser {
     row.artist_name = r['Artist_Name'] || '';
     row.album_title = r['Release_Title'] || '';
     row.release_id = r['Release_ID'] || '';
+    row.upc = r['Release_ID'] || '';
     row.quantity = this.safeInt(r['Quantity'] || '0');
     const rawUsd = r['Total_Payable_USD'] || r['USD_Amount'] || '0';
     const rawLocal = r['Adjusted_Total_Payable'] || r['Adjusted_total_payable'] || r['Total_Payable'] || rawUsd;

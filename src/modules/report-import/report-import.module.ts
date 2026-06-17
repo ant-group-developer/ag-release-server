@@ -5,6 +5,7 @@ import { BucketModule2 } from '../bucket2/bucket2.module';
 import { EtlModule } from '../etl/etl.module';
 import { DspModule } from '../dsp/dsp.module';
 import { ReleaseModule } from '../release/release.module';
+import { SpotifyModule } from '../partners-api/spotify/spotify.module';
 import { Label } from '../label/entities/label.entity';
 import { ReportImportController } from './controllers/report-import.controller';
 import { ReportSourceConfigController } from './controllers/report-source-config.controller';
@@ -22,6 +23,7 @@ import { ReportSourceConfigService } from './services/report-source-config.servi
     EtlModule,
     DspModule,
     ReleaseModule,
+    SpotifyModule,
     TypeOrmModule.forFeature([Label]),
   ],
   controllers: [ReportImportController, ReportSourceConfigController],

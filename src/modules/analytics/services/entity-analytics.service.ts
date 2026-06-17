@@ -20,6 +20,37 @@ export type EntityType = 'release' | 'label' | 'artist' | 'track';
 export class EntityAnalyticsService {
 	constructor(private readonly clickHouseService: ClickHouseService) {}
 
+	private revenueNumber(value?: string | null): number {
+		return Number(value ?? 0);
+	}
+
+	private revenueExact(value?: string | null): string {
+		return value?.toString() ?? '0';
+	}
+
+	private addRevenueExact(values: Array<string | null | undefined>): string {
+		const decimals = values.map((value) => this.revenueExact(value));
+		const scale = Math.max(0, ...decimals.map((value) => (value.split('.')[1] || '').length));
+		let sum = 0n;
+
+		for (const value of decimals) {
+			const negative = value.trim().startsWith('-');
+			const unsigned = negative ? value.trim().slice(1) : value.trim();
+			const [whole = '0', frac = ''] = unsigned.split('.');
+			const units = BigInt(`${whole || '0'}${frac.padEnd(scale, '0') || ''}`);
+			sum += negative ? -units : units;
+		}
+
+		const negative = sum < 0n;
+		const abs = negative ? -sum : sum;
+		if (scale === 0) return `${negative ? '-' : ''}${abs.toString()}`;
+
+		const padded = abs.toString().padStart(scale + 1, '0');
+		const whole = padded.slice(0, -scale) || '0';
+		const frac = padded.slice(-scale).replace(/0+$/, '');
+		return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
+	}
+
 	// ─────────────────────────────────────────────────────
 	// Helper: build JOIN + WHERE scoped theo entity + tenant
 	// ─────────────────────────────────────────────────────
@@ -131,7 +162,8 @@ export class EntityAnalyticsService {
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
-			totalRevenueUsd: Number(salesRows[0]?.total_revenue_usd ?? 0),
+			totalRevenueUsd: this.revenueNumber(salesRows[0]?.total_revenue_usd),
+			totalRevenueUsdExact: this.revenueExact(salesRows[0]?.total_revenue_usd),
 		};
 	}
 
@@ -298,7 +330,8 @@ export class EntityAnalyticsService {
 			p.series.push({
 				dsp: row.dsp_name,
 				salesViews: Number(row.sales_views),
-				revenueUsd: Number(row.revenue_usd),
+				revenueUsd: this.revenueNumber(row.revenue_usd),
+				revenueUsdExact: this.revenueExact(row.revenue_usd),
 			});
 		}
 		return { topDsps, items: Array.from(periodMap.values()) };
@@ -458,24 +491,26 @@ export class EntityAnalyticsService {
 		const periodMap = new Map<
 			string,
 			{
-				revenueUsd: number;
+				revenueUsdExactParts: string[];
 				quantity: number;
-				series: { dsp: string; revenueUsd: number; quantity: number }[];
+				series: { dsp: string; revenueUsd: number; revenueUsdExact: string; quantity: number }[];
 			}
 		>();
 		for (const row of rows) {
 			let p = periodMap.get(row.period_str);
 			if (!p) {
-				p = { revenueUsd: 0, quantity: 0, series: [] };
+				p = { revenueUsdExactParts: [], quantity: 0, series: [] };
 				periodMap.set(row.period_str, p);
 			}
-			const rev = Number(row.revenue_usd);
+			const revExact = this.revenueExact(row.revenue_usd);
+			const rev = this.revenueNumber(row.revenue_usd);
 			const qty = Number(row.quantity);
-			p.revenueUsd += rev;
+			p.revenueUsdExactParts.push(revExact);
 			p.quantity += qty;
 			p.series.push({
 				dsp: row.dsp_name,
 				revenueUsd: rev,
+				revenueUsdExact: revExact,
 				quantity: qty,
 			});
 		}
@@ -483,7 +518,8 @@ export class EntityAnalyticsService {
 			topDsps,
 			items: Array.from(periodMap.entries()).map(([key, val]) => ({
 				period: key,
-				revenueUsd: val.revenueUsd,
+				revenueUsd: this.revenueNumber(this.addRevenueExact(val.revenueUsdExactParts)),
+				revenueUsdExact: this.addRevenueExact(val.revenueUsdExactParts),
 				quantity: val.quantity,
 				series: val.series,
 			})),
