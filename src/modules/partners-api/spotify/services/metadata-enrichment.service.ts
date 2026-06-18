@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios, { AxiosError } from 'axios';
-import { DataSource, ILike, In } from 'typeorm';
-import { SpotifyService } from './spotify.service';
-import { Release } from 'src/modules/release/entities/release.entity';
-import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
-import { Track } from 'src/modules/track/entities/track.entity';
-import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import { SpotifyEnrichmentService } from './spotify-enrichment.service';
+import { DeezerEnrichmentService } from './deezer-enrichment.service';
+import { LocalEnrichmentService } from './local-enrichment.service';
 
 /**
  * Enriched metadata returned from Spotify or Deezer APIs for a given ISRC.
@@ -72,47 +68,14 @@ interface EnrichmentLookupOptions {
 	forceExternal?: boolean;
 }
 
-const sleepHelper = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function requestWithRetry<T>(
-	fn: () => Promise<T>,
-	logger: Logger,
-	retries = 5,
-	delayMs = 1000,
-): Promise<T> {
-	try {
-		return await fn();
-	} catch (err) {
-		const axiosError = err as AxiosError;
-		if (axiosError.response?.status === 429) {
-			if (retries <= 0) throw err;
-			const retryAfterHeader = axiosError.response.headers?.['retry-after'];
-			const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader as string, 10) : 0;
-			const waitTime = retryAfterSec > 0 ? (retryAfterSec * 1000 + 500) : delayMs;
-
-			logger.warn(`[Spotify API] 429 Too Many Requests. Retrying after ${waitTime}ms (remaining retries: ${retries})...`);
-			await sleepHelper(waitTime);
-			return requestWithRetry(fn, logger, retries - 1, delayMs * 2);
-		}
-
-		if (retries > 0 && (!axiosError.response || axiosError.response.status >= 500)) {
-			logger.warn(`[Spotify API] Request failed (${axiosError.response?.status || 'network error'}). Retrying in ${delayMs}ms...`);
-			await sleepHelper(delayMs);
-			return requestWithRetry(fn, logger, retries - 1, delayMs * 2);
-		}
-
-		throw err;
-	}
-}
-
 @Injectable()
 export class MetadataEnrichmentService {
 	private readonly logger = new Logger(MetadataEnrichmentService.name);
 
-
 	constructor(
-		private readonly spotifyService: SpotifyService,
-		private readonly dataSource: DataSource,
+		private readonly spotifyEnrichmentService: SpotifyEnrichmentService,
+		private readonly deezerEnrichmentService: DeezerEnrichmentService,
+		private readonly localEnrichmentService: LocalEnrichmentService,
 	) {}
 
 	// ─────────────────────────────────────────────────────
@@ -128,28 +91,59 @@ export class MetadataEnrichmentService {
 
 		// ─── Local-first: check if ISRC already exists in DB ───
 		if (!options?.forceExternal) {
-			const localResult = await this.findLocalByIsrc(normalizedIsrc);
+			const localResult = await this.localEnrichmentService.findLocalByIsrc(normalizedIsrc);
 			if (localResult) {
 				this.logger.log(`[Local Cache] Found enriched ISRC ${normalizedIsrc} in local DB, skipping external API call`);
 				return localResult;
 			}
 		}
 
-		// Call both Spotify and Deezer APIs in parallel
-		const [spotifyResult, deezerResult] = await Promise.all([
-			this.enrichFromSpotify(normalizedIsrc).catch((err) => {
-				this.logger.warn(
-					`Spotify lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
-				);
-				return null;
-			}),
-			this.enrichFromDeezer(normalizedIsrc).catch((err) => {
-				this.logger.warn(
-					`Deezer lookup failed for ISRC ${normalizedIsrc}: ${err.message}`,
-				);
-				return null;
-			}),
+		let spotifyResult: EnrichedMetadata | null = null;
+		let deezerResult: EnrichedMetadata | null = null;
+		let spotifyError: any = null;
+		let deezerError: any = null;
+
+		await Promise.all([
+			this.spotifyEnrichmentService.enrichFromSpotify(normalizedIsrc)
+				.then((res) => {
+					spotifyResult = res;
+				})
+				.catch((err) => {
+					if (err.response?.status === 404) {
+						spotifyResult = null;
+					} else {
+						spotifyError = err;
+					}
+				}),
+			this.deezerEnrichmentService.enrichFromDeezer(normalizedIsrc)
+				.then((res) => {
+					deezerResult = res;
+				})
+				.catch((err) => {
+					if (
+						err.response?.status === 404 ||
+						err.response?.data?.error?.code === 800 ||
+						err.data?.error?.code === 800
+					) {
+						deezerResult = null;
+					} else {
+						deezerError = err;
+					}
+				}),
 		]);
+
+		// If both APIs failed with fatal errors, throw a combined error to abort scanning
+		if (spotifyError && deezerError) {
+			throw new Error(`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`);
+		}
+
+		// Log individual warnings if one failed but the other succeeded or returned benign not-found
+		if (spotifyError) {
+			this.logger.warn(`Spotify lookup failed for ISRC ${normalizedIsrc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`);
+		}
+		if (deezerError) {
+			this.logger.warn(`Deezer lookup failed for ISRC ${normalizedIsrc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`);
+		}
 
 		if (spotifyResult) {
 			return this.mergeProviderMetadata(spotifyResult, deezerResult);
@@ -166,32 +160,63 @@ export class MetadataEnrichmentService {
 		options?: EnrichmentLookupOptions,
 	): Promise<EnrichedMetadata | null> {
 		if (!upc?.trim()) return null;
-		const normalizedUpc = normalizeUpc(upc);
+		const normalizedUpc = upc.trim();
 
 		// ─── Local-first: check if UPC already exists in DB ───
 		if (!options?.forceExternal) {
-			const localResult = await this.findLocalByUpc(normalizedUpc);
+			const localResult = await this.localEnrichmentService.findLocalByUpc(normalizedUpc);
 			if (localResult) {
 				this.logger.log(`[Local Cache] Found enriched UPC ${normalizedUpc} in local DB, skipping external API call`);
 				return localResult;
 			}
 		}
 
-		// Call both Spotify and Deezer APIs in parallel
-		const [spotifyResult, deezerResult] = await Promise.all([
-			this.enrichFromSpotifyByUpc(normalizedUpc).catch((err) => {
-				this.logger.warn(
-					`Spotify UPC lookup failed for UPC ${normalizedUpc}: ${err.message}`,
-				);
-				return null;
-			}),
-			this.enrichFromDeezerByUpc(normalizedUpc).catch((err) => {
-				this.logger.warn(
-					`Deezer UPC lookup failed for UPC ${normalizedUpc}: ${err.message}`,
-				);
-				return null;
-			}),
+		let spotifyResult: EnrichedMetadata | null = null;
+		let deezerResult: EnrichedMetadata | null = null;
+		let spotifyError: any = null;
+		let deezerError: any = null;
+
+		await Promise.all([
+			this.spotifyEnrichmentService.enrichFromSpotifyByUpc(normalizedUpc)
+				.then((res) => {
+					spotifyResult = res;
+				})
+				.catch((err) => {
+					if (err.response?.status === 404) {
+						spotifyResult = null;
+					} else {
+						spotifyError = err;
+					}
+				}),
+			this.deezerEnrichmentService.enrichFromDeezerByUpc(normalizedUpc)
+				.then((res) => {
+					deezerResult = res;
+				})
+				.catch((err) => {
+					if (
+						err.response?.status === 404 ||
+						err.response?.data?.error?.code === 800 ||
+						err.data?.error?.code === 800
+					) {
+						deezerResult = null;
+					} else {
+						deezerError = err;
+					}
+				}),
 		]);
+
+		// If both APIs failed with fatal errors, throw a combined error to abort scanning
+		if (spotifyError && deezerError) {
+			throw new Error(`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`);
+		}
+
+		// Log individual warnings if one failed but the other succeeded or returned benign not-found
+		if (spotifyError) {
+			this.logger.warn(`Spotify UPC lookup failed for UPC ${normalizedUpc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`);
+		}
+		if (deezerError) {
+			this.logger.warn(`Deezer UPC lookup failed for UPC ${normalizedUpc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`);
+		}
 
 		if (spotifyResult) {
 			return this.mergeProviderMetadata(spotifyResult, deezerResult);
@@ -201,6 +226,77 @@ export class MetadataEnrichmentService {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Batch-enrich a list of ISRCs. Returns a Map<isrc, EnrichedMetadata>.
+	 * Throttles requests to respect API rate limits.
+	 */
+	async enrichBatch(
+		isrcs: string[],
+		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean },
+	): Promise<Map<string, EnrichedMetadata>> {
+		const concurrency = options?.concurrency ?? 3;
+		const delayMs = options?.delayMs ?? 200;
+		const results = new Map<string, EnrichedMetadata>();
+		const unique = [...new Set(isrcs.map((i) => i.trim().toUpperCase()).filter(Boolean))];
+		const batchCache = new Map<string, EnrichedMetadata>();
+
+		this.logger.log(`Enriching ${unique.length} unique ISRCs (concurrency=${concurrency})...`);
+
+		// Process in sliding-window batches
+		for (let i = 0; i < unique.length; i += concurrency) {
+			const batch = unique.slice(i, i + concurrency);
+			const promises = batch.map(async (isrc) => {
+				const cached = batchCache.get(isrc);
+				if (cached) {
+					results.set(isrc, cached);
+					this.logger.log(`[Batch Cache] Found ISRC ${isrc} in current enrichment batch, skipping external API call`);
+					return;
+				}
+
+				try {
+					const meta = await this.enrichByIsrc(isrc, {
+						forceExternal: options?.forceExternal,
+					});
+					if (meta) {
+						this.cacheBatchMetadata(batchCache, isrc, meta);
+						results.set(isrc, batchCache.get(isrc) ?? this.buildMetadataForIsrc(meta, isrc));
+					}
+				} catch (err) {
+					this.logger.error(`Failed to enrich ISRC ${isrc}: ${err.message}`);
+					throw err; // Propagate fatal API error to halt scanning
+				}
+			});
+
+			await Promise.all(promises);
+
+			for (const isrc of batch) {
+				if (!results.has(isrc)) {
+					const cached = batchCache.get(isrc);
+					if (cached) {
+						results.set(isrc, cached);
+					}
+				}
+			}
+
+			// Log progress periodically (every 50 batches / 150 ISRCs)
+			const processedCount = i + batch.length;
+			if (processedCount % 150 === 0 || processedCount === unique.length) {
+				const percentage = ((processedCount / unique.length) * 100).toFixed(1);
+				this.logger.log(
+					`[Progress] Enriched ${processedCount}/${unique.length} ISRCs (${percentage}% completed)...`,
+				);
+			}
+
+			// Throttle between batches
+			if (i + concurrency < unique.length) {
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+			}
+		}
+
+		this.logger.log(`Enrichment complete: ${results.size}/${unique.length} ISRCs resolved.`);
+		return results;
 	}
 
 	private mergeProviderMetadata(
@@ -257,271 +353,6 @@ export class MetadataEnrichmentService {
 		};
 	}
 
-	private async enrichFromSpotifyByUpc(upc: string): Promise<EnrichedMetadata | null> {
-		const token = await this.spotifyService.getCacheToken();
-
-		// Step 1: Search album by UPC
-		const searchRes = await this.spotifyService.enqueue(() =>
-			requestWithRetry(() => axios.get(
-				'https://api.spotify.com/v1/search',
-				{
-					params: { type: 'album', q: `upc:${upc}` },
-					headers: { Authorization: `Bearer ${token}` },
-					timeout: 15000,
-				},
-			), this.logger)
-		);
-
-		const items = searchRes.data?.albums?.items;
-		if (!items || items.length === 0) return null;
-
-		const album = items[0];
-
-		// Step 2: Fetch full album details
-		let albumDetail: any = null;
-		if (album?.id) {
-			try {
-				const albumRes = await this.spotifyService.enqueue(() =>
-					requestWithRetry(() => axios.get(
-						`https://api.spotify.com/v1/albums/${album.id}`,
-						{
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
-					), this.logger)
-				);
-				albumDetail = albumRes.data;
-			} catch (err) {
-				this.logger.warn(
-					`Spotify album detail fetch failed for ${album.id}: ${err.message}`,
-				);
-				return null;
-			}
-		}
-
-		if (!albumDetail) return null;
-
-		const artist = albumDetail.artists?.[0];
-		const trackItems = albumDetail.tracks?.items || [];
-		const trackIds = trackItems.map((t: any) => t.id).filter(Boolean);
-
-		// Step 3: Fetch full track details to get ISRCs
-		const tracksWithIsrc: any[] = [];
-		if (trackIds.length > 0) {
-			try {
-				const chunks = [];
-				for (let i = 0; i < trackIds.length; i += 50) {
-					chunks.push(trackIds.slice(i, i + 50));
-				}
-
-				for (const chunk of chunks) {
-					const tracksRes = await this.spotifyService.enqueue(() =>
-						requestWithRetry(() => axios.get(
-							'https://api.spotify.com/v1/tracks',
-							{
-								params: { ids: chunk.join(',') },
-								headers: { Authorization: `Bearer ${token}` },
-								timeout: 15000,
-							},
-						), this.logger)
-					);
-					if (tracksRes.data?.tracks) {
-						tracksWithIsrc.push(...tracksRes.data.tracks);
-					}
-				}
-			} catch (err) {
-				this.logger.warn(
-					`Spotify tracks detail fetch failed for album ${album.id}: ${err.message}`,
-				);
-			}
-		}
-
-		const primaryIsrc = tracksWithIsrc[0]?.external_ids?.isrc || '';
-
-		return {
-			source: 'spotify',
-			isrc: primaryIsrc,
-
-			// Track
-			trackTitle: tracksWithIsrc[0]?.name || '',
-			trackSpotifyId: tracksWithIsrc[0]?.id,
-			trackSpotifyUrl: tracksWithIsrc[0]?.external_urls?.spotify,
-			trackDuration: tracksWithIsrc[0]?.duration_ms,
-
-			// Artist
-			artistName: artist?.name || '',
-			artistSpotifyId: artist?.id,
-			artistSpotifyUrl: artist?.external_urls?.spotify,
-
-			// Album
-			upc,
-			albumTitle: albumDetail.name || '',
-			albumSpotifyId: albumDetail.id,
-			albumSpotifyUrl: albumDetail.external_urls?.spotify || album.external_urls?.spotify,
-			releaseDate: albumDetail.release_date,
-			albumType: albumDetail.album_type,
-			totalTracks: albumDetail.total_tracks,
-			albumCoverUrl: albumDetail.images?.[0]?.url,
-			albumCoverImages: this.buildSpotifyCoverImages(albumDetail.images),
-
-			// Label & Copyright
-			labelName: albumDetail.label,
-			copyrights: albumDetail.copyrights?.map((c: any) => ({
-				text: c.text,
-				type: c.type,
-			})),
-			genres: albumDetail.genres,
-
-			// Track list
-			tracks: tracksWithIsrc.map((t) => ({
-				isrc: t.external_ids?.isrc || '',
-				title: t.name || '',
-				duration: t.duration_ms,
-				trackNumber: t.track_number,
-				spotifyId: t.id,
-				spotifyUrl: t.external_urls?.spotify,
-			})),
-		};
-	}
-
-	private async enrichFromDeezerByUpc(upc: string): Promise<EnrichedMetadata | null> {
-		// Step 1: Fetch full album details by UPC
-		const albumRes = await axios.get(
-			`https://api.deezer.com/album/upc:${upc}`,
-			{ timeout: 15000 },
-		);
-
-		const albumDetail = albumRes.data;
-		if (!albumDetail || albumDetail.error) return null;
-
-		const artist = albumDetail.artist;
-
-		// Step 2: Fetch ALL tracks (Deezer paginates at 25 per page)
-		const allTrackItems = await this.fetchAllDeezerAlbumTracks(albumDetail);
-
-		// Step 3: Fetch full track details (with ISRC) in chunks
-		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
-
-		const primaryIsrc = tracksWithIsrc[0]?.isrc || '';
-
-		return {
-			source: 'deezer',
-			isrc: primaryIsrc,
-
-			// Track
-			trackTitle: tracksWithIsrc[0]?.title_short || tracksWithIsrc[0]?.title || '',
-			trackDeezerId: tracksWithIsrc[0]?.id?.toString(),
-			trackDeezerUrl: tracksWithIsrc[0]?.link,
-			trackDuration: tracksWithIsrc[0]?.duration ? tracksWithIsrc[0]?.duration * 1000 : undefined,
-
-			// Artist
-			artistName: artist?.name || '',
-			artistDeezerId: artist?.id?.toString(),
-			artistDeezerUrl: artist?.link,
-			artistPicture: artist?.picture_big || artist?.picture_medium,
-
-			// Album
-			upc,
-			albumTitle: albumDetail.title || '',
-			albumDeezerId: albumDetail.id?.toString(),
-			albumDeezerUrl: albumDetail.link,
-			releaseDate: albumDetail.release_date,
-			albumType: albumDetail.record_type,
-			totalTracks: albumDetail.nb_tracks,
-			albumCoverUrl: albumDetail.cover_big || albumDetail.cover_xl,
-			albumCoverImages: this.buildDeezerCoverImages(albumDetail),
-
-			// Label & Copyright
-			labelName: albumDetail.label,
-			copyrights: albumDetail.copyrights || undefined,
-			genres: albumDetail.genres?.data?.map((g: any) => g.name).filter(Boolean) || [],
-
-			// Track list
-			tracks: tracksWithIsrc.map((t) => ({
-				isrc: t.isrc || '',
-				title: t.title_short || t.title || '',
-				duration: t.duration ? t.duration * 1000 : undefined,
-				trackNumber: t.track_position,
-				deezerId: t.id?.toString(),
-				deezerUrl: t.link,
-			})),
-		};
-	}
-
-	/**
-	 * Batch-enrich a list of ISRCs. Returns a Map<isrc, EnrichedMetadata>.
-	 * Throttles requests to respect API rate limits.
-	 */
-	async enrichBatch(
-		isrcs: string[],
-		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean },
-	): Promise<Map<string, EnrichedMetadata>> {
-		const concurrency = options?.concurrency ?? 3;
-		const delayMs = options?.delayMs ?? 200;
-		const results = new Map<string, EnrichedMetadata>();
-		const unique = [...new Set(isrcs.map((i) => i.trim().toUpperCase()).filter(Boolean))];
-		const batchCache = new Map<string, EnrichedMetadata>();
-
-		this.logger.log(`Enriching ${unique.length} unique ISRCs (concurrency=${concurrency})...`);
-
-		// Process in sliding-window batches
-		for (let i = 0; i < unique.length; i += concurrency) {
-			const batch = unique.slice(i, i + concurrency);
-			const promises = batch.map(async (isrc) => {
-				const cached = batchCache.get(isrc);
-				if (cached) {
-					results.set(isrc, cached);
-					this.logger.log(`[Batch Cache] Found ISRC ${isrc} in current enrichment batch, skipping external API call`);
-					return;
-				}
-
-				try {
-					const meta = await this.enrichByIsrc(isrc, {
-						forceExternal: options?.forceExternal,
-					});
-					if (meta) {
-						this.cacheBatchMetadata(batchCache, isrc, meta);
-						results.set(isrc, batchCache.get(isrc) ?? this.buildMetadataForIsrc(meta, isrc));
-					}
-				} catch (err) {
-					this.logger.warn(`Failed to enrich ISRC ${isrc}: ${err.message}`);
-				}
-			});
-
-			await Promise.all(promises);
-
-			for (const isrc of batch) {
-				if (!results.has(isrc)) {
-					const cached = batchCache.get(isrc);
-					if (cached) {
-						results.set(isrc, cached);
-					}
-				}
-			}
-
-			// Log progress periodically (every 50 batches / 150 ISRCs)
-			const processedCount = i + batch.length;
-			if (processedCount % 150 === 0 || processedCount === unique.length) {
-				const percentage = ((processedCount / unique.length) * 100).toFixed(1);
-				this.logger.log(
-					`[Progress] Enriched ${processedCount}/${unique.length} ISRCs (${percentage}% completed)...`,
-				);
-			}
-
-			// Throttle between batches
-			if (i + concurrency < unique.length) {
-				await this.sleep(delayMs);
-			}
-		}
-
-		this.logger.log(`Enrichment complete: ${results.size}/${unique.length} ISRCs resolved.`);
-		return results;
-	}
-
-	// ─────────────────────────────────────────────────────
-	// SPOTIFY
-	// ─────────────────────────────────────────────────────
-
 	private cacheBatchMetadata(
 		cache: Map<string, EnrichedMetadata>,
 		lookupIsrc: string,
@@ -571,429 +402,5 @@ export class MetadataEnrichmentService {
 
 	private normalizeIsrc(isrc?: string): string {
 		return isrc?.trim().toUpperCase() || '';
-	}
-
-	private buildSpotifyCoverImages(images?: any[]): EnrichedMetadata['albumCoverImages'] {
-		return (images || [])
-			.filter((image) => image?.url)
-			.map((image) => ({
-				url: image.url,
-				width: image.width ?? null,
-				height: image.height ?? null,
-				size: image.width && image.height ? `${image.width}x${image.height}` : null,
-				source: 'spotify' as const,
-			}));
-	}
-
-	private buildDeezerCoverImages(album?: any): EnrichedMetadata['albumCoverImages'] {
-		const sizeMap: Array<[string, string, number | null]> = [
-			['small', 'cover_small', 56],
-			['medium', 'cover_medium', 250],
-			['big', 'cover_big', 500],
-			['xl', 'cover_xl', 1000],
-		];
-
-		const images: NonNullable<EnrichedMetadata['albumCoverImages']> = [];
-		for (const [size, key, dimension] of sizeMap) {
-				const url = album?.[key];
-				if (!url) continue;
-				images.push({
-					url,
-					width: dimension,
-					height: dimension,
-					size,
-					source: 'deezer' as const,
-				});
-		}
-
-		return images;
-	}
-
-	private async enrichFromSpotify(isrc: string): Promise<EnrichedMetadata | null> {
-		const token = await this.spotifyService.getCacheToken();
-
-		// Step 1: Search track by ISRC
-		const searchRes = await this.spotifyService.enqueue(() =>
-			requestWithRetry(() => axios.get(
-				'https://api.spotify.com/v1/search',
-				{
-					params: { type: 'track', q: `isrc:${isrc}` },
-					headers: { Authorization: `Bearer ${token}` },
-					timeout: 15000,
-				},
-			), this.logger)
-		);
-
-		const items = searchRes.data?.tracks?.items;
-		if (!items || items.length === 0) return null;
-
-		const track = items[0];
-		const album = track.album;
-		const artist = track.artists?.[0];
-
-		// Step 2: Fetch full album details (to get UPC, label, copyrights)
-		let albumDetail: any = null;
-		if (album?.id) {
-			try {
-				const albumRes = await this.spotifyService.enqueue(() =>
-					requestWithRetry(() => axios.get(
-						`https://api.spotify.com/v1/albums/${album.id}`,
-						{
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
-					), this.logger)
-				);
-				albumDetail = albumRes.data;
-			} catch (err) {
-				this.logger.warn(
-					`Spotify album detail fetch failed for ${album.id}: ${err.message}`,
-				);
-			}
-		}
-
-		const upc = albumDetail?.external_ids?.upc || '';
-
-		// Step 3: Fetch full track details to get ISRCs
-		const tracksWithIsrc: any[] = [];
-		const trackItems = albumDetail?.tracks?.items || [];
-		const trackIds = trackItems.map((t: any) => t.id).filter(Boolean);
-		if (trackIds.length > 0) {
-			try {
-				const chunks = [];
-				for (let i = 0; i < trackIds.length; i += 50) {
-					chunks.push(trackIds.slice(i, i + 50));
-				}
-
-				for (const chunk of chunks) {
-					const tracksRes = await this.spotifyService.enqueue(() =>
-						requestWithRetry(() => axios.get(
-							'https://api.spotify.com/v1/tracks',
-							{
-								params: { ids: chunk.join(',') },
-								headers: { Authorization: `Bearer ${token}` },
-								timeout: 15000,
-							},
-						), this.logger)
-					);
-					if (tracksRes.data?.tracks) {
-						tracksWithIsrc.push(...tracksRes.data.tracks);
-					}
-				}
-			} catch (err) {
-				this.logger.warn(
-					`Spotify tracks detail fetch failed for album ${album.id}: ${err.message}`,
-				);
-			}
-		}
-
-		return {
-			source: 'spotify',
-			isrc,
-
-			// Track
-			trackTitle: track.name || '',
-			trackSpotifyId: track.id,
-			trackSpotifyUrl: track.external_urls?.spotify,
-			trackDuration: track.duration_ms,
-
-			// Artist
-			artistName: artist?.name || '',
-			artistSpotifyId: artist?.id,
-			artistSpotifyUrl: artist?.external_urls?.spotify,
-
-			// Album
-			upc,
-			albumTitle: albumDetail?.name || album?.name || '',
-			albumSpotifyId: album?.id,
-			albumSpotifyUrl: albumDetail?.external_urls?.spotify || album?.external_urls?.spotify,
-			releaseDate: albumDetail?.release_date || album?.release_date,
-			albumType: albumDetail?.album_type || album?.album_type,
-			totalTracks: albumDetail?.total_tracks || album?.total_tracks,
-			albumCoverUrl: (albumDetail?.images || album?.images)?.[0]?.url,
-			albumCoverImages: this.buildSpotifyCoverImages(albumDetail?.images || album?.images),
-
-			// Label & Copyright
-			labelName: albumDetail?.label,
-			copyrights: albumDetail?.copyrights?.map((c: any) => ({
-				text: c.text,
-				type: c.type,
-			})),
-			genres: albumDetail?.genres,
-
-			// Track list
-			tracks: tracksWithIsrc.map((t) => ({
-				isrc: t.external_ids?.isrc || '',
-				title: t.name || '',
-				duration: t.duration_ms,
-				trackNumber: t.track_number,
-				spotifyId: t.id,
-				spotifyUrl: t.external_urls?.spotify,
-			})),
-		};
-	}
-
-	// ─────────────────────────────────────────────────────
-	// DEEZER (public API — no auth needed)
-	// ─────────────────────────────────────────────────────
-
-	private async enrichFromDeezer(isrc: string): Promise<EnrichedMetadata | null> {
-		// Step 1: Search track by ISRC
-		const trackRes = await axios.get(
-			`https://api.deezer.com/track/isrc:${isrc}`,
-			{ timeout: 15000 },
-		);
-
-		const trackData = trackRes.data;
-		if (!trackData || trackData.error) return null;
-
-		const artist = trackData.artist;
-		const albumRef = trackData.album;
-
-		// Step 2: Fetch full album details (to get UPC, label, genres)
-		let albumDetail: any = null;
-		if (albumRef?.id) {
-			try {
-				// Deezer album cover URL ends with /image — strip it to get the album API URL
-				const albumUrl = `https://api.deezer.com/album/${albumRef.id}`;
-				const albumRes = await axios.get(albumUrl, { timeout: 15000 });
-				albumDetail = albumRes.data;
-			} catch (err) {
-				this.logger.warn(
-					`Deezer album detail fetch failed for ${albumRef.id}: ${err.message}`,
-				);
-			}
-		}
-
-		const upc = albumDetail?.upc || '';
-
-		// Fetch ALL tracks (Deezer paginates at 25 per page)
-		const allTrackItems = albumDetail ? await this.fetchAllDeezerAlbumTracks(albumDetail) : [];
-
-		// Fetch full track details (with ISRC) in chunks
-		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
-
-		// Extract genres from album detail
-		const genres = albumDetail?.genres?.data?.map((g: any) => g.name).filter(Boolean) || [];
-
-		return {
-			source: 'deezer',
-			isrc,
-
-			// Track
-			trackTitle: trackData.title_short || trackData.title || '',
-			trackDeezerId: trackData.id?.toString(),
-			trackDeezerUrl: trackData.link,
-			trackDuration: trackData.duration ? trackData.duration * 1000 : undefined, // Deezer returns seconds
-
-			// Artist
-			artistName: artist?.name || '',
-			artistDeezerId: artist?.id?.toString(),
-			artistDeezerUrl: artist?.link,
-			artistPicture: artist?.picture_big || artist?.picture_medium,
-
-			// Album
-			upc,
-			albumTitle: albumDetail?.title || albumRef?.title || '',
-			albumDeezerId: albumRef?.id?.toString(),
-			albumDeezerUrl: albumDetail?.link || albumRef?.link,
-			releaseDate: albumDetail?.release_date || trackData.release_date,
-			albumType: albumDetail?.record_type,
-			totalTracks: albumDetail?.nb_tracks,
-			albumCoverUrl: albumRef?.cover_big || albumRef?.cover_xl,
-			albumCoverImages: this.buildDeezerCoverImages(albumDetail || albumRef),
-
-			// Label & Copyright
-			labelName: albumDetail?.label,
-			copyrights: albumDetail?.copyrights || undefined,
-			genres,
-
-			// Track list
-			tracks: tracksWithIsrc.map((t) => ({
-				isrc: t.isrc || '',
-				title: t.title_short || t.title || '',
-				duration: t.duration ? t.duration * 1000 : undefined,
-				trackNumber: t.track_position,
-				deezerId: t.id?.toString(),
-				deezerUrl: t.link,
-			})),
-		};
-	}
-
-	// ─────────────────────────────────────────────────────
-	// UTILS
-	// ─────────────────────────────────────────────────────
-
-	/**
-	 * Deezer album API paginates tracks at 25 per page.
-	 * This helper follows `tracks.next` to collect ALL track items.
-	 */
-	private async fetchAllDeezerAlbumTracks(albumDetail: any): Promise<any[]> {
-		const allTracks: any[] = [...(albumDetail.tracks?.data || [])];
-		let nextUrl: string | undefined = albumDetail.tracks?.next;
-
-		while (nextUrl) {
-			try {
-				const res = await axios.get(nextUrl, { timeout: 15000 });
-				if (res.data?.data) {
-					allTracks.push(...res.data.data);
-				}
-				nextUrl = res.data?.next;
-			} catch (err) {
-				this.logger.warn(`Deezer album tracks pagination failed: ${err.message}`);
-				break;
-			}
-		}
-
-		return allTracks;
-	}
-
-	/**
-	 * Fetch full track details (with ISRC) from Deezer for a list of track items.
-	 * Processes in chunks of 10 with a 300ms delay between chunks to avoid rate limiting.
-	 */
-	private async fetchDeezerTrackDetails(trackItems: any[]): Promise<any[]> {
-		const tracksWithIsrc: any[] = [];
-		const chunkSize = 10;
-
-		for (let i = 0; i < trackItems.length; i += chunkSize) {
-			const chunk = trackItems.slice(i, i + chunkSize);
-			const promises = chunk.map(async (t: any) => {
-				try {
-					const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
-					if (tRes.data && !tRes.data.error) {
-						tracksWithIsrc.push(tRes.data);
-					}
-				} catch (err) {
-					this.logger.warn(`Deezer track detail fetch failed for track ${t.id}: ${err.message}`);
-				}
-			});
-			await Promise.all(promises);
-
-			// Delay between chunks to respect Deezer rate limits
-			if (i + chunkSize < trackItems.length) {
-				await this.sleep(300);
-			}
-		}
-
-		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
-		return tracksWithIsrc;
-	}
-
-	private sleep(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	// ─────────────────────────────────────────────────────
-	// LOCAL DB LOOKUP (cache-first)
-	// ─────────────────────────────────────────────────────
-
-	/**
-	 * Check if a track with this ISRC already exists in the local DB.
-	 * If found, construct EnrichedMetadata from the release + tracks data.
-	 */
-	private async findLocalByIsrc(isrc: string): Promise<EnrichedMetadata | null> {
-		try {
-			const trackRepo = this.dataSource.getRepository(Track);
-			const track = await trackRepo.findOne({
-				where: { isrc: ILike(isrc) },
-				relations: ['release', 'release.releaseArtists', 'release.releaseArtists.artist', 'release.label', 'release.tracks'],
-			});
-
-			if (!track?.release) return null;
-
-			const release = track.release;
-
-			// Only use local data if it has a real UPC/EAN, not a report/internal code.
-			if (!this.isValidStandardUpc(release.upc)) {
-				return null;
-			}
-			if (!(await this.hasSuccessfulEnrichment(release.id))) {
-				return null;
-			}
-
-			return this.buildLocalEnrichedMetadata(release, isrc);
-		} catch (err) {
-			this.logger.warn(`[Local Cache] Failed to query local DB for ISRC ${isrc}: ${err.message}`);
-			return null;
-		}
-	}
-
-	/**
-	 * Check if a release with this UPC already exists in the local DB.
-	 * If found, construct EnrichedMetadata from the release data.
-	 */
-	private async findLocalByUpc(upc: string): Promise<EnrichedMetadata | null> {
-		try {
-			const releaseRepo = this.dataSource.getRepository(Release);
-			const release = await releaseRepo.findOne({
-				where: { upc: In(buildEquivalentUpcs(upc)) },
-				relations: ['releaseArtists', 'releaseArtists.artist', 'label', 'tracks'],
-			});
-
-			if (!release) return null;
-
-			// Only use local data if UPC is a real UPC/EAN and title is present.
-			if (!this.isValidStandardUpc(release.upc) || !release.title?.trim()) {
-				return null;
-			}
-			if (!(await this.hasSuccessfulEnrichment(release.id))) {
-				return null;
-			}
-
-			const primaryIsrc = (release.tracks || [])
-				.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0]?.isrc || '';
-
-			return this.buildLocalEnrichedMetadata(release, primaryIsrc);
-		} catch (err) {
-			this.logger.warn(`[Local Cache] Failed to query local DB for UPC ${upc}: ${err.message}`);
-			return null;
-		}
-	}
-
-	/**
-	 * Build EnrichedMetadata from a local Release entity.
-	 */
-	private buildLocalEnrichedMetadata(release: Release, primaryIsrc: string): EnrichedMetadata {
-		const primaryArtist = (release.releaseArtists || [])
-			.find(ra => ra.artist)?.artist;
-
-		const tracks = (release.tracks || [])
-			.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
-			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-			.map(t => ({
-				isrc: t.isrc!,
-				title: t.title || '',
-				trackNumber: t.order,
-			}));
-
-		return {
-			source: 'local',
-			isrc: primaryIsrc,
-			trackTitle: tracks[0]?.title || '',
-			artistName: primaryArtist?.name || '',
-			upc: normalizeUpc(release.upc),
-			albumTitle: release.title || '',
-			releaseDate: release.releaseDate ? new Date(release.releaseDate).toISOString().slice(0, 10) : undefined,
-			totalTracks: tracks.length || undefined,
-			labelName: release.label?.name,
-			tracks,
-		};
-	}
-
-	private isValidStandardUpc(upc?: string | null): boolean {
-		const normalized = normalizeUpc(upc);
-		return /^\d{10,14}$/.test(normalized);
-	}
-
-	private async hasSuccessfulEnrichment(releaseId: string): Promise<boolean> {
-		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
-		return enrichmentRepo.exists({
-			where: {
-				releaseId,
-				status: ReleaseEnrichmentStatus.SUCCESS,
-			},
-		});
 	}
 }

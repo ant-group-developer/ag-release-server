@@ -167,7 +167,7 @@ export class ReportImportService {
         return job;
       }
 
-      if (job.status !== ImportJobStatus.PENDING) {
+      if (job.status !== ImportJobStatus.PENDING && job.status !== ImportJobStatus.FAILED) {
         throw new BadRequestException(`Job đang ở trạng thái ${job.status}, không thể bắt đầu lại.`);
       }
 
@@ -178,9 +178,18 @@ export class ReportImportService {
 
       const bucketName = this.r2Service.getBucketName({ isPublic: false });
 
-      // Verify all matched files exist in R2
+      const reportImportState = job.params?.reportImportState as
+        | { files?: Record<string, { status?: string }> }
+        | undefined;
+
+      // Verify all matched files that may still need fact import exist in R2.
       const missingFiles: string[] = [];
       for (const file of files) {
+        const fileKey = file.r2Key || file.path;
+        if (reportImportState?.files?.[fileKey]?.status === 'FACT_IMPORTED') {
+          continue;
+        }
+
         try {
           await this.r2Service.findOne({
             bucketName,

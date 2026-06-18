@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { ReleaseReportImportService } from './release-report-import.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
@@ -7,7 +7,9 @@ import { ReleaseArtist } from '../../release-artist/entities/release-artist.enti
 import { MetadataEnrichmentService, EnrichedMetadata } from '../../partners-api/spotify/services/metadata-enrichment.service';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import { hasMeaningfulText } from '../../etl/utils/fact-row-normalizer.util';
-import { normalizeUpc } from 'src/utils/upc.util';
+import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import { Release } from '../entities/release.entity';
+import { Track } from '../../track/entities/track.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -18,6 +20,13 @@ export interface ExtractedRow {
   artist_name?: string;
   album_title?: string;
   label_name?: string;
+}
+
+export interface ReportEntityExtractorProgress {
+  stage: 'enriching' | 'importing';
+  current: number;
+  total: number;
+  label: string;
 }
 
 @Injectable()
@@ -35,6 +44,7 @@ export class ReportEntityExtractorService {
     rows: ExtractedRow[],
     tenantId?: string,
     labelId?: string,
+    onProgress?: (progress: ReportEntityExtractorProgress) => Promise<void>,
   ): Promise<{
     totalReleases: number;
     created: number;
@@ -74,10 +84,18 @@ export class ReportEntityExtractorService {
     }
 
     // ─────────────────────────────────────────────────────
-    // ENRICHMENT STEP: Call Spotify/Deezer APIs to fill in
-    // missing metadata (UPC, album title, artist, label, etc.)
+    // IMPORT STEP: keep external enrichment off the import path.
+    // Spotify/Deezer metadata is filled later by metadata scan jobs.
     // ─────────────────────────────────────────────────────
-    const enrichedMap = await this.enrichGroupedData(upcMap);
+    const enrichedMap = new Map<string, EnrichedMetadata>();
+    this.logger.log('Skipping external metadata enrichment during import; continuing with raw PostgreSQL metadata import');
+    this.logger.log(`Preparing PostgreSQL metadata import for ${upcMap.size} grouped release(s)`);
+    await onProgress?.({
+      stage: 'importing',
+      current: 0,
+      total: upcMap.size,
+      label: `Preparing PostgreSQL metadata import: 0/${upcMap.size}`,
+    });
 
     const resolvedUpcMap = new Map<string, Map<string, ExtractedRow>>();
     for (const [upc, isrcMap] of upcMap) {
@@ -174,45 +192,20 @@ export class ReportEntityExtractorService {
     let created = 0;
     let skipped = 0;
     let errors = 0;
+    let importedCount = 0;
+
+    this.logger.log(`Importing ${inputs.length} release metadata item(s) into PostgreSQL`);
+    await onProgress?.({
+      stage: 'importing',
+      current: 0,
+      total: inputs.length,
+      label: `Importing metadata to PostgreSQL: 0/${inputs.length}`,
+    });
 
     for (const input of inputs) {
       try {
         // Import release and real tracks into PostgreSQL
         const release = await this.releaseReportImportService.importRelease(input);
-
-        // Check and save ReleaseEnrichment status if enrichment was attempted during import
-        let enriched: EnrichedMetadata | undefined;
-        let triedEnrichment = false;
-        if (input.bestRows) {
-          for (const row of input.bestRows) {
-            const isrc = this.cleanMeaningfulText(row.isrc);
-            if (!isrc) continue;
-            if (isrc.toUpperCase().startsWith('UPC-')) continue;
-            triedEnrichment = true;
-            enriched = enrichedMap.get(isrc);
-            if (enriched) break;
-          }
-        }
-
-        if (triedEnrichment) {
-          try {
-            const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
-            let reRecord = await enrichmentRepo.findOne({ where: { releaseId: release.id } });
-            if (!reRecord) {
-              reRecord = enrichmentRepo.create({ releaseId: release.id });
-            }
-            reRecord.status = enriched ? ReleaseEnrichmentStatus.SUCCESS : ReleaseEnrichmentStatus.NOT_FOUND;
-            reRecord.lastScannedAt = new Date();
-            reRecord.lastScanId = 'import-job';
-            reRecord.errorMessage = null;
-            reRecord.enrichmentSource = enriched?.source || null;
-
-            await enrichmentRepo.save(reRecord);
-            this.logger.log(`Saved ReleaseEnrichment status ${reRecord.status} for release ${release.id} during import`);
-          } catch (reErr) {
-            this.logger.warn(`Failed to save ReleaseEnrichment record for release ${release.id}: ${reErr.message}`);
-          }
-        }
 
         // Directly insert temporary UPC- ISRCs into pg_tracks_sync ClickHouse table
         if (input.upcTracks && input.upcTracks.length > 0) {
@@ -257,6 +250,17 @@ export class ReportEntityExtractorService {
           `Failed to extract/import release from report for UPC=${input.upc}: ${err.message}`,
           err.stack,
         );
+      } finally {
+        importedCount++;
+        if (importedCount % 25 === 0 || importedCount === inputs.length) {
+          this.logger.log(`PostgreSQL metadata import progress: ${importedCount}/${inputs.length}`);
+          await onProgress?.({
+            stage: 'importing',
+            current: importedCount,
+            total: inputs.length,
+            label: `Importing metadata to PostgreSQL: ${importedCount}/${inputs.length}`,
+          });
+        }
       }
     }
 
@@ -298,16 +302,95 @@ export class ReportEntityExtractorService {
    * Spotify/Deezer to get real metadata. Returns a Map<isrc, EnrichedMetadata>.
    *
    * Optimizations:
-   *   - Always lookup metadata from Spotify/Deezer for every imported release.
+   *   - Skip releases that already have final enrichment status.
    *   - Only query the first valid track's ISRC per release to avoid rate limiting and redundant calls.
    */
+  private async hasFinalEnrichmentForGroup(
+    upc: string,
+    rows: ExtractedRow[],
+  ): Promise<boolean> {
+    const releaseId = await this.findExistingReleaseId(upc, rows);
+    if (!releaseId) return false;
+
+    const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+    return enrichmentRepo.exists({
+      where: {
+        releaseId,
+        status: In([
+          ReleaseEnrichmentStatus.SUCCESS,
+          ReleaseEnrichmentStatus.NOT_FOUND,
+          ReleaseEnrichmentStatus.PROCESSING,
+        ]),
+      },
+    });
+  }
+
+  private async findExistingReleaseId(
+    upc: string,
+    rows: ExtractedRow[],
+  ): Promise<string | null> {
+    const normalizedUpc = normalizeUpc(upc);
+
+    if (normalizedUpc && !normalizedUpc.toUpperCase().startsWith('ISRC-')) {
+      const release = await this.dataSource.getRepository(Release).findOne({
+        where: { upc: In(buildEquivalentUpcs(normalizedUpc)) },
+        select: ['id'],
+      });
+      if (release?.id) return release.id;
+    }
+
+    const isrcs = [
+      ...new Set(
+        rows
+          .map((row) => this.cleanMeaningfulText(row.isrc).toUpperCase())
+          .filter((isrc) => isrc && !isrc.startsWith('UPC-')),
+      ),
+    ];
+    if (!isrcs.length) return null;
+
+    const existingTrack = await this.dataSource
+      .getRepository(Track)
+      .createQueryBuilder('track')
+      .select('track.releaseId', 'releaseId')
+      .where('UPPER(track.isrc) IN (:...isrcs)', { isrcs })
+      .andWhere('track.releaseId IS NOT NULL')
+      .limit(1)
+      .getRawOne<{ releaseId: string }>();
+
+    return existingTrack?.releaseId ?? null;
+  }
+
   private async enrichGroupedData(
     upcMap: Map<string, Map<string, ExtractedRow>>,
+    onProgress?: (progress: ReportEntityExtractorProgress) => Promise<void>,
+    attemptedEnrichmentIsrcs?: Set<string>,
   ): Promise<Map<string, EnrichedMetadata>> {
     const isrcsToEnrich: string[] = [];
+    await onProgress?.({
+      stage: 'enriching',
+      current: 0,
+      total: upcMap.size,
+      label: `Checking existing enrichment status: 0/${upcMap.size}`,
+    });
+
+    const existingEnrichmentLookup = await this.buildExistingEnrichmentLookup(upcMap);
+    await onProgress?.({
+      stage: 'enriching',
+      current: upcMap.size,
+      total: upcMap.size,
+      label: `Checking existing enrichment status: ${upcMap.size}/${upcMap.size}`,
+    });
 
     for (const [upc, isrcMap] of upcMap) {
       const bestRows = Array.from(isrcMap.values());
+      const existingReleaseId = this.resolveExistingReleaseIdFromLookup(
+        upc,
+        bestRows,
+        existingEnrichmentLookup,
+      );
+      if (existingReleaseId && existingEnrichmentLookup.finalReleaseIds.has(existingReleaseId)) {
+        continue;
+      }
 
       for (const row of bestRows) {
         const isrc = this.cleanMeaningfulText(row.isrc);
@@ -317,11 +400,19 @@ export class ReportEntityExtractorService {
 
         // Query only the first valid track's ISRC per release
         isrcsToEnrich.push(isrc);
+        attemptedEnrichmentIsrcs?.add(isrc.toUpperCase());
         break;
       }
     }
 
     if (isrcsToEnrich.length === 0) {
+      this.logger.log('No new external enrichment needed; continuing with PostgreSQL metadata import');
+      await onProgress?.({
+        stage: 'importing',
+        current: upcMap.size,
+        total: upcMap.size,
+        label: `No new external enrichment needed; preparing PostgreSQL import`,
+      });
       return new Map();
     }
 
@@ -330,16 +421,153 @@ export class ReportEntityExtractorService {
     );
 
     try {
-      return await this.metadataEnrichmentService.enrichBatch(isrcsToEnrich, {
-        concurrency: 1,
-        delayMs: 100,
-      });
+      const enrichedMap = new Map<string, EnrichedMetadata>();
+      const chunkSize = 50;
+      const concurrency = Math.max(1, Math.floor(Number(process.env.REPORT_IMPORT_ENRICH_CONCURRENCY) || 1));
+      const delayMs = Math.max(0, Math.floor(Number(process.env.REPORT_IMPORT_ENRICH_DELAY_MS) || 300));
+
+      for (let index = 0; index < isrcsToEnrich.length; index += chunkSize) {
+        const chunk = isrcsToEnrich.slice(index, index + chunkSize);
+        const chunkResult = await this.metadataEnrichmentService.enrichBatch(chunk, {
+          concurrency,
+          delayMs,
+        });
+
+        for (const [isrc, metadata] of chunkResult) {
+          enrichedMap.set(isrc, metadata);
+        }
+
+        const current = Math.min(index + chunk.length, isrcsToEnrich.length);
+        await onProgress?.({
+          stage: 'enriching',
+          current,
+          total: isrcsToEnrich.length,
+          label: `Enriching metadata from Spotify/Deezer: ${current}/${isrcsToEnrich.length}`,
+        });
+      }
+
+      return enrichedMap;
     } catch (err) {
       this.logger.error(
         `Enrichment batch failed (non-fatal, proceeding with original data): ${err.message}`,
       );
       return new Map();
     }
+  }
+
+  private async buildExistingEnrichmentLookup(
+    upcMap: Map<string, Map<string, ExtractedRow>>,
+  ): Promise<{
+    releaseIdByUpc: Map<string, string>;
+    releaseIdByIsrc: Map<string, string>;
+    finalReleaseIds: Set<string>;
+  }> {
+    const equivalentUpcs = new Set<string>();
+    const isrcs = new Set<string>();
+
+    for (const [upc, isrcMap] of upcMap) {
+      const normalizedUpc = normalizeUpc(upc);
+      if (normalizedUpc && !normalizedUpc.toUpperCase().startsWith('ISRC-')) {
+        for (const equivalent of buildEquivalentUpcs(normalizedUpc)) {
+          equivalentUpcs.add(equivalent);
+        }
+      }
+
+      for (const row of isrcMap.values()) {
+        const isrc = this.cleanMeaningfulText(row.isrc).toUpperCase();
+        if (isrc && !isrc.startsWith('UPC-')) {
+          isrcs.add(isrc);
+        }
+      }
+    }
+
+    const releaseIdByUpc = new Map<string, string>();
+    if (equivalentUpcs.size > 0) {
+      const releases = await this.dataSource.getRepository(Release).find({
+        where: { upc: In([...equivalentUpcs]) },
+        select: ['id', 'upc'],
+      });
+
+      for (const release of releases) {
+        for (const equivalent of buildEquivalentUpcs(release.upc)) {
+          releaseIdByUpc.set(equivalent, release.id);
+        }
+      }
+    }
+
+    const releaseIdByIsrc = new Map<string, string>();
+    if (isrcs.size > 0) {
+      const tracks = await this.dataSource
+        .getRepository(Track)
+        .createQueryBuilder('track')
+        .select('UPPER(track.isrc)', 'isrc')
+        .addSelect('track.releaseId', 'releaseId')
+        .where('UPPER(track.isrc) IN (:...isrcs)', { isrcs: [...isrcs] })
+        .andWhere('track.releaseId IS NOT NULL')
+        .getRawMany<{ isrc: string; releaseId: string }>();
+
+      for (const track of tracks) {
+        if (track.isrc && track.releaseId) {
+          releaseIdByIsrc.set(track.isrc, track.releaseId);
+        }
+      }
+    }
+
+    const releaseIds = [...new Set([
+      ...releaseIdByUpc.values(),
+      ...releaseIdByIsrc.values(),
+    ])];
+    const finalReleaseIds = new Set<string>();
+
+    if (releaseIds.length > 0) {
+      const enrichments = await this.dataSource.getRepository(ReleaseEnrichment).find({
+        where: {
+          releaseId: In(releaseIds),
+          status: In([
+            ReleaseEnrichmentStatus.SUCCESS,
+            ReleaseEnrichmentStatus.NOT_FOUND,
+            ReleaseEnrichmentStatus.PROCESSING,
+          ]),
+        },
+        select: ['releaseId'],
+      });
+
+      for (const enrichment of enrichments) {
+        finalReleaseIds.add(enrichment.releaseId);
+      }
+    }
+
+    return {
+      releaseIdByUpc,
+      releaseIdByIsrc,
+      finalReleaseIds,
+    };
+  }
+
+  private resolveExistingReleaseIdFromLookup(
+    upc: string,
+    rows: ExtractedRow[],
+    lookup: {
+      releaseIdByUpc: Map<string, string>;
+      releaseIdByIsrc: Map<string, string>;
+    },
+  ): string | null {
+    const normalizedUpc = normalizeUpc(upc);
+    if (normalizedUpc && !normalizedUpc.toUpperCase().startsWith('ISRC-')) {
+      for (const equivalent of buildEquivalentUpcs(normalizedUpc)) {
+        const releaseId = lookup.releaseIdByUpc.get(equivalent);
+        if (releaseId) return releaseId;
+      }
+    }
+
+    for (const row of rows) {
+      const isrc = this.cleanMeaningfulText(row.isrc).toUpperCase();
+      if (!isrc || isrc.startsWith('UPC-')) continue;
+      const releaseId = lookup.releaseIdByIsrc.get(isrc);
+      if (releaseId) return releaseId;
+    }
+
+    return null;
   }
 
   /**
