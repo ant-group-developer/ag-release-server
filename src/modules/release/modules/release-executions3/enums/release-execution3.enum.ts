@@ -76,3 +76,16 @@ export enum ExecutionStepMode {
 	SEQUENTIAL = 'sequential', // chạy tuần tự, bước sau chờ bước trước
 	PARALLEL = 'parallel', // chạy đồng thời tất cả
 }
+
+export enum CiJobType3 {
+	EMAIL_STATE51 = 'EMAIL_STATE51',
+	ADMIN_EXPORT = 'ADMIN_EXPORT',
+}
+
+export enum CiJobStatus3 {
+	PENDING = 'PENDING',
+	PROCESSING = 'PROCESSING',
+	COMPLETED = 'COMPLETED',
+	FAILED = 'FAILED',
+	CANCEL = 'CANCEL',
+}

@@ -1,29 +1,5 @@
 import { Metadata, PageDto } from 'src/common/dtos/common.response.dto';
 
-// export class QueryGetListReleaseExecutionDto extends BaseQueryDto2 {
-// 	@IsOptional()
-// 	fieldOrder: string = 'exec.createdAt';
-
-// 	@IsOptional()
-// 	orderBy: OrderDirection = OrderDirection.DESC;
-
-// 	@ApiPropertyOptional({
-// 		description: 'Filter by statuses',
-// 		enum: ExecutionStatus,
-// 		isArray: true,
-// 	})
-// 	@IsOptional()
-// 	@IsArray()
-// 	@IsEnum(ExecutionStatus, { each: true })
-// 	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
-// 	status?: ExecutionStatus[];
-
-// 	@ApiPropertyOptional({ description: 'Filter by Release ID' })
-// 	@IsOptional()
-// 	@IsUUID()
-// 	releaseId?: string;
-// }
-
 export class ReleaseExecutionResultDto {
 	id?: string;
 	dspId?: string;
@@ -31,27 +7,27 @@ export class ReleaseExecutionResultDto {
 	status?: ReleaseDspStatus;
 }
 
-export class ReleaseExecutionMetadata extends Metadata {
+export class ReleaseExecution3Metadata extends Metadata {
 	readonly statusCounts?: Record<string, number>;
 
-	constructor(init?: Partial<ReleaseExecutionMetadata>) {
+	constructor(init?: Partial<ReleaseExecution3Metadata>) {
 		super(init);
 		this.statusCounts = init?.statusCounts;
 	}
 }
 
 export class ReleaseExecutionPageDto<T> extends PageDto<T> {
-	metadata: ReleaseExecutionMetadata;
+	metadata: ReleaseExecution3Metadata;
 
 	constructor({
 		items,
 		metadata,
 	}: {
 		items: T[];
-		metadata?: Partial<ReleaseExecutionMetadata>;
+		metadata?: Partial<ReleaseExecution3Metadata>;
 	}) {
 		super({ items, metadata });
-		this.metadata = new ReleaseExecutionMetadata({
+		this.metadata = new ReleaseExecution3Metadata({
 			page: metadata?.page ?? 1,
 			pageSize: metadata?.pageSize ?? items.length,
 			totalItems: metadata?.totalItems ?? items.length,
@@ -161,6 +137,18 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 	@IsEnum(ReleaseExecutionStatus, { each: true })
 	@IsArray()
 	status?: ReleaseExecutionStatus[];
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		return String(value)
+			.split(',')
+			.map((item) => item.trim());
+	})
+	@IsEnum(ExecutionType, { each: true })
+	@IsArray()
+	type?: ExecutionType[];
 
 	@IsOptional()
 	@Transform(({ value }) => {

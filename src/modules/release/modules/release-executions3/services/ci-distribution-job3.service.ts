@@ -5,17 +5,11 @@ import {
 	Injectable,
 	Logger,
 	NotFoundException,
-	OnModuleInit,
 } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CronJob } from 'cron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { AppEvent } from 'src/common/enums/common';
-import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { NotificationResendService } from 'src/modules/notification/services/notification.resend-service';
@@ -27,18 +21,17 @@ import {
 	QueryGroupedCiJob3Dto,
 	UpdateCiJob3Dto,
 } from '../dtos/ci-distribution-job3.dto';
+import { CiDistributionJob3 } from '../entites/ci-distribution-job3.entity';
 import {
-	CiDistributionJob3,
 	CiJobStatus3,
 	CiJobType3,
-} from '../entites/ci-distribution-job3.entity';
-import { ReleaseExecutionStepStatus } from '../enums/release-execution3.enum';
+	ReleaseExecutionStepStatus,
+} from '../enums/release-execution3.enum';
 import { ReleaseExecution3Service } from './release-execution3.service'; // hoặc service tương đương resume step
 
 @Injectable()
-export class CiDistributionJob3Service implements OnModuleInit {
+export class CiDistributionJob3Service {
 	private readonly logger = new Logger(CiDistributionJob3Service.name);
-	private static readonly CRON_JOB_NAME = 'ci-daily-send-v3';
 
 	constructor(
 		@InjectRepository(CiDistributionJob3)
@@ -47,8 +40,6 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		private readonly log: LogsService,
 		private readonly fileExportCiService: FileExportCiService,
 		private readonly notificationResendService: NotificationResendService,
-		private readonly schedulerRegistry: SchedulerRegistry,
-		private readonly appConfigService: AppConfigService,
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecutionService: ReleaseExecution3Service,
@@ -56,28 +47,7 @@ export class CiDistributionJob3Service implements OnModuleInit {
 		private readonly ciToolService: CiToolService,
 	) {}
 
-	onModuleInit() {
-		this.registerDailySendCron();
-	}
-
-	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
-	handleAppConfigUpdated() {
-		this.registerDailySendCron();
-	}
-
-	/**
-	 * Cron check CI Tool job status bên tool ci.
-	 * Chạy mỗi phút, nhưng chỉ check job nào đã tới nextCiToolCheckAt.
-	 */
-	// @Cron('*/5 * * * *')
-	// @Cron('* * * * *') // mỗi phút
-	// @Cron('*/10 * * * *') // mỗi 10p
-	@Cron('*/10 * * * * *') // mỗi 10 giây, test nhanh
-	async handleCheckCiToolJobStatus() {
-		await this.checkCiToolJobStatus();
-	}
-
-	private async checkCiToolJobStatus() {
+	async checkCiToolJobStatus() {
 		const jobs = await this.repo.find({
 			where: {
 				type: CiJobType3.ADMIN_EXPORT,
@@ -186,45 +156,6 @@ export class CiDistributionJob3Service implements OnModuleInit {
 					err.stack,
 				);
 			}
-		}
-	}
-
-	// ==========================================
-	// Cron: hẹn lịch gửi định kì hàng ngày theo app config
-	// ==========================================
-
-	private registerDailySendCron() {
-		const jobName = CiDistributionJob3Service.CRON_JOB_NAME;
-
-		const jobs = this.schedulerRegistry.getCronJobs();
-		if (jobs.has(jobName)) {
-			this.schedulerRegistry.deleteCronJob(jobName);
-			this.logger.log(`Deleted existing cron job: ${jobName}`);
-		}
-
-		try {
-			// const cronExpression = '*/1 * * * *'; // mỗi phút, test nhanh
-			const cronExpression =
-				this.appConfigService.cache?.config?.partners?.ci
-					?.dailySendCron || '0 8 * * *';
-
-			const job = new CronJob(cronExpression, () => {
-				this.handleDailySend().catch((err) => {
-					this.logger.error(
-						`[CRON] Daily send failed: ${err.message}`,
-					);
-				});
-			});
-
-			this.schedulerRegistry.addCronJob(jobName, job);
-			job.start();
-			this.logger.log(
-				`Registered cron job [${jobName}] with expression: ${cronExpression}`,
-			);
-		} catch (err) {
-			this.logger.error(
-				`Failed to create cron job [${jobName}]: ${(err as Error).message}`,
-			);
 		}
 	}
 
