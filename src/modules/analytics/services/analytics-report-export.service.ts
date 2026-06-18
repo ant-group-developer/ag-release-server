@@ -14,6 +14,7 @@ import {
 } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { isValidStandardUpc } from 'src/utils/upc.util';
 import { EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
@@ -69,6 +70,7 @@ interface DetailRow {
   date: string;
   startDate: string;
   endDate: string;
+  tenant: string;
   dspName: string;
   upc: string;
   isrc: string;
@@ -466,19 +468,28 @@ export class AnalyticsReportExportService {
       this.getTrackMetadata(isrcs),
       this.getReleaseMetadataByUpc(albumUpcs),
     ]);
+    const tenantNames = await this.getTenantNames(
+      Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean))),
+    );
 
     return rows.map((row) => {
       const meta = row.isrc.startsWith('UPC-')
         ? releaseMeta.get(row.isrc.substring(4))
         : trackMeta.get(row.isrc);
+      const upc = meta?.release_upc || row.fallback_upc || '';
 
       return {
         date: row.date,
         startDate: row.start_date,
         endDate: row.end_date,
+        tenant:
+          meta?.workspace_name ||
+          tenantNames.get(row.tenant_id) ||
+          row.tenant_id ||
+          '',
         dspName: row.dsp_name || row.dsp_id,
-        upc: meta?.release_upc || row.fallback_upc || '',
-        isrc: row.isrc,
+        upc: isValidStandardUpc(upc) ? upc : '',
+        isrc: this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc,
         releaseName: meta?.release_title || row.fallback_album_title || '',
         trackName: meta?.track_title || row.fallback_track_title || '',
         artistName: meta?.artist_names || row.fallback_artist_name || '',
@@ -489,6 +500,10 @@ export class AnalyticsReportExportService {
         currency: 'USD',
       };
     });
+  }
+
+  private isGeneratedUpcBackfill(value: string): boolean {
+    return value.trim().toUpperCase().startsWith('UPC-');
   }
 
   private async getTrackMetadata(isrcs: string[]): Promise<Map<string, MetadataRow>> {
@@ -521,6 +536,27 @@ export class AnalyticsReportExportService {
 
     for (const row of rows) {
       map.set(row.isrc, row);
+    }
+    return map;
+  }
+
+  private async getTenantNames(tenantIds: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!tenantIds.length) return map;
+
+    const rows = await this.entityManager.query(
+      `
+        SELECT
+          id::text AS id,
+          COALESCE(NULLIF(title, ''), name, id::text) AS tenant_name
+        FROM tenants
+        WHERE id = ANY($1)
+      `,
+      [tenantIds],
+    );
+
+    for (const row of rows) {
+      map.set(row.id, row.tenant_name);
     }
     return map;
   }
@@ -735,8 +771,7 @@ export class AnalyticsReportExportService {
   private getDetailColumns(): Partial<ExcelJS.Column>[] {
     return [
       { header: 'Date', key: 'date', width: 12 },
-      { header: 'StartDate', key: 'startDate', width: 14 },
-      { header: 'EndDate', key: 'endDate', width: 14 },
+      { header: 'Workspace', key: 'tenant', width: 28 },
       { header: 'DspName', key: 'dspName', width: 28 },
       { header: 'Upc', key: 'upc', width: 18 },
       { header: 'Isrc', key: 'isrc', width: 18 },
