@@ -336,13 +336,23 @@ export class ImportedReleaseDeleteService {
   private parseReportDeleteDate(value: string, fieldName: string): Date {
     const trimmed = value.trim();
     const normalized = trimmed.replace(' ', 'T');
-    const hasTime = /T\d{2}:\d{2}/.test(normalized);
-    const hasTimezone = /(Z|[+-]\d{2}:?\d{2})$/.test(normalized);
+    const timezoneMatch = normalized.match(/(Z|[+-]\d{2}:?\d{2})$/);
+    const timezone = timezoneMatch?.[1] ?? '+07:00';
+    const valueWithoutTimezone = timezoneMatch
+      ? normalized.slice(0, -timezoneMatch[1].length)
+      : normalized;
+    const hasTime = /T\d{2}:\d{2}/.test(valueWithoutTimezone);
+    const hasSeconds = /T\d{2}:\d{2}:\d{2}/.test(valueWithoutTimezone);
 
     const defaultTime =
       fieldName === 'toDate' ? 'T23:59:59.999' : 'T00:00:00';
-    const isoValue = hasTime ? normalized : `${normalized}${defaultTime}`;
-    const valueWithTimezone = hasTimezone ? isoValue : `${isoValue}+07:00`;
+    const valueWithTime = hasTime
+      ? valueWithoutTimezone
+      : `${valueWithoutTimezone}${defaultTime}`;
+    const isoValue = hasTime && !hasSeconds
+      ? `${valueWithTime}:${fieldName === 'toDate' ? '59.999' : '00.000'}`
+      : valueWithTime;
+    const valueWithTimezone = `${isoValue}${timezone}`;
     const parsed = new Date(valueWithTimezone);
 
     if (Number.isNaN(parsed.getTime())) {
