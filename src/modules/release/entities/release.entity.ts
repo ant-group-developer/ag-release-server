@@ -199,6 +199,38 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	isImportedFromReport: boolean;
 
 	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Nguồn import tạo release từ report',
+	})
+	importSourceType: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Parser/import code tạo release từ report',
+	})
+	importParserCode: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 500,
+		nullable: true,
+		comment: 'Tên file import tạo release từ report',
+	})
+	importFileName: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Job/batch import tạo release từ report',
+	})
+	importJobId: string | null;
+
+	@Column({
 		type: 'enum',
 		enum: ReleaseTimeMode,
 		default: ReleaseTimeMode.GLOBAL_MIDNIGHT,

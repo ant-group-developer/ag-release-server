@@ -98,17 +98,74 @@ export class BucketR2Service {
 		const bucketName = this.getBucketName({ isPublic });
 		const stat = await fs.promises.stat(filePath);
 
-		await this.client.send(
-			new PutObjectCommand({
-				Bucket: bucketName,
-				Key: key,
-				Body: fs.createReadStream(filePath),
-				ContentType: contentType,
-				ContentLength: stat.size,
-			}),
-		);
+		await this.sendPutObjectWithRetry({
+			bucketName,
+			key,
+			filePath,
+			contentType,
+			contentLength: stat.size,
+		});
 
 		return { bucketName, key };
+	}
+
+	private async sendPutObjectWithRetry(data: {
+		bucketName: string;
+		key: string;
+		filePath: string;
+		contentType: string;
+		contentLength: number;
+	}): Promise<void> {
+		const maxAttempts = 3;
+		let lastError: unknown;
+
+		for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+			try {
+				await this.client.send(
+					new PutObjectCommand({
+						Bucket: data.bucketName,
+						Key: data.key,
+						Body: fs.createReadStream(data.filePath),
+						ContentType: data.contentType,
+						ContentLength: data.contentLength,
+					}),
+				);
+				return;
+			} catch (error) {
+				lastError = error;
+				if (attempt >= maxAttempts || !this.isRetryableUploadError(error)) {
+					throw error;
+				}
+				await this.sleep(500 * attempt);
+			}
+		}
+
+		throw lastError;
+	}
+
+	private isRetryableUploadError(error: unknown): boolean {
+		const err = error as {
+			code?: string;
+			name?: string;
+			message?: string;
+			$metadata?: { httpStatusCode?: number };
+		};
+		const statusCode = err.$metadata?.httpStatusCode;
+		const code = err.code || err.name;
+
+		return (
+			code === 'ECONNRESET' ||
+			code === 'ETIMEDOUT' ||
+			code === 'EPIPE' ||
+			code === 'TimeoutError' ||
+			code === 'RequestTimeout' ||
+			code === 'SlowDown' ||
+			(typeof statusCode === 'number' && statusCode >= 500)
+		);
+	}
+
+	private sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	async getSignedUrlRead(data: IGetSignedUrlRead): Promise<string> {

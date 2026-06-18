@@ -377,6 +377,7 @@ export class ImportJobsService implements OnModuleInit {
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE source_type = {sourceType:String}
         AND status IN ({queued:String}, {processing:String})
+      ORDER BY created_at ASC
     `;
     const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
       sourceType: ImportJobSourceType.REPORT_UPLOAD,

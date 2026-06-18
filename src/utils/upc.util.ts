@@ -7,6 +7,27 @@ export function normalizeUpc(value?: string | null): string {
 	return normalized || '0';
 }
 
+export function isValidStandardUpc(value?: string | null): boolean {
+	const normalized = normalizeUpc(value);
+	return /^\d{10,14}$/.test(normalized);
+}
+
+export function normalizeStandardUpcOrEmpty(value?: string | null): string {
+	const normalized = normalizeUpc(value);
+	return isValidStandardUpc(normalized) ? normalized : '';
+}
+
+export function normalizeReportUpcOrFallback(
+	upc?: string | null,
+	isrc?: string | null,
+): string {
+	const normalizedUpc = normalizeStandardUpcOrEmpty(upc);
+	if (normalizedUpc) return normalizedUpc;
+
+	const normalizedIsrc = normalizeReportIsrc(isrc);
+	return normalizedIsrc ? `ISRC-${normalizedIsrc}` : '';
+}
+
 export function buildEquivalentUpcs(value?: string | null): string[] {
 	const normalized = normalizeUpc(value);
 	if (!normalized) return [];
@@ -20,4 +41,10 @@ export function buildEquivalentUpcs(value?: string | null): string[] {
 	}
 
 	return [...variants];
+}
+
+function normalizeReportIsrc(value?: string | null): string {
+	const cleaned = value?.trim().toUpperCase() ?? '';
+	if (!cleaned || cleaned === 'N/A' || cleaned.startsWith('UPC-')) return '';
+	return cleaned;
 }

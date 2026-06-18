@@ -1,9 +1,26 @@
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  ValidateNested,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ImportJob } from '../../etl/interfaces';
+import { ImportJob, ImportJobSourceType } from '../../etl/interfaces';
 import { computeProgressDetail } from '../../etl/services/import-jobs/import-jobs.service';
 import { ReportImportStartResponse, ReportImportStatusResponse } from '../interfaces/report-import.interface';
+
+export enum ReportReleaseImportSourceType {
+  REPORT_UPLOAD = ImportJobSourceType.REPORT_UPLOAD,
+  FTP_SYNC_PERIOD = ImportJobSourceType.FTP_SYNC_PERIOD,
+  FTP_SYNC_ALL = ImportJobSourceType.FTP_SYNC_ALL,
+  FTP_RETRY = ImportJobSourceType.FTP_RETRY,
+  FTP_AUTO_CRON = ImportJobSourceType.FTP_AUTO_CRON,
+}
 
 export class PreValidateFileDto {
   @ApiProperty({ description: 'Original local file path' })
@@ -106,6 +123,78 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
   }
 }
 
+export class DeleteImportedReleasesDto {
+  @ApiPropertyOptional({
+    description:
+      'Local datetime. If timezone is omitted, Asia/Saigon (UTC+7) is assumed.',
+    example: '2026-01-01T08:30',
+  })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?(?:Z|[+-]\d{2}:?\d{2})?)?$/,
+  )
+  fromDate?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Local datetime. If timezone is omitted, Asia/Saigon (UTC+7) is assumed.',
+    example: '2026-01-31T23:59',
+  })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?(?:Z|[+-]\d{2}:?\d{2})?)?$/,
+  )
+  toDate?: string;
+
+  @ApiPropertyOptional({ description: 'Tenant ID' })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({ description: 'Label ID' })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  labelId?: string;
+
+  @ApiPropertyOptional({
+    enum: ReportReleaseImportSourceType,
+    enumName: 'ReportReleaseImportSourceType',
+    example: ReportReleaseImportSourceType.REPORT_UPLOAD,
+  })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  importSourceType?: ReportReleaseImportSourceType;
+
+  @ApiPropertyOptional({ example: 'wmg-sales' })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  parserCode?: string;
+
+  @ApiPropertyOptional({ example: 'wmg-sales-2026-01.csv' })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  fileName?: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  deleteAll?: boolean;
+}
+
 function toVN(dt: string | null): string | null {
   if (!dt) return null;
   try {
@@ -118,4 +207,8 @@ function toVN(dt: string | null): string | null {
   } catch {
     return dt;
   }
+}
+
+function emptyToUndefined(value: unknown): unknown {
+  return typeof value === 'string' && value.trim() === '' ? undefined : value;
 }

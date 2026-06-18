@@ -12,7 +12,12 @@ import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild
 import { DspMappingService } from '../../dsp/services/dsp-mapping.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
-import { ImportJob, ImportJobStatus, FactSalesRow } from '../../etl/interfaces';
+import {
+  FactSalesRow,
+  ImportJob,
+  ImportJobSourceType,
+  ImportJobStatus,
+} from '../../etl/interfaces';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { ExtractedRow, ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
 import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
@@ -32,6 +37,7 @@ interface ReportImportFileCheckpoint {
   status: ReportImportFileStatus;
   sourceFileName: string;
   importSource: string;
+  parserCode?: string;
   factTable: string;
   rows: number;
   affectedPeriods: string[];
@@ -134,6 +140,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
         status: 'PENDING',
         sourceFileName,
         importSource: `${file.sourceCode}_report`,
+        parserCode: file.parserCode,
         factTable: file.reportType === 'sales'
           ? CLICKHOUSE_TABLES.FACT_SALES_REPORT
           : CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
@@ -466,6 +473,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
           status: 'FACT_IMPORTED',
           sourceFileName: filename,
           importSource,
+          parserCode: file.parserCode,
           factTable,
           rows: fileProcessedRows,
           affectedPeriods: Array.from(fileAffectedPeriods),
@@ -477,33 +485,66 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
       const importedCheckpoints = this.getImportedFileCheckpoints(state);
 
       // 3. Extract and import entities into PostgreSQL
-      const rowsToImport = await this.loadMetadataRowsFromClickHouse(importedCheckpoints);
-      if (rowsToImport.length > 0) {
+      const totalMetadataRows = importedCheckpoints.reduce(
+        (sum, checkpoint) => sum + checkpoint.rows,
+        0,
+      );
+      if (totalMetadataRows > 0) {
         state.stage = 'METADATA_IMPORT';
         await this.saveReportImportState(jobId, state);
 
-        this.logger.log(`Extracting and importing ${rowsToImport.length} unique entities to PostgreSQL...`);
+        this.logger.log(`Extracting and importing metadata entities to PostgreSQL for ${importedCheckpoints.length} file(s)...`);
         await this.importJobsService.updateProgress(jobId, {
           progressCurrent: 0,
-          progressTotal: rowsToImport.length,
-          progressLabel: `Importing metadata to PostgreSQL: 0/${rowsToImport.length}`,
+          progressTotal: importedCheckpoints.length,
+          progressLabel: `Importing metadata to PostgreSQL`,
         }, true);
 
-        const entityResult = await this.reportEntityExtractorService.extractAndImport(
-          rowsToImport,
-          job.tenantId, // The default tenant ID chosen on pre-validate upload form
-          labelId,
-          async (progress) => {
-            await this.importJobsService.updateProgress(jobId, {
-              progressCurrent: progress.current,
-              progressTotal: progress.total,
-              progressLabel: progress.label,
-            }, true);
-          },
-        ).catch((err) => {
-          this.logger.error(`Failed to extract/import entities to PostgreSQL for job ${jobId}: ${err.message}`);
-          return { totalReleases: 0, created: 0, skipped: 0, errors: 0 };
-        });
+        const entityResult = {
+          totalReleases: 0,
+          created: 0,
+          skipped: 0,
+          errors: 0,
+        };
+
+        for (let index = 0; index < importedCheckpoints.length; index += 1) {
+          const checkpoint = importedCheckpoints[index];
+          const rowsToImport = await this.loadMetadataRowsFromClickHouse([
+            checkpoint,
+          ]);
+          if (!rowsToImport.length) continue;
+
+          const result = await this.reportEntityExtractorService.extractAndImport(
+            rowsToImport,
+            job.tenantId, // The default tenant ID chosen on pre-validate upload form
+            labelId,
+            async (progress) => {
+              await this.importJobsService.updateProgress(jobId, {
+                progressCurrent: progress.current,
+                progressTotal: progress.total,
+                progressLabel: progress.label,
+              }, true);
+            },
+            {
+              sourceType: ImportJobSourceType.REPORT_UPLOAD,
+              parserCode: checkpoint.parserCode,
+              fileName: checkpoint.sourceFileName,
+              jobId,
+            },
+          ).catch((err) => {
+            this.logger.error(`Failed to extract/import entities to PostgreSQL for ${checkpoint.sourceFileName}: ${err.message}`);
+            return { totalReleases: 0, created: 0, skipped: 0, errors: 1 };
+          });
+
+          entityResult.totalReleases += result.totalReleases;
+          entityResult.created += result.created;
+          entityResult.skipped += result.skipped;
+          entityResult.errors += result.errors;
+
+          await this.importJobsService.updateProgress(jobId, {
+            progressLabel: `Importing metadata to PostgreSQL`,
+          }, true);
+        }
 
         this.logger.log(
           `Entity import completed: ${entityResult.created} created, ` +
