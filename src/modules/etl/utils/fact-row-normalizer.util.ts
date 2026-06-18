@@ -1,4 +1,4 @@
-import { normalizeUpc } from 'src/utils/upc.util';
+import { normalizeReportUpcOrFallback } from 'src/utils/upc.util';
 
 const TEXT_NA = 'N/A';
 
@@ -34,9 +34,15 @@ export function normalizeFactTextFields<T extends Record<string, any>>(row: T): 
     if (NON_TEXT_FIELDS.has(key)) continue;
 
     if (typeof value === 'string') {
-      const normalizedValue = key === 'upc' ? normalizeUpc(value) : value;
-      row[key as keyof T] = normalizeTextValue(normalizedValue) as T[keyof T];
+      row[key as keyof T] = normalizeTextValue(value) as T[keyof T];
     }
+  }
+
+  const record = row as Record<string, any>;
+  if (typeof record.upc === 'string') {
+    record.upc = normalizeTextValue(
+      normalizeReportUpcOrFallback(record.upc, record.isrc),
+    );
   }
 
   return row;

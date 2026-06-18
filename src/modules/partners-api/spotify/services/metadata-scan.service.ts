@@ -15,7 +15,11 @@ import {
 	ScanSessionStatus,
 } from 'src/modules/release/entities/metadata-scan-session.entity';
 import { EnrichEventsGateway } from './enrich-events.gateway';
-import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import {
+	buildEquivalentUpcs,
+	isValidStandardUpc,
+	normalizeUpc,
+} from 'src/utils/upc.util';
 
 export interface ScanResult {
 	scanId: string;
@@ -393,14 +397,16 @@ export class MetadataScanService implements OnModuleInit {
 								);
 
 								if (primaryEnriched.artistName) {
-									const hasExactArtist = (pr.release.releaseArtists || []).some(
-										(ra) => ra.artist?.name?.trim()?.toLowerCase() === primaryEnriched.artistName?.trim()?.toLowerCase()
-									);
-									if (!hasExactArtist) {
+									const existingArtists = pr.release.releaseArtists || [];
+									const existingNames = existingArtists.map(ra => ra.artist?.name?.trim()).filter(Boolean);
+									const isSameArtist = existingNames.length === 1 && existingNames[0].toLowerCase() === primaryEnriched.artistName.trim().toLowerCase();
+
+									if (!isSameArtist) {
+										const oldValue = existingNames.join(', ') || 'null';
 										if (!dryRun) {
-											await this.metadataSyncService.ensureArtistLink(pr.release, primaryEnriched.artistName);
+											await this.metadataSyncService.syncReleaseArtistFromEnriched(pr.release, primaryEnriched.artistName);
 										}
-										changes.push(`Artist: added "${primaryEnriched.artistName}"`);
+										changes.push(`Artist: "${oldValue}" -> "${primaryEnriched.artistName}"`);
 										chunkChangeLogs.push(
 											this.metadataSyncService.buildLogEntry(scanId, now, dryRun, {
 												entityType: 'artist',
@@ -409,9 +415,9 @@ export class MetadataScanService implements OnModuleInit {
 												isrc: primaryEnriched.isrc || `UPC-${upc}`,
 												upc,
 												fieldName: 'artist_name',
-												oldValue: (pr.release.releaseArtists || []).map(ra => ra.artist?.name).filter(Boolean).join(', '),
+												oldValue,
 												newValue: primaryEnriched.artistName,
-												changeType: 'create',
+												changeType: 'update',
 												enriched: primaryEnriched,
 											}),
 										);
@@ -565,7 +571,7 @@ export class MetadataScanService implements OnModuleInit {
 								});
 
 								if (existing) {
-									if (existing.id !== release.id) {
+									if (existing.id !== release.id && !isValidStandardUpc(release.upc)) {
 										this.logger.log(
 											`Merging duplicate release ${release.id} (UPC: ${release.upc}) into existing release ${existing.id} (UPC: ${existing.upc})`,
 										);
@@ -736,6 +742,24 @@ export class MetadataScanService implements OnModuleInit {
 										if (pending) pending.resolved = true;
 										markReleaseProgress(releaseId, 'success');
 										continue;
+									} else if (existing.id !== release.id) {
+										changes.push(
+											`UPC ${apiUpc} already exists on release ${existing.id}; current release ${release.id} has valid UPC ${release.upc}, skipped merge`,
+										);
+										chunkChangeLogs.push(
+											this.metadataSyncService.buildLogEntry(scanId, now, dryRun, {
+												entityType: 'release',
+												entityId: release.id,
+												releaseId: release.id,
+												isrc: primaryEnriched.isrc,
+												upc: release.upc || '',
+												fieldName: 'duplicate_valid_upc_skip',
+												oldValue: release.upc || '',
+												newValue: `Existing release ${existing.id} has UPC ${apiUpc}`,
+												changeType: 'skip',
+												enriched: primaryEnriched,
+											}),
+										);
 									}
 								} else {
 									if (!dryRun) {
@@ -898,14 +922,16 @@ export class MetadataScanService implements OnModuleInit {
 
 							// ─── Artist ──────────────────────────────
 							if (primaryEnriched.artistName) {
-								const hasExactArtist = (release.releaseArtists || []).some(
-									(ra) => ra.artist?.name?.trim()?.toLowerCase() === primaryEnriched.artistName?.trim()?.toLowerCase()
-								);
-								if (!hasExactArtist) {
+								const existingArtists = release.releaseArtists || [];
+								const existingNames = existingArtists.map(ra => ra.artist?.name?.trim()).filter(Boolean);
+								const isSameArtist = existingNames.length === 1 && existingNames[0].toLowerCase() === primaryEnriched.artistName.trim().toLowerCase();
+
+								if (!isSameArtist) {
+									const oldValue = existingNames.join(', ') || 'null';
 									if (!dryRun) {
-										await this.metadataSyncService.ensureArtistLink(release, primaryEnriched.artistName);
+										await this.metadataSyncService.syncReleaseArtistFromEnriched(release, primaryEnriched.artistName);
 									}
-									changes.push(`Artist: added "${primaryEnriched.artistName}"`);
+									changes.push(`Artist: "${oldValue}" -> "${primaryEnriched.artistName}"`);
 
 									chunkChangeLogs.push(
 										this.metadataSyncService.buildLogEntry(scanId, now, dryRun, {
@@ -915,9 +941,9 @@ export class MetadataScanService implements OnModuleInit {
 											isrc: primaryEnriched.isrc,
 											upc: release.upc || '',
 											fieldName: 'artist_name',
-											oldValue: (release.releaseArtists || []).map(ra => ra.artist?.name).filter(Boolean).join(', '),
+											oldValue,
 											newValue: primaryEnriched.artistName,
-											changeType: 'create',
+											changeType: 'update',
 											enriched: primaryEnriched,
 										}),
 									);

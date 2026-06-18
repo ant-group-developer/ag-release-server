@@ -7,7 +7,11 @@ import { ReleaseArtist } from '../../release-artist/entities/release-artist.enti
 import { MetadataEnrichmentService, EnrichedMetadata } from '../../partners-api/spotify/services/metadata-enrichment.service';
 import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import { hasMeaningfulText } from '../../etl/utils/fact-row-normalizer.util';
-import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import {
+  buildEquivalentUpcs,
+  normalizeReportUpcOrFallback,
+  normalizeUpc,
+} from 'src/utils/upc.util';
 import { Release } from '../entities/release.entity';
 import { Track } from '../../track/entities/track.entity';
 import * as fs from 'fs';
@@ -61,7 +65,10 @@ export class ReportEntityExtractorService {
 
     for (const row of rows) {
       let isrc = this.cleanMeaningfulText(row.isrc);
-      let upc = normalizeUpc(this.cleanMeaningfulText(row.upc));
+      let upc = normalizeReportUpcOrFallback(
+        this.cleanMeaningfulText(row.upc),
+        isrc,
+      );
       
       // Chỉ bỏ qua khi thiếu cả hai
       if (!isrc && !upc) continue;
