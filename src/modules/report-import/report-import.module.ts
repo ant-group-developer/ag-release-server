@@ -15,6 +15,7 @@ import { ReportImportQueueService } from './services/report-import-queue.service
 import { ReportImportWorkerService } from './services/report-import-worker.service';
 import { ConfigSyncService } from './services/config-sync.service';
 import { ReportSourceConfigService } from './services/report-source-config.service';
+import { ImportedReleaseDeleteService } from './services/imported-release-delete.service';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ReportSourceConfigService } from './services/report-source-config.servi
     ReportImportWorkerService,
     ConfigSyncService,
     ReportSourceConfigService,
+    ImportedReleaseDeleteService,
   ],
   exports: [ReportImportService],
 })

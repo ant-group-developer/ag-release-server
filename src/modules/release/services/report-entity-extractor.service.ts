@@ -33,6 +33,13 @@ export interface ReportEntityExtractorProgress {
   label: string;
 }
 
+export interface ReportEntityImportContext {
+  sourceType?: string;
+  parserCode?: string;
+  fileName?: string;
+  jobId?: string;
+}
+
 @Injectable()
 export class ReportEntityExtractorService {
   private readonly logger = new Logger(ReportEntityExtractorService.name);
@@ -49,6 +56,7 @@ export class ReportEntityExtractorService {
     tenantId?: string,
     labelId?: string,
     onProgress?: (progress: ReportEntityExtractorProgress) => Promise<void>,
+    context?: ReportEntityImportContext,
   ): Promise<{
     totalReleases: number;
     created: number;
@@ -101,7 +109,7 @@ export class ReportEntityExtractorService {
       stage: 'importing',
       current: 0,
       total: upcMap.size,
-      label: `Preparing PostgreSQL metadata import: 0/${upcMap.size}`,
+      label: `Preparing PostgreSQL metadata import`,
     });
 
     const resolvedUpcMap = new Map<string, Map<string, ExtractedRow>>();
@@ -193,6 +201,10 @@ export class ReportEntityExtractorService {
         tracks: pgTracks,
         upcTracks,
         bestRows,
+        importSourceType: context?.sourceType,
+        importParserCode: context?.parserCode,
+        importFileName: context?.fileName,
+        importJobId: context?.jobId,
       });
     }
 
@@ -206,7 +218,7 @@ export class ReportEntityExtractorService {
       stage: 'importing',
       current: 0,
       total: inputs.length,
-      label: `Importing metadata to PostgreSQL: 0/${inputs.length}`,
+      label: `Importing metadata to PostgreSQL`,
     });
 
     for (const input of inputs) {
@@ -265,7 +277,7 @@ export class ReportEntityExtractorService {
             stage: 'importing',
             current: importedCount,
             total: inputs.length,
-            label: `Importing metadata to PostgreSQL: ${importedCount}/${inputs.length}`,
+            label: `Importing metadata to PostgreSQL`,
           });
         }
       }

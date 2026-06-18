@@ -38,6 +38,14 @@ export interface ReleaseReportImportInput {
 
 		isrc: string;
 	}[];
+
+	importSourceType?: string;
+
+	importParserCode?: string;
+
+	importFileName?: string;
+
+	importJobId?: string;
 }
 
 @Injectable()
@@ -105,6 +113,10 @@ export class ReleaseReportImportService {
 					labelId: label.id,
 					tenantId,
 					isImportedFromReport: true,
+					importSourceType: input.importSourceType || null,
+					importParserCode: input.importParserCode || null,
+					importFileName: input.importFileName || null,
+					importJobId: input.importJobId || null,
 				}),
 			);
 
@@ -134,6 +146,10 @@ export class ReleaseReportImportService {
 						order: index + 1,
 						copyArtistsFromRelease: true,
 						isImportedFromReport: true,
+						importSourceType: input.importSourceType || null,
+						importParserCode: input.importParserCode || null,
+						importFileName: input.importFileName || null,
+						importJobId: input.importJobId || null,
 					}),
 				),
 			);
