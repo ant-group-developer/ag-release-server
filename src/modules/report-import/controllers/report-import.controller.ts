@@ -39,6 +39,7 @@ export class ReportImportController {
       body.tenantId || user?.tenantId,
       user?.sub,
       body.allowedExtensions,
+      body.labelId,
     );
     return new ResponseSuccess({
       data: result,

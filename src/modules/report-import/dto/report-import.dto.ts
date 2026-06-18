@@ -1,6 +1,6 @@
 import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ImportJob } from '../../etl/interfaces';
 import { computeProgressDetail } from '../../etl/services/import-jobs/import-jobs.service';
 import { ReportImportStartResponse, ReportImportStatusResponse } from '../interfaces/report-import.interface';
@@ -25,12 +25,19 @@ export class PreValidateRequestDto {
   @Type(() => PreValidateFileDto)
   files: PreValidateFileDto[];
 
-  @ApiProperty({ description: 'Optional default Tenant ID to assign releases to', required: false })
+  @ApiPropertyOptional({ description: 'Optional default Tenant ID to assign releases to' })
   @IsOptional()
   @IsString()
   tenantId?: string;
 
-  @ApiProperty({ description: 'Allowed file extensions (e.g. csv, txt, xlsx)', required: false, type: [String] })
+  @ApiPropertyOptional({
+    description: 'Optional fallback Label ID under tenantId. API-enriched labelName is prioritized when available.',
+  })
+  @IsOptional()
+  @IsString()
+  labelId?: string;
+
+  @ApiPropertyOptional({ description: 'Allowed file extensions (e.g. csv, txt, xlsx)', type: [String] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -45,7 +52,9 @@ export class ReportImportStartResponseDto implements ReportImportStartResponse {
   constructor(job: ImportJob) {
     this.jobId = job.id;
     this.status = job.status;
-    this.message = 'Job processing has been started.';
+    this.message = job.status === 'QUEUED'
+      ? 'Job has been queued for background processing.'
+      : 'Job processing has been started.';
   }
 }
 

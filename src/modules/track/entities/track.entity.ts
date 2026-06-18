@@ -179,6 +179,32 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	isImportedFromReport: boolean;
 
 	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata spotify',
+	})
+	metadataSpotify: {
+		trackId?: string | null;
+		trackUrl?: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata deezer',
+	})
+	metadataDeezer: {
+		trackId?: string | null;
+		trackUrl?: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
 		type: 'uuid',
 		nullable: true,
 		comment: 'Price tier áp dụng cho track ' + COMMENT_FOR_NULLABLE_DRAFT,

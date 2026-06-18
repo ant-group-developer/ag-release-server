@@ -208,6 +208,7 @@ export class SyncService {
       await this.clickHouseService.execute(
         `ALTER TABLE music_analytics.${table} DELETE WHERE ${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
       );
+      await this.clickHouseService.waitForTableMutations(table);
 
       // 2. Rebuild cubes for the period partition
       const formattedPeriod = `${period.substring(0, 4)}-${period.substring(4, 6)}`;

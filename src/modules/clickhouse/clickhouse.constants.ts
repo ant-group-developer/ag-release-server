@@ -12,6 +12,7 @@ export const CLICKHOUSE_TABLES = {
   DSPS_REPORT: 'dsps_report',
   TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
   SALES_TER_MONTHLY: 'sales_ter_monthly_cube_v2',
+  SALES_EXPORT_MONTHLY: 'sales_export_monthly_cube',
   TRENDS_TER_MONTHLY: 'trends_ter_monthly_cube',
   IMPORT_JOBS: 'import_jobs',
   EXCHANGE_RATES: 'exchange_rates',

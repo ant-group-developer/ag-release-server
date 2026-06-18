@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import { BaseSalesParser } from './base-sales.parser';
 import { FactSalesRow } from '../../interfaces';
+import { normalizeUpc } from 'src/utils/upc.util';
 
 export interface WmgStreamingOpts {
   batchSize?: number;
@@ -49,7 +50,7 @@ export class WmgSalesParser extends BaseSalesParser {
     batchId: string,
     opts: WmgStreamingOpts,
   ): Promise<FactSalesRow | null> {
-    const upc = this.cleanExcelQuoted(record['GPID'] || '');
+    const upc = normalizeUpc(this.cleanExcelQuoted(record['GPID'] || ''));
     if (!upc) return null;
 
     const dspName = (record['Digital Service Provider(DSP)'] || '').trim();
@@ -70,30 +71,32 @@ export class WmgSalesParser extends BaseSalesParser {
 
     const accountName = (record['Account Name'] || '').trim();
     const payee = (record['Payee'] || '').trim();
+    const productTitle = this.normalizeText(record['Product Title']);
+    const projectTitle = this.normalizeText(record['Project Title']);
 
     const row = this.createBaseRow(batchId);
     row.dsp_id = dspId;
     row.reporting_period_start = start;
     row.reporting_period_end = end;
     row.service_name = dspName;
-    row.member_name = accountName || payee || opts.memberName;
-    row.label_name = (record['Marketing Owner Name'] || '').trim();
+    row.member_name = this.normalizeText(accountName || payee || opts.memberName);
     row.territory_code = this.normalizeCountryCode(record['Country'] || '');
     row.isrc = isrc;
     row.upc = upc;
-    row.track_title = (record['Product Title'] || '').trim();
-    row.album_title = (record['Project Title'] || '').trim();
-    row.artist_name = (record['Artist Name'] || '').trim();
+    row.track_title = projectTitle;
+    row.album_title = productTitle;
+    row.artist_name = this.normalizeText(record['Artist Name']);
     row.quantity = this.safeInt(saleUnits);
     row.revenue_local = this.safeDecimal(netRoyalty);
     row.revenue_usd = '0';
     row.revenue_currency = opts.revenueCurrency;
-    row.usage_type = (record['Config Type'] || '').trim();
+    row.usage_type = this.normalizeText(record['Config Type']);
     row.source_category = 'sales';
     row.metadata = {
       is_album_level: String(isAlbumLevel),
       recdate_month: this.cleanExcelQuoted(record['Recdate Month ID'] || ''),
       repdate_month: this.cleanExcelQuoted(record['Repdate Month ID'] || ''),
+      project_title: projectTitle,
       catalog_number: this.cleanExcelQuoted(record['Catalog Number'] || ''),
       config: (record['Config'] || '').trim(),
       config_desc: (record['Config Desc'] || '').trim(),
@@ -165,6 +168,7 @@ export class WmgSalesParser extends BaseSalesParser {
           continue;
         }
 
+        this.normalizeParsedRows([parsed]);
         buffer.push(parsed);
         totalRows++;
         if (dspName) uniqueDsps.add(dspName);
