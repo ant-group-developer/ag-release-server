@@ -7,6 +7,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
@@ -19,6 +20,7 @@ import { VevoChannelCallbackDto } from '../dto/vevo.dto';
 import { ChannelHistory } from '../entities/channel-history.entity';
 import { Channel } from '../entities/channel.entity';
 import { ChannelStatus } from '../enum/channel.enum';
+import { VevoCreateChannelResponse } from '../interfaces/vevo.interface';
 import { VevoService } from './vevo.service';
 
 @Injectable()
@@ -34,6 +36,8 @@ export class ChannelService {
 		private readonly dataSource: DataSource,
 		private readonly tenantService: TenantService,
 		private readonly vevoService: VevoService,
+
+		private readonly logsService: LogsService,
 	) {}
 
 	async create(dto: CreateChannelDto) {
@@ -47,9 +51,10 @@ export class ChannelService {
 			}),
 		);
 
-		this.processVevoChannel(channel.id, channel.name).catch((e) =>
-			console.log(e),
-		);
+		this.processVevoChannel({
+			channelId: channel.id,
+			channelName: channel.name,
+		}).catch((e) => console.log(e));
 
 		return channel;
 	}
@@ -91,11 +96,16 @@ export class ChannelService {
 		});
 	}
 
-	async getList(
-		query: QueryGetListChannelDto,
-		actorTenantId: string,
-		onlyActorTenant = false,
-	) {
+	private async markSuccess(channelId: string) {
+		await this.channelRepo.update(channelId, {
+			status: ChannelStatus.SUCCESS,
+			error: null,
+		});
+	}
+
+	async getList(query: QueryGetListChannelDto, actorTenantId: string) {
+		const onlyActorTenant = query.onlyActorTenant === true;
+		const { status } = query;
 		const qb = this.createDetailQuery(true);
 		// Tenant thuong chi duoc xem channel cua chinh no va toan bo tenant con.
 		// System tenant nhan undefined de khong ap dung bo loc tenant.
@@ -107,6 +117,10 @@ export class ChannelService {
 			qb.andWhere('channel.name ILIKE :keyword', {
 				keyword: `%${query.keyword}%`,
 			});
+		}
+
+		if (status) {
+			qb.andWhere('channel.status = :status', { status });
 		}
 
 		if (onlyActorTenant) {
@@ -136,6 +150,18 @@ export class ChannelService {
 				totalItems,
 			},
 		});
+	}
+
+	async getListChannelOnlyActorTenant(
+		query: QueryGetListChannelDto,
+		actorTenantId: string,
+	) {
+		const filter = Object.assign(new QueryGetListChannelDto(), query, {
+			onlyActorTenant: true,
+			status: ChannelStatus.SUCCESS,
+		});
+
+		return this.getList(filter, actorTenantId);
 	}
 
 	async getListSimple(query: QueryGetListChannelDto, actorTenantId: string) {
@@ -282,13 +308,33 @@ export class ChannelService {
 		return qb;
 	}
 
-	private async processVevoChannel(channelId: string, channelName: string) {
+	private async processVevoChannel({
+		channelId,
+		channelName,
+	}: {
+		channelId: string;
+		channelName: string;
+	}) {
 		await this.markProcessing(channelId);
 
 		try {
 			const response = await this.vevoService.newChannel(channelName);
 
+			this.logsService.log({
+				module: 'channel',
+				data: {
+					request: { channelId, channelName },
+					response,
+				},
+				message: 'Response create channel vevo',
+			});
+
 			if (!response.errors?.length && response.data?.createChannel) {
+				return;
+			}
+
+			if (this.isChannelAlreadyExistsOnVevo(response)) {
+				await this.markSuccess(channelId);
 				return;
 			}
 
@@ -312,5 +358,20 @@ export class ChannelService {
 				`Unexpected Vevo channel request error for ${channelName}: ${message}`,
 			);
 		}
+	}
+
+	private isChannelAlreadyExistsOnVevo(response: VevoCreateChannelResponse) {
+		return response.errors?.some((error) => {
+			const message = (
+				error.extensions?.message ||
+				error.message ||
+				''
+			).toLowerCase();
+
+			return (
+				error.extensions?.code === 'invalid-channel' &&
+				message.includes('already exists')
+			);
+		});
 	}
 }

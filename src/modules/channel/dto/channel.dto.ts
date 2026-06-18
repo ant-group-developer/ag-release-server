@@ -1,14 +1,15 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
-	IsUrl,
 	IsUUID,
 	Matches,
 	MaxLength,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { ChannelStatus } from '../enum/channel.enum';
 
 export class CreateChannelDto {
 	@ApiProperty({
@@ -47,7 +48,6 @@ export class CreateChannelDto {
 		description: 'Public thumbnail URL',
 	})
 	@IsOptional()
-	@IsUrl()
 	@MaxLength(500)
 	thumbUrl?: string;
 }
@@ -60,4 +60,10 @@ export class QueryGetListChannelDto extends BaseQueryDto {
 	fieldOrder: string = 'name';
 
 	tenantId?: string;
+
+	@IsOptional()
+	@IsEnum(ChannelStatus)
+	status?: ChannelStatus;
+
+	onlyActorTenant?: boolean;
 }
