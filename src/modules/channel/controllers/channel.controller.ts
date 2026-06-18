@@ -65,10 +65,9 @@ export class ChannelController {
 		@Query() query: QueryGetListChannelDto,
 		@Req() req: Request,
 	) {
-		const result = await this.channelService.getList(
+		const result = await this.channelService.getListChannelOnlyActorTenant(
 			query,
 			req.user!.tenantId,
-			true,
 		);
 		return new ResponseSuccess({ data: result });
 	}

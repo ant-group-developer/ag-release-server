@@ -115,7 +115,10 @@ export class ReleaseController {
 	@ApiOperation({ summary: 'Bulk submit releases' })
 	@ApiBody({ type: BulkSubmitReleaseDto })
 	@ApiResponse({ status: 200, type: ResponseSuccess })
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post('bulk-submit')
 	async bulkSubmit(@Req() req: Request, @Body() dto: BulkSubmitReleaseDto) {
 		await this.releaseService.bulkSubmit(dto);
@@ -271,7 +274,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -306,7 +312,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/submit')
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -321,7 +330,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/takedown')
 	async takedown(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -336,7 +348,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/gen-upc')
 	async genUpc(
 		@Param('id', ParseUUIDPipe) id: string,
