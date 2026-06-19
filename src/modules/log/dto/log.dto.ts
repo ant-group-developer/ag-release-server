@@ -1,5 +1,6 @@
 // dtos/query-get-list-log.dto.ts
 
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsArray, IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
@@ -14,6 +15,11 @@ export enum FieldOrderLog {
 }
 
 export class QueryGetListLogDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({
+		enum: LogLevel,
+		isArray: true,
+		description: 'Filter by log levels. Accepts comma-separated values.',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -26,6 +32,11 @@ export class QueryGetListLogDto extends BaseQueryDto2 {
 	@IsEnum(LogLevel, { each: true })
 	level?: LogLevel[];
 
+	@ApiPropertyOptional({
+		enum: ErrorType,
+		isArray: true,
+		description: 'Filter by error types. Accepts comma-separated values.',
+	})
 	@IsOptional()
 	@Transform(({ value }) =>
 		value
@@ -38,17 +49,21 @@ export class QueryGetListLogDto extends BaseQueryDto2 {
 	@IsEnum(ErrorType, { each: true })
 	type?: ErrorType[];
 
+	@ApiPropertyOptional({ description: 'Filter by module name' })
 	@IsOptional()
 	module?: string;
 
+	@ApiPropertyOptional({ format: 'uuid' })
 	@IsOptional()
 	@IsUUID()
 	releaseSubmitId?: string;
 
+	@ApiPropertyOptional({ format: 'uuid' })
 	@IsOptional()
 	@IsUUID()
 	releaseSubmitStepId?: string;
 
+	@ApiPropertyOptional({ enum: FieldOrderLog })
 	@IsEnum(FieldOrderLog)
 	fieldOrder: string = FieldOrderLog.log_createdAt;
 }
