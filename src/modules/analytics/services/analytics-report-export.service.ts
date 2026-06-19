@@ -1078,7 +1078,7 @@ export class AnalyticsReportExportService {
       { header: 'LabelName', key: 'labelName', width: 28 },
       { header: 'Territory', key: 'territory', width: 12 },
       { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
+      { header: 'Revenue', key: 'revenueUsd', width: 18 },
       { header: 'Currency', key: 'currency', width: 10 },
     ];
   }
