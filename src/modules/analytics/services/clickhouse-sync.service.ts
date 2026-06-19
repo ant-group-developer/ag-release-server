@@ -131,8 +131,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, Postgres=${pgCount} ISRCs`,
 			);
 
-			// Neu ClickHouse trong hoac thieu du lieu dang ke (>10% chenh lech)
-			if (chCount === 0 || chCount < pgCount * 0.9 || chWithReleaseUpc < pgCount * 0.9) {
+			// Neu ClickHouse trong hoac thieu du lieu (so voi Postgres)
+			if (chCount === 0 || chCount < pgCount || chWithReleaseUpc < pgCount) {
 				this.logger.log(
 					`Starting full initial sync from Postgres to ClickHouse (${pgCount} ISRCs)...`,
 				);

@@ -1,7 +1,11 @@
 import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
-import { EntityOverviewQueryDto, EntityTimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	ChartQueryDto,
+	EntityOverviewQueryDto,
+	EntityTimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Request } from 'express';
 
@@ -93,6 +97,108 @@ export class ArtistAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTimeline(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/line-chart')
+	@ApiOperation({ summary: 'Trend view line chart for an artist' })
+	async trendViewLineChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewLineChart(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/line-chart')
+	@ApiOperation({ summary: 'Revenue line chart for an artist' })
+	async revenueLineChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueLineChart(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/dsp/bar-chart')
+	@ApiOperation({ summary: 'Trend view DSP bar chart for an artist' })
+	async trendViewDspBarChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewDspBarChart(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/ter/bar-chart')
+	@ApiOperation({ summary: 'Trend view territory bar chart for an artist' })
+	async trendViewTerritoryBarChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewTerritoryBarChart(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/dsp/bar-chart')
+	@ApiOperation({ summary: 'Revenue DSP bar chart for an artist' })
+	async revenueDspBarChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueDspBarChart(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/ter/bar-chart')
+	@ApiOperation({ summary: 'Revenue territory bar chart for an artist' })
+	async revenueTerritoryBarChart(
+		@Param('artistId') artistId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueTerritoryBarChart(
 				'artist',
 				artistId,
 				dto,

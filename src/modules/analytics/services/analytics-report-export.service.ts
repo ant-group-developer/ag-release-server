@@ -1070,15 +1070,15 @@ export class AnalyticsReportExportService {
       { header: 'Date', key: 'date', width: 12 },
       { header: 'Workspace', key: 'tenant', width: 28 },
       { header: 'DspName', key: 'dspName', width: 28 },
-      { header: 'Upc', key: 'upc', width: 18 },
-      { header: 'Isrc', key: 'isrc', width: 18 },
+      { header: 'UPC', key: 'upc', width: 18 },
+      { header: 'ISRC', key: 'isrc', width: 18 },
       { header: 'ReleaseName', key: 'releaseName', width: 32 },
       { header: 'TrackName', key: 'trackName', width: 32 },
       { header: 'ArtistName', key: 'artistName', width: 28 },
       { header: 'LabelName', key: 'labelName', width: 28 },
       { header: 'Territory', key: 'territory', width: 12 },
       { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
+      { header: 'Revenue', key: 'revenueUsd', width: 18 },
       { header: 'Currency', key: 'currency', width: 10 },
     ];
   }
