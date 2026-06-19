@@ -96,9 +96,10 @@ export class ChannelService {
 		});
 	}
 
-	private async markSuccess(channelId: string) {
+	private async markSuccess(channelId: string, youtubeChannelId?: string) {
 		await this.channelRepo.update(channelId, {
 			status: ChannelStatus.SUCCESS,
+			...(youtubeChannelId ? { youtubeChannelId } : {}),
 			error: null,
 		});
 	}
@@ -202,6 +203,10 @@ export class ChannelService {
 		actorTenantId: string,
 		userId: string,
 	) {
+		// chưa có api update bên vevo
+		dto.name = undefined;
+		dto.youtubeChannelId = undefined;
+
 		// Kiem tra channel hien tai nam trong cay tenant ma nguoi dung quan ly.
 		const channel = await this.findOne(id, actorTenantId);
 		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
@@ -334,7 +339,10 @@ export class ChannelService {
 			}
 
 			if (this.isChannelAlreadyExistsOnVevo(response)) {
-				await this.markSuccess(channelId);
+				await this.markSuccess(
+					channelId,
+					this.getYoutubeChannelIdFromVevoResponse(response),
+				);
 				return;
 			}
 
@@ -373,5 +381,13 @@ export class ChannelService {
 				message.includes('already exists')
 			);
 		});
+	}
+
+	private getYoutubeChannelIdFromVevoResponse(
+		response: VevoCreateChannelResponse,
+	) {
+		return response.errors?.find(
+			(error) => error.extensions?.youtube_channel_id,
+		)?.extensions?.youtube_channel_id;
 	}
 }
