@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from '../../../clickhouse/clickhouse.constants';
+import { REVENUE_USD_EXPRESSION } from './revenue-sql.util';
 
 @Injectable()
 export class CubeRebuildService {
@@ -36,7 +37,7 @@ export class CubeRebuildService {
               f.dsp_id,
               f.isrc,
               sum(f.quantity) AS total_quantity,
-              sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
+              ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
           LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -53,7 +54,7 @@ export class CubeRebuildService {
               f.territory_code,
               f.isrc,
               sum(f.quantity) AS total_quantity,
-              sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
+              ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
           LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -177,7 +178,7 @@ export class CubeRebuildService {
           f.dsp_id,
           f.isrc,
           sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
+          ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
@@ -192,7 +193,7 @@ export class CubeRebuildService {
           f.territory_code,
           f.isrc,
           sum(f.quantity) AS total_quantity,
-          sum(f.revenue_local / if(er.usd_to_local_rate > 0, er.usd_to_local_rate, 1)) AS total_revenue_usd
+          ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month

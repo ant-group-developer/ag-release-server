@@ -20,7 +20,7 @@ export class LabelAnalyticsController {
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a label' })
 	async overview(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityOverviewQueryDto,
 		@Req() req: Request,
 	) {

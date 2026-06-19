@@ -1,8 +1,22 @@
-import { Controller, Post, Get, Param, Body, NotFoundException } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  MessageEvent,
+  NotFoundException,
+  Param,
+  Post,
+  Sse,
+  UseInterceptors,
+} from '@nestjs/common';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { concat, from, interval, merge, Observable, of } from 'rxjs';
+import { map, switchMap, takeWhile } from 'rxjs/operators';
 import { ReportImportService } from '../services/report-import.service';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
 import {
+  DeleteImportedReleasesDto,
   PreValidateRequestDto,
   ReportImportStartResponseDto,
   ReportImportStatusResponseDto,
@@ -15,6 +29,10 @@ import {
   ReportImportStartResponse,
   ReportImportStatusResponse,
 } from '../interfaces/report-import.interface';
+import { ImportedReleaseDeleteService } from '../services/imported-release-delete.service';
+import { JobEventsGateway } from '../../etl/services/import-jobs/job-events.gateway';
+import { ImportJob } from '../../etl/interfaces';
+import { computeProgressDetail } from '../../etl/services/import-jobs/import-jobs.service';
 
 @ApiTags('Report Import')
 @Controller('report-import')
@@ -22,6 +40,8 @@ export class ReportImportController {
   constructor(
     private readonly reportImportService: ReportImportService,
     private readonly importJobsService: ImportJobsService,
+    private readonly importedReleaseDeleteService: ImportedReleaseDeleteService,
+    private readonly jobEvents: JobEventsGateway,
   ) {}
 
   @SystemAdminOnly()
@@ -39,6 +59,7 @@ export class ReportImportController {
       body.tenantId || user?.tenantId,
       user?.sub,
       body.allowedExtensions,
+      body.labelId,
     );
     return new ResponseSuccess({
       data: result,
@@ -79,4 +100,112 @@ export class ReportImportController {
       data: new ReportImportStatusResponseDto(job),
     });
   }
+
+  @SystemAdminOnly()
+  @Post('releases/delete')
+  @UseInterceptors(AnyFilesInterceptor())
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Delete imported releases from PostgreSQL',
+    description:
+      'Hard deletes releases where is_imported_from_report=true. At least one filter is required unless deleteAll=true.',
+  })
+  async deleteImportedReleases(
+    @User() user: any,
+    @Body() body: DeleteImportedReleasesDto,
+  ): Promise<ResponseSuccess<any>> {
+    const result =
+      await this.importedReleaseDeleteService.createDeleteJob(body, user?.sub);
+    return new ResponseSuccess({ data: result });
+  }
+
+  @SystemAdminOnly()
+  @Sse('releases/delete/:jobId/events')
+  @ApiOperation({
+    summary: 'Stream imported release delete progress via SSE',
+    description:
+      'Client listens here after POST /report-import/releases/delete. Auto-closes on completed or failed status.',
+  })
+  @ApiParam({ name: 'jobId', description: 'Delete job ID' })
+  streamDeleteEvents(@Param('jobId') jobId: string): Observable<MessageEvent> {
+    const updates$ = this.jobEvents.subscribe(jobId).pipe(
+      map((evt) => ({
+        type: evt.type,
+        data: evt.data,
+      } as MessageEvent)),
+    );
+
+    const heartbeat$ = interval(20000).pipe(
+      map(() => ({
+        type: 'heartbeat',
+        data: {},
+      } as MessageEvent)),
+    );
+
+    const initial$ = from(this.importJobsService.findById(jobId)).pipe(
+      switchMap((job) => {
+        if (!job) {
+          throw new NotFoundException(`Delete job not found: ${jobId}`);
+        }
+
+        const snapshotEvt: MessageEvent = {
+          type: 'snapshot',
+          data: formatReportImportJob(job),
+        };
+
+        if (
+          job.status === 'COMPLETED' ||
+          job.status === 'FAILED' ||
+          job.status === 'CANCELLED'
+        ) {
+          return of(snapshotEvt);
+        }
+
+        return concat(of(snapshotEvt), updates$);
+      }),
+    );
+
+    return merge(initial$, heartbeat$).pipe(
+      takeWhile((evt) => {
+        return (
+          evt.type !== 'completed' &&
+          evt.type !== 'failed' &&
+          evt.type !== 'cancelled'
+        );
+      }, true),
+    );
+  }
+}
+
+function formatReportImportJob(job: ImportJob) {
+  return {
+    id: job.id,
+    sourceType: job.sourceType,
+    status: job.status,
+    progress: {
+      current: job.status === 'COMPLETED' ? job.progressTotal : job.progressCurrent,
+      total: job.progressTotal,
+      label: job.status === 'COMPLETED' ? 'Done' : job.progressLabel,
+      detail: computeProgressDetail(job),
+    },
+    rows: {
+      total: job.totalRows,
+      processed: job.processedRows,
+      skipped: job.skippedRows,
+      errors: job.errorRows,
+    },
+    file: job.fileName
+      ? { name: job.fileName, sizeBytes: job.fileSizeBytes, hash: job.fileHash || null }
+      : null,
+    params: job.params,
+    result: job.result,
+    error: job.errorMessage || null,
+    batchId: job.batchId || null,
+    tenantId: job.tenantId || null,
+    createdBy: job.createdBy || null,
+    createdAt: job.createdAt,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    durationMs: job.durationMs,
+  };
 }

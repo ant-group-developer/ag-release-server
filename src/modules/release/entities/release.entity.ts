@@ -199,6 +199,38 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	isImportedFromReport: boolean;
 
 	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Nguồn import tạo release từ report',
+	})
+	importSourceType: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Parser/import code tạo release từ report',
+	})
+	importParserCode: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 500,
+		nullable: true,
+		comment: 'Tên file import tạo release từ report',
+	})
+	importFileName: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Job/batch import tạo release từ report',
+	})
+	importJobId: string | null;
+
+	@Column({
 		type: 'enum',
 		enum: ReleaseTimeMode,
 		default: ReleaseTimeMode.GLOBAL_MIDNIGHT,
@@ -350,6 +382,42 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	metadataSpotify: {
 		folderBucket: string | null;
 		folderServer: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			spotifyId?: string | null;
+			spotifyUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata deezer',
+	})
+	metadataDeezer: {
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			deezerId?: string | null;
+			deezerUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
 	} | null;
 
 	@OneToMany(() => ReleaseLog, (rL) => rL.release)

@@ -16,10 +16,10 @@ import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
 import { EntityManager, IsNull } from 'typeorm';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
-import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	CiJobType3,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';

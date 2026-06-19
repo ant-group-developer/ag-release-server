@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
@@ -23,8 +24,10 @@ import {
   RevenueReleaseItem,
   TrendViewLineChartItem,
   DspBarChartItem,
+  TerritoryBarChartItem,
   RevenueLineChartItem,
 } from '../interfaces/analytics.interface';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class TimelineAnalyticsService {
@@ -33,7 +36,48 @@ export class TimelineAnalyticsService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
+    @InjectEntityManager()
+    private readonly entityManager: EntityManager,
   ) { }
+
+  private revenueNumber(value?: string | null): number {
+    return Number(value ?? 0);
+  }
+
+  private revenueExact(value?: string | null): string {
+    return value?.toString() ?? '0';
+  }
+
+  private addRevenueExact(values: Array<string | null | undefined>): string {
+    const decimals = values.map((value) => this.revenueExact(value));
+    const scale = Math.max(0, ...decimals.map((value) => (value.split('.')[1] || '').length));
+    let sum = 0n;
+
+    for (const value of decimals) {
+      const negative = value.trim().startsWith('-');
+      const unsigned = negative ? value.trim().slice(1) : value.trim();
+      const [whole = '0', frac = ''] = unsigned.split('.');
+      const units = BigInt(`${whole || '0'}${frac.padEnd(scale, '0') || ''}`);
+      sum += negative ? -units : units;
+    }
+
+    const negative = sum < 0n;
+    const abs = negative ? -sum : sum;
+    if (scale === 0) return `${negative ? '-' : ''}${abs.toString()}`;
+
+    const padded = abs.toString().padStart(scale + 1, '0');
+    const whole = padded.slice(0, -scale) || '0';
+    const frac = padded.slice(-scale).replace(/0+$/, '');
+    return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
+  }
+
+  private subtractRevenueExact(left?: string | null, right?: string | null): string {
+    const rightValue = this.revenueExact(right);
+    return this.addRevenueExact([
+      left,
+      rightValue.startsWith('-') ? rightValue.slice(1) : `-${rightValue}`,
+    ]);
+  }
 
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
@@ -42,7 +86,7 @@ export class TimelineAnalyticsService {
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
-    query: TimelineQueryDto,
+    query: { labelId?: string; releaseId?: string },
   ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
@@ -153,7 +197,8 @@ export class TimelineAnalyticsService {
       period.series.push({
         dsp: row.dsp_name,
         salesViews: Number(row.sales_views),
-        revenueUsd: Number(row.revenue_usd),
+        revenueUsd: this.revenueNumber(row.revenue_usd),
+        revenueUsdExact: this.revenueExact(row.revenue_usd),
       });
     }
 
@@ -371,7 +416,8 @@ export class TimelineAnalyticsService {
       period.series.push({
         territory: row.ter_name,
         salesViews: Number(row.sales_views),
-        revenueUsd: Number(row.revenue_usd),
+        revenueUsd: this.revenueNumber(row.revenue_usd),
+        revenueUsdExact: this.revenueExact(row.revenue_usd),
       });
     }
 
@@ -458,7 +504,8 @@ export class TimelineAnalyticsService {
     }>(sql, params);
 
     return {
-      totalRevenueUsd: Number(rows[0]?.total_revenue_usd ?? 0),
+      totalRevenueUsd: this.revenueNumber(rows[0]?.total_revenue_usd),
+      totalRevenueUsdExact: this.revenueExact(rows[0]?.total_revenue_usd),
       totalQuantity: Number(rows[0]?.total_quantity ?? 0),
       totalTerritories: Number(rows[0]?.total_territories ?? 0),
     };
@@ -530,27 +577,30 @@ export class TimelineAnalyticsService {
     }>(timelineSql, params);
 
     // Group kết quả: mỗi period có tổng + series DSP breakdown
-    const periodMap = new Map<string, { revenueUsd: number; quantity: number; series: { dsp: string; revenueUsd: number; quantity: number }[] }>();
+    const periodMap = new Map<string, { revenueUsdExactParts: string[]; quantity: number; series: { dsp: string; revenueUsd: number; revenueUsdExact: string; quantity: number }[] }>();
     for (const row of rows) {
       let period = periodMap.get(row.period_str);
       if (!period) {
-        period = { revenueUsd: 0, quantity: 0, series: [] };
+        period = { revenueUsdExactParts: [], quantity: 0, series: [] };
         periodMap.set(row.period_str, period);
       }
-      const rev = Number(row.revenue_usd);
+      const revExact = this.revenueExact(row.revenue_usd);
+      const rev = this.revenueNumber(row.revenue_usd);
       const qty = Number(row.quantity);
-      period.revenueUsd += rev;
+      period.revenueUsdExactParts.push(revExact);
       period.quantity += qty;
       period.series.push({
         dsp: row.dsp_name,
         revenueUsd: rev,
+        revenueUsdExact: revExact,
         quantity: qty,
       });
     }
 
     const items = Array.from(periodMap.entries()).map(([key, val]) => ({
       period: key,
-      revenueUsd: val.revenueUsd,
+      revenueUsd: this.revenueNumber(this.addRevenueExact(val.revenueUsdExactParts)),
+      revenueUsdExact: this.addRevenueExact(val.revenueUsdExactParts),
       quantity: val.quantity,
       series: val.series,
     }));
@@ -622,7 +672,8 @@ export class TimelineAnalyticsService {
 
     const items: RevenueDspItem[] = rows.map((r) => ({
       dspName: r.dsp_name,
-      revenueUsd: Number(r.revenue_usd),
+      revenueUsd: this.revenueNumber(r.revenue_usd),
+      revenueUsdExact: this.revenueExact(r.revenue_usd),
       quantity: Number(r.quantity),
     }));
 
@@ -633,18 +684,20 @@ export class TimelineAnalyticsService {
       const totalSql = queries.getRevenueTopDspTotalQuery(joinSql, joinExpr, filterSql);
       const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
       const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-      const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+      const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
       const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-      const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+      const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
       const otherQty = totalQty - itemsQtySum;
-      const otherRev = totalRev - itemsRevSum;
+      const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+      const otherRev = this.revenueNumber(otherRevExact);
 
       if (otherQty > 0 || otherRev > 0) {
         items.push({
           dspName: 'Other',
           revenueUsd: otherRev > 0 ? otherRev : 0,
+          revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
           quantity: otherQty > 0 ? otherQty : 0,
         });
       }
@@ -730,7 +783,8 @@ export class TimelineAnalyticsService {
           artistName: meta?.artistName ?? 'Unknown Artist',
           picture: meta?.artistPicture ?? null,
           trackCount: Number(r.track_count),
-          revenueUsd: Number(r.revenue_usd),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
         });
       });
@@ -742,13 +796,14 @@ export class TimelineAnalyticsService {
         const totalSql = queries.getRevenueTopArtistTotalQuery(filterSql, !!query.keyword);
         const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
         const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
         const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
         const otherQty = totalQty - itemsQtySum;
-        const otherRev = totalRev - itemsRevSum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
           items.push({
@@ -758,6 +813,7 @@ export class TimelineAnalyticsService {
             picture: null,
             trackCount: 0,
             revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
           });
         }
@@ -887,7 +943,8 @@ export class TimelineAnalyticsService {
           artistName: artistNameMap.get(r.isrc) ?? fallback?.artistName ?? '',
           releaseId: meta?.releaseId ?? null,
           releaseTitle: meta?.releaseTitle ?? null,
-          revenueUsd: Number(r.revenue_usd),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
         });
       });
@@ -898,13 +955,14 @@ export class TimelineAnalyticsService {
         const totalSql = queries.getRevenueTopTrackTotalQuery(joinSql, filterSql);
         const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
         const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
         const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
         const otherQty = totalQty - itemsQtySum;
-        const otherRev = totalRev - itemsRevSum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
           items.push({
@@ -916,6 +974,7 @@ export class TimelineAnalyticsService {
             releaseId: null,
             releaseTitle: null,
             revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
           });
         }
@@ -998,7 +1057,8 @@ export class TimelineAnalyticsService {
           picture: meta?.picture ?? null,
           releaseCount: Number(r.release_count),
           trackCount: Number(r.track_count),
-          revenueUsd: Number(r.revenue_usd),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
         });
       });
@@ -1009,13 +1069,14 @@ export class TimelineAnalyticsService {
         const totalSql = queries.getRevenueTopLabelTotalQuery(joinSql, filterSql);
         const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
         const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
         const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
         const otherQty = totalQty - itemsQtySum;
-        const otherRev = totalRev - itemsRevSum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
           items.push({
@@ -1024,6 +1085,7 @@ export class TimelineAnalyticsService {
             labelName: 'Other',
             picture: null,
             revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
           });
         }
@@ -1094,7 +1156,8 @@ export class TimelineAnalyticsService {
           tenantId: r.tenantId,
           tenantName: meta?.title ?? 'Unknown Tenant',
           logo: meta?.logo ?? null,
-          revenueUsd: Number(r.revenue_usd),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
         });
       });
@@ -1105,13 +1168,14 @@ export class TimelineAnalyticsService {
         const totalSql = queries.getRevenueTopTenantTotalQuery(joinSql, filterSql);
         const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
         const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
         const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
         const otherQty = totalQty - itemsQtySum;
-        const otherRev = totalRev - itemsRevSum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
           items.push({
@@ -1120,6 +1184,7 @@ export class TimelineAnalyticsService {
             tenantName: 'Other',
             logo: null,
             revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
           });
         }
@@ -1248,7 +1313,8 @@ export class TimelineAnalyticsService {
           labelId: meta?.labelId ?? null,
           labelName: meta?.labelName ?? null,
           trackCount: meta?.trackCount ?? 0,
-          revenueUsd: Number(r.revenue_usd),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
           release: meta ? { coverArtThumbnails: meta.coverArtThumbnails } : null,
         });
@@ -1260,13 +1326,14 @@ export class TimelineAnalyticsService {
         const totalSql = queries.getRevenueTopReleaseTotalQuery(filterSql);
         const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
         const totalQty = Number(totalResult[0]?.total_qty ?? 0);
-        const totalRev = Number(totalResult[0]?.total_rev ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
 
         const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
-        const itemsRevSum = items.reduce((acc, it) => acc + it.revenueUsd, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
 
         const otherQty = totalQty - itemsQtySum;
-        const otherRev = totalRev - itemsRevSum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
           items.push({
@@ -1278,6 +1345,7 @@ export class TimelineAnalyticsService {
             labelName: null,
             trackCount: 0,
             revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
             release: null,
           });
@@ -1401,6 +1469,40 @@ export class TimelineAnalyticsService {
   // Vì dữ liệu sales đã aggregate theo tháng, nên lấy
   // từ đầu tháng fromDate đến cuối tháng toDate.
   // ═══════════════════════════════════════════════════════
+  async getTrendViewTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const totalSql = queries.getTrendViewTerritoryBarChartTotalQuery(joinSql, filterSql);
+    const totalResult = await this.clickHouseService.query<{ total_views: string }>(totalSql, params);
+    const grandTotal = Number(totalResult[0]?.total_views ?? 0);
+
+    const sql = queries.getTrendViewTerritoryBarChartQuery(joinSql, filterSql);
+    const rows = await this.clickHouseService.query<{
+      territory: string;
+      total_views: string;
+    }>(sql, params);
+
+    const items: TerritoryBarChartItem[] = rows.map((r) => ({
+      territory: r.territory,
+      totalViews: Number(r.total_views),
+    }));
+
+    const top5Total = items.reduce((acc, it) => acc + (it.totalViews ?? 0), 0);
+    const otherViews = grandTotal - top5Total;
+    if (otherViews > 0) {
+      items.push({ territory: 'Other', totalViews: otherViews });
+    }
+
+    return this.mapTerritoryCodesToCountryNames(items);
+  }
+
   async getRevenueLineChart(
     tenantId: string,
     query: ChartQueryDto,
@@ -1441,7 +1543,8 @@ export class TimelineAnalyticsService {
 
     return rows.map((r) => ({
       period: r.period,
-      revenueUsd: Number(r.revenue_usd),
+      revenueUsd: this.revenueNumber(r.revenue_usd),
+      revenueUsdExact: this.revenueExact(r.revenue_usd),
       quantity: Number(r.quantity),
     }));
   }
@@ -1489,7 +1592,7 @@ export class TimelineAnalyticsService {
     // Step 1: Get total revenue across all DSPs
     const totalSql = queries.getRevenueDspBarChartTotalQuery(joinSql, filterSql);
     const totalResult = await this.clickHouseService.query<{ total_rev: string }>(totalSql, params);
-    const grandTotal = Number(totalResult[0]?.total_rev ?? 0);
+    const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
 
     // Step 2: Get top 5 DSPs by revenue
     const sql = queries.getRevenueDspBarChartQuery(joinSql, joinExpr, filterSql, resolvedDspName);
@@ -1501,16 +1604,96 @@ export class TimelineAnalyticsService {
     const items: DspBarChartItem[] = rows.map((r) => ({
       dspName: r.dsp_name,
       totalViews: undefined, // ensure matching expected type
-      revenueUsd: Number(r.revenue_usd),
+      revenueUsd: this.revenueNumber(r.revenue_usd),
+      revenueUsdExact: this.revenueExact(r.revenue_usd),
     }));
 
     // Step 3: Calculate Other
-    const top5Total = items.reduce((acc, it) => acc + (it.revenueUsd ?? 0), 0);
-    const otherRev = grandTotal - top5Total;
+    const top5TotalExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
+    const otherRevExact = this.subtractRevenueExact(grandTotalExact, top5TotalExact);
+    const otherRev = this.revenueNumber(otherRevExact);
     if (otherRev > 0) {
-      items.push({ dspName: 'Other', revenueUsd: otherRev });
+      items.push({ dspName: 'Other', revenueUsd: otherRev, revenueUsdExact: otherRevExact });
     }
 
     return items;
+  }
+
+  async getRevenueTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const totalSql = queries.getRevenueTerritoryBarChartTotalQuery(joinSql, filterSql);
+    const totalResult = await this.clickHouseService.query<{ total_rev: string }>(totalSql, params);
+    const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+
+    const sql = queries.getRevenueTerritoryBarChartQuery(joinSql, filterSql);
+    const rows = await this.clickHouseService.query<{
+      territory: string;
+      revenue_usd: string;
+    }>(sql, params);
+
+    const items: TerritoryBarChartItem[] = rows.map((r) => ({
+      territory: r.territory,
+      revenueUsd: this.revenueNumber(r.revenue_usd),
+      revenueUsdExact: this.revenueExact(r.revenue_usd),
+    }));
+
+    const top5TotalExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
+    const otherRevExact = this.subtractRevenueExact(grandTotalExact, top5TotalExact);
+    const otherRev = this.revenueNumber(otherRevExact);
+    if (otherRev > 0) {
+      items.push({ territory: 'Other', revenueUsd: otherRev, revenueUsdExact: otherRevExact });
+    }
+
+    return this.mapTerritoryCodesToCountryNames(items);
+  }
+
+  private async mapTerritoryCodesToCountryNames(
+    items: TerritoryBarChartItem[],
+  ): Promise<TerritoryBarChartItem[]> {
+    const iso2Codes = Array.from(
+      new Set(
+        items
+          .map((item) => item.territory?.trim().toUpperCase())
+          .filter((territory): territory is string =>
+            !!territory && territory !== 'OTHER',
+          ),
+      ),
+    );
+
+    if (!iso2Codes.length) return items;
+
+    const countries = (await this.entityManager.query(
+      `
+        SELECT UPPER(iso2) AS iso2, name
+        FROM countries
+        WHERE UPPER(iso2) = ANY($1)
+      `,
+      [iso2Codes],
+    )) as Array<{
+      iso2: string;
+      name: string;
+    }>;
+    const countryNameByIso2 = new Map(
+      countries.map((country) => [country.iso2, country.name]),
+    );
+
+    return items.map((item) => {
+      const iso2 = item.territory?.trim().toUpperCase();
+      return {
+        ...item,
+        territory:
+          iso2 && iso2 !== 'OTHER'
+            ? countryNameByIso2.get(iso2) ?? item.territory
+            : item.territory,
+      };
+    });
   }
 }

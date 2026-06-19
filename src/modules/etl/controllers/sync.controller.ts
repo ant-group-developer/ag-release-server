@@ -278,7 +278,7 @@ export class SyncController {
         const period = periods[i];
         await this.importJobsService.updateProgress(
           jobId,
-          { progressCurrent: i, progressLabel: `Syncing ${period} (${i + 1}/${periods.length})...` },
+          { progressCurrent: i, progressLabel: `Syncing ${period}...` },
           true,
         );
         try {

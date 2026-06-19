@@ -59,10 +59,10 @@ export class AwaParser extends BaseParser {
    * If empty/missing → XX (unknown).
    */
   private mapAwaRegion(code: string): string {
-    if (!code || code.trim() === '' || code === '0') return 'XX';
+    if (!code || code.trim() === '' || code === '0') return 'N/A';
     // Any numeric value = Japanese prefecture → JP
     const num = parseInt(code, 10);
     if (!isNaN(num) && num >= 1) return 'JP';
-    return 'XX';
+    return 'N/A';
   }
 }

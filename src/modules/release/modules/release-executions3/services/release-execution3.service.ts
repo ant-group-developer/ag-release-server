@@ -1,23 +1,24 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/common.response.dto';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { LogsService } from 'src/modules/log/services/logs.services';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
-import { Brackets, EntityManager, In, Repository } from 'typeorm';
-import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
+import { ReleaseService } from 'src/modules/release/services/release.service';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
-	CiDistributionJob3,
-	CiJobStatus3,
-} from '../entites/ci-distribution-job3.entity';
+	QueryGetListReleaseExecution3Dto,
+	ReleaseExecutionPageDto,
+} from '../dtos/release-execution3.dto';
+import { CiDistributionJob3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	CiJobStatus3,
 	ExecutionType,
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
@@ -25,6 +26,7 @@ import {
 import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
 import { ReleaseExecution3Builder } from './release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './release-execution3.engine';
+import { ReleaseExecution3QueryService } from './release-execution3.query.service';
 
 @Injectable()
 export class ReleaseExecution3Service {
@@ -43,14 +45,16 @@ export class ReleaseExecution3Service {
 		private readonly dspRoutingService: DspRoutingConfigsService,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
+
+		private readonly queueService: ReleaseExecution3Queue,
+
 		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
-
-		private readonly logService: LogsService,
-		private readonly queueService: ReleaseExecution3Queue,
+		private readonly queryService: ReleaseExecution3QueryService,
 	) {}
 
-	// đã handle
 	// đẩy vào queue, consumer tự quét và xử lí
 	async newReleaseExecution(body: {
 		release: Release;
@@ -60,35 +64,10 @@ export class ReleaseExecution3Service {
 		return await this.queueService.queueExecution(body);
 	}
 
-	// lấy ra các bản ghi đang ở WAITING_PARTNER đã tới giờ xử lí, worker sẽ update trạng thái
-	// @Cron('* * * * * *') // 1s
-	// @Cron('*/10 * * * * *') // 10s
-	// @Cron('*/3 * * * *') // 3 phut
-	@Cron('* * * * *') // mỗi 1 phút
 	async resumeWaitingSteps(): Promise<void> {
 		const now = new Date();
 
-		const waitingSteps = await this.stepRepo
-			.createQueryBuilder('step')
-			.innerJoin(
-				ReleaseExecution3,
-				'execution',
-				'execution.id = step.releaseExecutionId',
-			)
-			.where('step.status = :stepStatus', {
-				stepStatus: ReleaseExecutionStepStatus.WAITING_PARTNER,
-			})
-			.andWhere("step.metadata->>'scheduledAt' IS NOT NULL")
-			.andWhere("(step.metadata->>'scheduledAt')::timestamptz <= :now", {
-				now,
-			})
-			.andWhere('execution.status IN (:...executionStatuses)', {
-				executionStatuses: [
-					ReleaseExecutionStatus.PROCESSING,
-					ReleaseExecutionStatus.WAITING_PARTNER,
-				],
-			})
-			.getMany();
+		const waitingSteps = await this.queryService.getListWaitingSteps(now);
 
 		// Group theo executionId, chỉ resume 1 lần mỗi execution
 		const executionIds = [
@@ -106,7 +85,7 @@ export class ReleaseExecution3Service {
 
 	// main
 	async startProcessing(id: string): Promise<void> {
-		const execution = await this.findOne(id);
+		const execution = await this.queryService.findOne(id);
 
 		if (execution.status !== ReleaseExecutionStatus.NEW) {
 			throw new Error('Only execution with NEW status can be started');
@@ -132,7 +111,7 @@ export class ReleaseExecution3Service {
 	}
 
 	async runPipeline(id: string): Promise<void> {
-		const execution = await this.findOne(id);
+		const execution = await this.queryService.findOne(id);
 		const steps = execution.steps || [];
 
 		try {
@@ -443,181 +422,78 @@ export class ReleaseExecution3Service {
 
 	// query
 	async getList(query: QueryGetListReleaseExecution3Dto) {
-		const page = query.page || 1;
-		const pageSize = query.pageSize || 10;
+		query.releaseIds = await this.resolveReleaseExecutionReleaseIds(query);
 
-		const qb = this.executionRepo
-			.createQueryBuilder('execution')
-			.orderBy('execution.createdAt', 'DESC')
-			.skip((page - 1) * pageSize)
-			.take(pageSize);
+		const [items, totalItems] = await this.getListItems(query);
+		const statusCounts = await this.queryService.getStatusCounts(query);
 
-		if (query.latestOnly) {
-			const latestExecutionSubQuery = this.executionRepo
-				.createQueryBuilder('latestExecution')
-				.select('latestExecution.id')
-				.distinctOn(['latestExecution.releaseId'])
-				.orderBy('latestExecution.releaseId', 'ASC')
-				.addOrderBy('latestExecution.createdAt', 'DESC')
-				.addOrderBy('latestExecution.id', 'DESC')
-				.getQuery();
+		return new ReleaseExecutionPageDto({
+			items,
+			metadata: {
+				...query,
+				totalItems,
+				statusCounts,
+			},
+		});
+	}
 
-			qb.andWhere(`execution.id IN (${latestExecutionSubQuery})`);
+	private async getListItems(
+		query: QueryGetListReleaseExecution3Dto,
+	): Promise<[ReleaseExecution3[], number]> {
+		const qb = this.queryService.createQbGetList(query);
+
+		orderAndPaging2({ qb, filter: query });
+
+		return qb.getManyAndCount();
+	}
+
+	// gọi sang release service để lấy ra list release id
+	private async resolveReleaseExecutionReleaseIds(
+		query: QueryGetListReleaseExecution3Dto,
+	): Promise<string[]> {
+		const explicitReleaseIds = [...(query.releaseIds ?? [])].filter(
+			Boolean,
+		);
+		const uniqueExplicitReleaseIds = [...new Set(explicitReleaseIds)];
+
+		if (!query.queryListReleases) {
+			return uniqueExplicitReleaseIds;
 		}
 
-		if (query.releaseId) {
-			qb.andWhere('execution.releaseId = :releaseId', {
-				releaseId: query.releaseId,
-			});
-		}
-
-		if (query.status) {
-			qb.andWhere('execution.status = :status', {
-				status: query.status,
-			});
-		}
-
-		if (query.startCreatedAt) {
-			qb.andWhere('execution.createdAt >= :startCreatedAt', {
-				startCreatedAt: query.startCreatedAt,
-			});
-		}
-
-		if (query.endCreatedAt) {
-			qb.andWhere('execution.createdAt <= :endCreatedAt', {
-				endCreatedAt: query.endCreatedAt,
-			});
-		}
-
-		const keywords = [...(query.keyword ?? [])].filter(
-			(keyword) => !!keyword?.trim(),
+		const releaseQuery = Object.assign(
+			new QueryGetListReleaseDto(),
+			query.queryListReleases,
+			{
+				page: 1,
+				pageSize: 100000,
+			},
 		);
 
-		if (keywords.length) {
-			qb.andWhere(
-				new Brackets((keywordQb) => {
-					keywords.forEach((keyword, index) => {
-						const paramKey = `keyword${index}`;
-						const condition = `(
-							execution.release_upc ILIKE :${paramKey}
-							OR execution.release_title ILIKE :${paramKey}
-						)`;
-						const params = { [paramKey]: `%${keyword}%` };
+		const releases = await this.releaseService.getList(releaseQuery);
+		const queriedReleaseIds = [
+			...new Set(
+				releases.items
+					.map((release) => (release as { id?: string }).id)
+					.filter((id): id is string => !!id),
+			),
+		];
 
-						if (index === 0) {
-							keywordQb.where(condition, params);
-						} else {
-							keywordQb.orWhere(condition, params);
-						}
-					});
-				}),
-			);
+		if (!uniqueExplicitReleaseIds.length) {
+			return queriedReleaseIds ?? [];
 		}
 
-		const [items, total] = await qb.getManyAndCount();
-
-		return new PageDto({
-			metadata: { totalItems: total, page, pageSize },
-			items,
-		});
+		const queriedReleaseIdSet = new Set(queriedReleaseIds);
+		return uniqueExplicitReleaseIds.filter((releaseId) =>
+			queriedReleaseIdSet.has(releaseId),
+		);
 	}
 
-	async findOne(id: string) {
-		const entity = await this.executionRepo.findOne({
-			where: { id },
-			relations: {
-				logs: true,
-			},
-		});
-
-		if (!entity) {
-			throw new NotFoundException('Release submit not found');
-		}
-
-		const steps = await this.stepRepo.find({
-			where: {
-				releaseExecutionId: id,
-			},
-			relations: {
-				logs: true,
-				// parentStep: true,
-			},
-			order: {
-				order: 'ASC',
-			},
-		});
-
-		entity.steps = this.buildStepTreeList(steps);
-
-		return entity;
-	}
-
-	private buildStepTreeList(steps: ReleaseExecutionStep3[]) {
-		const map = new Map<string, ReleaseExecutionStep3>();
-		const roots: ReleaseExecutionStep3[] = [];
-
-		for (const step of steps) {
-			step.childSteps = [];
-			map.set(step.id, step);
-		}
-
-		for (const step of steps) {
-			if (!step.parentStepId) {
-				roots.push(step);
-				continue;
-			}
-
-			const parent = map.get(step.parentStepId);
-
-			if (!parent) {
-				roots.push(step);
-				continue;
-			}
-
-			parent.childSteps?.push(step);
-		}
-
-		return roots;
-	}
-
-	async cancelPendingExecutions({
-		releaseId,
-		excludeExecutionId,
-	}: {
+	async cancelPendingExecutions(input: {
 		releaseId: string;
 		excludeExecutionId?: string;
 	}) {
-		const pendingStatuses = [
-			ReleaseExecutionStatus.NEW,
-			ReleaseExecutionStatus.PROCESSING,
-			ReleaseExecutionStatus.WAITING_PARTNER,
-			ReleaseExecutionStatus.WAITING_ACTION,
-		];
-
-		const qb = this.executionRepo
-			.createQueryBuilder('execution')
-			.select('execution.id', 'id')
-			.where('execution.releaseId = :releaseId', { releaseId })
-			.andWhere('execution.status IN (:...statuses)', {
-				statuses: pendingStatuses,
-			});
-
-		if (excludeExecutionId) {
-			const excludeExecution = await this.executionRepo.findOne({
-				where: { id: excludeExecutionId },
-				select: ['createdAt'],
-			});
-
-			if (excludeExecution) {
-				qb.andWhere('execution.id != :excludeExecutionId', {
-					excludeExecutionId,
-				}).andWhere('execution.createdAt < :createdAt', {
-					createdAt: excludeExecution.createdAt,
-				});
-			}
-		}
-
-		const pendingExecutions = await qb.getRawMany<{ id: string }>();
+		const pendingExecutions =
+			await this.queryService.getPendingExecutions(input);
 
 		if (pendingExecutions.length === 0) return;
 
@@ -787,5 +663,9 @@ export class ReleaseExecution3Service {
 
 		// enqueue pipeline để xử lý async
 		await this.queueService.queueRunPipeline(step.releaseExecutionId);
+	}
+
+	async findOne(id: string) {
+		return this.queryService.findOne(id);
 	}
 }

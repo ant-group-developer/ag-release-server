@@ -82,8 +82,21 @@ export class ImportJobsService implements OnModuleInit {
   async markProcessing(id: string): Promise<void> {
     const job = await this.requireSnapshot(id);
     job.status = ImportJobStatus.PROCESSING;
-    job.startedAt = nowDt64();
+    job.startedAt = job.startedAt ?? nowDt64();
+    job.finishedAt = null;
+    job.errorMessage = '';
     await this.persist(job);
+  }
+
+  async markQueued(id: string): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.status = ImportJobStatus.QUEUED;
+    job.progressLabel = 'Queued';
+    job.finishedAt = null;
+    job.durationMs = 0;
+    job.errorMessage = '';
+    await this.persist(job);
+    return job;
   }
 
   /**
@@ -160,6 +173,9 @@ export class ImportJobsService implements OnModuleInit {
     job.finishedAt = nowDt64();
     job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
     job.progressLabel = 'Failed';
+    if (job.totalRows === 0 && job.processedRows > 0) {
+      job.totalRows = job.processedRows;
+    }
     await this.persist(job);
     this.cleanup(id);
     this.logger.error(`Job ${id} FAILED: ${job.errorMessage}`);
@@ -170,6 +186,16 @@ export class ImportJobsService implements OnModuleInit {
     if (!job) return;
     job.batchId = batchId;
     await this.persist(job);
+  }
+
+  async patchParams(id: string, patch: Record<string, unknown>): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.params = {
+      ...(job.params ?? {}),
+      ...patch,
+    };
+    await this.persist(job);
+    return job;
   }
 
   async backfillRowCountsFromResults(): Promise<{ updatedCount: number }> {
@@ -346,6 +372,21 @@ export class ImportJobsService implements OnModuleInit {
     return { items: rows.map(rowToDomain), totalItems };
   }
 
+  async findRecoverableReportUploadJobs(): Promise<ImportJob[]> {
+    const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status IN ({queued:String}, {processing:String})
+      ORDER BY created_at ASC
+    `;
+    const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
+      sourceType: ImportJobSourceType.REPORT_UPLOAD,
+      queued: ImportJobStatus.QUEUED,
+      processing: ImportJobStatus.PROCESSING,
+    });
+    return rows.map(rowToDomain);
+  }
+
   @Cron('*/1 * * * *') // every 1 minute
   async checkPendingTimeout(): Promise<void> {
     const sql = `
@@ -389,11 +430,15 @@ export class ImportJobsService implements OnModuleInit {
     const sql = `
       SELECT id, started_at FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE status = {status:String}
+        AND source_type != {reportUpload:String}
     `;
     const stale = await this.clickHouseService.query<{
       id: string;
       started_at: string | null;
-    }>(sql, { status: ImportJobStatus.PROCESSING });
+    }>(sql, {
+      status: ImportJobStatus.PROCESSING,
+      reportUpload: ImportJobSourceType.REPORT_UPLOAD,
+    });
 
     if (!stale.length) return;
     this.logger.warn(`Crash recovery: marking ${stale.length} stale PROCESSING job(s) as FAILED`);
@@ -605,8 +650,13 @@ export function computeProgressDetail(job: ImportJob) {
       }
     }
   } else {
-    // PENDING or PROCESSING
-    if (progressLabel.startsWith('Downloading:')) {
+    // PENDING, QUEUED or PROCESSING
+    if (status === ImportJobStatus.QUEUED) {
+      stage = 'queued';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'pending' });
+      }
+    } else if (progressLabel.startsWith('Downloading:')) {
       stage = 'downloading';
       const activeIdx = progressCurrent;
       for (let idx = 0; idx < files.length; idx++) {

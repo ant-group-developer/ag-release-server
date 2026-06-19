@@ -12,13 +12,13 @@ interface FrankfurterRate {
   date: string;
   base: string;
   quote: string;
-  rate: number;
+  rate: number | string;
 }
 
 export interface ExchangeRateRow {
   rate_month: string;
   currency: string;
-  usd_to_local_rate: number;
+  usd_to_local_rate: string;
   rate_date: string;
   is_provisional: number;
 }
@@ -67,7 +67,7 @@ export class ExchangeRateService {
     const rows: ExchangeRateRow[] = rates.map((r) => ({
       rate_month: yearMonth,
       currency: r.quote,
-      usd_to_local_rate: r.rate,
+      usd_to_local_rate: String(r.rate),
       rate_date: r.date,
       is_provisional: 0,
     }));
@@ -77,7 +77,7 @@ export class ExchangeRateService {
       rows.push({
         rate_month: yearMonth,
         currency: 'USD',
-        usd_to_local_rate: 1.0,
+        usd_to_local_rate: '1',
         rate_date: eomDate,
         is_provisional: 0,
       });

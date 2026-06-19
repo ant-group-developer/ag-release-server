@@ -9,10 +9,7 @@ import {
 	IsUUID,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import {
-	CiJobStatus3,
-	CiJobType3,
-} from '../entites/ci-distribution-job3.entity';
+import { CiJobStatus3, CiJobType3 } from '../enums/release-execution3.enum';
 
 export enum FieldOrderCiJob3 {
 	job_createdAt = 'job.createdAt',
@@ -88,7 +85,7 @@ export class GroupedCiJob3Dto {
 }
 
 export class UpdateCiJob3Dto {
-	// nếu cần thì thêm 
+	// nếu cần thì thêm
 	@ApiProperty({
 		description: 'Chỉ cho phép skipped',
 		example: 'skipped',
@@ -135,8 +132,8 @@ export class QueryGetListCiJob3Dto extends BaseQueryDto2 {
 	@Transform(({ value }) =>
 		value
 			? String(value)
-				.split(',')
-				.map((v) => v.trim())
+					.split(',')
+					.map((v) => v.trim())
 			: [],
 	)
 	@IsArray()

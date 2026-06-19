@@ -4,7 +4,7 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import path from 'path';
-import { DEFAULT_WAIT_MINUTES } from 'src/common/constants/common.default.constants';
+
 import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
@@ -31,6 +31,9 @@ type StepTaskContext = {
 	step: ReleaseExecutionStep3;
 	releaseExecution: ReleaseExecution3;
 };
+
+export const DEFAULT_WAIT_MINUTES = 0.1; // 0.1 phút // dev
+export const MINUTES_PER_DAY = 0.1; // 0.1 phút // dev
 
 @Injectable()
 export class ReleaseExecution3WorkerTest {
@@ -628,7 +631,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		return ReleaseExecutionStepStatus.DONE;
+		// return ReleaseExecutionStepStatus.DONE;
 		try {
 			const parentStep = step.parentStepId
 				? await this.manager.findOne(ReleaseExecutionStep3, {
@@ -815,7 +818,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
-		return ReleaseExecutionStepStatus.DONE;
+		// return ReleaseExecutionStepStatus.DONE;
 		try {
 			if (!step.parentStepId) {
 				throw new Error(
@@ -852,11 +855,11 @@ export class ReleaseExecution3WorkerTest {
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
 			// dev
-			await this.sftpConnectService.uploadFolder({
-				sftp: config.sftp,
-				localDir: outputDir,
-				remoteDir: config.sftp.path ?? '/',
-			});
+			// await this.sftpConnectService.uploadFolder({
+			// 	sftp: config.sftp,
+			// 	localDir: outputDir,
+			// 	remoteDir: config.sftp.path ?? '/',
+			// });
 
 			await removeFolder(outputDir);
 

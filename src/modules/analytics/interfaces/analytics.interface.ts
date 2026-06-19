@@ -19,6 +19,7 @@ export interface DspTimelineSeriesItem {
   salesViews?: number;
   trendViews?: number;
   revenueUsd?: number;
+  revenueUsdExact?: string;
 }
 
 export interface DspTimelinePeriod {
@@ -36,6 +37,7 @@ export interface TerTimelineSeriesItem {
   salesViews?: number;
   trendViews?: number;
   revenueUsd?: number;
+  revenueUsdExact?: string;
 }
 
 export interface TerTimelinePeriod {
@@ -55,6 +57,7 @@ export interface TerTimelineResponse {
 export interface RevenueOverviewResponse {
   /** Tổng doanh thu quy đổi USD trong khoảng thời gian */
   totalRevenueUsd: number;
+  totalRevenueUsdExact?: string;
   /** Tổng lượt nghe */
   totalQuantity: number;
   /** Tổng số vùng lãnh thổ (quốc gia) phát sinh doanh thu */
@@ -64,6 +67,7 @@ export interface RevenueOverviewResponse {
 export interface RevenueDspItem {
   dspName: string;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -72,12 +76,14 @@ export type RevenueTopDspResponse = RevenueDspItem[];
 export interface RevenueTimelineDspItem {
   dsp: string;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
 export interface RevenueTimelinePeriod {
   period: string;  // 'YYYY-MM'
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
   series: RevenueTimelineDspItem[];
 }
@@ -182,6 +188,7 @@ export interface RevenueArtistItem {
   picture: string | null;
   trackCount: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -196,6 +203,7 @@ export interface RevenueTrackItem {
   releaseId: string | null;
   releaseTitle: string | null;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -205,6 +213,7 @@ export interface EntityOverviewResponse {
   totalTrendViews: number;   // tổng lượt stream trend trong kỳ
   totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
   totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
+  totalRevenueUsdExact?: string;
 }
 
 export interface RevenueLabelItem {
@@ -215,6 +224,7 @@ export interface RevenueLabelItem {
   releaseCount?: number;
   trackCount?: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -224,6 +234,7 @@ export interface RevenueTenantItem {
   tenantName: string;
   logo: string | null;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -259,6 +270,7 @@ export interface RevenueReleaseItem {
   labelName: string | null;
   trackCount: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
   release: {
     coverArtThumbnails: ICoverArtThumbnails;
@@ -280,11 +292,20 @@ export interface DspBarChartItem {
   dspName: string;
   totalViews?: number;
   revenueUsd?: number;
+  revenueUsdExact?: string;
 }
 
 /** Một điểm trên line-chart revenue theo tháng */
+export interface TerritoryBarChartItem {
+  territory: string;
+  totalViews?: number;
+  revenueUsd?: number;
+  revenueUsdExact?: string;
+}
+
 export interface RevenueLineChartItem {
   period: string; // 'YYYY-MM'
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }

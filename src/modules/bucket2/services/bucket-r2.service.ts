@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { Readable } from 'stream';
 import { BucketException } from '../constants/bucket.response';
@@ -85,6 +86,86 @@ export class BucketR2Service {
 		return getSignedUrl(this.client, command, {
 			expiresIn: 60 * 60,
 		});
+	}
+
+	async uploadFileFromPath(data: {
+		key: string;
+		filePath: string;
+		contentType: string;
+		isPublic?: boolean;
+	}): Promise<{ bucketName: string; key: string }> {
+		const { key, filePath, contentType, isPublic = false } = data;
+		const bucketName = this.getBucketName({ isPublic });
+		const stat = await fs.promises.stat(filePath);
+
+		await this.sendPutObjectWithRetry({
+			bucketName,
+			key,
+			filePath,
+			contentType,
+			contentLength: stat.size,
+		});
+
+		return { bucketName, key };
+	}
+
+	private async sendPutObjectWithRetry(data: {
+		bucketName: string;
+		key: string;
+		filePath: string;
+		contentType: string;
+		contentLength: number;
+	}): Promise<void> {
+		const maxAttempts = 3;
+		let lastError: unknown;
+
+		for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+			try {
+				await this.client.send(
+					new PutObjectCommand({
+						Bucket: data.bucketName,
+						Key: data.key,
+						Body: fs.createReadStream(data.filePath),
+						ContentType: data.contentType,
+						ContentLength: data.contentLength,
+					}),
+				);
+				return;
+			} catch (error) {
+				lastError = error;
+				if (attempt >= maxAttempts || !this.isRetryableUploadError(error)) {
+					throw error;
+				}
+				await this.sleep(500 * attempt);
+			}
+		}
+
+		throw lastError;
+	}
+
+	private isRetryableUploadError(error: unknown): boolean {
+		const err = error as {
+			code?: string;
+			name?: string;
+			message?: string;
+			$metadata?: { httpStatusCode?: number };
+		};
+		const statusCode = err.$metadata?.httpStatusCode;
+		const code = err.code || err.name;
+
+		return (
+			code === 'ECONNRESET' ||
+			code === 'ETIMEDOUT' ||
+			code === 'EPIPE' ||
+			code === 'TimeoutError' ||
+			code === 'RequestTimeout' ||
+			code === 'SlowDown' ||
+			(typeof statusCode === 'number' && statusCode >= 500)
+		);
+	}
+
+	private sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	async getSignedUrlRead(data: IGetSignedUrlRead): Promise<string> {
