@@ -31,6 +31,7 @@ interface TrackSyncRow {
 	isrc: string;
 	tenant_id: string;
 	release_id: string;
+	release_upc: string;
 	label_id: string;
 	artist_ids: string[];
 	is_deleted: number;
@@ -110,10 +111,12 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			// Dem so ban ghi hien co tren ClickHouse
 			const countResult = await this.clickHouseService.query<{
 				c: string;
+				with_release_upc: string;
 			}>(
-				`SELECT count() AS c FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
+				`SELECT count() AS c, countIf(release_upc != '') AS with_release_upc FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
 			);
 			const chCount = Number(countResult[0]?.c ?? 0);
+			const chWithReleaseUpc = Number(countResult[0]?.with_release_upc ?? 0);
 
 			// Dem so ISRC hop le tren Postgres
 			const pgCountResult = await this.entityManager.query(
@@ -125,11 +128,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
 
 			this.logger.log(
-				`Initial sync check: ClickHouse=${chCount} rows, Postgres=${pgCount} ISRCs`,
+				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, Postgres=${pgCount} ISRCs`,
 			);
 
 			// Neu ClickHouse trong hoac thieu du lieu dang ke (>10% chenh lech)
-			if (chCount === 0 || chCount < pgCount * 0.9) {
+			if (chCount === 0 || chCount < pgCount * 0.9 || chWithReleaseUpc < pgCount * 0.9) {
 				this.logger.log(
 					`Starting full initial sync from Postgres to ClickHouse (${pgCount} ISRCs)...`,
 				);
@@ -157,6 +160,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            t.isrc AS isrc,
            r.tenant_id AS tenant_id,
            r.id AS release_id,
+           COALESCE(r.upc, '') AS release_upc,
            COALESCE(r.label_id, '') AS label_id,
            COALESCE(
              (
@@ -180,6 +184,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				isrc: row.isrc,
 				tenant_id: row.tenant_id ?? '',
 				release_id: row.release_id ?? '',
+				release_upc: row.release_upc ?? '',
 				label_id: row.label_id ?? '',
 				artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 				is_deleted: 0,
@@ -340,6 +345,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            t.isrc AS isrc,
            r.tenant_id AS tenant_id,
            r.id AS release_id,
+           COALESCE(r.upc, '') AS release_upc,
            COALESCE(r.label_id, '') AS label_id,
            COALESCE(
              (
@@ -362,6 +368,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					isrc: row.isrc,
 					tenant_id: row.tenant_id ?? '',
 					release_id: row.release_id ?? '',
+					release_upc: row.release_upc ?? '',
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					is_deleted: 0,
@@ -381,6 +388,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            t.isrc AS isrc,
            r.tenant_id AS tenant_id,
            r.id AS release_id,
+           COALESCE(r.upc, '') AS release_upc,
            COALESCE(r.label_id, '') AS label_id,
            COALESCE(
              (
@@ -403,6 +411,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					isrc: row.isrc,
 					tenant_id: row.tenant_id ?? '',
 					release_id: row.release_id ?? '',
+					release_upc: row.release_upc ?? '',
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					is_deleted: 0,

@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 
 export class AnalyticsReportExportDto {
   @ApiProperty({
@@ -51,4 +59,19 @@ export class AnalyticsReportExportDto {
   @IsOptional()
   @IsString()
   dspId?: string;
+}
+
+export class CancelAnalyticsReportExportJobsDto {
+  @ApiProperty({
+    description: 'List of analytics report export job IDs to cancel',
+    type: [String],
+    example: [
+      '5f31ab56-2cbe-4ac2-a6d5-425574040f3e',
+      '7a51a118-ca40-41d5-9b38-6d5ef615b84c',
+    ],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  jobIds: string[];
 }

@@ -81,6 +81,10 @@ export class ImportJobsService implements OnModuleInit {
 
   async markProcessing(id: string): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping PROCESSING transition.`);
+      return;
+    }
     job.status = ImportJobStatus.PROCESSING;
     job.startedAt = job.startedAt ?? nowDt64();
     job.finishedAt = null;
@@ -127,6 +131,11 @@ export class ImportJobsService implements OnModuleInit {
 
   async markCompleted(id: string, result: Record<string, unknown>): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.cleanup(id);
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping COMPLETED transition.`);
+      return;
+    }
     job.status = ImportJobStatus.COMPLETED;
     job.result = result;
     job.finishedAt = nowDt64();
@@ -168,6 +177,11 @@ export class ImportJobsService implements OnModuleInit {
 
   async markFailed(id: string, error: Error | string): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.cleanup(id);
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping FAILED transition.`);
+      return;
+    }
     job.status = ImportJobStatus.FAILED;
     job.errorMessage = error instanceof Error ? error.message : String(error);
     job.finishedAt = nowDt64();
@@ -181,6 +195,31 @@ export class ImportJobsService implements OnModuleInit {
     this.logger.error(`Job ${id} FAILED: ${job.errorMessage}`);
   }
 
+  async markCancelled(id: string, reason = 'Cancelled by user'): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    if (
+      job.status === ImportJobStatus.COMPLETED ||
+      job.status === ImportJobStatus.FAILED ||
+      job.status === ImportJobStatus.CANCELLED
+    ) {
+      return job;
+    }
+
+    job.status = ImportJobStatus.CANCELLED;
+    job.errorMessage = reason;
+    job.finishedAt = nowDt64();
+    job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
+    job.progressLabel = 'Cancelled';
+    if (job.totalRows === 0 && job.processedRows > 0) {
+      job.totalRows = job.processedRows;
+    }
+
+    await this.persist(job);
+    this.cleanup(id);
+    this.logger.warn(`Job ${id} CANCELLED: ${reason}`);
+    return job;
+  }
+
   async setBatchId(id: string, batchId: string): Promise<void> {
     const job = this.snapshots.get(id);
     if (!job) return;
@@ -192,6 +231,16 @@ export class ImportJobsService implements OnModuleInit {
     const job = await this.requireSnapshot(id);
     job.params = {
       ...(job.params ?? {}),
+      ...patch,
+    };
+    await this.persist(job);
+    return job;
+  }
+
+  async patchResult(id: string, patch: Record<string, unknown>): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.result = {
+      ...(job.result ?? {}),
       ...patch,
     };
     await this.persist(job);
@@ -387,6 +436,27 @@ export class ImportJobsService implements OnModuleInit {
     return rows.map(rowToDomain);
   }
 
+  async findActiveJobsBySource(
+    sourceType: ImportJobSourceType,
+    tenantId?: string,
+  ): Promise<ImportJob[]> {
+    const tenantFilter = tenantId ? 'AND tenant_id = {tenantId:String}' : '';
+    const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status IN ({queued:String}, {processing:String})
+        ${tenantFilter}
+      ORDER BY created_at ASC
+    `;
+    const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
+      sourceType,
+      queued: ImportJobStatus.QUEUED,
+      processing: ImportJobStatus.PROCESSING,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    return rows.map(rowToDomain);
+  }
+
   @Cron('*/1 * * * *') // every 1 minute
   async checkPendingTimeout(): Promise<void> {
     const sql = `
@@ -480,6 +550,8 @@ export class ImportJobsService implements OnModuleInit {
         ? 'completed'
         : job.status === ImportJobStatus.FAILED
         ? 'failed'
+        : job.status === ImportJobStatus.CANCELLED
+        ? 'cancelled'
         : 'progress',
       data: {
         id: job.id,

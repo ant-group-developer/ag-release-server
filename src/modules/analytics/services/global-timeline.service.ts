@@ -32,6 +32,7 @@ import { EntityManager } from 'typeorm';
 @Injectable()
 export class TimelineAnalyticsService {
   private readonly logger = new Logger(TimelineAnalyticsService.name);
+  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -884,6 +885,12 @@ export class TimelineAnalyticsService {
       params.matchedIsrcs = matchedIsrcs;
     }
 
+    if (!joinSql) {
+      joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      filterSql += ' AND t.is_deleted = 0';
+    }
+    filterSql += ` ${this.validReleaseUpcFilter}`;
+
     // Count query
     const countSql = queries.getRevenueTopTrackCountQuery(joinSql, filterSql);
     const countResult = await this.clickHouseService.query<{ total: string }>(countSql, params);
@@ -1260,7 +1267,7 @@ export class TimelineAnalyticsService {
     const isSystem = checkIsSystemTenant(tenantId);
 
     const params: Record<string, any> = { from: fromDate, to: toDate };
-    let filterSql = 'AND t.is_deleted = 0';
+    let filterSql = `AND t.is_deleted = 0 ${this.validReleaseUpcFilter}`;
 
     if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';

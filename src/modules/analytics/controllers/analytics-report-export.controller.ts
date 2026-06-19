@@ -8,7 +8,7 @@ import {
   Req,
   Sse,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { ImportJob } from 'src/modules/etl/interfaces';
@@ -20,8 +20,14 @@ import { JobEventsGateway } from 'src/modules/etl/services/import-jobs/job-event
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { concat, from, interval, merge, Observable, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
-import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
 import {
+  AnalyticsReportExportDto,
+  CancelAnalyticsReportExportJobsDto,
+} from '../dto/analytics-report-export.dto';
+import {
+  AnalyticsReportExportCancelAllResult,
+  AnalyticsReportExportCancelListResult,
+  AnalyticsReportExportCancelResult,
   AnalyticsReportExportJobResult,
   AnalyticsReportExportService,
 } from '../services/analytics-report-export.service';
@@ -53,6 +59,68 @@ export class AnalyticsReportExportController {
       req.user!.tenantId,
       req.user!.sub,
       dto,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('export/cancel-all')
+  @ApiOperation({
+    summary: 'Cancel all active analytics report export jobs',
+    description:
+      'Cancels QUEUED and PROCESSING analytics report export jobs. Normal tenants cancel only their own jobs; system tenant cancels all.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Active export jobs cancelled successfully.',
+  })
+  async cancelAllExportJobs(
+    @Req() req: Request,
+  ): Promise<ResponseSuccess<AnalyticsReportExportCancelAllResult>> {
+    const data = await this.exportService.cancelAllExportJobs(
+      req.user!.tenantId,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('export/cancel-list')
+  @ApiOperation({
+    summary: 'Cancel selected analytics report export jobs',
+    description:
+      'Cancels selected QUEUED and PROCESSING analytics report export jobs. Normal tenants cancel only their own jobs; system tenant can cancel any export job.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Selected export jobs cancel request handled successfully.',
+  })
+  async cancelSelectedExportJobs(
+    @Req() req: Request,
+    @Body() dto: CancelAnalyticsReportExportJobsDto,
+  ): Promise<ResponseSuccess<AnalyticsReportExportCancelListResult>> {
+    const data = await this.exportService.cancelExportJobs(
+      dto.jobIds,
+      req.user!.tenantId,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('export/:jobId/cancel')
+  @ApiOperation({
+    summary: 'Cancel one analytics report export job',
+    description:
+      'Cancels a QUEUED or PROCESSING analytics report export job. Terminal jobs are returned unchanged.',
+  })
+  @ApiParam({ name: 'jobId', description: 'Export job ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Export job cancel request handled successfully.',
+  })
+  async cancelExportJob(
+    @Req() req: Request,
+    @Param('jobId') jobId: string,
+  ): Promise<ResponseSuccess<AnalyticsReportExportCancelResult>> {
+    const data = await this.exportService.cancelExportJob(
+      jobId,
+      req.user!.tenantId,
     );
     return new ResponseSuccess({ data });
   }

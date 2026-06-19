@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS music_analytics.pg_tracks_sync (
     isrc String,
     tenant_id String,
     release_id String,
+    release_upc String DEFAULT '',
     label_id String,
     artist_ids Array(String), -- Mảng chứa danh sách ID nghệ sĩ tham gia track
     is_deleted UInt8 DEFAULT 0,
