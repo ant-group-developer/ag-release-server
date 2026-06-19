@@ -369,7 +369,7 @@ export class ChannelService {
 			).toLowerCase();
 
 			return (
-				error.extensions?.code === 'invalid-channel' &&
+				// error.extensions?.code === 'invalid-channel' &&
 				message.includes('already exists')
 			);
 		});
