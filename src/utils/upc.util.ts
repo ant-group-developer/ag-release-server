@@ -21,7 +21,7 @@ export function normalizeReportUpcOrFallback(
 	upc?: string | null,
 	isrc?: string | null,
 ): string {
-	const normalizedUpc = normalizeStandardUpcOrEmpty(upc);
+	const normalizedUpc = normalizeUpc(upc);
 	if (normalizedUpc) return normalizedUpc;
 
 	const normalizedIsrc = normalizeReportIsrc(isrc);

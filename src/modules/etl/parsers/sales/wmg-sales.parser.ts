@@ -4,7 +4,7 @@ import { BaseSalesParser } from './base-sales.parser';
 import { FactSalesRow } from '../../interfaces';
 import {
   normalizeReportUpcOrFallback,
-  normalizeStandardUpcOrEmpty,
+  normalizeUpc,
 } from 'src/utils/upc.util';
 
 export interface WmgStreamingOpts {
@@ -57,7 +57,7 @@ export class WmgSalesParser extends BaseSalesParser {
     const isAlbumLevel = !isrcRaw;
     const rawGpid = this.cleanExcelQuoted(record['GPID'] || '');
     const upc = isAlbumLevel
-      ? normalizeStandardUpcOrEmpty(rawGpid)
+      ? normalizeUpc(rawGpid)
       : normalizeReportUpcOrFallback(rawGpid, isrcRaw);
     if (!upc) return null;
 
