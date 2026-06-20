@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { QueryGetListLogDto } from '../dto/log.dto';
 import { ErrorType, LogLevel, Logs } from '../entites/logs.entity';
 
@@ -113,6 +113,7 @@ export class LogsService {
 			level,
 			type,
 			modules,
+			keyword,
 			releaseSubmitId,
 			releaseSubmitStepId,
 		} = query;
@@ -129,6 +130,24 @@ export class LogsService {
 
 		if (modules?.length) {
 			qb.andWhere('log.module IN (:...modules)', { modules });
+		}
+
+		const keywords = keyword?.filter(Boolean);
+		if (keywords?.length) {
+			qb.andWhere(
+				new Brackets((subQb) => {
+					keywords.forEach((item, index) => {
+						subQb.orWhere(
+							`(
+								log.module ILIKE :keyword${index}
+								OR log.message ILIKE :keyword${index}
+								OR CAST(log.data AS TEXT) ILIKE :keyword${index}
+							)`,
+							{ [`keyword${index}`]: `%${item}%` },
+						);
+					});
+				}),
+			);
 		}
 
 		if (releaseSubmitId) {
