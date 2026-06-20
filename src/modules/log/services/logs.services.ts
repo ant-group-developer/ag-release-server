@@ -155,6 +155,21 @@ export class LogsService {
 		});
 	}
 
+	async getModules() {
+		const rows = await this.repo
+			.createQueryBuilder('log')
+			.select('log.module', 'module')
+			.where('log.module IS NOT NULL')
+			.andWhere("log.module <> ''")
+			.groupBy('log.module')
+			.orderBy('LOWER(log.module)', 'ASC')
+			.getRawMany<{ module: string | null }>();
+
+		return rows
+			.map((row) => row.module)
+			.filter((module): module is string => !!module);
+	}
+
 	async getDetail(id: string) {
 		const log = await this.repo.findOne({
 			where: { id },
