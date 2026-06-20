@@ -2,14 +2,17 @@ import {
 	Body,
 	Controller,
 	Param,
-	ParseUUIDPipe,
 	Post,
 	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { EntityOverviewQueryDto, EntityTimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	ChartQueryDto,
+	EntityOverviewQueryDto,
+	EntityTimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
 @ApiTags('Analytics - Label')
@@ -20,7 +23,7 @@ export class LabelAnalyticsController {
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a label' })
 	async overview(
-		@Param('labelId', ParseUUIDPipe) labelId: string,
+		@Param('labelId') labelId: string,
 		@Body() dto: EntityOverviewQueryDto,
 		@Req() req: Request,
 	) {
@@ -96,6 +99,108 @@ export class LabelAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTimeline(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/line-chart')
+	@ApiOperation({ summary: 'Trend view line chart for a label' })
+	async trendViewLineChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewLineChart(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/line-chart')
+	@ApiOperation({ summary: 'Revenue line chart for a label' })
+	async revenueLineChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueLineChart(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/dsp/bar-chart')
+	@ApiOperation({ summary: 'Trend view DSP bar chart for a label' })
+	async trendViewDspBarChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewDspBarChart(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/ter/bar-chart')
+	@ApiOperation({ summary: 'Trend view territory bar chart for a label' })
+	async trendViewTerritoryBarChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewTerritoryBarChart(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/dsp/bar-chart')
+	@ApiOperation({ summary: 'Revenue DSP bar chart for a label' })
+	async revenueDspBarChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueDspBarChart(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/ter/bar-chart')
+	@ApiOperation({ summary: 'Revenue territory bar chart for a label' })
+	async revenueTerritoryBarChart(
+		@Param('labelId') labelId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueTerritoryBarChart(
 				'label',
 				labelId,
 				dto,

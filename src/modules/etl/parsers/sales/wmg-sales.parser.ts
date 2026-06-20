@@ -2,7 +2,10 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import { BaseSalesParser } from './base-sales.parser';
 import { FactSalesRow } from '../../interfaces';
-import { normalizeUpc } from 'src/utils/upc.util';
+import {
+  normalizeReportUpcOrFallback,
+  normalizeStandardUpcOrEmpty,
+} from 'src/utils/upc.util';
 
 export interface WmgStreamingOpts {
   batchSize?: number;
@@ -50,7 +53,12 @@ export class WmgSalesParser extends BaseSalesParser {
     batchId: string,
     opts: WmgStreamingOpts,
   ): Promise<FactSalesRow | null> {
-    const upc = normalizeUpc(this.cleanExcelQuoted(record['GPID'] || ''));
+    const isrcRaw = this.cleanExcelQuoted(record['ISRC'] || '').trim().toUpperCase();
+    const isAlbumLevel = !isrcRaw;
+    const rawGpid = this.cleanExcelQuoted(record['GPID'] || '');
+    const upc = isAlbumLevel
+      ? normalizeStandardUpcOrEmpty(rawGpid)
+      : normalizeReportUpcOrFallback(rawGpid, isrcRaw);
     if (!upc) return null;
 
     const dspName = (record['Digital Service Provider(DSP)'] || '').trim();
@@ -58,8 +66,6 @@ export class WmgSalesParser extends BaseSalesParser {
 
     const dspId = await opts.resolveDspId(dspName);
 
-    const isrcRaw = this.cleanExcelQuoted(record['ISRC'] || '');
-    const isAlbumLevel = !isrcRaw;
     const isrc = isAlbumLevel ? `UPC-${upc}` : isrcRaw;
 
     const { start, end } = this.monthToRange(record['Recdate Month ID'] || '');

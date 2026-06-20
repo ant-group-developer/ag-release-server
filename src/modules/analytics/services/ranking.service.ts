@@ -23,6 +23,7 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 @Injectable()
 export class RankingService {
   private readonly logger = new Logger(RankingService.name);
+  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -78,6 +79,12 @@ export class RankingService {
     let { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
     params.from = fromDate;
     params.to = toDate;
+
+    if (!joinSql) {
+      joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      filterSql += ' AND t.is_deleted = 0';
+    }
+    filterSql += ` ${this.validReleaseUpcFilter}`;
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;

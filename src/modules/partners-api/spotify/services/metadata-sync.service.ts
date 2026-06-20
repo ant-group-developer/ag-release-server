@@ -19,6 +19,7 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { EnrichedMetadata } from './metadata-enrichment.service';
 import { stringToCode } from 'src/utils/util';
+import { isValidStandardUpc } from 'src/utils/upc.util';
 
 export interface ChangeLogEntry {
 	id: string;
@@ -283,7 +284,10 @@ export class MetadataSyncService {
 		);
 	}
 
-	async ensureArtistLink(release: Release, artistName: string): Promise<void> {
+	async syncReleaseArtistFromEnriched(
+		release: Release,
+		artistName: string,
+	): Promise<void> {
 		const artistRepo = this.dataSource.getRepository(Artist);
 		const releaseArtistRepo = this.dataSource.getRepository(ReleaseArtist);
 		const trackArtistRepo = this.dataSource.getRepository(TrackArtist);
@@ -304,42 +308,46 @@ export class MetadataSyncService {
 			);
 		}
 
-		const existingLink = await releaseArtistRepo.findOne({
-			where: { releaseId: release.id, artistId: artist.id },
+		// Delete existing artists for this release
+		await releaseArtistRepo.delete({ releaseId: release.id });
+
+		// Link release to new artist
+		const releaseArtist = await releaseArtistRepo.save(
+			releaseArtistRepo.create({
+				releaseId: release.id,
+				artistId: artist.id,
+				addArtistToTracks: true,
+				isImportedFromReport: true,
+			}),
+		);
+
+		// Delete existing artists for tracks of this release
+		const tracks = await this.dataSource.getRepository(Track).find({
+			where: { releaseId: release.id },
 		});
+		const trackIds = tracks.map((t) => t.id);
 
-		if (!existingLink) {
-			const releaseArtist = await releaseArtistRepo.save(
-				releaseArtistRepo.create({
-					releaseId: release.id,
-					artistId: artist.id,
-					addArtistToTracks: true,
-					isImportedFromReport: true,
-				}),
-			);
+		if (trackIds.length > 0) {
+			await trackArtistRepo.delete({ trackId: In(trackIds) });
 
-			const tracks = await this.dataSource.getRepository(Track).find({
-				where: { releaseId: release.id },
-			});
-
-			for (const track of tracks) {
-				const existingTrackArtist = await trackArtistRepo.findOne({
-					where: { trackId: track.id, artistId: artist.id },
-				});
-				if (!existingTrackArtist) {
-					await trackArtistRepo.save(
-						trackArtistRepo.create({
-							trackId: track.id,
-							artistId: artist.id,
-							releaseArtistId: releaseArtist.id,
-							isFromReleaseAction: true,
-							isImportedFromReport: true,
-						}),
-					);
-				}
+			// Link tracks to the new artist
+			for (const trackId of trackIds) {
+				await trackArtistRepo.save(
+					trackArtistRepo.create({
+						trackId,
+						artistId: artist.id,
+						releaseArtistId: releaseArtist.id,
+						isFromReleaseAction: true,
+						isImportedFromReport: true,
+					}),
+				);
 			}
 		}
+
+		releaseArtist.artist = artist;
+		release.releaseArtists = [releaseArtist];
 	}
+
 
 	async mergeDuplicateTrackRowsWithManager(
 		manager: EntityManager,
@@ -438,6 +446,51 @@ export class MetadataSyncService {
 			);
 
 			if (existingTrack) {
+				const duplicateTracks = await this.findImportedInvalidUpcDuplicateTracks(
+					apiTrack.isrc,
+					release.id,
+					release.tenantId,
+				);
+				const mergeableDuplicates = duplicateTracks.filter(
+					(duplicateTrack) => duplicateTrack.id !== existingTrack.id,
+				);
+				if (mergeableDuplicates.length > 0) {
+					const duplicateIds = mergeableDuplicates.map((track) => track.id);
+					if (!dryRun) {
+						await this.dataSource.transaction(async (manager) => {
+							await this.mergeDuplicateTrackRowsWithManager(
+								manager,
+								existingTrack.id,
+								duplicateIds,
+							);
+							await this.cleanupEmptyImportedInvalidUpcReleases(
+								manager,
+								mergeableDuplicates.map((track) => track.releaseId),
+							);
+						});
+					}
+
+					for (const duplicateTrack of mergeableDuplicates) {
+						changes.push(
+							`Track[${apiTrack.isrc}] duplicate ${duplicateTrack.id} from imported release ${duplicateTrack.releaseId} merged into ${existingTrack.id}`,
+						);
+						chunkChangeLogs.push(
+							this.buildLogEntry(scanId, now, dryRun, {
+								entityType: 'track',
+								entityId: duplicateTrack.id,
+								releaseId: release.id,
+								isrc: apiTrack.isrc,
+								upc: release.upc || '',
+								fieldName: 'duplicate_imported_track_merged',
+								oldValue: duplicateTrack.releaseId,
+								newValue: existingTrack.id,
+								changeType: 'merge',
+								enriched: primaryEnriched,
+							}),
+						);
+					}
+				}
+
 				// Update existing track to its official order and title if changed
 				const trackPatch: Partial<Track> = {
 					title: apiTrack.title,
@@ -483,7 +536,10 @@ export class MetadataSyncService {
 					.getOne();
 
 				if (duplicateTrack?.release?.tenantId === release.tenantId) {
-					if (duplicateTrack.release.isImportedFromReport) {
+					if (
+						duplicateTrack.release.isImportedFromReport &&
+						!isValidStandardUpc(duplicateTrack.release.upc)
+					) {
 						const duplicateTrackPatch: Partial<Track> = {
 							releaseId: release.id,
 							title: apiTrack.title,
@@ -508,10 +564,16 @@ export class MetadataSyncService {
 						}
 
 						if (!dryRun) {
-							await trackRepo.update(
-								{ id: duplicateTrack.id },
-								duplicateTrackPatch,
-							);
+							await this.dataSource.transaction(async (manager) => {
+								await manager.getRepository(Track).update(
+									{ id: duplicateTrack.id },
+									duplicateTrackPatch,
+								);
+								await this.cleanupEmptyImportedInvalidUpcReleases(
+									manager,
+									[duplicateTrack.releaseId],
+								);
+							});
 						}
 
 						changes.push(
@@ -540,6 +602,7 @@ export class MetadataSyncService {
 									isrc: apiTrack.isrc,
 									tenant_id: release.tenantId || '',
 									release_id: release.id,
+									release_upc: release.upc || '',
 									label_id: release.labelId || '',
 									artist_ids: artistIds,
 									is_deleted: 0,
@@ -554,7 +617,9 @@ export class MetadataSyncService {
 					}
 
 					changes.push(
-						`Track[${apiTrack.isrc}] duplicate exists on non-imported release ${duplicateTrack.releaseId}; skipped create`,
+						duplicateTrack.release.isImportedFromReport
+							? `Track[${apiTrack.isrc}] duplicate exists on imported release ${duplicateTrack.releaseId} with valid UPC; skipped create`
+							: `Track[${apiTrack.isrc}] duplicate exists on non-imported release ${duplicateTrack.releaseId}; skipped create`,
 					);
 					chunkChangeLogs.push(
 						this.buildLogEntry(scanId, now, dryRun, {
@@ -563,7 +628,9 @@ export class MetadataSyncService {
 							releaseId: release.id,
 							isrc: apiTrack.isrc,
 							upc: release.upc || '',
-							fieldName: 'duplicate_isrc_skip',
+							fieldName: duplicateTrack.release.isImportedFromReport
+								? 'duplicate_imported_valid_upc_skip'
+								: 'duplicate_isrc_skip',
 							oldValue: duplicateTrack.releaseId,
 							newValue: release.id,
 							changeType: 'skip',
@@ -643,6 +710,7 @@ export class MetadataSyncService {
 							isrc: apiTrack.isrc,
 							tenant_id: release.tenantId || '',
 							release_id: release.id,
+							release_upc: release.upc || '',
 							label_id: release.labelId || '',
 							artist_ids: artistIds,
 							is_deleted: 0,
@@ -671,6 +739,66 @@ export class MetadataSyncService {
 				}
 			}
 		}
+	}
+
+	private async findImportedInvalidUpcDuplicateTracks(
+		isrc: string,
+		currentReleaseId: string,
+		tenantId?: string | null,
+	): Promise<Track[]> {
+		const normalizedIsrc = this.normalizeIsrc(isrc);
+		if (!normalizedIsrc || !tenantId) return [];
+
+		const tracks = await this.dataSource.getRepository(Track)
+			.createQueryBuilder('track')
+			.leftJoinAndSelect('track.release', 'duplicateRelease')
+			.where('UPPER(track.isrc) = :isrc', { isrc: normalizedIsrc })
+			.andWhere('track.releaseId != :releaseId', { releaseId: currentReleaseId })
+			.andWhere('duplicateRelease.tenantId = :tenantId', { tenantId })
+			.andWhere('duplicateRelease.isImportedFromReport = :isImportedFromReport', {
+				isImportedFromReport: true,
+			})
+			.getMany();
+
+		return tracks.filter((track) => !isValidStandardUpc(track.release?.upc));
+	}
+
+	private async cleanupEmptyImportedInvalidUpcReleases(
+		manager: EntityManager,
+		releaseIds: string[],
+	): Promise<string[]> {
+		const uniqueReleaseIds = Array.from(new Set(releaseIds.filter(Boolean)));
+		if (!uniqueReleaseIds.length) return [];
+
+		const releaseRepo = manager.getRepository(Release);
+		const trackRepo = manager.getRepository(Track);
+		const deletedReleaseIds: string[] = [];
+
+		for (const releaseId of uniqueReleaseIds) {
+			const release = await releaseRepo.findOne({ where: { id: releaseId } });
+			if (!release?.isImportedFromReport || isValidStandardUpc(release.upc)) {
+				continue;
+			}
+
+			const trackCount = await trackRepo.count({ where: { releaseId } });
+			if (trackCount > 0) continue;
+
+			await manager.createQueryBuilder().delete().from('release_artist').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_contributors').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_localize').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_cover_art').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_dsp_delivery').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_territories').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('videos').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_captions').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_logs').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_language').where('release_id = :id', { id: releaseId }).execute();
+			await manager.createQueryBuilder().delete().from('release_enrichments').where('release_id = :id', { id: releaseId }).execute();
+			await releaseRepo.delete(releaseId);
+			deletedReleaseIds.push(releaseId);
+		}
+
+		return deletedReleaseIds;
 	}
 
 	private async resolveOrCreateApiLabel(

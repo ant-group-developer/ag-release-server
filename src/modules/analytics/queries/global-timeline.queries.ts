@@ -500,6 +500,7 @@ export function getRevenueTopTrackTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
+      AND s.isrc NOT LIKE 'UPC-%'
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}

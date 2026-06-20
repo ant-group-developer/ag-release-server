@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as ExcelJS from 'exceljs';
 import { once } from 'events';
@@ -9,11 +10,13 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import {
+  ImportJob,
   ImportJobSourceType,
   ImportJobStatus,
 } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { isValidStandardUpc } from 'src/utils/upc.util';
 import { EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
@@ -31,6 +34,21 @@ export interface AnalyticsReportExportJobResult {
   status: ImportJobStatus;
   eventsUrl: string;
 }
+
+export interface AnalyticsReportExportCancelResult {
+  jobId: string;
+  status: ImportJobStatus;
+  cancelled: boolean;
+}
+
+export interface AnalyticsReportExportCancelAllResult {
+  cancelledCount: number;
+  jobIds: string[];
+  skippedCount: number;
+}
+
+export interface AnalyticsReportExportCancelListResult
+  extends AnalyticsReportExportCancelAllResult {}
 
 interface SummaryRow {
   startDate: string;
@@ -69,6 +87,7 @@ interface DetailRow {
   date: string;
   startDate: string;
   endDate: string;
+  tenant: string;
   dspName: string;
   upc: string;
   isrc: string;
@@ -103,9 +122,20 @@ type ExportProgressPatch = {
   totalRows?: number;
 };
 
+class ExportJobCancelledError extends Error {
+  constructor(jobId: string) {
+    super(`Export job ${jobId} was cancelled`);
+    this.name = ExportJobCancelledError.name;
+  }
+}
+
 @Injectable()
 export class AnalyticsReportExportService {
+  private readonly logger = new Logger(AnalyticsReportExportService.name);
   private readonly batchSize = 10_000;
+  private readonly exportRetentionDays = 7;
+  private readonly cleanupBatchSize = 100;
+  private readonly cancelledExportJobs = new Set<string>();
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -142,16 +172,207 @@ export class AnalyticsReportExportService {
     };
   }
 
+  async cancelExportJob(
+    jobId: string,
+    tenantId: string,
+  ): Promise<AnalyticsReportExportCancelResult> {
+    const job = await this.getReadableExportJob(jobId, tenantId);
+    if (this.isTerminalStatus(job.status)) {
+      return {
+        jobId: job.id,
+        status: job.status,
+        cancelled: job.status === ImportJobStatus.CANCELLED,
+      };
+    }
+
+    this.cancelledExportJobs.add(job.id);
+    const cancelledJob = await this.importJobsService.markCancelled(
+      job.id,
+      'Cancelled by user',
+    );
+    if (cancelledJob.status !== ImportJobStatus.CANCELLED) {
+      this.cancelledExportJobs.delete(job.id);
+    }
+    return {
+      jobId: cancelledJob.id,
+      status: cancelledJob.status,
+      cancelled: cancelledJob.status === ImportJobStatus.CANCELLED,
+    };
+  }
+
+  async cancelAllExportJobs(
+    tenantId: string,
+  ): Promise<AnalyticsReportExportCancelAllResult> {
+    const isSystem = checkIsSystemTenant(tenantId);
+    const jobs = await this.importJobsService.findActiveJobsBySource(
+      ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+      isSystem ? undefined : tenantId,
+    );
+
+    const jobIds: string[] = [];
+    let skippedCount = 0;
+    for (const job of jobs) {
+      if (
+        job.status !== ImportJobStatus.QUEUED &&
+        job.status !== ImportJobStatus.PROCESSING
+      ) {
+        skippedCount++;
+        continue;
+      }
+
+      this.cancelledExportJobs.add(job.id);
+      const cancelledJob = await this.importJobsService.markCancelled(
+        job.id,
+        'Cancelled by user',
+      );
+      if (cancelledJob.status === ImportJobStatus.CANCELLED) {
+        jobIds.push(job.id);
+      } else {
+        this.cancelledExportJobs.delete(job.id);
+        skippedCount++;
+      }
+    }
+
+    return {
+      cancelledCount: jobIds.length,
+      jobIds,
+      skippedCount,
+    };
+  }
+
+  async cancelExportJobs(
+    jobIds: string[],
+    tenantId: string,
+  ): Promise<AnalyticsReportExportCancelListResult> {
+    const uniqueJobIds = Array.from(new Set(jobIds));
+    const cancelledJobIds: string[] = [];
+    let skippedCount = jobIds.length - uniqueJobIds.length;
+
+    for (const jobId of uniqueJobIds) {
+      try {
+        const job = await this.getReadableExportJob(jobId, tenantId);
+        if (
+          job.status !== ImportJobStatus.QUEUED &&
+          job.status !== ImportJobStatus.PROCESSING
+        ) {
+          skippedCount++;
+          continue;
+        }
+
+        this.cancelledExportJobs.add(job.id);
+        const cancelledJob = await this.importJobsService.markCancelled(
+          job.id,
+          'Cancelled by user',
+        );
+        if (cancelledJob.status === ImportJobStatus.CANCELLED) {
+          cancelledJobIds.push(job.id);
+        } else {
+          this.cancelledExportJobs.delete(job.id);
+          skippedCount++;
+        }
+      } catch (err) {
+        if (err instanceof NotFoundException) {
+          skippedCount++;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    return {
+      cancelledCount: cancelledJobIds.length,
+      jobIds: cancelledJobIds,
+      skippedCount,
+    };
+  }
+
+  @Cron('0 3 * * *')
+  async cleanupExpiredExportFiles(): Promise<void> {
+    const jobs = await this.findExpiredCompletedExportJobs();
+    if (!jobs.length) return;
+
+    let deletedCount = 0;
+    let skippedCount = 0;
+    for (const job of jobs) {
+      const key = typeof job.result?.key === 'string' ? job.result.key : '';
+      if (!key) {
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        await this.r2Service.deletePrivate(key);
+      } catch (err) {
+        if (!this.isR2NotFoundError(err)) {
+          this.logger.warn(
+            `Failed to delete expired analytics export file for job ${job.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          skippedCount++;
+          continue;
+        }
+      }
+
+      await this.importJobsService.patchResult(job.id, {
+        downloadUrl: null,
+        bucketDeletedAt: new Date().toISOString(),
+        bucketDeletedReason: `Expired after ${this.exportRetentionDays} days`,
+      });
+      deletedCount++;
+    }
+
+    if (deletedCount > 0 || skippedCount > 0) {
+      this.logger.log(
+        `Expired analytics export cleanup finished: deleted=${deletedCount}, skipped=${skippedCount}`,
+      );
+    }
+  }
+
+  private async findExpiredCompletedExportJobs(): Promise<ImportJob[]> {
+    const sql = `
+      SELECT id FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status = {status:String}
+        AND result != ''
+        AND JSONExtractString(result, 'key') != ''
+        AND JSONExtractString(result, 'bucketDeletedAt') = ''
+        AND coalesce(finished_at, created_at) < now64(3) - toIntervalDay({retentionDays:UInt16})
+      ORDER BY finished_at ASC
+      LIMIT {limit:UInt32}
+    `;
+    const rows = await this.clickHouseService.query<{ id: string }>(sql, {
+      sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
+      status: ImportJobStatus.COMPLETED,
+      retentionDays: this.exportRetentionDays,
+      limit: this.cleanupBatchSize,
+    });
+    const jobs: ImportJob[] = [];
+    for (const row of rows) {
+      const job = await this.importJobsService.findById(row.id);
+      if (job) jobs.push(job);
+    }
+    return jobs;
+  }
+
+  private isR2NotFoundError(error: unknown): boolean {
+    const err = error as { message?: string; statusCode?: number; $metadata?: { httpStatusCode?: number } };
+    const statusCode = err.statusCode ?? err.$metadata?.httpStatusCode;
+    const message = err.message?.toLowerCase() ?? '';
+    return statusCode === 404 || message.includes('not found');
+  }
+
   async exportReport(
     tenantId: string,
     dto: AnalyticsReportExportDto,
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
+    jobId?: string,
   ): Promise<AnalyticsReportExportResult> {
+    await this.throwIfExportJobCancelled(jobId);
     const range = this.getMonthRange(dto);
     const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
     if (dto.trackId && !trackIsrc) {
       throw new BadRequestException('trackId does not have a valid ISRC');
     }
+    await this.throwIfExportJobCancelled(jobId);
 
     const format = dto.format ?? 'xlsx';
     const fileName = this.buildFileName(dto);
@@ -168,10 +389,12 @@ export class AnalyticsReportExportService {
         true,
       );
       const summary = await this.getSummary(tenantId, dto, range, trackIsrc);
+      await this.throwIfExportJobCancelled(jobId);
       await onProgress?.(
         { progressCurrent: 2, progressLabel: 'Writing report file' },
         true,
       );
+      await this.throwIfExportJobCancelled(jobId);
 
       let totalRows = 0;
       if (format === 'csv') {
@@ -182,6 +405,7 @@ export class AnalyticsReportExportService {
           range,
           trackIsrc,
           onProgress,
+          jobId,
         );
       } else {
         totalRows = await this.writeWorkbookFile(
@@ -192,8 +416,10 @@ export class AnalyticsReportExportService {
           range,
           trackIsrc,
           onProgress,
+          jobId,
         );
       }
+      await this.throwIfExportJobCancelled(jobId);
 
       await onProgress?.(
         {
@@ -204,6 +430,7 @@ export class AnalyticsReportExportService {
         },
         true,
       );
+      await this.throwIfExportJobCancelled(jobId);
 
       await this.r2Service.uploadFileFromPath({
         key,
@@ -211,6 +438,7 @@ export class AnalyticsReportExportService {
         contentType,
         isPublic: false,
       });
+      await this.throwIfExportJobCancelled(jobId);
 
       return {
         fileName,
@@ -234,22 +462,72 @@ export class AnalyticsReportExportService {
     dto: AnalyticsReportExportDto,
   ): Promise<void> {
     try {
+      await this.throwIfExportJobCancelled(jobId);
       await this.importJobsService.markProcessing(jobId);
+      await this.throwIfExportJobCancelled(jobId);
       const result = await this.exportReport(
         tenantId,
         dto,
         (patch, force = false) =>
           this.importJobsService.updateProgress(jobId, patch, force),
+        jobId,
       );
+      await this.throwIfExportJobCancelled(jobId);
       await this.importJobsService.markCompleted(jobId, {
         ...result,
         totalProcessedRows: result.totalRows,
       });
     } catch (err) {
+      if (err instanceof ExportJobCancelledError) {
+        await this.importJobsService.markCancelled(jobId, 'Cancelled by user');
+        return;
+      }
       await this.importJobsService.markFailed(
         jobId,
         err instanceof Error ? err : String(err),
       );
+    } finally {
+      this.cancelledExportJobs.delete(jobId);
+    }
+  }
+
+  private async getReadableExportJob(jobId: string, tenantId: string) {
+    const job =
+      this.importJobsService.getSnapshot(jobId) ??
+      (await this.importJobsService.findById(jobId));
+    if (!job || job.sourceType !== ImportJobSourceType.ANALYTICS_REPORT_EXPORT) {
+      throw new NotFoundException(`Export job not found: ${jobId}`);
+    }
+    if (!checkIsSystemTenant(tenantId) && job.tenantId !== tenantId) {
+      throw new NotFoundException(`Export job not found: ${jobId}`);
+    }
+    return job;
+  }
+
+  private isTerminalStatus(status: ImportJobStatus): boolean {
+    return (
+      status === ImportJobStatus.COMPLETED ||
+      status === ImportJobStatus.FAILED ||
+      status === ImportJobStatus.CANCELLED
+    );
+  }
+
+  private async throwIfExportJobCancelled(jobId?: string): Promise<void> {
+    if (!jobId) return;
+    if (this.cancelledExportJobs.has(jobId)) {
+      throw new ExportJobCancelledError(jobId);
+    }
+
+    const snapshot = this.importJobsService.getSnapshot(jobId);
+    if (snapshot?.status === ImportJobStatus.CANCELLED) {
+      this.cancelledExportJobs.add(jobId);
+      throw new ExportJobCancelledError(jobId);
+    }
+
+    const job = await this.importJobsService.findById(jobId);
+    if (job?.status === ImportJobStatus.CANCELLED) {
+      this.cancelledExportJobs.add(jobId);
+      throw new ExportJobCancelledError(jobId);
     }
   }
 
@@ -466,19 +744,28 @@ export class AnalyticsReportExportService {
       this.getTrackMetadata(isrcs),
       this.getReleaseMetadataByUpc(albumUpcs),
     ]);
+    const tenantNames = await this.getTenantNames(
+      Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean))),
+    );
 
     return rows.map((row) => {
       const meta = row.isrc.startsWith('UPC-')
         ? releaseMeta.get(row.isrc.substring(4))
         : trackMeta.get(row.isrc);
+      const upc = meta?.release_upc || row.fallback_upc || '';
 
       return {
         date: row.date,
         startDate: row.start_date,
         endDate: row.end_date,
+        tenant:
+          meta?.workspace_name ||
+          tenantNames.get(row.tenant_id) ||
+          row.tenant_id ||
+          '',
         dspName: row.dsp_name || row.dsp_id,
-        upc: meta?.release_upc || row.fallback_upc || '',
-        isrc: row.isrc,
+        upc: isValidStandardUpc(upc) ? upc : '',
+        isrc: this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc,
         releaseName: meta?.release_title || row.fallback_album_title || '',
         trackName: meta?.track_title || row.fallback_track_title || '',
         artistName: meta?.artist_names || row.fallback_artist_name || '',
@@ -489,6 +776,10 @@ export class AnalyticsReportExportService {
         currency: 'USD',
       };
     });
+  }
+
+  private isGeneratedUpcBackfill(value: string): boolean {
+    return value.trim().toUpperCase().startsWith('UPC-');
   }
 
   private async getTrackMetadata(isrcs: string[]): Promise<Map<string, MetadataRow>> {
@@ -521,6 +812,27 @@ export class AnalyticsReportExportService {
 
     for (const row of rows) {
       map.set(row.isrc, row);
+    }
+    return map;
+  }
+
+  private async getTenantNames(tenantIds: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!tenantIds.length) return map;
+
+    const rows = await this.entityManager.query(
+      `
+        SELECT
+          id::text AS id,
+          COALESCE(NULLIF(title, ''), name, id::text) AS tenant_name
+        FROM tenants
+        WHERE id = ANY($1)
+      `,
+      [tenantIds],
+    );
+
+    for (const row of rows) {
+      map.set(row.id, row.tenant_name);
     }
     return map;
   }
@@ -601,6 +913,7 @@ export class AnalyticsReportExportService {
     range: { startDate: string; endDate: string },
     trackIsrc: string | null,
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
+    jobId?: string,
   ): Promise<number> {
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
       filename: filePath,
@@ -629,37 +942,53 @@ export class AnalyticsReportExportService {
 
     let offset = 0;
     let totalRows = 0;
-    while (true) {
-      const rawRows = await this.getRawDetailsPage(
-        tenantId,
-        dto,
-        range,
-        trackIsrc,
-        this.batchSize,
-        offset,
-      );
-      if (!rawRows.length) break;
+    let detailCommitted = false;
+    let workbookCommitted = false;
+    try {
+      while (true) {
+        await this.throwIfExportJobCancelled(jobId);
+        const rawRows = await this.getRawDetailsPage(
+          tenantId,
+          dto,
+          range,
+          trackIsrc,
+          this.batchSize,
+          offset,
+        );
+        if (!rawRows.length) break;
+        await this.throwIfExportJobCancelled(jobId);
 
-      const details = await this.enrichDetails(rawRows);
-      for (const row of details) {
-        detailSheet.addRow(row).commit();
+        const details = await this.enrichDetails(rawRows);
+        for (const row of details) {
+          detailSheet.addRow(row).commit();
+        }
+        totalRows += rawRows.length;
+        await onProgress?.(
+          {
+            progressCurrent: 2,
+            progressLabel: `Writing report file (${totalRows} rows)`,
+            processedRows: totalRows,
+          },
+          false,
+        );
+        await this.throwIfExportJobCancelled(jobId);
+
+        if (rawRows.length < this.batchSize) break;
+        offset += this.batchSize;
       }
-      totalRows += rawRows.length;
-      await onProgress?.(
-        {
-          progressCurrent: 2,
-          progressLabel: `Writing report file (${totalRows} rows)`,
-          processedRows: totalRows,
-        },
-        false,
-      );
 
-      if (rawRows.length < this.batchSize) break;
-      offset += this.batchSize;
+      detailSheet.commit();
+      detailCommitted = true;
+      await workbook.commit();
+      workbookCommitted = true;
+    } finally {
+      if (!detailCommitted) {
+        detailSheet.commit();
+      }
+      if (!workbookCommitted) {
+        await workbook.commit().catch(() => undefined);
+      }
     }
-
-    detailSheet.commit();
-    await workbook.commit();
     return totalRows;
   }
 
@@ -670,6 +999,7 @@ export class AnalyticsReportExportService {
     range: { startDate: string; endDate: string },
     trackIsrc: string | null,
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
+    jobId?: string,
   ): Promise<number> {
     const stream = fs.createWriteStream(filePath, { encoding: 'utf8' });
     const columns = this.getDetailColumns();
@@ -684,6 +1014,7 @@ export class AnalyticsReportExportService {
     let totalRows = 0;
     try {
       while (true) {
+        await this.throwIfExportJobCancelled(jobId);
         const rawRows = await this.getRawDetailsPage(
           tenantId,
           dto,
@@ -693,6 +1024,7 @@ export class AnalyticsReportExportService {
           offset,
         );
         if (!rawRows.length) break;
+        await this.throwIfExportJobCancelled(jobId);
 
         const details = await this.enrichDetails(rawRows);
         for (const row of details) {
@@ -711,6 +1043,7 @@ export class AnalyticsReportExportService {
           },
           false,
         );
+        await this.throwIfExportJobCancelled(jobId);
 
         if (rawRows.length < this.batchSize) break;
         offset += this.batchSize;
@@ -735,18 +1068,17 @@ export class AnalyticsReportExportService {
   private getDetailColumns(): Partial<ExcelJS.Column>[] {
     return [
       { header: 'Date', key: 'date', width: 12 },
-      { header: 'StartDate', key: 'startDate', width: 14 },
-      { header: 'EndDate', key: 'endDate', width: 14 },
+      { header: 'Workspace', key: 'tenant', width: 28 },
       { header: 'DspName', key: 'dspName', width: 28 },
-      { header: 'Upc', key: 'upc', width: 18 },
-      { header: 'Isrc', key: 'isrc', width: 18 },
+      { header: 'UPC', key: 'upc', width: 18 },
+      { header: 'ISRC', key: 'isrc', width: 18 },
       { header: 'ReleaseName', key: 'releaseName', width: 32 },
       { header: 'TrackName', key: 'trackName', width: 32 },
       { header: 'ArtistName', key: 'artistName', width: 28 },
       { header: 'LabelName', key: 'labelName', width: 28 },
       { header: 'Territory', key: 'territory', width: 12 },
       { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
+      { header: 'Revenue', key: 'revenueUsd', width: 18 },
       { header: 'Currency', key: 'currency', width: 10 },
     ];
   }
