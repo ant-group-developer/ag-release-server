@@ -112,7 +112,7 @@ export class LogsService {
 			pageSize,
 			level,
 			type,
-			module,
+			modules,
 			releaseSubmitId,
 			releaseSubmitStepId,
 		} = query;
@@ -127,10 +127,8 @@ export class LogsService {
 			qb.andWhere('log.type IN (:...type)', { type });
 		}
 
-		if (module) {
-			qb.andWhere('log.module ILIKE :module', {
-				module: `%${module}%`,
-			});
+		if (modules?.length) {
+			qb.andWhere('log.module IN (:...modules)', { modules });
 		}
 
 		if (releaseSubmitId) {
