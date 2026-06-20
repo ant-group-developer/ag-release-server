@@ -21,6 +21,14 @@ export class LogsController {
 	}
 
 	/** Lấy chi tiết log */
+	@Get('modules')
+	@ApiOperation({ summary: 'Get log modules' })
+	@ApiResponse({ status: 200, description: 'Log module list' })
+	async getModules() {
+		const result = await this.logsService.getModules();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Get log detail' })
 	@ApiParam({ name: 'id', format: 'uuid' })

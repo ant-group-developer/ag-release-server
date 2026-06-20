@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -50,6 +52,16 @@ export class CreateChannelDto {
 	@IsOptional()
 	@MaxLength(500)
 	thumbUrl?: string;
+
+	@ApiPropertyOptional({
+		example: false,
+		description:
+			'Set true when the channel already exists in Vevo Backstage. The server will only create the local DB record and will not call Vevo.',
+	})
+	@IsOptional()
+	@Transform(({ value }) => value === true || value === 'true')
+	@IsBoolean()
+	existedOnVevoBackstage?: boolean;
 }
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}

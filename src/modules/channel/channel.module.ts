@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from '../app-config/app-config.module';
+import { NotificationModule } from '../notification/notification.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { ChannelController } from './controllers/channel.controller';
 import { VevoController } from './controllers/vevo.controller';
@@ -16,6 +17,7 @@ import { VevoService } from './services/vevo.service';
 		TypeOrmModule.forFeature([Channel, ChannelHistory]),
 		HttpModule,
 		AppConfigModule,
+		NotificationModule,
 		TenantModule,
 	],
 	controllers: [ChannelController, VevoController],

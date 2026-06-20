@@ -19,6 +19,6 @@ import { NotificationUserService } from './services/notification.user-service';
 		NotificationUserService,
 		NotificationResendService,
 	],
-	exports: [NotificationService, NotificationResendService],
+	exports: [NotificationService, NotificationResendService, TelegramService],
 })
 export class NotificationModule {}
