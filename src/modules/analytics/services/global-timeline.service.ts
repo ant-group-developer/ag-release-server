@@ -768,21 +768,18 @@ export class TimelineAnalyticsService {
 
     if (rows.length > 0) {
       const artistIds = rows.map((r) => r.artistId);
-      const artistMappings = await this.isrcResolverService.getAllIsrcArtistMappingsForTenant(tenantId);
-      const artistMetaMap = new Map<string, { artistName: string; artistPicture: string | null }>();
-      for (const a of artistMappings) {
-        if (!artistMetaMap.has(a.artistId)) {
-          artistMetaMap.set(a.artistId, { artistName: a.artistName, artistPicture: a.artistPicture });
-        }
-      }
+      const artistMetaMap = await this.isrcResolverService.getArtistMetadata(artistIds);
 
       rows.forEach((r, index) => {
         const meta = artistMetaMap.get(r.artistId);
         items.push({
           rank: offset + index + 1,
           artistId: r.artistId,
-          artistName: meta?.artistName ?? 'Unknown Artist',
-          picture: meta?.artistPicture ?? null,
+          artistName: meta?.name ?? 'Unknown Artist',
+          picture: meta?.picture ?? null,
+          profiles: meta?.profiles ?? [],
+          country: meta?.country ?? null,
+          genre: meta?.genre ?? null,
           trackCount: Number(r.track_count),
           revenueUsd: this.revenueNumber(r.revenue_usd),
           revenueUsdExact: this.revenueExact(r.revenue_usd),
@@ -812,6 +809,9 @@ export class TimelineAnalyticsService {
             artistId: 'other',
             artistName: 'Other',
             picture: null,
+            profiles: [],
+            country: null,
+            genre: null,
             trackCount: 0,
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',

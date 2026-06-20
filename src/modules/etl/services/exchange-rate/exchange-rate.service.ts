@@ -39,7 +39,7 @@ export interface ExchangeRateRow {
 export class ExchangeRateService {
   private readonly logger = new Logger(ExchangeRateService.name);
   private readonly API_BASE =
-    process.env.FRANKFURTER_API_URL || 'http://localhost:8111/v2/rates';
+    process.env.FRANKFURTER_API_URL || 'https://api.frankfurter.dev/v2/rates';
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -285,20 +285,6 @@ export class ExchangeRateService {
       this.logger.debug(`Got ${data.length} rates for ${date}`);
       return data;
     } catch (err) {
-      if (this.API_BASE.includes('localhost') || this.API_BASE.includes('127.0.0.1')) {
-        this.logger.warn(`Local API failed: ${err.message}. Trying public Frankfurter API fallback...`);
-        const fallbackUrl = `https://api.frankfurter.dev/v2/rates?base=USD&date=${date}`;
-        try {
-          const response = await fetch(fallbackUrl);
-          if (response.ok) {
-            const data: FrankfurterRate[] = await response.json();
-            this.logger.debug(`Got ${data.length} rates from public fallback for ${date}`);
-            return data;
-          }
-        } catch (fallbackErr) {
-          this.logger.error(`Fallback public API also failed: ${fallbackErr.message}`);
-        }
-      }
       this.logger.error(`Frankfurter API error: ${err.message}`);
       throw err;
     }
