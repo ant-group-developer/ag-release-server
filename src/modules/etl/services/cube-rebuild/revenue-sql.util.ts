@@ -12,6 +12,6 @@ sum(
   if(
     f.revenue_usd != 0,
     f.revenue_usd,
-    f.revenue_local / ${EXCHANGE_RATE_DECIMAL}
+    divideDecimal(f.revenue_local, ${EXCHANGE_RATE_DECIMAL}, 18)
   )
 )`;

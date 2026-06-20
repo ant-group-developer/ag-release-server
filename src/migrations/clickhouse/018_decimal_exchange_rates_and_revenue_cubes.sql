@@ -25,11 +25,11 @@ AS SELECT
       if(
         f.revenue_usd != 0,
         f.revenue_usd,
-        f.revenue_local / if(
+        divideDecimal(f.revenue_local, if(
           toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)) > 0,
           toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)),
           toDecimal128(1, 18)
-        )
+        ), 18)
       )
     ) AS total_revenue_usd
 FROM music_analytics.fact_sales_report f
@@ -49,11 +49,11 @@ AS SELECT
       if(
         f.revenue_usd != 0,
         f.revenue_usd,
-        f.revenue_local / if(
+        divideDecimal(f.revenue_local, if(
           toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)) > 0,
           toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)),
           toDecimal128(1, 18)
-        )
+        ), 18)
       )
     ) AS total_revenue_usd
 FROM music_analytics.fact_sales_report f
