@@ -547,6 +547,9 @@ export class RankingService {
         artistName: meta?.name ?? 'Unknown Artist',
         picture: pictureUrl,
         image: pictureUrl,
+        profiles: meta?.profiles ?? [],
+        country: meta?.country ?? null,
+        genre: meta?.genre ?? null,
         trackCount: Number(a.trackCount),
         totalViews: Number(a.totalViews),
       };

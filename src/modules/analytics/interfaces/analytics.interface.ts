@@ -132,6 +132,9 @@ export interface ArtistRankingItem {
   artistName: string;
   picture: string | null;
   image: string | null;
+  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+  country: string | null;
+  genre: string | null;
   trackCount: number;
   totalViews: number;
 }
@@ -186,6 +189,9 @@ export interface RevenueArtistItem {
   artistId: string;
   artistName: string;
   picture: string | null;
+  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+  country: string | null;
+  genre: string | null;
   trackCount: number;
   revenueUsd: number;
   revenueUsdExact?: string;
@@ -214,6 +220,14 @@ export interface EntityOverviewResponse {
   totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
   totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
   totalRevenueUsdExact?: string;
+  artist?: {
+    id: string;
+    name: string;
+    picture: string | null;
+    profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+    country: string | null;
+    genre: string | null;
+  } | null;
 }
 
 export interface RevenueLabelItem {

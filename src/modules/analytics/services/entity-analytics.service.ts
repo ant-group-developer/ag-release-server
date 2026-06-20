@@ -5,6 +5,7 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
+import { Artist } from 'src/modules/artist/entities/artist.entity';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
@@ -220,11 +221,44 @@ export class EntityAnalyticsService {
 			}>(salesSql, params),
 		]);
 
+		let artistMeta = null;
+		if (entityType === 'artist') {
+			const artist = await this.entityManager.findOne(Artist, {
+				where: { id: entityId },
+				relations: ['artistProfiles', 'artistProfiles.dsp', 'country', 'genre'],
+			});
+			if (artist) {
+				const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
+				let pictureUrl: string | null = null;
+				if (artist.picture) {
+					pictureUrl = artist.picture.startsWith('http')
+						? artist.picture
+						: `${domain}/${artist.picture}`;
+				}
+				const profiles = (artist.artistProfiles ?? [])
+					.filter((p) => p.url)
+					.map((p) => ({
+						dspCode: p.dsp?.code ?? '',
+						dspName: p.dsp?.name ?? '',
+						url: p.url,
+					}));
+				artistMeta = {
+					id: artist.id,
+					name: artist.name,
+					picture: pictureUrl,
+					profiles,
+					country: artist.country?.name ?? artist.originCountry ?? null,
+					genre: artist.genre?.name ?? artist.primaryGenre ?? null,
+				};
+			}
+		}
+
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
 			totalRevenueUsd: this.revenueNumber(salesRows[0]?.total_revenue_usd),
 			totalRevenueUsdExact: this.revenueExact(salesRows[0]?.total_revenue_usd),
+			artist: artistMeta,
 		};
 	}
 

@@ -285,16 +285,29 @@ export class IsrcResolverService {
   }
 
   /**
-   * Lấy thông tin ảnh đại diện cho danh sách artistIds từ PostgreSQL
+   * Lấy thông tin chi tiết cho danh sách artistIds từ PostgreSQL
+   * Bao gồm: name, picture, profiles (Spotify/Apple Music...), country, genre
    */
-  async getArtistMetadata(artistIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+  async getArtistMetadata(artistIds: string[]): Promise<Map<string, {
+    name: string;
+    picture: string | null;
+    profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+    country: string | null;
+    genre: string | null;
+  }>> {
     if (!artistIds.length) return new Map();
     const artists = await this.artistRepo.find({
       where: { id: In(artistIds) },
-      select: ['id', 'name', 'picture'],
+      relations: ['artistProfiles', 'artistProfiles.dsp', 'country', 'genre'],
     });
 
-    const map = new Map<string, { name: string; picture: string | null }>();
+    const map = new Map<string, {
+      name: string;
+      picture: string | null;
+      profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+      country: string | null;
+      genre: string | null;
+    }>();
     const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
     for (const a of artists) {
       let pictureUrl: string | null = null;
@@ -303,9 +316,21 @@ export class IsrcResolverService {
           ? a.picture
           : `${domain}/${a.picture}`;
       }
+
+      const profiles = (a.artistProfiles ?? [])
+        .filter((p) => p.url)
+        .map((p) => ({
+          dspCode: p.dsp?.code ?? '',
+          dspName: p.dsp?.name ?? '',
+          url: p.url,
+        }));
+
       map.set(a.id, {
         name: a.name,
         picture: pictureUrl,
+        profiles,
+        country: a.country?.name ?? a.originCountry ?? null,
+        genre: a.genre?.name ?? a.primaryGenre ?? null,
       });
     }
     return map;
