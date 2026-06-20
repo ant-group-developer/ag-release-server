@@ -482,10 +482,9 @@ export class ReleaseExecution3Service {
 			return queriedReleaseIds ?? [];
 		}
 
-		const queriedReleaseIdSet = new Set(queriedReleaseIds);
-		return uniqueExplicitReleaseIds.filter((releaseId) =>
-			queriedReleaseIdSet.has(releaseId),
-		);
+		return [
+			...new Set([...uniqueExplicitReleaseIds, ...queriedReleaseIds]),
+		];
 	}
 
 	async cancelPendingExecutions(input: {

@@ -243,6 +243,7 @@ export class ReportEntityExtractorService {
             isrc: track.isrc,
             tenant_id: release.tenantId || '',
             release_id: release.id,
+            release_upc: release.upc || '',
             label_id: release.labelId || '',
             artist_ids: artistIds,
             is_deleted: 0,

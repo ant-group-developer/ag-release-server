@@ -122,18 +122,6 @@ export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {
 			.split(',')
 			.map((item) => item.trim());
 	})
-	@IsUUID('4', { each: true })
-	@IsArray()
-	releaseId?: string[];
-
-	@IsOptional()
-	@Transform(({ value }) => {
-		if (!value) return [];
-		if (Array.isArray(value)) return value;
-		return String(value)
-			.split(',')
-			.map((item) => item.trim());
-	})
 	@IsEnum(ReleaseExecutionStatus, { each: true })
 	@IsArray()
 	status?: ReleaseExecutionStatus[];

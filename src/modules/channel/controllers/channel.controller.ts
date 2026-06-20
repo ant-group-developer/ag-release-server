@@ -19,6 +19,7 @@ import {
 	QueryGetListChannelDto,
 	UpdateChannelDto,
 } from '../dto/channel.dto';
+import { ChannelStatus } from '../enum/channel.enum';
 import { ChannelService } from '../services/channel.service';
 
 @ApiTags('Channels')
@@ -34,8 +35,14 @@ export class ChannelController {
 		const result = await this.channelService.create(dto);
 
 		return new ResponseSuccess({
-			message: 'Channel is processing',
-			messageCode: 'common.processing',
+			message:
+				result.status === ChannelStatus.PROCESSING
+					? 'Channel is processing'
+					: 'Success',
+			messageCode:
+				result.status === ChannelStatus.PROCESSING
+					? 'common.processing'
+					: 'common.success',
 			data: result,
 		});
 	}

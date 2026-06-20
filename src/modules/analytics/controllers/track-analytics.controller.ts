@@ -1,7 +1,11 @@
 import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
-import { EntityOverviewQueryDto, EntityTimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	ChartQueryDto,
+	EntityOverviewQueryDto,
+	EntityTimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Request } from 'express';
 
@@ -89,6 +93,108 @@ export class TrackAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTimeline(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/line-chart')
+	@ApiOperation({ summary: 'Trend view line chart for a track' })
+	async trendViewLineChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewLineChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/line-chart')
+	@ApiOperation({ summary: 'Revenue line chart for a track' })
+	async revenueLineChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueLineChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/dsp/bar-chart')
+	@ApiOperation({ summary: 'Trend view DSP bar chart for a track' })
+	async trendViewDspBarChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewDspBarChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('trend-view/ter/bar-chart')
+	@ApiOperation({ summary: 'Trend view territory bar chart for a track' })
+	async trendViewTerritoryBarChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTrendViewTerritoryBarChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/dsp/bar-chart')
+	@ApiOperation({ summary: 'Revenue DSP bar chart for a track' })
+	async revenueDspBarChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueDspBarChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('revenue/ter/bar-chart')
+	@ApiOperation({ summary: 'Revenue territory bar chart for a track' })
+	async revenueTerritoryBarChart(
+		@Param('isrc') isrc: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getRevenueTerritoryBarChart(
 				'track',
 				isrc,
 				dto,

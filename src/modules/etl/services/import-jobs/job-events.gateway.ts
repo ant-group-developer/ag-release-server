@@ -4,7 +4,7 @@ import { filter } from 'rxjs/operators';
 
 export interface JobEvent {
   jobId: string;
-  type: 'progress' | 'completed' | 'failed' | 'snapshot';
+  type: 'progress' | 'completed' | 'failed' | 'cancelled' | 'snapshot';
   data: Record<string, any>;
   timestamp: string;
 }

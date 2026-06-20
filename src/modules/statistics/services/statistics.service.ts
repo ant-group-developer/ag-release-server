@@ -272,9 +272,26 @@ export class StatisticsService {
 		startDate: Date;
 		endDate: Date;
 	}) {
-		return startDate && endDate
-			? { createdAt: Between(startDate, endDate) }
-			: {};
+		if (!startDate || !endDate) return {};
+
+		const { startOfDay, endOfDay } = this.normalizeDateRangeToFullDays({
+			startDate,
+			endDate,
+		});
+		return { createdAt: Between(startOfDay, endOfDay) };
+	}
+
+	private normalizeDateRangeToFullDays({
+		startDate,
+		endDate,
+	}: {
+		startDate: Date;
+		endDate: Date;
+	}) {
+		return {
+			startOfDay: dayjs(startDate).startOf('day').toDate(),
+			endOfDay: dayjs(endDate).endOf('day').toDate(),
+		};
 	}
 
 	// private method --version 2

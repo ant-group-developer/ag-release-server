@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
@@ -94,6 +95,102 @@ export class ReleaseAnalyticsController {
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueTimeline(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('trend-view/line-chart')
+	@ApiOperation({ summary: 'Trend view line chart for a release' })
+	async trendViewLineChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTrendViewLineChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/line-chart')
+	@ApiOperation({ summary: 'Revenue line chart for a release' })
+	async revenueLineChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getRevenueLineChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('trend-view/dsp/bar-chart')
+	@ApiOperation({ summary: 'Trend view DSP bar chart for a release' })
+	async trendViewDspBarChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTrendViewDspBarChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('trend-view/ter/bar-chart')
+	@ApiOperation({ summary: 'Trend view territory bar chart for a release' })
+	async trendViewTerritoryBarChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTrendViewTerritoryBarChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/dsp/bar-chart')
+	@ApiOperation({ summary: 'Revenue DSP bar chart for a release' })
+	async revenueDspBarChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getRevenueDspBarChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/ter/bar-chart')
+	@ApiOperation({ summary: 'Revenue territory bar chart for a release' })
+	async revenueTerritoryBarChart(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: ChartQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getRevenueTerritoryBarChart(
 			'release',
 			releaseId,
 			dto,

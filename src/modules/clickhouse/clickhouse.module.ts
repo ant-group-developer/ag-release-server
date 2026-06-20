@@ -34,7 +34,7 @@ import { ClickHouseMigrationService } from './clickhouse-migration.service';
             async_insert: 1,
             wait_for_async_insert: 1,
           },
-          request_timeout: 30_000,
+          request_timeout: 300_000,
         });
       },
       inject: [ConfigService],
