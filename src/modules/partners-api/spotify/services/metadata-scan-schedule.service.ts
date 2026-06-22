@@ -203,7 +203,6 @@ export class MetadataScanScheduleService implements OnModuleInit {
 		this.metadataScanService
 			.scanAndEnrichAll({
 				scanId,
-				dryRun: false,
 				force: schedule.force,
 				limit: schedule.limitCount ?? undefined,
 				isImportedFromReport: schedule.isImportedFromReport,

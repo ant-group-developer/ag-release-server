@@ -133,9 +133,33 @@ export class TrackDraftService {
 
 	// update
 	async bulkUpdate(data: BulkUpdateTrackDraft) {
-		for (const t of data.trackDrafts) {
+		const trackDrafts = data.trackDrafts.filter((t) => t.id);
+
+		if (!this.shouldUpdateTrackDraftsIndividually(trackDrafts)) {
+			await this.trackRepo.manager.transaction(async (manager) => {
+				const repo = manager.getRepository(Track);
+
+				await repo.save(
+					trackDrafts.map((trackDraft, index) => ({
+						id: trackDraft.id,
+						order: -(index + 1),
+					})),
+				);
+
+				await repo.save(
+					trackDrafts.map((trackDraft) => ({
+						id: trackDraft.id,
+						order: trackDraft.order,
+					})),
+				);
+			});
+			return;
+		}
+
+		for (const t of trackDrafts) {
 			if (t.id) {
-				this.updateSafeSync(t.id, t);
+				// this.updateSafe(t.id, t);
+				await this.update(t.id, t);
 			}
 		}
 	}
@@ -163,15 +187,24 @@ export class TrackDraftService {
 		return this.trackQueryService.ensureDraftTrack(result);
 	}
 
-	async updateSafe(id: string, data: UpdateTrackDraftDto) {
-		try {
-			await this.update(id, data);
-		} catch (error) {
-			this.logger.error(error);
-		}
+	private shouldUpdateTrackDraftsIndividually(
+		trackDrafts: UpdateTrackDraftDto[],
+	) {
+		return trackDrafts.some((trackDraft) => {
+			if (trackDraft.order === undefined) {
+				return true;
+			}
+
+			const updateKeys = Object.keys(trackDraft).filter(
+				(key) =>
+					trackDraft[key as keyof UpdateTrackDraftDto] !== undefined,
+			);
+
+			return updateKeys.some((key) => !['id', 'order'].includes(key));
+		});
 	}
 
-	updateSafeSync(id: string, data: UpdateTrackDraftDto) {
+	updateSafe(id: string, data: UpdateTrackDraftDto) {
 		this.update(id, data).catch((err) => console.log(err));
 	}
 

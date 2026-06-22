@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,14 +18,20 @@ export class DspMappingService implements OnModuleInit {
   private readonly logger = new Logger(DspMappingService.name);
   private dspsReportCache: Map<string, DspsReport> = new Map(); // dsp_name (lowercase) -> DspsReport object
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
+  ) {}
 
-  async onModuleInit() {
-    try {
-      await this.loadCache();
-    } catch (err) {
+  onModuleInit() {
+    this.initializeCacheInBackground().catch((err) => {
       this.logger.error(`Failed to load dsps_report cache during init: ${err.message}`, err.stack);
-    }
+    });
+  }
+
+  private async initializeCacheInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
+    await this.loadCache();
   }
 
   /**

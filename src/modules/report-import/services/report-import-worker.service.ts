@@ -11,6 +11,7 @@ import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.se
 import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild.service';
 import { DspMappingService } from '../../dsp/services/dsp-mapping.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
 import {
   FactSalesRow,
@@ -66,10 +67,18 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
     private readonly exchangeRateService: ExchangeRateService,
     @InjectRepository(Label)
     private readonly labelRepo: Repository<Label>,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
   ) {}
 
-  async onApplicationBootstrap() {
-    this.logger.log('Starting Report Import Worker...');
+  onApplicationBootstrap() {
+    this.initializeWorkerInBackground().catch((err) => {
+      this.logger.error(`Failed to initialize Report Import Worker: ${err.message}`, err.stack);
+    });
+  }
+
+  private async initializeWorkerInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
+
     // Redeliver any jobs stuck in processing from a previous crash
     await this.queueService.redeliverStuckJobs().catch((err) => {
       this.logger.error(`Failed to redeliver stuck jobs: ${err.message}`);

@@ -7,6 +7,7 @@ export enum ScanSessionStatus {
 	PROCESSING = 'PROCESSING',
 	COMPLETED = 'COMPLETED',
 	FAILED = 'FAILED',
+	CANCELLED = 'CANCELLED',
 }
 
 export enum MetadataScanTriggerType {
