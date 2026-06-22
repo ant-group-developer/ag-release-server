@@ -120,7 +120,10 @@ export class MetadataScanService implements OnModuleInit {
 		triggerType?: MetadataScanTriggerType;
 		scheduleId?: string;
 	}): Promise<ScanResult> {
-		const limit = options?.limit;
+		const limit =
+			options?.limit !== undefined && options.limit > 0
+				? options.limit
+				: undefined;
 		const dryRun = false;
 		const scanId = options?.scanId ?? uuidv4();
 		const force = options?.force ?? false;
