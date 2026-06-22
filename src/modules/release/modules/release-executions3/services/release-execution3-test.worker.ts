@@ -34,6 +34,7 @@ type StepTaskContext = {
 
 export const DEFAULT_WAIT_MINUTES = 0.1; // 0.1 phút // dev
 export const MINUTES_PER_DAY = 0.1; // 0.1 phút // dev
+const waitMinutes = 0.1;
 
 @Injectable()
 export class ReleaseExecution3WorkerTest {
@@ -596,8 +597,7 @@ export class ReleaseExecution3WorkerTest {
 			}
 
 			// Lần đầu chạy → set lịch và dừng lại
-			const waitMinutes =
-				step.metadata?.input?.waitMinutes ?? DEFAULT_WAIT_MINUTES;
+
 			const newScheduledAt = new Date(
 				Date.now() + waitMinutes * 60 * 1000,
 			);
@@ -676,7 +676,7 @@ export class ReleaseExecution3WorkerTest {
 				generatedIsrcs,
 			});
 
-			const { outputDir, batchId, xml } =
+			const { outputDir, batchId, releaseReference, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
 					release: releaseForMetadata,
 					ernVersion: config.ernVersion,
@@ -695,6 +695,7 @@ export class ReleaseExecution3WorkerTest {
 				output: {
 					outputDir,
 					batchId,
+					releaseReference,
 					xml,
 				},
 			};
@@ -916,8 +917,9 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
-			console.log('Syncing data from DSP...');
+			// console.log('Syncing data from DSP...');
 
 			const parent = await this.getParentStep(step);
 
@@ -934,17 +936,17 @@ export class ReleaseExecution3WorkerTest {
 					ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
 				);
 				const batchId = metadataStep?.metadata?.output?.batchId;
-				const upc =
-					releaseExecution.metadata.input
-						.upcAutoIfReleaseSnapshotNull ||
-					releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+				const releaseReference =
+					metadataStep?.metadata?.output?.releaseReference;
 
 				if (!batchId) {
 					throw new Error(
 						'Missing batchId from CREATE_METADATA_ON_SERVER step',
 					);
 				}
-				if (!upc) throw new Error('Missing UPC for VEVO response');
+				if (!releaseReference) {
+					throw new Error('Missing ISRC for VEVO response');
+				}
 
 				const config =
 					await this.dspRoutingService.resolveFullDeliveryConfig(
@@ -954,7 +956,7 @@ export class ReleaseExecution3WorkerTest {
 				const response = await this.sftpConnectService.getVevoResponse({
 					sftp: config.sftp,
 					batchId,
-					upc,
+					releaseReference,
 				});
 
 				if (!response) {

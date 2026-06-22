@@ -134,7 +134,7 @@ export class ChannelService {
 			qb.andWhere('channel.status = :status', { status });
 		}
 
-		if (onlyActorTenant) {
+		if (onlyActorTenant && checkIsNotSystemTenant(actorTenantId)) {
 			qb.andWhere('channel.tenantId = :actorTenantId', {
 				actorTenantId,
 			});

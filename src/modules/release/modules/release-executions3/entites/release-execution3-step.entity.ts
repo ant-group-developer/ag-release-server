@@ -43,7 +43,9 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.parentStep)
 	childSteps?: ReleaseExecutionStep3[];
 
-	@OneToMany(() => Logs, (log) => log.releaseExecutionStep)
+	@OneToMany(() => Logs, (log) => log.releaseExecutionStep, {
+		persistence: false,
+	})
 	logs: Logs[];
 
 	@Column({ type: 'varchar', length: 50 })
