@@ -113,6 +113,11 @@ export class ReleaseExecution3Builder {
 				const { dspDirect, dspAggregator } =
 					releaseExecution.metadata.input;
 
+				const aggregatorDsps = [
+					...(dspAggregator?.ci?.ci ?? []),
+					...(dspAggregator?.ci?.state51 ?? []),
+				];
+
 				if (dspDirect?.length) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.PROCESS_DIRECT,
@@ -122,11 +127,11 @@ export class ReleaseExecution3Builder {
 					});
 				}
 
-				if (dspAggregator?.ci?.ci?.length) {
+				if (aggregatorDsps.length) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.PROCESS_AGG,
 						order: 2,
-						metadata: { input: { dsps: dspAggregator.ci.ci } },
+						metadata: { input: { dsps: aggregatorDsps } },
 						childExecutionMode: 'parallel',
 					});
 				}

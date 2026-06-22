@@ -367,11 +367,11 @@ export class SftpConnectService {
 	async getVevoResponse({
 		sftp,
 		batchId,
-		upc,
+		releaseReference,
 	}: {
 		sftp: SftpMetadata;
 		batchId: string;
-		upc: string;
+		releaseReference: string;
 	}): Promise<{
 		status: 'success' | 'failure';
 		key: string;
@@ -386,7 +386,7 @@ export class SftpConnectService {
 		}
 
 		const s3 = this.createS3Client(sftp);
-		const prefix = this.buildS3Key(sftp.path, batchId, upc);
+		const prefix = this.buildS3Key(sftp.path, batchId, releaseReference);
 		const result = await s3.send(
 			new ListObjectsV2Command({
 				Bucket: sftp.bucket,

@@ -80,14 +80,20 @@ export class ReleaseDdexService {
 		const batchId = genBatchId();
 
 		const upc = release.upc ?? 'new_upc';
-		if (!upc) {
-			throw new Error('Không tìm thấy mã UPC của release');
+		const releaseReference =
+			release.type === 'video' ? release.video?.isrc : upc;
+		if (!releaseReference) {
+			throw new Error(
+				release.type === 'video'
+					? 'Không tìm thấy mã ISRC của video'
+					: 'Không tìm thấy mã UPC của release',
+			);
 		}
 
 		const baseDir =
 			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
 		const outputRoot = path.join(baseDir, batchId);
-		const releaseDir = path.join(outputRoot, upc);
+		const releaseDir = path.join(outputRoot, releaseReference);
 		const resourcesDir = path.join(releaseDir, 'resources');
 
 		fs.mkdirSync(resourcesDir, { recursive: true });
@@ -97,6 +103,7 @@ export class ReleaseDdexService {
 		const tempDir = await fs.promises.mkdtemp(
 			path.join(os.tmpdir(), `release-${release.id}-${Date.now()}-`),
 		);
+		let coverExtension: string | undefined;
 
 		try {
 			if (release.type === 'video') {
@@ -105,11 +112,12 @@ export class ReleaseDdexService {
 						release,
 						tempDir,
 					);
+				coverExtension = coverImage.extension;
 
 				await this.processCoverImage({
 					coverImage,
 					outputDir: resourcesDir,
-					upc,
+					releaseReference: releaseReference,
 				});
 
 				await this.processVideoAndSubtitleFiles({
@@ -124,11 +132,12 @@ export class ReleaseDdexService {
 						release,
 						tempDir,
 					);
+				coverExtension = coverImage.extension;
 
 				await this.processCoverImage({
 					coverImage,
 					outputDir: resourcesDir,
-					upc,
+					releaseReference: upc,
 				});
 
 				await this.processAudioFiles({
@@ -143,6 +152,7 @@ export class ReleaseDdexService {
 				ernVersion,
 				recipient,
 				sender,
+				coverExtension,
 			});
 
 			if (dspCode?.toUpperCase() !== 'VEVO') {
@@ -161,7 +171,13 @@ export class ReleaseDdexService {
 				message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
 			});
 
-			return { outputDir: outputRoot, outputRoot, batchId, xml };
+			return {
+				outputDir: outputRoot,
+				outputRoot,
+				batchId,
+				releaseReference,
+				xml,
+			};
 		} finally {
 			// Xóa file tạm dù thành công hay throw
 			await fs.promises.rm(tempDir, { recursive: true, force: true });
@@ -174,10 +190,12 @@ export class ReleaseDdexService {
 		ernVersion,
 		sender,
 		recipient,
+		coverExtension,
 	}: {
 		release: Release;
 		outputDir: string;
 		ernVersion: ErnVersion2;
+		coverExtension?: string;
 		sender: {
 			partyId: string;
 			name: string;
@@ -192,10 +210,20 @@ export class ReleaseDdexService {
 			ernVersion,
 			sender,
 			recipient,
+			coverExtension,
 		});
 		const xmlContent = this.ernService2.generate(input);
 
-		const mainXmlPath = path.join(outputDir, `${release.upc}.xml`);
+		const releaseReference =
+			release.type === 'video' ? release.video?.isrc : release.upc;
+		if (!releaseReference) {
+			throw new Error(
+				release.type === 'video'
+					? 'Không tìm thấy mã ISRC của video'
+					: 'Không tìm thấy mã UPC của release',
+			);
+		}
+		const mainXmlPath = path.join(outputDir, `${releaseReference}.xml`);
 		fs.writeFileSync(mainXmlPath, xmlContent, 'utf-8');
 
 		return xmlContent;
@@ -580,11 +608,11 @@ export class ReleaseDdexService {
 	private async processCoverImage({
 		coverImage,
 		outputDir,
-		upc,
+		releaseReference,
 	}: {
 		coverImage: CoverImageInfo;
 		outputDir: string;
-		upc: string;
+		releaseReference: string;
 	}): Promise<void> {
 		const buffer = await fs.promises.readFile(coverImage.filePath);
 		const img = await resizeCoverImageTo3000x3000({
@@ -592,7 +620,7 @@ export class ReleaseDdexService {
 		});
 
 		const ext = this.normalizeImageExtension(coverImage.extension);
-		const fileName = `${upc}${ext}`;
+		const fileName = `${releaseReference}${ext}`;
 		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
@@ -686,9 +714,11 @@ export class ReleaseDdexService {
 		ernVersion,
 		sender,
 		recipient,
+		coverExtension,
 	}: {
 		release: Release;
 		ernVersion: ErnVersion2;
+		coverExtension?: string;
 		sender: {
 			partyId: string;
 			name: string;
@@ -704,6 +734,7 @@ export class ReleaseDdexService {
 				ernVersion,
 				sender,
 				recipient,
+				coverExtension,
 			});
 		}
 		const normalizeParentalWarning = (code?: string) => {
@@ -730,7 +761,9 @@ export class ReleaseDdexService {
 
 		const cover = release.releaseCoverArts?.[0];
 		const coverExt = cover
-			? this.normalizeImageExtension(cover.file?.extension ?? 'jpg')
+			? this.normalizeImageExtension(
+					coverExtension ?? cover.file?.extension ?? 'jpg',
+				)
 			: '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
@@ -810,7 +843,7 @@ export class ReleaseDdexService {
 					? {
 							fileName: `${release.upc}${coverExt}`,
 							filePath: 'resources',
-							codecType: 'image/jpeg',
+							codecType: this.getImageMimeType(coverExt),
 							width: cover.width,
 							height: cover.height,
 						}
@@ -1116,6 +1149,20 @@ export class ReleaseDdexService {
 		return '.jpg'; // Default
 	}
 
+	private getImageMimeType(ext: string): string {
+		switch (ext.toLowerCase()) {
+			case '.png':
+				return 'image/png';
+			case '.webp':
+				return 'image/webp';
+			case '.tif':
+			case '.tiff':
+				return 'image/tiff';
+			default:
+				return 'image/jpeg';
+		}
+	}
+
 	/**
 	 * Normalize audio extension
 	 */
@@ -1137,15 +1184,19 @@ export class ReleaseDdexService {
 		ernVersion,
 		sender,
 		recipient,
+		coverExtension,
 	}: {
 		release: Release;
 		ernVersion: ErnVersion2;
 		sender: { partyId: string; name: string };
 		recipient: { partyId: string; name: string };
+		coverExtension?: string;
 	}): ErnInput2 {
 		const cover = release.releaseCoverArts?.[0];
 		const coverExt = cover
-			? this.normalizeImageExtension(cover.file?.extension ?? 'jpg')
+			? this.normalizeImageExtension(
+					coverExtension ?? cover.file?.extension ?? 'jpg',
+				)
 			: '.jpg';
 
 		const territories = this.getTerritoriesFromRelease(release);
@@ -1184,7 +1235,7 @@ export class ReleaseDdexService {
 		return {
 			version: ernVersion,
 			message: {
-				id: release.upc ?? release.id,
+				id: videoIsrc || release.id,
 				sender,
 				recipient,
 			},
@@ -1218,9 +1269,9 @@ export class ReleaseDdexService {
 				territories,
 				coverArt: cover
 					? {
-							fileName: `${release.upc}${coverExt}`,
+							fileName: `${videoIsrc}${coverExt}`,
 							filePath: 'resources',
-							codecType: 'image/jpeg',
+							codecType: this.getImageMimeType(coverExt),
 							width: cover.width,
 							height: cover.height,
 						}
