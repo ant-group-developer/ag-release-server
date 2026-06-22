@@ -34,6 +34,7 @@ type StepTaskContext = {
 
 export const DEFAULT_WAIT_MINUTES = 0.1; // 0.1 phút // dev
 export const MINUTES_PER_DAY = 0.1; // 0.1 phút // dev
+const waitMinutes = 0.1;
 
 @Injectable()
 export class ReleaseExecution3WorkerTest {
@@ -596,8 +597,7 @@ export class ReleaseExecution3WorkerTest {
 			}
 
 			// Lần đầu chạy → set lịch và dừng lại
-			const waitMinutes =
-				step.metadata?.input?.waitMinutes ?? DEFAULT_WAIT_MINUTES;
+
 			const newScheduledAt = new Date(
 				Date.now() + waitMinutes * 60 * 1000,
 			);
@@ -916,8 +916,9 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
-			console.log('Syncing data from DSP...');
+			// console.log('Syncing data from DSP...');
 
 			const parent = await this.getParentStep(step);
 
