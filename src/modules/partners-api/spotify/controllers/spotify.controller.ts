@@ -67,19 +67,16 @@ export class SpotifyController {
 			'Scans releases with placeholder UPCs (ISRC-xxx) or missing metadata. ' +
 			'Enriches with real data from Spotify/Deezer APIs. ' +
 			'Every change is logged to ClickHouse `metadata_enrichment_log`. ' +
-			'Use dryRun=true to preview. If limit is not provided, runs for ALL releases in background.',
+			'If limit is not provided, runs for ALL releases in background.',
 	})
-	@ApiQuery({ name: 'dryRun', required: false, type: Boolean, description: 'Preview changes without writing to DB' })
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max releases to process (omit to run ALL in background)' })
 	@ApiQuery({ name: 'force', required: false, type: Boolean, description: 'Force re-scan already enriched releases' })
 	@ApiQuery({ name: 'isImportedFromReport', required: false, type: Boolean, description: 'true: full report-import enrichment, false: links only' })
 	async scanAndEnrich(
-		@Query('dryRun') dryRun?: string,
 		@Query('limit') limit?: string,
 		@Query('force') force?: string,
 		@Query('isImportedFromReport') isImportedFromReport?: string,
 	) {
-		const isDryRun = dryRun === 'true';
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
 		const isForce = force === 'true';
 		const parsedIsImportedFromReport =
@@ -89,7 +86,6 @@ export class SpotifyController {
 		// Always run the scan asynchronously in the background
 		this.metadataScanService
 			.scanAndEnrichAll({
-				dryRun: isDryRun,
 				limit: parsedLimit,
 				scanId,
 				force: isForce,
@@ -104,7 +100,6 @@ export class SpotifyController {
 			data: {
 				message: 'Scan started in the background',
 				scanId,
-				dryRun: isDryRun,
 				force: isForce,
 				limit: parsedLimit,
 				isImportedFromReport: parsedIsImportedFromReport,
@@ -153,6 +148,22 @@ export class SpotifyController {
 	@ApiOperation({ summary: 'Run metadata scan schedule now' })
 	async runScanScheduleNow(@Param('id') id: string) {
 		const result = await this.metadataScanScheduleService.runNow(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('enrich/scan/:scanId/cancel')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Cancel a specific metadata scan session' })
+	async cancelScanSession(@Param('scanId') scanId: string) {
+		const result = await this.metadataScanService.cancelScanSession(scanId);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('enrich/scan/cancel-all')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Cancel all active metadata scan sessions' })
+	async cancelAllScanSessions() {
+		const result = await this.metadataScanService.cancelAllScanSessions();
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -275,7 +286,8 @@ export class SpotifyController {
 
 				if (
 					session.status === 'COMPLETED' ||
-					session.status === 'FAILED'
+					session.status === 'FAILED' ||
+					session.status === 'CANCELLED'
 				) {
 					return of(snapshotEvt);
 				}
@@ -288,7 +300,8 @@ export class SpotifyController {
 			takeWhile((evt) => {
 				return (
 					evt.type !== 'completed' &&
-					evt.type !== 'failed'
+					evt.type !== 'failed' &&
+					evt.type !== 'cancelled'
 				);
 			}, true),
 		);

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
-import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
+import { ClickHouseService, CLICKHOUSE_TABLES, ClickHouseMigrationService } from '../../../clickhouse';
 import {
   CreateImportJobInput,
   ImportJob,
@@ -34,14 +34,18 @@ export class ImportJobsService implements OnModuleInit {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly jobEvents: JobEventsGateway,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    try {
-      await this.markStaleAsFailed();
-    } catch (err) {
+  onModuleInit() {
+    this.initializeJobsInBackground().catch((err) => {
       this.logger.warn(`Crash recovery sweep failed: ${err.message}`);
-    }
+    });
+  }
+
+  private async initializeJobsInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
+    await this.markStaleAsFailed();
   }
 
   async create(input: CreateImportJobInput): Promise<ImportJob> {

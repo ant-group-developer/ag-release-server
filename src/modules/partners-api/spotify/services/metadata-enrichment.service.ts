@@ -66,6 +66,7 @@ export interface EnrichedMetadata {
 
 interface EnrichmentLookupOptions {
 	forceExternal?: boolean;
+	checkCancelled?: () => Promise<void> | void;
 }
 
 @Injectable()
@@ -86,6 +87,9 @@ export class MetadataEnrichmentService {
 		isrc: string,
 		options?: EnrichmentLookupOptions,
 	): Promise<EnrichedMetadata | null> {
+		if (options?.checkCancelled) {
+			await options.checkCancelled();
+		}
 		if (!isrc?.trim()) return null;
 		const normalizedIsrc = isrc.trim().toUpperCase();
 
@@ -159,6 +163,9 @@ export class MetadataEnrichmentService {
 		upc: string,
 		options?: EnrichmentLookupOptions,
 	): Promise<EnrichedMetadata | null> {
+		if (options?.checkCancelled) {
+			await options.checkCancelled();
+		}
 		if (!upc?.trim()) return null;
 		const normalizedUpc = upc.trim();
 
@@ -234,7 +241,7 @@ export class MetadataEnrichmentService {
 	 */
 	async enrichBatch(
 		isrcs: string[],
-		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean },
+		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean; checkCancelled?: () => Promise<void> | void },
 	): Promise<Map<string, EnrichedMetadata>> {
 		const concurrency = options?.concurrency ?? 3;
 		const delayMs = options?.delayMs ?? 200;
@@ -246,8 +253,14 @@ export class MetadataEnrichmentService {
 
 		// Process in sliding-window batches
 		for (let i = 0; i < unique.length; i += concurrency) {
+			if (options?.checkCancelled) {
+				await options.checkCancelled();
+			}
 			const batch = unique.slice(i, i + concurrency);
 			const promises = batch.map(async (isrc) => {
+				if (options?.checkCancelled) {
+					await options.checkCancelled();
+				}
 				const cached = batchCache.get(isrc);
 				if (cached) {
 					results.set(isrc, cached);
@@ -258,6 +271,7 @@ export class MetadataEnrichmentService {
 				try {
 					const meta = await this.enrichByIsrc(isrc, {
 						forceExternal: options?.forceExternal,
+						checkCancelled: options?.checkCancelled,
 					});
 					if (meta) {
 						this.cacheBatchMetadata(batchCache, isrc, meta);

@@ -1,7 +1,14 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { DataSource, FindOptionsWhere, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Release } from 'src/modules/release/entities/release.entity';
+
+export class ScanCancelledError extends Error {
+	constructor(scanId: string) {
+		super(`Scan session ${scanId} was cancelled`);
+		this.name = ScanCancelledError.name;
+	}
+}
 import { Track } from 'src/modules/track/entities/track.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
@@ -41,6 +48,7 @@ export interface ScanResult {
 @Injectable()
 export class MetadataScanService implements OnModuleInit {
 	private readonly logger = new Logger(MetadataScanService.name);
+	private readonly cancelledScanSessions = new Set<string>();
 
 	constructor(
 		private readonly dataSource: DataSource,
@@ -106,15 +114,17 @@ export class MetadataScanService implements OnModuleInit {
 	 */
 	async scanAndEnrichAll(options?: {
 		limit?: number;
-		dryRun?: boolean;
 		scanId?: string;
 		force?: boolean;
 		isImportedFromReport?: boolean;
 		triggerType?: MetadataScanTriggerType;
 		scheduleId?: string;
 	}): Promise<ScanResult> {
-		const limit = options?.limit;
-		const dryRun = options?.dryRun ?? false;
+		const limit =
+			options?.limit !== undefined && options.limit > 0
+				? options.limit
+				: undefined;
+		const dryRun = false;
 		const scanId = options?.scanId ?? uuidv4();
 		const force = options?.force ?? false;
 		const isImportedFromReport = options?.isImportedFromReport ?? true;
@@ -147,17 +157,21 @@ export class MetadataScanService implements OnModuleInit {
 		});
 		await sessionRepo.save(session);
 
+		const result: ScanResult = {
+			scanId,
+			totalScanned: 0,
+			enriched: 0,
+			upcResolved: 0,
+			metadataUpdated: 0,
+			errors: 0,
+			changesLogged: 0,
+			details: [],
+		};
+
+		let currentPendingReleases: Array<{ release: Release; currentTrackIndex: number; resolved: boolean }> = [];
+		let currentChunkFailedReleases = new Set<string>();
+
 		try {
-			const result: ScanResult = {
-				scanId,
-				totalScanned: 0,
-				enriched: 0,
-				upcResolved: 0,
-				metadataUpdated: 0,
-				errors: 0,
-				changesLogged: 0,
-				details: [],
-			};
 
 			const changeLogs: ChangeLogEntry[] = [];
 			const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
@@ -262,6 +276,7 @@ export class MetadataScanService implements OnModuleInit {
 
 			const chunkSize = 50;
 			for (let rIndex = 0; rIndex < allReleases.length; rIndex += chunkSize) {
+				await this.throwIfScanCancelled(scanId);
 				const releaseChunk = allReleases.slice(rIndex, rIndex + chunkSize);
 				this.logger.log(
 					`[Scan Progress] Processing releases ${rIndex + 1} to ${Math.min(
@@ -276,9 +291,11 @@ export class MetadataScanService implements OnModuleInit {
 					currentTrackIndex: 0,
 					resolved: false,
 				}));
+				currentPendingReleases = pendingReleases;
 
 				const chunkChangeLogs: ChangeLogEntry[] = [];
 				const chunkFailedReleases = new Set<string>();
+				currentChunkFailedReleases = chunkFailedReleases;
 
 				// Collect releases that have NO real tracks, so we can try UPC lookup on them
 				const releasesForUpcLookup = pendingReleases.filter(pr => {
@@ -297,6 +314,7 @@ export class MetadataScanService implements OnModuleInit {
 							this.logger.log(`Querying Spotify/Deezer for UPC ${upc}...`);
 							const enriched = await this.metadataEnrichmentService.enrichByUpc(upc, {
 								forceExternal: force,
+								checkCancelled: () => this.throwIfScanCancelled(scanId),
 							});
 							if (enriched) {
 								const primaryEnriched = enriched;
@@ -469,6 +487,7 @@ export class MetadataScanService implements OnModuleInit {
 				}
 
 				while (pendingReleases.some(pr => !pr.resolved && pr.currentTrackIndex < (pr.release.tracks?.length ?? 0))) {
+					await this.throwIfScanCancelled(scanId);
 					// Collect one ISRC per pending/unresolved release
 					const isrcToReleaseMap = new Map<string, { release: Release; track: Track }>();
 
@@ -500,6 +519,7 @@ export class MetadataScanService implements OnModuleInit {
 						concurrency: Math.max(1, Math.floor(Number(process.env.METADATA_SCAN_ENRICH_CONCURRENCY) || 1)),
 						delayMs: Math.max(0, Math.floor(Number(process.env.METADATA_SCAN_ENRICH_DELAY_MS) || 500)),
 						forceExternal: force,
+						checkCancelled: () => this.throwIfScanCancelled(scanId),
 					});
 
 					// Group results by release
@@ -520,6 +540,7 @@ export class MetadataScanService implements OnModuleInit {
 
 					// Apply updates for releases that got successfully enriched in this round
 					for (const [releaseId, { release, enrichedTracks }] of releaseUpdates) {
+						await this.throwIfScanCancelled(scanId);
 						try {
 							if (enrichedTracks.length === 0) continue;
 
@@ -1003,6 +1024,7 @@ export class MetadataScanService implements OnModuleInit {
 
 				// For releases that were NOT enriched (resolved = false), mark as NOT_FOUND
 				for (const pr of pendingReleases) {
+					await this.throwIfScanCancelled(scanId);
 					if (!pr.resolved && !chunkFailedReleases.has(pr.release.id)) {
 						await this.updateEnrichmentStatus(pr.release.id, ReleaseEnrichmentStatus.NOT_FOUND, scanId, {
 							dryRun,
@@ -1066,6 +1088,8 @@ export class MetadataScanService implements OnModuleInit {
 				});
 			}
 
+			await this.throwIfScanCancelled(scanId);
+
 			session.status = ScanSessionStatus.COMPLETED;
 			session.finishedAt = new Date();
 			await sessionRepo.save(session);
@@ -1093,6 +1117,52 @@ export class MetadataScanService implements OnModuleInit {
 
 			return result;
 		} catch (err) {
+			if (err instanceof ScanCancelledError) {
+				await this.revertProcessingReleasesToPending(scanId);
+
+				let chunkSuccess = 0;
+				let chunkFailed = 0;
+				let chunkProcessed = 0;
+				for (const pr of currentPendingReleases) {
+					if (pr.resolved) {
+						chunkSuccess++;
+						chunkProcessed++;
+					} else if (currentChunkFailedReleases.has(pr.release.id)) {
+						chunkFailed++;
+						chunkProcessed++;
+					}
+				}
+
+				session.processedReleases += chunkProcessed;
+				session.successCount += chunkSuccess;
+				session.failedCount += chunkFailed;
+
+				session.status = ScanSessionStatus.CANCELLED;
+				session.errorMessage = 'Scan cancelled by user';
+				session.finishedAt = new Date();
+				await sessionRepo.save(session);
+
+				result.totalScanned = session.processedReleases;
+				result.enriched = session.successCount;
+				result.errors = session.failedCount;
+
+				this.enrichEventsGateway.emit({
+					scanId,
+					type: 'cancelled',
+					timestamp: new Date().toISOString(),
+					data: {
+						status: session.status,
+						totalReleases: session.totalReleases,
+						processedReleases: session.processedReleases,
+						successCount: session.successCount,
+						failedCount: session.failedCount,
+						notFoundCount: session.notFoundCount,
+					},
+				});
+				this.logger.warn(`Scan session ${scanId} was cancelled by user.`);
+				return result;
+			}
+
 			await this.markProcessingReleasesFailed(scanId, err.message, dryRun);
 			session.status = ScanSessionStatus.FAILED;
 			session.errorMessage = err.message;
@@ -1109,6 +1179,8 @@ export class MetadataScanService implements OnModuleInit {
 				},
 			});
 			throw err;
+		} finally {
+			this.cancelledScanSessions.delete(scanId);
 		}
 	}
 
@@ -1311,6 +1383,102 @@ export class MetadataScanService implements OnModuleInit {
 			.where('release.id IN (:...releaseIds)', { releaseIds })
 			.orderBy('release.createdAt', 'DESC')
 			.getMany();
+	}
+
+	private async throwIfScanCancelled(scanId: string): Promise<void> {
+		if (this.cancelledScanSessions.has(scanId)) {
+			throw new ScanCancelledError(scanId);
+		}
+
+		const session = await this.dataSource.getRepository(MetadataScanSession).findOne({
+			where: { id: scanId },
+			select: ['status'],
+		});
+
+		if (session?.status === ScanSessionStatus.CANCELLED) {
+			this.cancelledScanSessions.add(scanId);
+			throw new ScanCancelledError(scanId);
+		}
+	}
+
+	private async revertProcessingReleasesToPending(scanId: string): Promise<void> {
+		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
+		await enrichmentRepo.update(
+			{
+				lastScanId: scanId,
+				status: ReleaseEnrichmentStatus.PROCESSING,
+			},
+			{
+				status: ReleaseEnrichmentStatus.PENDING,
+				errorMessage: 'Scan cancelled by user',
+				lastScannedAt: new Date(),
+			},
+		);
+	}
+
+	async cancelScanSession(scanId: string): Promise<{
+		scanId: string;
+		status: ScanSessionStatus;
+		cancelled: boolean;
+	}> {
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const session = await sessionRepo.findOne({ where: { id: scanId } });
+		if (!session) {
+			throw new NotFoundException(`Scan session not found: ${scanId}`);
+		}
+
+		if (
+			session.status === ScanSessionStatus.COMPLETED ||
+			session.status === ScanSessionStatus.FAILED ||
+			session.status === ScanSessionStatus.CANCELLED
+		) {
+			return {
+				scanId: session.id,
+				status: session.status,
+				cancelled: session.status === ScanSessionStatus.CANCELLED,
+			};
+		}
+
+		this.cancelledScanSessions.add(scanId);
+		session.status = ScanSessionStatus.CANCELLED;
+		session.errorMessage = 'Cancelled by user';
+		session.finishedAt = new Date();
+		await sessionRepo.save(session);
+
+		await this.revertProcessingReleasesToPending(scanId);
+
+		return {
+			scanId: session.id,
+			status: session.status,
+			cancelled: true,
+		};
+	}
+
+	async cancelAllScanSessions(): Promise<{
+		cancelledCount: number;
+		scanIds: string[];
+	}> {
+		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
+		const activeSessions = await sessionRepo.find({
+			where: { status: ScanSessionStatus.PROCESSING },
+		});
+
+		const scanIds: string[] = [];
+		for (const session of activeSessions) {
+			this.cancelledScanSessions.add(session.id);
+			session.status = ScanSessionStatus.CANCELLED;
+			session.errorMessage = 'Cancelled by user';
+			session.finishedAt = new Date();
+			await sessionRepo.save(session);
+
+			await this.revertProcessingReleasesToPending(session.id);
+			scanIds.push(session.id);
+		}
+
+		return {
+			cancelledCount: scanIds.length,
+			scanIds,
+		};
 	}
 
 	private async markProcessingReleasesFailed(

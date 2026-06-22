@@ -42,6 +42,6 @@ import { ClickHouseMigrationService } from './clickhouse-migration.service';
     ClickHouseService,
     ClickHouseMigrationService,
   ],
-  exports: [ClickHouseService, CLICKHOUSE_CLIENT],
+  exports: [ClickHouseService, CLICKHOUSE_CLIENT, ClickHouseMigrationService],
 })
 export class ClickHouseModule {}
