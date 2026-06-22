@@ -4,6 +4,7 @@ import { CronJob } from 'cron';
 import { SyncService } from '../sync/sync.service';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
 import { ImportJobSourceType } from '../../interfaces';
+import { ClickHouseMigrationService } from '../../../clickhouse';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit {
@@ -13,9 +14,17 @@ export class SchedulerService implements OnModuleInit {
     private readonly syncService: SyncService,
     private readonly importJobsService: ImportJobsService,
     private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
+    this.initializeSchedulerInBackground().catch((err) => {
+      this.logger.error(`Failed to initialize auto-sync cron: ${err.message}`, err.stack);
+    });
+  }
+
+  private async initializeSchedulerInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
     try {
       const config = await this.syncService.getSyncConfig();
       if (config.cron) {

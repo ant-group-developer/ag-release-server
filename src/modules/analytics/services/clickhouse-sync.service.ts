@@ -10,6 +10,7 @@ import { InjectEntityManager } from '@nestjs/typeorm';
 import { Client } from 'pg';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
+import { ClickHouseMigrationService } from 'src/modules/clickhouse/clickhouse-migration.service';
 import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
 import { EntityManager } from 'typeorm';
 
@@ -61,13 +62,14 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		private readonly clickHouseService: ClickHouseService,
 		private readonly configService: ConfigService,
 		private readonly seedingService: DspSeedingService,
+		private readonly clickHouseMigrationService: ClickHouseMigrationService,
 	) {}
 
 	// ======================================================
 	// LIFECYCLE: Khoi dong
 	// ======================================================
 
-	async onModuleInit() {
+	onModuleInit() {
 		if (this.configService.get<string>('NODE_ENV') === 'dev-tuan') {
 			this.logger.log(
 				'Skipping ClickHouse sync service initialization in dev-tuan environment.',
@@ -75,7 +77,17 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		this.logger.log('Initializing ClickHouse sync service...');
+		this.initializeSyncInBackground().catch((err) => {
+			this.logger.error(
+				`ClickHouse background sync initialization failed: ${err.message}`,
+				err.stack,
+			);
+		});
+	}
+
+	private async initializeSyncInBackground() {
+		// Wait for ClickHouse migrations to finish first
+		await this.clickHouseMigrationService.waitForMigrations();
 
 		// 1. Sync dsps from PostgreSQL to ClickHouse pg_dsps_sync on startup
 		await this.syncDspsOnStartup();

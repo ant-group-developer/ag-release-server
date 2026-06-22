@@ -1,14 +1,25 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { ReportSourceConfigs } from '../configs';
 
 @Injectable()
 export class ConfigSyncService implements OnModuleInit {
   private readonly logger = new Logger(ConfigSyncService.name);
 
-  constructor(private readonly clickHouseService: ClickHouseService) {}
+  constructor(
+    private readonly clickHouseService: ClickHouseService,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
+  ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
+    this.syncConfigsInBackground().catch((err) => {
+      this.logger.error(`Failed to sync report configs: ${err.message}`, err.stack);
+    });
+  }
+
+  private async syncConfigsInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
     try {
       // Check if table has rows first
       const countResult = await this.clickHouseService.query<{ total: string }>(
