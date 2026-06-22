@@ -4,7 +4,7 @@ import { filter } from 'rxjs/operators';
 
 export interface EnrichEvent {
 	scanId: string;
-	type: 'progress' | 'completed' | 'failed';
+	type: 'progress' | 'completed' | 'failed' | 'cancelled';
 	data: Record<string, any>;
 	timestamp: string;
 }
