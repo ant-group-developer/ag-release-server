@@ -70,13 +70,6 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	// ======================================================
 
 	onModuleInit() {
-		if (this.configService.get<string>('NODE_ENV') === 'dev-tuan') {
-			this.logger.log(
-				'Skipping ClickHouse sync service initialization in dev-tuan environment.',
-			);
-			return;
-		}
-
 		this.initializeSyncInBackground().catch((err) => {
 			this.logger.error(
 				`ClickHouse background sync initialization failed: ${err.message}`,
