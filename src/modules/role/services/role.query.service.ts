@@ -66,14 +66,18 @@ export class RoleQueryService {
 
 			skip,
 			pageSize,
-			isActive,
 		} = data;
 
 		const query = this.roleRepo.createQueryBuilder('role');
 
 		query
 			.leftJoin('role.rolePermissions', 'rolePermission')
-			.leftJoin('rolePermission.permission', 'permission');
+			.leftJoin(
+				'rolePermission.permission',
+				'permission',
+				'permission.isActive = :permissionIsActive',
+				{ permissionIsActive: true },
+			);
 
 		query.addSelect([
 			'rolePermission.id',
@@ -83,11 +87,6 @@ export class RoleQueryService {
 			'permission.name',
 			'permission.code',
 		]);
-
-		query.where('permission.isActive = :isActive', { isActive: true });
-
-		const activeFilter = isActive ?? true;
-		query.andWhere('role.isActive = :isActive', { isActive: activeFilter });
 
 		if (keyword) {
 			query.andWhere('role.name ILIKE :keyword', {
