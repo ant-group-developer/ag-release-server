@@ -116,7 +116,7 @@ export class ReleaseController {
 	@ApiBody({ type: BulkSubmitReleaseDto })
 	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Post('bulk-submit')
@@ -275,7 +275,7 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Put(':id')
@@ -313,7 +313,7 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Post(':id/submit')
@@ -331,7 +331,7 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Post(':id/takedown')
@@ -349,7 +349,7 @@ export class ReleaseController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Post(':id/gen-upc')
