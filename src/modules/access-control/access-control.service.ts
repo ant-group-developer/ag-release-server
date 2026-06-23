@@ -46,11 +46,12 @@ export class AccessControlService {
 	): Promise<AuthContext> {
 		const cacheKey = `${userId}_${tenantId}`;
 
-		const cached = await this.cacheService.get<AuthContext>({
-			entity: EntityCache.AUTH_CONTEXT,
-			key: cacheKey,
-		});
-		if (cached) return cached;
+		// TODO: TEMP - bypass cache for debugging
+		// const cached = await this.cacheService.get<AuthContext>({
+		// 	entity: EntityCache.AUTH_CONTEXT,
+		// 	key: cacheKey,
+		// });
+		// if (cached) return cached;
 
 		const context = await this.buildAuthContext(userId, tenantId);
 

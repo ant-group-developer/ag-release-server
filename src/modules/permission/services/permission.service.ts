@@ -5,6 +5,8 @@ import {
 	ResponseError,
 	ResponseSuccess,
 } from 'src/common/dtos/common.response.dto';
+import { CacheService } from 'src/modules/cache/cache.service';
+import { EntityCache } from 'src/modules/cache/enum/cache.enum';
 import { Repository } from 'typeorm';
 import {
 	BulkCreatePermissionDto,
@@ -25,6 +27,7 @@ export class PermissionService {
 		private readonly permissionRepo: Repository<Permission>,
 
 		private readonly permissionQueryService: PermissionQueryService,
+		private readonly cacheService: CacheService,
 	) {}
 
 	// create
@@ -129,6 +132,10 @@ export class PermissionService {
 		}
 
 		await this.permissionRepo.update(id, { ...data, modifierId: userId });
+
+		// Invalidate all auth contexts — permission code/status may have changed
+		await this.invalidateAllAuthContexts();
+
 		return await this.findOne(id);
 	}
 
@@ -157,5 +164,15 @@ export class PermissionService {
 
 	async delete(id: string): Promise<void> {
 		await this.permissionRepo.delete(id);
+
+		// Invalidate all auth contexts — permission removed
+		await this.invalidateAllAuthContexts();
+	}
+
+	private async invalidateAllAuthContexts(): Promise<void> {
+		await this.cacheService.delByPrefix({
+			entity: EntityCache.AUTH_CONTEXT,
+			prefix: '*',
+		});
 	}
 }
