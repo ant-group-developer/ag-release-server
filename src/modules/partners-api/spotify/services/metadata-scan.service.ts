@@ -308,6 +308,12 @@ export class MetadataScanService implements OnModuleInit {
 					this.logger.log(`Performing UPC-based metadata lookup for ${releasesForUpcLookup.length} release(s)...`);
 					for (const pr of releasesForUpcLookup) {
 						try {
+							const releaseExists = await releaseRepo.exist({ where: { id: pr.release.id } });
+							if (!releaseExists) {
+								pr.resolved = true;
+								continue;
+							}
+
 							// Throttle to respect API rate limits
 							await new Promise((resolve) => setTimeout(resolve, 300));
 							const upc = pr.release.upc!.trim();
@@ -542,6 +548,14 @@ export class MetadataScanService implements OnModuleInit {
 					for (const [releaseId, { release, enrichedTracks }] of releaseUpdates) {
 						await this.throwIfScanCancelled(scanId);
 						try {
+							const releaseExists = await releaseRepo.exist({ where: { id: release.id } });
+							if (!releaseExists) {
+								this.logger.log(`Release ${release.id} was deleted/merged during this chunk processing. Skipping.`);
+								const pending = pendingReleases.find(pr => pr.release.id === releaseId);
+								if (pending) pending.resolved = true;
+								continue;
+							}
+
 							if (enrichedTracks.length === 0) continue;
 
 							const primaryEnriched = enrichedTracks[0].enriched;
@@ -1293,6 +1307,12 @@ export class MetadataScanService implements OnModuleInit {
 	): Promise<void> {
 		const dryRun = options?.dryRun ?? false;
 		if (dryRun) return;
+
+		const releaseExists = await this.dataSource.getRepository(Release).exist({ where: { id: releaseId } });
+		if (!releaseExists) {
+			this.logger.log(`Skipping updateEnrichmentStatus: Release ${releaseId} no longer exists.`);
+			return;
+		}
 
 		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
 		let enrichment = await enrichmentRepo.findOne({ where: { releaseId } });
