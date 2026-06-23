@@ -50,8 +50,9 @@ export class VevoWebhookController {
 	})
 	@ApiBody({ type: VevoChannelCallbackDto })
 	@ApiResponse({ status: 200, description: 'Callback received' })
-	async handleVevoCallback(@Body() payload: VevoChannelCallbackDto) {
-		const result = await this.webhookService.handleVevoCallback(payload);
+	async handleVevoChannelCallback(@Body() payload: VevoChannelCallbackDto) {
+		const result =
+			await this.webhookService.handleVevoChannelCallback(payload);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -67,9 +68,13 @@ export class VevoWebhookController {
 	})
 	@ApiBody({ type: VevoVideoNotificationDto })
 	@ApiResponse({ status: 200, description: 'Video callback received' })
-	async handleVideoNotification(@Body() payload: VevoVideoNotificationDto) {
+	async handleVevoVideoNotificationCallback(
+		@Body() payload: VevoVideoNotificationDto,
+	) {
 		const result =
-			await this.webhookService.handleVevoVideoNotification(payload);
+			await this.webhookService.handleVevoVideoNotificationCallback(
+				payload,
+			);
 		return new ResponseSuccess({ data: result });
 	}
 }
