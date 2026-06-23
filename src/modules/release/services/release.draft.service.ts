@@ -32,6 +32,8 @@ import { TrackSensitive } from 'src/modules/track-sensitive/entities/track-sensi
 import { TrackType } from 'src/modules/track-type/entities/track-type.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { TrackDraftService } from 'src/modules/track/services/track.draft.service';
+import { UserType } from 'src/modules/user/enum/user.enum';
+import { checkIsSystemAdmin } from 'src/modules/user/utils/user-type.util';
 import { UpsertReleaseVideoDto } from 'src/modules/video/dto/video.dto';
 import { VideoService } from 'src/modules/video/video.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
@@ -375,10 +377,24 @@ export class ReleaseDraftService {
 	}
 
 	// delete
-	async handleDeleteById(id: string): Promise<void> {
-		// await this.releaseQueryService.validateDelete(id);
+	async handleDeleteById(id: string, userType?: UserType): Promise<void> {
+		const release = await this.releaseQueryService.findOne(id);
+		this.checkCanDeleteRelease(release, userType);
+
 		await this.deleteRelatedRecords({ releaseId: id });
 		await this.deleteDb(id);
+	}
+
+	private checkCanDeleteRelease(release: Release, userType?: UserType) {
+		if (release.status === ReleaseStatus.DRAFT) {
+			return;
+		}
+
+		if (userType && checkIsSystemAdmin(userType)) {
+			return;
+		}
+
+		throw ReleaseException.CANNOT_DELETE_NON_DRAFT();
 	}
 
 	async deleteDb(id: string) {
@@ -993,11 +1009,14 @@ export class ReleaseDraftService {
 		};
 	}
 
-	async bulkDeleteRelease(query: QueryGetListReleaseDto) {
+	async bulkDeleteRelease(
+		query: QueryGetListReleaseDto,
+		userType?: UserType,
+	) {
 		const result = await this.getList(query);
 
 		for (const item of result.items) {
-			await this.handleDeleteById(item.id);
+			await this.handleDeleteById(item.id, userType);
 
 			this.logger.log(
 				`Deleted release: id=${item.id}, title="${item.title}"`,
