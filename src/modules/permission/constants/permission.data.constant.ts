@@ -35,13 +35,13 @@ export const Permission = {
 		UPDATE: 'label.update',
 		DELETE: 'label.delete',
 	},
-	RELEASE: {
-		REVIEW: 'release.review',
-		CREATE: 'release.create',
-		READ: 'release.read',
-		TAKE_DOWN: 'release.take_down',
-		UPDATE: 'release.update',
-		DELETE: 'release.delete',
+	RELEASE_AUDIO: {
+		REVIEW: 'release_audio.review',
+		CREATE: 'release_audio.create',
+		READ: 'release_audio.read',
+		TAKE_DOWN: 'release_audio.take_down',
+		UPDATE: 'release_audio.update',
+		DELETE: 'release_audio.delete',
 	},
 	RELEASE_VIDEO: {
 		REVIEW: 'release_video.review',

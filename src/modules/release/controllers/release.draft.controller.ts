@@ -69,7 +69,7 @@ export class ReleaseDraftController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.CREATE,
+		Permission.RELEASE_AUDIO.CREATE,
 		Permission.RELEASE_VIDEO.CREATE,
 	)
 	@Post()
@@ -96,7 +96,7 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.CREATE(result);
 	}
 
-	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	// @RequirePermissions(Permission.RELEASE_AUDIO.CREATE, Permission.RELEASE_AUDIO.UPDATE)
 	// @PublicRoute()
 	@Post('validate-list')
 	getErrorsSchemaReleasesSftp(@Body('releases') releases: ReleaseRawSftp[]) {
@@ -141,7 +141,7 @@ export class ReleaseDraftController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Put(':id')
@@ -179,7 +179,7 @@ export class ReleaseDraftController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Post(':id/auto-fill-cover-arts')
@@ -192,8 +192,8 @@ export class ReleaseDraftController {
 	}
 
 	@RequirePermissions(
-		Permission.RELEASE.CREATE,
-		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_AUDIO.CREATE,
+		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.CREATE,
 		Permission.RELEASE_VIDEO.UPDATE,
 	)

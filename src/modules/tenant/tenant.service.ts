@@ -493,10 +493,20 @@ export class TenantService {
 
 		// Nếu khoá tenant cha thì sẽ khoá tất cả tenant con
 		if (dto.isActive === false) {
+			const childIds = await this.getDescendantIds(id);
+
 			await this.tenantTreeRepo.update(
 				{ parent: { id } },
 				{ isActive: dto.isActive, modifierId: userReqId },
 			);
+
+			// Invalidate auth contexts for all descendant tenants
+			for (const childId of childIds) {
+				await this.accessControlService.invalidateAuthContext(
+					undefined,
+					childId,
+				);
+			}
 		}
 
 		// Invalidate all auth contexts for users in this tenant
