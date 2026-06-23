@@ -1067,6 +1067,7 @@ export class TimelineAnalyticsService {
           revenueUsd: this.revenueNumber(r.revenue_usd),
           revenueUsdExact: this.revenueExact(r.revenue_usd),
           quantity: Number(r.quantity),
+          tenant: meta?.tenant ?? null,
         });
       });
 
@@ -1094,6 +1095,7 @@ export class TimelineAnalyticsService {
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
+            tenant: null,
           });
         }
       }
