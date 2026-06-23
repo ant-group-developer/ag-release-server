@@ -23,7 +23,6 @@ import { Request } from 'express';
 import {
 	PublicRoute,
 	RequirePermissions,
-	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
@@ -219,16 +218,22 @@ export class ReleaseDraftController {
 		// 	query.tenantIds = [tenantId];
 		// }
 
-		const result = await this.releaseDraftService.bulkDeleteRelease(query);
+		const result = await this.releaseDraftService.bulkDeleteRelease(
+			query,
+			req.user!.type,
+		);
 
 		return new ResponseSuccess({ data: result });
 	}
 
-	@SystemAdminOnly()
+	// @SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
-	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseDraftService.handleDeleteById(id);
+	async delete(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<void>> {
+		await this.releaseDraftService.handleDeleteById(id, req.user!.type);
 		return ReleaseSuccess.DELETE();
 	}
 }
