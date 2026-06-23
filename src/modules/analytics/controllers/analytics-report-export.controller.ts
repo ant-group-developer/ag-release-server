@@ -31,8 +31,8 @@ import {
   AnalyticsReportExportCancelListResult,
   AnalyticsReportExportCancelResult,
   AnalyticsReportExportJobResult,
-  AnalyticsReportExportService,
-} from '../services/analytics-report-export.service';
+} from '../interfaces/analytics-report-export.interface';
+import { AnalyticsReportExportService } from '../services/analytics-report-export.service';
 
 @ApiTags('Analytics')
 @Controller('analytics/reports')

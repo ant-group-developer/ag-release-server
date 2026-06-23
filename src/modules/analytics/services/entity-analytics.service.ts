@@ -6,6 +6,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
@@ -22,7 +23,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 
-export type EntityType = 'release' | 'label' | 'artist' | 'track';
+export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant';
 
 @Injectable()
 export class EntityAnalyticsService {
@@ -99,7 +100,7 @@ export class EntityAnalyticsService {
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 		let filterSql = 'AND t.is_deleted = 0';
 
-		if (!isSystem) {
+		if (!isSystem && entityType !== 'tenant') {
 			filterSql += ' AND t.tenant_id = {tenantId:String}';
 			params.tenantId = tenantId;
 		}
@@ -117,6 +118,9 @@ export class EntityAnalyticsService {
 			case 'track':
 				// Normal tenant: tenant check qua JOIN, entity filter trên isrc
 				filterSql += ' AND s.isrc = {entityId:String}';
+				break;
+			case 'tenant':
+				filterSql += ' AND t.tenant_id = {entityId:String}';
 				break;
 		}
 
@@ -253,12 +257,29 @@ export class EntityAnalyticsService {
 			}
 		}
 
+		let tenantMeta = null;
+		if (entityType === 'tenant' && entityId) {
+			const tenant = await this.entityManager.findOne(Tenant, {
+				where: { id: entityId },
+				select: ['id', 'name', 'title', 'logo'],
+			});
+			if (tenant) {
+				tenantMeta = {
+					id: tenant.id,
+					name: tenant.name,
+					title: tenant.title || tenant.name,
+					logo: tenant.logo || null,
+				};
+			}
+		}
+
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
 			totalRevenueUsd: this.revenueNumber(salesRows[0]?.total_revenue_usd),
 			totalRevenueUsdExact: this.revenueExact(salesRows[0]?.total_revenue_usd),
 			artist: artistMeta,
+			tenant: tenantMeta,
 		};
 	}
 

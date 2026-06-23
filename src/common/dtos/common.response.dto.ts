@@ -30,6 +30,9 @@ export class ResponseSuccess<T> {
 	@ApiPropertyOptional()
 	data?: T;
 
+	@ApiPropertyOptional()
+	tenant?: any;
+
 	constructor({
 		statusCode = SUCCESS_STATUS_CODE_DEFAULT,
 		message = SUCCESS_MESSAGE_DEFAULT,
@@ -38,6 +41,7 @@ export class ResponseSuccess<T> {
 		sensitiveKeys = [],
 		isRemoveSensitiveFields = false,
 		data,
+		tenant,
 	}: {
 		statusCode?: number;
 		message?: string;
@@ -46,11 +50,13 @@ export class ResponseSuccess<T> {
 		sensitiveKeys?: string[];
 		isRemoveSensitiveFields?: boolean;
 		data?: T;
+		tenant?: any;
 	} = {}) {
 		this.statusCode = statusCode;
 		this.message = message;
 		this.messageCode = messageCode;
 		this.messageWarning = messageWarning;
+		this.tenant = tenant;
 
 		// IMPORTANT: nếu không remove sensitive thì vẫn phải gán data
 		if (data !== undefined) {

@@ -22,6 +22,7 @@ import { TrackAnalyticsController } from './controllers/track-analytics.controll
 import { ArtistAnalyticsController } from './controllers/artist-analytics.controller';
 import { DashboardAnalyticsController } from './controllers/dashboard-analytics.controller';
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
+import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
 
 // Services
 import { IsrcResolverService } from './services/isrc-resolver.service';
@@ -49,6 +50,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
     ArtistAnalyticsController,
     DashboardAnalyticsController,
     AnalyticsReportExportController,
+    TenantAnalyticsController,
   ],
   providers: [
     EntityAnalyticsService,
