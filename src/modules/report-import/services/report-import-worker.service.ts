@@ -20,6 +20,7 @@ import {
   ImportJobStatus,
 } from '../../etl/interfaces';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
+import { SpotifyReportSalesParser } from '../../etl/parsers/sales/spotify-report-sales.parser';
 import { ExtractedRow, ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
 import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
 import { hasMeaningfulText, normalizeFactRows } from '../../etl/utils/fact-row-normalizer.util';
@@ -471,6 +472,46 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
               memberName: file.defaultMember || 'AMG GROUP',
             }
           );
+        } else if (file.parserCode === 'spotify-report-sales') {
+          const parser = new SpotifyReportSalesParser();
+
+          await parser.parseFileStreaming(
+            localFilePath,
+            jobId,
+            async (batch: FactSalesRow[]) => {
+              // Populate audit/fallback fields on the batch rows
+              for (const r of batch) {
+                r.import_source = importSource;
+                r.source_file_name = filename;
+                r.label_name = r.label_name || fallbackLabelName || 'N/A';
+                normalizeFactRows([r]);
+
+                // Collect period
+                if (r.reporting_period_start) {
+                  fileAffectedPeriods.add(r.reporting_period_start.substring(0, 7)); // YYYY-MM
+                }
+              }
+
+              // Batch insert into ClickHouse
+              await this.clickHouseService.insertBatched(
+                factTable,
+                batch as unknown as Record<string, unknown>[],
+                50000
+              );
+
+              fileProcessedRows += batch.length;
+              totalProcessedRows += batch.length;
+
+              await this.importJobsService.updateProgress(jobId, {
+                processedRows: totalProcessedRows,
+                totalRows: totalProcessedRows,
+              });
+            },
+            {
+              batchSize: 50000,
+              memberName: file.defaultMember || 'ANT MUSIC LLC',
+            }
+          );
         } else {
           throw new Error(`Unsupported parser code: ${file.parserCode}`);
         }
@@ -590,7 +631,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
           progressLabel: `Rebuilding Cubes...`,
         }, true);
 
-        // Right now we only support sales report (WMG)
+        // Sales report (WMG, Spotify)
         await this.cubeRebuildService.rebuildSalesCubesForPeriods(periods);
       }
 
