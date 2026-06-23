@@ -72,6 +72,17 @@ export class Video extends BaseUserTrackedUUIDEntity {
 	isrc: string | null;
 
 	@Column({
+		type: 'varchar',
+		length: 100,
+		name: 'external_id',
+		nullable: true,
+		comment:
+			'External video id returned by Vevo video notification, used to build YouTube video URL' +
+			COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	externalId: string | null;
+
+	@Column({
 		type: 'text',
 		nullable: true,
 		comment:

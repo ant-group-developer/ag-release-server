@@ -19,12 +19,13 @@ import {
 	CreateVevoChannelDto,
 	VevoChannelCallbackDto,
 } from '../../channel/dto/vevo.dto';
+import { VevoVideoNotificationDto } from '../dto/vevo-video-notification.dto';
 import { VevoCallbackApiKeyGuard } from '../guards/vevo-callback-api-key.guard';
 import { WebhookService } from '../webhook.service';
 
 @ApiTags('Vevo')
 @Controller('vevo')
-export class VevoController {
+export class VevoWebhookController {
 	constructor(private readonly webhookService: WebhookService) {}
 
 	@Post('new-channel')
@@ -51,6 +52,24 @@ export class VevoController {
 	@ApiResponse({ status: 200, description: 'Callback received' })
 	async handleVevoCallback(@Body() payload: VevoChannelCallbackDto) {
 		const result = await this.webhookService.handleVevoCallback(payload);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@PublicRoute()
+	@UseGuards(VevoCallbackApiKeyGuard)
+	@Post('callback/video')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Receive a Vevo video notification callback' })
+	@ApiHeader({
+		name: 'x-api-key',
+		required: true,
+		description: 'Static Vevo callback API key',
+	})
+	@ApiBody({ type: VevoVideoNotificationDto })
+	@ApiResponse({ status: 200, description: 'Video callback received' })
+	async handleVideoNotification(@Body() payload: VevoVideoNotificationDto) {
+		const result =
+			await this.webhookService.handleVevoVideoNotification(payload);
 		return new ResponseSuccess({ data: result });
 	}
 }
