@@ -10,7 +10,13 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBody,
+	ApiOperation,
+	ApiParam,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { Request } from 'express';
@@ -62,8 +68,17 @@ export class ReleaseDraftController {
 		};
 	}
 
-	@RequirePermissions(Permission.RELEASE.CREATE)
+	@RequirePermissions(
+		Permission.RELEASE.CREATE,
+		Permission.RELEASE_VIDEO.CREATE,
+	)
 	@Post()
+	@ApiOperation({ summary: 'Create a draft release' })
+	@ApiBody({ type: CreateReleaseDraftDto })
+	@ApiResponse({
+		status: 201,
+		description: 'Draft release created successfully',
+	})
 	async create(@Body() data: CreateReleaseDraftDto, @Req() req: Request) {
 		const tenantId = req.user!.tenantId;
 
@@ -125,8 +140,18 @@ export class ReleaseDraftController {
 		return this.releaseDraftService.importReleases(payload);
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Put(':id')
+	@ApiOperation({ summary: 'Update a draft release' })
+	@ApiParam({ name: 'id', format: 'uuid', description: 'Release ID' })
+	@ApiBody({ type: UpdateReleaseDraftDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Draft release updated successfully',
+	})
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() data: UpdateReleaseDraftDto,
@@ -153,7 +178,10 @@ export class ReleaseDraftController {
 		return this.releaseDraftService.syncReleaseDataToTracks(id, dto);
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/auto-fill-cover-arts')
 	async autoFillCoverArts(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -163,7 +191,12 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.UPDATE(result);
 	}
 
-	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE.CREATE,
+		Permission.RELEASE.UPDATE,
+		Permission.RELEASE_VIDEO.CREATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Get(':id/validate')
 	async getErrorsSchemaReleaseById(@Param('id') id: string) {
 		const result =

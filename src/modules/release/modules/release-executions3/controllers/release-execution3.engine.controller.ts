@@ -9,6 +9,6 @@ export class ReleaseExecutionStepTestController {
 
 	@Post(':stepId/run')
 	async runStep(@Param('stepId') stepId: string) {
-		return this.engine.runByStepId(stepId);
+		// return this.engine.runByStepId(stepId);
 	}
 }

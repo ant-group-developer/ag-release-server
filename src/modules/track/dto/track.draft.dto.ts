@@ -53,6 +53,11 @@ export class CreateTrackDraftDto {
 	@MaxLength(20)
 	iswc?: string;
 
+	@ApiProperty({ example: false, required: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
+
 	@ApiProperty({ example: 'release-id-123' })
 	@IsString()
 	@IsUUID()

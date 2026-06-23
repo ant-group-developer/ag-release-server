@@ -65,4 +65,23 @@ export const envValidationSchema = Joi.object({
 
 	// Internal API Key
 	INTERNAL_API_KEY: Joi.string().optional(),
+
+	// Vevo callback API key
+	VEVO_CALLBACK_API_KEY: Joi.string().required(),
+
+	// ClickHouse
+	CLICKHOUSE_URL: Joi.string().required().default('http://127.0.0.1:8123'),
+	CLICKHOUSE_DATABASE: Joi.string().required().default('music_analytics'),
+	CLICKHOUSE_USER: Joi.string().required().default('default'),
+	CLICKHOUSE_PASSWORD: Joi.string().allow('').default(''),
+
+	// FTP / ETL
+	FTP_HOST: Joi.string().allow('').optional(),
+	FTP_PORT: Joi.number().default(21),
+	FTP_USER: Joi.string().allow('').optional(),
+	FTP_PASSWORD: Joi.string().allow('').optional(),
+	FTP_SECURE: Joi.string().allow('true', 'false', 'explicit', 'implicit').default('explicit'),
+	FTP_BASE_PATH: Joi.string().default('/root'),
+	FTP_SYNC_MODE: Joi.string().valid('manual', 'auto').default('manual'),
+	FTP_SYNC_CRON: Joi.string().default('0 2 * * *'),
 });

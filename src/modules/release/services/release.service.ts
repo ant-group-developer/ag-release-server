@@ -8,7 +8,11 @@ import { BucketService2 } from 'src/modules/bucket2/services/bucket2.service';
 import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
 import { UpcService } from 'src/modules/external/upc/upc.service';
 import { FileExportCiService } from 'src/modules/file-export-ci/file-export-ci.service';
-import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
+import {
+	CiDspStatus,
+	CiExportService,
+} from 'src/modules/partners-api/ci/services/ci-export.service';
+import { CiReleaseService } from 'src/modules/partners-api/ci/services/ci-release.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
@@ -27,14 +31,19 @@ import {
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
+import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
+import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
-import { ExecutionType } from '../modules/release-submit/entities/release-submit.entity';
-import { ReleaseSubmitService2 } from '../modules/release-submit/services/release-submit2.service';
-import { enhanceReleasesDetails } from '../utils/release.utils';
+import {
+	enhanceReleasesDetails,
+	normalizeMetadataExternal,
+} from '../utils/release.utils';
 import { ReleaseDdexService } from './release-ddex.service';
+import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-delivery.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -59,15 +68,16 @@ export class ReleaseService {
 		private readonly fileExportCiService: FileExportCiService,
 
 		// partners api
-		private readonly ciService: CiService,
-
-		@Inject(forwardRef(() => ReleaseSubmitService2))
-		private readonly releaseSubmitService2: ReleaseSubmitService2,
+		private readonly ciReleaseService: CiReleaseService,
+		private readonly ciExportService: CiExportService,
 
 		private readonly releaseDdexService: ReleaseDdexService,
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
+
+		@Inject(forwardRef(() => ReleaseDspDeliveryService))
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -77,10 +87,10 @@ export class ReleaseService {
 
 		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
-		return {
+		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		};
+		}) as IReleaseDetail;
 	}
 
 	async findOneFull(id: string) {
@@ -92,10 +102,10 @@ export class ReleaseService {
 
 		const coverArtThumbnails = getCoverArtThumbnails(releaseCoverArts);
 
-		return {
+		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		};
+		});
 	}
 
 	async getList(
@@ -123,7 +133,7 @@ export class ReleaseService {
 			await this.releaseQueryService.getListFull(query);
 
 		return new PageDto({
-			items,
+			items: items.map((item) => normalizeMetadataExternal(item)),
 			metadata: {
 				...query,
 				totalItems,
@@ -396,7 +406,7 @@ export class ReleaseService {
 	}
 
 	async genUpcById(releaseId: string) {
-		// return '123456789012';
+		// return '0850080651804';
 		const release = await this.releaseQueryService.getOneDetail(releaseId);
 
 		// Nếu release đã có UPC
@@ -461,8 +471,12 @@ export class ReleaseService {
 	}
 
 	async bulkSubmit(dto: BulkSubmitReleaseDto) {
+		const idsExclude = new Set(dto.idsExclude ?? []);
+
 		for (const id of dto.ids) {
-			await this.submit(id, { code: dto.codes });
+			if (idsExclude.has(id)) continue;
+
+			await this.submit3(id, { code: dto.codes });
 		}
 	}
 
@@ -475,22 +489,16 @@ export class ReleaseService {
 			releaseEndDate: null,
 		});
 
-		return this.releaseExecution3Service.submit({
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
+			releaseIds: [id],
+			items: dto.code.map((dspCode) => ({
+				dspCode,
+				status: ReleaseDspStatus.PROCESSING,
+			})),
+		});
+
+		return this.releaseExecution3Service.newReleaseExecution({
 			release,
-			dspCodes: dto.code,
-			type: ExecutionType.INITIAL_RELEASE,
-		});
-	}
-
-	async submit(id: string, dto: SubmitReleaseDto) {
-		await this.releaseQueryService.findOne(id);
-		await this.releaseRepo.update(id, {
-			status: ReleaseStatus.SUBMITTED,
-			releaseEndDate: null,
-		});
-
-		return this.releaseSubmitService2.submit({
-			releaseId: id,
 			dspCodes: dto.code,
 			type: ExecutionType.INITIAL_RELEASE,
 		});
@@ -501,39 +509,198 @@ export class ReleaseService {
 		await this.releaseRepo.update(id, {
 			releaseEndDate: new Date(),
 		});
-		return this.releaseSubmitService2.submit({
-			releaseId: id,
-			dspCodes: dto.code,
-			type: ExecutionType.TAKEDOWN,
-		});
+
+		await this.submit3(id, dto);
 	}
 
 	// get qa flag ci
-	async getQaFlagCi(id: string) {
-		// return []
-
+	async getReleaseFormatId(id: string): Promise<string> {
 		const release = await this.releaseQueryService.findOne(id);
-		const resListReleaseCi = await this.ciService.getReleases({
-			gtin: release.upc ? [release.upc] : [],
+
+		if (release.releaseFormatsIdCi) {
+			return release.releaseFormatsIdCi;
+		}
+
+		if (!release.upc) {
+			throw new ResponseError({ message: 'Release chưa có UPC' });
+		}
+
+		const releaseFormat = await this.ciReleaseService.getReleaseFormatOne({
+			gtin: release.upc,
 		});
-		const idCi = resListReleaseCi._embedded.find(
-			(item: any) => item.barcode === release.upc,
-		)?.id;
-		if (!idCi) {
+
+		const releaseFormatId = releaseFormat?.id;
+		if (!releaseFormatId) {
 			throw new ResponseError({ message: 'Không tìm thấy CI' });
 		}
-		const res2 = await this.ciService.getReleaseQaFlags(idCi);
+
+		const releaseFormatsIdCi = String(releaseFormatId);
+		await this.releaseRepo.update(id, { releaseFormatsIdCi });
+
+		return releaseFormatsIdCi;
+	}
+
+	async getQaFlagCi(id: string) {
+		const releaseFormatsId = await this.getReleaseFormatId(id);
+		const res2 = await this.ciReleaseService.getQaFlags({
+			releaseFormatsId,
+		});
 		return res2._embedded;
 	}
 
-	/** Sync lại release status từ DSP deliveries */
-	async syncReleaseStatus(releaseId: string) {
-		await this.releaseQueryService.findOne(releaseId);
-		const newStatus =
-			await this.releaseSubmitService2.deriveAndUpdateReleaseStatus(
-				releaseId,
+	async getStatusDspsCi(id: string): Promise<ReleaseExecutionResultDto[]> {
+		const releaseFormatId = await this.getReleaseFormatId(id);
+		const ciStatuses = await this.ciExportService.getStatusDsps({
+			releaseFormatId,
+		});
+
+		const release = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect(
+				'release.releaseDspDeliveries',
+				'releaseDspDelivery',
+			)
+			.leftJoinAndSelect('releaseDspDelivery.dsp', 'dsp')
+			.where('release.id = :id', { id })
+			.getOne();
+
+		if (!release) {
+			throw new ResponseError({ message: 'Release not found' });
+		}
+
+		const results: ReleaseExecutionResultDto[] = [];
+
+		for (const ciStatus of ciStatuses) {
+			const delivery = release.releaseDspDeliveries?.find(
+				(item) =>
+					item.dsp?.codeCi?.toLowerCase() ===
+					ciStatus.ciCode.toLowerCase(),
 			);
+
+			if (!delivery?.dsp?.code) continue;
+
+			results.push({
+				id: delivery.id,
+				dspId: delivery.dspId,
+				dspCode: delivery.dsp.code,
+				status: this.mapCiDspStatusToReleaseDspStatus(ciStatus),
+			});
+		}
+
+		return results;
+	}
+
+	private mapCiDspStatusToReleaseDspStatus(
+		ciStatus: CiDspStatus,
+	): ReleaseDspStatus {
+		switch (ciStatus.status?.toLowerCase()) {
+			case 'transferred':
+			case 'complete':
+			case 'completed':
+			case 'done':
+			case 'success':
+			case 'succeeded':
+				return ReleaseDspStatus.DISTRIBUTED;
+
+			case 'processing':
+			case 'pending':
+			case 'in_progress':
+			case 'queued':
+			case 'waiting':
+				return ReleaseDspStatus.PROCESSING;
+
+			case 'not_found':
+				return ReleaseDspStatus.NEVER_DISTRIBUTED;
+
+			default:
+				return ReleaseDspStatus.ISSUES;
+		}
+	}
+
+	/** Sync lại release status từ DSP deliveries */
+	async syncReleaseStatus(
+		releaseId: string,
+		dataDsp?: ReleaseExecutionResultDto[],
+	) {
+		const release = await this.releaseRepo
+			.createQueryBuilder('release')
+			.leftJoinAndSelect(
+				'release.releaseDspDeliveries',
+				'releaseDspDelivery',
+			)
+			.leftJoinAndSelect('releaseDspDelivery.dsp', 'dsp')
+			.where('release.id = :releaseId', { releaseId })
+			.getOne();
+
+		if (!release) {
+			throw new ResponseError({ message: 'Release not found' });
+		}
+
+		const newStatus = this.resolveReleaseStatusByDspDeliveries(
+			release,
+			dataDsp,
+		);
+
+		await this.releaseRepo.update(releaseId, { status: newStatus });
 		return { releaseId, status: newStatus };
+	}
+
+	private resolveReleaseStatusByDspDeliveries(
+		release: Release,
+
+		dataDsp?: ReleaseExecutionResultDto[],
+	): ReleaseStatus {
+		const statuses = dataDsp
+			? (release.releaseDspDeliveries
+					?.filter((delivery) =>
+						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
+					)
+					.map((delivery) => delivery.status) ?? [])
+			: (release.releaseDspDeliveries?.map(
+					(delivery) => delivery.status,
+				) ?? []);
+
+		if (!statuses.length) {
+			return release.status;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.PROCESSING)) {
+			return ReleaseStatus.PROCESSING;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.ISSUES)) {
+			return ReleaseStatus.FAILED;
+		}
+
+		if (
+			statuses.every((status) => status === ReleaseDspStatus.DISTRIBUTED)
+		) {
+			return ReleaseStatus.DISTRIBUTED;
+		}
+
+		if (
+			statuses.every((status) => status === ReleaseDspStatus.TAKEN_DOWN)
+		) {
+			return ReleaseStatus.TAKEN_DOWN;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.DISTRIBUTED)) {
+			return ReleaseStatus.DISTRIBUTED;
+		}
+
+		if (statuses.includes(ReleaseDspStatus.TAKEN_DOWN)) {
+			return ReleaseStatus.TAKEN_DOWN;
+		}
+
+		if (
+			statuses.every(
+				(status) => status === ReleaseDspStatus.NEVER_DISTRIBUTED,
+			)
+		) {
+			return release.status;
+		}
+
+		return release.status;
 	}
 
 	async getReleaseXml(id: string, code: string, ernVersion?: ErnVersion2) {

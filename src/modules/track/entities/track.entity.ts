@@ -136,6 +136,13 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 	isByAi: boolean;
 
 	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Track instrumental',
+	})
+	isInstrumental: boolean;
+
+	@Column({
 		type: 'text',
 		nullable: true,
 		comment: 'Lời bài hát',
@@ -163,6 +170,71 @@ export class Track extends BaseCustomIDEntity implements ITrack {
 		comment: 'Sao chép contributor từ release',
 	})
 	copyContributorsFromRelease: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Nguồn import tạo track từ report',
+	})
+	importSourceType: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Parser/import code tạo track từ report',
+	})
+	importParserCode: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 500,
+		nullable: true,
+		comment: 'Tên file import tạo track từ report',
+	})
+	importFileName: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Job/batch import tạo track từ report',
+	})
+	importJobId: string | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata spotify',
+	})
+	metadataSpotify: {
+		trackId?: string | null;
+		trackUrl?: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata deezer',
+	})
+	metadataDeezer: {
+		trackId?: string | null;
+		trackUrl?: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		lastSyncedAt?: string | null;
+	} | null;
 
 	@Column({
 		type: 'uuid',

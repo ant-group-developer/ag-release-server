@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { QueryGetListLogDto } from '../dto/log.dto';
 import { ErrorType, LogLevel, Logs } from '../entites/logs.entity';
 
@@ -16,6 +16,9 @@ type WriteLogDto = {
 
 	releaseSubmitId?: string;
 	releaseSubmitStepId?: string;
+
+	releaseExecutionId?: string;
+	releaseExecutionStepId?: string;
 };
 
 @Injectable()
@@ -68,8 +71,6 @@ export class LogsService {
 	}
 
 	private saveDbAndSendNotificationToDev_Safe(data: WriteLogDto) {
-		// console.log(data);
-
 		switch (data.level) {
 			case LogLevel.ERROR:
 				this.logger.error(data.message, data.data);
@@ -111,7 +112,8 @@ export class LogsService {
 			pageSize,
 			level,
 			type,
-			module,
+			modules,
+			keyword,
 			releaseSubmitId,
 			releaseSubmitStepId,
 		} = query;
@@ -126,10 +128,26 @@ export class LogsService {
 			qb.andWhere('log.type IN (:...type)', { type });
 		}
 
-		if (module) {
-			qb.andWhere('log.module ILIKE :module', {
-				module: `%${module}%`,
-			});
+		if (modules?.length) {
+			qb.andWhere('log.module IN (:...modules)', { modules });
+		}
+
+		const keywords = keyword?.filter(Boolean);
+		if (keywords?.length) {
+			qb.andWhere(
+				new Brackets((subQb) => {
+					keywords.forEach((item, index) => {
+						subQb.orWhere(
+							`(
+								log.module ILIKE :keyword${index}
+								OR log.message ILIKE :keyword${index}
+								OR CAST(log.data AS TEXT) ILIKE :keyword${index}
+							)`,
+							{ [`keyword${index}`]: `%${item}%` },
+						);
+					});
+				}),
+			);
 		}
 
 		if (releaseSubmitId) {
@@ -152,6 +170,21 @@ export class LogsService {
 			items,
 			metadata: { page, pageSize, totalItems },
 		});
+	}
+
+	async getModules() {
+		const rows = await this.repo
+			.createQueryBuilder('log')
+			.select('log.module', 'module')
+			.where('log.module IS NOT NULL')
+			.andWhere("log.module <> ''")
+			.groupBy('log.module')
+			.orderBy('LOWER(log.module)', 'ASC')
+			.getRawMany<{ module: string | null }>();
+
+		return rows
+			.map((row) => row.module)
+			.filter((module): module is string => !!module);
 	}
 
 	async getDetail(id: string) {

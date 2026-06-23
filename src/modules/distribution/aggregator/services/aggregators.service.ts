@@ -277,6 +277,12 @@ export class AggregatorsService {
 			metadata.privateKey = decryptSecretSafe(metadata.privateKey);
 		}
 
+		if (metadata.secretAccessKey) {
+			metadata.secretAccessKey = decryptSecretSafe(
+				metadata.secretAccessKey,
+			);
+		}
+
 		return metadata;
 	}
 

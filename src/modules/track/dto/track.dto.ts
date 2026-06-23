@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -54,6 +55,11 @@ export class CreateTrackDto {
 	@MaxLength(20)
 	@Transform(({ value }: { value: undefined | string }) => value ?? null)
 	iswc: string | null;
+
+	@ApiProperty({ example: false, required: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
 
 	@ApiProperty({ example: 'release-id-123' })
 	@IsString()
@@ -186,6 +192,20 @@ export class QueryGetListTrackDto extends BaseQueryDto2 {
 	})
 	@CsvUuidArray()
 	tenantIds?: string[];
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the track was imported from a report',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isImportedFromReport?: boolean;
 }
 
 export class BulkDeleteTracksDto {

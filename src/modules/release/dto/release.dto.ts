@@ -6,6 +6,7 @@ import {
 	IsBoolean,
 	IsDate,
 	IsEnum,
+	IsIn,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -21,6 +22,10 @@ import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 
 export class CreateReleaseDto {
+	@IsOptional()
+	@IsString()
+	type?: 'audio' | 'video';
+
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()
@@ -155,6 +160,11 @@ export class CreateReleaseDto {
 		value === undefined ? null : value,
 	)
 	priceTierId?: string | null;
+
+	@ApiProperty({ example: false, required: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
 }
 
 export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
@@ -262,6 +272,14 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	title?: string;
+
+	@ApiPropertyOptional({
+		enum: ['audio', 'video'],
+		description: 'Release content type',
+	})
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	type?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
 		enum: FieldOrderRelease,
@@ -393,6 +411,34 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	isVariousArtist?: boolean;
 
 	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the release was imported from a report',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isImportedFromReport?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Whether the release has been successfully enriched',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isEnrich?: boolean;
+
+	@ApiPropertyOptional({
 		type: [String],
 		description: 'Tenant IDs',
 	})
@@ -438,6 +484,10 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	title?: string;
+
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	type?: 'audio' | 'video';
 
 	@IsEnum(FieldOrderRelease)
 	fieldOrder: FieldOrderRelease = FieldOrderRelease.TITLE;
@@ -545,6 +595,11 @@ export class BulkSubmitReleaseDto {
 	@ApiProperty({ type: [String], format: 'uuid' })
 	@IsUUID('4', { each: true })
 	ids: string[];
+
+	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsOptional()
+	@IsUUID('4', { each: true })
+	idsExclude?: string[];
 
 	@ApiProperty({ type: [String] })
 	@IsString({ each: true })

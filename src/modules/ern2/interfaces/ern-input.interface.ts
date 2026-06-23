@@ -33,10 +33,14 @@ export interface ErnInput2 {
 	/** Track metadata list */
 	tracks: ErnTrackInput2[];
 
+	/** Video metadata list (optional) */
+	videos?: ErnVideoInput2[];
+
 	/** Deal terms (optional — defaults generated if omitted) */
 	deals?: {
 		release: ErnDealInput2[];
 		tracks?: ErnDealInput2[];
+		videos?: ErnDealInput2[];
 	};
 }
 
@@ -247,6 +251,7 @@ export interface ErnPriceInput {
 	priceType: 'StandardRetailPrice';
 	value: number;
 	currencyCode: string;
+	priceRangeType?: string;
 }
 
 // ============================================================================
@@ -306,4 +311,47 @@ export interface ManifestReleaseId2 {
 	isEan?: boolean;
 	/** Proprietary identifier */
 	proprietaryId?: { namespace: string; value: string };
+}
+
+// ============================================================================
+// VIDEO
+// ============================================================================
+
+export interface ErnVideoInput2 {
+	isrc: string;
+	title: string;
+	version?: string;
+	duration: string | number;
+	order: number;
+	genre?: string;
+	subGenre?: string;
+	languageOfPerformance?: string;
+	parentalWarning?: string;
+	artists: ErnArtistInput[];
+	contributors?: ErnContributorInput[];
+	pLine?: ErnCopyrightInput;
+	videoFile?: ErnVideoFileInput;
+	subtitles?: ErnSubtitleInput[];
+	channel?: string;
+	description?: string;
+	keywords?: string[];
+	madeForKids?: string;
+	visibility?: string;
+	partnerCustomId1?: string;
+	partnerCustomId2?: string;
+}
+
+export interface ErnVideoFileInput {
+	fileName: string;
+	filePath?: string;
+	codecType?: string;
+	hashSum?: string;
+	hashAlgorithm?: string;
+}
+
+export interface ErnSubtitleInput {
+	language: string;
+	fileName: string;
+	filePath?: string;
+	type?: 'Caption' | 'SubTitle';
 }

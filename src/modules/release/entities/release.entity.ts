@@ -12,6 +12,7 @@ import {
 } from 'src/common/constants/common.default.constants';
 import { AlbumFormat } from 'src/modules/album-format/entities/album-format.entity';
 import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
+import { ReleaseCaption } from 'src/modules/release-caption/entities/release-caption.entity';
 import { ReleaseContributor } from 'src/modules/release-contributor/entities/release-contributor.entity';
 import { ReleaseCoverArt } from 'src/modules/release-cover-art/entities/release-cover-art.entity';
 import { ReleaseTerritory } from 'src/modules/release-territory/entities/release-territory.entity';
@@ -20,6 +21,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { User } from 'src/modules/user/entities/user.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 import {
 	Column,
 	Entity,
@@ -40,6 +42,14 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'varchar',
 		length: 20,
+		comment: 'Video hay audio',
+		default: 'audio',
+	})
+	type: 'audio' | 'video';
+
+	@Column({
+		type: 'varchar',
+		length: 20,
 		nullable: true,
 		comment: 'Mã UPC của release',
 	})
@@ -49,6 +59,7 @@ export class Release extends BaseUserTrackedUUIDEntity {
 		type: 'varchar',
 		length: 10,
 		comment: 'ID định dạng album (single, EP, album...)',
+		nullable: true,
 	})
 	albumFormatId: string;
 
@@ -160,10 +171,64 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	@Column({
 		type: 'boolean',
 		default: false,
+		comment: 'Release instrumental',
+	})
+	isInstrumental: boolean;
+
+	@Column({
+		type: 'boolean',
+		default: false,
 		comment:
 			'Đánh dấu metadata đã được gửi sang CI Aggregator chung một mẻ chưa',
 	})
 	isSentMetadataCi: boolean;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'CI release format ID',
+	})
+	releaseFormatsIdCi: string | null;
+
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Được tạo từ luồng import release report',
+	})
+	isImportedFromReport: boolean;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'Nguồn import tạo release từ report',
+	})
+	importSourceType: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Parser/import code tạo release từ report',
+	})
+	importParserCode: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 500,
+		nullable: true,
+		comment: 'Tên file import tạo release từ report',
+	})
+	importFileName: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 100,
+		nullable: true,
+		comment: 'Job/batch import tạo release từ report',
+	})
+	importJobId: string | null;
 
 	@Column({
 		type: 'enum',
@@ -277,6 +342,12 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	)
 	releaseTerritory: ReleaseTerritory | null;
 
+	@OneToOne(() => Video, (video) => video.release)
+	video: Video | null;
+
+	@OneToMany(() => ReleaseCaption, (caption) => caption.release)
+	captions: ReleaseCaption[];
+
 	tracksCount?: number;
 	totalDuration?: number;
 
@@ -311,6 +382,42 @@ export class Release extends BaseUserTrackedUUIDEntity {
 	metadataSpotify: {
 		folderBucket: string | null;
 		folderServer: string | null;
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			spotifyId?: string | null;
+			spotifyUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
+	} | null;
+
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Metadata deezer',
+	})
+	metadataDeezer: {
+		albumId?: string | null;
+		albumUrl?: string | null;
+		coverImages?: Array<{
+			url: string;
+			width?: number | null;
+			height?: number | null;
+			size?: string | null;
+		}>;
+		trackLinks?: Array<{
+			isrc: string;
+			deezerId?: string | null;
+			deezerUrl?: string | null;
+		}>;
+		lastSyncedAt?: string | null;
 	} | null;
 
 	@OneToMany(() => ReleaseLog, (rL) => rL.release)

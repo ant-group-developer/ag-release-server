@@ -1,6 +1,7 @@
 // services/release-dsp-delivery.service.ts
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import { ReleaseDspDeliveryException } from '../../constants/release-dsp.constant';
@@ -13,6 +14,7 @@ import {
 import { ReleaseDspDelivery } from '../../entities/release-dsp-delivery.entity';
 import { Release } from '../../entities/release.entity';
 import { ReleaseDspStatus } from '../../enum/release-dsp.enum';
+import { ReleaseService } from '../release.service';
 import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.service';
 
 @Injectable()
@@ -20,14 +22,72 @@ export class ReleaseDspDeliveryService {
 	constructor(
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly repo: Repository<ReleaseDspDelivery>,
+
+		@InjectRepository(Dsp)
+		private readonly dspRepo: Repository<Dsp>,
+
 		private readonly queryService: ReleaseDspDeliveryQueryService,
 
 		private readonly tenantDspAgreementService: TenantDspAgreementService,
 
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
 	) {}
 	// ==================== Delivery orchestration ====================
+	async updateDeliveryStatus(input: {
+		releaseIds: string[];
+		items: {
+			id?: string;
+			dspId?: string;
+			dspCode: string;
+			status?: ReleaseDspStatus;
+		}[];
+	}): Promise<void> {
+		const { releaseIds } = input;
+		const items = await this.resolveDeliveryStatusItems(input.items);
+
+		if (!releaseIds.length || !items.length) return;
+
+		const now = new Date();
+		const values = releaseIds.flatMap((releaseId) =>
+			items.map((item) => ({
+				releaseId,
+				dspId: item.dspId,
+				status: item.status,
+				isSelected: true,
+				lastEnqueuedAt:
+					item.status === ReleaseDspStatus.PROCESSING ? now : null,
+				lastDeliveredAt:
+					item.status === ReleaseDspStatus.DISTRIBUTED ? now : null,
+			})),
+		);
+
+		await this.repo
+			.createQueryBuilder()
+			.insert()
+			.into(ReleaseDspDelivery)
+			.values(values)
+			.orUpdate(
+				[
+					'status',
+					'is_selected',
+					'last_enqueued_at',
+					'last_delivered_at',
+				],
+				['release_id', 'dsp_id'],
+			)
+			.execute();
+
+		await Promise.all(
+			[...new Set(releaseIds)].map((releaseId) =>
+				this.releaseService.syncReleaseStatus(releaseId, input.items),
+			),
+		);
+	}
+
 	async upsertProcessing(releaseId: string, dspId: string): Promise<void> {
 		const existed = await this.repo.findOne({
 			where: { releaseId, dspId },
@@ -272,5 +332,49 @@ export class ReleaseDspDeliveryService {
 
 	protected getRepo(manager?: EntityManager) {
 		return manager ? manager.getRepository(ReleaseDspDelivery) : this.repo;
+	}
+
+	private async resolveDeliveryStatusItems(
+		items: {
+			id?: string;
+			dspId?: string;
+			dspCode?: string;
+			status?: ReleaseDspStatus;
+		}[],
+	): Promise<{ dspId: string; status: ReleaseDspStatus }[]> {
+		if (!items.length) return [];
+
+		const dspCodes = [
+			...new Set(
+				items
+					.filter((item) => !item.id && !item.dspId && item.dspCode)
+					.map((item) => item.dspCode!),
+			),
+		];
+
+		const dspCodeToId = new Map<string, string>();
+		if (dspCodes.length) {
+			const dsps = await this.dspRepo.find({
+				where: { code: In(dspCodes) },
+				select: ['id', 'code'],
+			});
+
+			for (const dsp of dsps) {
+				dspCodeToId.set(dsp.code, dsp.id);
+			}
+		}
+
+		return items
+			.map((item) => ({
+				dspId:
+					item.id ??
+					item.dspId ??
+					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
+				status: item.status ?? ReleaseDspStatus.ISSUES,
+			}))
+			.filter(
+				(item): item is { dspId: string; status: ReleaseDspStatus } =>
+					!!item.dspId,
+			);
 	}
 }

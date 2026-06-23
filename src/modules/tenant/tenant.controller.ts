@@ -27,7 +27,6 @@ import {
 	FindTenantsDto,
 	UpdateTenantDto,
 } from './dtos/tenant.dto';
-import { SYSTEM_TENANT_ID } from './tenant.constant';
 import { Tenant } from './tenant.entity';
 import { TenantOrderBy, TenantType } from './tenant.enum';
 import { TenantService } from './tenant.service';
@@ -58,14 +57,34 @@ export class TenantController {
 		return new ResponseSuccess({ data });
 	}
 
+	// @Get('active')
+	// @ApiOperation({ summary: 'Get all tenants flatten which is actived' })
+	// async findAllActive(
+	// 	@Req() req: Request,
+	// ): Promise<ResponseSuccess<PageDto<Tenant>>> {
+	// 	const tenantId = checkIsSystemAdmin(req.user!.type)
+	// 		? SYSTEM_TENANT_ID
+	// 		: req.user!.tenantId;
+	// 	const result = await this.tenantService.findAll(
+	// 		{
+	// 			isActive: true,
+	// 			fieldOrder: TenantOrderBy.NAME,
+	// 			page: 1,
+	// 			pageSize: 999,
+	// 			skip: 0,
+	// 			limit: 999,
+	// 			orderBy: OrderDirection.ASC,
+	// 		},
+	// 		tenantId,
+	// 	);
+	// 	return new ResponseSuccess({ data: result });
+	// }
+
 	@Get('active')
 	@ApiOperation({ summary: 'Get all tenants flatten which is actived' })
 	async findAllActive(
 		@Req() req: Request,
 	): Promise<ResponseSuccess<PageDto<Tenant>>> {
-		const tenantId = checkIsSystemAdmin(req.user!.type)
-			? SYSTEM_TENANT_ID
-			: req.user!.tenantId;
 		const result = await this.tenantService.findAll(
 			{
 				isActive: true,
@@ -76,7 +95,7 @@ export class TenantController {
 				limit: 999,
 				orderBy: OrderDirection.ASC,
 			},
-			tenantId,
+			req.user!.tenantId,
 		);
 		return new ResponseSuccess({ data: result });
 	}
@@ -135,9 +154,7 @@ export class TenantController {
 		// Field-level permission: strip fields user cannot change (system admins bypass)
 		if (!isSysAdmin) {
 			const userPerms = new Set<string>(
-				Array.isArray(req.user!.permission)
-					? req.user!.permission
-					: [],
+				Array.isArray(req.user!.permission) ? req.user!.permission : [],
 			);
 
 			if (!userPerms.has(Permission.WORKSPACE.UPDATE_INFO)) {

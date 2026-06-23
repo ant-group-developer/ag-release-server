@@ -19,9 +19,19 @@ import {
 import { CreateReleaseCoverArtDto } from 'src/modules/release-cover-art/dto/release-cover-art.dto';
 import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/release-language.draft.dto';
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
+import { UpsertReleaseVideoDto } from 'src/modules/video/dto/video.dto';
 import { ReleaseTimeMode } from '../enum/release.enum';
 
 export class CreateReleaseDraftDto {
+	@ApiPropertyOptional({
+		enum: ['audio', 'video'],
+		example: 'video',
+		description: 'Release content type. Use video for VEVO video release.',
+	})
+	@IsOptional()
+	@IsString()
+	type?: 'audio' | 'video';
+
 	@ApiProperty({ example: 'Autumn Without You', maxLength: 150 })
 	@IsString()
 	@IsNotEmpty()
@@ -59,15 +69,20 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	isVariousArtist?: boolean;
 
+	@ApiPropertyOptional({ example: false, default: false })
+	@IsOptional()
+	@IsBoolean()
+	isInstrumental?: boolean;
+
 	@ApiProperty({ example: 'Zz2jDwRg6T' })
 	@IsString()
 	@IsOptional()
 	@Length(10, 10)
 	labelId?: string | null;
 
-	@IsNotEmpty()
+	@IsOptional()
 	@Length(10, 10)
-	albumFormatId: string;
+	albumFormatId?: string;
 
 	@ApiProperty({ example: 2025 })
 	@IsNumber()
@@ -146,6 +161,17 @@ export class CreateReleaseDraftDto {
 	@IsOptional()
 	@IsUUID()
 	priceTierId?: string | null;
+
+	@ApiPropertyOptional({
+		type: () => UpsertReleaseVideoDto,
+		nullable: true,
+		description:
+			'VEVO video metadata. Send null on update to remove linked video metadata.',
+	})
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpsertReleaseVideoDto)
+	video?: UpsertReleaseVideoDto | null;
 }
 
 export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
@@ -173,22 +199,39 @@ export class UpdateReleaseDraftDto extends PartialType(CreateReleaseDraftDto) {
 	@IsOptional()
 	@ValidateNested()
 	@Type(() => CreateReleaseCoverArtDto)
+	@ApiPropertyOptional({
+		type: () => CreateReleaseCoverArtDto,
+		nullable: true,
+	})
 	releaseCoverArt?: CreateReleaseCoverArtDto | null;
 
 	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdateReleaseLanguageDraftDto)
+	@ApiPropertyOptional({ type: () => UpdateReleaseLanguageDraftDto })
 	releaseLanguage?: UpdateReleaseLanguageDraftDto;
 
 	@IsOptional()
 	@ValidateNested()
 	@Type(() => UpdateReleaseTerritoryDto)
+	@ApiPropertyOptional({ type: () => UpdateReleaseTerritoryDto })
 	releaseTerritory?: UpdateReleaseTerritoryDto;
 
 	@IsOptional()
 	@IsUUID()
 	@ValidateIf((_, value) => value !== undefined)
 	priceTierId?: string | null;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpsertReleaseVideoDto)
+	@ApiPropertyOptional({
+		type: () => UpsertReleaseVideoDto,
+		nullable: true,
+		description:
+			'VEVO video metadata. Send null to remove linked video metadata.',
+	})
+	video?: UpsertReleaseVideoDto | null;
 }
 
 export class SyncReleaseToTracksDto {

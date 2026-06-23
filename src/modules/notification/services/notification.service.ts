@@ -56,7 +56,17 @@ export class NotificationService {
 		await this.sendToDev({ subject, html });
 	}
 
-	async sendToDev({ subject, html }: { subject: string; html: string }) {
+	async sendToDev({
+		subject,
+		html,
+		sendToTelegram = true,
+		sendToEmail = true,
+	}: {
+		subject: string;
+		html: string;
+		sendToTelegram?: boolean;
+		sendToEmail?: boolean;
+	}) {
 		const listUserDev = await this.notificationUserService.getListUserDev();
 		const listEmails: string[] = [];
 		const listTelegramIds: string[] = [];
@@ -70,16 +80,20 @@ export class NotificationService {
 				}
 			});
 
-			await this.emailService.sendMessage({
-				to: listEmails,
-				subject,
-				html,
-			});
+			if (sendToEmail) {
+				await this.emailService.sendMessage({
+					to: listEmails,
+					subject,
+					html,
+				});
+			}
 
-			await this.telegramService.sendMessages({
-				telegramIds: listTelegramIds,
-				message: htmlToText(html),
-			});
+			if (sendToTelegram) {
+				await this.telegramService.sendMessages({
+					telegramIds: listTelegramIds,
+					message: htmlToText(html),
+				});
+			}
 		}
 	}
 

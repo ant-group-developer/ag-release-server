@@ -11,6 +11,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Timezone } from 'src/modules/timezone/entities/timezone.entity';
 import { Repository } from 'typeorm';
 
+import { NO_LINGUISTIC_CONTENT_LANGUAGE } from 'src/common/constants/common.default.constants';
 import { PriceTier } from 'src/modules/price-tiers/entities/price-tier.entity';
 import { ReleaseException } from '../constants/release.constant';
 import { UpdateReleaseDraftDto } from '../dto/release.draft.dto';
@@ -226,12 +227,17 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
+		if (release.type === 'video') {
+			return [];
+		}
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
 
 		if (release) {
 			result.push(...this.validateRelease(release));
-			result.push(...this.validateLanguage(release.releaseLanguage));
+			if (!release.isInstrumental) {
+				result.push(...this.validateLanguage(release.releaseLanguage));
+			}
 			result.push(...this.validateTracks(release.tracks));
 		}
 
@@ -282,7 +288,8 @@ export class ReleaseValidateService {
 			if (release.title !== release.title.trim()) {
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.noLeadingTrailingSpace',
+						messageCode:
+							'formFields.validate.noLeadingTrailingSpace',
 						message: 'Tên không được có khoảng trắng ở đầu và cuối',
 						page: 'core-detail',
 						field: 'title',
@@ -296,7 +303,8 @@ export class ReleaseValidateService {
 			if (featMatches) {
 				result.push(
 					new FieldErrorDetails({
-						messageCode: 'formFields.validate.titleCannotContainFeat',
+						messageCode:
+							'formFields.validate.titleCannotContainFeat',
 						message: 'Tiêu đề không được chứa "feat"',
 						page: 'core-detail',
 						field: 'title',
@@ -456,28 +464,70 @@ export class ReleaseValidateService {
 			);
 		}
 
-		// release contributors validation (Dynamic isRequired)
+		// const hasExplicitTrack = release.tracks?.some((track) =>
+		// 	this.isExplicitContent(track.trackSensitive?.code),
+		// );
+		//
+		// if (release.isInstrumental && hasExplicitTrack) {
+		// 	result.push(
+		// 		new FieldErrorDetails({
+		// 			messageCode: 'NOVOCALSETFOREXPLICITCONTENT',
+		// 			message:
+		// 				'Explicit Content has been indicated on this release, but the metadata says there are no vocals. Update the release metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
+		// 			page: 'core-detail',
+		// 			field: 'isInstrumental',
+		// 		}),
+		// 	);
+		// }
+
+		const LYRICIST_ROLE_CODE = 'Lyricist';
+
 		if (requiredRoles.length > 0) {
 			let applicableRoles = requiredRoles;
-			if (release.releaseLanguage?.audioLanguage?.code === 'NoLanguage') {
+
+			const isNoLinguisticContent =
+				release.isInstrumental ||
+				release.releaseLanguage?.audioLanguage?.code ===
+					NO_LINGUISTIC_CONTENT_LANGUAGE;
+
+			if (isNoLinguisticContent) {
 				applicableRoles = applicableRoles.filter(
-					(r) => r.code !== 'Lyricist',
+					(role) => role.code !== LYRICIST_ROLE_CODE,
 				);
+
+				const hasLyricist = release.releaseContributors?.some(
+					(contributor) =>
+						contributor.artistRole?.code === LYRICIST_ROLE_CODE,
+				);
+
+				if (hasLyricist) {
+					result.push(
+						new FieldErrorDetails({
+							messageCode:
+								'formFields.validate.noLinguisticContentHasLyricist',
+							message:
+								'Bản phát hành không có nội dung lời thì không được có contributor với vai trò Người viết lời',
+							page: 'core-detail',
+							field: 'releaseContributors',
+						}),
+					);
+				}
 			}
 
 			const missingRoles = applicableRoles.filter(
 				(role) =>
 					!release.releaseContributors?.some(
-						(c) => c.artistRole?.code === role.code,
+						(contributor) =>
+							contributor.artistRole?.code === role.code,
 					),
 			);
 
 			if (missingRoles.length > 0) {
-				const missing = missingRoles.map((r) => r.name);
+				const missing = missingRoles.map((role) => role.name);
+
 				result.push(
 					new FieldErrorDetails({
-						messageCode:
-							`formFields.validate.missingRequired.${missing.join('')}`,
+						messageCode: `formFields.validate.missingRequired.${missing.join('')}`,
 						message: `Bản phát hành bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
 						page: 'core-detail',
 						field: 'releaseContributors',
@@ -538,13 +588,16 @@ export class ReleaseValidateService {
 
 		tracks.forEach((track, index) => {
 			const { trackLanguage } = track;
+			const isInstrumental = track.isInstrumental;
 
 			if (track.title) {
 				if (track.title !== track.title.trim()) {
 					result.push(
 						new FieldErrorDetails({
-							messageCode: 'formFields.validate.noLeadingTrailingSpace',
-							message: 'Tên bài hát không được có khoảng trắng ở đầu và cuối',
+							messageCode:
+								'formFields.validate.noLeadingTrailingSpace',
+							message:
+								'Tên bài hát không được có khoảng trắng ở đầu và cuối',
 							page: 'tracks',
 							field: `tracks.${index}.title`,
 							trackId: track.id,
@@ -558,7 +611,8 @@ export class ReleaseValidateService {
 				if (featMatches) {
 					result.push(
 						new FieldErrorDetails({
-							messageCode: 'formFields.validate.titleCannotContainFeat',
+							messageCode:
+								'formFields.validate.titleCannotContainFeat',
 							message: 'Tiêu đề không được chứa "feat"',
 							page: 'tracks',
 							field: `tracks.${index}.title`,
@@ -632,16 +686,6 @@ export class ReleaseValidateService {
 				);
 			}
 
-			if (!track.trackLanguage.recordingCountryId) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.trackLanguage.recordingCountryId`,
-						trackId: track.id,
-					}),
-				);
-			}
-
 			// track artists validation
 			if (!track.trackArtists.length) {
 				result.push(
@@ -655,33 +699,76 @@ export class ReleaseValidateService {
 			}
 
 			// track contributors validation (Dynamic isRequired)
-			if (requiredRoles.length > 0) {
-				let applicableRoles = requiredRoles;
-				if (track.trackLanguage?.audioLanguage?.code === 'NoLanguage') {
-					applicableRoles = applicableRoles.filter(
-						(r) => r.code !== 'Lyricist',
-					);
-				}
+			const LYRICIST_ROLE_CODE = 'Lyricist';
 
-				const missingRoles = applicableRoles.filter(
-					(role) =>
-						!track.trackContributors?.some(
-							(c) => c.artistRole?.code === role.code,
-						),
+			const isNoLinguisticContent =
+				isInstrumental ||
+				track.trackLanguage?.audioLanguage?.code ===
+					NO_LINGUISTIC_CONTENT_LANGUAGE;
+
+			// if (
+			// 	isNoLinguisticContent &&
+			// 	this.isExplicitContent(track.trackSensitive?.code)
+			// ) {
+			// 	result.push(
+			// 		new FieldErrorDetails({
+			// 			messageCode: 'NOVOCALSETFOREXPLICITCONTENT',
+			// 			message:
+			// 				'Explicit Content has been indicated on this track, but the metadata says there are no vocals. Update the track metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
+			// 			page: 'tracks',
+			// 			field: `tracks.${index}.trackSensitiveId`,
+			// 			trackId: track.id,
+			// 		}),
+			// 	);
+			// }
+
+			if (isNoLinguisticContent) {
+				const hasLyricist = track.trackContributors?.some(
+					(contributor) =>
+						contributor.artistRole?.code === LYRICIST_ROLE_CODE,
 				);
 
-				if (missingRoles.length > 0) {
-					const missing = missingRoles.map((r) => r.name);
+				if (hasLyricist) {
 					result.push(
 						new FieldErrorDetails({
-							messageCode: `formFields.validate.missingRequired.${missing.join('')}`,	
-							message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+							messageCode:
+								'formFields.validate.noLinguisticContentHasLyricist',
+							message:
+								'Track không có nội dung lời thì không được có contributor với vai trò Người viết lời',
 							page: 'tracks',
 							field: `tracks.${index}.trackContributors`,
 							trackId: track.id,
 						}),
 					);
 				}
+			}
+
+			const applicableRoles = isNoLinguisticContent
+				? requiredRoles.filter(
+						(role) => role.code !== LYRICIST_ROLE_CODE,
+					)
+				: requiredRoles;
+
+			const missingRoles = applicableRoles.filter(
+				(role) =>
+					!track.trackContributors?.some(
+						(contributor) =>
+							contributor.artistRole?.code === role.code,
+					),
+			);
+
+			if (missingRoles.length > 0) {
+				const missing = missingRoles.map((role) => role.name);
+
+				result.push(
+					new FieldErrorDetails({
+						messageCode: `formFields.validate.missingRequired.${missing.join('')}`,
+						message: `Track bắt buộc phải có contributor với vai trò ${missing.join(' và ')}`,
+						page: 'tracks',
+						field: `tracks.${index}.trackContributors`,
+						trackId: track.id,
+					}),
+				);
 			}
 
 			//
@@ -695,34 +782,36 @@ export class ReleaseValidateService {
 				);
 			}
 
-			if (!trackLanguage?.audioLanguageId) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.trackLanguage.audioLanguageId`,
-						trackId: track.id,
-					}),
-				);
-			}
+			if (!isInstrumental) {
+				if (!trackLanguage?.audioLanguageId) {
+					result.push(
+						new FieldErrorDetails({
+							page: 'tracks',
+							field: `tracks.${index}.trackLanguage.audioLanguageId`,
+							trackId: track.id,
+						}),
+					);
+				}
 
-			if (!trackLanguage?.metadataLanguageId) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.trackLanguage.metadataLanguageId`,
-						trackId: track.id,
-					}),
-				);
-			}
+				if (!trackLanguage?.metadataLanguageId) {
+					result.push(
+						new FieldErrorDetails({
+							page: 'tracks',
+							field: `tracks.${index}.trackLanguage.metadataLanguageId`,
+							trackId: track.id,
+						}),
+					);
+				}
 
-			if (!trackLanguage?.metadataLanguageCountryId) {
-				result.push(
-					new FieldErrorDetails({
-						page: 'tracks',
-						field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
-						trackId: track.id,
-					}),
-				);
+				if (!trackLanguage?.metadataLanguageCountryId) {
+					result.push(
+						new FieldErrorDetails({
+							page: 'tracks',
+							field: `tracks.${index}.trackLanguage.metadataLanguageCountryId`,
+							trackId: track.id,
+						}),
+					);
+				}
 			}
 
 			if (!trackLanguage?.recordingCountryId) {
@@ -748,4 +837,15 @@ export class ReleaseValidateService {
 
 		return result;
 	}
+
+	// private isExplicitContent(code?: string | null): boolean {
+	// 	const normalizedCode = code?.replace(/[^a-zA-Z]/g, '').toUpperCase();
+	//
+	// 	return [
+	// 		'EXPLICIT',
+	// 		'EXPLICITCONTENT',
+	// 		'EXPLICITCONTENTEDITED',
+	// 		'PARENTALADVISORY',
+	// 	].includes(normalizedCode ?? '');
+	// }
 }

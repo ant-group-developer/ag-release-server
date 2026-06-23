@@ -184,6 +184,20 @@ export class UpdatePartnerSpotifyConfigDto {
 	token?: string;
 }
 
+export class UpdatePartnerVevoConfigDto {
+	@IsOptional()
+	@IsString()
+	token: string;
+
+	@IsOptional()
+	@IsString()
+	baseUrl: string;
+
+	@IsOptional()
+	@IsString()
+	callbackUrl: string;
+}
+
 export class UpdatePartnersConfigDto {
 	@IsOptional()
 	@ValidateNested()
@@ -194,6 +208,11 @@ export class UpdatePartnersConfigDto {
 	@ValidateNested()
 	@Type(() => UpdatePartnerSpotifyConfigDto)
 	spotify?: UpdatePartnerSpotifyConfigDto;
+
+	@IsOptional()
+	@ValidateNested()
+	@Type(() => UpdatePartnerVevoConfigDto)
+	vevo?: UpdatePartnerVevoConfigDto;
 }
 
 export class UpdateConfigDto {

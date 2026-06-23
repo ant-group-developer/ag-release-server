@@ -57,7 +57,7 @@ export class UpcService implements OnModuleInit {
 	}
 
 	async getUpc(payload: GetUpcRequest) {
-		console.log(payload);
+		// return { upc: '0850080651804' };
 
 		return firstValueFrom(
 			this.grpcService

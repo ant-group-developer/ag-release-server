@@ -14,6 +14,7 @@
 /download_unzip
 /src/modules/access-bomb/file
 /release_download_bucket
+/~
 # Logs
 logs
 *.log
@@ -74,3 +75,7 @@ secrets
 .agent
 
 debug-create-release-dto.json
+
+analytics/*
+
+scratch/*

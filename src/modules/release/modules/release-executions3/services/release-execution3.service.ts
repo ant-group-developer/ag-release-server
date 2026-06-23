@@ -1,168 +1,670 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
+import { RoutingModeEnum } from 'src/modules/distribution/dsp-routing/enum/dsp-routing.enum';
+import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/services/dsp-routing-config.service';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { Repository } from 'typeorm';
-import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
+import { ReleaseService } from 'src/modules/release/services/release.service';
+import { EntityManager, In, Repository } from 'typeorm';
+import {
+	QueryGetListReleaseExecution3Dto,
+	ReleaseExecutionPageDto,
+} from '../dtos/release-execution3.dto';
+import { CiDistributionJob3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	CiJobStatus3,
 	ExecutionType,
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
 } from '../enums/release-execution3.enum';
+import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
 import { ReleaseExecution3Builder } from './release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './release-execution3.engine';
+import { ReleaseExecution3QueryService } from './release-execution3.query.service';
 
 @Injectable()
 export class ReleaseExecution3Service {
 	constructor(
+		@InjectEntityManager()
+		private readonly manager: EntityManager,
+
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
 		@InjectRepository(ReleaseExecutionStep3)
-		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
+		private readonly step3Repo: Repository<ReleaseExecutionStep3>,
 
-		private readonly execution3Builder: ReleaseExecution3Builder,
+		@InjectRepository(ReleaseExecutionStep3)
+		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
+		private readonly dspRoutingService: DspRoutingConfigsService,
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
+
+		private readonly queueService: ReleaseExecution3Queue,
+
+		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
+		private readonly queryService: ReleaseExecution3QueryService,
 	) {}
 
-	async submit(body: {
+	// đẩy vào queue, consumer tự quét và xử lí
+	async newReleaseExecution(body: {
 		release: Release;
 		dspCodes: string[];
 		type: ExecutionType;
 	}) {
-		const execution = await this.executionRepo.save(
-			this.executionRepo.create({
-				releaseId: body.release.id,
-				type: body.type,
-				status: ReleaseExecutionStatus.NEW,
-				releaseTitle: body.release.title,
-				releaseUpc: body.release.upc ?? '',
-				metadata: {
-					input: {
-						releaseSnapshot: body.release,
-						dspCodes: body.dspCodes,
-					},
-					output: {
-						result: [],
-					},
-				},
-			}),
+		return await this.queueService.queueExecution(body);
+	}
+
+	async resumeWaitingSteps(): Promise<void> {
+		const now = new Date();
+
+		const waitingSteps = await this.queryService.getListWaitingSteps(now);
+
+		// Group theo executionId, chỉ resume 1 lần mỗi execution
+		const executionIds = [
+			...new Set(waitingSteps.map((step) => step.releaseExecutionId)),
+		];
+
+		console.log(
+			`[ReleaseExecution3Service] Found ${waitingSteps.length} waiting steps, ${executionIds.length} executions to resume`,
+		); // log thêm
+
+		for (const executionId of executionIds) {
+			await this.queueService.queueRunPipeline(executionId);
+		}
+	}
+
+	// main
+	async startProcessing(id: string): Promise<void> {
+		const execution = await this.queryService.findOne(id);
+
+		if (execution.status !== ReleaseExecutionStatus.NEW) {
+			throw new Error('Only execution with NEW status can be started');
+		}
+
+		// cancel job cũ
+		await this.cancelPendingExecutions({
+			releaseId: execution.metadata.input.releaseSnapshot.id,
+			excludeExecutionId: id,
+		});
+
+		execution.status = ReleaseExecutionStatus.PROCESSING;
+		await this.executionRepo.save(execution);
+
+		// parse execution.metadata
+		await this.parseMetadata(execution);
+
+		// build tree
+		await this.builder.buildStepsChild({ releaseExecution: execution });
+
+		// enqueue pipeline execution vì nó nặng
+		await this.queueService.queueRunPipeline(id);
+	}
+
+	async runPipeline(id: string): Promise<void> {
+		const execution = await this.queryService.findOne(id);
+		const steps = execution.steps || [];
+
+		try {
+			for (const step of steps) {
+				const statusStep = await this.engine.processStep({
+					step,
+					releaseExecution: execution,
+				});
+
+				if (this.shouldStopSequential(statusStep)) {
+					await this.updateExecutionStatus({
+						execution,
+						status: this.mapStepStatusToExecutionStatus(statusStep),
+					});
+					return;
+				}
+			}
+
+			await this.refreshExecutionStatus(execution);
+		} finally {
+			// Luôn sync output kể cả khi pipeline return sớm hoặc phát sinh lỗi.
+			await this.engine.syncExecutionOutputToReleaseDeliveryDsp(
+				execution,
+			);
+		}
+	}
+
+	async syncExecutionOutputToReleaseDeliveryDsp(id: string) {
+		await this.engine.syncExecutionOutputToReleaseDeliveryDsp({ id });
+	}
+
+	private async parseMetadata(execution: ReleaseExecution3): Promise<void> {
+		const { dspCodes } = execution.metadata.input;
+
+		if (!dspCodes?.length) {
+			return;
+		}
+
+		const dsps = await this.manager.find(Dsp, {
+			where: { code: In(dspCodes) },
+			relations: ['dspRoutingConfig', 'dspRoutingConfig.aggregator'],
+		});
+
+		const directDsps: Dsp[] = [];
+		const ciDealDsps: Dsp[] = [];
+		const state51Dsps: Dsp[] = [];
+
+		for (const dsp of dsps) {
+			const config = dsp.dspRoutingConfig;
+
+			const isCI =
+				config?.mode === RoutingModeEnum.AGGREGATOR &&
+				config.aggregator?.code === 'CI';
+
+			if (!isCI) {
+				directDsps.push(dsp);
+				continue;
+			}
+
+			if (dsp.hasDeal) {
+				ciDealDsps.push(dsp);
+			} else {
+				state51Dsps.push(dsp);
+			}
+		}
+
+		execution.metadata.input.dspDirect = directDsps;
+
+		execution.metadata.input.dspAggregator = {
+			ci: {
+				ci: ciDealDsps,
+				state51: state51Dsps,
+				primaryDsp: null,
+			},
+		};
+
+		const ciDsps = [...ciDealDsps, ...state51Dsps];
+		const allDeliveryDsps = [...directDsps, ...ciDsps];
+
+		execution.metadata.input.delivery = {
+			all: this.buildDeliveryMetadataInput(
+				execution.metadata.input.releaseSnapshot.id,
+				allDeliveryDsps,
+			),
+			directByDspId: Object.fromEntries(
+				directDsps.map((dsp) => [
+					dsp.id,
+					this.buildDeliveryMetadataInput(
+						execution.metadata.input.releaseSnapshot.id,
+						[dsp],
+					),
+				]),
+			),
+			aggCi: this.buildDeliveryMetadataInput(
+				execution.metadata.input.releaseSnapshot.id,
+				ciDsps,
+			),
+		};
+
+		execution.metadata.output = {
+			result: allDeliveryDsps.map((dsp) => ({
+				dspId: dsp.id,
+				dspCode: dsp.code,
+				status: undefined,
+			})),
+		};
+
+		for (const dsp of ciDsps) {
+			if (!dsp.code) {
+				continue;
+			}
+
+			try {
+				await this.dspRoutingService.resolveFullDeliveryConfig(
+					dsp.code,
+				);
+
+				execution.metadata.input.dspAggregator.ci.primaryDsp = dsp;
+				break;
+			} catch {
+				continue;
+			}
+		}
+
+		await this.executionRepo.save(execution);
+	}
+
+	private buildDeliveryMetadataInput(releaseId: string, dsps: Dsp[]) {
+		return {
+			releaseId,
+			items: dsps
+				.filter((dsp) => !!dsp.id)
+				.map((dsp) => ({
+					dspId: dsp.id,
+					dspCode: dsp.code,
+				})),
+		};
+	}
+
+	private shouldStopSequential(status: ReleaseExecutionStepStatus): boolean {
+		return [
+			ReleaseExecutionStepStatus.FAILED,
+			ReleaseExecutionStepStatus.CANCELLED,
+			ReleaseExecutionStepStatus.WAITING_ACTION,
+			ReleaseExecutionStepStatus.WAITING_PARTNER,
+		].includes(status);
+	}
+
+	private mapStepStatusToExecutionStatus(
+		status: ReleaseExecutionStepStatus,
+	): ReleaseExecutionStatus {
+		switch (status) {
+			case ReleaseExecutionStepStatus.DONE:
+				return ReleaseExecutionStatus.DONE;
+
+			case ReleaseExecutionStepStatus.FAILED:
+				return ReleaseExecutionStatus.FAILED;
+
+			case ReleaseExecutionStepStatus.CANCELLED:
+				return ReleaseExecutionStatus.CANCELLED;
+
+			case ReleaseExecutionStepStatus.WAITING_ACTION:
+				return ReleaseExecutionStatus.WAITING_ACTION;
+
+			case ReleaseExecutionStepStatus.WAITING_PARTNER:
+				return ReleaseExecutionStatus.WAITING_PARTNER;
+
+			default:
+				return ReleaseExecutionStatus.PROCESSING;
+		}
+	}
+
+	private async refreshExecutionStatus(
+		execution: ReleaseExecution3,
+	): Promise<ReleaseExecutionStatus> {
+		// từ trạng thái của các step => status của exe
+		const status = this.deriveExecutionStatusFromSteps(execution);
+
+		await this.updateExecutionStatus({ execution, status });
+
+		return status;
+	}
+
+	//
+	private async updateExecutionStatus({
+		execution,
+		status,
+		summary,
+	}: {
+		execution: ReleaseExecution3;
+		status: ReleaseExecutionStatus;
+		summary?: string;
+	}): Promise<void> {
+		execution.status = status;
+
+		if (summary !== undefined) {
+			execution.summary = summary;
+		}
+
+		if (this.isFinalExecutionStatus(status)) {
+			execution.completedAt = new Date();
+		}
+
+		// Chỉ update các cột trạng thái; không dùng save(execution) vì snapshot
+		// metadata cũ có thể ghi đè output.result vừa được các step cập nhật.
+		await this.executionRepo.update(execution.id, {
+			status: execution.status,
+			completedAt: execution.completedAt,
+			...(summary !== undefined && { summary: execution.summary }),
+		});
+		await this.syncDeliveryStatusByExecutionStatus(execution, status);
+	}
+
+	private async syncDeliveryStatusByExecutionStatus(
+		execution: ReleaseExecution3,
+		executionStatus: ReleaseExecutionStatus,
+	): Promise<void> {
+		const delivery = execution.metadata?.input?.delivery?.all;
+		if (!delivery?.releaseId || !delivery.items?.length) return;
+
+		const status = this.mapExecutionStatusToDeliveryStatus(executionStatus);
+
+		await this.releaseDspDeliveryService.updateDeliveryStatus({
+			releaseIds: [delivery.releaseId],
+			items: delivery.items.map((item) => ({
+				...item,
+				dspCode: item.dspCode,
+				status,
+			})),
+		});
+	}
+
+	private mapExecutionStatusToDeliveryStatus(
+		status: ReleaseExecutionStatus,
+	): ReleaseDspStatus {
+		if (status === ReleaseExecutionStatus.DONE) {
+			return ReleaseDspStatus.DISTRIBUTED;
+		}
+
+		if (
+			[
+				ReleaseExecutionStatus.FAILED,
+				ReleaseExecutionStatus.CANCELLED,
+			].includes(status)
+		) {
+			return ReleaseDspStatus.ISSUES;
+		}
+
+		return ReleaseDspStatus.PROCESSING;
+	}
+
+	private isFinalExecutionStatus(status: ReleaseExecutionStatus): boolean {
+		return [
+			ReleaseExecutionStatus.DONE,
+			ReleaseExecutionStatus.FAILED,
+			ReleaseExecutionStatus.CANCELLED,
+		].includes(status);
+	}
+
+	private deriveExecutionStatusFromSteps(
+		execution: ReleaseExecution3,
+	): ReleaseExecutionStatus {
+		const steps = execution.steps || [];
+
+		if (!steps.length) {
+			return execution.status;
+		}
+
+		const statuses = steps.map((step) => step.status);
+
+		if (statuses.includes(ReleaseExecutionStepStatus.WAITING_ACTION)) {
+			return ReleaseExecutionStatus.WAITING_ACTION;
+		}
+
+		// if (statuses.includes(ReleaseExecutionStepStatus.WAITING_PARTNER)) {
+		// 	return ReleaseExecutionStatus.WAITING_PARTNER;
+		// }
+
+		if (statuses.some((s) => s === ReleaseExecutionStepStatus.PROCESSING)) {
+			return ReleaseExecutionStatus.PROCESSING;
+		}
+
+		if (statuses.some((s) => s === ReleaseExecutionStepStatus.NEW)) {
+			return ReleaseExecutionStatus.PROCESSING;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.DONE)) {
+			return ReleaseExecutionStatus.DONE;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.FAILED)) {
+			return ReleaseExecutionStatus.FAILED;
+		}
+
+		if (statuses.every((s) => s === ReleaseExecutionStepStatus.CANCELLED)) {
+			return ReleaseExecutionStatus.CANCELLED;
+		}
+
+		if (
+			statuses.includes(ReleaseExecutionStepStatus.FAILED) &&
+			statuses.includes(ReleaseExecutionStepStatus.CANCELLED)
+		) {
+			return ReleaseExecutionStatus.FAILED;
+		}
+
+		return ReleaseExecutionStatus.PROCESSING;
+	}
+
+	// query
+	async getList(query: QueryGetListReleaseExecution3Dto) {
+		query.releaseIds = await this.resolveReleaseExecutionReleaseIds(query);
+
+		const [items, totalItems] = await this.getListItems(query);
+		const statusCounts = await this.queryService.getStatusCounts(query);
+
+		return new ReleaseExecutionPageDto({
+			items,
+			metadata: {
+				...query,
+				totalItems,
+				statusCounts,
+			},
+		});
+	}
+
+	private async getListItems(
+		query: QueryGetListReleaseExecution3Dto,
+	): Promise<[ReleaseExecution3[], number]> {
+		const qb = this.queryService.createQbGetList(query);
+
+		orderAndPaging2({ qb, filter: query });
+
+		return qb.getManyAndCount();
+	}
+
+	// gọi sang release service để lấy ra list release id
+	private async resolveReleaseExecutionReleaseIds(
+		query: QueryGetListReleaseExecution3Dto,
+	): Promise<string[]> {
+		const explicitReleaseIds = [...(query.releaseIds ?? [])].filter(
+			Boolean,
+		);
+		const uniqueExplicitReleaseIds = [...new Set(explicitReleaseIds)];
+
+		if (!query.queryListReleases) {
+			return uniqueExplicitReleaseIds;
+		}
+
+		const releaseQuery = Object.assign(
+			new QueryGetListReleaseDto(),
+			query.queryListReleases,
+			{
+				page: 1,
+				pageSize: 100000,
+			},
 		);
 
-		await this.execution3Builder.startProcessing(execution.id);
-		// await this.engine.runByExecutionId(execution.id);
+		const releases = await this.releaseService.getList(releaseQuery);
+		const queriedReleaseIds = [
+			...new Set(
+				releases.items
+					.map((release) => (release as { id?: string }).id)
+					.filter((id): id is string => !!id),
+			),
+		];
 
-		return this.findOne(execution.id);
+		if (!uniqueExplicitReleaseIds.length) {
+			return queriedReleaseIds ?? [];
+		}
+
+		return [
+			...new Set([...uniqueExplicitReleaseIds, ...queriedReleaseIds]),
+		];
 	}
 
-	async getList(query: QueryGetListReleaseExecution3Dto) {
-		const page = query.page || 1;
-		const pageSize = query.pageSize || 10;
+	async cancelPendingExecutions(input: {
+		releaseId: string;
+		excludeExecutionId?: string;
+	}) {
+		const pendingExecutions =
+			await this.queryService.getPendingExecutions(input);
 
-		const qb = this.executionRepo
-			.createQueryBuilder('execution')
-			.orderBy('execution.createdAt', 'DESC')
-			.skip((page - 1) * pageSize)
-			.take(pageSize);
+		if (pendingExecutions.length === 0) return;
 
-		if (query.releaseId) {
-			qb.andWhere('execution.releaseId = :releaseId', {
-				releaseId: query.releaseId,
-			});
-		}
+		const executionIds = pendingExecutions.map((e) => e.id);
 
-		if (query.status) {
-			qb.andWhere('execution.status = :status', {
-				status: query.status,
-			});
-		}
+		// cacncel execution
+		await this.executionRepo
+			.createQueryBuilder()
+			.update()
+			.set({
+				status: ReleaseExecutionStatus.CANCELLED,
+				completedAt: new Date(),
+			})
+			.where('id IN (:...ids)', { ids: executionIds })
+			.execute();
 
-		const [items, total] = await qb.getManyAndCount();
+		// cancel step
+		await this.step3Repo
+			.createQueryBuilder()
+			.update()
+			.set({
+				status: ReleaseExecutionStepStatus.CANCELLED,
+				completedAt: new Date(),
+			})
+			.where('release_execution_id IN (:...ids)', { ids: executionIds })
+			.andWhere('status IN (:...stepStatuses)', {
+				stepStatuses: [
+					ReleaseExecutionStepStatus.NEW,
+					ReleaseExecutionStepStatus.PROCESSING,
+					ReleaseExecutionStepStatus.WAITING_ACTION,
+					ReleaseExecutionStepStatus.WAITING_PARTNER,
+				],
+			})
+			.execute();
 
-		return new PageDto({
-			metadata: { totalItems: total, page, pageSize },
-			items,
-		});
+		// cancel ci job
+		await this.manager
+			.createQueryBuilder()
+			.update(CiDistributionJob3)
+			.set({
+				status: CiJobStatus3.CANCEL,
+				note: 'Job execution cha bị huỷ do được execute lại',
+			})
+			.where('release_execution_id IN (:...ids)', { ids: executionIds })
+			.andWhere('status IN (:...jobStatuses)', {
+				jobStatuses: [
+					CiJobStatus3.PENDING,
+					CiJobStatus3.PROCESSING,
+					CiJobStatus3.COMPLETED,
+				],
+			})
+			.execute();
 	}
 
-	async findOne(id: string) {
-		const entity = await this.executionRepo.findOne({
-			where: { id },
-			relations: {
-				logs: true,
-			},
+	private async setStepAndChildrenStatusRecursive({
+		step,
+		targetStatus,
+	}: {
+		step: ReleaseExecutionStep3;
+		targetStatus: ReleaseExecutionStepStatus;
+	}): Promise<void> {
+		await this.stepRepo.update(step.id, {
+			status: targetStatus,
+			startedAt:
+				targetStatus === ReleaseExecutionStepStatus.NEW
+					? null
+					: step.startedAt,
+			completedAt: this.getCompletedAtByStatus({
+				status: targetStatus,
+			}),
+			metadata:
+				targetStatus === ReleaseExecutionStepStatus.NEW
+					? this.resetStepMetadataForRetry(step.metadata)
+					: step.metadata,
 		});
 
-		if (!entity) {
-			throw new NotFoundException('Release submit not found');
-		}
-
-		const steps = await this.stepRepo.find({
+		const children = await this.stepRepo.find({
 			where: {
-				releaseExecutionId: id,
-			},
-			relations: {
-				logs: true,
-			},
-			order: {
-				order: 'ASC',
+				parentStepId: step.id,
 			},
 		});
 
-		entity.steps = this.buildStepTreeList(steps);
-
-		return entity;
+		for (const child of children) {
+			await this.setStepAndChildrenStatusRecursive({
+				step: child,
+				targetStatus,
+			});
+		}
 	}
 
-	async retryStep(stepId: string) {
+	private resetStepMetadataForRetry(
+		metadata: Record<string, any> | null,
+	): Record<string, any> {
+		const retryMetadata = { ...(metadata ?? {}) };
+		delete retryMetadata.scheduledAt;
+
+		return {
+			...retryMetadata,
+			output: null,
+		};
+	}
+
+	private getCompletedAtByStatus({
+		status,
+	}: {
+		status: ReleaseExecutionStepStatus;
+	}): Date | null {
+		if (status === ReleaseExecutionStepStatus.NEW) {
+			return null;
+		}
+
+		if (
+			[
+				ReleaseExecutionStepStatus.DONE,
+				ReleaseExecutionStepStatus.FAILED,
+				ReleaseExecutionStepStatus.SKIPPED,
+				ReleaseExecutionStepStatus.CANCELLED,
+			].includes(status)
+		) {
+			return new Date();
+		}
+
+		return null;
+	}
+
+	async retryStep(stepId: string): Promise<void> {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
 		});
 
-		if (!step) {
-			throw new NotFoundException('Step not found');
-		}
+		if (!step) throw new Error('Step not found');
 
-		await this.stepRepo.update(step.id, {
-			status: ReleaseExecutionStepStatus.NEW,
-			startedAt: null,
-			completedAt: null,
+		await this.setStepAndChildrenStatusRecursive({
+			step,
+			targetStatus: ReleaseExecutionStepStatus.NEW,
 		});
 
-		return this.engine.runByStepId(stepId);
+		// enqueue pipeline để xử lý async vì runPipeline nặng
+		await this.queueService.queueRunPipeline(step.releaseExecutionId);
 	}
 
-	async runStep(stepId: string) {
-		return this.engine.runByStepId(stepId);
+	async updateStatusStepAndRerunPipeline({
+		stepId,
+		status,
+	}: {
+		stepId: string;
+		status: ReleaseExecutionStepStatus;
+	}) {
+		const step = await this.stepRepo.findOne({
+			where: { id: stepId },
+			relations: { childSteps: true },
+		});
+
+		if (!step) throw new Error('Step not found');
+
+		await this.stepRepo.update(step.id, {
+			status,
+			completedAt: [
+				ReleaseExecutionStepStatus.DONE,
+				ReleaseExecutionStepStatus.FAILED,
+				ReleaseExecutionStepStatus.SKIPPED,
+				ReleaseExecutionStepStatus.CANCELLED,
+			].includes(status)
+				? new Date()
+				: null,
+		});
+
+		// enqueue pipeline để xử lý async
+		await this.queueService.queueRunPipeline(step.releaseExecutionId);
 	}
 
-	private buildStepTreeList(steps: ReleaseExecutionStep3[]) {
-		const map = new Map<string, ReleaseExecutionStep3>();
-		const roots: ReleaseExecutionStep3[] = [];
-
-		for (const step of steps) {
-			step.childSteps = [];
-			map.set(step.id, step);
-		}
-
-		for (const step of steps) {
-			if (!step.parentStepId) {
-				roots.push(step);
-				continue;
-			}
-
-			const parent = map.get(step.parentStepId);
-
-			if (!parent) {
-				roots.push(step);
-				continue;
-			}
-
-			parent.childSteps?.push(step);
-		}
-
-		return roots;
+	async findOne(id: string) {
+		return this.queryService.findOne(id);
 	}
 }
