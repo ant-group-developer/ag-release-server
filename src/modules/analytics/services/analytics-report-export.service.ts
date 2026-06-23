@@ -17,6 +17,7 @@ import {
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { isValidStandardUpc } from 'src/utils/upc.util';
+import { zipFolder } from 'src/utils/util';
 import { EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
@@ -366,6 +367,11 @@ export class AnalyticsReportExportService {
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
     jobId?: string,
   ): Promise<AnalyticsReportExportResult> {
+    // ── Route to split export if splitMode is active ──────────
+    if (dto.splitMode && dto.splitMode !== 'none') {
+      return this.exportReportSplit(tenantId, dto, onProgress, jobId);
+    }
+
     await this.throwIfExportJobCancelled(jobId);
     const range = this.getMonthRange(dto);
     const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
@@ -456,6 +462,241 @@ export class AnalyticsReportExportService {
     }
   }
 
+  /**
+   * Export with split mode — query all data, group by split key,
+   * write individual files, then zip them using existing zipFolder util.
+   */
+  private async exportReportSplit(
+    tenantId: string,
+    dto: AnalyticsReportExportDto,
+    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
+    jobId?: string,
+  ): Promise<AnalyticsReportExportResult> {
+    await this.throwIfExportJobCancelled(jobId);
+    const range = this.getMonthRange(dto);
+    const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
+    if (dto.trackId && !trackIsrc) {
+      throw new BadRequestException('trackId does not have a valid ISRC');
+    }
+
+    const fileName = this.buildFileName(dto);
+    const tempDir = path.join(os.tmpdir(), `export-split-${uuidv4()}`);
+    const zipPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
+    const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
+
+    try {
+      await fs.promises.mkdir(tempDir, { recursive: true });
+
+      // Step 1: Query all data in batches
+      await onProgress?.(
+        { progressCurrent: 1, progressLabel: 'Querying data' },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+
+      const allDetails: DetailRow[] = [];
+      let offset = 0;
+      while (true) {
+        await this.throwIfExportJobCancelled(jobId);
+        const rawRows = await this.getRawDetailsPage(
+          tenantId, dto, range, trackIsrc, this.batchSize, offset,
+        );
+        if (!rawRows.length) break;
+        const enriched = await this.enrichDetails(rawRows);
+        allDetails.push(...enriched);
+        await onProgress?.(
+          {
+            progressCurrent: 1,
+            progressLabel: `Querying data (${allDetails.length} rows)`,
+            processedRows: allDetails.length,
+          },
+          false,
+        );
+        if (rawRows.length < this.batchSize) break;
+        offset += this.batchSize;
+      }
+
+      // Step 2: Group data by split key
+      await onProgress?.(
+        { progressCurrent: 2, progressLabel: 'Splitting data into groups' },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+
+      const groups = this.groupDetailRows(allDetails, dto);
+
+      // Step 3: Write each group as a file
+      await onProgress?.(
+        { progressCurrent: 2, progressLabel: `Writing ${groups.size} file(s)` },
+        true,
+      );
+
+      let filesWritten = 0;
+      for (const [groupPath, rows] of groups) {
+        await this.throwIfExportJobCancelled(jobId);
+        const filePath = path.join(tempDir, groupPath);
+        await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+        await this.writeGroupFile(filePath, rows, dto);
+        filesWritten++;
+        await onProgress?.(
+          {
+            progressCurrent: 2,
+            progressLabel: `Writing file ${filesWritten}/${groups.size}`,
+          },
+          false,
+        );
+      }
+
+      // Step 4: Create ZIP using existing utility
+      await onProgress?.(
+        { progressCurrent: 3, progressLabel: 'Creating ZIP archive' },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+      await zipFolder(tempDir, zipPath);
+
+      // Step 5: Upload to R2
+      await onProgress?.(
+        {
+          progressCurrent: 3,
+          progressLabel: 'Uploading ZIP file',
+          processedRows: allDetails.length,
+          totalRows: allDetails.length,
+        },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+
+      await this.r2Service.uploadFileFromPath({
+        key,
+        filePath: zipPath,
+        contentType: 'application/zip',
+        isPublic: false,
+      });
+      await this.throwIfExportJobCancelled(jobId);
+
+      return {
+        fileName,
+        key,
+        downloadUrl: await this.r2Service.getSignedUrlDown({
+          key, fileName, isPublic: false,
+        }),
+        expiresInSeconds: 4 * 3600,
+        totalRows: allDetails.length,
+      };
+    } finally {
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+      await fs.promises.unlink(zipPath).catch(() => undefined);
+    }
+  }
+
+  /** Group detail rows by split key into a map of relativePath → rows. */
+  private groupDetailRows(
+    rows: DetailRow[],
+    dto: AnalyticsReportExportDto,
+  ): Map<string, DetailRow[]> {
+    const splitMode = dto.splitMode!;
+    const format = dto.format ?? 'xlsx';
+    const groups = new Map<string, DetailRow[]>();
+
+    for (const row of rows) {
+      let relativePath: string;
+
+      switch (splitMode) {
+        case 'by_workspace': {
+          const name = this.sanitizeFileName(row.tenant || 'unknown');
+          relativePath = `${name}_${dto.fromDate}_${dto.endDate}.${format}`;
+          break;
+        }
+        case 'by_artist': {
+          const name = this.sanitizeFileName(row.artistName || 'unknown');
+          relativePath = `${name}_${dto.fromDate}_${dto.endDate}.${format}`;
+          break;
+        }
+        case 'by_period': {
+          const periodKey = this.getPeriodKey(row.date, dto.splitPeriodUnit ?? 'month');
+          relativePath = `${periodKey}.${format}`;
+          break;
+        }
+        case 'workspace_artist': {
+          const wsName = this.sanitizeFileName(row.tenant || 'unknown');
+          const artName = this.sanitizeFileName(row.artistName || 'unknown');
+          relativePath = `${wsName}/${artName}.${format}`;
+          break;
+        }
+        case 'workspace_period': {
+          const wsName = this.sanitizeFileName(row.tenant || 'unknown');
+          const periodKey = this.getPeriodKey(row.date, dto.splitPeriodUnit ?? 'month');
+          relativePath = `${wsName}/${periodKey}.${format}`;
+          break;
+        }
+        default:
+          relativePath = `report.${format}`;
+      }
+
+      if (!groups.has(relativePath)) {
+        groups.set(relativePath, []);
+      }
+      groups.get(relativePath)!.push(row);
+    }
+
+    return groups;
+  }
+
+  /** Convert a YYYY-MM date to a period key based on unit. */
+  private getPeriodKey(date: string, unit: string): string {
+    if (unit === 'quarter') {
+      const [year, month] = date.split('-').map(Number);
+      const quarter = Math.ceil(month / 3);
+      return `${year}-Q${quarter}`;
+    }
+    return date;
+  }
+
+  /** Write a group of detail rows to a single XLSX or CSV file. */
+  private async writeGroupFile(
+    filePath: string,
+    rows: DetailRow[],
+    dto: AnalyticsReportExportDto,
+  ): Promise<void> {
+    const format = dto.format ?? 'xlsx';
+
+    if (format === 'csv') {
+      const columns = this.getDetailColumns();
+      const headers = columns.map((c) => c.header?.toString() ?? '');
+      const keys = columns.map((c) => c.key?.toString() ?? '');
+      const lines = [`\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}`];
+      for (const row of rows) {
+        const record = row as unknown as Record<string, unknown>;
+        lines.push(keys.map((key) => this.csvEscape(record[key])).join(','));
+      }
+      await fs.promises.writeFile(filePath, lines.join('\n'), 'utf8');
+    } else {
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        filename: filePath,
+        useStyles: true,
+        useSharedStrings: false,
+      });
+      const sheet = workbook.addWorksheet('Detail');
+      sheet.columns = this.getDetailColumns();
+      for (const row of rows) {
+        sheet.addRow(row).commit();
+      }
+      sheet.commit();
+      await workbook.commit();
+    }
+  }
+
+  /** Sanitize a string for use as a file/directory name. */
+  private sanitizeFileName(name: string): string {
+    return name
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .substring(0, 100) || 'unnamed';
+  }
+
   private async runExportJob(
     jobId: string,
     tenantId: string,
@@ -532,6 +773,10 @@ export class AnalyticsReportExportService {
   }
 
   private buildFileName(dto: AnalyticsReportExportDto): string {
+    const splitMode = dto.splitMode ?? 'none';
+    if (splitMode !== 'none') {
+      return `analytics-report_${dto.fromDate}_${dto.endDate}.zip`;
+    }
     const format = dto.format ?? 'xlsx';
     return `analytics-report_${dto.fromDate}_${dto.endDate}.${format}`;
   }
@@ -572,10 +817,15 @@ export class AnalyticsReportExportService {
       's.period <= toDate({to:String})',
     ];
 
-    if (!checkIsSystemTenant(tenantId)) {
+    // Multi-tenant: use dto.tenantIds if provided, otherwise fall back
+    const resolvedTenantIds = dto.tenantIds?.length
+      ? dto.tenantIds
+      : (!checkIsSystemTenant(tenantId) ? [tenantId] : []);
+
+    if (resolvedTenantIds.length > 0) {
       filters.push('t.is_deleted = 0');
-      filters.push('t.tenant_id = {tenantId:String}');
-      params.tenantId = tenantId;
+      filters.push('t.tenant_id IN ({tenantIds:Array(String)})');
+      params.tenantIds = resolvedTenantIds;
     }
 
     if (dto.labelId) {

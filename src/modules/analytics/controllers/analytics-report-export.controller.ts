@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   MessageEvent,
   NotFoundException,
   Param,
@@ -17,6 +18,7 @@ import {
   ImportJobsService,
 } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from 'src/modules/etl/services/import-jobs/job-events.gateway';
+import { TenantService } from 'src/modules/tenant/tenant.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { concat, from, interval, merge, Observable, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
@@ -39,6 +41,7 @@ export class AnalyticsReportExportController {
     private readonly exportService: AnalyticsReportExportService,
     private readonly importJobsService: ImportJobsService,
     private readonly jobEvents: JobEventsGateway,
+    private readonly tenantService: TenantService,
   ) {}
 
   @Post('export')
@@ -55,8 +58,13 @@ export class AnalyticsReportExportController {
     @Req() req: Request,
     @Body() dto: AnalyticsReportExportDto,
   ): Promise<ResponseSuccess<AnalyticsReportExportJobResult>> {
+    const tenantId = req.user!.tenantId;
+
+    // ── Validate & resolve tenantIds ────────────────────────────
+    await this.validateAndResolveTenantIds(dto, tenantId);
+
     const data = await this.exportService.createExportJob(
-      req.user!.tenantId,
+      tenantId,
       req.user!.sub,
       dto,
     );
@@ -179,6 +187,42 @@ export class AnalyticsReportExportController {
         );
       }, true),
     );
+  }
+
+  /**
+   * Validate quyền truy cập workspace:
+   * - System tenant → cho phép chọn bất kỳ workspace.
+   * - Normal tenant → chỉ được chọn workspace hiện tại + descendant.
+   * - Nếu dto.tenantIds trống → mặc định gán [currentTenantId].
+   */
+  private async validateAndResolveTenantIds(
+    dto: AnalyticsReportExportDto,
+    currentTenantId: string,
+  ): Promise<void> {
+    // Nếu không truyền tenantIds → mặc định workspace hiện tại
+    if (!dto.tenantIds?.length) {
+      if (!checkIsSystemTenant(currentTenantId)) {
+        dto.tenantIds = [currentTenantId];
+      }
+      // System tenant không truyền → lấy tất cả (tenantIds = undefined)
+      return;
+    }
+
+    // System tenant → cho phép chọn bất kỳ
+    if (checkIsSystemTenant(currentTenantId)) {
+      return;
+    }
+
+    // Normal tenant → kiểm tra tất cả tenantIds phải nằm trong descendant tree
+    const allowedIds = await this.tenantService.getDescendantIds(currentTenantId);
+    const allowedSet = new Set(allowedIds);
+
+    const forbidden = dto.tenantIds.filter((id) => !allowedSet.has(id));
+    if (forbidden.length > 0) {
+      throw new ForbiddenException(
+        `You do not have access to workspace(s): ${forbidden.join(', ')}`,
+      );
+    }
   }
 
   private assertReadableJob(
