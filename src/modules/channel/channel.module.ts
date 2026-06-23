@@ -5,10 +5,8 @@ import { AppConfigModule } from '../app-config/app-config.module';
 import { NotificationModule } from '../notification/notification.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { ChannelController } from './controllers/channel.controller';
-import { VevoController } from './controllers/vevo.controller';
 import { ChannelHistory } from './entities/channel-history.entity';
 import { Channel } from './entities/channel.entity';
-import { VevoCallbackApiKeyGuard } from './guards/vevo-callback-api-key.guard';
 import { ChannelService } from './services/channel.service';
 import { VevoService } from './services/vevo.service';
 
@@ -20,8 +18,8 @@ import { VevoService } from './services/vevo.service';
 		NotificationModule,
 		TenantModule,
 	],
-	controllers: [ChannelController, VevoController],
-	providers: [ChannelService, VevoService, VevoCallbackApiKeyGuard],
-	exports: [ChannelService],
+	controllers: [ChannelController],
+	providers: [ChannelService, VevoService],
+	exports: [ChannelService, VevoService],
 })
 export class ChannelModule {}
