@@ -9,6 +9,8 @@ import {
   Matches,
 } from 'class-validator';
 
+
+
 export class AnalyticsReportExportDto {
   @ApiProperty({
     description: 'Start month of the report range',
@@ -59,6 +61,39 @@ export class AnalyticsReportExportDto {
   @IsOptional()
   @IsString()
   dspId?: string;
+
+  // ─── NEW FIELDS ──────────────────────────────────────────────
+
+  @ApiPropertyOptional({
+    description:
+      'Danh sách workspace/tenant ID cần lọc dữ liệu. ' +
+      'Chỉ được chọn workspace hiện tại + workspace con trực tiếp/gián tiếp. ' +
+      'System tenant được chọn bất kỳ workspace. ' +
+      'Mặc định: [workspace hiện tại] nếu không truyền.',
+    type: [String],
+    example: ['5f31ab56-2cbe-4ac2-a6d5-425574040f3e'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  tenantIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Export separate subfolders for each artist under the tenant.',
+    type: Boolean,
+    default: false,
+  })
+  @IsOptional()
+  isExportArtist?: boolean = false;
+
+  @ApiPropertyOptional({
+    description: 'Split data by period unit. "month" = monthly, "quarter" = quarterly, "none" = no splitting.',
+    enum: ['month', 'quarter', 'none'],
+    default: 'none',
+  })
+  @IsOptional()
+  @IsIn(['month', 'quarter', 'none'])
+  periodUnit?: 'month' | 'quarter' | 'none' = 'none';
 }
 
 export class CancelAnalyticsReportExportJobsDto {
