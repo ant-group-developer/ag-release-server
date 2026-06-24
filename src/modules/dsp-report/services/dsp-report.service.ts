@@ -10,6 +10,8 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Video } from 'src/modules/video/entities/video.entity';
+import { normalizeUpc, buildEquivalentUpcs, normalizeReportUpcOrFallback } from 'src/utils/upc.util';
+import { hasMeaningfulText } from 'src/modules/etl/utils/fact-row-normalizer.util';
 
 export interface DspsReportResponse {
   idDspsReport: string;
@@ -27,6 +29,8 @@ export interface DspsReportResponse {
     createdAt: string;
     updatedAt: string;
   } | null;
+  totalReleasesCount?: number;
+  pendingReleasesCount?: number;
 }
 
 export function mapRawDspsReport(row: any): DspsReportResponse {
@@ -157,8 +161,19 @@ export class DspReportService {
       params,
     );
 
+     const items = rows.map(mapRawDspsReport);
+
+    // Fetch stats for each report on the current page
+    await Promise.all(
+      items.map(async (item) => {
+        const stats = await this.getImportStats(item.idDspsReport);
+        item.totalReleasesCount = stats.totalReleasesCount;
+        item.pendingReleasesCount = stats.pendingReleasesCount;
+      })
+    );
+
     return {
-      items: rows.map(mapRawDspsReport),
+      items,
       totalItems,
     };
   }
@@ -187,7 +202,143 @@ export class DspReportService {
        WHERE r.id_dsps_report = {id: String}`,
       { id }
     );
-    return rows.length > 0 ? mapRawDspsReport(rows[0]) : null;
+    if (rows.length === 0) return null;
+    const response = mapRawDspsReport(rows[0]);
+    const stats = await this.getImportStats(id);
+    response.totalReleasesCount = stats.totalReleasesCount;
+    response.pendingReleasesCount = stats.pendingReleasesCount;
+    return response;
+  }
+
+  /**
+   * Calculate stats of unique releases in ClickHouse raw metadata vs what is already imported in Postgres
+   */
+  async getImportStats(idDspsReport: string): Promise<{ totalReleasesCount: number; pendingReleasesCount: number }> {
+    // 1. Resolve dspType
+    let dspType = 'audio';
+    const reportRows = await this.clickHouseService.query<{ pg_uuid: string }>(
+      `SELECT pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report = {id: String}`,
+      { id: idDspsReport }
+    );
+    if (reportRows.length > 0 && reportRows[0].pg_uuid) {
+      const dsp = await this.entityManager.findOne(Dsp, { where: { id: reportRows[0].pg_uuid } });
+      if (dsp) {
+        dspType = dsp.type;
+      }
+    }
+
+    // 2. Query ClickHouse for upc and isrc
+    const clickHouseRows = await this.clickHouseService.query<{ upc: string; isrc: string }>(
+      `
+        SELECT trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+        FROM (
+          SELECT upc, isrc FROM music_analytics.fact_sales_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          UNION ALL
+          SELECT upc, isrc FROM music_analytics.fact_dsp_comprehensive_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+        )
+      `,
+      { dspId: idDspsReport }
+    );
+
+    if (clickHouseRows.length === 0) {
+      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
+    }
+
+    // 3. Group rows into releases like extractAndImport does
+    const upcMap = new Map<string, Set<string>>(); // Map<upc, Set<isrc>>
+    for (const row of clickHouseRows) {
+      const isrc = hasMeaningfulText(row.isrc) ? row.isrc.trim() : '';
+      let upc = normalizeReportUpcOrFallback(hasMeaningfulText(row.upc) ? row.upc.trim() : '', isrc);
+
+      if (!isrc && !upc) continue;
+
+      if (!upc && isrc) {
+        upc = `ISRC-${isrc}`;
+      }
+
+      if (!upcMap.has(upc)) {
+        upcMap.set(upc, new Set());
+      }
+      if (isrc) {
+        upcMap.get(upc)!.add(isrc);
+      }
+    }
+
+    const totalReleasesCount = upcMap.size;
+    if (totalReleasesCount === 0) {
+      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
+    }
+
+    // 4. Fetch existing releases in Postgres
+    let existingUpcs = new Set<string>();
+    const allGroupedUpcs = Array.from(upcMap.keys());
+    const normalizedUpcs = allGroupedUpcs.map((u) => normalizeUpc(u)).filter(Boolean);
+    if (normalizedUpcs.length > 0) {
+      const equivalentUpcsSet = new Set<string>();
+      for (const u of normalizedUpcs) {
+        const equivalents = buildEquivalentUpcs(u);
+        for (const eq of equivalents) {
+          equivalentUpcsSet.add(eq);
+        }
+      }
+      const allEquivalentUpcs = Array.from(equivalentUpcsSet);
+
+      const existingReleases = await this.entityManager.find(Release, {
+        where: { upc: In(allEquivalentUpcs) },
+        select: ['upc'],
+      });
+      existingUpcs = new Set(existingReleases.map((r) => normalizeUpc(r.upc)).filter(Boolean));
+    }
+
+    // 5. Fetch existing tracks/videos in Postgres
+    let existingIsrcs = new Set<string>();
+    const allIsrcs = new Set<string>();
+    for (const isrcSet of upcMap.values()) {
+      for (const isrc of isrcSet) {
+        allIsrcs.add(isrc);
+      }
+    }
+    const allIsrcsList = Array.from(allIsrcs);
+
+    if (allIsrcsList.length > 0) {
+      if (dspType === 'video') {
+        const existingVideos = await this.entityManager.find(Video, {
+          where: { isrc: In(allIsrcsList) },
+          select: ['isrc'],
+        });
+        existingIsrcs = new Set(existingVideos.map((v) => v.isrc).filter((isrc): isrc is string => !!isrc));
+      } else {
+        const existingTracks = await this.entityManager.find(Track, {
+          where: { isrc: In(allIsrcsList) },
+          select: ['isrc'],
+        });
+        existingIsrcs = new Set(existingTracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc));
+      }
+    }
+
+    // 6. Calculate pending count
+    let pendingReleasesCount = 0;
+    for (const [upc, isrcSet] of upcMap.entries()) {
+      const hasUpc = !!upc;
+      const upcExists = hasUpc && existingUpcs.has(normalizeUpc(upc));
+
+      let isrcExists = false;
+      for (const isrc of isrcSet) {
+        if (existingIsrcs.has(isrc)) {
+          isrcExists = true;
+          break;
+        }
+      }
+
+      if (!upcExists && !isrcExists) {
+        pendingReleasesCount++;
+      }
+    }
+
+    return {
+      totalReleasesCount,
+      pendingReleasesCount,
+    };
   }
 
   /**
@@ -314,18 +465,35 @@ export class DspReportService {
       );
 
       if (rawMetadataRows.length > 0) {
-        const upcs = rawMetadataRows.map((r) => r.upc).filter(Boolean);
-        const isrcs = rawMetadataRows.map((r) => r.isrc).filter(Boolean);
+        const upcs = rawMetadataRows.map((r) => {
+          const isrc = hasMeaningfulText(r.isrc) ? r.isrc!.trim() : '';
+          let upc = normalizeReportUpcOrFallback(hasMeaningfulText(r.upc) ? r.upc!.trim() : '', isrc);
+          if (!upc && isrc) {
+            upc = `ISRC-${isrc}`;
+          }
+          return upc;
+        }).filter((x): x is string => !!x);
+        const isrcs = rawMetadataRows.map((r) => r.isrc).filter((x): x is string => !!x);
 
         let existingUpcs = new Set<string>();
         let existingIsrcs = new Set<string>();
 
         if (upcs.length > 0) {
+          const normalizedUpcs = upcs.map((u) => normalizeUpc(u));
+          const equivalentUpcsSet = new Set<string>();
+          for (const u of normalizedUpcs) {
+            const equivalents = buildEquivalentUpcs(u);
+            for (const eq of equivalents) {
+              equivalentUpcsSet.add(eq);
+            }
+          }
+          const allEquivalentUpcs = Array.from(equivalentUpcsSet);
+
           const existingReleases = await this.entityManager.find(Release, {
-            where: { upc: In(upcs) },
+            where: { upc: In(allEquivalentUpcs) },
             select: ['upc'],
           });
-          existingUpcs = new Set(existingReleases.map((r) => r.upc).filter((upc): upc is string => !!upc));
+          existingUpcs = new Set(existingReleases.map((r) => normalizeUpc(r.upc)).filter(Boolean));
         }
 
         if (isrcs.length > 0) {
@@ -344,11 +512,22 @@ export class DspReportService {
           }
         }
 
-        const filteredRows = rawMetadataRows.filter(
-          (row) =>
-            (row.upc && !existingUpcs.has(row.upc)) ||
-            (row.isrc && !existingIsrcs.has(row.isrc)),
-        );
+        const filteredRows = rawMetadataRows.filter((row) => {
+          const isrc = hasMeaningfulText(row.isrc) ? row.isrc!.trim() : '';
+          let upc = normalizeReportUpcOrFallback(hasMeaningfulText(row.upc) ? row.upc!.trim() : '', isrc);
+          if (!isrc && !upc) return false;
+          if (!upc && isrc) {
+            upc = `ISRC-${isrc}`;
+          }
+
+          const hasUpc = !!upc;
+          const hasIsrc = !!isrc;
+
+          const upcExists = hasUpc && existingUpcs.has(normalizeUpc(upc));
+          const isrcExists = hasIsrc && existingIsrcs.has(isrc);
+
+          return !upcExists && !isrcExists;
+        });
 
         if (filteredRows.length > 0) {
           this.logger.log(

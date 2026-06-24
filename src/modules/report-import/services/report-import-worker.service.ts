@@ -474,6 +474,8 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
           );
         } else if (file.parserCode === 'spotify-report-sales') {
           const parser = new SpotifyReportSalesParser();
+          const spotifyDsp = await this.dspMappingService.resolveOrCreateDspReport('Spotify', 'spotify_report');
+          const spotifyDspId = spotifyDsp.id_dsps_report;
 
           await parser.parseFileStreaming(
             localFilePath,
@@ -484,6 +486,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
                 r.import_source = importSource;
                 r.source_file_name = filename;
                 r.label_name = r.label_name || fallbackLabelName || 'N/A';
+                r.dsp_id = spotifyDspId;
                 normalizeFactRows([r]);
 
                 // Collect period
