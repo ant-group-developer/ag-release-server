@@ -304,6 +304,13 @@ export class ReleaseService {
 			...data,
 			isSentMetadataCi: false,
 			modifierId: userId,
+
+			// chuyển sang dạng tạo trực tiếp → tránh vấn đề sau này chạy xoá release import thì bị mất luôn release user đã sửa
+			isImportedFromReport: false,
+			importSourceType: null,
+			importParserCode: null,
+			importFileName: null,
+			importJobId: null,
 		});
 		return await this.releaseQueryService.findOne(id);
 	}
