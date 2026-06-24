@@ -29,8 +29,14 @@ export class VevoParser extends BaseParser {
     batchId: string,
     filePath: string,
   ): FactDspRow | null {
-    const isrc = record['isrc'];
-    if (!isrc) return null;
+    let isrc = record['isrc']?.trim() || '';
+    const upc = record['upc']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+      record['isrc'] = isrc;
+    }
 
     const basename = path.basename(filePath);
 

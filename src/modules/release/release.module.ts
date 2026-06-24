@@ -30,7 +30,9 @@ import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
 import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
+import { ReleaseEnrichment } from './entities/release-enrichment.entity';
 import { Release } from './entities/release.entity';
+import { MetadataScanSession } from './entities/metadata-scan-session.entity';
 import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
 import { ReleaseLogModule } from './modules/release-log/release-log.module';
 import { ReleaseDdexService } from './services/release-ddex.service';
@@ -45,7 +47,6 @@ import { ReleaseQueryService } from './services/release.query.service';
 import { ReleaseService } from './services/release.service';
 import { ReleaseValidateService } from './services/release.validate.service';
 // import { ReleaseExecutionsModule } from './modules/release-executions/release-executions.module';
-import { ReportEntityExtractorService } from './services/report-entity-extractor.service';
 import { ErnModule2 } from '../ern2/ern.module';
 import { LogsModule } from '../log/logs.module';
 import { CiModule } from '../partners-api/ci/ci.module';
@@ -58,6 +59,7 @@ import { ReleaseExecution } from './modules/release-executions/entities/release-
 import { ReleaseExecutionProcessorService } from './modules/release-executions/services/release-execution-processor.service';
 import { ReleaseExecutionsQueryService } from './modules/release-executions/services/release-executions.query.service';
 import { ReleaseExecutionsService } from './modules/release-executions/services/release-executions.service';
+import { ReportEntityExtractorService } from './services/report-entity-extractor.service';
 
 import { ReleaseExecution3Controller } from './modules/release-executions3/controllers/release-execution3.controller';
 import { ReleaseExecutionStepTestController } from './modules/release-executions3/controllers/release-execution3.engine.controller';
@@ -79,10 +81,13 @@ import { CiDistributionJob3Service } from './modules/release-executions3/service
 import { ReleaseExecution3Consumer } from './modules/release-executions3/services/queue/release-execution3.consumer';
 import { ReleaseExecution3Queue } from './modules/release-executions3/services/queue/release-execution3.queue';
 import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
+import { ReleaseExecution3CronJobService } from './modules/release-executions3/services/release-execution3.cron-job.service';
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
+import { ReleaseExecution3QueryService } from './modules/release-executions3/services/release-execution3.query.service';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
+import { ReleaseExecution3WorkerTest } from './modules/release-executions3/services/release-execution3-test.worker';
 
 @Module({
 	imports: [
@@ -101,6 +106,8 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 			Country,
 			ReleaseDspDelivery,
 			ReleaseLog,
+			ReleaseEnrichment,
+			MetadataScanSession,
 
 			ReleaseExecution,
 			ReleaseExecutionDsp,
@@ -180,16 +187,17 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseExecutionsQueryService,
 		ReleaseExecutionProcessorService,
 
-		// v2
-
 		// v3
 		ReleaseExecution3Builder,
+		ReleaseExecution3CronJobService,
 		ReleaseExecutionStepEngine,
 		ReleaseExecution3Service,
+		ReleaseExecution3QueryService,
 		ReleaseExecution3Queue,
 		ReleaseExecution3Consumer,
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
+		ReleaseExecution3WorkerTest,
 	],
 	exports: [
 		ReleaseDdexService,
@@ -197,6 +205,7 @@ import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3
 		ReleaseReportImportService,
 		ReleaseValidateService,
 		ReportEntityExtractorService,
+		ReleaseExecution3CronJobService,
 	],
 })
-export class ReleaseModule {}
+export class ReleaseModule { }

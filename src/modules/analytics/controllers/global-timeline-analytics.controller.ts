@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ResponseSuccess, PageDto } from 'src/common/dtos/common.response.dto';
 import { TimelineAnalyticsService } from '../services/global-timeline.service';
-import { TimelineQueryDto } from '../dto/analytics-query.dto';
+import { TimelineQueryDto, ChartQueryDto } from '../dto/analytics-query.dto';
 import {
   DspTimelineResponse,
   TerTimelineResponse,
@@ -16,6 +16,10 @@ import {
   RevenueTenantItem,
   OverviewTrendsResponse,
   RevenueReleaseItem,
+  TrendViewLineChartItem,
+  DspBarChartItem,
+  TerritoryBarChartItem,
+  RevenueLineChartItem,
 } from '../interfaces/analytics.interface';
 
 /**
@@ -331,6 +335,142 @@ export class TimelineAnalyticsController {
     @Body() query: TimelineQueryDto,
   ): Promise<ResponseSuccess<OverviewTrendsResponse>> {
     const data = await this.timelineService.getTrendsOverview(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // CHART APIs (Line Chart & Bar Chart)
+  // ═══════════════════════════════════════════════════════
+
+  @Post('trend-view/line-chart')
+  @ApiOperation({
+    summary: 'Get monthly trend views line chart data',
+    description:
+      'Returns total trend views aggregated by month. Uses trends_dsp_daily_cube, ' +
+      'grouping daily data into months based on the exact fromDate/toDate range.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trend view line chart data retrieved successfully.',
+  })
+  async getTrendViewLineChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<TrendViewLineChartItem[]>> {
+    const data = await this.timelineService.getTrendViewLineChart(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('trend-view/dsp/bar-chart')
+  @ApiOperation({
+    summary: 'Get top 5 DSPs by trend views bar chart data',
+    description:
+      'Returns top 5 DSPs by total trend views with an "Other" bucket for the rest. ' +
+      'Uses trends_dsp_daily_cube for near real-time play count data.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trend view DSP bar chart data retrieved successfully.',
+  })
+  async getTrendViewDspBarChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<DspBarChartItem[]>> {
+    const data = await this.timelineService.getTrendViewDspBarChart(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('trend-view/ter/bar-chart')
+  @ApiOperation({
+    summary: 'Get top 5 territories by trend views bar chart data',
+    description:
+      'Returns top 5 territories by total trend views with an "Other" bucket for the rest. ' +
+      'Uses trends_ter_monthly_cube for territory trend data.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trend view territory bar chart data retrieved successfully.',
+  })
+  async getTrendViewTerritoryBarChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<TerritoryBarChartItem[]>> {
+    const data = await this.timelineService.getTrendViewTerritoryBarChart(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/line-chart')
+  @ApiOperation({
+    summary: 'Get monthly revenue line chart data',
+    description:
+      'Returns total revenue (USD) and quantity aggregated by month. Uses sales_dsp_monthly_cube_v2. ' +
+      'Dates are normalized to first-of-month since sales data is monthly.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Revenue line chart data retrieved successfully.',
+  })
+  async getRevenueLineChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<RevenueLineChartItem[]>> {
+    const data = await this.timelineService.getRevenueLineChart(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/dsp/bar-chart')
+  @ApiOperation({
+    summary: 'Get top 5 DSPs by revenue bar chart data',
+    description:
+      'Returns top 5 DSPs by total revenue with an "Other" bucket for the rest. ' +
+      'Uses sales_dsp_monthly_cube_v2 for official revenue data.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Revenue DSP bar chart data retrieved successfully.',
+  })
+  async getRevenueDspBarChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<DspBarChartItem[]>> {
+    const data = await this.timelineService.getRevenueDspBarChart(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/ter/bar-chart')
+  @ApiOperation({
+    summary: 'Get top 5 territories by revenue bar chart data',
+    description:
+      'Returns top 5 territories by total revenue with an "Other" bucket for the rest. ' +
+      'Uses sales_ter_monthly_cube_v2 for official revenue data.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Revenue territory bar chart data retrieved successfully.',
+  })
+  async getRevenueTerritoryBarChart(
+    @Req() req: Request,
+    @Body() query: ChartQueryDto,
+  ): Promise<ResponseSuccess<TerritoryBarChartItem[]>> {
+    const data = await this.timelineService.getRevenueTerritoryBarChart(
       req.user!.tenantId,
       query,
     );

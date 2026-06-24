@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
-import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
+import { ClickHouseService, CLICKHOUSE_TABLES, ClickHouseMigrationService } from '../../../clickhouse';
 import {
   CreateImportJobInput,
   ImportJob,
@@ -34,14 +34,18 @@ export class ImportJobsService implements OnModuleInit {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly jobEvents: JobEventsGateway,
+    private readonly clickHouseMigrationService: ClickHouseMigrationService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    try {
-      await this.markStaleAsFailed();
-    } catch (err) {
+  onModuleInit() {
+    this.initializeJobsInBackground().catch((err) => {
       this.logger.warn(`Crash recovery sweep failed: ${err.message}`);
-    }
+    });
+  }
+
+  private async initializeJobsInBackground() {
+    await this.clickHouseMigrationService.waitForMigrations();
+    await this.markStaleAsFailed();
   }
 
   async create(input: CreateImportJobInput): Promise<ImportJob> {
@@ -81,9 +85,26 @@ export class ImportJobsService implements OnModuleInit {
 
   async markProcessing(id: string): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping PROCESSING transition.`);
+      return;
+    }
     job.status = ImportJobStatus.PROCESSING;
-    job.startedAt = nowDt64();
+    job.startedAt = job.startedAt ?? nowDt64();
+    job.finishedAt = null;
+    job.errorMessage = '';
     await this.persist(job);
+  }
+
+  async markQueued(id: string): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.status = ImportJobStatus.QUEUED;
+    job.progressLabel = 'Queued';
+    job.finishedAt = null;
+    job.durationMs = 0;
+    job.errorMessage = '';
+    await this.persist(job);
+    return job;
   }
 
   /**
@@ -114,6 +135,11 @@ export class ImportJobsService implements OnModuleInit {
 
   async markCompleted(id: string, result: Record<string, unknown>): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.cleanup(id);
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping COMPLETED transition.`);
+      return;
+    }
     job.status = ImportJobStatus.COMPLETED;
     job.result = result;
     job.finishedAt = nowDt64();
@@ -155,14 +181,47 @@ export class ImportJobsService implements OnModuleInit {
 
   async markFailed(id: string, error: Error | string): Promise<void> {
     const job = await this.requireSnapshot(id);
+    if (job.status === ImportJobStatus.CANCELLED) {
+      this.cleanup(id);
+      this.logger.warn(`Job ${id} already CANCELLED. Skipping FAILED transition.`);
+      return;
+    }
     job.status = ImportJobStatus.FAILED;
     job.errorMessage = error instanceof Error ? error.message : String(error);
     job.finishedAt = nowDt64();
     job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
     job.progressLabel = 'Failed';
+    if (job.totalRows === 0 && job.processedRows > 0) {
+      job.totalRows = job.processedRows;
+    }
     await this.persist(job);
     this.cleanup(id);
     this.logger.error(`Job ${id} FAILED: ${job.errorMessage}`);
+  }
+
+  async markCancelled(id: string, reason = 'Cancelled by user'): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    if (
+      job.status === ImportJobStatus.COMPLETED ||
+      job.status === ImportJobStatus.FAILED ||
+      job.status === ImportJobStatus.CANCELLED
+    ) {
+      return job;
+    }
+
+    job.status = ImportJobStatus.CANCELLED;
+    job.errorMessage = reason;
+    job.finishedAt = nowDt64();
+    job.durationMs = computeDurationMs(job.startedAt, job.finishedAt);
+    job.progressLabel = 'Cancelled';
+    if (job.totalRows === 0 && job.processedRows > 0) {
+      job.totalRows = job.processedRows;
+    }
+
+    await this.persist(job);
+    this.cleanup(id);
+    this.logger.warn(`Job ${id} CANCELLED: ${reason}`);
+    return job;
   }
 
   async setBatchId(id: string, batchId: string): Promise<void> {
@@ -170,6 +229,26 @@ export class ImportJobsService implements OnModuleInit {
     if (!job) return;
     job.batchId = batchId;
     await this.persist(job);
+  }
+
+  async patchParams(id: string, patch: Record<string, unknown>): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.params = {
+      ...(job.params ?? {}),
+      ...patch,
+    };
+    await this.persist(job);
+    return job;
+  }
+
+  async patchResult(id: string, patch: Record<string, unknown>): Promise<ImportJob> {
+    const job = await this.requireSnapshot(id);
+    job.result = {
+      ...(job.result ?? {}),
+      ...patch,
+    };
+    await this.persist(job);
+    return job;
   }
 
   async backfillRowCountsFromResults(): Promise<{ updatedCount: number }> {
@@ -346,6 +425,42 @@ export class ImportJobsService implements OnModuleInit {
     return { items: rows.map(rowToDomain), totalItems };
   }
 
+  async findRecoverableReportUploadJobs(): Promise<ImportJob[]> {
+    const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status IN ({queued:String}, {processing:String})
+      ORDER BY created_at ASC
+    `;
+    const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
+      sourceType: ImportJobSourceType.REPORT_UPLOAD,
+      queued: ImportJobStatus.QUEUED,
+      processing: ImportJobStatus.PROCESSING,
+    });
+    return rows.map(rowToDomain);
+  }
+
+  async findActiveJobsBySource(
+    sourceType: ImportJobSourceType,
+    tenantId?: string,
+  ): Promise<ImportJob[]> {
+    const tenantFilter = tenantId ? 'AND tenant_id = {tenantId:String}' : '';
+    const sql = `
+      SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
+      WHERE source_type = {sourceType:String}
+        AND status IN ({queued:String}, {processing:String})
+        ${tenantFilter}
+      ORDER BY created_at ASC
+    `;
+    const rows = await this.clickHouseService.query<ImportJobRow>(sql, {
+      sourceType,
+      queued: ImportJobStatus.QUEUED,
+      processing: ImportJobStatus.PROCESSING,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    return rows.map(rowToDomain);
+  }
+
   @Cron('*/1 * * * *') // every 1 minute
   async checkPendingTimeout(): Promise<void> {
     const sql = `
@@ -389,11 +504,15 @@ export class ImportJobsService implements OnModuleInit {
     const sql = `
       SELECT id, started_at FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE status = {status:String}
+        AND source_type != {reportUpload:String}
     `;
     const stale = await this.clickHouseService.query<{
       id: string;
       started_at: string | null;
-    }>(sql, { status: ImportJobStatus.PROCESSING });
+    }>(sql, {
+      status: ImportJobStatus.PROCESSING,
+      reportUpload: ImportJobSourceType.REPORT_UPLOAD,
+    });
 
     if (!stale.length) return;
     this.logger.warn(`Crash recovery: marking ${stale.length} stale PROCESSING job(s) as FAILED`);
@@ -435,6 +554,8 @@ export class ImportJobsService implements OnModuleInit {
         ? 'completed'
         : job.status === ImportJobStatus.FAILED
         ? 'failed'
+        : job.status === ImportJobStatus.CANCELLED
+        ? 'cancelled'
         : 'progress',
       data: {
         id: job.id,
@@ -605,8 +726,13 @@ export function computeProgressDetail(job: ImportJob) {
       }
     }
   } else {
-    // PENDING or PROCESSING
-    if (progressLabel.startsWith('Downloading:')) {
+    // PENDING, QUEUED or PROCESSING
+    if (status === ImportJobStatus.QUEUED) {
+      stage = 'queued';
+      for (const f of files) {
+        fileStatuses.push({ name: f.path, status: 'pending' });
+      }
+    } else if (progressLabel.startsWith('Downloading:')) {
       stage = 'downloading';
       const activeIdx = progressCurrent;
       for (let idx = 0; idx < files.length; idx++) {

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import {
 	DEFAULT_WAIT_MINUTES,
 	MINUTES_PER_DAY,
 } from 'src/common/constants/common.default.constants';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
-import { EntityManager, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import { ReleaseExecutionStepType } from '../enums/release-execution3.enum';
@@ -15,9 +15,6 @@ export class ReleaseExecution3Builder {
 	constructor(
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
-
-		@InjectEntityManager()
-		private readonly manager: EntityManager,
 	) {}
 
 	async buildStepsChild({
@@ -27,7 +24,6 @@ export class ReleaseExecution3Builder {
 		step?: ReleaseExecutionStep3;
 		releaseExecution: ReleaseExecution3;
 	}) {
-		// : Promise<ReleaseExecutionStep3[]>
 		const { releaseSnapshot } = releaseExecution.metadata.input;
 		const stepResult: Partial<ReleaseExecutionStep3>[] = [];
 
@@ -117,6 +113,11 @@ export class ReleaseExecution3Builder {
 				const { dspDirect, dspAggregator } =
 					releaseExecution.metadata.input;
 
+				const aggregatorDsps = [
+					...(dspAggregator?.ci?.ci ?? []),
+					...(dspAggregator?.ci?.state51 ?? []),
+				];
+
 				if (dspDirect?.length) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.PROCESS_DIRECT,
@@ -126,11 +127,11 @@ export class ReleaseExecution3Builder {
 					});
 				}
 
-				if (dspAggregator?.ci?.ci?.length) {
+				if (aggregatorDsps.length) {
 					stepResult.push({
 						type: ReleaseExecutionStepType.PROCESS_AGG,
 						order: 2,
-						metadata: { input: { dsps: dspAggregator.ci.ci } },
+						metadata: { input: { dsps: aggregatorDsps } },
 						childExecutionMode: 'parallel',
 					});
 				}
@@ -141,26 +142,19 @@ export class ReleaseExecution3Builder {
 				const dsps: Dsp[] = STEP.metadata?.input?.dsps ?? [];
 
 				dsps.forEach((dsp, index) => {
-					stepResult.push(
-						{
-							type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
-							order: index + 1,
-							isDeliveryStep: true,
-							metadata: {
-								input: {
-									dsp,
-									delivery:
-										releaseExecution.metadata.input.delivery
-											?.directByDspId?.[dsp.id],
-								},
+					stepResult.push({
+						type: ReleaseExecutionStepType.PROCESS_DIRECT_CHILD,
+						order: index + 1,
+						isDeliveryStep: true,
+						metadata: {
+							input: {
+								dsp,
+								delivery:
+									releaseExecution.metadata.input.delivery
+										?.directByDspId?.[dsp.id],
 							},
 						},
-						// {
-						// 	type: ReleaseExecutionStepType.SYNC_RESULT_TO_RELEASE,
-						// 	order: index + 2,
-						// 	metadata: { input: { dsp } },
-						// }
-					);
+					});
 				});
 				break;
 			}
@@ -351,16 +345,12 @@ export class ReleaseExecution3Builder {
 				return [];
 		}
 
-		// Gán id, parentStepId, releaseExecutionId rồi đệ quy
-		// const savedSteps: ReleaseExecutionStep3[] = [];
-
 		for (const childStep of stepResult) {
 			childStep.releaseExecutionId = releaseExecution.id;
 			childStep.parentStepId = STEP?.id ?? null;
 		}
 
 		const stepDb = await this.stepRepo.save(stepResult);
-		// console.log('save: ', stepDb.length)
 
 		for (const childStep of stepDb) {
 			const children = await this.buildStepsChild({
@@ -369,7 +359,6 @@ export class ReleaseExecution3Builder {
 			});
 
 			childStep.childSteps = children;
-			// savedSteps.push(childStep as ReleaseExecutionStep3);
 		}
 
 		return stepDb;

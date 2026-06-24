@@ -13,7 +13,7 @@ export class NotificationUserService {
 
 	async getListUserDev() {
 		const users = await this.userRepository.find({
-			where: { type: UserType.USER },
+			where: { type: UserType.ADMIN },
 		});
 
 		return users;

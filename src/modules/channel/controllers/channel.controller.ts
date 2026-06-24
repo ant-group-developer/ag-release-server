@@ -3,8 +3,6 @@ import {
 	Controller,
 	Delete,
 	Get,
-	HttpCode,
-	HttpStatus,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -12,26 +10,17 @@ import {
 	Query,
 	Req,
 } from '@nestjs/common';
-import {
-	ApiBody,
-	ApiOperation,
-	ApiParam,
-	ApiResponse,
-	ApiTags,
-} from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import {
-	PublicRoute,
-	SystemAdminOnly,
-} from '../auth/decorators/auth.decorator';
-import { VevoChannelCallbackDto } from '../partners-api/vevo/dtos/vevo.dto';
-import { ChannelService } from './channel.service';
+import { SystemAdminOnly } from '../../auth/decorators/auth.decorator';
 import {
 	CreateChannelDto,
 	QueryGetListChannelDto,
 	UpdateChannelDto,
-} from './dto/channel.dto';
+} from '../dto/channel.dto';
+import { ChannelStatus } from '../enum/channel.enum';
+import { ChannelService } from '../services/channel.service';
 
 @ApiTags('Channels')
 @Controller('channels')
@@ -44,22 +33,18 @@ export class ChannelController {
 	@ApiBody({ type: CreateChannelDto })
 	async create(@Body() dto: CreateChannelDto) {
 		const result = await this.channelService.create(dto);
+
 		return new ResponseSuccess({
-			message: 'Channel is processing',
-			messageCode: 'common.processing',
+			message:
+				result.status === ChannelStatus.PROCESSING
+					? 'Channel is processing'
+					: 'Success',
+			messageCode:
+				result.status === ChannelStatus.PROCESSING
+					? 'common.processing'
+					: 'common.success',
 			data: result,
 		});
-	}
-
-	@PublicRoute()
-	@Post('vevo/callback')
-	@HttpCode(HttpStatus.OK)
-	@ApiOperation({ summary: 'Receive a completed Vevo channel request' })
-	@ApiBody({ type: VevoChannelCallbackDto })
-	@ApiResponse({ status: 200, description: 'Callback received' })
-	async handleVevoCallback(@Body() payload: VevoChannelCallbackDto) {
-		const result = await this.channelService.handleVevoCallback(payload);
-		return new ResponseSuccess({ data: result });
 	}
 
 	@Get()
@@ -87,10 +72,9 @@ export class ChannelController {
 		@Query() query: QueryGetListChannelDto,
 		@Req() req: Request,
 	) {
-		const result = await this.channelService.getList(
+		const result = await this.channelService.getListChannelOnlyActorTenant(
 			query,
 			req.user!.tenantId,
-			true,
 		);
 		return new ResponseSuccess({ data: result });
 	}

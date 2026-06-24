@@ -115,7 +115,10 @@ export class ReleaseController {
 	@ApiOperation({ summary: 'Bulk submit releases' })
 	@ApiBody({ type: BulkSubmitReleaseDto })
 	@ApiResponse({ status: 200, type: ResponseSuccess })
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post('bulk-submit')
 	async bulkSubmit(@Req() req: Request, @Body() dto: BulkSubmitReleaseDto) {
 		await this.releaseService.bulkSubmit(dto);
@@ -199,6 +202,13 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get(':id/status-dsps-ci')
+	async getStatusDspsCi(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.getStatusDspsCi(id);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	// @Get(':id/test-status')
 	// async testSyncStatus(@Param('id', ParseUUIDPipe) id: string) {
 	// 	const result = await this.releaseService.testSyncReleaseStatus(id);
@@ -264,7 +274,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Put(':id')
 	async update(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -299,7 +312,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/submit')
 	async submit(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -314,7 +330,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/takedown')
 	async takedown(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -329,7 +348,10 @@ export class ReleaseController {
 		});
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/gen-upc')
 	async genUpc(
 		@Param('id', ParseUUIDPipe) id: string,

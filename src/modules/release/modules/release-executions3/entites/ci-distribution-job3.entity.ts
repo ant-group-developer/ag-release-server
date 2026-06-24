@@ -1,29 +1,9 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { CiJobStatus3, CiJobType3 } from '../enums/release-execution3.enum';
 import { ReleaseExecutionStep3 } from './release-execution3-step.entity';
 import { ReleaseExecution3 } from './release-execution3.entity';
-
-export enum CiJobType3 {
-	EMAIL_STATE51 = 'EMAIL_STATE51',
-	ADMIN_EXPORT = 'ADMIN_EXPORT',
-}
-
-export enum CiJobStatus3 {
-	PENDING = 'PENDING',
-	PROCESSING = 'PROCESSING',
-	COMPLETED = 'COMPLETED',
-	FAILED = 'FAILED',
-	CANCEL = 'CANCEL',
-}
-
-// export enum CiJobStatus3 {
-// 	PENDING = 'pending',
-// 	PROCESSING = 'processing',
-// 	COMPLETED = 'completed',
-// 	FAILED = 'failed',
-// 	CANCEL = 'cancel',
-// }
 
 @Entity('ci_distribution_jobs3')
 export class CiDistributionJob3 extends BaseUUIDEntity {

@@ -81,6 +81,28 @@ export class TenantController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('active/accessible')
+	@ApiOperation({
+		summary: 'Get active tenants accessible by current user tenant',
+	})
+	async findAllActiveAccessible(
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<Tenant>>> {
+		const result = await this.tenantService.findAll(
+			{
+				isActive: true,
+				fieldOrder: TenantOrderBy.NAME,
+				page: 1,
+				pageSize: 999,
+				skip: 0,
+				limit: 999,
+				orderBy: OrderDirection.ASC,
+			},
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@RequirePermissions(Permission.WORKSPACE.READ)
 	@Get(':id')
 	async findOne(
@@ -135,9 +157,7 @@ export class TenantController {
 		// Field-level permission: strip fields user cannot change (system admins bypass)
 		if (!isSysAdmin) {
 			const userPerms = new Set<string>(
-				Array.isArray(req.user!.permission)
-					? req.user!.permission
-					: [],
+				Array.isArray(req.user!.permission) ? req.user!.permission : [],
 			);
 
 			if (!userPerms.has(Permission.WORKSPACE.UPDATE_INFO)) {

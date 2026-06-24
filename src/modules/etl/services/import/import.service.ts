@@ -6,10 +6,11 @@ import { ClickHouseService, CLICKHOUSE_TABLES } from '../../../clickhouse';
 import { getParserForFolder } from '../../parsers';
 import { getSalesParserForFolder } from '../../parsers/sales';
 import { DeezerIllegitimateParser, SoundCloudIllegitimateParser, SpotifyIllegitimateParser, TiktokIllegitimateParser } from '../../parsers/illegitimate';
-import { FactDspRow, FactSalesRow } from '../../interfaces';
+import { FactDspRow, FactSalesRow, ImportJobSourceType } from '../../interfaces';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
+import { normalizeFactRows } from '../../utils/fact-row-normalizer.util';
 
 export interface ImportResult {
   batchId: string;
@@ -168,6 +169,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {
@@ -183,15 +185,43 @@ export class ImportService {
           50_000,
         );
         // Trích xuất metadata và import release/track sang PostgreSQL
-        await this.reportEntityExtractorService.extractAndImport(allRows).catch((err) => {
-          this.logger.error(`Failed to extract/import entities from comprehensive report for ${folderName}: ${err.message}`);
-        });
+        for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
+          await this.reportEntityExtractorService.extractAndImport(
+            rows,
+            undefined,
+            undefined,
+            undefined,
+            {
+              sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
+              parserCode: folderName,
+              fileName: sourceFileName,
+              jobId: batchId,
+            },
+          ).catch((err) => {
+            this.logger.error(`Failed to extract/import entities from comprehensive report ${sourceFileName}: ${err.message}`);
+          });
+        }
       } catch (err) {
         this.logger.error(`Bulk insert failed for ${folderName}: ${err.message}`);
       }
     }
 
     return this.buildResult(folderName, files, allRows.length, startTime);
+  }
+
+  private groupRowsBySourceFile<T extends { source_file_name?: string }>(
+    rows: T[],
+  ): Map<string, T[]> {
+    const grouped = new Map<string, T[]>();
+
+    for (const row of rows) {
+      const fileName = row.source_file_name?.trim() || 'unknown';
+      const fileRows = grouped.get(fileName) ?? [];
+      fileRows.push(row);
+      grouped.set(fileName, fileRows);
+    }
+
+    return grouped;
   }
 
   /**
@@ -226,6 +256,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {
@@ -241,9 +272,22 @@ export class ImportService {
           50_000,
         );
         // Trích xuất metadata và import release/track sang PostgreSQL
-        await this.reportEntityExtractorService.extractAndImport(allRows).catch((err) => {
-          this.logger.error(`Failed to extract/import entities from sales report for ${folderName}: ${err.message}`);
-        });
+        for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
+          await this.reportEntityExtractorService.extractAndImport(
+            rows,
+            undefined,
+            undefined,
+            undefined,
+            {
+              sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
+              parserCode: folderName,
+              fileName: sourceFileName,
+              jobId: batchId,
+            },
+          ).catch((err) => {
+            this.logger.error(`Failed to extract/import entities from sales report ${sourceFileName}: ${err.message}`);
+          });
+        }
       } catch (err) {
         this.logger.error(`Sales bulk insert failed for ${folderName}: ${err.message}`);
       }
@@ -289,6 +333,7 @@ export class ImportService {
           row.dsp_id = dspsReport.id_dsps_report;
           row.import_source = 'ftp';
           row.source_file_name = sourceFileName;
+          normalizeFactRows([row]);
         }
         allRows.push(...rows);
       } catch (err) {

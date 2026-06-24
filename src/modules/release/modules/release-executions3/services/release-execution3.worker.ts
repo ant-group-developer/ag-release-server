@@ -7,7 +7,7 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
-import { CiService } from 'src/modules/partners-api/ci/services/ci.service';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
@@ -15,10 +15,11 @@ import { TrackService } from 'src/modules/track/services/track.service';
 import { VideoService } from 'src/modules/video/video.service';
 import { removeFolder } from 'src/utils/util';
 import { EntityManager, IsNull } from 'typeorm';
-import { CiJobType3 } from '../entites/ci-distribution-job3.entity';
+import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
+	CiJobType3,
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
@@ -45,7 +46,6 @@ export class ReleaseExecution3Worker {
 
 		private readonly trackService: TrackService,
 		private readonly videoService: VideoService,
-		private readonly ciService: CiService,
 		private readonly logService: LogsService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
@@ -113,7 +113,7 @@ export class ReleaseExecution3Worker {
 				return this.sendEmailState51(context);
 
 			case ReleaseExecutionStepType.SYNC_DATA_DSP_CI:
-				return this.syncDataDspCi(context);
+				return this.syncDataStatusDspCi(context);
 
 			case ReleaseExecutionStepType.WAIT_PARTNER_PROCESS:
 				return this.waitPartnerProcess(context);
@@ -670,7 +670,7 @@ export class ReleaseExecution3Worker {
 				generatedIsrcs,
 			});
 
-			const { outputDir, batchId, xml } =
+			const { outputDir, batchId, releaseReference, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
 					release: releaseForMetadata,
 					ernVersion: config.ernVersion,
@@ -689,6 +689,7 @@ export class ReleaseExecution3Worker {
 				output: {
 					outputDir,
 					batchId,
+					releaseReference,
 					xml,
 				},
 			};
@@ -927,17 +928,17 @@ export class ReleaseExecution3Worker {
 					ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
 				);
 				const batchId = metadataStep?.metadata?.output?.batchId;
-				const upc =
-					releaseExecution.metadata.input
-						.upcAutoIfReleaseSnapshotNull ||
-					releaseExecution.metadata?.input?.releaseSnapshot?.upc;
+				const releaseReference =
+					metadataStep?.metadata?.output?.releaseReference;
 
 				if (!batchId) {
 					throw new Error(
 						'Missing batchId from CREATE_METADATA_ON_SERVER step',
 					);
 				}
-				if (!upc) throw new Error('Missing UPC for VEVO response');
+				if (!releaseReference) {
+					throw new Error('Missing ISRC for VEVO response');
+				}
 
 				const config =
 					await this.dspRoutingService.resolveFullDeliveryConfig(
@@ -947,7 +948,7 @@ export class ReleaseExecution3Worker {
 				const response = await this.sftpConnectService.getVevoResponse({
 					sftp: config.sftp,
 					batchId,
-					upc,
+					releaseReference,
 				});
 
 				if (!response) {
@@ -1092,41 +1093,25 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
-	private async syncDataDspCi({
+	private async syncDataStatusDspCi({
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		try {
-			const upc =
-				releaseExecution.metadata?.input?.releaseSnapshot?.upc ||
-				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull;
-
-			if (!upc) {
-				throw new Error('Missing UPC from release snapshot');
-			}
-
-			const dspCiCodes: string[] =
-				step.metadata?.input?.dspCiCodes ??
-				[
-					...(releaseExecution.metadata.input.dspAggregator?.ci?.ci ??
-						[]),
-					...(releaseExecution.metadata.input.dspAggregator?.ci
-						?.state51 ?? []),
-				]
-					.map((dsp) => dsp.codeCi)
-					.filter((code): code is string => !!code);
-
-			const dspStatuses = await this.ciService.getStatusDsps({
-				upc,
-				dspCiCodes,
+			const releaseId = this.releaseIdFromExecution(releaseExecution);
+			const ciDspStatuses =
+				await this.releaseService.getStatusDspsCi(releaseId);
+			const dspStatuses = this.mergeMissingCiDspStatuses({
+				step,
+				releaseExecution,
+				ciDspStatuses,
 			});
 
 			step.metadata = {
 				...step.metadata,
 				input: {
 					...step.metadata?.input,
-					upc,
-					dspCiCodes,
+					releaseId,
 				},
 				output: {
 					...step.metadata?.output,
@@ -1139,7 +1124,7 @@ export class ReleaseExecution3Worker {
 			const allTransferred =
 				dspStatuses.length > 0 &&
 				dspStatuses.every(
-					(item) => item.status?.toLowerCase() === 'transferred',
+					(item) => item.status === ReleaseDspStatus.DISTRIBUTED,
 				);
 
 			if (allTransferred) {
@@ -1176,5 +1161,49 @@ export class ReleaseExecution3Worker {
 		step,
 	}: StepTaskContext): ReleaseExecutionStepStatus {
 		return ReleaseExecutionStepStatus.DONE;
+	}
+
+	private mergeMissingCiDspStatuses({
+		step,
+		releaseExecution,
+		ciDspStatuses,
+	}: {
+		step: ReleaseExecutionStep3;
+		releaseExecution: ReleaseExecution3;
+		ciDspStatuses: ReleaseExecutionResultDto[];
+	}): ReleaseExecutionResultDto[] {
+		const expectedCiCodes: string[] =
+			step.metadata?.input?.dspCiCodes ?? [];
+
+		if (!expectedCiCodes.length) {
+			return ciDspStatuses;
+		}
+
+		const allCiDsps: Dsp[] = [
+			...(releaseExecution.metadata.input.dspAggregator?.ci?.ci ?? []),
+			...(releaseExecution.metadata.input.dspAggregator?.ci?.state51 ??
+				[]),
+		];
+
+		const statusByDspCode = new Map(
+			ciDspStatuses.map((item) => [item.dspCode, item]),
+		);
+
+		return expectedCiCodes.map((ciCode) => {
+			const dsp = allCiDsps.find(
+				(item) => item.codeCi?.toLowerCase() === ciCode.toLowerCase(),
+			);
+
+			const existing = dsp?.code
+				? statusByDspCode.get(dsp.code)
+				: undefined;
+			if (existing) return existing;
+
+			return {
+				dspId: dsp?.id,
+				dspCode: dsp?.code ?? ciCode,
+				status: ReleaseDspStatus.ISSUES,
+			};
+		});
 	}
 }

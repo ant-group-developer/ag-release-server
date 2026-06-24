@@ -1,11 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException, Logger, HttpException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { Repository } from 'typeorm';
 import { ReportDetectorService } from './report-detector.service';
 import { ReportImportQueueService } from './report-import-queue.service';
 import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
 import { ImportJobSourceType, ImportJobStatus, ImportJob } from '../../etl/interfaces';
+import { Label } from '../../label/entities/label.entity';
 
 @Injectable()
 export class ReportImportService {
@@ -16,6 +19,8 @@ export class ReportImportService {
     private readonly queueService: ReportImportQueueService,
     private readonly r2Service: BucketR2Service,
     private readonly importJobsService: ImportJobsService,
+    @InjectRepository(Label)
+    private readonly labelRepo: Repository<Label>,
   ) {}
 
   /**
@@ -26,9 +31,24 @@ export class ReportImportService {
     tenantId: string,
     userId: string,
     allowedExtensions?: string[],
+    labelId?: string,
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('Danh sách file trống');
+    }
+
+    const selectedLabelId = labelId?.trim();
+    if (selectedLabelId) {
+      if (!tenantId) {
+        throw new BadRequestException('tenantId is required when labelId is provided');
+      }
+
+      const label = await this.labelRepo.findOne({
+        where: { id: selectedLabelId, tenantId },
+      });
+      if (!label) {
+        throw new BadRequestException('labelId does not belong to the selected tenant');
+      }
     }
 
     const matched: Array<{
@@ -108,7 +128,7 @@ export class ReportImportService {
     // Create the PENDING ImportJob to track this upload folder batch
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.REPORT_UPLOAD,
-      params: { files: matched },
+      params: { files: matched, labelId: selectedLabelId || undefined },
       fileName: fileNames.join(', '),
       fileSizeBytes: totalSizeBytes,
       progressTotal: matched.length,
@@ -143,7 +163,11 @@ export class ReportImportService {
         throw new NotFoundException(`Không tìm thấy Job ID: ${jobId}`);
       }
 
-      if (job.status !== ImportJobStatus.PENDING) {
+      if (job.status === ImportJobStatus.QUEUED) {
+        return job;
+      }
+
+      if (job.status !== ImportJobStatus.PENDING && job.status !== ImportJobStatus.FAILED) {
         throw new BadRequestException(`Job đang ở trạng thái ${job.status}, không thể bắt đầu lại.`);
       }
 
@@ -154,9 +178,18 @@ export class ReportImportService {
 
       const bucketName = this.r2Service.getBucketName({ isPublic: false });
 
-      // Verify all matched files exist in R2
+      const reportImportState = job.params?.reportImportState as
+        | { files?: Record<string, { status?: string }> }
+        | undefined;
+
+      // Verify all matched files that may still need fact import exist in R2.
       const missingFiles: string[] = [];
       for (const file of files) {
+        const fileKey = file.r2Key || file.path;
+        if (reportImportState?.files?.[fileKey]?.status === 'FACT_IMPORTED') {
+          continue;
+        }
+
         try {
           await this.r2Service.findOne({
             bucketName,
@@ -179,6 +212,7 @@ export class ReportImportService {
       // Push jobId to Redis Queue
       try {
         await this.queueService.pushJob(job.id);
+        job = await this.importJobsService.markQueued(job.id);
       } catch (err) {
         const errorMsg = `Không thể đẩy job vào Redis Queue: ${err.message}`;
         this.logger.error(errorMsg);

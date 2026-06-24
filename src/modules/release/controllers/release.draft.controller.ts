@@ -23,7 +23,6 @@ import { Request } from 'express';
 import {
 	PublicRoute,
 	RequirePermissions,
-	SystemAdminOnly,
 } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
@@ -68,7 +67,10 @@ export class ReleaseDraftController {
 		};
 	}
 
-	@RequirePermissions(Permission.RELEASE.CREATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.CREATE,
+		Permission.RELEASE_VIDEO.CREATE,
+	)
 	@Post()
 	@ApiOperation({ summary: 'Create a draft release' })
 	@ApiBody({ type: CreateReleaseDraftDto })
@@ -93,7 +95,7 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.CREATE(result);
 	}
 
-	// @RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	// @RequirePermissions(Permission.RELEASE_AUDIO.CREATE, Permission.RELEASE_AUDIO.UPDATE)
 	// @PublicRoute()
 	@Post('validate-list')
 	getErrorsSchemaReleasesSftp(@Body('releases') releases: ReleaseRawSftp[]) {
@@ -137,7 +139,10 @@ export class ReleaseDraftController {
 		return this.releaseDraftService.importReleases(payload);
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Put(':id')
 	@ApiOperation({ summary: 'Update a draft release' })
 	@ApiParam({ name: 'id', format: 'uuid', description: 'Release ID' })
@@ -172,7 +177,10 @@ export class ReleaseDraftController {
 		return this.releaseDraftService.syncReleaseDataToTracks(id, dto);
 	}
 
-	@RequirePermissions(Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Post(':id/auto-fill-cover-arts')
 	async autoFillCoverArts(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -182,7 +190,12 @@ export class ReleaseDraftController {
 		return ReleaseSuccess.UPDATE(result);
 	}
 
-	@RequirePermissions(Permission.RELEASE.CREATE, Permission.RELEASE.UPDATE)
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.CREATE,
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.CREATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
 	@Get(':id/validate')
 	async getErrorsSchemaReleaseById(@Param('id') id: string) {
 		const result =
@@ -205,16 +218,22 @@ export class ReleaseDraftController {
 		// 	query.tenantIds = [tenantId];
 		// }
 
-		const result = await this.releaseDraftService.bulkDeleteRelease(query);
+		const result = await this.releaseDraftService.bulkDeleteRelease(
+			query,
+			req.user!.type,
+		);
 
 		return new ResponseSuccess({ data: result });
 	}
 
-	@SystemAdminOnly()
+	// @SystemAdminOnly()
 	@Delete(':id')
 	@ApiOperation({ summary: 'Delete a release by ID' })
-	async delete(@Param('id') id: string): Promise<ResponseSuccess<void>> {
-		await this.releaseDraftService.handleDeleteById(id);
+	async delete(
+		@Param('id') id: string,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<void>> {
+		await this.releaseDraftService.handleDeleteById(id, req.user!.type);
 		return ReleaseSuccess.DELETE();
 	}
 }

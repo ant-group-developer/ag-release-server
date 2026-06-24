@@ -9,6 +9,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { stringToCode } from 'src/utils/util';
+import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 import { DataSource, EntityManager, ILike, In, Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
 
@@ -37,6 +38,14 @@ export interface ReleaseReportImportInput {
 
 		isrc: string;
 	}[];
+
+	importSourceType?: string;
+
+	importParserCode?: string;
+
+	importFileName?: string;
+
+	importJobId?: string;
 }
 
 @Injectable()
@@ -48,10 +57,12 @@ export class ReleaseReportImportService {
 	) {}
 
 	async importRelease(input: ReleaseReportImportInput): Promise<Release> {
+		input = { ...input, upc: normalizeUpc(input.upc) };
+		const equivalentUpcs = buildEquivalentUpcs(input.upc);
 		// Import theo UPC là idempotent: release đã tồn tại thì không ghi đè
 		// metadata hoặc tạo thêm artist/track từ report.
 		const existingRelease = await this.releaseRepo.findOne({
-			where: { upc: input.upc },
+			where: { upc: In(equivalentUpcs) },
 		});
 		if (existingRelease) return existingRelease;
 
@@ -67,7 +78,7 @@ export class ReleaseReportImportService {
 			// Kiểm tra lại trong transaction để giảm khả năng tạo trùng khi
 			// nhiều report cùng UPC được xử lý gần như đồng thời.
 			const releaseInTransaction = await manager.findOne(Release, {
-				where: { upc: input.upc },
+				where: { upc: In(equivalentUpcs) },
 			});
 			if (releaseInTransaction) return releaseInTransaction;
 
@@ -102,6 +113,10 @@ export class ReleaseReportImportService {
 					labelId: label.id,
 					tenantId,
 					isImportedFromReport: true,
+					importSourceType: input.importSourceType || null,
+					importParserCode: input.importParserCode || null,
+					importFileName: input.importFileName || null,
+					importJobId: input.importJobId || null,
 				}),
 			);
 
@@ -131,6 +146,10 @@ export class ReleaseReportImportService {
 						order: index + 1,
 						copyArtistsFromRelease: true,
 						isImportedFromReport: true,
+						importSourceType: input.importSourceType || null,
+						importParserCode: input.importParserCode || null,
+						importFileName: input.importFileName || null,
+						importJobId: input.importJobId || null,
 					}),
 				),
 			);

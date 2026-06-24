@@ -19,8 +19,13 @@ export class AwaParser extends BaseParser {
     record: Record<string, string>,
     batchId: string,
   ): FactDspRow | null {
-    const isrc = record['isrc'];
-    if (!isrc) return null;
+    let isrc = record['isrc']?.trim() || '';
+    const upc = record['upc']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     const row = this.createBaseRow(batchId);
     row.reporting_period = this.normalizeDate(record['dt']); // YYYYMMDD
@@ -54,10 +59,10 @@ export class AwaParser extends BaseParser {
    * If empty/missing → XX (unknown).
    */
   private mapAwaRegion(code: string): string {
-    if (!code || code.trim() === '' || code === '0') return 'XX';
+    if (!code || code.trim() === '' || code === '0') return 'N/A';
     // Any numeric value = Japanese prefecture → JP
     const num = parseInt(code, 10);
     if (!isNaN(num) && num >= 1) return 'JP';
-    return 'XX';
+    return 'N/A';
   }
 }

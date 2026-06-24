@@ -12,7 +12,7 @@ export interface FactDspRow {
   label_name: string;
 
   // Geography
-  territory_code: string; // ISO-2 country code, 'XX' if unknown
+  territory_code: string; // ISO-2 country code, 'N/A' if unknown
 
   // Content Metadata
   isrc: string;

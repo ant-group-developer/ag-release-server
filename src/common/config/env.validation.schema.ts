@@ -66,6 +66,9 @@ export const envValidationSchema = Joi.object({
 	// Internal API Key
 	INTERNAL_API_KEY: Joi.string().optional(),
 
+	// Vevo callback API key
+	VEVO_CALLBACK_API_KEY: Joi.string().required(),
+
 	// ClickHouse
 	CLICKHOUSE_URL: Joi.string().required().default('http://127.0.0.1:8123'),
 	CLICKHOUSE_DATABASE: Joi.string().required().default('music_analytics'),

@@ -8,17 +8,16 @@ import { FtpService } from './services/ftp/ftp.service';
 import { SyncService } from './services/sync/sync.service';
 import { SchedulerService } from './services/scheduler/scheduler.service';
 import { JobService } from './services/job/job.service';
-import { ImportJobsService } from './services/import-jobs/import-jobs.service';
-import { JobEventsGateway } from './services/import-jobs/job-events.gateway';
 import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
 import { CubeRebuildService } from './services/cube-rebuild/cube-rebuild.service';
 import { DspModule } from '../dsp/dsp.module';
 import { ClickHouseModule } from '../clickhouse/clickhouse.module';
 import { DspReportModule } from '../dsp-report/dsp-report.module';
 import { ReleaseModule } from '../release/release.module';
+import { ImportJobsModule } from './import-jobs.module';
 
 @Module({
-  imports: [DspModule, ClickHouseModule, DspReportModule, ReleaseModule],
+  imports: [DspModule, ClickHouseModule, DspReportModule, ReleaseModule, ImportJobsModule],
   controllers: [ImportController, SyncController, JobController, ExchangeRateController],
   providers: [
     ImportService,
@@ -26,11 +25,9 @@ import { ReleaseModule } from '../release/release.module';
     SyncService,
     SchedulerService,
     JobService, // @deprecated — giữ tạm, sẽ remove sau khi confirm không nơi khác inject
-    ImportJobsService,
-    JobEventsGateway,
     ExchangeRateService,
     CubeRebuildService,
   ],
-  exports: [ImportService, SyncService, ImportJobsService, JobEventsGateway, ExchangeRateService, CubeRebuildService],
+  exports: [ImportService, SyncService, ImportJobsModule, ExchangeRateService, CubeRebuildService],
 })
 export class EtlModule {}

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, ILike } from 'typeorm';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
@@ -181,6 +181,7 @@ export class IsrcResolverService {
     return results;
   }
 
+
   /**
    * Lấy full track metadata cho tenant (bao gồm release, label info).
    * Dùng cho ranking Release/Label khi cần aggregate toàn bộ ISRCs.
@@ -266,34 +267,72 @@ export class IsrcResolverService {
   /**
    * Lấy thông tin logo/ảnh đại diện cho danh sách labelIds từ PostgreSQL
    */
-  async getLabelMetadata(labelIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+  async getLabelMetadata(labelIds: string[]): Promise<Map<string, {
+    name: string;
+    picture: string | null;
+    tenant: { id: string; name: string; title: string; logo: string | null } | null;
+  }>> {
     if (!labelIds.length) return new Map();
     const labels = await this.labelRepo.find({
       where: { id: In(labelIds) },
-      select: ['id', 'name', 'picture'],
+      relations: ['tenant'],
+      select: {
+        id: true,
+        name: true,
+        picture: true,
+        tenant: {
+          id: true,
+          name: true,
+          title: true,
+          logo: true,
+        },
+      },
     });
 
-    const map = new Map<string, { name: string; picture: string | null }>();
+    const map = new Map<string, {
+      name: string;
+      picture: string | null;
+      tenant: { id: string; name: string; title: string; logo: string | null } | null;
+    }>();
     for (const l of labels) {
       map.set(l.id, {
         name: l.name,
         picture: l.picture, // Tự động định dạng URL qua MediaUrlTransformer
+        tenant: l.tenant ? {
+          id: l.tenant.id,
+          name: l.tenant.name,
+          title: l.tenant.title,
+          logo: l.tenant.logo || null,
+        } : null,
       });
     }
     return map;
   }
 
   /**
-   * Lấy thông tin ảnh đại diện cho danh sách artistIds từ PostgreSQL
+   * Lấy thông tin chi tiết cho danh sách artistIds từ PostgreSQL
+   * Bao gồm: name, picture, profiles (Spotify/Apple Music...), country, genre
    */
-  async getArtistMetadata(artistIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+  async getArtistMetadata(artistIds: string[]): Promise<Map<string, {
+    name: string;
+    picture: string | null;
+    profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+    country: string | null;
+    genre: string | null;
+  }>> {
     if (!artistIds.length) return new Map();
     const artists = await this.artistRepo.find({
       where: { id: In(artistIds) },
-      select: ['id', 'name', 'picture'],
+      relations: ['artistProfiles', 'artistProfiles.dsp', 'country', 'genre'],
     });
 
-    const map = new Map<string, { name: string; picture: string | null }>();
+    const map = new Map<string, {
+      name: string;
+      picture: string | null;
+      profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+      country: string | null;
+      genre: string | null;
+    }>();
     const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
     for (const a of artists) {
       let pictureUrl: string | null = null;
@@ -302,9 +341,21 @@ export class IsrcResolverService {
           ? a.picture
           : `${domain}/${a.picture}`;
       }
+
+      const profiles = (a.artistProfiles ?? [])
+        .filter((p) => p.url)
+        .map((p) => ({
+          dspCode: p.dsp?.code ?? '',
+          dspName: p.dsp?.name ?? '',
+          url: p.url,
+        }));
+
       map.set(a.id, {
         name: a.name,
         picture: pictureUrl,
+        profiles,
+        country: a.country?.name ?? a.originCountry ?? null,
+        genre: a.genre?.name ?? a.primaryGenre ?? null,
       });
     }
     return map;
@@ -368,5 +419,48 @@ export class IsrcResolverService {
       });
     }
     return map;
+  }
+
+  async getArtistIdsByKeyword(keyword: string): Promise<string[]> {
+    const artists = await this.artistRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return artists.map((a) => a.id);
+  }
+
+  async getLabelIdsByKeyword(keyword: string): Promise<string[]> {
+    const labels = await this.labelRepo.find({
+      where: { name: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return labels.map((l) => l.id);
+  }
+
+  async getTenantIdsByKeyword(keyword: string): Promise<string[]> {
+    const tenants = await this.tenantRepo.find({
+      where: [
+        { name: ILike(`%${keyword}%`) },
+        { title: ILike(`%${keyword}%`) },
+      ],
+      select: ['id'],
+    });
+    return tenants.map((t) => t.id);
+  }
+
+  async getReleaseIdsByKeyword(keyword: string): Promise<string[]> {
+    const releases = await this.releaseRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['id'],
+    });
+    return releases.map((r) => r.id);
+  }
+
+  async getIsrcsByTrackTitleKeyword(keyword: string): Promise<string[]> {
+    const tracks = await this.trackRepo.find({
+      where: { title: ILike(`%${keyword}%`) },
+      select: ['isrc'],
+    });
+    return tracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc);
   }
 }

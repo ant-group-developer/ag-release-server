@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { AppEvent } from 'src/common/enums/common';
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Repository } from 'typeorm';
+import { CiToolService } from '../partners-api/ci-tool/ci-tool.service';
 import { appConfigDefault } from './constants/app-config.constant';
 import { UpdateConfigDto } from './dtos/app-config.dto';
 import { AppConfig } from './entities/app-config.entity';
@@ -21,6 +22,7 @@ export class AppConfigService implements OnModuleInit {
 		@InjectRepository(ArtistRole)
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 		private readonly eventEmitter: EventEmitter2,
+		private readonly ciToolService: CiToolService,
 	) {}
 
 	getCache(): AppConfig {
@@ -131,6 +133,23 @@ export class AppConfigService implements OnModuleInit {
 		this.setCache(result);
 
 		return result;
+	}
+
+	async refreshCiToolToken() {
+		const token = await this.ciToolService.getTokenCi();
+
+		const dataDb = this.getCache();
+		const partners = dataDb.config.partners;
+
+		return this.update({
+			partners: {
+				...partners,
+				ci: {
+					...partners.ci,
+					token,
+				},
+			},
+		});
 	}
 
 	// private

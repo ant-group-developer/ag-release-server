@@ -1,25 +1,24 @@
-import {
-	ConflictException,
-	Injectable,
-	Logger,
-	NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
-import { VevoChannelCallbackDto } from 'src/modules/partners-api/vevo/dtos/vevo.dto';
-import { VevoService } from 'src/modules/partners-api/vevo/services/vevo.service';
+import { LogsService } from 'src/modules/log/services/logs.services';
+import { TelegramService } from 'src/modules/notification/services/notification.telegram-service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { DataSource, In, Not, Repository } from 'typeorm';
+import { ChannelException } from '../constants/channel.constant';
 import {
 	CreateChannelDto,
 	QueryGetListChannelDto,
 	UpdateChannelDto,
-} from './dto/channel.dto';
-import { ChannelHistory } from './entities/channel-history.entity';
-import { Channel } from './entities/channel.entity';
-import { ChannelStatus } from './enum/channel.enum';
+} from '../dto/channel.dto';
+import { VevoChannelCallbackDto } from '../dto/vevo.dto';
+import { ChannelHistory } from '../entities/channel-history.entity';
+import { Channel } from '../entities/channel.entity';
+import { ChannelStatus } from '../enum/channel.enum';
+import { VevoCreateChannelResponse } from '../interfaces/vevo.interface';
+import { VevoService } from './vevo.service';
 
 @Injectable()
 export class ChannelService {
@@ -32,54 +31,92 @@ export class ChannelService {
 		private readonly channelHistoryRepo: Repository<ChannelHistory>,
 		@InjectDataSource()
 		private readonly dataSource: DataSource,
-		private readonly vevoService: VevoService,
 		private readonly tenantService: TenantService,
+		private readonly vevoService: VevoService,
+
+		private readonly logsService: LogsService,
+		private readonly telegramService: TelegramService,
 	) {}
 
 	async create(dto: CreateChannelDto) {
 		await this.ensureNameUnique(dto.name);
 
+		const {
+			existedOnVevoBackstage,
+			name,
+			tenantId,
+			youtubeChannelId,
+			thumbUrl,
+		} = dto;
+
+		if (!existedOnVevoBackstage) {
+			const response = await this.vevoService.newChannel(name);
+
+			this.logsService.log({
+				module: 'channel',
+				data: {
+					request: { channelName: name },
+					response,
+				},
+				message: 'Response create channel vevo',
+			});
+
+			if (response.errors?.length || !response.data?.createChannel) {
+				throw this.buildVevoCreateChannelError(response);
+			}
+		}
+
 		const channel = await this.channelRepo.save(
 			this.channelRepo.create({
-				...dto,
-				status: ChannelStatus.PROCESSING,
+				name,
+				tenantId,
+				youtubeChannelId: youtubeChannelId ?? null,
+				thumbUrl: thumbUrl ?? null,
+				status: existedOnVevoBackstage
+					? ChannelStatus.SUCCESS
+					: ChannelStatus.PROCESSING,
 				error: null,
 			}),
 		);
-
-		this.processVevoChannel(channel.id, channel.name).catch((error) => {
-			this.logger.error(
-				`Unexpected Vevo channel processing error for ${channel.name}: ${this.getErrorMessage(error)}`,
-			);
-		});
 
 		return channel;
 	}
 
 	async handleVevoCallback(payload: VevoChannelCallbackDto) {
-		const result = await this.channelRepo.update(
-			{ name: payload.channel_name },
-			{
+		const channel = await this.channelRepo.findOne({
+			where: { name: payload.channel_name },
+		});
+
+		if (channel) {
+			await this.channelRepo.update(channel.id, {
 				status: ChannelStatus.SUCCESS,
 				error: null,
 				youtubeChannelId: payload.youtube_channel_id,
-			},
-		);
+			});
 
-		if (!result.affected) {
-			this.logger.warn(
-				`Channel not found for Vevo callback: ${payload.channel_name}`,
-			);
+			return { received: true, created: false };
 		}
 
-		return { received: true };
+		const createdChannel = await this.channelRepo.save(
+			this.channelRepo.create({
+				name: payload.channel_name,
+				youtubeChannelId: payload.youtube_channel_id,
+				status: ChannelStatus.SUCCESS,
+				error: null,
+				tenantId: null,
+			}),
+		);
+
+		this.notifyChannelCreatedWithoutTenant(createdChannel).catch((error) =>
+			this.logger.error(error),
+		);
+
+		return { received: true, created: true };
 	}
 
-	async getList(
-		query: QueryGetListChannelDto,
-		actorTenantId: string,
-		onlyActorTenant = false,
-	) {
+	async getList(query: QueryGetListChannelDto, actorTenantId: string) {
+		const onlyActorTenant = query.onlyActorTenant === true;
+		const { status } = query;
 		const qb = this.createDetailQuery(true);
 		// Tenant thuong chi duoc xem channel cua chinh no va toan bo tenant con.
 		// System tenant nhan undefined de khong ap dung bo loc tenant.
@@ -93,7 +130,11 @@ export class ChannelService {
 			});
 		}
 
-		if (onlyActorTenant) {
+		if (status) {
+			qb.andWhere('channel.status = :status', { status });
+		}
+
+		if (onlyActorTenant && checkIsNotSystemTenant(actorTenantId)) {
 			qb.andWhere('channel.tenantId = :actorTenantId', {
 				actorTenantId,
 			});
@@ -120,6 +161,18 @@ export class ChannelService {
 				totalItems,
 			},
 		});
+	}
+
+	async getListChannelOnlyActorTenant(
+		query: QueryGetListChannelDto,
+		actorTenantId: string,
+	) {
+		const filter = Object.assign(new QueryGetListChannelDto(), query, {
+			onlyActorTenant: true,
+			status: ChannelStatus.SUCCESS,
+		});
+
+		return this.getList(filter, actorTenantId);
 	}
 
 	async getListSimple(query: QueryGetListChannelDto, actorTenantId: string) {
@@ -160,6 +213,10 @@ export class ChannelService {
 		actorTenantId: string,
 		userId: string,
 	) {
+		// chưa có api update bên vevo
+		dto.name = undefined;
+		dto.youtubeChannelId = undefined;
+
 		// Kiem tra channel hien tai nam trong cay tenant ma nguoi dung quan ly.
 		const channel = await this.findOne(id, actorTenantId);
 		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
@@ -241,7 +298,7 @@ export class ChannelService {
 		});
 
 		if (exists) {
-			throw new ConflictException('Channel name already exists');
+			throw ChannelException.ALREADY_EXISTS();
 		}
 	}
 
@@ -266,31 +323,40 @@ export class ChannelService {
 		return qb;
 	}
 
-	private async processVevoChannel(channelId: string, channelName: string) {
-		try {
-			await this.vevoService.createChannel({ channelName });
-		} catch (error) {
-			const message = this.getErrorMessage(error);
+	private buildVevoCreateChannelError(response: VevoCreateChannelResponse) {
+		const firstError = response.errors?.[0];
+		const message =
+			firstError?.extensions?.message ||
+			firstError?.message ||
+			'Vevo channel creation failed';
+		const code = firstError?.extensions?.code;
 
-			await this.channelRepo.update(channelId, {
-				status: ChannelStatus.FAILED,
-				error: message,
-			});
+		if (code === 'duplicate-channel') {
+			return ChannelException.DUPLICATE_CHANNEL_ON_VEVO(response);
+		}
 
-			this.logger.error(
-				`Vevo channel request failed for ${channelName}: ${message}`,
+		if (code === 'invalid-channel') {
+			return ChannelException.CHANNEL_CREATE_REQUEST_EXISTS_ON_VEVO(
+				response,
 			);
 		}
+
+		return ChannelException.VEVO_CREATE_FAILED(
+			message,
+			response,
+			firstError?.extensions?.status || 400,
+		);
 	}
 
-	private getErrorMessage(error: unknown) {
-		if (error instanceof Error) return error.message;
-		if (typeof error === 'string') return error;
-
-		try {
-			return JSON.stringify(error);
-		} catch {
-			return 'Unknown Vevo channel creation error';
-		}
+	private async notifyChannelCreatedWithoutTenant(channel: Channel) {
+		await this.telegramService.sendToDev(
+			[
+				'[VEVO] Channel added without tenant',
+				'Vevo callback added a channel successfully, but tenant_id is not set.',
+				`Channel name: ${channel.name}`,
+				`YouTube channel ID: ${channel.youtubeChannelId || '-'}`,
+				`Channel ID: ${channel.id}`,
+			].join('\n'),
+		);
 	}
 }

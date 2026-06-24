@@ -22,13 +22,18 @@ const MIGRATIONS_TABLE = 'clickhouse_migrations';
 @Injectable()
 export class ClickHouseMigrationService implements OnModuleInit {
   private readonly logger = new Logger(ClickHouseMigrationService.name);
+  private migrationPromise: Promise<void> = Promise.resolve();
 
   constructor(
     @Inject(CLICKHOUSE_CLIENT)
     private readonly client: ClickHouseClient,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
+    this.migrationPromise = this.runMigrations();
+  }
+
+  private async runMigrations(): Promise<void> {
     try {
       await this.ensureMigrationsTable();
       await this.runPendingMigrations();
@@ -38,6 +43,10 @@ export class ClickHouseMigrationService implements OnModuleInit {
         error.stack,
       );
     }
+  }
+
+  async waitForMigrations(): Promise<void> {
+    await this.migrationPromise;
   }
 
   /**

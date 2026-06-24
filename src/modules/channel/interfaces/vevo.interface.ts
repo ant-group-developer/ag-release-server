@@ -9,11 +9,12 @@ export interface VevoGraphqlErrorExtension {
 export interface VevoGraphqlError {
 	message: string;
 	extensions?: VevoGraphqlErrorExtension;
+	path?: string[];
 }
 
 export interface VevoCreateChannelResponse {
-	data?: {
+	data: {
 		createChannel: boolean;
-	};
+	} | null;
 	errors?: VevoGraphqlError[];
 }

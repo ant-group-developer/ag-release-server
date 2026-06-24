@@ -4,6 +4,7 @@ import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
 import { ReleaseLogService } from 'src/modules/release/modules/release-log/services/release-log.service';
+import { normalizeMetadataExternal } from 'src/modules/release/utils/release.utils';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { Repository } from 'typeorm';
 import {
@@ -52,7 +53,7 @@ export class TrackService {
 	// read
 	async getDetail(id: string): Promise<Track> {
 		const trackDb = await this.trackQueryService.getDetailOne(id);
-		return this.enhanceDetailsOne(trackDb);
+		return this.enhanceDetailsOne(trackDb) as Track;
 	}
 
 	async getDetailMetadata(id: string): Promise<Track> {
@@ -141,7 +142,7 @@ export class TrackService {
 		);
 
 		track.release.releaseCoverArts = undefined;
-		return track;
+		return normalizeMetadataExternal(track) as Track;
 	}
 
 	private enhanceDetailsList(tracks: Track[]) {

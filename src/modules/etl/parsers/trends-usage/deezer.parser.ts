@@ -31,8 +31,13 @@ export class DeezerParser extends BaseParser {
     // Skip _TB files entirely — they overlap with Regular and cause double-counting
     if (path.basename(filePath).includes('_TB')) return null;
 
-    const isrc = record['ISRC'];
-    if (!isrc) return null;
+    let isrc = record['ISRC']?.trim() || '';
+    const upc = record['UPC']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     const row = this.createBaseRow(batchId);
     // Date format: DD-MM-YYYY

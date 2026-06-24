@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
+	IsEnum,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
-	IsUrl,
 	IsUUID,
 	Matches,
 	MaxLength,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { ChannelStatus } from '../enum/channel.enum';
 
 export class CreateChannelDto {
 	@ApiProperty({
@@ -47,9 +50,18 @@ export class CreateChannelDto {
 		description: 'Public thumbnail URL',
 	})
 	@IsOptional()
-	@IsUrl()
 	@MaxLength(500)
 	thumbUrl?: string;
+
+	@ApiPropertyOptional({
+		example: false,
+		description:
+			'Set true when the channel already exists in Vevo Backstage. The server will only create the local DB record and will not call Vevo.',
+	})
+	@IsOptional()
+	@Transform(({ value }) => value === true || value === 'true')
+	@IsBoolean()
+	existedOnVevoBackstage?: boolean;
 }
 
 export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
@@ -60,4 +72,10 @@ export class QueryGetListChannelDto extends BaseQueryDto {
 	fieldOrder: string = 'name';
 
 	tenantId?: string;
+
+	@IsOptional()
+	@IsEnum(ChannelStatus)
+	status?: ChannelStatus;
+
+	onlyActorTenant?: boolean;
 }

@@ -152,11 +152,21 @@ export class SoundCloudParser extends BaseParser {
             record[h.trim()] = (values[idx] || '').trim();
           });
 
-          const isrc = record['isrc'];
-          if (!isrc) continue;
-
+          let isrc = record['isrc']?.trim() || '';
           const trackId = record['track_id'] || '';
           const trackMeta = trackLookup.get(trackId);
+
+          if (!isrc && trackMeta?.isrc) {
+            isrc = trackMeta.isrc.trim();
+          }
+
+          const upc = trackMeta?.upc?.trim() || '';
+
+          if (!isrc && !upc) continue;
+
+          if (!isrc && upc) {
+            isrc = `UPC-${upc}`;
+          }
 
           const row = this.createBaseRow(batchId);
           row.reporting_period = this.normalizeDate(record['reporting_start_date']);

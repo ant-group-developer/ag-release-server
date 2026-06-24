@@ -19,6 +19,7 @@ export interface DspTimelineSeriesItem {
   salesViews?: number;
   trendViews?: number;
   revenueUsd?: number;
+  revenueUsdExact?: string;
 }
 
 export interface DspTimelinePeriod {
@@ -36,6 +37,7 @@ export interface TerTimelineSeriesItem {
   salesViews?: number;
   trendViews?: number;
   revenueUsd?: number;
+  revenueUsdExact?: string;
 }
 
 export interface TerTimelinePeriod {
@@ -55,6 +57,7 @@ export interface TerTimelineResponse {
 export interface RevenueOverviewResponse {
   /** Tổng doanh thu quy đổi USD trong khoảng thời gian */
   totalRevenueUsd: number;
+  totalRevenueUsdExact?: string;
   /** Tổng lượt nghe */
   totalQuantity: number;
   /** Tổng số vùng lãnh thổ (quốc gia) phát sinh doanh thu */
@@ -64,6 +67,7 @@ export interface RevenueOverviewResponse {
 export interface RevenueDspItem {
   dspName: string;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -72,12 +76,14 @@ export type RevenueTopDspResponse = RevenueDspItem[];
 export interface RevenueTimelineDspItem {
   dsp: string;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
 export interface RevenueTimelinePeriod {
   period: string;  // 'YYYY-MM'
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
   series: RevenueTimelineDspItem[];
 }
@@ -126,6 +132,9 @@ export interface ArtistRankingItem {
   artistName: string;
   picture: string | null;
   image: string | null;
+  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+  country: string | null;
+  genre: string | null;
   trackCount: number;
   totalViews: number;
 }
@@ -139,6 +148,12 @@ export interface LabelRankingItem {
   releaseCount: number;
   trackCount: number;
   totalViews: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -180,8 +195,12 @@ export interface RevenueArtistItem {
   artistId: string;
   artistName: string;
   picture: string | null;
+  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+  country: string | null;
+  genre: string | null;
   trackCount: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -196,6 +215,7 @@ export interface RevenueTrackItem {
   releaseId: string | null;
   releaseTitle: string | null;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -205,6 +225,21 @@ export interface EntityOverviewResponse {
   totalTrendViews: number;   // tổng lượt stream trend trong kỳ
   totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
   totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
+  totalRevenueUsdExact?: string;
+  artist?: {
+    id: string;
+    name: string;
+    picture: string | null;
+    profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+    country: string | null;
+    genre: string | null;
+  } | null;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 export interface RevenueLabelItem {
@@ -215,7 +250,14 @@ export interface RevenueLabelItem {
   releaseCount?: number;
   trackCount?: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 export interface RevenueTenantItem {
@@ -224,6 +266,7 @@ export interface RevenueTenantItem {
   tenantName: string;
   logo: string | null;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
 }
 
@@ -259,8 +302,42 @@ export interface RevenueReleaseItem {
   labelName: string | null;
   trackCount: number;
   revenueUsd: number;
+  revenueUsdExact?: string;
   quantity: number;
   release: {
     coverArtThumbnails: ICoverArtThumbnails;
   } | null;
+}
+
+// ═══════════════════════════════════════════════════════
+// Chart APIs (line-chart / bar-chart)
+// ═══════════════════════════════════════════════════════
+
+/** Một điểm trên line-chart trend-view theo tháng */
+export interface TrendViewLineChartItem {
+  period: string; // 'YYYY-MM'
+  totalViews: number;
+}
+
+/** Một cột trong bar-chart DSP (top 5 + Other) */
+export interface DspBarChartItem {
+  dspName: string;
+  totalViews?: number;
+  revenueUsd?: number;
+  revenueUsdExact?: string;
+}
+
+/** Một điểm trên line-chart revenue theo tháng */
+export interface TerritoryBarChartItem {
+  territory: string;
+  totalViews?: number;
+  revenueUsd?: number;
+  revenueUsdExact?: string;
+}
+
+export interface RevenueLineChartItem {
+  period: string; // 'YYYY-MM'
+  revenueUsd: number;
+  revenueUsdExact?: string;
+  quantity: number;
 }

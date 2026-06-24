@@ -1,5 +1,6 @@
 import { INestApplication, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { corsConfig } from './common/config/cors.config';
 import { setupSwagger } from './common/config/swagger.config';
@@ -8,8 +9,10 @@ import { globalValidationPipe } from './common/config/validation.config';
 export let APP_GOLBAL: INestApplication<any>;
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule);
+	const app = await NestFactory.create<NestExpressApplication>(AppModule);
 	APP_GOLBAL = app;
+
+	app.set('query parser', 'extended');
 
 	// setInterval(() => {
 	// 	const memoryData = process.memoryUsage();

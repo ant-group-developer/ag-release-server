@@ -47,8 +47,13 @@ export class BoomplayParser extends BaseParser {
     record: Record<string, string>,
     batchId: string,
   ): FactDspRow | null {
-    const isrc = record['isrc'];
-    if (!isrc) return null;
+    let isrc = record['isrc']?.trim() || '';
+    const upc = record['upc']?.trim() || '';
+    if (!isrc && !upc) return null;
+
+    if (!isrc && upc) {
+      isrc = `UPC-${upc}`;
+    }
 
     const row = this.createBaseRow(batchId);
     // Boomplay date format: DD/MM/YYYY

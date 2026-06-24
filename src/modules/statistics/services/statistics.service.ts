@@ -54,7 +54,7 @@ export class StatisticsService {
 		@InjectDataSource() private dataSource: DataSource,
 	) {}
 
-	async getIssueCounts(filter: QueryGetIssueCountDto) {
+	async getIssueCounts(filter: QueryGetIssueCountDto, tenantId?: string) {
 		const qb = this.createBaseQbIssue();
 		this.leftJoinIssueWithTenantIssue(qb);
 		this.selectIssue({
@@ -65,6 +65,10 @@ export class StatisticsService {
 		qb.groupBy(IssueFields.ID);
 
 		this.andWhereTenantIssueCreatedAt({ qb, ...filter });
+
+		if (tenantId) {
+			qb.andWhere(`${this.tenantIssueAlias}.tenantId = :tenantId`, { tenantId });
+		}
 
 		const raw = await qb.getRawMany<{
 			issue_id: string;
@@ -79,7 +83,7 @@ export class StatisticsService {
 		}));
 	}
 
-	async getOverviewCounts(filter: QueryGetOverviewCountDto) {
+	async getOverviewCounts(filter: QueryGetOverviewCountDto, tenantId?: string) {
 		const [
 			releasesCount,
 			tracksCount,
@@ -88,12 +92,12 @@ export class StatisticsService {
 			releasesImportCount,
 			tracksImportCount,
 		] = await Promise.all([
-			this.getReleasesCount(filter),
-			this.getTracksCount(filter),
-			this.getLabelsCount(filter),
-			this.getArtistsCount(filter),
-			this.getReleasesImportCount(filter),
-			this.getTracksImportCount(filter),
+			this.getReleasesCount(filter, tenantId),
+			this.getTracksCount(filter, tenantId),
+			this.getLabelsCount(filter, tenantId),
+			this.getArtistsCount(filter, tenantId),
+			this.getReleasesImportCount(filter, tenantId),
+			this.getTracksImportCount(filter, tenantId),
 		]);
 
 		return {
@@ -106,66 +110,122 @@ export class StatisticsService {
 		};
 	}
 
-	async getStreamCountsByCountry(filter: QueryGetStreamCountByCountryDto) {
-		return this.trackRevenueRepo
+	async getStreamCountsByCountry(filter: QueryGetStreamCountByCountryDto, tenantId?: string) {
+		const qb = this.trackRevenueRepo
 			.createQueryBuilder('trackRevenue')
 			.select('trackRevenue.countryCode', 'countryCode')
 			.addSelect('COUNT(trackRevenue.id)', 'total')
-			.groupBy('trackRevenue.countryCode')
-			.getRawMany();
+			.groupBy('trackRevenue.countryCode');
+
+		if (tenantId) {
+			qb.innerJoin('trackRevenue.track', 'track')
+				.innerJoin('track.release', 'release')
+				.andWhere('release.tenantId = :tenantId', { tenantId });
+		}
+
+		return qb.getRawMany();
 	}
 
-	async getReleasesCount(filter: BaseQueryStatisticsDto) {
+	async getReleasesCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const where: any = {
+			...this.buildDateFilter({ startDate, endDate }),
+		};
+		if (tenantId) {
+			where.tenantId = tenantId;
+		}
 
 		return await this.releaseRepo.count({
-			where: this.buildDateFilter({ startDate, endDate }),
+			where,
 		});
 	}
 
-	async getReleasesImportCount(filter: BaseQueryStatisticsDto) {
+	async getReleasesImportCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const where: any = {
+			...this.buildDateFilter({ startDate, endDate }),
+			isImportedFromReport: true,
+		};
+		if (tenantId) {
+			where.tenantId = tenantId;
+		}
+
 		return await this.releaseRepo.count({
-			where: {
-				...this.buildDateFilter({ startDate, endDate }),
-				isImportedFromReport: true,
-			},
+			where,
 		});
 	}
 
-	async getTracksCount(filter: BaseQueryStatisticsDto) {
+	async getTracksCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const where: any = {
+			...this.buildDateFilter({ startDate, endDate }),
+		};
+		if (tenantId) {
+			where.release = { tenantId };
+		}
+
 		return await this.trackRepo.count({
-			where: this.buildDateFilter({ startDate, endDate }),
+			where,
 		});
 	}
 
-	async getTracksImportCount(filter: BaseQueryStatisticsDto) {
+	async getTracksImportCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const where: any = {
+			...this.buildDateFilter({ startDate, endDate }),
+			isImportedFromReport: true,
+		};
+		if (tenantId) {
+			where.release = { tenantId };
+		}
+
 		return await this.trackRepo.count({
-			where: {
-				...this.buildDateFilter({ startDate, endDate }),
-				isImportedFromReport: true,
-			},
+			where,
 		});
 	}
 
-	async getLabelsCount(filter: BaseQueryStatisticsDto) {
+	async getLabelsCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const where: any = {
+			...this.buildDateFilter({ startDate, endDate }),
+		};
+		if (tenantId) {
+			where.tenantId = tenantId;
+		}
+
 		return await this.labelRepo.count({
-			where: this.buildDateFilter({ startDate, endDate }),
+			where,
 		});
 	}
 
-	async getArtistsCount(filter: BaseQueryStatisticsDto) {
+	async getArtistsCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
-		return await this.artistsRepo.count({
-			where: this.buildDateFilter({ startDate, endDate }),
-		});
+
+		const qb = this.artistsRepo.createQueryBuilder('artist');
+
+		if (startDate && endDate) {
+			const { startOfDay, endOfDay } = this.normalizeDateRangeToFullDays({
+				startDate,
+				endDate,
+			});
+			qb.where('artist.createdAt BETWEEN :startOfDay AND :endOfDay', {
+				startOfDay,
+				endOfDay,
+			});
+		}
+
+		if (tenantId) {
+			qb.innerJoin('artist.releaseArtists', 'releaseArtist')
+				.innerJoin('releaseArtist.release', 'release')
+				.andWhere('release.tenantId = :tenantId', { tenantId });
+		}
+
+		return await qb.getCount();
 	}
 
 	async getRevenueDspTimeline(
 		filter: QueryGetStreamCountByCountryDto,
+		tenantId?: string,
 	): Promise<IRevenueDspTimeline[]> {
 		const { startDate, endDate, typeGroup } = filter;
 		if (!startDate || !endDate)
@@ -182,7 +242,7 @@ export class StatisticsService {
 		const formatMap = { day: 'YYYY-MM-DD', month: 'YYYY-MM', year: 'YYYY' };
 		const dateFormat = formatMap[typeGroup] || 'YYYY-MM';
 
-		const detailData = await this.trackRevenueRepo
+		const detailData = this.trackRevenueRepo
 			.createQueryBuilder('tr')
 			.leftJoin('tr.dsp', 'dsp')
 			.select(`TO_CHAR(tr.reportDate, '${dateFormat}')`, 'date')
@@ -193,7 +253,16 @@ export class StatisticsService {
 			.where('tr.reportDate BETWEEN :startDate AND :endDate', {
 				startDate,
 				endDate,
-			})
+			});
+
+		if (tenantId) {
+			detailData
+				.innerJoin('tr.track', 'track')
+				.innerJoin('track.release', 'release')
+				.andWhere('release.tenantId = :tenantId', { tenantId });
+		}
+
+		const detailDataRows = await detailData
 			.groupBy('date')
 			.addGroupBy('tr.dspId')
 			.addGroupBy('dsp.name')
@@ -212,7 +281,7 @@ export class StatisticsService {
 		>();
 		const detailMap = new Map<string, IRevenueDspDetail[]>();
 
-		for (const d of detailData) {
+		for (const d of detailDataRows) {
 			const key = d.date;
 			if (!detailMap.has(key)) detailMap.set(key, []);
 			detailMap.get(key)!.push({
@@ -272,9 +341,26 @@ export class StatisticsService {
 		startDate: Date;
 		endDate: Date;
 	}) {
-		return startDate && endDate
-			? { createdAt: Between(startDate, endDate) }
-			: {};
+		if (!startDate || !endDate) return {};
+
+		const { startOfDay, endOfDay } = this.normalizeDateRangeToFullDays({
+			startDate,
+			endDate,
+		});
+		return { createdAt: Between(startOfDay, endOfDay) };
+	}
+
+	private normalizeDateRangeToFullDays({
+		startDate,
+		endDate,
+	}: {
+		startDate: Date;
+		endDate: Date;
+	}) {
+		return {
+			startOfDay: dayjs(startDate).startOf('day').toDate(),
+			endOfDay: dayjs(endDate).endOf('day').toDate(),
+		};
 	}
 
 	// private method --version 2
