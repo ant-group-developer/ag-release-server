@@ -4,6 +4,7 @@ export class ReleaseExecutionResultDto {
 	id?: string;
 	dspId?: string;
 	dspCode: string;
+	dspCodeCi?: string | null;
 	status?: ReleaseDspStatus;
 }
 
