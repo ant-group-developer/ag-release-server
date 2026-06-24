@@ -267,18 +267,43 @@ export class IsrcResolverService {
   /**
    * Lấy thông tin logo/ảnh đại diện cho danh sách labelIds từ PostgreSQL
    */
-  async getLabelMetadata(labelIds: string[]): Promise<Map<string, { name: string; picture: string | null }>> {
+  async getLabelMetadata(labelIds: string[]): Promise<Map<string, {
+    name: string;
+    picture: string | null;
+    tenant: { id: string; name: string; title: string; logo: string | null } | null;
+  }>> {
     if (!labelIds.length) return new Map();
     const labels = await this.labelRepo.find({
       where: { id: In(labelIds) },
-      select: ['id', 'name', 'picture'],
+      relations: ['tenant'],
+      select: {
+        id: true,
+        name: true,
+        picture: true,
+        tenant: {
+          id: true,
+          name: true,
+          title: true,
+          logo: true,
+        },
+      },
     });
 
-    const map = new Map<string, { name: string; picture: string | null }>();
+    const map = new Map<string, {
+      name: string;
+      picture: string | null;
+      tenant: { id: string; name: string; title: string; logo: string | null } | null;
+    }>();
     for (const l of labels) {
       map.set(l.id, {
         name: l.name,
         picture: l.picture, // Tự động định dạng URL qua MediaUrlTransformer
+        tenant: l.tenant ? {
+          id: l.tenant.id,
+          name: l.tenant.name,
+          title: l.tenant.title,
+          logo: l.tenant.logo || null,
+        } : null,
       });
     }
     return map;

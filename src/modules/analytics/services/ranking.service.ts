@@ -448,6 +448,7 @@ export class RankingService {
         releaseCount: Number(l.releaseCount),
         trackCount: Number(l.trackCount),
         totalViews: Number(l.totalViews),
+        tenant: meta?.tenant ?? null,
       };
     });
 

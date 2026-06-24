@@ -11,6 +11,7 @@ import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { BucketModule2 } from 'src/modules/bucket2/bucket2.module';
 import { ImportJobsModule } from 'src/modules/etl/import-jobs.module';
+import { TenantModule } from 'src/modules/tenant/tenant.module';
 
 // Controllers
 import { TimelineAnalyticsController } from './controllers/global-timeline-analytics.controller';
@@ -21,6 +22,7 @@ import { TrackAnalyticsController } from './controllers/track-analytics.controll
 import { ArtistAnalyticsController } from './controllers/artist-analytics.controller';
 import { DashboardAnalyticsController } from './controllers/dashboard-analytics.controller';
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
+import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
 
 // Services
 import { IsrcResolverService } from './services/isrc-resolver.service';
@@ -36,6 +38,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
   imports: [
     BucketModule2,
     ImportJobsModule,
+    TenantModule,
     TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp, Tenant]),
   ],
   controllers: [
@@ -47,6 +50,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
     ArtistAnalyticsController,
     DashboardAnalyticsController,
     AnalyticsReportExportController,
+    TenantAnalyticsController,
   ],
   providers: [
     EntityAnalyticsService,
