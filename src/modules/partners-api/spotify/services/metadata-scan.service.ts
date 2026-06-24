@@ -1253,8 +1253,31 @@ export class MetadataScanService implements OnModuleInit {
 		params.limit = pageSize;
 		params.offset = offset;
 
-		const items = await this.clickHouseService.query(itemsQuery, params);
-		return { items, totalItems };
+		const items = await this.clickHouseService.query<any>(itemsQuery, params);
+		const mappedItems = items.map((row) => ({
+			id: row.id,
+			scanId: row.scan_id,
+			entityType: row.entity_type,
+			entityId: row.entity_id,
+			releaseId: row.release_id,
+			isrc: row.isrc,
+			upc: row.upc,
+			fieldName: row.field_name,
+			oldValue: row.old_value,
+			newValue: row.new_value,
+			changeType: row.change_type,
+			enrichmentSource: row.enrichment_source,
+			apiTrackId: row.api_track_id,
+			apiAlbumId: row.api_album_id,
+			apiArtistId: row.api_artist_id,
+			status: row.status,
+			errorMessage: row.error_message,
+			isDryRun: !!row.is_dry_run,
+			createdAt: row.created_at,
+			createdBy: row.created_by,
+		}));
+
+		return { items: mappedItems, totalItems };
 	}
 
 	/**

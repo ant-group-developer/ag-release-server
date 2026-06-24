@@ -49,10 +49,18 @@ class ExportJobCancelledError extends Error {
 @Injectable()
 export class AnalyticsReportExportService {
   private readonly logger = new Logger(AnalyticsReportExportService.name);
-  private readonly batchSize = 10_000;
+  private readonly batchSize = 100_000;
   private readonly exportRetentionDays = 7;
   private readonly cleanupBatchSize = 100;
   private readonly cancelledExportJobs = new Set<string>();
+
+  private activeJobsCount = 0;
+  private readonly maxConcurrentJobs = 2;
+  private readonly jobQueue: Array<{
+    jobId: string;
+    tenantId: string;
+    dto: AnalyticsReportExportDto;
+  }> = [];
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -61,6 +69,31 @@ export class AnalyticsReportExportService {
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
   ) {}
+
+  private enqueueJob(jobId: string, tenantId: string, dto: AnalyticsReportExportDto) {
+    this.jobQueue.push({ jobId, tenantId, dto });
+    this.processNextJob();
+  }
+
+  private processNextJob() {
+    if (this.activeJobsCount >= this.maxConcurrentJobs) {
+      return;
+    }
+    const next = this.jobQueue.shift();
+    if (!next) {
+      return;
+    }
+
+    this.activeJobsCount++;
+    setImmediate(async () => {
+      try {
+        await this.runExportJob(next.jobId, next.tenantId, next.dto);
+      } finally {
+        this.activeJobsCount--;
+        this.processNextJob();
+      }
+    });
+  }
 
   async createExportJob(
     tenantId: string,
@@ -80,9 +113,7 @@ export class AnalyticsReportExportService {
 
     await this.importJobsService.markQueued(job.id);
 
-    setImmediate(() => {
-      void this.runExportJob(job.id, tenantId, dto);
-    });
+    this.enqueueJob(job.id, tenantId, dto);
 
     return {
       jobId: job.id,
@@ -323,6 +354,10 @@ export class AnalyticsReportExportService {
       await this.throwIfExportJobCancelled(jobId);
 
       const allDetails: DetailRow[] = [];
+      const trackMetaCache = new Map<string, MetadataRow>();
+      const releaseMetaCache = new Map<string, MetadataRow>();
+      const tenantNamesCache = new Map<string, string>();
+      const stringPool = new Map<string, string>();
       let offset = 0;
       while (true) {
         await this.throwIfExportJobCancelled(jobId);
@@ -330,7 +365,13 @@ export class AnalyticsReportExportService {
           tenantId, dto, range, trackIsrc, this.batchSize, offset,
         );
         if (!rawRows.length) break;
-        const enriched = await this.enrichDetails(rawRows);
+        const enriched = await this.enrichDetails(
+          rawRows,
+          trackMetaCache,
+          releaseMetaCache,
+          tenantNamesCache,
+          stringPool,
+        );
         allDetails.push(...enriched);
         await onProgress?.(
           {
@@ -343,6 +384,12 @@ export class AnalyticsReportExportService {
         if (rawRows.length < this.batchSize) break;
         offset += this.batchSize;
       }
+
+      // Free up cache memory as it is no longer needed
+      trackMetaCache.clear();
+      releaseMetaCache.clear();
+      tenantNamesCache.clear();
+      stringPool.clear();
 
       // Step 2: Group data into nested folders
       await onProgress?.(
@@ -845,7 +892,13 @@ export class AnalyticsReportExportService {
     return this.clickHouseService.query<RawDetailRow>(query, params);
   }
 
-  private async enrichDetails(rows: RawDetailRow[]): Promise<DetailRow[]> {
+  private async enrichDetails(
+    rows: RawDetailRow[],
+    trackMetaCache: Map<string, MetadataRow>,
+    releaseMetaCache: Map<string, MetadataRow>,
+    tenantNamesCache: Map<string, string>,
+    stringPool: Map<string, string>,
+  ): Promise<DetailRow[]> {
     if (!rows.length) return [];
 
     const isrcs = Array.from(
@@ -860,40 +913,71 @@ export class AnalyticsReportExportService {
       ),
     );
 
-    const [trackMeta, releaseMeta] = await Promise.all([
-      this.getTrackMetadata(isrcs),
-      this.getReleaseMetadataByUpc(albumUpcs),
-    ]);
-    const tenantNames = await this.getTenantNames(
-      Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean))),
-    );
+    // 1. Fetch missing track metadata
+    const missingIsrcs = isrcs.filter((isrc) => !trackMetaCache.has(isrc));
+    if (missingIsrcs.length > 0) {
+      const newTrackMeta = await this.getTrackMetadata(missingIsrcs);
+      for (const [isrc, meta] of newTrackMeta) {
+        trackMetaCache.set(isrc, meta);
+      }
+    }
+
+    // 2. Fetch missing release metadata
+    const missingUpcs = albumUpcs.filter((upc) => !releaseMetaCache.has(upc));
+    if (missingUpcs.length > 0) {
+      const newReleaseMeta = await this.getReleaseMetadataByUpc(missingUpcs);
+      for (const [upc, meta] of newReleaseMeta) {
+        releaseMetaCache.set(upc, meta);
+      }
+    }
+
+    // 3. Fetch missing tenant names
+    const tenantIds = Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean)));
+    const missingTenantIds = tenantIds.filter((id) => !tenantNamesCache.has(id));
+    if (missingTenantIds.length > 0) {
+      const newTenantNames = await this.getTenantNames(missingTenantIds);
+      for (const [id, name] of newTenantNames) {
+        tenantNamesCache.set(id, name);
+      }
+    }
+
+    const getSharedString = (val: string | null | undefined): string => {
+      if (val == null) return '';
+      let cached = stringPool.get(val);
+      if (!cached) {
+        stringPool.set(val, val);
+        cached = val;
+      }
+      return cached;
+    };
 
     return rows.map((row) => {
       const meta = row.isrc.startsWith('UPC-')
-        ? releaseMeta.get(row.isrc.substring(4))
-        : trackMeta.get(row.isrc);
+        ? releaseMetaCache.get(row.isrc.substring(4))
+        : trackMetaCache.get(row.isrc);
       const upc = meta?.release_upc || row.fallback_upc || '';
 
       return {
-        date: row.date,
-        startDate: row.start_date,
-        endDate: row.end_date,
-        tenant:
+        date: getSharedString(row.date),
+        startDate: getSharedString(row.start_date),
+        endDate: getSharedString(row.end_date),
+        tenant: getSharedString(
           meta?.workspace_name ||
-          tenantNames.get(row.tenant_id) ||
+          tenantNamesCache.get(row.tenant_id) ||
           row.tenant_id ||
-          '',
-        dspName: row.dsp_name || row.dsp_id,
-        upc: isValidStandardUpc(upc) ? upc : '',
-        isrc: this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc,
-        releaseName: meta?.release_title || row.fallback_album_title || '',
-        trackName: meta?.track_title || row.fallback_track_title || '',
-        artistName: meta?.artist_names || row.fallback_artist_name || '',
-        labelName: meta?.label_name || row.fallback_label_name || '',
-        territory: row.territory,
+          ''
+        ),
+        dspName: getSharedString(row.dsp_name || row.dsp_id),
+        upc: getSharedString(isValidStandardUpc(upc) ? upc : ''),
+        isrc: getSharedString(this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc),
+        releaseName: getSharedString(meta?.release_title || row.fallback_album_title || ''),
+        trackName: getSharedString(meta?.track_title || row.fallback_track_title || ''),
+        artistName: getSharedString(meta?.artist_names || row.fallback_artist_name || ''),
+        labelName: getSharedString(meta?.label_name || row.fallback_label_name || ''),
+        territory: getSharedString(row.territory),
         totalUsage: Number(row.total_usage ?? 0),
-        revenueUsd: row.revenue_usd?.toString() ?? '0',
-        currency: 'USD',
+        revenueUsd: getSharedString(row.revenue_usd?.toString() ?? '0'),
+        currency: getSharedString('USD'),
       };
     });
   }
