@@ -11,6 +11,7 @@ interface DspSyncRow {
   dsp_name: string;
   dsp_ci_code: string;
   picture: string;
+  type: string;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,7 @@ export class DspSeedingService {
       dsp_name: dsp.name ?? '',
       dsp_ci_code: dsp.codeCi ?? '',
       picture: dsp.picture ?? '',
+      type: dsp.type ?? 'audio',
       created_at: now,
       updated_at: now,
     }));

@@ -3,6 +3,13 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { v4 as uuidv4 } from 'uuid';
 import { DspMappingService } from 'src/modules/dsp/services/dsp-mapping.service';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, In } from 'typeorm';
+import { ReportEntityExtractorService, ExtractedRow } from 'src/modules/release/services/report-entity-extractor.service';
+import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
+import { Release } from 'src/modules/release/entities/release.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 
 export interface DspsReportResponse {
   idDspsReport: string;
@@ -53,6 +60,9 @@ export class DspReportService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly dspMappingService: DspMappingService,
+    @InjectEntityManager()
+    private readonly entityManager: EntityManager,
+    private readonly reportEntityExtractorService: ReportEntityExtractorService,
   ) {}
 
   /**
@@ -247,6 +257,121 @@ export class DspReportService {
       { pgUuid, id: idDspsReport }
     );
     this.logger.log(`Assigned dsps_report ${idDspsReport} → pg_uuid ${pgUuid}`);
+    await this.dspMappingService.loadCache();
+
+    // Sync metadata from Clickhouse raw tables to PostgreSQL
+    try {
+      const dsp = await this.entityManager.findOne(Dsp, { where: { id: pgUuid } });
+      const dspType = dsp?.type || 'audio';
+
+      this.logger.log(`Scanning raw metadata from ClickHouse for dsp_id ${idDspsReport} (DSP type: ${dspType})...`);
+
+      const rawMetadataRows = await this.clickHouseService.query<ExtractedRow>(
+        `
+          SELECT
+            isrc,
+            upc,
+            argMax(track_title, score) AS track_title,
+            argMax(artist_name, score) AS artist_name,
+            argMax(album_title, score) AS album_title,
+            argMax(label_name, score) AS label_name
+          FROM (
+            SELECT
+              trimBoth(toString(isrc)) AS isrc,
+              trimBoth(toString(upc)) AS upc,
+              trimBoth(toString(track_title)) AS track_title,
+              trimBoth(toString(artist_name)) AS artist_name,
+              trimBoth(toString(album_title)) AS album_title,
+              trimBoth(toString(label_name)) AS label_name,
+              if(track_title != '' AND track_title != 'N/A', 1, 0)
+                + if(artist_name != '' AND artist_name != 'N/A', 1, 0)
+                + if(album_title != '' AND album_title != 'N/A', 1, 0)
+                + if(label_name != '' AND label_name != 'N/A', 1, 0) AS score
+            FROM music_analytics.fact_sales_report
+            WHERE dsp_id = {dspId: String}
+              AND (trimBoth(toString(isrc)) != '' OR trimBoth(toString(upc)) != '')
+
+            UNION ALL
+
+            SELECT
+              trimBoth(toString(isrc)) AS isrc,
+              trimBoth(toString(upc)) AS upc,
+              trimBoth(toString(track_title)) AS track_title,
+              trimBoth(toString(artist_name)) AS artist_name,
+              trimBoth(toString(album_title)) AS album_title,
+              trimBoth(toString(label_name)) AS label_name,
+              if(track_title != '' AND track_title != 'N/A', 1, 0)
+                + if(artist_name != '' AND artist_name != 'N/A', 1, 0)
+                + if(album_title != '' AND album_title != 'N/A', 1, 0)
+                + if(label_name != '' AND label_name != 'N/A', 1, 0) AS score
+            FROM music_analytics.fact_dsp_comprehensive_report
+            WHERE dsp_id = {dspId: String}
+              AND (trimBoth(toString(isrc)) != '' OR trimBoth(toString(upc)) != '')
+          )
+          GROUP BY upc, isrc
+        `,
+        { dspId: idDspsReport }
+      );
+
+      if (rawMetadataRows.length > 0) {
+        const upcs = rawMetadataRows.map((r) => r.upc).filter(Boolean);
+        const isrcs = rawMetadataRows.map((r) => r.isrc).filter(Boolean);
+
+        let existingUpcs = new Set<string>();
+        let existingIsrcs = new Set<string>();
+
+        if (upcs.length > 0) {
+          const existingReleases = await this.entityManager.find(Release, {
+            where: { upc: In(upcs) },
+            select: ['upc'],
+          });
+          existingUpcs = new Set(existingReleases.map((r) => r.upc).filter((upc): upc is string => !!upc));
+        }
+
+        if (isrcs.length > 0) {
+          if (dspType === 'video') {
+            const existingVideos = await this.entityManager.find(Video, {
+              where: { isrc: In(isrcs) },
+              select: ['isrc'],
+            });
+            existingIsrcs = new Set(existingVideos.map((v) => v.isrc).filter((isrc): isrc is string => !!isrc));
+          } else {
+            const existingTracks = await this.entityManager.find(Track, {
+              where: { isrc: In(isrcs) },
+              select: ['isrc'],
+            });
+            existingIsrcs = new Set(existingTracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc));
+          }
+        }
+
+        const filteredRows = rawMetadataRows.filter(
+          (row) =>
+            (row.upc && !existingUpcs.has(row.upc)) ||
+            (row.isrc && !existingIsrcs.has(row.isrc)),
+        );
+
+        if (filteredRows.length > 0) {
+          this.logger.log(
+            `Found ${filteredRows.length} new metadata rows to import for dsp_id ${idDspsReport} (DSP type: ${dspType})`,
+          );
+          await this.reportEntityExtractorService.extractAndImport(
+            filteredRows,
+            undefined,
+            undefined,
+            undefined,
+            {
+              sourceType: 'dsp_assignment_sync',
+              jobId: idDspsReport,
+              dspType,
+            },
+          );
+        } else {
+          this.logger.log(`No new metadata to import for dsp_id ${idDspsReport}`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to sync metadata after assigning dsp_report: ${err.message}`, err.stack);
+    }
   }
 
   /**

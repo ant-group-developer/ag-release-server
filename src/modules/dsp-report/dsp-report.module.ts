@@ -4,9 +4,10 @@ import { DspReportService } from './services/dsp-report.service';
 import { FtpExcludePatternController } from './controllers/ftp-exclude-pattern.controller';
 import { ExcludePatternService } from './services/ftp-exclude-pattern.service';
 import { DspModule } from '../dsp/dsp.module';
+import { ReleaseModule } from '../release/release.module';
 
 @Module({
-  imports: [DspModule],
+  imports: [DspModule, ReleaseModule],
   controllers: [DspReportController, FtpExcludePatternController],
   providers: [DspReportService, ExcludePatternService],
   exports: [DspReportService, ExcludePatternService],

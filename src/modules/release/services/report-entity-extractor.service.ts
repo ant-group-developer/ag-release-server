@@ -38,6 +38,7 @@ export interface ReportEntityImportContext {
   parserCode?: string;
   fileName?: string;
   jobId?: string;
+  dspType?: 'audio' | 'video';
 }
 
 @Injectable()
@@ -223,8 +224,10 @@ export class ReportEntityExtractorService {
 
     for (const input of inputs) {
       try {
-        // Import release and real tracks into PostgreSQL
-        const release = await this.releaseReportImportService.importRelease(input);
+        // Import release and real tracks/videos into PostgreSQL
+        const release = context?.dspType === 'video'
+          ? await this.releaseReportImportService.importVideoRelease(input)
+          : await this.releaseReportImportService.importRelease(input);
 
         // Directly insert temporary UPC- ISRCs into pg_tracks_sync ClickHouse table
         if (input.upcTracks && input.upcTracks.length > 0) {
@@ -246,11 +249,12 @@ export class ReportEntityExtractorService {
             release_upc: release.upc || '',
             label_id: release.labelId || '',
             artist_ids: artistIds,
+            release_type: context?.dspType || 'audio',
             is_deleted: 0,
             updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
           }));
 
-          this.logger.log(`Inserting ${chData.length} temporary UPC track(s) directly into pg_tracks_sync for release ${release.id}`);
+          this.logger.log(`Inserting ${chData.length} temporary UPC track/video(s) directly into pg_tracks_sync for release ${release.id}`);
           await this.clickHouseService.insert(
             CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
             chData,

@@ -559,6 +559,36 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
 
         for (let index = 0; index < importedCheckpoints.length; index += 1) {
           const checkpoint = importedCheckpoints[index];
+
+          // Fetch dsp_id from Clickhouse fact table
+          const dspIdRows = await this.clickHouseService.query<{ dsp_id: string }>(
+            `SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable}
+             WHERE source_file_name = {filename: String} AND import_source = {source: String} LIMIT 1`,
+            { filename: checkpoint.sourceFileName, source: checkpoint.importSource }
+          );
+          const dspId = dspIdRows[0]?.dsp_id;
+
+          let pgUuid: string | null = null;
+          let dspType: 'audio' | 'video' = 'audio';
+
+          if (dspId) {
+            const dspsReport = await this.dspMappingService.getDspsReportById(dspId);
+            if (dspsReport && dspsReport.pg_uuid) {
+              pgUuid = dspsReport.pg_uuid;
+              const pgDsp = await this.dspMappingService.getPgDspsSyncByUuid(pgUuid);
+              if (pgDsp) {
+                dspType = (pgDsp.type as 'audio' | 'video') || 'audio';
+              }
+            }
+          }
+
+          if (!pgUuid) {
+            this.logger.log(
+              `Skipping metadata import for checkpoint ${checkpoint.sourceFileName} as it has no assigned Postgres DSP (pg_uuid is empty). Status is kept as Pending.`
+            );
+            continue;
+          }
+
           const rowsToImport = await this.loadMetadataRowsFromClickHouse([
             checkpoint,
           ]);
@@ -580,6 +610,7 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
               parserCode: checkpoint.parserCode,
               fileName: checkpoint.sourceFileName,
               jobId,
+              dspType,
             },
           ).catch((err) => {
             this.logger.error(`Failed to extract/import entities to PostgreSQL for ${checkpoint.sourceFileName}: ${err.message}`);

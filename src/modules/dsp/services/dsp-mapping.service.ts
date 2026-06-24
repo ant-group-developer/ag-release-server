@@ -167,7 +167,7 @@ export class DspMappingService implements OnModuleInit {
    */
   async getPgDspsSyncByUuid(pgUuid: string): Promise<Record<string, unknown> | null> {
     const rows = await this.clickHouseService.query(
-      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
+      `SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, type, created_at, updated_at
        FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
        WHERE pg_uuid = {uuid: String}`,
       { uuid: pgUuid }
