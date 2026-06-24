@@ -525,9 +525,11 @@ export class ReleaseService {
 			throw new ResponseError({ message: 'Release chưa có UPC' });
 		}
 
-		const releaseFormat = await this.ciReleaseService.getReleaseFormatOne({
-			gtin: release.upc,
-		});
+		const releaseFormat = await this.ciReleaseService.getReleaseFormatOneV2(
+			{
+				gtin: release.upc,
+			},
+		);
 
 		const releaseFormatId = releaseFormat?.id;
 		if (!releaseFormatId) {
@@ -542,7 +544,7 @@ export class ReleaseService {
 
 	async getQaFlagCi(id: string) {
 		const releaseFormatsId = await this.getReleaseFormatId(id);
-		const res2 = await this.ciReleaseService.getQaFlags({
+		const res2 = await this.ciReleaseService.getQaFlagsV2({
 			releaseFormatsId,
 		});
 		return res2._embedded;
@@ -583,6 +585,7 @@ export class ReleaseService {
 				id: delivery.id,
 				dspId: delivery.dspId,
 				dspCode: delivery.dsp.code,
+				dspCodeCi: delivery.dsp.codeCi,
 				status: this.mapCiDspStatusToReleaseDspStatus(ciStatus),
 			});
 		}
