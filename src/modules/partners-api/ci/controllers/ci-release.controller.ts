@@ -23,12 +23,22 @@ export class CiReleaseController {
 
 	@Get('releaseformats')
 	async getReleaseFormats(@Query() query: GetCiReleaseFormatsDto) {
-		return this.ciReleaseService.getReleaseFormats(query);
+		return this.ciReleaseService.getReleaseFormatsV1(query);
 	}
 
 	@Get('releaseformats/one')
 	async getReleaseFormatOne(@Query() query: GetCiReleaseFormatsDto) {
-		return this.ciReleaseService.getReleaseFormatOne(query);
+		return this.ciReleaseService.getReleaseFormatOneV1(query);
+	}
+
+	@Get('releaseformats-v2')
+	async getReleaseFormatsV2(@Query() query: GetCiReleaseFormatsDto) {
+		return this.ciReleaseService.getReleaseFormatsV2(query);
+	}
+
+	@Get('releaseformats-v2/one')
+	async getReleaseFormatOneV2(@Query() query: GetCiReleaseFormatsDto) {
+		return this.ciReleaseService.getReleaseFormatOneV2(query);
 	}
 
 	@Get('releaseformats/:releaseFormatsId/qaflags')
@@ -36,7 +46,7 @@ export class CiReleaseController {
 		@Param('releaseFormatsId') releaseFormatsId: string,
 		@Query() query: Omit<GetCiQaFlagsDto, 'releaseFormatsId'>,
 	) {
-		return this.ciReleaseService.getQaFlags({
+		return this.ciReleaseService.getQaFlagsV1({
 			...query,
 			releaseFormatsId,
 		});
