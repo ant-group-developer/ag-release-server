@@ -24,6 +24,14 @@ export interface ImportResult {
     rows: number;
     durationMs: number;
     fileNames: string[];
+    releases?: {
+      totalReleases: number;
+      created: number;
+      skipped: number;
+      errors: number;
+      inDb: number;
+      pending: number;
+    } | null;
   }>;
   errors: string[];
 }
@@ -177,6 +185,8 @@ export class ImportService {
       }
     }
 
+    const entityResult = { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
+
     if (allRows.length > 0) {
       try {
         await this.clickHouseService.insertBatched(
@@ -186,7 +196,7 @@ export class ImportService {
         );
         // Trích xuất metadata và import release/track sang PostgreSQL
         for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
-          await this.reportEntityExtractorService.extractAndImport(
+          const res = await this.reportEntityExtractorService.extractAndImport(
             rows,
             undefined,
             undefined,
@@ -199,14 +209,24 @@ export class ImportService {
             },
           ).catch((err) => {
             this.logger.error(`Failed to extract/import entities from comprehensive report ${sourceFileName}: ${err.message}`);
+            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
           });
+
+          if (res) {
+            entityResult.totalReleases += res.totalReleases;
+            entityResult.created += res.created;
+            entityResult.skipped += res.skipped;
+            entityResult.errors += res.errors;
+            entityResult.inDb += res.inDb;
+            entityResult.pending += res.pending;
+          }
         }
       } catch (err) {
         this.logger.error(`Bulk insert failed for ${folderName}: ${err.message}`);
       }
     }
 
-    return this.buildResult(folderName, files, allRows.length, startTime);
+    return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
   }
 
   private groupRowsBySourceFile<T extends { source_file_name?: string }>(
@@ -264,6 +284,8 @@ export class ImportService {
       }
     }
 
+    const entityResult = { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
+
     if (allRows.length > 0) {
       try {
         await this.clickHouseService.insertBatched(
@@ -273,7 +295,7 @@ export class ImportService {
         );
         // Trích xuất metadata và import release/track sang PostgreSQL
         for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
-          await this.reportEntityExtractorService.extractAndImport(
+          const res = await this.reportEntityExtractorService.extractAndImport(
             rows,
             undefined,
             undefined,
@@ -286,14 +308,24 @@ export class ImportService {
             },
           ).catch((err) => {
             this.logger.error(`Failed to extract/import entities from sales report ${sourceFileName}: ${err.message}`);
+            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
           });
+
+          if (res) {
+            entityResult.totalReleases += res.totalReleases;
+            entityResult.created += res.created;
+            entityResult.skipped += res.skipped;
+            entityResult.errors += res.errors;
+            entityResult.inDb += res.inDb;
+            entityResult.pending += res.pending;
+          }
         }
       } catch (err) {
         this.logger.error(`Sales bulk insert failed for ${folderName}: ${err.message}`);
       }
     }
 
-    return this.buildResult(folderName, files, allRows.length, startTime);
+    return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
   }
 
   /**
@@ -361,6 +393,14 @@ export class ImportService {
     files: string[],
     totalRows: number,
     startTime: number,
+    entityResult?: {
+      totalReleases: number;
+      created: number;
+      skipped: number;
+      errors: number;
+      inDb: number;
+      pending: number;
+    },
   ): ImportResult['dspResults'][0] {
     const duration = Date.now() - startTime;
     this.logger.log(`${folderName}: ${totalRows} rows from ${files.length} files in ${duration}ms`);
@@ -372,6 +412,16 @@ export class ImportService {
       rows: totalRows,
       durationMs: duration,
       fileNames: files.map((f) => path.basename(f)),
+      releases: entityResult
+        ? {
+            totalReleases: entityResult.totalReleases,
+            created: entityResult.created,
+            skipped: entityResult.skipped,
+            errors: entityResult.errors,
+            inDb: entityResult.inDb,
+            pending: entityResult.pending,
+          }
+        : null,
     };
   }
 

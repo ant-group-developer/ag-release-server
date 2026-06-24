@@ -538,6 +538,15 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
       const importedCheckpoints = this.getImportedFileCheckpoints(state);
 
       // 3. Extract and import entities into PostgreSQL
+      const entityResult = {
+        totalReleases: 0,
+        created: 0,
+        skipped: 0,
+        errors: 0,
+        inDb: 0,
+        pending: 0,
+      };
+
       const totalMetadataRows = importedCheckpoints.reduce(
         (sum, checkpoint) => sum + checkpoint.rows,
         0,
@@ -552,13 +561,6 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
           progressTotal: importedCheckpoints.length,
           progressLabel: `Importing metadata to PostgreSQL`,
         }, true);
-
-        const entityResult = {
-          totalReleases: 0,
-          created: 0,
-          skipped: 0,
-          errors: 0,
-        };
 
         for (let index = 0; index < importedCheckpoints.length; index += 1) {
           const checkpoint = importedCheckpoints[index];
@@ -585,11 +587,12 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
             }
           }
 
+          let dryRun = false;
           if (!pgUuid) {
             this.logger.log(
               `Skipping metadata import for checkpoint ${checkpoint.sourceFileName} as it has no assigned Postgres DSP (pg_uuid is empty). Status is kept as Pending.`
             );
-            continue;
+            dryRun = true;
           }
 
           const rowsToImport = await this.loadMetadataRowsFromClickHouse([
@@ -602,11 +605,13 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
             job.tenantId, // The default tenant ID chosen on pre-validate upload form
             labelId,
             async (progress) => {
-              await this.importJobsService.updateProgress(jobId, {
-                progressCurrent: progress.current,
-                progressTotal: progress.total,
-                progressLabel: progress.label,
-              }, true);
+              if (!dryRun) {
+                await this.importJobsService.updateProgress(jobId, {
+                  progressCurrent: progress.current,
+                  progressTotal: progress.total,
+                  progressLabel: progress.label,
+                }, true);
+              }
             },
             {
               sourceType: ImportJobSourceType.REPORT_UPLOAD,
@@ -614,16 +619,19 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
               fileName: checkpoint.sourceFileName,
               jobId,
               dspType,
+              dryRun,
             },
           ).catch((err) => {
             this.logger.error(`Failed to extract/import entities to PostgreSQL for ${checkpoint.sourceFileName}: ${err.message}`);
-            return { totalReleases: 0, created: 0, skipped: 0, errors: 1 };
+            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
           });
 
           entityResult.totalReleases += result.totalReleases;
           entityResult.created += result.created;
           entityResult.skipped += result.skipped;
           entityResult.errors += result.errors;
+          entityResult.inDb += result.inDb;
+          entityResult.pending += result.pending;
 
           await this.importJobsService.updateProgress(jobId, {
             progressLabel: `Importing metadata to PostgreSQL`,
@@ -632,7 +640,8 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
 
         this.logger.log(
           `Entity import completed: ${entityResult.created} created, ` +
-          `${entityResult.skipped} skipped, ${entityResult.errors} errors.`,
+          `${entityResult.skipped} skipped, ${entityResult.errors} errors, ` +
+          `${entityResult.inDb} inDb, ${entityResult.pending} pending.`,
         );
       }
 
@@ -676,6 +685,14 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
       await this.importJobsService.markCompleted(jobId, {
         totalProcessedRows,
         affectedPeriods: Array.from(affectedPeriods),
+        releases: {
+          total: entityResult.totalReleases,
+          imported: entityResult.created,
+          skipped: entityResult.skipped,
+          errors: entityResult.errors,
+          inDb: entityResult.inDb,
+          pending: entityResult.pending,
+        },
       });
 
       await this.cleanupR2Files(files);
