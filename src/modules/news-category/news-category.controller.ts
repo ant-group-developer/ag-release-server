@@ -41,6 +41,12 @@ export class NewsCategoryController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Get('tree')
+	async getTree() {
+		const result = await this.newsCategoryService.getTree();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get('simple')
 	async getListSimple() {
 		const result = await this.newsCategoryService.getListSimple();
