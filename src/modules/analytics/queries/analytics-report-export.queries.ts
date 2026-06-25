@@ -4,7 +4,6 @@ export function getRawDetailsPageQuery(
   resolvedDspName: string,
   commonJoinsSql: string,
   whereSql: string,
-  pagingSql: string,
 ): string {
   return `
     SELECT
@@ -30,7 +29,6 @@ export function getRawDetailsPageQuery(
     ${whereSql}
     GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory, isrc
     ORDER BY date ASC, dsp_name ASC, territory ASC, isrc ASC
-    ${pagingSql}
   `;
 }
 

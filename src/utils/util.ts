@@ -207,7 +207,7 @@ import archiver from 'archiver';
 export function zipFolder(sourceDir: string, zipPath: string): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const output = fs.createWriteStream(zipPath);
-		const archive = archiver('zip', { zlib: { level: 9 } });
+		const archive = archiver('zip', { zlib: { level: 6 } });
 
 		output.on('close', () => resolve());
 		archive.on('error', (err) => reject(err));

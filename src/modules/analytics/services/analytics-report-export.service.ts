@@ -59,19 +59,12 @@ class ExportJobCancelledError extends Error {
 @Injectable()
 export class AnalyticsReportExportService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsReportExportService.name);
-  private readonly batchSize = 100_000;
   private readonly exportRetentionDays = 7;
   private readonly cleanupBatchSize = 100;
   private readonly cancelledExportJobs = new Set<string>();
   private readonly maxConcurrentWorkers = 10;
   private isRunning = false;
-
-  // Global metadata cache shared across concurrent jobs (TTL 10 min)
-  private readonly METADATA_CACHE_TTL_MS = 10 * 60 * 1000;
-  private readonly globalTrackMeta = new Map<string, MetadataRow>();
-  private readonly globalReleaseMeta = new Map<string, MetadataRow>();
-  private readonly globalTenantNames = new Map<string, string>();
-  private globalCacheRefreshedAt = 0;
+  private readonly sanitizedNamesCache = new Map<string, string>();
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -123,12 +116,13 @@ export class AnalyticsReportExportService implements OnModuleInit {
     userId: string,
     dto: AnalyticsReportExportDto,
   ): Promise<AnalyticsReportExportJobResult> {
-    const tenantNamesMap = await this.getTenantNames([tenantId]);
-    const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
+    // KHÔNG query Postgres (getTenantNames) trên hot path của HTTP — chỉ tạo job
+    // + enqueue rồi return ngay. Tên workspace sẽ được resolve ở worker
+    // (runExportJob) và patch lại fileName. Giữ HTTP handler ở mức vài ms.
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
       params: dto as unknown as Record<string, unknown>,
-      fileName: this.buildFileName(tenantName, dto),
+      fileName: this.buildFileName('workspace', dto),
       progressTotal: 4,
       tenantId,
       createdBy: userId,
@@ -349,65 +343,89 @@ export class AnalyticsReportExportService implements OnModuleInit {
     const tenantNamesMap = await this.getTenantNames([tenantId]);
     const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
     const fileName = this.buildFileName(tenantName, dto);
+    // Hot path của createExportJob đã bỏ getTenantNames; resolve tên workspace ở
+    // đây (trong worker) rồi patch lại fileName để FE/SSE hiển thị đúng.
+    if (jobId) {
+      await this.importJobsService.updateFileName(jobId, fileName).catch(() => undefined);
+    }
     const tempDir = path.join(os.tmpdir(), `export-split-${uuidv4()}`);
     const zipPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
     const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
     const format = dto.format ?? 'csv';
     const groups = new Map<string, GroupState>();
+    const cache = {
+      trackMeta: new Map<string, MetadataRow>(),
+      releaseMeta: new Map<string, MetadataRow>(),
+      tenantNames: new Map<string, string>(),
+    };
 
     try {
       await fs.promises.mkdir(tempDir, { recursive: true });
 
-      // Step 1: Pre-fetch all metadata into global cache
+      // Step 1: Pre-fetch all metadata into job-local cache
       await onProgress?.({ progressCurrent: 1, progressLabel: 'Pre-fetching metadata' }, true);
       await this.throwIfExportJobCancelled(jobId);
-      await this.prefetchMetadata(tenantId, dto, range, trackIsrc);
+      await this.prefetchMetadata(tenantId, dto, range, trackIsrc, cache);
 
-      // Step 2: Stream batches → enrich → write directly to group files
+      // Step 2: Stream toàn bộ resultset 1-pass → enrich → write directly to group files
+      // (Trước đây dùng LIMIT/OFFSET pagination → ClickHouse phải join+group+sort lại
+      //  toàn bộ mỗi page = O(n²). Giờ ClickHouse làm 1 lần, Node đọc theo chunk.)
       await onProgress?.({ progressCurrent: 2, progressLabel: 'Streaming data' }, true);
       const stringPool = new Map<string, string>();
-      let offset = 0;
       let totalRows = 0;
+      let sinceYield = 0;
+      let sinceProgress = 0;
 
-      while (true) {
-        await this.throwIfExportJobCancelled(jobId);
-        const rawRows = await this.getRawDetailsPage(
-          tenantId, dto, range, trackIsrc, this.batchSize, offset,
-        );
-        if (!rawRows.length) break;
+      await this.streamRawDetails(
+        tenantId,
+        dto,
+        range,
+        trackIsrc,
+        async (rawRows) => {
+          for (const raw of rawRows) {
+            const detail = this.enrichSingleRow(raw, stringPool, cache);
+            const groupKeys = this.getRowGroupKeys(detail, dto);
 
-        for (const raw of rawRows) {
-          const detail = this.enrichSingleRow(raw, stringPool);
-          const groupKeys = this.getRowGroupKeys(detail, dto);
-
-          for (const gk of groupKeys) {
-            let group = groups.get(gk);
-            if (!group) {
-              const groupFolder = path.join(tempDir, gk);
-              await fs.promises.mkdir(groupFolder, { recursive: true });
-              group = {
-                writer: createStreamWriter(
-                  path.join(groupFolder, `detail.${format}`),
-                  format,
-                ),
-                summary: createEmptyAccumulator(),
-              };
-              groups.set(gk, group);
+            for (const gk of groupKeys) {
+              let group = groups.get(gk);
+              if (!group) {
+                const groupFolder = path.join(tempDir, gk);
+                await fs.promises.mkdir(groupFolder, { recursive: true });
+                group = {
+                  writer: createStreamWriter(
+                    path.join(groupFolder, `detail.${format}`),
+                    format,
+                  ),
+                  summary: createEmptyAccumulator(),
+                };
+                groups.set(gk, group);
+              }
+              group.writer.appendRow(detail as any);
+              updateAccumulator(group.summary, detail as any);
             }
-            group.writer.appendRow(detail as any);
-            updateAccumulator(group.summary, detail as any);
-          }
-          totalRows++;
-        }
+            totalRows++;
+            sinceYield++;
+            sinceProgress++;
 
-        await onProgress?.({
-          progressCurrent: 2,
-          progressLabel: `Streaming data (${totalRows} rows)`,
-          processedRows: totalRows,
-        }, false);
-        if (rawRows.length < this.batchSize) break;
-        offset += this.batchSize;
-      }
+            // Yield event loop thường xuyên để không block (kể cả khi còn in-process).
+            if (sinceYield >= 1000) {
+              sinceYield = 0;
+              await new Promise((resolve) => setImmediate(resolve));
+            }
+          }
+
+          await this.throwIfExportJobCancelled(jobId);
+          if (sinceProgress >= 50_000) {
+            sinceProgress = 0;
+            await onProgress?.({
+              progressCurrent: 2,
+              progressLabel: `Streaming data (${totalRows} rows)`,
+              processedRows: totalRows,
+            }, false);
+          }
+        },
+      );
+      // String pool chỉ hữu ích trong phạm vi 1 lần stream; clear sau khi xong.
       stringPool.clear();
 
       // Step 3: Flush writers, write summaries
@@ -439,6 +457,7 @@ export class AnalyticsReportExportService implements OnModuleInit {
         totalRows,
       };
     } finally {
+      this.sanitizedNamesCache.clear();
       for (const [, g] of groups) {
         await g.writer.flush().catch(() => {});
       }
@@ -556,14 +575,13 @@ export class AnalyticsReportExportService implements OnModuleInit {
     dto: AnalyticsReportExportDto,
     range: ReturnType<typeof this.getMonthRange>,
     trackIsrc: string | null,
+    cache: {
+      trackMeta: Map<string, MetadataRow>;
+      releaseMeta: Map<string, MetadataRow>;
+      tenantNames: Map<string, string>;
+    },
   ): Promise<void> {
-    const now = Date.now();
-    if (now - this.globalCacheRefreshedAt < this.METADATA_CACHE_TTL_MS) {
-      this.logger.log('Using active global metadata cache');
-      return; // Cache is still fresh
-    }
-
-    this.logger.log('Refreshing global metadata cache for unique identifiers...');
+    this.logger.log('Refreshing metadata cache for unique identifiers...');
     const filters = this.buildFilters(tenantId, dto, trackIsrc);
     const uniqueIdentifiersSql = getUniqueIdentifiersQuery(
       this.getCommonJoins(),
@@ -589,24 +607,20 @@ export class AnalyticsReportExportService implements OnModuleInit {
     this.logger.log(`Found ${isrcs.length} unique ISRCs and ${tenantIds.length} tenants`);
 
     const BATCH = 5000;
-    this.globalTrackMeta.clear();
-    this.globalReleaseMeta.clear();
-    this.globalTenantNames.clear();
-
     for (let i = 0; i < isrcs.length; i += BATCH) {
       const batchIsrcs = isrcs.slice(i, i + BATCH);
       const trackMap = await this.getTrackMetadata(batchIsrcs);
       
       const upcsToFetch = new Set<string>();
       for (const [isrc, track] of trackMap) {
-        this.globalTrackMeta.set(isrc, track);
+        cache.trackMeta.set(isrc, track);
         if (track.release_upc) upcsToFetch.add(track.release_upc);
       }
 
       if (upcsToFetch.size > 0) {
         const releaseMap = await this.getReleaseMetadataByUpc(Array.from(upcsToFetch));
         for (const [upc, release] of releaseMap) {
-          this.globalReleaseMeta.set(upc, release);
+          cache.releaseMeta.set(upc, release);
         }
       }
     }
@@ -614,16 +628,19 @@ export class AnalyticsReportExportService implements OnModuleInit {
     if (tenantIds.length > 0) {
       const tenantMap = await this.getTenantNames(tenantIds);
       for (const [tid, tname] of tenantMap) {
-        this.globalTenantNames.set(tid, tname);
+        cache.tenantNames.set(tid, tname);
       }
     }
-
-    this.globalCacheRefreshedAt = Date.now();
   }
 
   private enrichSingleRow(
     raw: RawDetailRow,
     stringPool: Map<string, string>,
+    cache: {
+      trackMeta: Map<string, MetadataRow>;
+      releaseMeta: Map<string, MetadataRow>;
+      tenantNames: Map<string, string>;
+    },
   ): DetailRow {
     const pool = (val: string | null | undefined): string | undefined => {
       if (!val) return undefined;
@@ -636,14 +653,14 @@ export class AnalyticsReportExportService implements OnModuleInit {
     };
 
     const isrc = raw.isrc;
-    const trackInfo = isrc ? this.globalTrackMeta.get(isrc) : null;
+    const trackInfo = isrc ? cache.trackMeta.get(isrc) : null;
     const isStandardUpc = isValidStandardUpc(raw.fallback_upc || '');
     const upcToLookup = isStandardUpc ? raw.fallback_upc : trackInfo?.release_upc;
-    const releaseInfo = upcToLookup ? this.globalReleaseMeta.get(upcToLookup) : null;
+    const releaseInfo = upcToLookup ? cache.releaseMeta.get(upcToLookup) : null;
 
     const baseInfo = trackInfo || releaseInfo;
     const finalTenantName = raw.tenant_id 
-      ? this.globalTenantNames.get(raw.tenant_id) 
+      ? cache.tenantNames.get(raw.tenant_id) 
       : baseInfo?.workspace_name;
 
     const artistNameRaw = pool(raw.fallback_artist_name || trackInfo?.artist_names || releaseInfo?.artist_names || '');
@@ -669,12 +686,18 @@ export class AnalyticsReportExportService implements OnModuleInit {
 
   /** Sanitize a string for use as a file/directory name. */
   private sanitizeFileName(name: string): string {
-    return name
+    let cached = this.sanitizedNamesCache.get(name);
+    if (cached !== undefined) return cached;
+
+    const sanitized = name
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
       .replace(/\s+/g, '_')
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '')
       .substring(0, 100) || 'unnamed';
+
+    this.sanitizedNamesCache.set(name, sanitized);
+    return sanitized;
   }
 
   private async runExportJob(
@@ -854,27 +877,24 @@ export class AnalyticsReportExportService implements OnModuleInit {
     `;
   }
 
-  private async getRawDetailsPage(
+  private async streamRawDetails(
     tenantId: string,
     dto: AnalyticsReportExportDto,
     _range: { startDate: string; endDate: string },
     trackIsrc: string | null,
-    limit: number,
-    offset: number,
-  ): Promise<RawDetailRow[]> {
+    onRows: (rows: RawDetailRow[]) => Promise<void>,
+  ): Promise<number> {
     const { params, whereSql } = this.buildFilters(tenantId, dto, trackIsrc);
     const resolvedDspName =
       "coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)";
-    const pagingSql = limit > 0 ? `LIMIT ${limit} OFFSET ${offset}` : '';
 
     const query = getRawDetailsPageQuery(
       resolvedDspName,
       this.getCommonJoins(),
       whereSql,
-      pagingSql,
     );
 
-    return this.clickHouseService.query<RawDetailRow>(query, params);
+    return this.clickHouseService.queryStream<RawDetailRow>(query, params, onRows);
   }
 
 
@@ -901,7 +921,7 @@ export class AnalyticsReportExportService implements OnModuleInit {
     if (!tenantIds.length) return map;
 
     const validUuidTenantIds = tenantIds.filter((id) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       if (!isUuid && id === 'system-tenant') {
         map.set(id, 'System Tenant');
       }

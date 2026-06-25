@@ -41,6 +41,49 @@ export class ClickHouseService implements OnModuleDestroy {
   }
 
   /**
+   * Execute a SELECT query and stream results in chunks.
+   *
+   * Khác với `query()` (gọi `result.json()` parse TOÀN BỘ resultset đồng bộ →
+   * block event loop khi resultset lớn), method này dùng `result.stream()` đọc
+   * theo từng chunk row. Callback `onRows` được gọi cho mỗi nhóm row; giữa các
+   * nhóm event loop được giải phóng → không block HTTP handler.
+   *
+   * Dùng cho các query export lớn (hàng triệu dòng). Trả về tổng số row đã xử lý.
+   */
+  async queryStream<T = Record<string, unknown>>(
+    sql: string,
+    params: Record<string, unknown> | undefined,
+    onRows: (rows: T[]) => Promise<void> | void,
+  ): Promise<number> {
+    const startTime = Date.now();
+    let totalRows = 0;
+    const resultSet = await this.client.query({
+      query: sql,
+      query_params: params,
+      format: 'JSONEachRow',
+    });
+
+    try {
+      const stream = resultSet.stream<T>();
+      for await (const chunk of stream) {
+        // Mỗi `chunk` là một mảng Row; mỗi Row.json() trả về object đã parse.
+        const rows = chunk.map((row) => row.json());
+        totalRows += rows.length;
+        await onRows(rows);
+      }
+      this.logger.debug(
+        `Stream query done: ${totalRows} rows in ${Date.now() - startTime}ms | ${sql.substring(0, 100)}...`,
+      );
+      return totalRows;
+    } catch (error) {
+      this.logger.error(`Stream query failed: ${error.message}`, error.stack);
+      throw error;
+    } finally {
+      resultSet.close();
+    }
+  }
+
+  /**
    * Bulk insert rows into a table.
    * Uses @clickhouse/client stream-based insert for optimal performance
    * when loading millions of rows.
