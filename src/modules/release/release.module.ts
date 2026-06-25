@@ -29,10 +29,11 @@ import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
+import { MetadataScanSession } from './entities/metadata-scan-session.entity';
 import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { ReleaseEnrichment } from './entities/release-enrichment.entity';
 import { Release } from './entities/release.entity';
-import { MetadataScanSession } from './entities/metadata-scan-session.entity';
+import { ReleaseErrorsModule } from './modules/release-errors/release-errors.module';
 import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
 import { ReleaseLogModule } from './modules/release-log/release-log.module';
 import { ReleaseDdexService } from './services/release-ddex.service';
@@ -134,6 +135,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		VideoModule,
 		ReleaseCaptionModule,
 		ReleaseLogModule,
+		ReleaseErrorsModule,
 
 		FileExportCiModule,
 
@@ -208,4 +210,4 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3CronJobService,
 	],
 })
-export class ReleaseModule { }
+export class ReleaseModule {}
