@@ -52,7 +52,7 @@ export const createDynamicCorsConfig = (
 			// 2. Cache hit
 			const cached = cache.get(domain);
 			if (cached && cached.expiresAt > now) {
-				return callback(cached.allowed ? null : new Error('CORS'), cached.allowed);
+				return callback(null, cached.allowed);
 			}
 
 			// 3. DB lookup
@@ -60,7 +60,7 @@ export const createDynamicCorsConfig = (
 			const allowed = !!record;
 			cache.set(domain, { allowed, expiresAt: now + CACHE_TTL });
 
-			callback(allowed ? null : new Error('CORS'), allowed);
+			callback(null, allowed);
 		},
 		credentials: true,
 	};
