@@ -7,7 +7,10 @@ import { DspRoutingConfigsService } from 'src/modules/distribution/dsp-routing/s
 import { SftpConnectService } from 'src/modules/distribution/sftp-connect/sftp-connect.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
+import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
+import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
@@ -47,6 +50,8 @@ export class ReleaseExecution3Worker {
 		private readonly trackService: TrackService,
 		private readonly videoService: VideoService,
 		private readonly logService: LogsService,
+		private readonly ciImportService: CiImportService,
+		private readonly releaseErrorService: ReleaseErrorService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -96,6 +101,9 @@ export class ReleaseExecution3Worker {
 
 			case ReleaseExecutionStepType.CREATE_FOLDER_DONE_CI:
 				return this.createFolderDoneCi(context);
+
+			case ReleaseExecutionStepType.GET_RESULT_IMPORT_CI:
+				return this.getResultImportCi(context);
 
 			case ReleaseExecutionStepType.VALIDATE_QA_CI:
 				return this.validateQaCi(context);
@@ -419,6 +427,102 @@ export class ReleaseExecution3Worker {
 			this.logService.error({
 				message: `[CREATE_FOLDER_DONE_CI] ${err.message}`,
 				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: step.id,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
+	private async getResultImportCi({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const releaseSnapshot =
+				releaseExecution.metadata.input.releaseSnapshot;
+			const releaseId = this.releaseIdFromExecution(releaseExecution);
+			const upc =
+				releaseSnapshot.upc ||
+				releaseExecution.metadata.input.upcAutoIfReleaseSnapshotNull ||
+				releaseExecution.releaseUpc;
+
+			if (!upc) {
+				throw new Error('Missing UPC from release execution');
+			}
+
+			const metadataStep = await this.getSiblingStepByType(
+				step,
+				ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
+			);
+			const batchId = metadataStep?.metadata?.output?.batchId;
+
+			if (!batchId) {
+				throw new Error(
+					'Missing batchId from CREATE_METADATA_ON_SERVER step',
+				);
+			}
+
+			const imports = await this.ciImportService.getImportsSimple({
+				package_id: upc,
+				page_size: 999,
+				external_identifier: batchId,
+			});
+
+			const errors = imports.flatMap((item: any) =>
+				Array.isArray(item?.errors) ? item.errors : [],
+			);
+
+			step.metadata = {
+				...step.metadata,
+				input: {
+					...step.metadata?.input,
+					package_id: upc,
+					external_identifier: batchId,
+					page_size: 999,
+				},
+				output: {
+					imports,
+					errors,
+					hasIssues: errors.length > 0,
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			if (errors.length > 0) {
+				await this.releaseErrorService.bulkCreateErrors(
+					errors.map((message: string) => ({
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+						type: ReleaseErrorType.IMPORT_CI,
+						message,
+					})),
+				);
+
+				this.logService.error({
+					message: `[GET_RESULT_IMPORT_CI] Import CI has ${errors.length} issue(s)`,
+					releaseExecutionId: releaseExecution.id,
+					releaseExecutionStepId: step.id,
+					data: { upc, batchId, errors },
+				});
+
+				return ReleaseExecutionStepStatus.FAILED;
+			}
+
+			this.logService.success({
+				message: `[GET_RESULT_IMPORT_CI] Import CI passed`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+				data: { upc, batchId, imports },
+			});
+
+			return ReleaseExecutionStepStatus.DONE;
+		} catch (err) {
+			this.logService.error({
+				message: `[GET_RESULT_IMPORT_CI] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
 			});
 

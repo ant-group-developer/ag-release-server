@@ -32,6 +32,7 @@ import {
 } from 'typeorm';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
+import { ReleaseError } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseLog } from '../modules/release-log/entities/release-log.entity';
 
 @Entity('releases', {
@@ -422,6 +423,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => ReleaseLog, (rL) => rL.release)
 	logs: ReleaseLog[];
+
+	@OneToMany(() => ReleaseError, (error) => error.release)
+	errors: ReleaseError[];
 
 	// nếu dùng thì nhớ phải join đủ
 	get listCodeExportCi() {

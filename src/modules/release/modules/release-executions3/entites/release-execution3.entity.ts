@@ -2,6 +2,7 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Logs } from 'src/modules/log/entites/logs.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
+import { ReleaseError } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import {
 	AfterLoad,
 	Column,
@@ -62,6 +63,9 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.releaseExecution)
 	steps: ReleaseExecutionStep3[];
+
+	@OneToMany(() => ReleaseError, (error) => error.releaseExecution)
+	releaseErrors: ReleaseError[];
 
 	@OneToMany(() => Logs, (log) => log.releaseExecution)
 	logs: Logs[];
