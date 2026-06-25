@@ -38,7 +38,6 @@ import {
 } from '../dto/release.draft.dto';
 import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { IReleaseDetail } from '../interfaces/release.interface';
-import { GetReleaseValidateErrorsDto } from '../modules/release-errors/dto/release-error.dto';
 import { ReleaseDraftService } from '../services/release.draft.service';
 
 @ApiTags('Releases Draft')
@@ -200,12 +199,13 @@ export class ReleaseDraftController {
 	@Get(':id/validate')
 	async getErrorsSchemaReleaseById(
 		@Param('id') id: string,
-		@Query() query: GetReleaseValidateErrorsDto,
+		@Query('isFixed') isFixed?: string,
 	) {
+		const isFixedValue = isFixed === 'true';
 		const result =
 			await this.releaseDraftService.getErrorsSchemaReleaseById(
 				id,
-				query.isFixed,
+				isFixedValue,
 			);
 		return new ResponseSuccess({ data: result });
 	}

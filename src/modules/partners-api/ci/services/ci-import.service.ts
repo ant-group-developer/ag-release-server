@@ -3,6 +3,12 @@ import axios, { AxiosInstance } from 'axios';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { GetCiImportsDto } from '../dtos/ci-import.dto';
 
+export interface CiImportSimpleItem {
+	status?: string;
+	modify_time?: string;
+	errors: string[];
+}
+
 @Injectable()
 export class CiImportService {
 	private readonly logger = new Logger(CiImportService.name);
@@ -70,7 +76,9 @@ export class CiImportService {
 		}
 	}
 
-	async getImportsSimple(params?: GetCiImportsDto): Promise<any[]> {
+	async getImportsSimple(
+		params?: GetCiImportsDto,
+	): Promise<CiImportSimpleItem[]> {
 		const imports = await this.getImports(params);
 		const items = Array.isArray(imports)
 			? imports
@@ -87,7 +95,7 @@ export class CiImportService {
 		}));
 	}
 
-	private getImportWarnings(item: any): any[] {
+	private getImportWarnings(item: any): string[] {
 		const importFiles = Array.isArray(item?.import_file)
 			? item.import_file
 			: [];
@@ -99,11 +107,17 @@ export class CiImportService {
 					? [file.description]
 					: [];
 
-			return descriptions.flatMap((description: any) =>
-				Array.isArray(description?.warnings)
+			return descriptions.flatMap((description: any) => {
+				const warnings = Array.isArray(description?.warnings)
 					? description.warnings
-					: [],
-			);
+					: [];
+
+				return warnings.map((warning: any) =>
+					typeof warning === 'string'
+						? warning
+						: JSON.stringify(warning),
+				);
+			});
 		});
 	}
 
