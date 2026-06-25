@@ -248,7 +248,10 @@ export class SyncController {
         { progressTotal: 1, progressCurrent: 1, progressLabel: 'Done' },
         true,
       );
-      await this.importJobsService.markCompleted(jobId, result as unknown as Record<string, unknown>);
+      await this.importJobsService.markCompleted(jobId, {
+        ...(result as any),
+        releases: result.releases,
+      });
     } catch (err) {
       await this.importJobsService.markFailed(jobId, err);
     }
@@ -274,6 +277,7 @@ export class SyncController {
 
       const results: unknown[] = [];
       let totalRows = 0;
+      const releases = { total: 0, imported: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
       for (let i = 0; i < periods.length; i++) {
         const period = periods[i];
         await this.importJobsService.updateProgress(
@@ -286,6 +290,14 @@ export class SyncController {
           results.push(result);
           if (result && typeof (result as any).totalRows === 'number') {
             totalRows += (result as any).totalRows;
+          }
+          if (result && result.releases) {
+            releases.total += result.releases.total;
+            releases.imported += result.releases.imported;
+            releases.skipped += result.releases.skipped;
+            releases.errors += result.releases.errors;
+            releases.inDb += result.releases.inDb;
+            releases.pending += result.releases.pending;
           }
         } catch (err) {
           results.push({ period, error: err.message });
@@ -301,6 +313,7 @@ export class SyncController {
         totalPeriods: periods.length,
         totalRows,
         results,
+        releases,
       });
     } catch (err) {
       await this.importJobsService.markFailed(jobId, err);

@@ -148,6 +148,12 @@ export interface LabelRankingItem {
   releaseCount: number;
   trackCount: number;
   totalViews: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -228,6 +234,12 @@ export interface EntityOverviewResponse {
     country: string | null;
     genre: string | null;
   } | null;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 export interface RevenueLabelItem {
@@ -240,6 +252,12 @@ export interface RevenueLabelItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
 }
 
 export interface RevenueTenantItem {

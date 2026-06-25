@@ -120,6 +120,19 @@ export class ScheduleService implements OnModuleInit {
 		await this.releaseExecution3CronJobService.checkCiToolJobStatus();
 	}
 
+	// @Cron('*/10 * * * * *') // mỗi 10 giây
+	@Cron('0 0 * * *') // mỗi ngày lúc 00:00
+	async refreshCiToolToken() {
+		try {
+			await this.appConfigService.refreshCiToolToken();
+			this.logger.log('[CRON] CI Tool token refreshed');
+		} catch (err) {
+			this.logger.error(
+				`[CRON] Refresh CI Tool token failed: ${(err as Error).message}`,
+			);
+		}
+	}
+
 	@Cron('*/10 * * * * *') // mỗi 10 giây
 	async consumeReleaseExecutions3() {
 		await this.releaseExecution3CronJobService.consumeExecutions();

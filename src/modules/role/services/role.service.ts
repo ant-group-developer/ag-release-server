@@ -61,6 +61,9 @@ export class RoleService {
 
 		const result = await this.getOne(role.id);
 
+		// Invalidate all auth contexts — new role may be auto-enabled via isDefault
+		await this.invalidateAllAuthContexts();
+
 		return new ResponseSuccess({
 			data: result,
 			messageWarning: messageWarnings.join('\n'),
@@ -217,6 +220,9 @@ export class RoleService {
 
 	async deleteRolePermission(rolePermissionId: string): Promise<void> {
 		await this.rolePermissionRepo.delete(rolePermissionId);
+
+		// Invalidate all auth contexts — permission removed from role
+		await this.invalidateAllAuthContexts();
 	}
 
 	async validateExisted(roleIds: string[]) {

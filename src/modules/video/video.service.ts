@@ -5,13 +5,19 @@ import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
 import { ReleaseLogService } from 'src/modules/release/modules/release-log/services/release-log.service';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import {
 	CreateVideoDto,
 	UpdateVideoDto,
 	UpsertReleaseVideoDto,
 } from './dto/video.dto';
 import { Video } from './entities/video.entity';
+
+type VevoVideoNotificationOperation =
+	| 'insert'
+	| 'update'
+	| 'delete'
+	| 'replace';
 
 @Injectable()
 export class VideoService {
@@ -235,6 +241,43 @@ export class VideoService {
 		await this.update(videoId, { isrc: newIsrc });
 
 		return newIsrc;
+	}
+
+	async updateVevoExternalIdByIsrc({
+		isrc,
+		operation,
+		externalId,
+	}: {
+		isrc: string;
+		operation: VevoVideoNotificationOperation;
+		externalId: string | null;
+	}) {
+		const normalizedIsrc = isrc.trim().toUpperCase();
+		const video = await this.videoRepo.findOne({
+			where: { isrc: ILike(normalizedIsrc) },
+		});
+
+		if (!video) {
+			throw new NotFoundException(
+				`Video not found by ISRC: ${normalizedIsrc}`,
+			);
+		}
+
+		if (operation === 'delete') {
+			video.externalId = null;
+		} else if (externalId) {
+			video.externalId = externalId;
+		}
+
+		const result = await this.videoRepo.save(video);
+
+		return {
+			operation,
+			isrc: normalizedIsrc,
+			externalId: result.externalId,
+			videoId: result.id,
+			updated: operation === 'delete' || !!externalId,
+		};
 	}
 
 	private async ensureChannel(channelId?: string | null) {

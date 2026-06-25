@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Cron } from '@nestjs/schedule';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as ExcelJS from 'exceljs';
-import { once } from 'events';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -17,110 +16,28 @@ import {
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { isValidStandardUpc } from 'src/utils/upc.util';
+import { zipFolder } from 'src/utils/util';
 import { EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
-
-export interface AnalyticsReportExportResult {
-  fileName: string;
-  key: string;
-  downloadUrl: string;
-  expiresInSeconds: number;
-  totalRows: number;
-}
-
-export interface AnalyticsReportExportJobResult {
-  jobId: string;
-  status: ImportJobStatus;
-  eventsUrl: string;
-}
-
-export interface AnalyticsReportExportCancelResult {
-  jobId: string;
-  status: ImportJobStatus;
-  cancelled: boolean;
-}
-
-export interface AnalyticsReportExportCancelAllResult {
-  cancelledCount: number;
-  jobIds: string[];
-  skippedCount: number;
-}
-
-export interface AnalyticsReportExportCancelListResult
-  extends AnalyticsReportExportCancelAllResult {}
-
-interface SummaryRow {
-  startDate: string;
-  endDate: string;
-  totalUsage: number;
-  revenueUsd: string;
-  currency: string;
-  trackCount: number;
-  releaseCount: number;
-  labelCount: number;
-  dspCount: number;
-  territoryCount: number;
-}
-
-interface RawDetailRow {
-  date: string;
-  start_date: string;
-  end_date: string;
-  dsp_id: string;
-  dsp_name: string;
-  territory: string;
-  isrc: string;
-  tenant_id: string;
-  release_id: string;
-  label_id: string;
-  fallback_upc: string;
-  fallback_track_title: string;
-  fallback_album_title: string;
-  fallback_artist_name: string;
-  fallback_label_name: string;
-  total_usage: string;
-  revenue_usd: string;
-}
-
-interface DetailRow {
-  date: string;
-  startDate: string;
-  endDate: string;
-  tenant: string;
-  dspName: string;
-  upc: string;
-  isrc: string;
-  releaseName: string;
-  trackName: string;
-  artistName: string;
-  labelName: string;
-  territory: string;
-  totalUsage: number;
-  revenueUsd: string;
-  currency: string;
-}
-
-interface MetadataRow {
-  isrc?: string;
-  upc?: string;
-  workspace_name: string;
-  release_title: string;
-  release_upc: string;
-  catalog_id: string;
-  release_date: string | null;
-  track_title?: string;
-  label_name: string;
-  artist_names: string;
-}
-
-type ExportProgressPatch = {
-  progressCurrent?: number;
-  progressTotal?: number;
-  progressLabel?: string;
-  processedRows?: number;
-  totalRows?: number;
-};
+import {
+  AnalyticsReportExportResult,
+  AnalyticsReportExportJobResult,
+  AnalyticsReportExportCancelResult,
+  AnalyticsReportExportCancelAllResult,
+  AnalyticsReportExportCancelListResult,
+  SummaryRow,
+  RawDetailRow,
+  DetailRow,
+  MetadataRow,
+  ExportProgressPatch,
+} from '../interfaces/analytics-report-export.interface';
+import {
+  getRawDetailsPageQuery,
+  getTrackMetadataQuery,
+  getTenantNamesQuery,
+  getReleaseMetadataByUpcQuery,
+} from '../queries/analytics-report-export.queries';
 
 class ExportJobCancelledError extends Error {
   constructor(jobId: string) {
@@ -132,10 +49,18 @@ class ExportJobCancelledError extends Error {
 @Injectable()
 export class AnalyticsReportExportService {
   private readonly logger = new Logger(AnalyticsReportExportService.name);
-  private readonly batchSize = 10_000;
+  private readonly batchSize = 100_000;
   private readonly exportRetentionDays = 7;
   private readonly cleanupBatchSize = 100;
   private readonly cancelledExportJobs = new Set<string>();
+
+  private activeJobsCount = 0;
+  private readonly maxConcurrentJobs = 2;
+  private readonly jobQueue: Array<{
+    jobId: string;
+    tenantId: string;
+    dto: AnalyticsReportExportDto;
+  }> = [];
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -145,15 +70,42 @@ export class AnalyticsReportExportService {
     private readonly entityManager: EntityManager,
   ) {}
 
+  private enqueueJob(jobId: string, tenantId: string, dto: AnalyticsReportExportDto) {
+    this.jobQueue.push({ jobId, tenantId, dto });
+    this.processNextJob();
+  }
+
+  private processNextJob() {
+    if (this.activeJobsCount >= this.maxConcurrentJobs) {
+      return;
+    }
+    const next = this.jobQueue.shift();
+    if (!next) {
+      return;
+    }
+
+    this.activeJobsCount++;
+    setImmediate(async () => {
+      try {
+        await this.runExportJob(next.jobId, next.tenantId, next.dto);
+      } finally {
+        this.activeJobsCount--;
+        this.processNextJob();
+      }
+    });
+  }
+
   async createExportJob(
     tenantId: string,
     userId: string,
     dto: AnalyticsReportExportDto,
   ): Promise<AnalyticsReportExportJobResult> {
+    const tenantNamesMap = await this.getTenantNames([tenantId]);
+    const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
       params: dto as unknown as Record<string, unknown>,
-      fileName: this.buildFileName(dto),
+      fileName: this.buildFileName(tenantName, dto),
       progressTotal: 4,
       tenantId,
       createdBy: userId,
@@ -161,9 +113,7 @@ export class AnalyticsReportExportService {
 
     await this.importJobsService.markQueued(job.id);
 
-    setImmediate(() => {
-      void this.runExportJob(job.id, tenantId, dto);
-    });
+    this.enqueueJob(job.id, tenantId, dto);
 
     return {
       jobId: job.id,
@@ -366,67 +316,140 @@ export class AnalyticsReportExportService {
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
     jobId?: string,
   ): Promise<AnalyticsReportExportResult> {
+    return this.exportReportSplit(tenantId, dto, onProgress, jobId);
+  }
+
+  /**
+   * Export with split mode — query all data, group by split key,
+   * write individual files, then zip them using existing zipFolder util.
+   */
+  private async exportReportSplit(
+    tenantId: string,
+    dto: AnalyticsReportExportDto,
+    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
+    jobId?: string,
+  ): Promise<AnalyticsReportExportResult> {
     await this.throwIfExportJobCancelled(jobId);
     const range = this.getMonthRange(dto);
     const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
     if (dto.trackId && !trackIsrc) {
       throw new BadRequestException('trackId does not have a valid ISRC');
     }
-    await this.throwIfExportJobCancelled(jobId);
 
-    const format = dto.format ?? 'xlsx';
-    const fileName = this.buildFileName(dto);
-    const contentType =
-      format === 'csv'
-        ? 'text/csv; charset=utf-8'
-        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    const tempPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
+    const tenantNamesMap = await this.getTenantNames([tenantId]);
+    const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
+    const fileName = this.buildFileName(tenantName, dto);
+    const tempDir = path.join(os.tmpdir(), `export-split-${uuidv4()}`);
+    const zipPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
     const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
 
     try {
+      await fs.promises.mkdir(tempDir, { recursive: true });
+
+      // Step 1: Query all data in batches
       await onProgress?.(
-        { progressCurrent: 1, progressLabel: 'Preparing report' },
-        true,
-      );
-      const summary = await this.getSummary(tenantId, dto, range, trackIsrc);
-      await this.throwIfExportJobCancelled(jobId);
-      await onProgress?.(
-        { progressCurrent: 2, progressLabel: 'Writing report file' },
+        { progressCurrent: 1, progressLabel: 'Querying data' },
         true,
       );
       await this.throwIfExportJobCancelled(jobId);
 
-      let totalRows = 0;
-      if (format === 'csv') {
-        totalRows = await this.writeCsvFile(
-          tempPath,
-          tenantId,
-          dto,
-          range,
-          trackIsrc,
-          onProgress,
-          jobId,
+      const allDetails: DetailRow[] = [];
+      const trackMetaCache = new Map<string, MetadataRow>();
+      const releaseMetaCache = new Map<string, MetadataRow>();
+      const tenantNamesCache = new Map<string, string>();
+      const stringPool = new Map<string, string>();
+      let offset = 0;
+      while (true) {
+        await this.throwIfExportJobCancelled(jobId);
+        const rawRows = await this.getRawDetailsPage(
+          tenantId, dto, range, trackIsrc, this.batchSize, offset,
         );
-      } else {
-        totalRows = await this.writeWorkbookFile(
-          tempPath,
-          summary,
-          tenantId,
-          dto,
-          range,
-          trackIsrc,
-          onProgress,
-          jobId,
+        if (!rawRows.length) break;
+        const enriched = await this.enrichDetails(
+          rawRows,
+          trackMetaCache,
+          releaseMetaCache,
+          tenantNamesCache,
+          stringPool,
+        );
+        allDetails.push(...enriched);
+        await onProgress?.(
+          {
+            progressCurrent: 1,
+            progressLabel: `Querying data (${allDetails.length} rows)`,
+            processedRows: allDetails.length,
+          },
+          false,
+        );
+        if (rawRows.length < this.batchSize) break;
+        offset += this.batchSize;
+      }
+
+      // Free up cache memory as it is no longer needed
+      trackMetaCache.clear();
+      releaseMetaCache.clear();
+      tenantNamesCache.clear();
+      stringPool.clear();
+
+      // Step 2: Group data into nested folders
+      await onProgress?.(
+        { progressCurrent: 2, progressLabel: 'Splitting data into groups' },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+
+      const groups = this.groupDetailRowsNew(allDetails, dto);
+
+      // Step 3: Write each group as folder with summary + detail files
+      await onProgress?.(
+        { progressCurrent: 2, progressLabel: `Writing ${groups.size} folders` },
+        true,
+      );
+
+      let filesWritten = 0;
+      const format = dto.format ?? 'xlsx';
+      for (const [groupPath, rows] of groups) {
+        await this.throwIfExportJobCancelled(jobId);
+
+        const groupFolder = path.join(tempDir, groupPath);
+        await fs.promises.mkdir(groupFolder, { recursive: true });
+
+        // Calculate summary
+        const summary = this.calculateSummary(rows, groupPath, dto);
+
+        // Write summary.[format]
+        const summaryFilePath = path.join(groupFolder, `summary.${format}`);
+        await this.writeSummaryFile(summaryFilePath, summary, format);
+
+        // Write detail.[format]
+        const detailFilePath = path.join(groupFolder, `detail.${format}`);
+        await this.writeDetailFile(detailFilePath, rows, format);
+
+        filesWritten++;
+        await onProgress?.(
+          {
+            progressCurrent: 2,
+            progressLabel: `Writing folder ${filesWritten}/${groups.size}`,
+          },
+          false,
         );
       }
-      await this.throwIfExportJobCancelled(jobId);
 
+      // Step 4: Create ZIP using existing utility
+      await onProgress?.(
+        { progressCurrent: 3, progressLabel: 'Creating ZIP archive' },
+        true,
+      );
+      await this.throwIfExportJobCancelled(jobId);
+      await zipFolder(tempDir, zipPath);
+
+      // Step 5: Upload to R2
       await onProgress?.(
         {
           progressCurrent: 3,
-          progressLabel: 'Uploading report file',
-          processedRows: totalRows,
-          totalRows,
+          progressLabel: 'Uploading ZIP file',
+          processedRows: allDetails.length,
+          totalRows: allDetails.length,
         },
         true,
       );
@@ -434,8 +457,8 @@ export class AnalyticsReportExportService {
 
       await this.r2Service.uploadFileFromPath({
         key,
-        filePath: tempPath,
-        contentType,
+        filePath: zipPath,
+        contentType: 'application/zip',
         isPublic: false,
       });
       await this.throwIfExportJobCancelled(jobId);
@@ -444,16 +467,232 @@ export class AnalyticsReportExportService {
         fileName,
         key,
         downloadUrl: await this.r2Service.getSignedUrlDown({
-          key,
-          fileName,
-          isPublic: false,
+          key, fileName, isPublic: false,
         }),
         expiresInSeconds: 4 * 3600,
-        totalRows,
+        totalRows: allDetails.length,
       };
     } finally {
-      await fs.promises.unlink(tempPath).catch(() => undefined);
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+      await fs.promises.unlink(zipPath).catch(() => undefined);
     }
+  }
+
+  private groupDetailRowsNew(
+    rows: DetailRow[],
+    dto: AnalyticsReportExportDto,
+  ): Map<string, DetailRow[]> {
+    const groups = new Map<string, DetailRow[]>();
+    const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
+    const periodUnit = dto.periodUnit || 'none';
+
+    for (const row of rows) {
+      const tenantFolder = this.sanitizeFileName(row.tenant || 'unnamed_workspace');
+
+      // 1. Add to tenant root folder
+      const tenantRootPath = tenantFolder;
+      if (!groups.has(tenantRootPath)) {
+        groups.set(tenantRootPath, []);
+      }
+      groups.get(tenantRootPath)!.push(row);
+
+      // 2. Period folders
+      if (periodUnit === 'month' || periodUnit === 'quarter') {
+        const periodKey = this.getPeriodKey(row.date, periodUnit);
+        const periodPath = `${tenantFolder}/${periodKey}`;
+        if (!groups.has(periodPath)) {
+          groups.set(periodPath, []);
+        }
+        groups.get(periodPath)!.push(row);
+
+        // 3. Artist folders inside period folder
+        if (isExportArtist) {
+          const artistFolder = this.sanitizeFileName(row.artistName || 'unnamed_artist');
+          const artistPeriodPath = `${tenantFolder}/${periodKey}/${artistFolder}`;
+          if (!groups.has(artistPeriodPath)) {
+            groups.set(artistPeriodPath, []);
+          }
+          groups.get(artistPeriodPath)!.push(row);
+        }
+      } else {
+        // No period, but artist subfolders under tenant root
+        if (isExportArtist) {
+          const artistFolder = this.sanitizeFileName(row.artistName || 'unnamed_artist');
+          const artistPath = `${tenantFolder}/${artistFolder}`;
+          if (!groups.has(artistPath)) {
+            groups.set(artistPath, []);
+          }
+          groups.get(artistPath)!.push(row);
+        }
+      }
+    }
+
+    return groups;
+  }
+
+  private getPeriodKey(date: string, unit: string): string {
+    if (unit === 'quarter' || unit === 'quater') {
+      const [year, month] = date.split('-').map(Number);
+      const quarter = Math.ceil(month / 3);
+      return `${year}-Q${quarter}`;
+    }
+    return date;
+  }
+
+  private calculateSummary(
+    rows: DetailRow[],
+    groupPath: string,
+    dto: AnalyticsReportExportDto,
+  ): SummaryRow {
+    const firstRow = rows[0];
+    const tenantName = firstRow?.tenant || 'unnamed_workspace';
+    
+    const parts = groupPath.split('/');
+    let artistName = '';
+    let period = '';
+
+    const periodUnit = dto.periodUnit || 'none';
+    const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
+
+    if (parts.length === 2) {
+      if (periodUnit === 'month' || periodUnit === 'quarter') {
+        period = parts[1];
+      } else if (isExportArtist) {
+        artistName = firstRow?.artistName || parts[1];
+      }
+    } else if (parts.length === 3) {
+      period = parts[1];
+      artistName = firstRow?.artistName || parts[2];
+    }
+
+    const revenueSumStr = this.addRevenueExact(rows.map(r => r.revenueUsd));
+    const totalUsage = rows.reduce((acc, r) => acc + (r.totalUsage || 0), 0);
+
+    const uniqueIsrcs = new Set(rows.map(r => r.isrc).filter(Boolean));
+    const uniqueReleases = new Set(rows.map(r => r.releaseName || r.upc).filter(Boolean));
+    const uniqueLabels = new Set(rows.map(r => r.labelName).filter(Boolean));
+    const uniqueDsps = new Set(rows.map(r => r.dspName).filter(Boolean));
+    const uniqueTerritories = new Set(rows.map(r => r.territory).filter(Boolean));
+    const uniqueArtists = new Set(rows.map(r => r.artistName).filter(Boolean));
+
+    const startDates = rows.map(r => r.startDate).filter(Boolean);
+    const endDates = rows.map(r => r.endDate).filter(Boolean);
+    const startDate = startDates.length ? startDates.reduce((min, d) => d < min ? d : min, startDates[0]) : `${dto.fromDate}-01`;
+    const endDate = endDates.length ? endDates.reduce((max, d) => d > max ? d : max, endDates[0]) : this.lastDayOfMonth(dto.endDate);
+
+    return {
+      startDate,
+      endDate,
+      tenantName,
+      artistName: artistName || undefined,
+      period: period || undefined,
+      totalUsage,
+      revenueUsd: revenueSumStr,
+      currency: 'USD',
+      trackCount: uniqueIsrcs.size,
+      releaseCount: uniqueReleases.size,
+      labelCount: uniqueLabels.size,
+      dspCount: uniqueDsps.size,
+      territoryCount: uniqueTerritories.size,
+      artistCount: uniqueArtists.size,
+    } as any;
+  }
+
+  private addRevenueExact(values: string[]): string {
+    let sum = 0;
+    for (const val of values) {
+      const parsed = parseFloat(val);
+      if (!isNaN(parsed)) {
+        sum += parsed;
+      }
+    }
+    return sum.toFixed(2);
+  }
+
+  private getSummaryColumns(): Partial<ExcelJS.Column>[] {
+    return [
+      { header: 'StartDate', key: 'startDate', width: 14 },
+      { header: 'EndDate', key: 'endDate', width: 14 },
+      { header: 'WorkspaceName', key: 'tenantName', width: 28 },
+      { header: 'TotalUsage', key: 'totalUsage', width: 14 },
+      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
+      { header: 'Currency', key: 'currency', width: 10 },
+      { header: 'TrackCount', key: 'trackCount', width: 12 },
+      { header: 'ReleaseCount', key: 'releaseCount', width: 14 },
+      { header: 'LabelCount', key: 'labelCount', width: 12 },
+      { header: 'DspCount', key: 'dspCount', width: 12 },
+      { header: 'TerritoryCount', key: 'territoryCount', width: 15 },
+      { header: 'ArtistCount', key: 'artistCount', width: 12 },
+    ];
+  }
+
+  private async writeSummaryFile(
+    filePath: string,
+    summary: SummaryRow,
+    format: 'xlsx' | 'csv',
+  ): Promise<void> {
+    if (format === 'csv') {
+      const columns = this.getSummaryColumns();
+      const headers = columns.map((c) => c.header?.toString() ?? '');
+      const keys = columns.map((c) => c.key?.toString() ?? '');
+      const lines = [
+        `\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}`,
+        keys.map((key) => this.csvEscape((summary as any)[key])).join(','),
+      ];
+      await fs.promises.writeFile(filePath, lines.join('\n'), 'utf8');
+    } else {
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        filename: filePath,
+        useStyles: true,
+        useSharedStrings: false,
+      });
+      const sheet = workbook.addWorksheet('Summary');
+      sheet.columns = this.getSummaryColumns();
+      sheet.addRow(summary).commit();
+      sheet.commit();
+      await workbook.commit();
+    }
+  }
+
+  private async writeDetailFile(
+    filePath: string,
+    rows: DetailRow[],
+    format: 'xlsx' | 'csv',
+  ): Promise<void> {
+    if (format === 'csv') {
+      const columns = this.getDetailColumns();
+      const headers = columns.map((c) => c.header?.toString() ?? '');
+      const keys = columns.map((c) => c.key?.toString() ?? '');
+      const lines = [`\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}`];
+      for (const row of rows) {
+        const record = row as unknown as Record<string, unknown>;
+        lines.push(keys.map((key) => this.csvEscape(record[key])).join(','));
+      }
+      await fs.promises.writeFile(filePath, lines.join('\n'), 'utf8');
+    } else {
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        filename: filePath,
+        useStyles: true,
+        useSharedStrings: false,
+      });
+      const sheet = workbook.addWorksheet('Detail');
+      sheet.columns = this.getDetailColumns();
+      for (const row of rows) {
+        sheet.addRow(row).commit();
+      }
+      sheet.commit();
+      await workbook.commit();
+    }
+  }
+
+  /** Sanitize a string for use as a file/directory name. */
+  private sanitizeFileName(name: string): string {
+    return name
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .substring(0, 100) || 'unnamed';
   }
 
   private async runExportJob(
@@ -531,9 +770,9 @@ export class AnalyticsReportExportService {
     }
   }
 
-  private buildFileName(dto: AnalyticsReportExportDto): string {
-    const format = dto.format ?? 'xlsx';
-    return `analytics-report_${dto.fromDate}_${dto.endDate}.${format}`;
+  private buildFileName(tenantName: string, dto: AnalyticsReportExportDto): string {
+    const sanitized = this.sanitizeFileName(tenantName);
+    return `${sanitized}_analytics-report_${dto.fromDate}_${dto.endDate}.zip`;
   }
 
   private getMonthRange(dto: AnalyticsReportExportDto) {
@@ -572,10 +811,15 @@ export class AnalyticsReportExportService {
       's.period <= toDate({to:String})',
     ];
 
-    if (!checkIsSystemTenant(tenantId)) {
+    // Multi-tenant: use dto.tenantIds if provided, otherwise fall back
+    const resolvedTenantIds = dto.tenantIds?.length
+      ? dto.tenantIds
+      : (!checkIsSystemTenant(tenantId) ? [tenantId] : []);
+
+    if (resolvedTenantIds.length > 0) {
       filters.push('t.is_deleted = 0');
-      filters.push('t.tenant_id = {tenantId:String}');
-      params.tenantId = tenantId;
+      filters.push('t.tenant_id IN ({tenantIds:Array(String)})');
+      params.tenantIds = resolvedTenantIds;
     }
 
     if (dto.labelId) {
@@ -625,62 +869,6 @@ export class AnalyticsReportExportService {
     `;
   }
 
-  private async getSummary(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    range: { startDate: string; endDate: string },
-    trackIsrc: string | null,
-  ): Promise<SummaryRow> {
-    const { params, whereSql } = this.buildFilters(tenantId, dto, trackIsrc);
-    const rows = await this.clickHouseService.query<{
-      total_usage: string;
-      revenue_usd: string;
-      track_count: string;
-      release_count: string;
-      label_count: string;
-      dsp_count: string;
-      territory_count: string;
-    }>(
-      `
-        SELECT
-          sum(s.total_usage) AS total_usage,
-          sum(s.revenue_usd) AS revenue_usd,
-          uniq(s.isrc) AS track_count,
-          uniqIf(t.release_id, t.release_id != '') AS release_count,
-          uniqIf(t.label_id, t.label_id != '') AS label_count,
-          uniq(s.dsp_id) AS dsp_count,
-          uniq(s.territory_code) AS territory_count
-        FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
-        ${this.getCommonJoins()}
-        ${whereSql}
-      `,
-      params,
-    );
-    const row = rows[0];
-
-    return {
-      startDate: range.startDate,
-      endDate: range.endDate,
-      totalUsage: Number(row?.total_usage ?? 0),
-      revenueUsd: row?.revenue_usd?.toString() ?? '0',
-      currency: 'USD',
-      trackCount: Number(row?.track_count ?? 0),
-      releaseCount: Number(row?.release_count ?? 0),
-      labelCount: Number(row?.label_count ?? 0),
-      dspCount: Number(row?.dsp_count ?? 0),
-      territoryCount: Number(row?.territory_count ?? 0),
-    };
-  }
-
-  private async getRawDetails(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    _range: { startDate: string; endDate: string },
-    trackIsrc: string | null,
-  ): Promise<RawDetailRow[]> {
-    return this.getRawDetailsPage(tenantId, dto, _range, trackIsrc, 0, 0);
-  }
-
   private async getRawDetailsPage(
     tenantId: string,
     dto: AnalyticsReportExportDto,
@@ -694,38 +882,23 @@ export class AnalyticsReportExportService {
       "coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)";
     const pagingSql = limit > 0 ? `LIMIT ${limit} OFFSET ${offset}` : '';
 
-    return this.clickHouseService.query<RawDetailRow>(
-      `
-        SELECT
-          formatDateTime(s.period, '%Y-%m') AS date,
-          formatDateTime(s.period, '%Y-%m-01') AS start_date,
-          formatDateTime(addDays(addMonths(toStartOfMonth(s.period), 1), -1), '%Y-%m-%d') AS end_date,
-          s.dsp_id AS dsp_id,
-          ${resolvedDspName} AS dsp_name,
-          s.territory_code AS territory,
-          s.isrc AS isrc,
-          any(t.tenant_id) AS tenant_id,
-          any(t.release_id) AS release_id,
-          any(t.label_id) AS label_id,
-          any(s.upc) AS fallback_upc,
-          any(s.track_title) AS fallback_track_title,
-          any(s.album_title) AS fallback_album_title,
-          any(s.artist_name) AS fallback_artist_name,
-          any(s.label_name) AS fallback_label_name,
-          sum(s.total_usage) AS total_usage,
-          sum(s.revenue_usd) AS revenue_usd
-        FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
-        ${this.getCommonJoins()}
-        ${whereSql}
-        GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory, isrc
-        ORDER BY date ASC, dsp_name ASC, territory ASC, isrc ASC
-        ${pagingSql}
-      `,
-      params,
+    const query = getRawDetailsPageQuery(
+      resolvedDspName,
+      this.getCommonJoins(),
+      whereSql,
+      pagingSql,
     );
+
+    return this.clickHouseService.query<RawDetailRow>(query, params);
   }
 
-  private async enrichDetails(rows: RawDetailRow[]): Promise<DetailRow[]> {
+  private async enrichDetails(
+    rows: RawDetailRow[],
+    trackMetaCache: Map<string, MetadataRow>,
+    releaseMetaCache: Map<string, MetadataRow>,
+    tenantNamesCache: Map<string, string>,
+    stringPool: Map<string, string>,
+  ): Promise<DetailRow[]> {
     if (!rows.length) return [];
 
     const isrcs = Array.from(
@@ -740,40 +913,71 @@ export class AnalyticsReportExportService {
       ),
     );
 
-    const [trackMeta, releaseMeta] = await Promise.all([
-      this.getTrackMetadata(isrcs),
-      this.getReleaseMetadataByUpc(albumUpcs),
-    ]);
-    const tenantNames = await this.getTenantNames(
-      Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean))),
-    );
+    // 1. Fetch missing track metadata
+    const missingIsrcs = isrcs.filter((isrc) => !trackMetaCache.has(isrc));
+    if (missingIsrcs.length > 0) {
+      const newTrackMeta = await this.getTrackMetadata(missingIsrcs);
+      for (const [isrc, meta] of newTrackMeta) {
+        trackMetaCache.set(isrc, meta);
+      }
+    }
+
+    // 2. Fetch missing release metadata
+    const missingUpcs = albumUpcs.filter((upc) => !releaseMetaCache.has(upc));
+    if (missingUpcs.length > 0) {
+      const newReleaseMeta = await this.getReleaseMetadataByUpc(missingUpcs);
+      for (const [upc, meta] of newReleaseMeta) {
+        releaseMetaCache.set(upc, meta);
+      }
+    }
+
+    // 3. Fetch missing tenant names
+    const tenantIds = Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean)));
+    const missingTenantIds = tenantIds.filter((id) => !tenantNamesCache.has(id));
+    if (missingTenantIds.length > 0) {
+      const newTenantNames = await this.getTenantNames(missingTenantIds);
+      for (const [id, name] of newTenantNames) {
+        tenantNamesCache.set(id, name);
+      }
+    }
+
+    const getSharedString = (val: string | null | undefined): string => {
+      if (val == null) return '';
+      let cached = stringPool.get(val);
+      if (!cached) {
+        stringPool.set(val, val);
+        cached = val;
+      }
+      return cached;
+    };
 
     return rows.map((row) => {
       const meta = row.isrc.startsWith('UPC-')
-        ? releaseMeta.get(row.isrc.substring(4))
-        : trackMeta.get(row.isrc);
+        ? releaseMetaCache.get(row.isrc.substring(4))
+        : trackMetaCache.get(row.isrc);
       const upc = meta?.release_upc || row.fallback_upc || '';
 
       return {
-        date: row.date,
-        startDate: row.start_date,
-        endDate: row.end_date,
-        tenant:
+        date: getSharedString(row.date),
+        startDate: getSharedString(row.start_date),
+        endDate: getSharedString(row.end_date),
+        tenant: getSharedString(
           meta?.workspace_name ||
-          tenantNames.get(row.tenant_id) ||
+          tenantNamesCache.get(row.tenant_id) ||
           row.tenant_id ||
-          '',
-        dspName: row.dsp_name || row.dsp_id,
-        upc: isValidStandardUpc(upc) ? upc : '',
-        isrc: this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc,
-        releaseName: meta?.release_title || row.fallback_album_title || '',
-        trackName: meta?.track_title || row.fallback_track_title || '',
-        artistName: meta?.artist_names || row.fallback_artist_name || '',
-        labelName: meta?.label_name || row.fallback_label_name || '',
-        territory: row.territory,
+          ''
+        ),
+        dspName: getSharedString(row.dsp_name || row.dsp_id),
+        upc: getSharedString(isValidStandardUpc(upc) ? upc : ''),
+        isrc: getSharedString(this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc),
+        releaseName: getSharedString(meta?.release_title || row.fallback_album_title || ''),
+        trackName: getSharedString(meta?.track_title || row.fallback_track_title || ''),
+        artistName: getSharedString(meta?.artist_names || row.fallback_artist_name || ''),
+        labelName: getSharedString(meta?.label_name || row.fallback_label_name || ''),
+        territory: getSharedString(row.territory),
         totalUsage: Number(row.total_usage ?? 0),
-        revenueUsd: row.revenue_usd?.toString() ?? '0',
-        currency: 'USD',
+        revenueUsd: getSharedString(row.revenue_usd?.toString() ?? '0'),
+        currency: getSharedString('USD'),
       };
     });
   }
@@ -781,32 +985,12 @@ export class AnalyticsReportExportService {
   private isGeneratedUpcBackfill(value: string): boolean {
     return value.trim().toUpperCase().startsWith('UPC-');
   }
-
   private async getTrackMetadata(isrcs: string[]): Promise<Map<string, MetadataRow>> {
     const map = new Map<string, MetadataRow>();
     if (!isrcs.length) return map;
 
     const rows = await this.entityManager.query(
-      `
-        SELECT
-          t.isrc AS isrc,
-          COALESCE(NULLIF(ten.title, ''), ten.name, '') AS workspace_name,
-          r.title AS release_title,
-          COALESCE(r.upc, '') AS release_upc,
-          COALESCE(r.catalog_id, '') AS catalog_id,
-          r.release_date AS release_date,
-          t.title AS track_title,
-          COALESCE(l.name, '') AS label_name,
-          COALESCE(string_agg(DISTINCT a.name, ', '), '') AS artist_names
-        FROM tracks t
-        INNER JOIN releases r ON r.id = t.release_id
-        LEFT JOIN labels l ON l.id = r.label_id
-        LEFT JOIN tenants ten ON ten.id = r.tenant_id
-        LEFT JOIN track_artist ta ON ta.track_id = t.id
-        LEFT JOIN artists a ON a.id = ta.artist_id
-        WHERE t.isrc = ANY($1)
-        GROUP BY t.isrc, ten.title, ten.name, r.title, r.upc, r.catalog_id, r.release_date, t.title, l.name
-      `,
+      getTrackMetadataQuery(),
       [isrcs],
     );
 
@@ -820,15 +1004,19 @@ export class AnalyticsReportExportService {
     const map = new Map<string, string>();
     if (!tenantIds.length) return map;
 
+    const validUuidTenantIds = tenantIds.filter((id) => {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+      if (!isUuid && id === 'system-tenant') {
+        map.set(id, 'System Tenant');
+      }
+      return isUuid;
+    });
+
+    if (!validUuidTenantIds.length) return map;
+
     const rows = await this.entityManager.query(
-      `
-        SELECT
-          id::text AS id,
-          COALESCE(NULLIF(title, ''), name, id::text) AS tenant_name
-        FROM tenants
-        WHERE id = ANY($1)
-      `,
-      [tenantIds],
+      getTenantNamesQuery(),
+      [validUuidTenantIds],
     );
 
     for (const row of rows) {
@@ -844,25 +1032,7 @@ export class AnalyticsReportExportService {
     if (!upcs.length) return map;
 
     const rows = await this.entityManager.query(
-      `
-        SELECT
-          r.upc AS upc,
-          COALESCE(NULLIF(ten.title, ''), ten.name, '') AS workspace_name,
-          r.title AS release_title,
-          COALESCE(r.upc, '') AS release_upc,
-          COALESCE(r.catalog_id, '') AS catalog_id,
-          r.release_date AS release_date,
-          '' AS track_title,
-          COALESCE(l.name, '') AS label_name,
-          COALESCE(string_agg(DISTINCT a.name, ', '), '') AS artist_names
-        FROM releases r
-        LEFT JOIN labels l ON l.id = r.label_id
-        LEFT JOIN tenants ten ON ten.id = r.tenant_id
-        LEFT JOIN release_artist ra ON ra.release_id = r.id
-        LEFT JOIN artists a ON a.id = ra.artist_id
-        WHERE r.upc = ANY($1)
-        GROUP BY r.upc, ten.title, ten.name, r.title, r.catalog_id, r.release_date, l.name
-      `,
+      getReleaseMetadataByUpcQuery(),
       [upcs],
     );
 
@@ -870,199 +1040,6 @@ export class AnalyticsReportExportService {
       map.set(row.upc, row);
     }
     return map;
-  }
-
-  private async toWorkbook(
-    summary: SummaryRow,
-    details: DetailRow[],
-  ): Promise<Buffer> {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'ag-release-server';
-    workbook.created = new Date();
-
-    const summarySheet = workbook.addWorksheet('Summary');
-    summarySheet.columns = [
-      { header: 'StartDate', key: 'startDate', width: 14 },
-      { header: 'EndDate', key: 'endDate', width: 14 },
-      { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
-      { header: 'Currency', key: 'currency', width: 10 },
-      { header: 'TrackCount', key: 'trackCount', width: 12 },
-      { header: 'ReleaseCount', key: 'releaseCount', width: 14 },
-      { header: 'LabelCount', key: 'labelCount', width: 12 },
-      { header: 'DspCount', key: 'dspCount', width: 12 },
-      { header: 'TerritoryCount', key: 'territoryCount', width: 15 },
-    ];
-    summarySheet.addRow(summary);
-    this.styleSheet(summarySheet);
-
-    const detailSheet = workbook.addWorksheet('Detail');
-    detailSheet.columns = this.getDetailColumns();
-    detailSheet.addRows(details);
-    this.styleSheet(detailSheet);
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    return Buffer.from(buffer);
-  }
-
-  private async writeWorkbookFile(
-    filePath: string,
-    summary: SummaryRow,
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    range: { startDate: string; endDate: string },
-    trackIsrc: string | null,
-    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
-    jobId?: string,
-  ): Promise<number> {
-    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
-      filename: filePath,
-      useStyles: true,
-      useSharedStrings: false,
-    });
-
-    const summarySheet = workbook.addWorksheet('Summary');
-    summarySheet.columns = [
-      { header: 'StartDate', key: 'startDate', width: 14 },
-      { header: 'EndDate', key: 'endDate', width: 14 },
-      { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
-      { header: 'Currency', key: 'currency', width: 10 },
-      { header: 'TrackCount', key: 'trackCount', width: 12 },
-      { header: 'ReleaseCount', key: 'releaseCount', width: 14 },
-      { header: 'LabelCount', key: 'labelCount', width: 12 },
-      { header: 'DspCount', key: 'dspCount', width: 12 },
-      { header: 'TerritoryCount', key: 'territoryCount', width: 15 },
-    ];
-    summarySheet.addRow(summary).commit();
-    summarySheet.commit();
-
-    const detailSheet = workbook.addWorksheet('Detail');
-    detailSheet.columns = this.getDetailColumns();
-
-    let offset = 0;
-    let totalRows = 0;
-    let detailCommitted = false;
-    let workbookCommitted = false;
-    try {
-      while (true) {
-        await this.throwIfExportJobCancelled(jobId);
-        const rawRows = await this.getRawDetailsPage(
-          tenantId,
-          dto,
-          range,
-          trackIsrc,
-          this.batchSize,
-          offset,
-        );
-        if (!rawRows.length) break;
-        await this.throwIfExportJobCancelled(jobId);
-
-        const details = await this.enrichDetails(rawRows);
-        for (const row of details) {
-          detailSheet.addRow(row).commit();
-        }
-        totalRows += rawRows.length;
-        await onProgress?.(
-          {
-            progressCurrent: 2,
-            progressLabel: `Writing report file (${totalRows} rows)`,
-            processedRows: totalRows,
-          },
-          false,
-        );
-        await this.throwIfExportJobCancelled(jobId);
-
-        if (rawRows.length < this.batchSize) break;
-        offset += this.batchSize;
-      }
-
-      detailSheet.commit();
-      detailCommitted = true;
-      await workbook.commit();
-      workbookCommitted = true;
-    } finally {
-      if (!detailCommitted) {
-        detailSheet.commit();
-      }
-      if (!workbookCommitted) {
-        await workbook.commit().catch(() => undefined);
-      }
-    }
-    return totalRows;
-  }
-
-  private async writeCsvFile(
-    filePath: string,
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    range: { startDate: string; endDate: string },
-    trackIsrc: string | null,
-    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
-    jobId?: string,
-  ): Promise<number> {
-    const stream = fs.createWriteStream(filePath, { encoding: 'utf8' });
-    const columns = this.getDetailColumns();
-    const headers = columns.map((col) => col.header?.toString() ?? '');
-    const keys = columns.map((col) => col.key?.toString() ?? '');
-    await this.writeStreamLine(
-      stream,
-      `\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}\n`,
-    );
-
-    let offset = 0;
-    let totalRows = 0;
-    try {
-      while (true) {
-        await this.throwIfExportJobCancelled(jobId);
-        const rawRows = await this.getRawDetailsPage(
-          tenantId,
-          dto,
-          range,
-          trackIsrc,
-          this.batchSize,
-          offset,
-        );
-        if (!rawRows.length) break;
-        await this.throwIfExportJobCancelled(jobId);
-
-        const details = await this.enrichDetails(rawRows);
-        for (const row of details) {
-          const record = row as unknown as Record<string, unknown>;
-          await this.writeStreamLine(
-            stream,
-            `${keys.map((key) => this.csvEscape(record[key])).join(',')}\n`,
-          );
-        }
-        totalRows += rawRows.length;
-        await onProgress?.(
-          {
-            progressCurrent: 2,
-            progressLabel: `Writing report file (${totalRows} rows)`,
-            processedRows: totalRows,
-          },
-          false,
-        );
-        await this.throwIfExportJobCancelled(jobId);
-
-        if (rawRows.length < this.batchSize) break;
-        offset += this.batchSize;
-      }
-    } finally {
-      await new Promise<void>((resolve, reject) => {
-        stream.end((err?: Error | null) => (err ? reject(err) : resolve()));
-      });
-    }
-    return totalRows;
-  }
-
-  private async writeStreamLine(
-    stream: fs.WriteStream,
-    line: string,
-  ): Promise<void> {
-    if (!stream.write(line)) {
-      await once(stream, 'drain');
-    }
   }
 
   private getDetailColumns(): Partial<ExcelJS.Column>[] {
@@ -1081,30 +1058,6 @@ export class AnalyticsReportExportService {
       { header: 'Revenue', key: 'revenueUsd', width: 18 },
       { header: 'Currency', key: 'currency', width: 10 },
     ];
-  }
-
-  private styleSheet(sheet: ExcelJS.Worksheet) {
-    sheet.views = [{ state: 'frozen', ySplit: 1 }];
-    sheet.getRow(1).font = { bold: true };
-    sheet.getRow(1).alignment = { vertical: 'middle' };
-    sheet.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: 1, column: sheet.columnCount },
-    };
-  }
-
-  private toCsv(details: DetailRow[]): string {
-    const columns = this.getDetailColumns();
-    const headers = columns.map((col) => col.header?.toString() ?? '');
-    const keys = columns.map((col) => col.key?.toString() ?? '');
-    const lines = [headers.map((h) => this.csvEscape(h)).join(',')];
-
-    for (const row of details) {
-      const record = row as unknown as Record<string, unknown>;
-      lines.push(keys.map((key) => this.csvEscape(record[key])).join(','));
-    }
-
-    return lines.join('\n');
   }
 
   private csvEscape(value: unknown): string {

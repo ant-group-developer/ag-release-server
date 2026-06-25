@@ -14,6 +14,7 @@ import {
 } from 'src/utils/upc.util';
 import { Release } from '../entities/release.entity';
 import { Track } from '../../track/entities/track.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -38,6 +39,8 @@ export interface ReportEntityImportContext {
   parserCode?: string;
   fileName?: string;
   jobId?: string;
+  dspType?: 'audio' | 'video';
+  dryRun?: boolean;
 }
 
 @Injectable()
@@ -62,11 +65,13 @@ export class ReportEntityExtractorService {
     created: number;
     skipped: number;
     errors: number;
+    inDb: number;
+    pending: number;
   }> {
     const resolvedTenantId = tenantId === 'system-tenant' ? undefined : tenantId;
 
     if (!rows || rows.length === 0) {
-      return { totalReleases: 0, created: 0, skipped: 0, errors: 0 };
+      return { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
     }
 
     const upcMap = new Map<string, Map<string, ExtractedRow>>();
@@ -211,7 +216,77 @@ export class ReportEntityExtractorService {
     let created = 0;
     let skipped = 0;
     let errors = 0;
+    let inDb = 0;
+    let pending = 0;
     let importedCount = 0;
+
+    // Pre-fetch existing releases and tracks/videos in PostgreSQL
+    const upcs = inputs.map((input) => input.upc);
+    const isrcs = inputs.flatMap((input) => input.tracks?.map((t: any) => t.isrc) || []).filter(Boolean);
+
+    let existingUpcs = new Set<string>();
+    let existingIsrcs = new Set<string>();
+
+    if (upcs.length > 0) {
+      const normalizedUpcs = upcs.map((u) => normalizeUpc(u));
+      const equivalentUpcsSet = new Set<string>();
+      for (const u of normalizedUpcs) {
+        const equivalents = buildEquivalentUpcs(u);
+        for (const eq of equivalents) {
+          equivalentUpcsSet.add(eq);
+        }
+      }
+      const allEquivalentUpcs = Array.from(equivalentUpcsSet);
+
+      const existingReleases = await this.dataSource.getRepository(Release).find({
+        where: { upc: In(allEquivalentUpcs) },
+        select: ['upc'],
+      });
+      existingUpcs = new Set(existingReleases.map((r) => normalizeUpc(r.upc)).filter((u): u is string => !!u));
+    }
+
+    if (isrcs.length > 0) {
+      if (context?.dspType === 'video') {
+        const existingVideos = await this.dataSource.getRepository(Video).find({
+          where: { isrc: In(isrcs) },
+          select: ['isrc'],
+        });
+        existingIsrcs = new Set(existingVideos.map((v) => v.isrc).filter((isrc): isrc is string => !!isrc));
+      } else {
+        const existingTracks = await this.dataSource.getRepository(Track).find({
+          where: { isrc: In(isrcs) },
+          select: ['isrc'],
+        });
+        existingIsrcs = new Set(existingTracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc));
+      }
+    }
+
+    // Determine initial inDb vs pending status
+    for (const input of inputs) {
+      const upcExists = !!input.upc && existingUpcs.has(normalizeUpc(input.upc));
+      let isrcExists = false;
+      if (input.tracks && input.tracks.length > 0) {
+        const trackIsrcs = input.tracks.map((t: any) => t.isrc).filter(Boolean);
+        isrcExists = trackIsrcs.some((isrc: string) => existingIsrcs.has(isrc));
+      }
+      if (upcExists || isrcExists) {
+        inDb++;
+      } else {
+        pending++;
+      }
+    }
+
+    if (context?.dryRun) {
+      this.logger.log(`Dry run mode: matched ${inDb} already in DB, ${pending} pending`);
+      return {
+        totalReleases: inputs.length,
+        created: 0,
+        skipped: 0,
+        errors: 0,
+        inDb,
+        pending,
+      };
+    }
 
     this.logger.log(`Importing ${inputs.length} release metadata item(s) into PostgreSQL`);
     await onProgress?.({
@@ -222,9 +297,19 @@ export class ReportEntityExtractorService {
     });
 
     for (const input of inputs) {
+      const upcExists = !!input.upc && existingUpcs.has(normalizeUpc(input.upc));
+      let isrcExists = false;
+      if (input.tracks && input.tracks.length > 0) {
+        const trackIsrcs = input.tracks.map((t: any) => t.isrc).filter(Boolean);
+        isrcExists = trackIsrcs.some((isrc: string) => existingIsrcs.has(isrc));
+      }
+      const alreadyExists = upcExists || isrcExists;
+
       try {
-        // Import release and real tracks into PostgreSQL
-        const release = await this.releaseReportImportService.importRelease(input);
+        // Import release and real tracks/videos into PostgreSQL
+        const release = context?.dspType === 'video'
+          ? await this.releaseReportImportService.importVideoRelease(input)
+          : await this.releaseReportImportService.importRelease(input);
 
         // Directly insert temporary UPC- ISRCs into pg_tracks_sync ClickHouse table
         if (input.upcTracks && input.upcTracks.length > 0) {
@@ -246,11 +331,12 @@ export class ReportEntityExtractorService {
             release_upc: release.upc || '',
             label_id: release.labelId || '',
             artist_ids: artistIds,
+            release_type: context?.dspType || 'audio',
             is_deleted: 0,
             updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
           }));
 
-          this.logger.log(`Inserting ${chData.length} temporary UPC track(s) directly into pg_tracks_sync for release ${release.id}`);
+          this.logger.log(`Inserting ${chData.length} temporary UPC track/video(s) directly into pg_tracks_sync for release ${release.id}`);
           await this.clickHouseService.insert(
             CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
             chData,
@@ -259,13 +345,17 @@ export class ReportEntityExtractorService {
           });
         }
 
-        if (release.isImportedFromReport) {
-          created++;
+        if (alreadyExists) {
+          // It was already in DB
         } else {
-          skipped++;
+          created++;
+          pending--;
         }
       } catch (err) {
         errors++;
+        if (!alreadyExists) {
+          pending--;
+        }
         this.logger.error(
           `Failed to extract/import release from report for UPC=${input.upc}: ${err.message}`,
           err.stack,
@@ -289,6 +379,8 @@ export class ReportEntityExtractorService {
       created,
       skipped,
       errors,
+      inDb,
+      pending,
     };
   }
 
