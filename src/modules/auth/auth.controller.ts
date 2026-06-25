@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -25,8 +25,11 @@ export class AuthController {
 
 	@PublicRoute()
 	@Post('login')
-	async login(@Body() body: SiginDto) {
-		const data = await this.auth.login(body);
+	async login(
+		@Body() body: SiginDto,
+		@Headers('x-custom-domain-tenant') customDomainTenantId?: string,
+	) {
+		const data = await this.auth.login(body, customDomainTenantId);
 		return new ResponseSuccess({ data });
 	}
 

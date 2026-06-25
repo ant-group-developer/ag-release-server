@@ -1,10 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectEntityManager } from '@nestjs/typeorm';
-import * as ExcelJS from 'exceljs';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
@@ -15,121 +10,52 @@ import {
 } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { isValidStandardUpc } from 'src/utils/upc.util';
-import { zipFolder } from 'src/utils/util';
-import { EntityManager } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsReportExportDto } from '../dto/analytics-report-export.dto';
 import {
-  AnalyticsReportExportResult,
   AnalyticsReportExportJobResult,
   AnalyticsReportExportCancelResult,
   AnalyticsReportExportCancelAllResult,
   AnalyticsReportExportCancelListResult,
-  SummaryRow,
-  RawDetailRow,
-  DetailRow,
-  MetadataRow,
-  ExportProgressPatch,
 } from '../interfaces/analytics-report-export.interface';
-import {
-  getRawDetailsPageQuery,
-  getTrackMetadataQuery,
-  getTenantNamesQuery,
-  getReleaseMetadataByUpcQuery,
-  getUniqueIdentifiersQuery,
-} from '../queries/analytics-report-export.queries';
-import {
-  GroupState,
-  SummaryAccumulator,
-  createEmptyAccumulator,
-  formatRevenueSum,
-  updateAccumulator,
-  createStreamWriter,
-} from './stream-detail-writer';
 import { ExportQueueService } from './export-queue.service';
+import { ExportWorkerPoolService } from '../workers/export-worker-pool.service';
 
-class ExportJobCancelledError extends Error {
-  constructor(jobId: string) {
-    super(`Export job ${jobId} was cancelled`);
-    this.name = ExportJobCancelledError.name;
-  }
-}
-
+/**
+ * AnalyticsReportExportService — quản lý vòng đời job export (tạo / huỷ /
+ * cleanup). Việc CHẠY export đã chuyển sang ExportWorkerPoolService
+ * (worker_threads) để không chiếm event loop HTTP.
+ */
 @Injectable()
-export class AnalyticsReportExportService implements OnModuleInit {
+export class AnalyticsReportExportService {
   private readonly logger = new Logger(AnalyticsReportExportService.name);
   private readonly exportRetentionDays = 7;
   private readonly cleanupBatchSize = 100;
-  private readonly cancelledExportJobs = new Set<string>();
-  private readonly maxConcurrentWorkers = 10;
-  private isRunning = false;
-  private readonly sanitizedNamesCache = new Map<string, string>();
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly r2Service: BucketR2Service,
     private readonly importJobsService: ImportJobsService,
     private readonly exportQueueService: ExportQueueService,
-    @InjectEntityManager()
-    private readonly entityManager: EntityManager,
+    private readonly workerPool: ExportWorkerPoolService,
   ) {}
-
-  async onModuleInit() {
-    await this.exportQueueService.redeliverStuck();
-    this.isRunning = true;
-    for (let i = 0; i < this.maxConcurrentWorkers; i++) {
-      this.startWorker(i);
-    }
-    this.logger.log(`Started ${this.maxConcurrentWorkers} export workers`);
-  }
-
-  private startWorker(workerId: number) {
-    setImmediate(async () => {
-      while (this.isRunning) {
-        try {
-          const jobId = await this.exportQueueService.dequeue();
-          if (jobId) {
-            this.logger.log(`Worker-${workerId} picked up export job ${jobId}`);
-            const job = await this.importJobsService.findById(jobId);
-            if (job && !this.isTerminalStatus(job.status)) {
-              await this.runExportJob(
-                jobId,
-                job.tenantId || '',
-                job.params as unknown as AnalyticsReportExportDto,
-              );
-            }
-            await this.exportQueueService.ack(jobId);
-          } else {
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-        } catch (err: any) {
-          this.logger.error(`Worker-${workerId} error: ${err.message}`, err.stack);
-          await new Promise((r) => setTimeout(r, 3000));
-        }
-      }
-    });
-  }
 
   async createExportJob(
     tenantId: string,
     userId: string,
     dto: AnalyticsReportExportDto,
   ): Promise<AnalyticsReportExportJobResult> {
-    // KHÔNG query Postgres (getTenantNames) trên hot path của HTTP — chỉ tạo job
-    // + enqueue rồi return ngay. Tên workspace sẽ được resolve ở worker
-    // (runExportJob) và patch lại fileName. Giữ HTTP handler ở mức vài ms.
+    // Hot path HTTP: chỉ tạo job + enqueue rồi return ngay (vài ms). Tên workspace
+    // thật được resolve ở worker (ExportRunner) và patch lại fileName sau.
     const job = await this.importJobsService.create({
       sourceType: ImportJobSourceType.ANALYTICS_REPORT_EXPORT,
       params: dto as unknown as Record<string, unknown>,
-      fileName: this.buildFileName('workspace', dto),
+      fileName: this.buildPlaceholderFileName(dto),
       progressTotal: 4,
       tenantId,
       createdBy: userId,
     });
 
     await this.importJobsService.markQueued(job.id);
-
     await this.exportQueueService.enqueue(job.id);
 
     return {
@@ -152,14 +78,11 @@ export class AnalyticsReportExportService implements OnModuleInit {
       };
     }
 
-    this.cancelledExportJobs.add(job.id);
+    this.workerPool.requestCancel(job.id);
     const cancelledJob = await this.importJobsService.markCancelled(
       job.id,
       'Cancelled by user',
     );
-    if (cancelledJob.status !== ImportJobStatus.CANCELLED) {
-      this.cancelledExportJobs.delete(job.id);
-    }
     return {
       jobId: cancelledJob.id,
       status: cancelledJob.status,
@@ -187,7 +110,7 @@ export class AnalyticsReportExportService implements OnModuleInit {
         continue;
       }
 
-      this.cancelledExportJobs.add(job.id);
+      this.workerPool.requestCancel(job.id);
       const cancelledJob = await this.importJobsService.markCancelled(
         job.id,
         'Cancelled by user',
@@ -195,16 +118,11 @@ export class AnalyticsReportExportService implements OnModuleInit {
       if (cancelledJob.status === ImportJobStatus.CANCELLED) {
         jobIds.push(job.id);
       } else {
-        this.cancelledExportJobs.delete(job.id);
         skippedCount++;
       }
     }
 
-    return {
-      cancelledCount: jobIds.length,
-      jobIds,
-      skippedCount,
-    };
+    return { cancelledCount: jobIds.length, jobIds, skippedCount };
   }
 
   async cancelExportJobs(
@@ -226,7 +144,7 @@ export class AnalyticsReportExportService implements OnModuleInit {
           continue;
         }
 
-        this.cancelledExportJobs.add(job.id);
+        this.workerPool.requestCancel(job.id);
         const cancelledJob = await this.importJobsService.markCancelled(
           job.id,
           'Cancelled by user',
@@ -234,7 +152,6 @@ export class AnalyticsReportExportService implements OnModuleInit {
         if (cancelledJob.status === ImportJobStatus.CANCELLED) {
           cancelledJobIds.push(job.id);
         } else {
-          this.cancelledExportJobs.delete(job.id);
           skippedCount++;
         }
       } catch (err) {
@@ -252,6 +169,8 @@ export class AnalyticsReportExportService implements OnModuleInit {
       skippedCount,
     };
   }
+
+  // PLACEHOLDER_CLEANUP
 
   @Cron('0 3 * * *')
   async cleanupExpiredExportFiles(): Promise<void> {
@@ -327,414 +246,6 @@ export class AnalyticsReportExportService implements OnModuleInit {
     return statusCode === 404 || message.includes('not found');
   }
 
-  async exportReport(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
-    jobId?: string,
-  ): Promise<AnalyticsReportExportResult> {
-    await this.throwIfExportJobCancelled(jobId);
-    const range = this.getMonthRange(dto);
-    const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
-    if (dto.trackId && !trackIsrc) {
-      throw new BadRequestException('trackId does not have a valid ISRC');
-    }
-
-    const tenantNamesMap = await this.getTenantNames([tenantId]);
-    const tenantName = tenantNamesMap.get(tenantId) || 'unnamed_workspace';
-    const fileName = this.buildFileName(tenantName, dto);
-    // Hot path của createExportJob đã bỏ getTenantNames; resolve tên workspace ở
-    // đây (trong worker) rồi patch lại fileName để FE/SSE hiển thị đúng.
-    if (jobId) {
-      await this.importJobsService.updateFileName(jobId, fileName).catch(() => undefined);
-    }
-    const tempDir = path.join(os.tmpdir(), `export-split-${uuidv4()}`);
-    const zipPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
-    const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
-    const format = dto.format ?? 'csv';
-    const groups = new Map<string, GroupState>();
-    const cache = {
-      trackMeta: new Map<string, MetadataRow>(),
-      releaseMeta: new Map<string, MetadataRow>(),
-      tenantNames: new Map<string, string>(),
-    };
-
-    try {
-      await fs.promises.mkdir(tempDir, { recursive: true });
-
-      // Step 1: Pre-fetch all metadata into job-local cache
-      await onProgress?.({ progressCurrent: 1, progressLabel: 'Pre-fetching metadata' }, true);
-      await this.throwIfExportJobCancelled(jobId);
-      await this.prefetchMetadata(tenantId, dto, range, trackIsrc, cache);
-
-      // Step 2: Stream toàn bộ resultset 1-pass → enrich → write directly to group files
-      // (Trước đây dùng LIMIT/OFFSET pagination → ClickHouse phải join+group+sort lại
-      //  toàn bộ mỗi page = O(n²). Giờ ClickHouse làm 1 lần, Node đọc theo chunk.)
-      await onProgress?.({ progressCurrent: 2, progressLabel: 'Streaming data' }, true);
-      const stringPool = new Map<string, string>();
-      let totalRows = 0;
-      let sinceYield = 0;
-      let sinceProgress = 0;
-
-      await this.streamRawDetails(
-        tenantId,
-        dto,
-        range,
-        trackIsrc,
-        async (rawRows) => {
-          for (const raw of rawRows) {
-            const detail = this.enrichSingleRow(raw, stringPool, cache);
-            const groupKeys = this.getRowGroupKeys(detail, dto);
-
-            for (const gk of groupKeys) {
-              let group = groups.get(gk);
-              if (!group) {
-                const groupFolder = path.join(tempDir, gk);
-                await fs.promises.mkdir(groupFolder, { recursive: true });
-                group = {
-                  writer: createStreamWriter(
-                    path.join(groupFolder, `detail.${format}`),
-                    format,
-                  ),
-                  summary: createEmptyAccumulator(),
-                };
-                groups.set(gk, group);
-              }
-              group.writer.appendRow(detail as any);
-              updateAccumulator(group.summary, detail as any);
-            }
-            totalRows++;
-            sinceYield++;
-            sinceProgress++;
-
-            // Yield event loop thường xuyên để không block (kể cả khi còn in-process).
-            if (sinceYield >= 1000) {
-              sinceYield = 0;
-              await new Promise((resolve) => setImmediate(resolve));
-            }
-          }
-
-          await this.throwIfExportJobCancelled(jobId);
-          if (sinceProgress >= 50_000) {
-            sinceProgress = 0;
-            await onProgress?.({
-              progressCurrent: 2,
-              progressLabel: `Streaming data (${totalRows} rows)`,
-              processedRows: totalRows,
-            }, false);
-          }
-        },
-      );
-      // String pool chỉ hữu ích trong phạm vi 1 lần stream; clear sau khi xong.
-      stringPool.clear();
-
-      // Step 3: Flush writers, write summaries
-      await onProgress?.({ progressCurrent: 3, progressLabel: `Finalizing ${groups.size} folders` }, true);
-      for (const [gk, group] of groups) {
-        await this.throwIfExportJobCancelled(jobId);
-        await group.writer.flush();
-        const summary = this.buildSummaryFromAccumulator(group.summary, gk, dto);
-        await this.writeSummaryFile(path.join(tempDir, gk, `summary.${format}`), summary, format);
-      }
-
-      // Step 4: ZIP + Upload
-      await onProgress?.({ progressCurrent: 3, progressLabel: 'Creating ZIP archive' }, true);
-      await this.throwIfExportJobCancelled(jobId);
-      await zipFolder(tempDir, zipPath);
-
-      await onProgress?.({
-        progressCurrent: 4, progressLabel: 'Uploading ZIP file',
-        processedRows: totalRows, totalRows,
-      }, true);
-      await this.throwIfExportJobCancelled(jobId);
-
-      await this.r2Service.uploadFileFromPath({ key, filePath: zipPath, contentType: 'application/zip', isPublic: false });
-
-      return {
-        fileName, key,
-        downloadUrl: await this.r2Service.getSignedUrlDown({ key, fileName, isPublic: false }),
-        expiresInSeconds: 4 * 3600,
-        totalRows,
-      };
-    } finally {
-      this.sanitizedNamesCache.clear();
-      for (const [, g] of groups) {
-        await g.writer.flush().catch(() => {});
-      }
-      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-      await fs.promises.unlink(zipPath).catch(() => undefined);
-    }
-  }
-
-  private getRowGroupKeys(row: DetailRow, dto: AnalyticsReportExportDto): string[] {
-    const keys: string[] = [];
-    const tenantFolder = this.sanitizeFileName(row.tenant || 'unnamed_workspace');
-    const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
-    const periodUnit = dto.periodUnit || 'none';
-    keys.push(tenantFolder);
-
-    if (periodUnit === 'month' || periodUnit === 'quarter') {
-      const periodKey = this.getPeriodKey(row.date, periodUnit);
-      keys.push(`${tenantFolder}/${periodKey}`);
-      if (isExportArtist) {
-        keys.push(`${tenantFolder}/${periodKey}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`);
-      }
-    } else if (isExportArtist) {
-      keys.push(`${tenantFolder}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`);
-    }
-    return keys;
-  }
-
-  private getPeriodKey(date: string, unit: string): string {
-    if (unit === 'quarter' || unit === 'quater') {
-      const [year, month] = date.split('-').map(Number);
-      return `${year}-Q${Math.ceil(month / 3)}`;
-    }
-    return date;
-  }
-
-  private buildSummaryFromAccumulator(acc: SummaryAccumulator, groupPath: string, dto: AnalyticsReportExportDto): SummaryRow {
-    const parts = groupPath.split('/');
-    let artistName = '';
-    let period = '';
-    const periodUnit = dto.periodUnit || 'none';
-    const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
-
-    if (parts.length === 2) {
-      if (periodUnit === 'month' || periodUnit === 'quarter') period = parts[1];
-      else if (isExportArtist) artistName = parts[1];
-    } else if (parts.length === 3) {
-      period = parts[1];
-      artistName = parts[2];
-    }
-
-    return {
-      startDate: acc.minStartDate || `${dto.fromDate}-01`,
-      endDate: acc.maxEndDate || this.lastDayOfMonth(dto.endDate),
-      tenantName: acc.tenantName || 'unnamed_workspace',
-      artistName: artistName || undefined,
-      period: period || undefined,
-      totalUsage: acc.totalUsage,
-      revenueUsd: formatRevenueSum(acc),
-      currency: 'USD',
-      trackCount: acc.uniqueIsrcs.size,
-      releaseCount: acc.uniqueReleases.size,
-      labelCount: acc.uniqueLabels.size,
-      dspCount: acc.uniqueDsps.size,
-      territoryCount: acc.uniqueTerritories.size,
-      artistCount: acc.uniqueArtists.size,
-    } as any;
-  }
-  private getSummaryColumns(): Partial<ExcelJS.Column>[] {
-    return [
-      { header: 'StartDate', key: 'startDate', width: 14 },
-      { header: 'EndDate', key: 'endDate', width: 14 },
-      { header: 'WorkspaceName', key: 'tenantName', width: 28 },
-      { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'RevenueUsd', key: 'revenueUsd', width: 18 },
-      { header: 'Currency', key: 'currency', width: 10 },
-      { header: 'TrackCount', key: 'trackCount', width: 12 },
-      { header: 'ReleaseCount', key: 'releaseCount', width: 14 },
-      { header: 'LabelCount', key: 'labelCount', width: 12 },
-      { header: 'DspCount', key: 'dspCount', width: 12 },
-      { header: 'TerritoryCount', key: 'territoryCount', width: 15 },
-      { header: 'ArtistCount', key: 'artistCount', width: 12 },
-    ];
-  }
-
-  private async writeSummaryFile(
-    filePath: string,
-    summary: SummaryRow,
-    format: 'xlsx' | 'csv',
-  ): Promise<void> {
-    if (format === 'csv') {
-      const columns = this.getSummaryColumns();
-      const headers = columns.map((c) => c.header?.toString() ?? '');
-      const keys = columns.map((c) => c.key?.toString() ?? '');
-      const lines = [
-        `\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}`,
-        keys.map((key) => this.csvEscape((summary as any)[key])).join(','),
-      ];
-      await fs.promises.writeFile(filePath, lines.join('\n'), 'utf8');
-    } else {
-      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
-        filename: filePath,
-        useStyles: true,
-        useSharedStrings: false,
-      });
-      const sheet = workbook.addWorksheet('Summary');
-      sheet.columns = this.getSummaryColumns();
-      sheet.addRow(summary).commit();
-      sheet.commit();
-      await workbook.commit();
-    }
-  }
-
-  private async prefetchMetadata(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    range: ReturnType<typeof this.getMonthRange>,
-    trackIsrc: string | null,
-    cache: {
-      trackMeta: Map<string, MetadataRow>;
-      releaseMeta: Map<string, MetadataRow>;
-      tenantNames: Map<string, string>;
-    },
-  ): Promise<void> {
-    this.logger.log('Refreshing metadata cache for unique identifiers...');
-    const filters = this.buildFilters(tenantId, dto, trackIsrc);
-    const uniqueIdentifiersSql = getUniqueIdentifiersQuery(
-      this.getCommonJoins(),
-      filters.whereSql,
-    );
-
-    const rows = await this.clickHouseService.query<any>(
-      uniqueIdentifiersSql,
-      filters.params,
-    );
-
-    const uniqueIsrcs = new Set<string>();
-    const uniqueTenantIds = new Set<string>();
-
-    for (const row of rows) {
-      if (row.isrc) uniqueIsrcs.add(row.isrc);
-      if (row.tenant_id) uniqueTenantIds.add(row.tenant_id);
-    }
-
-    const isrcs = Array.from(uniqueIsrcs);
-    const tenantIds = Array.from(uniqueTenantIds);
-
-    this.logger.log(`Found ${isrcs.length} unique ISRCs and ${tenantIds.length} tenants`);
-
-    const BATCH = 5000;
-    for (let i = 0; i < isrcs.length; i += BATCH) {
-      const batchIsrcs = isrcs.slice(i, i + BATCH);
-      const trackMap = await this.getTrackMetadata(batchIsrcs);
-      
-      const upcsToFetch = new Set<string>();
-      for (const [isrc, track] of trackMap) {
-        cache.trackMeta.set(isrc, track);
-        if (track.release_upc) upcsToFetch.add(track.release_upc);
-      }
-
-      if (upcsToFetch.size > 0) {
-        const releaseMap = await this.getReleaseMetadataByUpc(Array.from(upcsToFetch));
-        for (const [upc, release] of releaseMap) {
-          cache.releaseMeta.set(upc, release);
-        }
-      }
-    }
-
-    if (tenantIds.length > 0) {
-      const tenantMap = await this.getTenantNames(tenantIds);
-      for (const [tid, tname] of tenantMap) {
-        cache.tenantNames.set(tid, tname);
-      }
-    }
-  }
-
-  private enrichSingleRow(
-    raw: RawDetailRow,
-    stringPool: Map<string, string>,
-    cache: {
-      trackMeta: Map<string, MetadataRow>;
-      releaseMeta: Map<string, MetadataRow>;
-      tenantNames: Map<string, string>;
-    },
-  ): DetailRow {
-    const pool = (val: string | null | undefined): string | undefined => {
-      if (!val) return undefined;
-      let cached = stringPool.get(val);
-      if (!cached) {
-        cached = val;
-        stringPool.set(val, cached);
-      }
-      return cached;
-    };
-
-    const isrc = raw.isrc;
-    const trackInfo = isrc ? cache.trackMeta.get(isrc) : null;
-    const isStandardUpc = isValidStandardUpc(raw.fallback_upc || '');
-    const upcToLookup = isStandardUpc ? raw.fallback_upc : trackInfo?.release_upc;
-    const releaseInfo = upcToLookup ? cache.releaseMeta.get(upcToLookup) : null;
-
-    const baseInfo = trackInfo || releaseInfo;
-    const finalTenantName = raw.tenant_id 
-      ? cache.tenantNames.get(raw.tenant_id) 
-      : baseInfo?.workspace_name;
-
-    const artistNameRaw = pool(raw.fallback_artist_name || trackInfo?.artist_names || releaseInfo?.artist_names || '');
-
-    return {
-      date: pool(raw.date),
-      startDate: pool(raw.start_date),
-      endDate: pool(raw.end_date),
-      tenant: pool(finalTenantName),
-      dspName: pool(raw.dsp_name),
-      upc: pool(raw.fallback_upc),
-      isrc: pool(raw.isrc),
-      releaseName: pool(raw.fallback_album_title || baseInfo?.release_title || ''),
-      trackName: pool(raw.fallback_track_title || trackInfo?.track_title || ''),
-      artistName: artistNameRaw,
-      labelName: pool(raw.fallback_label_name || baseInfo?.label_name || ''),
-      territory: pool(raw.territory),
-      totalUsage: Number(raw.total_usage || 0),
-      revenueUsd: String(raw.revenue_usd || '0.00'),
-      currency: pool('USD'),
-    } as any;
-  }
-
-  /** Sanitize a string for use as a file/directory name. */
-  private sanitizeFileName(name: string): string {
-    let cached = this.sanitizedNamesCache.get(name);
-    if (cached !== undefined) return cached;
-
-    const sanitized = name
-      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-      .replace(/\s+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '')
-      .substring(0, 100) || 'unnamed';
-
-    this.sanitizedNamesCache.set(name, sanitized);
-    return sanitized;
-  }
-
-  private async runExportJob(
-    jobId: string,
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-  ): Promise<void> {
-    try {
-      await this.throwIfExportJobCancelled(jobId);
-      await this.importJobsService.markProcessing(jobId);
-      await this.throwIfExportJobCancelled(jobId);
-      const result = await this.exportReport(
-        tenantId,
-        dto,
-        (patch, force = false) =>
-          this.importJobsService.updateProgress(jobId, patch, force),
-        jobId,
-      );
-      await this.throwIfExportJobCancelled(jobId);
-      await this.importJobsService.markCompleted(jobId, {
-        ...result,
-        totalProcessedRows: result.totalRows,
-      });
-    } catch (err) {
-      if (err instanceof ExportJobCancelledError) {
-        await this.importJobsService.markCancelled(jobId, 'Cancelled by user');
-        return;
-      }
-      await this.importJobsService.markFailed(
-        jobId,
-        err instanceof Error ? err : String(err),
-      );
-    } finally {
-      this.cancelledExportJobs.delete(jobId);
-    }
-  }
-
   private async getReadableExportJob(jobId: string, tenantId: string) {
     const job =
       this.importJobsService.getSnapshot(jobId) ??
@@ -756,237 +267,10 @@ export class AnalyticsReportExportService implements OnModuleInit {
     );
   }
 
-  private async throwIfExportJobCancelled(jobId?: string): Promise<void> {
-    if (!jobId) return;
-    if (this.cancelledExportJobs.has(jobId)) {
-      throw new ExportJobCancelledError(jobId);
-    }
-
-    const snapshot = this.importJobsService.getSnapshot(jobId);
-    if (snapshot?.status === ImportJobStatus.CANCELLED) {
-      this.cancelledExportJobs.add(jobId);
-      throw new ExportJobCancelledError(jobId);
-    }
-
-    const job = await this.importJobsService.findById(jobId);
-    if (job?.status === ImportJobStatus.CANCELLED) {
-      this.cancelledExportJobs.add(jobId);
-      throw new ExportJobCancelledError(jobId);
-    }
-  }
-
-  private buildFileName(tenantName: string, dto: AnalyticsReportExportDto): string {
-    const sanitized = this.sanitizeFileName(tenantName);
+  private buildPlaceholderFileName(dto: AnalyticsReportExportDto): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     const now = new Date();
     const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    return `${sanitized}_analytics-report_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
-  }
-
-  private getMonthRange(dto: AnalyticsReportExportDto) {
-    if (dto.fromDate > dto.endDate) {
-      throw new BadRequestException('fromDate must be before or equal to endDate');
-    }
-
-    return {
-      from: `${dto.fromDate}-01`,
-      to: `${dto.endDate}-01`,
-      startDate: `${dto.fromDate}-01`,
-      endDate: this.lastDayOfMonth(dto.endDate),
-    };
-  }
-
-  private async resolveTrackIsrc(trackId?: string): Promise<string | null> {
-    if (!trackId) return null;
-    const rows = await this.entityManager.query(
-      `SELECT isrc FROM tracks WHERE id = $1 LIMIT 1`,
-      [trackId],
-    );
-    return rows[0]?.isrc || null;
-  }
-
-  private buildFilters(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    trackIsrc: string | null,
-  ) {
-    const params: Record<string, unknown> = {
-      from: `${dto.fromDate}-01`,
-      to: `${dto.endDate}-01`,
-    };
-    const filters: string[] = [
-      's.period >= toDate({from:String})',
-      's.period <= toDate({to:String})',
-    ];
-
-    // Multi-tenant: use dto.tenantIds if provided, otherwise fall back
-    const resolvedTenantIds = dto.tenantIds?.length
-      ? dto.tenantIds
-      : (!checkIsSystemTenant(tenantId) ? [tenantId] : []);
-
-    if (resolvedTenantIds.length > 0) {
-      filters.push('t.is_deleted = 0');
-      filters.push('t.tenant_id IN ({tenantIds:Array(String)})');
-      params.tenantIds = resolvedTenantIds;
-    }
-
-    if (dto.labelId) {
-      filters.push('t.is_deleted = 0');
-      filters.push('t.label_id = {labelId:String}');
-      params.labelId = dto.labelId;
-    }
-
-    if (dto.releaseId) {
-      filters.push('t.is_deleted = 0');
-      filters.push('t.release_id = {releaseId:String}');
-      params.releaseId = dto.releaseId;
-    }
-
-    if (dto.artistId) {
-      filters.push('t.is_deleted = 0');
-      filters.push('has(t.artist_ids, {artistId:String})');
-      params.artistId = dto.artistId;
-    }
-
-    if (trackIsrc) {
-      filters.push('s.isrc = {trackIsrc:String}');
-      params.trackIsrc = trackIsrc;
-    }
-
-    if (dto.dspId) {
-      filters.push(`(
-        s.dsp_id = {dspId:String}
-        OR r.pg_uuid = {dspId:String}
-        OR p.pg_uuid = {dspId:String}
-        OR p.dsp_code = {dspId:String}
-      )`);
-      params.dspId = dto.dspId;
-    }
-
-    return {
-      params,
-      whereSql: filters.length ? `WHERE ${filters.join(' AND ')}` : '',
-    };
-  }
-
-  private getCommonJoins() {
-    return `
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
-    `;
-  }
-
-  private async streamRawDetails(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    _range: { startDate: string; endDate: string },
-    trackIsrc: string | null,
-    onRows: (rows: RawDetailRow[]) => Promise<void>,
-  ): Promise<number> {
-    const { params, whereSql } = this.buildFilters(tenantId, dto, trackIsrc);
-    const resolvedDspName =
-      "coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)";
-
-    const query = getRawDetailsPageQuery(
-      resolvedDspName,
-      this.getCommonJoins(),
-      whereSql,
-    );
-
-    return this.clickHouseService.queryStream<RawDetailRow>(query, params, onRows);
-  }
-
-
-  private isGeneratedUpcBackfill(value: string): boolean {
-    return value.trim().toUpperCase().startsWith('UPC-');
-  }
-  private async getTrackMetadata(isrcs: string[]): Promise<Map<string, MetadataRow>> {
-    const map = new Map<string, MetadataRow>();
-    if (!isrcs.length) return map;
-
-    const rows = await this.entityManager.query(
-      getTrackMetadataQuery(),
-      [isrcs],
-    );
-
-    for (const row of rows) {
-      map.set(row.isrc, row);
-    }
-    return map;
-  }
-
-  private async getTenantNames(tenantIds: string[]): Promise<Map<string, string>> {
-    const map = new Map<string, string>();
-    if (!tenantIds.length) return map;
-
-    const validUuidTenantIds = tenantIds.filter((id) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (!isUuid && id === 'system-tenant') {
-        map.set(id, 'System Tenant');
-      }
-      return isUuid;
-    });
-
-    if (!validUuidTenantIds.length) return map;
-
-    const rows = await this.entityManager.query(
-      getTenantNamesQuery(),
-      [validUuidTenantIds],
-    );
-
-    for (const row of rows) {
-      map.set(row.id, row.tenant_name);
-    }
-    return map;
-  }
-
-  private async getReleaseMetadataByUpc(
-    upcs: string[],
-  ): Promise<Map<string, MetadataRow>> {
-    const map = new Map<string, MetadataRow>();
-    if (!upcs.length) return map;
-
-    const rows = await this.entityManager.query(
-      getReleaseMetadataByUpcQuery(),
-      [upcs],
-    );
-
-    for (const row of rows) {
-      map.set(row.upc, row);
-    }
-    return map;
-  }
-
-  private getDetailColumns(): Partial<ExcelJS.Column>[] {
-    return [
-      { header: 'Date', key: 'date', width: 12 },
-      { header: 'Workspace', key: 'tenant', width: 28 },
-      { header: 'DspName', key: 'dspName', width: 28 },
-      { header: 'UPC', key: 'upc', width: 18 },
-      { header: 'ISRC', key: 'isrc', width: 18 },
-      { header: 'ReleaseName', key: 'releaseName', width: 32 },
-      { header: 'TrackName', key: 'trackName', width: 32 },
-      { header: 'ArtistName', key: 'artistName', width: 28 },
-      { header: 'LabelName', key: 'labelName', width: 28 },
-      { header: 'Territory', key: 'territory', width: 12 },
-      { header: 'TotalUsage', key: 'totalUsage', width: 14 },
-      { header: 'Revenue', key: 'revenueUsd', width: 18 },
-      { header: 'Currency', key: 'currency', width: 10 },
-    ];
-  }
-
-  private csvEscape(value: unknown): string {
-    const text = value == null ? '' : String(value);
-    if (/[",\n\r]/.test(text)) {
-      return `"${text.replace(/"/g, '""')}"`;
-    }
-    return text;
-  }
-
-  private lastDayOfMonth(month: string): string {
-    const [year, monthNumber] = month.split('-').map((part) => Number(part));
-    const lastDay = new Date(year, monthNumber, 0).getDate();
-    return `${month}-${String(lastDay).padStart(2, '0')}`;
+    return `workspace_analytics-report_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
   }
 }

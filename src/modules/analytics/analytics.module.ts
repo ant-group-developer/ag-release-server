@@ -34,6 +34,7 @@ import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { AnalyticsReportExportService } from './services/analytics-report-export.service';
 import { ExportQueueService } from './services/export-queue.service';
+import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ExportQueueService } from './services/export-queue.service';
     EntityAnalyticsService,
     AnalyticsReportExportService,
     ExportQueueService,
+    ExportWorkerPoolService,
     IsrcResolverService,
     TimelineAnalyticsService,
     RankingService,
