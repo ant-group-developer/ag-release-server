@@ -24,7 +24,8 @@ export enum FieldOrderReleaseError {
 	isFixed = 'releaseError.isFixed',
 }
 
-const toBoolean = ({ value }: { value: unknown }) => {
+export const toBoolean = ({ value }: { value: unknown }) => {
+	if (value === undefined || value === null || value === '') return undefined;
 	if (value === 'true') return true;
 	if (value === 'false') return false;
 	return value;
@@ -38,6 +39,14 @@ export class CreateReleaseErrorDto {
 	@IsBoolean()
 	@Transform(toBoolean)
 	isFixed?: boolean;
+
+	@IsOptional()
+	@IsUUID()
+	releaseExecutionId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	stepId?: string;
 
 	@IsOptional()
 	@IsString()
@@ -80,6 +89,14 @@ export class UpdateReleaseErrorDto {
 	@IsBoolean()
 	@Transform(toBoolean)
 	isFixed?: boolean;
+
+	@IsOptional()
+	@IsUUID()
+	releaseExecutionId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	stepId?: string;
 
 	@IsOptional()
 	@IsString()
@@ -127,6 +144,14 @@ export class GetListReleaseErrorsDto extends BaseQueryDto2 {
 	@IsString()
 	messageCode?: string;
 
+	@IsOptional()
+	@IsUUID()
+	releaseExecutionId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	stepId?: string;
+
 	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
 	@IsBoolean()
@@ -140,4 +165,12 @@ export class GetListReleaseErrorsDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.DESC;
+}
+
+export class GetReleaseValidateErrorsDto {
+	@ApiPropertyOptional({ type: Boolean })
+	@IsOptional()
+	@IsBoolean()
+	@Transform(toBoolean)
+	isFixed?: boolean;
 }

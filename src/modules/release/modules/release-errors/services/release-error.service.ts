@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import {
+	FieldErrorDetails,
+	PageDto,
+} from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -39,6 +42,24 @@ export class ReleaseErrorService {
 		});
 	}
 
+	async getEnrichedErrors(filter: GetListReleaseErrorsDto) {
+		const result = await this.getListErrors(filter);
+		return this.enrichData(result.items);
+	}
+
+	enrichData(errors: ReleaseError[]): FieldErrorDetails[] {
+		return errors.map(
+			(error) =>
+				new FieldErrorDetails({
+					messageCode: error.messageCode ?? undefined,
+					message: error.message,
+					page: error.page ?? undefined,
+					field: error.field ?? undefined,
+					trackId: error.trackId ?? undefined,
+				}),
+		);
+	}
+
 	private createQbGetList(filter: GetListReleaseErrorsDto) {
 		const qb = this.repo.createQueryBuilder('releaseError');
 		qb.leftJoinAndSelect('releaseError.release', 'release');
@@ -53,7 +74,15 @@ export class ReleaseErrorService {
 		qb: SelectQueryBuilder<ReleaseError>;
 		filter: GetListReleaseErrorsDto;
 	}) {
-		const { releaseId, keyword, messageCode, type, isFixed } = filter;
+		const {
+			releaseId,
+			keyword,
+			messageCode,
+			type,
+			isFixed,
+			releaseExecutionId,
+			stepId,
+		} = filter;
 
 		qb.andWhere('releaseError.releaseId = :releaseId', { releaseId });
 
@@ -83,6 +112,19 @@ export class ReleaseErrorService {
 			qb.andWhere('releaseError.messageCode = :messageCode', {
 				messageCode,
 			});
+		}
+
+		if (releaseExecutionId) {
+			qb.andWhere(
+				'releaseError.releaseExecutionId = :releaseExecutionId',
+				{
+					releaseExecutionId,
+				},
+			);
+		}
+
+		if (stepId) {
+			qb.andWhere('releaseError.stepId = :stepId', { stepId });
 		}
 
 		if (type) {
