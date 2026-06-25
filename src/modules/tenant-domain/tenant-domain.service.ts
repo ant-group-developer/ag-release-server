@@ -45,8 +45,13 @@ export class TenantDomainService {
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
-	async getDomain(tenantId: string): Promise<TenantDomain | null> {
-		return this.repo.findOne({ where: { tenantId } });
+	async getDomain(tenantId: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions } | null> {
+		const domain = await this.repo.findOne({ where: { tenantId } });
+		if (!domain) return null;
+		return {
+			domain,
+			dnsInstructions: this.buildDnsInstructions(domain),
+		};
 	}
 
 	async findActiveByDomain(domain: string): Promise<TenantDomain | null> {
