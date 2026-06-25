@@ -224,8 +224,14 @@ export class ImportJobsService implements OnModuleInit {
     return job;
   }
 
-  async setBatchId(id: string, batchId: string): Promise<void> {
+  async updateFileName(id: string, fileName: string): Promise<void> {
     const job = this.snapshots.get(id);
+    if (!job) return;
+    job.fileName = fileName;
+    await this.persist(job);
+  }
+
+  async setBatchId(id: string, batchId: string): Promise<void> {    const job = this.snapshots.get(id);
     if (!job) return;
     job.batchId = batchId;
     await this.persist(job);
@@ -342,6 +348,9 @@ export class ImportJobsService implements OnModuleInit {
   }
 
   async findById(id: string): Promise<ImportJob | null> {
+    const cached = this.snapshots.get(id);
+    if (cached) return cached;
+
     const sql = `
       SELECT * FROM ${CLICKHOUSE_TABLES.IMPORT_JOBS} FINAL
       WHERE id = {id:String}
@@ -542,10 +551,12 @@ export class ImportJobsService implements OnModuleInit {
 
   private async persist(job: ImportJob): Promise<void> {
     job.updatedAt = nowDt64();
-    await this.clickHouseService.insert(
+    this.clickHouseService.insert(
       CLICKHOUSE_TABLES.IMPORT_JOBS,
       [domainToRow(job)] as unknown as Record<string, unknown>[],
-    );
+    ).catch((err) => {
+      this.logger.error(`Failed to persist job ${job.id} to ClickHouse: ${err.message}`, err.stack);
+    });
     this.lastFlushAt.set(job.id, Date.now());
 
     this.jobEvents.emit({

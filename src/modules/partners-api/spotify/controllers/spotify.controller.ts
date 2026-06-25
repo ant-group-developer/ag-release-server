@@ -188,7 +188,7 @@ export class SpotifyController {
 		const parsedPage = page ? parseInt(page, 10) : 1;
 		const parsedPageSize = pageSize ? parseInt(pageSize, 10) : 100;
 
-		const [historyResult, summary] = await Promise.all([
+		const [historyResult, summary, session] = await Promise.all([
 			this.metadataScanService.getChangeHistory({
 				scanId,
 				isrc,
@@ -197,10 +197,43 @@ export class SpotifyController {
 				pageSize: parsedPageSize,
 			}),
 			this.metadataScanService.getEnrichmentSummary(),
+			scanId ? this.metadataScanService.findScanSessionById(scanId) : Promise.resolve(null),
 		]);
+
+		let sessionInfo = null;
+		if (session) {
+			const startedAt = session.startedAt ? new Date(session.startedAt) : null;
+			const finishedAt = session.finishedAt ? new Date(session.finishedAt) : null;
+			let durationMs = null;
+			let duration = null;
+
+			if (startedAt) {
+				const end = finishedAt || new Date();
+				durationMs = end.getTime() - startedAt.getTime();
+				
+				if (durationMs < 1000) {
+					duration = `${durationMs}ms`;
+				} else {
+					const totalSec = Math.floor(durationMs / 1000);
+					const min = Math.floor(totalSec / 60);
+					const sec = totalSec % 60;
+					duration = min > 0 ? `${min}m ${sec}s` : `${sec}s`;
+				}
+			}
+
+			sessionInfo = {
+				startedAt,
+				finishedAt,
+				durationMs,
+				duration,
+				status: session.status,
+			};
+		}
+
 		return new ResponseSuccess({
 			data: {
 				summary,
+				session: sessionInfo,
 				items: historyResult.items,
 				metadata: {
 					page: parsedPage,
