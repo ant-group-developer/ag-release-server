@@ -33,6 +33,7 @@ import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service'
 import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { AnalyticsReportExportService } from './services/analytics-report-export.service';
+import { ExportQueueService } from './services/export-queue.service';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
   providers: [
     EntityAnalyticsService,
     AnalyticsReportExportService,
+    ExportQueueService,
     IsrcResolverService,
     TimelineAnalyticsService,
     RankingService,

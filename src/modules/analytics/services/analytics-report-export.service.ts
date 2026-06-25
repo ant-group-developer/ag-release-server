@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import * as ExcelJS from 'exceljs';
@@ -37,7 +37,17 @@ import {
   getTrackMetadataQuery,
   getTenantNamesQuery,
   getReleaseMetadataByUpcQuery,
+  getUniqueIdentifiersQuery,
 } from '../queries/analytics-report-export.queries';
+import {
+  GroupState,
+  SummaryAccumulator,
+  createEmptyAccumulator,
+  formatRevenueSum,
+  updateAccumulator,
+  createStreamWriter,
+} from './stream-detail-writer';
+import { ExportQueueService } from './export-queue.service';
 
 class ExportJobCancelledError extends Error {
   constructor(jobId: string) {
@@ -47,50 +57,63 @@ class ExportJobCancelledError extends Error {
 }
 
 @Injectable()
-export class AnalyticsReportExportService {
+export class AnalyticsReportExportService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsReportExportService.name);
   private readonly batchSize = 100_000;
   private readonly exportRetentionDays = 7;
   private readonly cleanupBatchSize = 100;
   private readonly cancelledExportJobs = new Set<string>();
+  private readonly maxConcurrentWorkers = 10;
+  private isRunning = false;
 
-  private activeJobsCount = 0;
-  private readonly maxConcurrentJobs = 2;
-  private readonly jobQueue: Array<{
-    jobId: string;
-    tenantId: string;
-    dto: AnalyticsReportExportDto;
-  }> = [];
+  // Global metadata cache shared across concurrent jobs (TTL 10 min)
+  private readonly METADATA_CACHE_TTL_MS = 10 * 60 * 1000;
+  private readonly globalTrackMeta = new Map<string, MetadataRow>();
+  private readonly globalReleaseMeta = new Map<string, MetadataRow>();
+  private readonly globalTenantNames = new Map<string, string>();
+  private globalCacheRefreshedAt = 0;
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly r2Service: BucketR2Service,
     private readonly importJobsService: ImportJobsService,
+    private readonly exportQueueService: ExportQueueService,
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
   ) {}
 
-  private enqueueJob(jobId: string, tenantId: string, dto: AnalyticsReportExportDto) {
-    this.jobQueue.push({ jobId, tenantId, dto });
-    this.processNextJob();
+  async onModuleInit() {
+    await this.exportQueueService.redeliverStuck();
+    this.isRunning = true;
+    for (let i = 0; i < this.maxConcurrentWorkers; i++) {
+      this.startWorker(i);
+    }
+    this.logger.log(`Started ${this.maxConcurrentWorkers} export workers`);
   }
 
-  private processNextJob() {
-    if (this.activeJobsCount >= this.maxConcurrentJobs) {
-      return;
-    }
-    const next = this.jobQueue.shift();
-    if (!next) {
-      return;
-    }
-
-    this.activeJobsCount++;
+  private startWorker(workerId: number) {
     setImmediate(async () => {
-      try {
-        await this.runExportJob(next.jobId, next.tenantId, next.dto);
-      } finally {
-        this.activeJobsCount--;
-        this.processNextJob();
+      while (this.isRunning) {
+        try {
+          const jobId = await this.exportQueueService.dequeue();
+          if (jobId) {
+            this.logger.log(`Worker-${workerId} picked up export job ${jobId}`);
+            const job = await this.importJobsService.findById(jobId);
+            if (job && !this.isTerminalStatus(job.status)) {
+              await this.runExportJob(
+                jobId,
+                job.tenantId || '',
+                job.params as unknown as AnalyticsReportExportDto,
+              );
+            }
+            await this.exportQueueService.ack(jobId);
+          } else {
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        } catch (err: any) {
+          this.logger.error(`Worker-${workerId} error: ${err.message}`, err.stack);
+          await new Promise((r) => setTimeout(r, 3000));
+        }
       }
     });
   }
@@ -113,7 +136,7 @@ export class AnalyticsReportExportService {
 
     await this.importJobsService.markQueued(job.id);
 
-    this.enqueueJob(job.id, tenantId, dto);
+    await this.exportQueueService.enqueue(job.id);
 
     return {
       jobId: job.id,
@@ -316,19 +339,6 @@ export class AnalyticsReportExportService {
     onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
     jobId?: string,
   ): Promise<AnalyticsReportExportResult> {
-    return this.exportReportSplit(tenantId, dto, onProgress, jobId);
-  }
-
-  /**
-   * Export with split mode — query all data, group by split key,
-   * write individual files, then zip them using existing zipFolder util.
-   */
-  private async exportReportSplit(
-    tenantId: string,
-    dto: AnalyticsReportExportDto,
-    onProgress?: (patch: ExportProgressPatch, force?: boolean) => Promise<void>,
-    jobId?: string,
-  ): Promise<AnalyticsReportExportResult> {
     await this.throwIfExportJobCancelled(jobId);
     const range = this.getMonthRange(dto);
     const trackIsrc = await this.resolveTrackIsrc(dto.trackId);
@@ -342,273 +352,160 @@ export class AnalyticsReportExportService {
     const tempDir = path.join(os.tmpdir(), `export-split-${uuidv4()}`);
     const zipPath = path.join(os.tmpdir(), `${uuidv4()}-${fileName}`);
     const key = `exports/analytics/${tenantId}/${uuidv4()}-${fileName}`;
+    const format = dto.format ?? 'csv';
+    const groups = new Map<string, GroupState>();
 
     try {
       await fs.promises.mkdir(tempDir, { recursive: true });
 
-      // Step 1: Query all data in batches
-      await onProgress?.(
-        { progressCurrent: 1, progressLabel: 'Querying data' },
-        true,
-      );
+      // Step 1: Pre-fetch all metadata into global cache
+      await onProgress?.({ progressCurrent: 1, progressLabel: 'Pre-fetching metadata' }, true);
       await this.throwIfExportJobCancelled(jobId);
+      await this.prefetchMetadata(tenantId, dto, range, trackIsrc);
 
-      const allDetails: DetailRow[] = [];
-      const trackMetaCache = new Map<string, MetadataRow>();
-      const releaseMetaCache = new Map<string, MetadataRow>();
-      const tenantNamesCache = new Map<string, string>();
+      // Step 2: Stream batches → enrich → write directly to group files
+      await onProgress?.({ progressCurrent: 2, progressLabel: 'Streaming data' }, true);
       const stringPool = new Map<string, string>();
       let offset = 0;
+      let totalRows = 0;
+
       while (true) {
         await this.throwIfExportJobCancelled(jobId);
         const rawRows = await this.getRawDetailsPage(
           tenantId, dto, range, trackIsrc, this.batchSize, offset,
         );
         if (!rawRows.length) break;
-        const enriched = await this.enrichDetails(
-          rawRows,
-          trackMetaCache,
-          releaseMetaCache,
-          tenantNamesCache,
-          stringPool,
-        );
-        allDetails.push(...enriched);
-        await onProgress?.(
-          {
-            progressCurrent: 1,
-            progressLabel: `Querying data (${allDetails.length} rows)`,
-            processedRows: allDetails.length,
-          },
-          false,
-        );
+
+        for (const raw of rawRows) {
+          const detail = this.enrichSingleRow(raw, stringPool);
+          const groupKeys = this.getRowGroupKeys(detail, dto);
+
+          for (const gk of groupKeys) {
+            let group = groups.get(gk);
+            if (!group) {
+              const groupFolder = path.join(tempDir, gk);
+              await fs.promises.mkdir(groupFolder, { recursive: true });
+              group = {
+                writer: createStreamWriter(
+                  path.join(groupFolder, `detail.${format}`),
+                  format,
+                ),
+                summary: createEmptyAccumulator(),
+              };
+              groups.set(gk, group);
+            }
+            group.writer.appendRow(detail as any);
+            updateAccumulator(group.summary, detail as any);
+          }
+          totalRows++;
+        }
+
+        await onProgress?.({
+          progressCurrent: 2,
+          progressLabel: `Streaming data (${totalRows} rows)`,
+          processedRows: totalRows,
+        }, false);
         if (rawRows.length < this.batchSize) break;
         offset += this.batchSize;
       }
-
-      // Free up cache memory as it is no longer needed
-      trackMetaCache.clear();
-      releaseMetaCache.clear();
-      tenantNamesCache.clear();
       stringPool.clear();
 
-      // Step 2: Group data into nested folders
-      await onProgress?.(
-        { progressCurrent: 2, progressLabel: 'Splitting data into groups' },
-        true,
-      );
-      await this.throwIfExportJobCancelled(jobId);
-
-      const groups = this.groupDetailRowsNew(allDetails, dto);
-
-      // Step 3: Write each group as folder with summary + detail files
-      await onProgress?.(
-        { progressCurrent: 2, progressLabel: `Writing ${groups.size} folders` },
-        true,
-      );
-
-      let filesWritten = 0;
-      const format = dto.format ?? 'xlsx';
-      for (const [groupPath, rows] of groups) {
+      // Step 3: Flush writers, write summaries
+      await onProgress?.({ progressCurrent: 3, progressLabel: `Finalizing ${groups.size} folders` }, true);
+      for (const [gk, group] of groups) {
         await this.throwIfExportJobCancelled(jobId);
-
-        const groupFolder = path.join(tempDir, groupPath);
-        await fs.promises.mkdir(groupFolder, { recursive: true });
-
-        // Calculate summary
-        const summary = this.calculateSummary(rows, groupPath, dto);
-
-        // Write summary.[format]
-        const summaryFilePath = path.join(groupFolder, `summary.${format}`);
-        await this.writeSummaryFile(summaryFilePath, summary, format);
-
-        // Write detail.[format]
-        const detailFilePath = path.join(groupFolder, `detail.${format}`);
-        await this.writeDetailFile(detailFilePath, rows, format);
-
-        filesWritten++;
-        await onProgress?.(
-          {
-            progressCurrent: 2,
-            progressLabel: `Writing folder ${filesWritten}/${groups.size}`,
-          },
-          false,
-        );
+        await group.writer.flush();
+        const summary = this.buildSummaryFromAccumulator(group.summary, gk, dto);
+        await this.writeSummaryFile(path.join(tempDir, gk, `summary.${format}`), summary, format);
       }
 
-      // Step 4: Create ZIP using existing utility
-      await onProgress?.(
-        { progressCurrent: 3, progressLabel: 'Creating ZIP archive' },
-        true,
-      );
+      // Step 4: ZIP + Upload
+      await onProgress?.({ progressCurrent: 3, progressLabel: 'Creating ZIP archive' }, true);
       await this.throwIfExportJobCancelled(jobId);
       await zipFolder(tempDir, zipPath);
 
-      // Step 5: Upload to R2
-      await onProgress?.(
-        {
-          progressCurrent: 3,
-          progressLabel: 'Uploading ZIP file',
-          processedRows: allDetails.length,
-          totalRows: allDetails.length,
-        },
-        true,
-      );
+      await onProgress?.({
+        progressCurrent: 4, progressLabel: 'Uploading ZIP file',
+        processedRows: totalRows, totalRows,
+      }, true);
       await this.throwIfExportJobCancelled(jobId);
 
-      await this.r2Service.uploadFileFromPath({
-        key,
-        filePath: zipPath,
-        contentType: 'application/zip',
-        isPublic: false,
-      });
-      await this.throwIfExportJobCancelled(jobId);
+      await this.r2Service.uploadFileFromPath({ key, filePath: zipPath, contentType: 'application/zip', isPublic: false });
 
       return {
-        fileName,
-        key,
-        downloadUrl: await this.r2Service.getSignedUrlDown({
-          key, fileName, isPublic: false,
-        }),
+        fileName, key,
+        downloadUrl: await this.r2Service.getSignedUrlDown({ key, fileName, isPublic: false }),
         expiresInSeconds: 4 * 3600,
-        totalRows: allDetails.length,
+        totalRows,
       };
     } finally {
+      for (const [, g] of groups) {
+        await g.writer.flush().catch(() => {});
+      }
       await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
       await fs.promises.unlink(zipPath).catch(() => undefined);
     }
   }
 
-  private groupDetailRowsNew(
-    rows: DetailRow[],
-    dto: AnalyticsReportExportDto,
-  ): Map<string, DetailRow[]> {
-    const groups = new Map<string, DetailRow[]>();
+  private getRowGroupKeys(row: DetailRow, dto: AnalyticsReportExportDto): string[] {
+    const keys: string[] = [];
+    const tenantFolder = this.sanitizeFileName(row.tenant || 'unnamed_workspace');
     const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
     const periodUnit = dto.periodUnit || 'none';
+    keys.push(tenantFolder);
 
-    for (const row of rows) {
-      const tenantFolder = this.sanitizeFileName(row.tenant || 'unnamed_workspace');
-
-      // 1. Add to tenant root folder
-      const tenantRootPath = tenantFolder;
-      if (!groups.has(tenantRootPath)) {
-        groups.set(tenantRootPath, []);
+    if (periodUnit === 'month' || periodUnit === 'quarter') {
+      const periodKey = this.getPeriodKey(row.date, periodUnit);
+      keys.push(`${tenantFolder}/${periodKey}`);
+      if (isExportArtist) {
+        keys.push(`${tenantFolder}/${periodKey}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`);
       }
-      groups.get(tenantRootPath)!.push(row);
-
-      // 2. Period folders
-      if (periodUnit === 'month' || periodUnit === 'quarter') {
-        const periodKey = this.getPeriodKey(row.date, periodUnit);
-        const periodPath = `${tenantFolder}/${periodKey}`;
-        if (!groups.has(periodPath)) {
-          groups.set(periodPath, []);
-        }
-        groups.get(periodPath)!.push(row);
-
-        // 3. Artist folders inside period folder
-        if (isExportArtist) {
-          const artistFolder = this.sanitizeFileName(row.artistName || 'unnamed_artist');
-          const artistPeriodPath = `${tenantFolder}/${periodKey}/${artistFolder}`;
-          if (!groups.has(artistPeriodPath)) {
-            groups.set(artistPeriodPath, []);
-          }
-          groups.get(artistPeriodPath)!.push(row);
-        }
-      } else {
-        // No period, but artist subfolders under tenant root
-        if (isExportArtist) {
-          const artistFolder = this.sanitizeFileName(row.artistName || 'unnamed_artist');
-          const artistPath = `${tenantFolder}/${artistFolder}`;
-          if (!groups.has(artistPath)) {
-            groups.set(artistPath, []);
-          }
-          groups.get(artistPath)!.push(row);
-        }
-      }
+    } else if (isExportArtist) {
+      keys.push(`${tenantFolder}/${this.sanitizeFileName(row.artistName || 'unnamed_artist')}`);
     }
-
-    return groups;
+    return keys;
   }
 
   private getPeriodKey(date: string, unit: string): string {
     if (unit === 'quarter' || unit === 'quater') {
       const [year, month] = date.split('-').map(Number);
-      const quarter = Math.ceil(month / 3);
-      return `${year}-Q${quarter}`;
+      return `${year}-Q${Math.ceil(month / 3)}`;
     }
     return date;
   }
 
-  private calculateSummary(
-    rows: DetailRow[],
-    groupPath: string,
-    dto: AnalyticsReportExportDto,
-  ): SummaryRow {
-    const firstRow = rows[0];
-    const tenantName = firstRow?.tenant || 'unnamed_workspace';
-    
+  private buildSummaryFromAccumulator(acc: SummaryAccumulator, groupPath: string, dto: AnalyticsReportExportDto): SummaryRow {
     const parts = groupPath.split('/');
     let artistName = '';
     let period = '';
-
     const periodUnit = dto.periodUnit || 'none';
     const isExportArtist = dto.isExportArtist === true || (dto.isExportArtist as any) === 'true';
 
     if (parts.length === 2) {
-      if (periodUnit === 'month' || periodUnit === 'quarter') {
-        period = parts[1];
-      } else if (isExportArtist) {
-        artistName = firstRow?.artistName || parts[1];
-      }
+      if (periodUnit === 'month' || periodUnit === 'quarter') period = parts[1];
+      else if (isExportArtist) artistName = parts[1];
     } else if (parts.length === 3) {
       period = parts[1];
-      artistName = firstRow?.artistName || parts[2];
+      artistName = parts[2];
     }
-
-    const revenueSumStr = this.addRevenueExact(rows.map(r => r.revenueUsd));
-    const totalUsage = rows.reduce((acc, r) => acc + (r.totalUsage || 0), 0);
-
-    const uniqueIsrcs = new Set(rows.map(r => r.isrc).filter(Boolean));
-    const uniqueReleases = new Set(rows.map(r => r.releaseName || r.upc).filter(Boolean));
-    const uniqueLabels = new Set(rows.map(r => r.labelName).filter(Boolean));
-    const uniqueDsps = new Set(rows.map(r => r.dspName).filter(Boolean));
-    const uniqueTerritories = new Set(rows.map(r => r.territory).filter(Boolean));
-    const uniqueArtists = new Set(rows.map(r => r.artistName).filter(Boolean));
-
-    const startDates = rows.map(r => r.startDate).filter(Boolean);
-    const endDates = rows.map(r => r.endDate).filter(Boolean);
-    const startDate = startDates.length ? startDates.reduce((min, d) => d < min ? d : min, startDates[0]) : `${dto.fromDate}-01`;
-    const endDate = endDates.length ? endDates.reduce((max, d) => d > max ? d : max, endDates[0]) : this.lastDayOfMonth(dto.endDate);
 
     return {
-      startDate,
-      endDate,
-      tenantName,
+      startDate: acc.minStartDate || `${dto.fromDate}-01`,
+      endDate: acc.maxEndDate || this.lastDayOfMonth(dto.endDate),
+      tenantName: acc.tenantName || 'unnamed_workspace',
       artistName: artistName || undefined,
       period: period || undefined,
-      totalUsage,
-      revenueUsd: revenueSumStr,
+      totalUsage: acc.totalUsage,
+      revenueUsd: formatRevenueSum(acc),
       currency: 'USD',
-      trackCount: uniqueIsrcs.size,
-      releaseCount: uniqueReleases.size,
-      labelCount: uniqueLabels.size,
-      dspCount: uniqueDsps.size,
-      territoryCount: uniqueTerritories.size,
-      artistCount: uniqueArtists.size,
+      trackCount: acc.uniqueIsrcs.size,
+      releaseCount: acc.uniqueReleases.size,
+      labelCount: acc.uniqueLabels.size,
+      dspCount: acc.uniqueDsps.size,
+      territoryCount: acc.uniqueTerritories.size,
+      artistCount: acc.uniqueArtists.size,
     } as any;
   }
-
-  private addRevenueExact(values: string[]): string {
-    let sum = 0;
-    for (const val of values) {
-      const parsed = parseFloat(val);
-      if (!isNaN(parsed)) {
-        sum += parsed;
-      }
-    }
-    return sum.toFixed(2);
-  }
-
   private getSummaryColumns(): Partial<ExcelJS.Column>[] {
     return [
       { header: 'StartDate', key: 'startDate', width: 14 },
@@ -654,35 +551,120 @@ export class AnalyticsReportExportService {
     }
   }
 
-  private async writeDetailFile(
-    filePath: string,
-    rows: DetailRow[],
-    format: 'xlsx' | 'csv',
+  private async prefetchMetadata(
+    tenantId: string,
+    dto: AnalyticsReportExportDto,
+    range: ReturnType<typeof this.getMonthRange>,
+    trackIsrc: string | null,
   ): Promise<void> {
-    if (format === 'csv') {
-      const columns = this.getDetailColumns();
-      const headers = columns.map((c) => c.header?.toString() ?? '');
-      const keys = columns.map((c) => c.key?.toString() ?? '');
-      const lines = [`\uFEFF${headers.map((h) => this.csvEscape(h)).join(',')}`];
-      for (const row of rows) {
-        const record = row as unknown as Record<string, unknown>;
-        lines.push(keys.map((key) => this.csvEscape(record[key])).join(','));
-      }
-      await fs.promises.writeFile(filePath, lines.join('\n'), 'utf8');
-    } else {
-      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
-        filename: filePath,
-        useStyles: true,
-        useSharedStrings: false,
-      });
-      const sheet = workbook.addWorksheet('Detail');
-      sheet.columns = this.getDetailColumns();
-      for (const row of rows) {
-        sheet.addRow(row).commit();
-      }
-      sheet.commit();
-      await workbook.commit();
+    const now = Date.now();
+    if (now - this.globalCacheRefreshedAt < this.METADATA_CACHE_TTL_MS) {
+      this.logger.log('Using active global metadata cache');
+      return; // Cache is still fresh
     }
+
+    this.logger.log('Refreshing global metadata cache for unique identifiers...');
+    const filters = this.buildFilters(tenantId, dto, trackIsrc);
+    const uniqueIdentifiersSql = getUniqueIdentifiersQuery(
+      this.getCommonJoins(),
+      filters.whereSql,
+    );
+
+    const rows = await this.clickHouseService.query<any>(
+      uniqueIdentifiersSql,
+      filters.params,
+    );
+
+    const uniqueIsrcs = new Set<string>();
+    const uniqueTenantIds = new Set<string>();
+
+    for (const row of rows) {
+      if (row.isrc) uniqueIsrcs.add(row.isrc);
+      if (row.tenant_id) uniqueTenantIds.add(row.tenant_id);
+    }
+
+    const isrcs = Array.from(uniqueIsrcs);
+    const tenantIds = Array.from(uniqueTenantIds);
+
+    this.logger.log(`Found ${isrcs.length} unique ISRCs and ${tenantIds.length} tenants`);
+
+    const BATCH = 5000;
+    this.globalTrackMeta.clear();
+    this.globalReleaseMeta.clear();
+    this.globalTenantNames.clear();
+
+    for (let i = 0; i < isrcs.length; i += BATCH) {
+      const batchIsrcs = isrcs.slice(i, i + BATCH);
+      const trackMap = await this.getTrackMetadata(batchIsrcs);
+      
+      const upcsToFetch = new Set<string>();
+      for (const [isrc, track] of trackMap) {
+        this.globalTrackMeta.set(isrc, track);
+        if (track.release_upc) upcsToFetch.add(track.release_upc);
+      }
+
+      if (upcsToFetch.size > 0) {
+        const releaseMap = await this.getReleaseMetadataByUpc(Array.from(upcsToFetch));
+        for (const [upc, release] of releaseMap) {
+          this.globalReleaseMeta.set(upc, release);
+        }
+      }
+    }
+
+    if (tenantIds.length > 0) {
+      const tenantMap = await this.getTenantNames(tenantIds);
+      for (const [tid, tname] of tenantMap) {
+        this.globalTenantNames.set(tid, tname);
+      }
+    }
+
+    this.globalCacheRefreshedAt = Date.now();
+  }
+
+  private enrichSingleRow(
+    raw: RawDetailRow,
+    stringPool: Map<string, string>,
+  ): DetailRow {
+    const pool = (val: string | null | undefined): string | undefined => {
+      if (!val) return undefined;
+      let cached = stringPool.get(val);
+      if (!cached) {
+        cached = val;
+        stringPool.set(val, cached);
+      }
+      return cached;
+    };
+
+    const isrc = raw.isrc;
+    const trackInfo = isrc ? this.globalTrackMeta.get(isrc) : null;
+    const isStandardUpc = isValidStandardUpc(raw.fallback_upc || '');
+    const upcToLookup = isStandardUpc ? raw.fallback_upc : trackInfo?.release_upc;
+    const releaseInfo = upcToLookup ? this.globalReleaseMeta.get(upcToLookup) : null;
+
+    const baseInfo = trackInfo || releaseInfo;
+    const finalTenantName = raw.tenant_id 
+      ? this.globalTenantNames.get(raw.tenant_id) 
+      : baseInfo?.workspace_name;
+
+    const artistNameRaw = pool(raw.fallback_artist_name || trackInfo?.artist_names || releaseInfo?.artist_names || '');
+
+    return {
+      date: pool(raw.date),
+      startDate: pool(raw.start_date),
+      endDate: pool(raw.end_date),
+      tenant: pool(finalTenantName),
+      dspName: pool(raw.dsp_name),
+      upc: pool(raw.fallback_upc),
+      isrc: pool(raw.isrc),
+      releaseName: pool(raw.fallback_album_title || baseInfo?.release_title || ''),
+      trackName: pool(raw.fallback_track_title || trackInfo?.track_title || ''),
+      artistName: artistNameRaw,
+      labelName: pool(raw.fallback_label_name || baseInfo?.label_name || ''),
+      territory: pool(raw.territory),
+      totalUsage: Number(raw.total_usage || 0),
+      revenueUsd: String(raw.revenue_usd || '0.00'),
+      currency: pool('USD'),
+    } as any;
   }
 
   /** Sanitize a string for use as a file/directory name. */
@@ -892,95 +874,6 @@ export class AnalyticsReportExportService {
     return this.clickHouseService.query<RawDetailRow>(query, params);
   }
 
-  private async enrichDetails(
-    rows: RawDetailRow[],
-    trackMetaCache: Map<string, MetadataRow>,
-    releaseMetaCache: Map<string, MetadataRow>,
-    tenantNamesCache: Map<string, string>,
-    stringPool: Map<string, string>,
-  ): Promise<DetailRow[]> {
-    if (!rows.length) return [];
-
-    const isrcs = Array.from(
-      new Set(rows.map((r) => r.isrc).filter((isrc) => !isrc.startsWith('UPC-'))),
-    );
-    const albumUpcs = Array.from(
-      new Set(
-        rows
-          .filter((r) => r.isrc.startsWith('UPC-'))
-          .map((r) => r.isrc.substring(4))
-          .filter(Boolean),
-      ),
-    );
-
-    // 1. Fetch missing track metadata
-    const missingIsrcs = isrcs.filter((isrc) => !trackMetaCache.has(isrc));
-    if (missingIsrcs.length > 0) {
-      const newTrackMeta = await this.getTrackMetadata(missingIsrcs);
-      for (const [isrc, meta] of newTrackMeta) {
-        trackMetaCache.set(isrc, meta);
-      }
-    }
-
-    // 2. Fetch missing release metadata
-    const missingUpcs = albumUpcs.filter((upc) => !releaseMetaCache.has(upc));
-    if (missingUpcs.length > 0) {
-      const newReleaseMeta = await this.getReleaseMetadataByUpc(missingUpcs);
-      for (const [upc, meta] of newReleaseMeta) {
-        releaseMetaCache.set(upc, meta);
-      }
-    }
-
-    // 3. Fetch missing tenant names
-    const tenantIds = Array.from(new Set(rows.map((r) => r.tenant_id).filter(Boolean)));
-    const missingTenantIds = tenantIds.filter((id) => !tenantNamesCache.has(id));
-    if (missingTenantIds.length > 0) {
-      const newTenantNames = await this.getTenantNames(missingTenantIds);
-      for (const [id, name] of newTenantNames) {
-        tenantNamesCache.set(id, name);
-      }
-    }
-
-    const getSharedString = (val: string | null | undefined): string => {
-      if (val == null) return '';
-      let cached = stringPool.get(val);
-      if (!cached) {
-        stringPool.set(val, val);
-        cached = val;
-      }
-      return cached;
-    };
-
-    return rows.map((row) => {
-      const meta = row.isrc.startsWith('UPC-')
-        ? releaseMetaCache.get(row.isrc.substring(4))
-        : trackMetaCache.get(row.isrc);
-      const upc = meta?.release_upc || row.fallback_upc || '';
-
-      return {
-        date: getSharedString(row.date),
-        startDate: getSharedString(row.start_date),
-        endDate: getSharedString(row.end_date),
-        tenant: getSharedString(
-          meta?.workspace_name ||
-          tenantNamesCache.get(row.tenant_id) ||
-          row.tenant_id ||
-          ''
-        ),
-        dspName: getSharedString(row.dsp_name || row.dsp_id),
-        upc: getSharedString(isValidStandardUpc(upc) ? upc : ''),
-        isrc: getSharedString(this.isGeneratedUpcBackfill(row.isrc) ? '' : row.isrc),
-        releaseName: getSharedString(meta?.release_title || row.fallback_album_title || ''),
-        trackName: getSharedString(meta?.track_title || row.fallback_track_title || ''),
-        artistName: getSharedString(meta?.artist_names || row.fallback_artist_name || ''),
-        labelName: getSharedString(meta?.label_name || row.fallback_label_name || ''),
-        territory: getSharedString(row.territory),
-        totalUsage: Number(row.total_usage ?? 0),
-        revenueUsd: getSharedString(row.revenue_usd?.toString() ?? '0'),
-        currency: getSharedString('USD'),
-      };
-    });
-  }
 
   private isGeneratedUpcBackfill(value: string): boolean {
     return value.trim().toUpperCase().startsWith('UPC-');
