@@ -754,7 +754,10 @@ export class AnalyticsReportExportService implements OnModuleInit {
 
   private buildFileName(tenantName: string, dto: AnalyticsReportExportDto): string {
     const sanitized = this.sanitizeFileName(tenantName);
-    return `${sanitized}_analytics-report_${dto.fromDate}_${dto.endDate}.zip`;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `${sanitized}_analytics-report_${dto.fromDate}_${dto.endDate}_${timestamp}.zip`;
   }
 
   private getMonthRange(dto: AnalyticsReportExportDto) {
