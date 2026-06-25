@@ -1,5 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Logs } from 'src/modules/log/entites/logs.entity';
+import { ReleaseError } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import {
 	AfterLoad,
 	Column,
@@ -47,6 +48,9 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 		persistence: false,
 	})
 	logs: Logs[];
+
+	@OneToMany(() => ReleaseError, (error) => error.step)
+	releaseErrors: ReleaseError[];
 
 	@Column({ type: 'varchar', length: 50 })
 	type: ReleaseExecutionStepType;

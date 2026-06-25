@@ -197,9 +197,16 @@ export class ReleaseDraftController {
 		Permission.RELEASE_VIDEO.UPDATE,
 	)
 	@Get(':id/validate')
-	async getErrorsSchemaReleaseById(@Param('id') id: string) {
+	async getErrorsSchemaReleaseById(
+		@Param('id') id: string,
+		@Query('isFixed') isFixed?: string,
+	) {
+		const isFixedValue = isFixed === 'true';
 		const result =
-			await this.releaseDraftService.getErrorsSchemaReleaseById(id);
+			await this.releaseDraftService.getErrorsSchemaReleaseById(
+				id,
+				isFixedValue,
+			);
 		return new ResponseSuccess({ data: result });
 	}
 
