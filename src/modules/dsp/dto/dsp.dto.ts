@@ -114,6 +114,15 @@ export class CreateDspDto {
 	@IsOptional()
 	@IsBoolean()
 	hasDeal?: boolean;
+
+	@ApiPropertyOptional({
+		description: 'Type of the DSP (audio or video)',
+		enum: ['audio', 'video'],
+		default: 'audio',
+	})
+	@IsOptional()
+	@IsEnum(['audio', 'video'])
+	type?: 'audio' | 'video';
 }
 
 class UpdateDspActionDto {

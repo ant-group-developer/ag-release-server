@@ -176,26 +176,37 @@ export class SpotifyController {
 	@ApiQuery({ name: 'scanId', required: false, type: String, description: 'Filter by scan ID' })
 	@ApiQuery({ name: 'isrc', required: false, type: String, description: 'Filter by ISRC' })
 	@ApiQuery({ name: 'releaseId', required: false, type: String, description: 'Filter by release ID' })
-	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max results (default 100)' })
+	@ApiQuery({ name: 'page', required: false, type: Number, description: 'Page index (default 1)' })
+	@ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Page size (default 100)' })
 	async getChangeHistory(
 		@Query('scanId') scanId?: string,
 		@Query('isrc') isrc?: string,
 		@Query('releaseId') releaseId?: string,
-		@Query('limit') limit?: string,
+		@Query('page') page?: string,
+		@Query('pageSize') pageSize?: string,
 	) {
-		const [items, summary] = await Promise.all([
+		const parsedPage = page ? parseInt(page, 10) : 1;
+		const parsedPageSize = pageSize ? parseInt(pageSize, 10) : 100;
+
+		const [historyResult, summary] = await Promise.all([
 			this.metadataScanService.getChangeHistory({
 				scanId,
 				isrc,
 				releaseId,
-				limit: limit ? parseInt(limit, 10) : 100,
+				page: parsedPage,
+				pageSize: parsedPageSize,
 			}),
 			this.metadataScanService.getEnrichmentSummary(),
 		]);
 		return new ResponseSuccess({
 			data: {
 				summary,
-				items,
+				items: historyResult.items,
+				metadata: {
+					page: parsedPage,
+					pageSize: parsedPageSize,
+					totalItems: historyResult.totalItems,
+				},
 			},
 		});
 	}
