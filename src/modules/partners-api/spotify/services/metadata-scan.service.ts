@@ -1206,14 +1206,15 @@ export class MetadataScanService implements OnModuleInit {
 	}
 
 	/**
-	 * Query change history from ClickHouse.
+	 * Query change history from ClickHouse with pagination.
 	 */
 	async getChangeHistory(query: {
 		scanId?: string;
 		isrc?: string;
 		releaseId?: string;
-		limit?: number;
-	}): Promise<any[]> {
+		page?: number;
+		pageSize?: number;
+	}): Promise<{ items: any[]; totalItems: number }> {
 		const conditions: string[] = [];
 		const params: Record<string, unknown> = {};
 
@@ -1231,16 +1232,52 @@ export class MetadataScanService implements OnModuleInit {
 		}
 
 		const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-		const limitClause = `LIMIT ${query.limit || 100}`;
 
-		return this.clickHouseService.query(
-			`SELECT *
-			 FROM ${CLICKHOUSE_TABLES.METADATA_ENRICHMENT_LOG}
-			 ${whereClause}
-			 ORDER BY created_at DESC
-			 ${limitClause}`,
-			params,
-		);
+		// Query total items
+		const countQuery = `SELECT count() as total FROM ${CLICKHOUSE_TABLES.METADATA_ENRICHMENT_LOG} ${whereClause}`;
+		const countResult = await this.clickHouseService.query<{ total: string }>(countQuery, params);
+		const totalItems = countResult.length > 0 ? parseInt(countResult[0].total, 10) : 0;
+
+		const page = query.page || 1;
+		const pageSize = query.pageSize || 100;
+		const offset = (page - 1) * pageSize;
+
+		const itemsQuery = `
+			SELECT *
+			FROM ${CLICKHOUSE_TABLES.METADATA_ENRICHMENT_LOG}
+			${whereClause}
+			ORDER BY created_at DESC
+			LIMIT {limit: UInt32} OFFSET {offset: UInt32}
+		`;
+
+		params.limit = pageSize;
+		params.offset = offset;
+
+		const items = await this.clickHouseService.query<any>(itemsQuery, params);
+		const mappedItems = items.map((row) => ({
+			id: row.id,
+			scanId: row.scan_id,
+			entityType: row.entity_type,
+			entityId: row.entity_id,
+			releaseId: row.release_id,
+			isrc: row.isrc,
+			upc: row.upc,
+			fieldName: row.field_name,
+			oldValue: row.old_value,
+			newValue: row.new_value,
+			changeType: row.change_type,
+			enrichmentSource: row.enrichment_source,
+			apiTrackId: row.api_track_id,
+			apiAlbumId: row.api_album_id,
+			apiArtistId: row.api_artist_id,
+			status: row.status,
+			errorMessage: row.error_message,
+			isDryRun: !!row.is_dry_run,
+			createdAt: row.created_at,
+			createdBy: row.created_by,
+		}));
+
+		return { items: mappedItems, totalItems };
 	}
 
 	/**
@@ -1284,6 +1321,7 @@ export class MetadataScanService implements OnModuleInit {
 		const totalRemaining = Math.max(0, totalReleases - totalDone);
 
 		return {
+			// Old fields (kept for backward compatibility)
 			totalReleases,
 			totalDone,
 			totalRemaining,
@@ -1292,6 +1330,16 @@ export class MetadataScanService implements OnModuleInit {
 			notFoundCount,
 			pendingCount,
 			processingCount,
+
+			// New descriptive fields (clear and explicit for frontend)
+			totalReleasesCount: totalReleases,
+			totalReleasesDone: totalDone,
+			totalReleasesRemaining: totalRemaining,
+			successReleasesCount: successCount,
+			failedReleasesCount: failedCount,
+			notFoundReleasesCount: notFoundCount,
+			pendingReleasesCount: pendingCount,
+			processingReleasesCount: processingCount,
 		};
 	}
 

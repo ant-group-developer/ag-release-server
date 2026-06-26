@@ -35,6 +35,7 @@ interface TrackSyncRow {
 	release_upc: string;
 	label_id: string;
 	artist_ids: string[];
+	release_type: string;
 	is_deleted: number;
 	updated_at: string;
 }
@@ -46,6 +47,7 @@ interface DspSyncRow {
 	dsp_name: string;
 	dsp_ci_code: string;
 	picture: string;
+	type: string;
 	created_at: string;
 	updated_at: string;
 }
@@ -123,12 +125,18 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			const chCount = Number(countResult[0]?.c ?? 0);
 			const chWithReleaseUpc = Number(countResult[0]?.with_release_upc ?? 0);
 
-			// Dem so ISRC hop le tren Postgres
+			// Dem so ISRC hop le tren Postgres (tracks + videos)
 			const pgCountResult = await this.entityManager.query(
-				`SELECT COUNT(DISTINCT t.isrc) AS c
-         FROM tracks t
-         INNER JOIN releases r ON r.id = t.release_id
-         WHERE t.isrc IS NOT NULL AND t.isrc != ''`,
+				`SELECT COUNT(DISTINCT isrc) AS c
+         FROM (
+           SELECT t.isrc FROM tracks t
+           INNER JOIN releases r ON r.id = t.release_id
+           WHERE t.isrc IS NOT NULL AND t.isrc != ''
+           UNION
+           SELECT v.isrc FROM videos v
+           INNER JOIN releases r ON r.id = v.release_id
+           WHERE v.isrc IS NOT NULL AND v.isrc != ''
+         ) AS combined`,
 			);
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
 
@@ -161,24 +169,56 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		while (true) {
 			// Lay tung cum tu Postgres de tranh qua tai RAM
 			const rows = await this.entityManager.query(
-				`SELECT DISTINCT ON (t.isrc)
-           t.isrc AS isrc,
-           r.tenant_id AS tenant_id,
-           r.id AS release_id,
-           COALESCE(r.upc, '') AS release_upc,
-           COALESCE(r.label_id, '') AS label_id,
-           COALESCE(
-             (
-               SELECT array_to_string(array_agg(artist_id), ',')
-               FROM track_artist
-               WHERE track_id = t.id
-             ),
-             ''
-           ) AS artist_ids
-         FROM tracks t
-         INNER JOIN releases r ON r.id = t.release_id
-         WHERE t.isrc IS NOT NULL AND t.isrc != ''
-         ORDER BY t.isrc
+				`SELECT DISTINCT ON (isrc)
+           isrc,
+           tenant_id,
+           release_id,
+           release_upc,
+           label_id,
+           artist_ids,
+           release_type
+         FROM (
+           SELECT
+             t.isrc AS isrc,
+             r.tenant_id AS tenant_id,
+             r.id AS release_id,
+             COALESCE(r.upc, '') AS release_upc,
+             COALESCE(r.label_id, '') AS label_id,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(artist_id), ',')
+                 FROM track_artist
+                 WHERE track_id = t.id
+               ),
+               ''
+             ) AS artist_ids,
+             'audio' AS release_type
+           FROM tracks t
+           INNER JOIN releases r ON r.id = t.release_id
+           WHERE t.isrc IS NOT NULL AND t.isrc != ''
+
+           UNION ALL
+
+           SELECT
+             v.isrc AS isrc,
+             r.tenant_id AS tenant_id,
+             r.id AS release_id,
+             COALESCE(r.upc, '') AS release_upc,
+             COALESCE(r.label_id, '') AS label_id,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(artist_id), ',')
+                 FROM video_artist
+                 WHERE video_id = v.id
+               ),
+               ''
+             ) AS artist_ids,
+             'video' AS release_type
+           FROM videos v
+           INNER JOIN releases r ON r.id = v.release_id
+           WHERE v.isrc IS NOT NULL AND v.isrc != ''
+         ) AS combined
+         ORDER BY isrc
          LIMIT $1 OFFSET $2`,
 				[INITIAL_SYNC_BATCH_SIZE, offset],
 			);
@@ -192,6 +232,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				release_upc: row.release_upc ?? '',
 				label_id: row.label_id ?? '',
 				artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
+				release_type: row.release_type ?? 'audio',
 				is_deleted: 0,
 				updated_at: new Date()
 					.toISOString()
@@ -331,6 +372,10 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			.filter((j) => j.entity_name === 'tracks' && j.action !== 'DELETE')
 			.map((j) => j.entity_id);
 
+		const videoUpsertIds = jobs
+			.filter((j) => j.entity_name === 'videos' && j.action !== 'DELETE')
+			.map((j) => j.entity_id);
+
 		const releaseUpsertIds = jobs
 			.filter(
 				(j) => j.entity_name === 'releases' && j.action !== 'DELETE',
@@ -343,7 +388,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-		// 1. Xu ly INSERT/UPDATE cho tracks
+		// 1a. Xu ly INSERT/UPDATE cho tracks
 		if (trackUpsertIds.length > 0) {
 			const rows = await this.entityManager.query(
 				`SELECT DISTINCT ON (t.isrc)
@@ -376,6 +421,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					release_upc: row.release_upc ?? '',
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
+					release_type: 'audio',
 					is_deleted: 0,
 					updated_at: now,
 				}));
@@ -386,11 +432,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			}
 		}
 
-		// 2. Xu ly INSERT/UPDATE cho releases (cap nhat tat ca tracks trong release do)
-		if (releaseUpsertIds.length > 0) {
+		// 1b. Xu ly INSERT/UPDATE cho videos
+		if (videoUpsertIds.length > 0) {
 			const rows = await this.entityManager.query(
-				`SELECT DISTINCT ON (t.isrc)
-           t.isrc AS isrc,
+				`SELECT DISTINCT ON (v.isrc)
+           v.isrc AS isrc,
            r.tenant_id AS tenant_id,
            r.id AS release_id,
            COALESCE(r.upc, '') AS release_upc,
@@ -398,16 +444,93 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            COALESCE(
              (
                SELECT array_to_string(array_agg(artist_id), ',')
-               FROM track_artist
-               WHERE track_id = t.id
+               FROM video_artist
+               WHERE video_id = v.id
              ),
              ''
            ) AS artist_ids
-         FROM tracks t
-         INNER JOIN releases r ON r.id = t.release_id
-         WHERE r.id = ANY($1)
-           AND t.isrc IS NOT NULL AND t.isrc != ''
-         ORDER BY t.isrc`,
+         FROM videos v
+         INNER JOIN releases r ON r.id = v.release_id
+         WHERE v.id = ANY($1)
+           AND v.isrc IS NOT NULL AND v.isrc != ''
+         ORDER BY v.isrc`,
+				[videoUpsertIds],
+			);
+
+			if (rows.length > 0) {
+				const chData: TrackSyncRow[] = rows.map((row: any) => ({
+					isrc: row.isrc,
+					tenant_id: row.tenant_id ?? '',
+					release_id: row.release_id ?? '',
+					release_upc: row.release_upc ?? '',
+					label_id: row.label_id ?? '',
+					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
+					release_type: 'video',
+					is_deleted: 0,
+					updated_at: now,
+				}));
+				await this.clickHouseService.insert(
+					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
+					chData,
+				);
+			}
+		}
+
+		// 2. Xu ly INSERT/UPDATE cho releases (cap nhat tat ca tracks va videos trong release do)
+		if (releaseUpsertIds.length > 0) {
+			const rows = await this.entityManager.query(
+				`SELECT DISTINCT ON (isrc)
+           isrc,
+           tenant_id,
+           release_id,
+           release_upc,
+           label_id,
+           artist_ids,
+           release_type
+         FROM (
+           SELECT
+             t.isrc AS isrc,
+             r.tenant_id AS tenant_id,
+             r.id AS release_id,
+             COALESCE(r.upc, '') AS release_upc,
+             COALESCE(r.label_id, '') AS label_id,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(artist_id), ',')
+                 FROM track_artist
+                 WHERE track_id = t.id
+               ),
+               ''
+             ) AS artist_ids,
+             'audio' AS release_type
+           FROM tracks t
+           INNER JOIN releases r ON r.id = t.release_id
+           WHERE r.id = ANY($1)
+             AND t.isrc IS NOT NULL AND t.isrc != ''
+
+           UNION ALL
+
+           SELECT
+             v.isrc AS isrc,
+             r.tenant_id AS tenant_id,
+             r.id AS release_id,
+             COALESCE(r.upc, '') AS release_upc,
+             COALESCE(r.label_id, '') AS label_id,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(artist_id), ',')
+                 FROM video_artist
+                 WHERE video_id = v.id
+               ),
+               ''
+             ) AS artist_ids,
+             'video' AS release_type
+           FROM videos v
+           INNER JOIN releases r ON r.id = v.release_id
+           WHERE r.id = ANY($1)
+             AND v.isrc IS NOT NULL AND v.isrc != ''
+         ) AS combined
+         ORDER BY isrc`,
 				[releaseUpsertIds],
 			);
 
@@ -419,6 +542,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					release_upc: row.release_upc ?? '',
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
+					release_type: row.release_type ?? 'audio',
 					is_deleted: 0,
 					updated_at: now,
 				}));
@@ -432,7 +556,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		// 3. Xu ly INSERT/UPDATE cho dsps
 		if (dspUpsertIds.length > 0) {
 			const rows = await this.entityManager.query(
-				`SELECT id, code, name, code_ci, picture
+				`SELECT id, code, name, code_ci, picture, type
          FROM dsps
          WHERE id = ANY($1)`,
 				[dspUpsertIds],
@@ -445,6 +569,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					dsp_name: row.name ?? '',
 					dsp_ci_code: row.code_ci ?? '',
 					picture: row.picture ?? '',
+					type: row.type ?? 'audio',
 					created_at: now,
 					updated_at: now,
 				}));

@@ -56,7 +56,7 @@ export class AuthService {
 	}
 
 	// Call after validating user credentials
-	async login(body: SiginDto) {
+	async login(body: SiginDto, customDomainTenantId?: string) {
 		const user = await this.userService.findOneByEmail(body.email, {
 			relations: {
 				tenantUser: true,
@@ -85,6 +85,15 @@ export class AuthService {
 			} else {
 				throw new ResponseError(UserMessages.TENANT.NOT_FOUND);
 			}
+		}
+
+		// Enforce custom domain restriction: user must belong to the domain's tenant
+		if (customDomainTenantId && tenantId !== customDomainTenantId) {
+			throw new ResponseError({
+				statusCode: 403,
+				message: 'Your account does not have access to this workspace',
+				messageCode: 'auth.domain_restricted',
+			});
 		}
 
 		const payload = {

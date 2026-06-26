@@ -64,6 +64,7 @@ import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
 import { TenantRolesModule } from './modules/tenant-roles/tenant-roles.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
+import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
@@ -145,6 +146,7 @@ import { ReportImportModule } from './modules/report-import/report-import.module
 
 		AppConfigModule,
 		TenantModule,
+		TenantDomainModule,
 		TenantDspModule,
 		TenantRolesModule,
 		UserModule,

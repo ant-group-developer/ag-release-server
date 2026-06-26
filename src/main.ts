@@ -2,9 +2,10 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
-import { corsConfig } from './common/config/cors.config';
+import { createDynamicCorsConfig } from './common/config/cors.config';
 import { setupSwagger } from './common/config/swagger.config';
 import { globalValidationPipe } from './common/config/validation.config';
+import { TenantDomainService } from './modules/tenant-domain/tenant-domain.service';
 
 export let APP_GOLBAL: INestApplication<any>;
 
@@ -14,23 +15,15 @@ async function bootstrap() {
 
 	app.set('query parser', 'extended');
 
-	// setInterval(() => {
-	// 	const memoryData = process.memoryUsage();
-	// 	const toMB = (bytes: number) =>
-	// 		(bytes / 1024 / 1024).toFixed(2) + ' MB';
-	// 	Logger.log(
-	// 		`RAM Usage - RSS: ${toMB(memoryData.rss)} | Heap Total: ${toMB(memoryData.heapTotal)} | Heap Used: ${toMB(memoryData.heapUsed)}`,
-	// 		'MemoryTracker',
-	// 	);
-	// }, 5000);
-
-	// Set up global validation pipe with class-transformer options
 	app.useGlobalPipes(globalValidationPipe);
 
-	// Set up Swagger documentation
 	setupSwagger(app);
 
-	app.enableCors(corsConfig());
+	// Dynamic CORS: primary domains from env + active custom domains from DB (cached)
+	const tenantDomainService = app.get(TenantDomainService);
+	app.enableCors(
+		createDynamicCorsConfig((domain) => tenantDomainService.findActiveByDomain(domain)),
+	);
 
 	const port = process.env.APP_PORT || 3000;
 

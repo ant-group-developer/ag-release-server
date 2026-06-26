@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, NotFoundException, Sse, MessageEvent } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiParam } from '@nestjs/swagger';
 import { ImportJobsService, computeProgressDetail } from '../services/import-jobs/import-jobs.service';
-import { ImportJob } from '../interfaces';
+import { ImportJob, ImportJobSourceType } from '../interfaces';
 import { QueryGetListJobsDto } from '../dto/job-query.dto';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Observable, from, of, concat, merge, interval } from 'rxjs';
@@ -133,6 +133,13 @@ export class JobController {
 }
 
 function formatJob(job: ImportJob) {
+  const isImportOrSync =
+    job.sourceType === ImportJobSourceType.REPORT_UPLOAD ||
+    job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
+    job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
+    job.sourceType === ImportJobSourceType.FTP_RETRY ||
+    job.sourceType === ImportJobSourceType.FTP_AUTO_CRON;
+
   return {
     id: job.id,
     sourceType: job.sourceType,
@@ -149,6 +156,9 @@ function formatJob(job: ImportJob) {
       skipped: job.skippedRows,
       errors: job.errorRows,
     },
+    releases: isImportOrSync && job.result && job.result.releases
+      ? job.result.releases
+      : null,
     file: job.fileName
       ? { name: job.fileName, sizeBytes: job.fileSizeBytes, hash: job.fileHash || null }
       : null,
