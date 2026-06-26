@@ -132,6 +132,7 @@ export class BulkUpdateReleaseErrorsDto {
 }
 
 export class GetListReleaseErrorsDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({ type: 'string' })
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;

@@ -57,6 +57,7 @@ export class ReleaseErrorService {
 					field: error.field ?? undefined,
 					trackId: error.trackId ?? undefined,
 					isFix: error.isFixed,
+					id: error.id,
 				}),
 		);
 	}

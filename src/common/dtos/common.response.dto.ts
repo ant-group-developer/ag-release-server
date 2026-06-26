@@ -176,6 +176,7 @@ export class FieldErrorDetails {
 	field: string;
 	trackId?: string;
 	isFix?: boolean;
+	id?: string;
 
 	constructor({
 		messageCode = 'validation.input',
@@ -184,6 +185,7 @@ export class FieldErrorDetails {
 		field = 'unknown',
 		trackId,
 		isFix,
+		id,
 	}: {
 		messageCode?: string;
 		message?: string;
@@ -191,6 +193,7 @@ export class FieldErrorDetails {
 		field?: string;
 		trackId?: string;
 		isFix?: boolean;
+		id?: string;
 	}) {
 		this.messageCode = messageCode;
 		this.message = message;
@@ -198,5 +201,6 @@ export class FieldErrorDetails {
 		this.field = field;
 		this.trackId = trackId;
 		this.isFix = isFix;
+		this.id = id;
 	}
 }
