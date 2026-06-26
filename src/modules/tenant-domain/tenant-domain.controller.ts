@@ -60,12 +60,9 @@ export class TenantDomainController {
 
 	@TenantOwnerOrAdminOnly()
 	@Get('tenants/:tenantId/domain/cf-oauth-url')
-	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup' })
-	async getCfOAuthUrl(
-		@Param('tenantId') tenantId: string,
-		@Query() query: GetCfOAuthUrlDto,
-	) {
-		const url = this.tenantDomainService.getCfOAuthUrl(tenantId, query.domain);
+	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup — uses domain already saved in DB' })
+	async getCfOAuthUrl(@Param('tenantId') tenantId: string) {
+		const url = await this.tenantDomainService.getCfOAuthUrl(tenantId);
 		return new ResponseSuccess({ data: { url } });
 	}
 

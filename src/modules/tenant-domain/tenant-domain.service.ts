@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'crypto';
+import { isPrimaryDomain, normalizeDomain, getPrimaryDomains } from 'src/common/config/domain.config';
 import { Repository } from 'typeorm';
 import { ResponseError } from '../../common/dtos/common.response.dto';
 import { Tenant } from '../tenant/tenant.entity';
@@ -23,12 +24,18 @@ export interface DnsInstructions {
 	txtRecord: { type: 'TXT'; name: string; value: string };
 }
 
+export interface DomainResolveResult {
+	isPrimaryDomain: boolean;
+	domain: string;
+	tenant: TenantBranding | null;
+}
+
 @Injectable()
 export class TenantDomainService {
 	private readonly logger = new Logger(TenantDomainService.name);
 
 	// in-memory cache: domain → { data, expiresAt }
-	private readonly resolveCache = new Map<string, { data: TenantBranding | null; expiresAt: number }>();
+	private readonly resolveCache = new Map<string, { data: DomainResolveResult; expiresAt: number }>();
 	private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
 	// CSRF state store: state → { tenantId, domain, expiresAt }
@@ -55,28 +62,31 @@ export class TenantDomainService {
 	}
 
 	async findActiveByDomain(domain: string): Promise<TenantDomain | null> {
-		return this.repo.findOne({ where: { domain, status: DomainStatus.ACTIVE } });
+		return this.repo.findOne({
+			where: { domain: normalizeDomain(domain), status: DomainStatus.ACTIVE },
+		});
 	}
 
 	// ─── Add Domain ────────────────────────────────────────────────────────────
 
 	async addDomain(tenantId: string, domain: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions }> {
-		this.validateDomainFormat(domain);
+		const normalizedDomain = normalizeDomain(domain);
+		this.validateDomainFormat(normalizedDomain);
 
 		const existing = await this.repo.findOne({ where: { tenantId } });
 		if (existing) {
 			throw new ResponseError(TenantDomainMessages.ALREADY_HAS_DOMAIN);
 		}
 
-		const taken = await this.repo.findOne({ where: { domain } });
+		const taken = await this.repo.findOne({ where: { domain: normalizedDomain } });
 		if (taken) {
 			throw new ResponseError(TenantDomainMessages.DOMAIN_TAKEN);
 		}
 
-		const cfResult = await this.cfSaasService.createCustomHostname(domain);
+		const cfResult = await this.cfSaasService.createCustomHostname(normalizedDomain);
 
 		const entity = this.repo.create({
-			domain,
+			domain: normalizedDomain,
 			tenantId,
 			status: DomainStatus.PENDING,
 			setupMode: DomainSetupMode.MANUAL,
@@ -149,17 +159,26 @@ export class TenantDomainService {
 
 	// ─── Resolve Domain (Public, with cache) ──────────────────────────────────
 
-	async resolveDomain(domain: string): Promise<TenantBranding | null> {
+	async resolveDomain(domain: string): Promise<DomainResolveResult> {
+		const normalizedDomain = normalizeDomain(domain);
+		if (isPrimaryDomain(normalizedDomain)) {
+			return {
+				isPrimaryDomain: true,
+				domain: normalizedDomain,
+				tenant: null,
+			};
+		}
+
 		const now = Date.now();
-		const cached = this.resolveCache.get(domain);
+		const cached = this.resolveCache.get(normalizedDomain);
 		if (cached && cached.expiresAt > now) return cached.data;
 
 		const record = await this.repo.findOne({
-			where: { domain, status: DomainStatus.ACTIVE },
+			where: { domain: normalizedDomain, status: DomainStatus.ACTIVE },
 			relations: ['tenant'],
 		});
 
-		const data: TenantBranding | null = record
+		const tenant: TenantBranding | null = record
 			? {
 					tenantId: record.tenantId,
 					name: record.tenant.name,
@@ -170,18 +189,28 @@ export class TenantDomainService {
 			  }
 			: null;
 
-		this.resolveCache.set(domain, { data, expiresAt: now + this.CACHE_TTL_MS });
+		const data = {
+			isPrimaryDomain: false,
+			domain: normalizedDomain,
+			tenant,
+		};
+		this.resolveCache.set(normalizedDomain, { data, expiresAt: now + this.CACHE_TTL_MS });
 		return data;
 	}
 
 	// ─── Cloudflare OAuth ──────────────────────────────────────────────────────
 
-	getCfOAuthUrl(tenantId: string, domain: string): string {
+	async getCfOAuthUrl(tenantId: string): Promise<string> {
+		const domainRecord = await this.repo.findOne({ where: { tenantId } });
+		if (!domainRecord) {
+			throw new ResponseError(TenantDomainMessages.NOT_FOUND);
+		}
+
 		const state = crypto.randomUUID();
 		this.oauthStateStore.set(state, {
 			tenantId,
-			domain,
-			expiresAt: Date.now() + 10 * 60 * 1000, // 10 min TTL
+			domain: domainRecord.domain,
+			expiresAt: Date.now() + 10 * 60 * 1000,
 		});
 
 		const params = new URLSearchParams({
@@ -225,8 +254,9 @@ export class TenantDomainService {
 			cfTenantZoneId: zoneId,
 		});
 
-		// Redirect FE về settings page với success flag
-		const frontendUrl = process.env.FRONTEND_URL ?? 'https://release.antmusic.net';
+		// Dùng primary domain đầu tiên làm base URL redirect
+		const primaryDomains = getPrimaryDomains();
+		const frontendUrl = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
 		return `${frontendUrl}/settings/domain?cf_setup=success`;
 	}
 
@@ -290,6 +320,6 @@ export class TenantDomainService {
 	}
 
 	private invalidateDomainCache(domain: string): void {
-		this.resolveCache.delete(domain);
+		this.resolveCache.delete(normalizeDomain(domain));
 	}
 }
