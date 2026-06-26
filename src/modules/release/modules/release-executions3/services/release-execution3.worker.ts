@@ -469,9 +469,22 @@ export class ReleaseExecution3Worker {
 				external_identifier: batchId,
 			});
 
+			if (imports.length === 0) {
+				throw new Error(
+					'Không tìm thấy import, có thể do CI chưa xử lý xong',
+				);
+			}
+
 			const errors = imports.flatMap((item: any) =>
 				Array.isArray(item?.errors) ? item.errors : [],
 			);
+			const hasProblemStatus = imports.some(
+				(item: any) =>
+					String(item?.status || '').toLowerCase() === 'problem',
+			);
+			const errorMessages = errors.length
+				? errors
+				: ['Import CI trả về status problem'];
 
 			step.metadata = {
 				...step.metadata,
@@ -484,15 +497,15 @@ export class ReleaseExecution3Worker {
 				output: {
 					imports,
 					errors,
-					hasIssues: errors.length > 0,
+					hasIssues: errors.length > 0 || hasProblemStatus,
 				},
 			};
 
 			await this.manager.save(ReleaseExecutionStep3, step);
 
-			if (errors.length > 0) {
+			if (errors.length > 0 || hasProblemStatus) {
 				await this.releaseErrorService.bulkCreateErrors(
-					errors.map((message: string) => ({
+					errorMessages.map((message: string) => ({
 						releaseId,
 						releaseExecutionId: releaseExecution.id,
 						stepId: step.id,
@@ -502,7 +515,7 @@ export class ReleaseExecution3Worker {
 				);
 
 				this.logService.error({
-					message: `[GET_RESULT_IMPORT_CI] Import CI has ${errors.length} issue(s)`,
+					message: `[GET_RESULT_IMPORT_CI] Import CI has ${errorMessages.length} issue(s)`,
 					releaseExecutionId: releaseExecution.id,
 					releaseExecutionStepId: step.id,
 					data: { upc, batchId, errors },
