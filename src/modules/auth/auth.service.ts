@@ -87,13 +87,19 @@ export class AuthService {
 			}
 		}
 
-		// Enforce custom domain restriction: user must belong to the domain's tenant
-		if (customDomainTenantId && tenantId !== customDomainTenantId) {
-			throw new ResponseError({
-				statusCode: 403,
-				message: 'Your account does not have access to this workspace',
-				messageCode: 'auth.domain_restricted',
-			});
+		// Enforce custom domain restriction: non-admin users must be a member of the domain's tenant
+		if (customDomainTenantId && !checkIsSystemAdmin(user.type)) {
+			await this.tenantUserService
+				.checkMembership(customDomainTenantId, user.id)
+				.catch(() => {
+					throw new ResponseError({
+						statusCode: 403,
+						message: 'Your account does not have access to this workspace',
+						messageCode: 'auth.domain_restricted',
+					});
+				});
+			// Issue token scoped to the custom domain's tenant
+			tenantId = customDomainTenantId;
 		}
 
 		const payload = {
