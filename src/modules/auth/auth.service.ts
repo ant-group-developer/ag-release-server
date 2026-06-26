@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
+import { isPrimaryDomain, normalizeDomain } from 'src/common/config/domain.config';
 import { TenantDomainService } from '../tenant-domain/tenant-domain.service';
 import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 import { TenantService } from '../tenant/tenant.service';
@@ -30,6 +31,23 @@ export class AuthService {
 		private readonly tenantService: TenantService,
 		private readonly tenantDomainService: TenantDomainService,
 	) {}
+
+	// Validate x-custom-domain header và trả về TenantDomain record.
+	// Trả null nếu là primary domain (no restriction needed).
+	// Throws 403 nếu domain không active hoặc không tồn tại trong DB.
+	private async resolveCustomDomain(customDomain: string) {
+		const normalized = normalizeDomain(customDomain);
+		if (isPrimaryDomain(normalized)) return null;
+		const record = await this.tenantDomainService.findActiveByDomain(normalized);
+		if (!record) {
+			throw new ResponseError({
+				statusCode: 403,
+				messageCode: 'auth.domain_not_active',
+				message: 'This domain is not configured or not yet active',
+			});
+		}
+		return record;
+	}
 
 	me(req: Request) {
 		// return this.userService.findOne(req.user?.sub as string);
@@ -91,29 +109,24 @@ export class AuthService {
 		}
 
 		// Enforce custom domain restriction
-		// Header x-custom-domain chỉ được gửi khi FE detect đang ở custom domain
-		// → domain phải tồn tại và active, user phải là member của tenant đó
-		if (customDomain && !checkIsSystemAdmin(user.type)) {
-			const domainRecord = await this.tenantDomainService.findActiveByDomain(customDomain);
-			if (!domainRecord) {
-				// Domain không tồn tại hoặc chưa active → không cho login
-				throw new ResponseError({
-					statusCode: 403,
-					message: 'This domain is not configured or not yet active',
-					messageCode: 'auth.domain_not_active',
-				});
+		if (customDomain) {
+			const domainRecord = await this.resolveCustomDomain(customDomain);
+			if (domainRecord) {
+				// Non-admin phải là member của tenant đó
+				if (!checkIsSystemAdmin(user.type)) {
+					await this.tenantUserService
+						.checkMembership(domainRecord.tenantId, user.id)
+						.catch(() => {
+							throw new ResponseError({
+								statusCode: 403,
+								message: 'Your account does not have access to this workspace',
+								messageCode: 'auth.domain_restricted',
+							});
+						});
+				}
+				// Cả admin và user đều được scope vào tenant của domain
+				tenantId = domainRecord.tenantId;
 			}
-			await this.tenantUserService
-				.checkMembership(domainRecord.tenantId, user.id)
-				.catch(() => {
-					throw new ResponseError({
-						statusCode: 403,
-						message: 'Your account does not have access to this workspace',
-						messageCode: 'auth.domain_restricted',
-					});
-				});
-			// Issue token scoped to domain's tenant
-			tenantId = domainRecord.tenantId;
 		}
 
 		const payload = {
@@ -205,17 +218,10 @@ export class AuthService {
 
 		this.userService.checkActive(user.isActive);
 
-		// On custom domain: can only switch to the domain's tenant
+		// On custom domain: lock switch-tenant to domain's tenant (non-admin only)
 		if (customDomain && !checkIsSystemAdmin(user.type)) {
-			const domainRecord = await this.tenantDomainService.findActiveByDomain(customDomain);
-			if (!domainRecord) {
-				throw new ResponseError({
-					statusCode: 403,
-					message: 'This domain is not configured or not yet active',
-					messageCode: 'auth.domain_not_active',
-				});
-			}
-			if (domainRecord.tenantId !== tenantId) {
+			const domainRecord = await this.resolveCustomDomain(customDomain);
+			if (domainRecord && domainRecord.tenantId !== tenantId) {
 				throw new ResponseError({
 					statusCode: 403,
 					message: 'Your account does not have access to this workspace',
