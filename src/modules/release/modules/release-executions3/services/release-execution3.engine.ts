@@ -11,7 +11,7 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
-import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
+import { ReleaseExecution3Worker } from './release-execution3.worker';
 
 @Injectable()
 export class ReleaseExecutionStepEngine {
@@ -22,8 +22,8 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
-		// private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-		private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
+		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 

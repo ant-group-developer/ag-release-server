@@ -175,6 +175,7 @@ export class FieldErrorDetails {
 	page: string;
 	field: string;
 	trackId?: string;
+	isFix?: boolean;
 
 	constructor({
 		messageCode = 'validation.input',
@@ -182,17 +183,20 @@ export class FieldErrorDetails {
 		page = 'unknown',
 		field = 'unknown',
 		trackId,
+		isFix,
 	}: {
 		messageCode?: string;
 		message?: string;
 		page?: string;
 		field?: string;
 		trackId?: string;
+		isFix?: boolean;
 	}) {
 		this.messageCode = messageCode;
 		this.message = message;
 		this.page = page;
 		this.field = field;
 		this.trackId = trackId;
+		this.isFix = isFix;
 	}
 }
