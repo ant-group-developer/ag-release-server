@@ -49,6 +49,10 @@ export class CreateReleaseErrorDto {
 	stepId?: string;
 
 	@IsOptional()
+	@IsUUID()
+	releaseReviewId?: string;
+
+	@IsOptional()
 	@IsString()
 	messageCode?: string;
 
@@ -90,37 +94,41 @@ export class UpdateReleaseErrorDto {
 	@Transform(toBoolean)
 	isFixed?: boolean;
 
-	@IsOptional()
-	@IsUUID()
-	releaseExecutionId?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// releaseExecutionId?: string;
 
-	@IsOptional()
-	@IsUUID()
-	stepId?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// stepId?: string;
 
-	@IsOptional()
-	@IsString()
-	messageCode?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// releaseReviewId?: string;
 
-	@IsOptional()
-	@IsString()
-	message?: string;
+	// @IsOptional()
+	// @IsString()
+	// messageCode?: string;
 
-	@IsOptional()
-	@IsString()
-	page?: string;
+	// @IsOptional()
+	// @IsString()
+	// message?: string;
 
-	@IsOptional()
-	@IsString()
-	field?: string;
+	// @IsOptional()
+	// @IsString()
+	// page?: string;
 
-	@IsOptional()
-	@IsUUID()
-	trackId?: string;
+	// @IsOptional()
+	// @IsString()
+	// field?: string;
 
-	@IsOptional()
-	@IsEnum(ReleaseErrorType)
-	type?: ReleaseErrorType | null;
+	// @IsOptional()
+	// @IsUUID()
+	// trackId?: string;
+
+	// @IsOptional()
+	// @IsEnum(ReleaseErrorType)
+	// type?: ReleaseErrorType | null;
 }
 
 export class BulkUpdateReleaseErrorsDto {
@@ -153,6 +161,10 @@ export class GetListReleaseErrorsDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsUUID()
 	stepId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	releaseReviewId?: string;
 
 	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
