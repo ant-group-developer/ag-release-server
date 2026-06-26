@@ -25,22 +25,35 @@ export class AuthController {
 
 	@PublicRoute()
 	@ApiHeader({
-		name: 'x-custom-domain-tenant',
+		name: 'x-custom-domain',
 		required: false,
-		description: 'Optional custom domain tenant ID',
+		description: 'Custom domain string (e.g. test.quizonline.website) — restricts login to that tenant',
 	})
 	@Post('login')
 	async login(
 		@Body() body: SiginDto,
-		@Headers('x-custom-domain-tenant') customDomainTenantId?: string,
+		@Headers('x-custom-domain') customDomain?: string,
 	) {
-		const data = await this.auth.login(body, customDomainTenantId);
+		const data = await this.auth.login(body, customDomain);
 		return new ResponseSuccess({ data });
 	}
 
+	@ApiHeader({
+		name: 'x-custom-domain',
+		required: false,
+		description: 'Custom domain string (e.g. test.quizonline.website) — restricts tenant switching to that tenant',
+	})
 	@Post('switch-tenant')
-	async switchTenant(@Body() body: SwitchTenantDto, @Req() req: Request) {
-		const data = await this.auth.switchTenant(body.tenantId, req.user!.sub);
+	async switchTenant(
+		@Body() body: SwitchTenantDto,
+		@Req() req: Request,
+		@Headers('x-custom-domain') customDomain?: string,
+	) {
+		const data = await this.auth.switchTenant(
+			body.tenantId,
+			req.user!.sub,
+			customDomain,
+		);
 		return new ResponseSuccess({ data });
 	}
 

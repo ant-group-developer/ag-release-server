@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantDomainModule } from '../tenant-domain/tenant-domain.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { TokenModule } from '../token/token.module';
 import { UserModule } from '../user/user.module';
@@ -14,6 +15,7 @@ import { RefreshTokensService } from './refresh-tokens.service';
 		TokenModule,
 		UserModule,
 		TenantModule,
+		TenantDomainModule,
 	],
 	controllers: [AuthController],
 	providers: [RefreshTokensService, AuthService],
