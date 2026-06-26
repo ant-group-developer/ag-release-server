@@ -34,6 +34,7 @@ import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
 import { ReleaseError } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseLog } from '../modules/release-log/entities/release-log.entity';
+import { ReleaseReview } from '../modules/release-reviews/entities/release-review.entity';
 
 @Entity('releases', {
 	comment:
@@ -426,6 +427,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => ReleaseError, (error) => error.release)
 	errors: ReleaseError[];
+
+	@OneToMany(() => ReleaseReview, (review) => review.release)
+	reviews: ReleaseReview[];
 
 	// nếu dùng thì nhớ phải join đủ
 	get listCodeExportCi() {

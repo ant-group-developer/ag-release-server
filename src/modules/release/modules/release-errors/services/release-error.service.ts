@@ -56,6 +56,8 @@ export class ReleaseErrorService {
 					page: error.page ?? undefined,
 					field: error.field ?? undefined,
 					trackId: error.trackId ?? undefined,
+					isFix: error.isFixed,
+					id: error.id,
 				}),
 		);
 	}
@@ -84,7 +86,9 @@ export class ReleaseErrorService {
 			stepId,
 		} = filter;
 
-		qb.andWhere('releaseError.releaseId = :releaseId', { releaseId });
+		if (releaseId) {
+			qb.andWhere('releaseError.releaseId = :releaseId', { releaseId });
+		}
 
 		if (keyword?.length) {
 			const keywords = keyword.map((k) => `%${k}%`);

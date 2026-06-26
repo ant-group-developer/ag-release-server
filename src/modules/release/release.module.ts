@@ -37,6 +37,8 @@ import { ReleaseError } from './modules/release-errors/entities/release-error.en
 import { ReleaseErrorsModule } from './modules/release-errors/release-errors.module';
 import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
 import { ReleaseLogModule } from './modules/release-log/release-log.module';
+import { ReleaseReview } from './modules/release-reviews/entities/release-review.entity';
+import { ReleaseReviewsModule } from './modules/release-reviews/release-reviews.module';
 import { ReleaseDdexService } from './services/release-ddex.service';
 // import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
@@ -111,6 +113,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			ReleaseEnrichment,
 			MetadataScanSession,
 			ReleaseError,
+			ReleaseReview,
 
 			ReleaseExecution,
 			ReleaseExecutionDsp,
@@ -138,6 +141,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseCaptionModule,
 		ReleaseLogModule,
 		ReleaseErrorsModule,
+		ReleaseReviewsModule,
 
 		FileExportCiModule,
 

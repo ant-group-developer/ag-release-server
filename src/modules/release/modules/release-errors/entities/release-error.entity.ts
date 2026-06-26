@@ -3,6 +3,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Release } from '../../../entities/release.entity';
 import { ReleaseExecutionStep3 } from '../../release-executions3/entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from '../../release-executions3/entites/release-execution3.entity';
+import { ReleaseReview } from '../../release-reviews/entities/release-review.entity';
 
 export enum ReleaseErrorType {
 	ADMIN_CREATE = 'admin_create',
@@ -69,4 +70,14 @@ export class ReleaseError extends BaseUUIDEntity {
 		nullable: true,
 	})
 	type?: ReleaseErrorType | null;
+
+	@Column({ name: 'release_review_id', type: 'uuid', nullable: true })
+	releaseReviewId?: string | null;
+
+	@ManyToOne(() => ReleaseReview, (review) => review.releaseErrors, {
+		onDelete: 'SET NULL',
+		nullable: true,
+	})
+	@JoinColumn({ name: 'release_review_id' })
+	releaseReview?: ReleaseReview | null;
 }

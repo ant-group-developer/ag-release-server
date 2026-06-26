@@ -265,3 +265,18 @@ export class SyncReleaseToTracksDto {
 	@IsBoolean()
 	syncContributors?: boolean;
 }
+
+export class GetReleaseSubmitErrorsDto {
+	@ApiPropertyOptional({ type: Boolean })
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }: { value: unknown }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		if (value === 'true') return true;
+		if (value === 'false') return false;
+		return value;
+	})
+	isFixed?: boolean;
+}
