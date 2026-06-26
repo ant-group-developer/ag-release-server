@@ -289,6 +289,28 @@ export const MediaUrlTransformer: ValueTransformer = {
 	},
 };
 
+export const HtmlMediaUrlTransformer: ValueTransformer = {
+	to: (value: string) => {
+		if (!value) return value;
+		const domain = process.env.R2_PUBLIC_BASE_URL || '';
+		if (!domain) return value;
+		// Thay thế tất cả src="domain/path" thành src="path"
+		const regex = new RegExp(`src="${domain}/`, 'g');
+		return value.replace(regex, 'src="');
+	},
+	from: (value: string) => {
+		if (!value) return value;
+		const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
+		// Tìm tất cả src="relative_path" (không bắt đầu bằng http) và chèn domain vào
+		return value.replace(/src="([^"]+)"/g, (match, src) => {
+			if (src.startsWith('http') || src.startsWith('data:')) {
+				return match;
+			}
+			return `src="${domain}/${src}"`;
+		});
+	},
+};
+
 export async function batchPromiseAll<T, R>({
 	items,
 	batchSize,

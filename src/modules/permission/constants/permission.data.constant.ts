@@ -51,14 +51,6 @@ export const Permission = {
 		UPDATE: 'release_video.update',
 		DELETE: 'release_video.delete',
 	},
-	RELEASE_VIDEO: {
-		REVIEW: 'release_video.review',
-		CREATE: 'release_video.create',
-		READ: 'release_video.read',
-		TAKE_DOWN: 'release_video.take_down',
-		UPDATE: 'release_video.update',
-		DELETE: 'release_video.delete',
-	},
 	TRACK: {
 		READ: 'track.read',
 		SCAN: 'track.scan',
