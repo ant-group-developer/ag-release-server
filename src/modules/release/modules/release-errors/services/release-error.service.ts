@@ -84,6 +84,7 @@ export class ReleaseErrorService {
 			isFixed,
 			releaseExecutionId,
 			stepId,
+			releaseReviewId,
 		} = filter;
 
 		if (releaseId) {
@@ -129,6 +130,12 @@ export class ReleaseErrorService {
 
 		if (stepId) {
 			qb.andWhere('releaseError.stepId = :stepId', { stepId });
+		}
+
+		if (releaseReviewId) {
+			qb.andWhere('releaseError.releaseReviewId = :releaseReviewId', {
+				releaseReviewId,
+			});
 		}
 
 		if (type) {

@@ -38,6 +38,7 @@ export enum ReleaseExecutionStepType {
 	GEN_ISRCS = 'GEN_ISRCS',
 	GEN_ISRC = 'GEN_ISRC',
 	VALIDATE = 'VALIDATE',
+	REVIEW_RELEASE = 'REVIEW_RELEASE',
 	PROCESS_DSPS = 'PROCESS_DSPS',
 
 	// === Direct DSP ===
