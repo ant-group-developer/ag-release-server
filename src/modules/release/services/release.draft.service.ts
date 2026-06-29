@@ -448,20 +448,13 @@ export class ReleaseDraftService {
 		});
 	}
 
-	async getErrorsSchemaReleaseById(id: string, isFixed?: boolean) {
+	async getErrorsSchemaReleaseById(id: string) {
 		const release = await this.releaseQueryService.findOneReleaseFull({
 			releaseId: id,
 		});
 
 		const schemaErrors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);
-
-		// const storedReleaseErrors =
-		// 	await this.releaseErrorService.getEnrichedErrors({
-		// 		releaseId: id,
-		// 		pageSize: 999,
-		// 		isFixed,
-		// 	} as GetListReleaseErrorsDto);
 
 		return [
 			...schemaErrors,
@@ -474,7 +467,8 @@ export class ReleaseDraftService {
 			await this.releaseErrorService.getEnrichedErrors({
 				releaseId: id,
 				pageSize: 999,
-				isFixed: query.isFixed,
+				submissionStatus: query.submissionStatus,
+				approvalStatus: query.approvalStatus,
 			} as GetListReleaseErrorsDto);
 
 		return storedReleaseErrors;

@@ -1018,7 +1018,6 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// dev
 			await this.sftpConnectService.uploadFolder({
 				sftp: config.sftp,
 				localDir: outputDir,

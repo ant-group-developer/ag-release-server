@@ -44,6 +44,8 @@ export class ReleaseErrorService {
 
 	async getEnrichedErrors(filter: GetListReleaseErrorsDto) {
 		const result = await this.getListErrors(filter);
+		return result;
+
 		return this.enrichData(result.items);
 	}
 
@@ -56,7 +58,6 @@ export class ReleaseErrorService {
 					page: error.page ?? undefined,
 					field: error.field ?? undefined,
 					trackId: error.trackId ?? undefined,
-					isFix: error.isFixed,
 					id: error.id,
 				}),
 		);
@@ -81,7 +82,8 @@ export class ReleaseErrorService {
 			keyword,
 			messageCode,
 			type,
-			isFixed,
+			submissionStatus,
+			approvalStatus,
 			releaseExecutionId,
 			stepId,
 			releaseReviewId,
@@ -93,23 +95,16 @@ export class ReleaseErrorService {
 
 		if (keyword?.length) {
 			const keywords = keyword.map((k) => `%${k}%`);
-			const booleanKeywords = keyword
-				.map((k) => k.toLowerCase())
-				.filter((k) => ['true', 'false'].includes(k))
-				.map((k) => k === 'true');
 
 			qb.andWhere(
 				`(
 					releaseError.message ILIKE ANY(:keywords)
 					OR releaseError.messageCode ILIKE ANY(:keywords)
 					OR releaseError.type::text ILIKE ANY(:keywords)
-					${
-						booleanKeywords.length
-							? 'OR releaseError.isFixed IN (:...booleanKeywords)'
-							: ''
-					}
+					OR releaseError.submissionStatus::text ILIKE ANY(:keywords)
+					OR releaseError.approvalStatus::text ILIKE ANY(:keywords)
 				)`,
-				{ keywords, booleanKeywords },
+				{ keywords },
 			);
 		}
 
@@ -142,8 +137,16 @@ export class ReleaseErrorService {
 			qb.andWhere('releaseError.type = :type', { type });
 		}
 
-		if (isFixed !== undefined) {
-			qb.andWhere('releaseError.isFixed = :isFixed', { isFixed });
+		if (submissionStatus) {
+			qb.andWhere('releaseError.submissionStatus = :submissionStatus', {
+				submissionStatus,
+			});
+		}
+
+		if (approvalStatus) {
+			qb.andWhere('releaseError.approvalStatus = :approvalStatus', {
+				approvalStatus,
+			});
 		}
 
 		orderAndPaging2({ qb, filter });
