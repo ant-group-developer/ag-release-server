@@ -38,8 +38,9 @@ export class TenantDomainService {
 	private readonly resolveCache = new Map<string, { data: DomainResolveResult; expiresAt: number }>();
 	private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
-	// CSRF state store: state → { tenantId, domain, expiresAt }
-	private readonly oauthStateStore = new Map<string, { tenantId: string; domain: string; expiresAt: number }>();
+	// CSRF state store: state → { tenantId, domain, returnUrl, expiresAt }
+	// returnUrl: full URL đã validate để redirect về sau khi xong (rỗng → fallback primary)
+	private readonly oauthStateStore = new Map<string, { tenantId: string; domain: string; returnUrl: string; expiresAt: number }>();
 
 	constructor(
 		@InjectRepository(TenantDomain)
@@ -213,7 +214,7 @@ export class TenantDomainService {
 
 	// ─── Cloudflare OAuth ──────────────────────────────────────────────────────
 
-	async getCfOAuthUrl(tenantId: string): Promise<string> {
+	async getCfOAuthUrl(tenantId: string, opts?: { returnUrl?: string; requestOrigin?: string }): Promise<string> {
 		const domainRecord = await this.repo.findOne({ where: { tenantId } });
 		if (!domainRecord) {
 			throw new ResponseError(TenantDomainMessages.NOT_FOUND);
@@ -224,10 +225,14 @@ export class TenantDomainService {
 			throw new ResponseError(TenantDomainMessages.CF_OAUTH_NOT_AVAILABLE);
 		}
 
+		// Ưu tiên returnUrl FE gửi (về đúng trang đang config); fallback origin header.
+		const returnUrl = await this.resolveSafeReturnUrl(opts?.returnUrl, opts?.requestOrigin);
+
 		const state = crypto.randomUUID();
 		this.oauthStateStore.set(state, {
 			tenantId,
 			domain: domainRecord.domain,
+			returnUrl,
 			expiresAt: Date.now() + 10 * 60 * 1000,
 		});
 
@@ -272,21 +277,91 @@ export class TenantDomainService {
 			cfTenantZoneId: zoneId,
 		});
 
-		// Dùng primary domain đầu tiên làm base URL redirect
-		const primaryDomains = getPrimaryDomains();
-		const frontendUrl = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
-		return `${frontendUrl}/settings/domain?cf_setup=success`;
+		// Redirect về đúng URL admin bắt đầu flow (đã validate ở getCfOAuthUrl)
+		return this.appendSetupParams(stateData.returnUrl, { cf_setup: 'success' });
 	}
 
-	async getCfOAuthErrorRedirectUrl(state: string, error: string, errorDescription?: string): Promise<string> {
-		// Clean up state if it exists
-		this.oauthStateStore.delete(state);
+	/**
+	 * Peek returnUrl đã lưu trong state (KHÔNG xóa state — để handleCfOAuthCallback
+	 * tự xóa khi xử lý). Trả '' nếu state không tồn tại/hết hạn → fallback primary.
+	 */
+	resolveCallbackReturnUrl(state: string): string {
+		const stateData = this.oauthStateStore.get(state);
+		if (!stateData || stateData.expiresAt < Date.now()) return '';
+		return stateData.returnUrl;
+	}
 
+	buildOAuthErrorRedirect(returnUrl: string, error: string, errorDescription?: string): string {
+		const params: Record<string, string> = { cf_setup: 'error', cf_error: error };
+		if (errorDescription) params.cf_error_description = errorDescription;
+		return this.appendSetupParams(returnUrl, params);
+	}
+
+	/**
+	 * Validate returnUrl FE gửi: chỉ chấp nhận khi origin của nó là primary domain
+	 * hoặc custom domain đang ACTIVE (chống open-redirect). Giữ nguyên path + query
+	 * của FE để về đúng trang đang config. Nếu returnUrl không hợp lệ/không có thì
+	 * thử origin header; cuối cùng trả '' → fallback primary lúc redirect.
+	 */
+	private async resolveSafeReturnUrl(returnUrl?: string, requestOrigin?: string): Promise<string> {
+		// 1. Thử returnUrl FE gửi (giữ full path để về đúng trang)
+		if (returnUrl) {
+			try {
+				const parsed = new URL(returnUrl);
+				// Dùng host (gồm port) cho khớp cách normalizeDomain/primaryDomains giữ port
+				if (await this.isAllowedHost(parsed.host)) {
+					// Bỏ hash + các param cf_setup cũ (nếu có) để tránh trùng
+					parsed.hash = '';
+					parsed.searchParams.delete('cf_setup');
+					parsed.searchParams.delete('cf_error');
+					parsed.searchParams.delete('cf_error_description');
+					return parsed.toString();
+				}
+				this.logger.warn(`CF OAuth: rejected unsafe returnUrl host "${parsed.host}"`);
+			} catch {
+				this.logger.warn(`CF OAuth: invalid returnUrl "${returnUrl}"`);
+			}
+		}
+
+		// 2. Fallback: origin header (chỉ có host, dùng path mặc định /settings/domain)
+		const host = normalizeDomain(requestOrigin);
+		if (host && (await this.isAllowedHost(host))) {
+			return `https://${host}/settings/domain`;
+		}
+
+		return '';
+	}
+
+	/** Host hợp lệ = primary domain hoặc custom domain đang ACTIVE. */
+	private async isAllowedHost(hostname: string): Promise<boolean> {
+		const host = normalizeDomain(hostname);
+		if (!host) return false;
+		if (isPrimaryDomain(host)) return true;
+		const active = await this.repo.findOne({ where: { domain: host, status: DomainStatus.ACTIVE } });
+		return !!active;
+	}
+
+	/**
+	 * Gắn các param cf_setup/cf_error vào returnUrl (giữ nguyên path + query sẵn có).
+	 * returnUrl rỗng → fallback PRIMARY_DOMAINS[0]/settings/domain.
+	 */
+	private appendSetupParams(returnUrl: string, params: Record<string, string>): string {
+		const base = returnUrl || this.defaultReturnUrl();
+		try {
+			const url = new URL(base);
+			for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+			return url.toString();
+		} catch {
+			// base không parse được (không nên xảy ra) → ghép thủ công
+			const qs = new URLSearchParams(params).toString();
+			return `${this.defaultReturnUrl()}?${qs}`;
+		}
+	}
+
+	private defaultReturnUrl(): string {
 		const primaryDomains = getPrimaryDomains();
-		const frontendUrl = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
-		const params = new URLSearchParams({ cf_setup: 'error', cf_error: error });
-		if (errorDescription) params.set('cf_error_description', errorDescription);
-		return `${frontendUrl}/settings/domain?${params.toString()}`;
+		const origin = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
+		return `${origin}/settings/domain`;
 	}
 
 	/**

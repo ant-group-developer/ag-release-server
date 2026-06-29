@@ -13,7 +13,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from '../../common/dtos/common.response.dto';
 import { PublicRoute, TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
-import { AddDomainDto, CfOAuthCallbackDto, GetCfOAuthUrlDto } from './dtos/tenant-domain.dto';
+import { AddDomainDto, CfOAuthCallbackDto, CfOAuthUrlQueryDto, GetCfOAuthUrlDto } from './dtos/tenant-domain.dto';
 import { TenantDomainService } from './tenant-domain.service';
 
 @ApiTags('Tenant Domain')
@@ -61,8 +61,16 @@ export class TenantDomainController {
 	@TenantOwnerOrAdminOnly()
 	@Get('tenants/:tenantId/domain/cf-oauth-url')
 	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup — uses domain already saved in DB' })
-	async getCfOAuthUrl(@Param('tenantId') tenantId: string) {
-		const url = await this.tenantDomainService.getCfOAuthUrl(tenantId);
+	async getCfOAuthUrl(
+		@Param('tenantId') tenantId: string,
+		@Query() query: CfOAuthUrlQueryDto,
+		@Req() req: Request,
+	) {
+		const requestOrigin = req.headers.origin ?? req.headers.referer;
+		const url = await this.tenantDomainService.getCfOAuthUrl(tenantId, {
+			returnUrl: query.returnUrl,
+			requestOrigin,
+		});
 		return new ResponseSuccess({ data: { url } });
 	}
 
@@ -81,14 +89,19 @@ export class TenantDomainController {
 	@ApiOperation({ summary: 'Cloudflare OAuth callback — exchanges code and adds DNS records' })
 	@Redirect()
 	async cfOAuthCallback(@Query() query: CfOAuthCallbackDto) {
+		// Peek returnUrl từ state để redirect về đúng trang admin bắt đầu flow.
+		// handleCfOAuthCallback sẽ tự xóa state khi xử lý thành công.
+		const returnUrl = this.tenantDomainService.resolveCallbackReturnUrl(query.state);
+
 		// Cloudflare trả error trực tiếp (vd: user từ chối authorize, scope sai)
 		if (query.error || !query.code) {
-			const redirectUrl = await this.tenantDomainService.getCfOAuthErrorRedirectUrl(
-				query.state,
-				query.error ?? 'missing_code',
-				query.error_description,
-			);
-			return { url: redirectUrl };
+			return {
+				url: this.tenantDomainService.buildOAuthErrorRedirect(
+					returnUrl,
+					query.error ?? 'missing_code',
+					query.error_description,
+				),
+			};
 		}
 
 		// Mọi lỗi trong quá trình xử lý đều redirect về FE thay vì trả 500,
@@ -101,12 +114,9 @@ export class TenantDomainController {
 			return { url: redirectUrl };
 		} catch (err) {
 			const { code, description } = this.tenantDomainService.mapCfCallbackError(err);
-			const redirectUrl = await this.tenantDomainService.getCfOAuthErrorRedirectUrl(
-				query.state,
-				code,
-				description,
-			);
-			return { url: redirectUrl };
+			return {
+				url: this.tenantDomainService.buildOAuthErrorRedirect(returnUrl, code, description),
+			};
 		}
 	}
 }
