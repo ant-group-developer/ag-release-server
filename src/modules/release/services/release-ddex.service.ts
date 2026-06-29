@@ -118,6 +118,7 @@ export class ReleaseDdexService {
 					coverImage,
 					outputDir: resourcesDir,
 					releaseReference: releaseReference,
+					shouldResize: false,
 				});
 
 				await this.processVideoAndSubtitleFiles({
@@ -609,19 +610,26 @@ export class ReleaseDdexService {
 		coverImage,
 		outputDir,
 		releaseReference,
+		shouldResize = true,
 	}: {
 		coverImage: CoverImageInfo;
 		outputDir: string;
 		releaseReference: string;
+		shouldResize?: boolean;
 	}): Promise<void> {
+		const ext = this.normalizeImageExtension(coverImage.extension);
+		const fileName = `${releaseReference}${ext}`;
+		const outputPath = path.join(outputDir, fileName);
+
+		if (!shouldResize) {
+			await fs.promises.copyFile(coverImage.filePath, outputPath);
+			return;
+		}
+
 		const buffer = await fs.promises.readFile(coverImage.filePath);
 		const img = await resizeCoverImageTo3000x3000({
 			buffer,
 		});
-
-		const ext = this.normalizeImageExtension(coverImage.extension);
-		const fileName = `${releaseReference}${ext}`;
-		const outputPath = path.join(outputDir, fileName);
 
 		await img.toFile(outputPath);
 	}
