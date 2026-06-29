@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
@@ -141,7 +141,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseCaptionModule,
 		ReleaseLogModule,
 		ReleaseErrorsModule,
-		ReleaseReviewsModule,
+		forwardRef(() => ReleaseReviewsModule),
 
 		FileExportCiModule,
 
@@ -214,6 +214,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseValidateService,
 		ReportEntityExtractorService,
 		ReleaseExecution3CronJobService,
+		ReleaseExecution3Service,
 	],
 })
 export class ReleaseModule {}

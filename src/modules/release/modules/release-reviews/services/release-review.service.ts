@@ -1,20 +1,45 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+	BadRequestException,
+	Inject,
+	Injectable,
+	NotFoundException,
+	forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
+import { OrderDirection } from 'src/common/enums/common';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
+import {
+	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
+	ReleaseError,
+} from 'src/modules/release/modules/release-errors/entities/release-error.entity';
+import { ReleaseExecutionStepStatus } from 'src/modules/release/modules/release-executions3/enums/release-execution3.enum';
+import { ReleaseExecution3Service } from 'src/modules/release/modules/release-executions3/services/release-execution3.service';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
 	CreateReleaseReviewDto,
+	FieldOrderReleaseReview,
 	GetListReleaseReviewsDto,
+	UpdateReleaseReviewDecisionDto,
 	UpdateReleaseReviewDto,
 } from '../dto/release-review.dto';
-import { ReleaseReview } from '../entities/release-review.entity';
+import {
+	ReleaseReview,
+	ReleaseReviewStatus,
+} from '../entities/release-review.entity';
 
 @Injectable()
 export class ReleaseReviewService {
 	constructor(
 		@InjectRepository(ReleaseReview)
 		private readonly repo: Repository<ReleaseReview>,
+
+		@InjectRepository(ReleaseError)
+		private readonly releaseErrorRepo: Repository<ReleaseError>,
+
+		@Inject(forwardRef(() => ReleaseExecution3Service))
+		private readonly releaseExecutionService: ReleaseExecution3Service,
 	) {}
 
 	async create(data: CreateReleaseReviewDto) {
@@ -22,6 +47,7 @@ export class ReleaseReviewService {
 			releaseId: data.releaseId,
 			releaseExecutionId: data.releaseExecutionId,
 			status: data.status,
+			stepId: data.stepId,
 		});
 
 		const review = await this.repo.save(entity);
@@ -71,6 +97,75 @@ export class ReleaseReviewService {
 		return new PageDto({
 			items,
 			metadata: { pageSize, page, totalItems },
+		});
+	}
+
+	async findLatestByReleaseId(releaseId: string) {
+		const filter = new GetListReleaseReviewsDto();
+		filter.releaseId = releaseId;
+		filter.page = 1;
+		filter.pageSize = 1;
+		filter.fieldOrder = FieldOrderReleaseReview.createdAt;
+		filter.orderBy = OrderDirection.DESC;
+
+		const result = await this.getList(filter);
+		const review = result.items[0];
+
+		if (!review) {
+			throw new NotFoundException('Release review not found');
+		}
+
+		return review;
+	}
+
+	async handleResultReviewRelease(
+		releaseId: string,
+		body: UpdateReleaseReviewDecisionDto,
+	) {
+		const review = await this.findLatestByReleaseId(releaseId);
+
+		if (
+			![
+				ReleaseReviewStatus.PENDING,
+				ReleaseReviewStatus.PROCESSING,
+			].includes(review.status)
+		) {
+			throw new BadRequestException(
+				'Review này đã được xử lý hoặc không còn chờ duyệt',
+			);
+		}
+
+		if (!review.stepId) {
+			throw new BadRequestException('Release review step not found');
+		}
+
+		const stepStatus =
+			body.status === ReleaseReviewStatus.COMPLETED
+				? ReleaseExecutionStepStatus.DONE
+				: ReleaseExecutionStepStatus.FAILED;
+		const approvalStatus =
+			body.status === ReleaseReviewStatus.COMPLETED
+				? ErrorApprovalStatus.APPROVED
+				: ErrorApprovalStatus.REJECTED;
+
+		// cập nhật trạng thái của submissionStatus và approvalStatus thành đã xử lý
+		await this.releaseErrorRepo.update(
+			{
+				releaseId,
+				// approvalStatus: ErrorApprovalStatus.PENDING,
+			},
+			{
+				submissionStatus: ErrorSubmissionStatus.FIXED,
+				approvalStatus,
+			},
+		);
+
+		review.status = body.status;
+		await this.repo.save(review);
+
+		await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
+			stepId: review.stepId,
+			status: stepStatus,
 		});
 	}
 

@@ -338,6 +338,7 @@ export class ReleaseExecution3Worker {
 				releaseId,
 				releaseExecutionId: releaseExecution.id,
 				status: ReleaseReviewStatus.PENDING,
+				stepId: step.id,
 			});
 
 			step.metadata = {
@@ -1018,7 +1019,6 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// dev
 			await this.sftpConnectService.uploadFolder({
 				sftp: config.sftp,
 				localDir: outputDir,

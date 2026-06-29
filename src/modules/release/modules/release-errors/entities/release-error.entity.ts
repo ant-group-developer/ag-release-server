@@ -6,9 +6,20 @@ import { ReleaseExecution3 } from '../../release-executions3/entites/release-exe
 import { ReleaseReview } from '../../release-reviews/entities/release-review.entity';
 
 export enum ReleaseErrorType {
-	ADMIN_CREATE = 'admin_create',
-	IMPORT_CI = 'import_ci',
-	QA_FLAG_CI = 'qa_flag_ci',
+	ADMIN_CREATE = 'ADMIN_CREATE',
+	IMPORT_CI = 'IMPORT_CI',
+	QA_FLAG_CI = 'QA_FLAG_CI',
+}
+
+export enum ErrorSubmissionStatus {
+	OPEN = 'OPEN',
+	FIXED = 'FIXED',
+}
+
+export enum ErrorApprovalStatus {
+	PENDING = 'PENDING',
+	APPROVED = 'APPROVED',
+	REJECTED = 'REJECTED',
 }
 
 @Entity('release_errors')
@@ -46,8 +57,21 @@ export class ReleaseError extends BaseUUIDEntity {
 	@JoinColumn({ name: 'step_id' })
 	step?: ReleaseExecutionStep3 | null;
 
-	@Column({ type: 'boolean', name: 'is_fixed', default: false })
-	isFixed: boolean;
+	@Column({
+		name: 'submission_status',
+		type: 'enum',
+		enum: ErrorSubmissionStatus,
+		default: ErrorSubmissionStatus.OPEN,
+	})
+	submissionStatus: ErrorSubmissionStatus;
+
+	@Column({
+		name: 'approval_status',
+		type: 'enum',
+		enum: ErrorApprovalStatus,
+		default: ErrorApprovalStatus.PENDING,
+	})
+	approvalStatus: ErrorApprovalStatus;
 
 	@Column({ type: 'varchar', nullable: true })
 	messageCode?: string | null;

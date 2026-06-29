@@ -21,6 +21,10 @@ import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { UpsertReleaseVideoDto } from 'src/modules/video/dto/video.dto';
 import { ReleaseTimeMode } from '../enum/release.enum';
+import {
+	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
+} from '../modules/release-errors/entities/release-error.entity';
 
 export class CreateReleaseDraftDto {
 	@ApiPropertyOptional({
@@ -267,16 +271,12 @@ export class SyncReleaseToTracksDto {
 }
 
 export class GetReleaseSubmitErrorsDto {
-	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
-	@IsBoolean()
-	@Transform(({ value }: { value: unknown }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		if (value === 'true') return true;
-		if (value === 'false') return false;
-		return value;
-	})
-	isFixed?: boolean;
+	@IsEnum(ErrorSubmissionStatus)
+	submissionStatus?: ErrorSubmissionStatus;
+
+	@ApiPropertyOptional({ enum: ErrorApprovalStatus })
+	@IsOptional()
+	@IsEnum(ErrorApprovalStatus)
+	approvalStatus?: ErrorApprovalStatus;
 }

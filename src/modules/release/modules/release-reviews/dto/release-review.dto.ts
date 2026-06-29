@@ -1,6 +1,6 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import { ReleaseReviewStatus } from '../entities/release-review.entity';
@@ -20,9 +20,11 @@ export class CreateReleaseReviewDto {
 	@IsUUID()
 	releaseId: string;
 
-	@IsOptional()
 	@IsUUID()
-	releaseExecutionId?: string;
+	releaseExecutionId: string;
+
+	@IsUUID()
+	stepId: string;
 
 	@ApiPropertyOptional({ enum: ReleaseReviewStatus })
 	@IsOptional()
@@ -39,6 +41,14 @@ export class UpdateReleaseReviewDto {
 	@IsOptional()
 	@IsEnum(ReleaseReviewStatus)
 	status?: ReleaseReviewStatus;
+}
+
+export class UpdateReleaseReviewDecisionDto {
+	@ApiProperty({
+		enum: [ReleaseReviewStatus.COMPLETED, ReleaseReviewStatus.FAILED],
+	})
+	@IsIn([ReleaseReviewStatus.COMPLETED, ReleaseReviewStatus.FAILED])
+	status: ReleaseReviewStatus.COMPLETED | ReleaseReviewStatus.FAILED;
 }
 
 export class GetListReleaseReviewsDto extends BaseQueryDto2 {

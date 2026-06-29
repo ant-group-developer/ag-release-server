@@ -38,6 +38,8 @@ import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/r
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
 import { ReleaseLogService } from '../modules/release-log/services/release-log.service';
+import { UpdateReleaseReviewDecisionDto } from '../modules/release-reviews/dto/release-review.dto';
+import { ReleaseReviewService } from '../modules/release-reviews/services/release-review.service';
 import {
 	enhanceReleasesDetails,
 	normalizeMetadataExternal,
@@ -76,6 +78,9 @@ export class ReleaseService {
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
 
+		@Inject(forwardRef(() => ReleaseReviewService))
+		private readonly releaseReviewService: ReleaseReviewService,
+
 		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
@@ -106,6 +111,16 @@ export class ReleaseService {
 			...restOfRelease,
 			coverArtThumbnails,
 		});
+	}
+
+	async updateReleaseReview(
+		releaseId: string,
+		body: UpdateReleaseReviewDecisionDto,
+	) {
+		return this.releaseReviewService.handleResultReviewRelease(
+			releaseId,
+			body,
+		);
 	}
 
 	async getList(

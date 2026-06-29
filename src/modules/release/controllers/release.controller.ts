@@ -47,6 +47,7 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { Release } from '../entities/release.entity';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { UpdateReleaseReviewDecisionDto } from '../modules/release-reviews/dto/release-review.dto';
 import { ReleaseService } from '../services/release.service';
 
 @ApiTags('Releases')
@@ -328,6 +329,16 @@ export class ReleaseController {
 			data: result,
 			messageCode: 'common.processing',
 		});
+	}
+
+	@Post(':id/release-review')
+	async updateReleaseReview(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: UpdateReleaseReviewDecisionDto,
+	) {
+		const result = await this.releaseService.updateReleaseReview(id, body);
+
+		return new ResponseSuccess({ data: result });
 	}
 
 	@RequirePermissions(
