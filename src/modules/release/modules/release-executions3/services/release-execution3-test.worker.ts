@@ -344,6 +344,7 @@ export class ReleaseExecution3WorkerTest {
 				releaseId,
 				releaseExecutionId: releaseExecution.id,
 				status: ReleaseReviewStatus.PENDING,
+				stepId: step.id,
 			});
 
 			step.metadata = {

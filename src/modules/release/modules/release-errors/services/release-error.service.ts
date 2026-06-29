@@ -11,7 +11,11 @@ import {
 	GetListReleaseErrorsDto,
 	UpdateReleaseErrorDto,
 } from '../dto/release-error.dto';
-import { ReleaseError } from '../entities/release-error.entity';
+import {
+	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
+	ReleaseError,
+} from '../entities/release-error.entity';
 
 @Injectable()
 export class ReleaseErrorService {
@@ -26,7 +30,14 @@ export class ReleaseErrorService {
 	}
 
 	async bulkUpdateErrors(data: UpdateReleaseErrorDto[]) {
-		const entities = this.repo.create(data);
+		const entities = this.repo.create(
+			data.map((item) => ({
+				...item,
+				...(item.submissionStatus === ErrorSubmissionStatus.FIXED && {
+					approvalStatus: ErrorApprovalStatus.PENDING,
+				}),
+			})),
+		);
 		return this.repo.save(entities);
 	}
 
