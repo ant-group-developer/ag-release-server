@@ -31,9 +31,15 @@ export class CloudflareDnsOAuthService {
 	private readonly baseUrl = 'https://api.cloudflare.com/client/v4';
 
 	async exchangeCode(code: string): Promise<CfTokenResponse> {
-		const res = await fetch('https://dash.cloudflare.com/oauth2/token', {
+		// Dùng api.cloudflare.com thay vì dash.cloudflare.com: host dash bật managed bot
+		// challenge (trả HTML "Just a moment...") cho request từ IP datacenter, còn host
+		// api không challenge và serve cùng token endpoint.
+		const res = await fetch('https://api.cloudflare.com/oauth2/token', {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Accept: 'application/json',
+			},
 			body: new URLSearchParams({
 				grant_type: 'authorization_code',
 				code,
@@ -46,6 +52,20 @@ export class CloudflareDnsOAuthService {
 		if (!res.ok) {
 			const text = await res.text();
 			this.logger.error('CF OAuth token exchange failed', text);
+
+			// Cloudflare trả trang managed challenge (HTML) thay vì JSON khi nghi request là bot.
+			// Thường xảy ra khi server chạy trên IP datacenter.
+			const isChallenge =
+				text.includes('Just a moment') ||
+				text.includes('challenge-platform') ||
+				text.trimStart().startsWith('<!DOCTYPE html');
+			if (isChallenge) {
+				throw new CfOAuthError(
+					'token_exchange_blocked',
+					'Cloudflare blocked the token request with a bot challenge. The server IP may be flagged; contact support.',
+				);
+			}
+
 			let description: string | undefined;
 			try {
 				description = JSON.parse(text)?.error_description;
