@@ -43,7 +43,12 @@ export const createDynamicCorsConfig = (
 			const domain = extractHost(origin);         // e.g. "localhost:3000" or "release.quizonline.website"
 			const hostname = extractHostname(origin);   // e.g. "localhost" or "release.quizonline.website"
 
-			// 1. Static primary domains (check both with and without port)
+			// 1. Auto-allow localhost in development
+			if (process.env.NODE_ENV === 'development' && hostname === 'localhost') {
+				return callback(null, true);
+			}
+
+			// 2. Static primary domains (check both with and without port)
 			if (primaryDomains.includes(domain) || primaryDomains.includes(hostname)) {
 				return callback(null, true);
 			}

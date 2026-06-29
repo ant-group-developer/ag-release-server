@@ -120,9 +120,9 @@ export class DspReportService {
 
     // Sorting options (default to dsp_name ASC)
     const allowedSortFields: Record<string, string> = {
-      name: 'r.dsp_name',
-      dspName: 'r.dsp_name',
-      source: 'r.source',
+      name: 'lower(r.dsp_name)',
+      dspName: 'lower(r.dsp_name)',
+      source: 'lower(r.source)',
       createdAt: 'r.created_at',
       created_at: 'r.created_at',
       updatedAt: 'r.updated_at',
@@ -131,7 +131,7 @@ export class DspReportService {
 
     const fieldOrder = query.fieldOrder && allowedSortFields[query.fieldOrder]
       ? allowedSortFields[query.fieldOrder]
-      : 'r.dsp_name';
+      : 'lower(r.dsp_name)';
 
     const orderBy = query.orderBy && ['ASC', 'DESC'].includes(query.orderBy.toUpperCase())
       ? query.orderBy.toUpperCase()
