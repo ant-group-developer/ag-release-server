@@ -81,6 +81,7 @@ export class TenantDomainController {
 	@ApiOperation({ summary: 'Cloudflare OAuth callback — exchanges code and adds DNS records' })
 	@Redirect()
 	async cfOAuthCallback(@Query() query: CfOAuthCallbackDto) {
+		// Cloudflare trả error trực tiếp (vd: user từ chối authorize, scope sai)
 		if (query.error || !query.code) {
 			const redirectUrl = await this.tenantDomainService.getCfOAuthErrorRedirectUrl(
 				query.state,
@@ -89,10 +90,23 @@ export class TenantDomainController {
 			);
 			return { url: redirectUrl };
 		}
-		const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
-			query.code,
-			query.state,
-		);
-		return { url: redirectUrl };
+
+		// Mọi lỗi trong quá trình xử lý đều redirect về FE thay vì trả 500,
+		// để user biết chính xác config sai gì.
+		try {
+			const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
+				query.code,
+				query.state,
+			);
+			return { url: redirectUrl };
+		} catch (err) {
+			const { code, description } = this.tenantDomainService.mapCfCallbackError(err);
+			const redirectUrl = await this.tenantDomainService.getCfOAuthErrorRedirectUrl(
+				query.state,
+				code,
+				description,
+			);
+			return { url: redirectUrl };
+		}
 	}
 }

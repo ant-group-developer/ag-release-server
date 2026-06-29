@@ -5,7 +5,7 @@ import { isPrimaryDomain, normalizeDomain, getPrimaryDomains } from 'src/common/
 import { Repository } from 'typeorm';
 import { ResponseError } from '../../common/dtos/common.response.dto';
 import { Tenant } from '../tenant/tenant.entity';
-import { CloudflareDnsOAuthService } from './cloudflare-dns-oauth.service';
+import { CfOAuthError, CloudflareDnsOAuthService } from './cloudflare-dns-oauth.service';
 import { CloudflareSaasService } from './cloudflare-saas.service';
 import { TenantDomainMessages } from './tenant-domain.constants';
 import { DomainSetupMode, DomainStatus, SslStatus, TenantDomain } from './entities/tenant-domain.entity';
@@ -52,13 +52,26 @@ export class TenantDomainService {
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
-	async getDomain(tenantId: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions } | null> {
+	async getDomain(tenantId: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions; canAutoSetup: boolean } | null> {
 		const domain = await this.repo.findOne({ where: { tenantId } });
 		if (!domain) return null;
 		return {
 			domain,
 			dnsInstructions: this.buildDnsInstructions(domain),
+			canAutoSetup: this.canAutoSetup(domain.status),
 		};
+	}
+
+	/**
+	 * Auto-setup (Connect Cloudflare) chỉ có ý nghĩa khi DNS chưa hoàn thiện.
+	 * Khi domain đã active/verifying thì DNS đã đúng → không cần auto-setup nữa.
+	 */
+	private canAutoSetup(status: DomainStatus): boolean {
+		return (
+			status === DomainStatus.PENDING ||
+			status === DomainStatus.FAILED ||
+			status === DomainStatus.EXPIRED
+		);
 	}
 
 	async findActiveByDomain(domain: string): Promise<TenantDomain | null> {
@@ -206,6 +219,11 @@ export class TenantDomainService {
 			throw new ResponseError(TenantDomainMessages.NOT_FOUND);
 		}
 
+		// Chặn double-submit: domain đã active/verifying thì DNS đã đúng rồi
+		if (!this.canAutoSetup(domainRecord.status)) {
+			throw new ResponseError(TenantDomainMessages.CF_OAUTH_NOT_AVAILABLE);
+		}
+
 		const state = crypto.randomUUID();
 		this.oauthStateStore.set(state, {
 			tenantId,
@@ -217,7 +235,7 @@ export class TenantDomainService {
 			client_id: process.env.CF_OAUTH_CLIENT_ID!,
 			redirect_uri: process.env.CF_OAUTH_REDIRECT_URI!,
 			response_type: 'code',
-			scope: 'zone:read dns:edit',
+			scope: 'zone.read dns.write',
 			state,
 		});
 
@@ -269,6 +287,29 @@ export class TenantDomainService {
 		const params = new URLSearchParams({ cf_setup: 'error', cf_error: error });
 		if (errorDescription) params.set('cf_error_description', errorDescription);
 		return `${frontendUrl}/settings/domain?${params.toString()}`;
+	}
+
+	/**
+	 * Map exception từ handleCfOAuthCallback thành { code, description } để
+	 * controller redirect về FE với cf_error tương ứng.
+	 */
+	mapCfCallbackError(err: unknown): { code: string; description?: string } {
+		if (err instanceof CfOAuthError) {
+			return { code: err.code, description: err.description };
+		}
+		if (err instanceof ResponseError) {
+			// Hiện tại chỉ có CF_OAUTH_INVALID_STATE / NOT_FOUND đi qua đây
+			const messageCode = err.messageCode;
+			if (messageCode === TenantDomainMessages.CF_OAUTH_INVALID_STATE.messageCode) {
+				return { code: 'oauth_invalid_state', description: TenantDomainMessages.CF_OAUTH_INVALID_STATE.message };
+			}
+			if (messageCode === TenantDomainMessages.NOT_FOUND.messageCode) {
+				return { code: 'domain_not_found', description: TenantDomainMessages.NOT_FOUND.message };
+			}
+			return { code: 'setup_failed', description: err.message };
+		}
+		this.logger.error('Unexpected CF OAuth callback error', err as any);
+		return { code: 'setup_failed', description: 'Unexpected error while completing Cloudflare setup' };
 	}
 
 	// ─── Health Check (called by cron) ─────────────────────────────────────────
