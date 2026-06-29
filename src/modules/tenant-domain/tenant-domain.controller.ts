@@ -81,6 +81,14 @@ export class TenantDomainController {
 	@ApiOperation({ summary: 'Cloudflare OAuth callback — exchanges code and adds DNS records' })
 	@Redirect()
 	async cfOAuthCallback(@Query() query: CfOAuthCallbackDto) {
+		if (query.error) {
+			const redirectUrl = await this.tenantDomainService.getCfOAuthErrorRedirectUrl(
+				query.state,
+				query.error,
+				query.error_description,
+			);
+			return { url: redirectUrl };
+		}
 		const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
 			query.code,
 			query.state,

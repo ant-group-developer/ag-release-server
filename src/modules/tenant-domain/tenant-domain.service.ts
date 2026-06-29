@@ -217,7 +217,7 @@ export class TenantDomainService {
 			client_id: process.env.CF_OAUTH_CLIENT_ID!,
 			redirect_uri: process.env.CF_OAUTH_REDIRECT_URI!,
 			response_type: 'code',
-			scope: 'account:read zone:read dns:edit',
+			scope: 'zone:read dns:edit',
 			state,
 		});
 
@@ -258,6 +258,17 @@ export class TenantDomainService {
 		const primaryDomains = getPrimaryDomains();
 		const frontendUrl = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
 		return `${frontendUrl}/settings/domain?cf_setup=success`;
+	}
+
+	async getCfOAuthErrorRedirectUrl(state: string, error: string, errorDescription?: string): Promise<string> {
+		// Clean up state if it exists
+		this.oauthStateStore.delete(state);
+
+		const primaryDomains = getPrimaryDomains();
+		const frontendUrl = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
+		const params = new URLSearchParams({ cf_setup: 'error', cf_error: error });
+		if (errorDescription) params.set('cf_error_description', errorDescription);
+		return `${frontendUrl}/settings/domain?${params.toString()}`;
 	}
 
 	// ─── Health Check (called by cron) ─────────────────────────────────────────

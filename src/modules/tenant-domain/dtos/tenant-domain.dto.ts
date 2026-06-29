@@ -19,10 +19,20 @@ export class GetCfOAuthUrlDto {
 }
 
 export class CfOAuthCallbackDto {
-	@ApiProperty()
+	@ApiPropertyOptional()
 	@IsString()
-	@IsNotEmpty()
-	code: string;
+	@IsOptional()
+	code?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	error?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	error_description?: string;
 
 	@ApiProperty()
 	@IsString()
