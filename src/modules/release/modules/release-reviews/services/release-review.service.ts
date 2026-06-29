@@ -11,6 +11,7 @@ import { OrderDirection } from 'src/common/enums/common';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import {
 	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
 	ReleaseError,
 } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseExecutionStepStatus } from 'src/modules/release/modules/release-executions3/enums/release-execution3.enum';
@@ -147,15 +148,20 @@ export class ReleaseReviewService {
 				? ErrorApprovalStatus.APPROVED
 				: ErrorApprovalStatus.REJECTED;
 
+		// cập nhật trạng thái của submissionStatus và approvalStatus thành đã xử lý
 		await this.releaseErrorRepo.update(
 			{
 				releaseId,
-				approvalStatus: ErrorApprovalStatus.PENDING,
+				// approvalStatus: ErrorApprovalStatus.PENDING,
 			},
 			{
+				submissionStatus: ErrorSubmissionStatus.FIXED,
 				approvalStatus,
 			},
 		);
+
+		review.status = body.status;
+		await this.repo.save(review);
 
 		await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
 			stepId: review.stepId,

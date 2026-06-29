@@ -109,11 +109,11 @@ export class ReleaseErrorService {
 
 			qb.andWhere(
 				`(
-					releaseError.message ILIKE ANY(:keywords)
+					"releaseError"."message" ILIKE ANY(:keywords)
 					OR releaseError.messageCode ILIKE ANY(:keywords)
-					OR releaseError.type::text ILIKE ANY(:keywords)
-					OR releaseError.submissionStatus::text ILIKE ANY(:keywords)
-					OR releaseError.approvalStatus::text ILIKE ANY(:keywords)
+					OR "releaseError"."type"::text ILIKE ANY(:keywords)
+					OR "releaseError"."submission_status"::text ILIKE ANY(:keywords)
+					OR "releaseError"."approval_status"::text ILIKE ANY(:keywords)
 				)`,
 				{ keywords },
 			);
