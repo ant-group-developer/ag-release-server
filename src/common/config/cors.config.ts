@@ -6,12 +6,18 @@ export const buildPrimaryDomainRegexes = (): RegExp[] => {
 
 	return allowedDomains.map((domain) => {
 		const escaped = domain.replace(/\./g, '\\.');
-		return new RegExp(`^https?:\\/\\/${escaped}$`);
+		// Allows optional port suffix (e.g. :3000) for local development
+		return new RegExp(`^https?:\\/\\/${escaped}(:\\d+)?$`);
 	});
 };
 
 const extractHost = (origin: string): string => {
 	return normalizeDomain(origin);
+};
+
+const extractHostname = (origin: string): string => {
+	const domain = normalizeDomain(origin);
+	return domain.split(':')[0];
 };
 
 /** Static config — used before app fully initialises (fallback) */
@@ -34,10 +40,11 @@ export const createDynamicCorsConfig = (
 		origin: async (origin, callback) => {
 			if (!origin) return callback(null, true);
 
-			const domain = extractHost(origin);
+			const domain = extractHost(origin);         // e.g. "localhost:3000" or "release.quizonline.website"
+			const hostname = extractHostname(origin);   // e.g. "localhost" or "release.quizonline.website"
 
-			// 1. Static primary domains
-			if (primaryDomains.includes(domain)) {
+			// 1. Static primary domains (check both with and without port)
+			if (primaryDomains.includes(domain) || primaryDomains.includes(hostname)) {
 				return callback(null, true);
 			}
 
@@ -49,8 +56,8 @@ export const createDynamicCorsConfig = (
 				return callback(null, cached.allowed);
 			}
 
-			// 3. DB lookup
-			const record = await findActiveByDomain(domain).catch(() => null);
+			// 3. DB lookup (query using hostname to match the DB record without port)
+			const record = await findActiveByDomain(hostname).catch(() => null);
 			const allowed = !!record;
 			cache.set(domain, { allowed, expiresAt: now + CACHE_TTL });
 
@@ -59,4 +66,3 @@ export const createDynamicCorsConfig = (
 		credentials: true,
 	};
 };
-
