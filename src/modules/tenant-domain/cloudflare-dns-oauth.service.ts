@@ -11,15 +11,35 @@ interface CfZone {
 	name: string;
 }
 
+/**
+ * Lỗi có cấu trúc cho luồng OAuth của Cloudflare.
+ * `code` được map ra query param `cf_error` để FE hiển thị thông báo phù hợp.
+ */
+export class CfOAuthError extends Error {
+	constructor(
+		public readonly code: string,
+		public readonly description?: string,
+	) {
+		super(description ? `${code}: ${description}` : code);
+		this.name = 'CfOAuthError';
+	}
+}
+
 @Injectable()
 export class CloudflareDnsOAuthService {
 	private readonly logger = new Logger(CloudflareDnsOAuthService.name);
 	private readonly baseUrl = 'https://api.cloudflare.com/client/v4';
 
 	async exchangeCode(code: string): Promise<CfTokenResponse> {
-		const res = await fetch('https://dash.cloudflare.com/oauth2/token', {
+		// Dùng api.cloudflare.com thay vì dash.cloudflare.com: host dash bật managed bot
+		// challenge (trả HTML "Just a moment...") cho request từ IP datacenter, còn host
+		// api không challenge và serve cùng token endpoint.
+		const res = await fetch('https://api.cloudflare.com/oauth2/token', {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Accept: 'application/json',
+			},
 			body: new URLSearchParams({
 				grant_type: 'authorization_code',
 				code,
@@ -32,7 +52,27 @@ export class CloudflareDnsOAuthService {
 		if (!res.ok) {
 			const text = await res.text();
 			this.logger.error('CF OAuth token exchange failed', text);
-			throw new Error('Failed to exchange Cloudflare OAuth code');
+
+			// Cloudflare trả trang managed challenge (HTML) thay vì JSON khi nghi request là bot.
+			// Thường xảy ra khi server chạy trên IP datacenter.
+			const isChallenge =
+				text.includes('Just a moment') ||
+				text.includes('challenge-platform') ||
+				text.trimStart().startsWith('<!DOCTYPE html');
+			if (isChallenge) {
+				throw new CfOAuthError(
+					'token_exchange_blocked',
+					'Cloudflare blocked the token request with a bot challenge. The server IP may be flagged; contact support.',
+				);
+			}
+
+			let description: string | undefined;
+			try {
+				description = JSON.parse(text)?.error_description;
+			} catch {
+				// body không phải JSON — bỏ qua, dùng description mặc định
+			}
+			throw new CfOAuthError('token_exchange_failed', description ?? 'Failed to exchange Cloudflare OAuth code');
 		}
 
 		return res.json();
@@ -56,7 +96,10 @@ export class CloudflareDnsOAuthService {
 		const json = await res.json();
 		if (!json.success || !json.result?.length) {
 			this.logger.error(`CF getZoneId: no zone found for ${rootDomain}`, json.errors);
-			throw new Error(`No Cloudflare zone found for domain: ${rootDomain}`);
+			throw new CfOAuthError(
+				'zone_not_found',
+				`No Cloudflare zone found for "${rootDomain}". The authorized Cloudflare account must manage this domain.`,
+			);
 		}
 
 		const zone = json.result[0] as CfZone;
@@ -106,12 +149,31 @@ export class CloudflareDnsOAuthService {
 
 		if (!cnameJson.success) {
 			this.logger.error(`CF addDnsRecords: CNAME failed for ${opts.domain}`, cnameJson.errors);
-			throw new Error(`Failed to add CNAME record: ${cnameJson.errors?.[0]?.message ?? 'unknown'}`);
+			throw this.toDnsError(cnameJson.errors, 'CNAME', opts.domain);
 		}
 
 		if (!txtJson.success) {
 			this.logger.error(`CF addDnsRecords: TXT failed for ${opts.txtName}`, txtJson.errors);
-			throw new Error(`Failed to add TXT record: ${txtJson.errors?.[0]?.message ?? 'unknown'}`);
+			throw this.toDnsError(txtJson.errors, 'TXT', opts.txtName);
 		}
+	}
+
+	/**
+	 * Map lỗi từ Cloudflare DNS API thành CfOAuthError.
+	 * Code 81053 = record (A/AAAA/CNAME) đã tồn tại với host đó.
+	 */
+	private toDnsError(
+		errors: Array<{ code: number; message: string }> | undefined,
+		recordType: 'CNAME' | 'TXT',
+		host: string,
+	): CfOAuthError {
+		const first = errors?.[0];
+		if (first?.code === 81053 || first?.code === 81057 || first?.code === 81058) {
+			return new CfOAuthError(
+				'record_exists',
+				`A ${recordType} record for "${host}" already exists in this zone. Please review the existing DNS records.`,
+			);
+		}
+		return new CfOAuthError('dns_add_failed', first?.message ?? `Failed to add ${recordType} record`);
 	}
 }

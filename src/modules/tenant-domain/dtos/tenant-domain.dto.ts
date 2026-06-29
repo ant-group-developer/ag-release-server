@@ -18,11 +18,31 @@ export class GetCfOAuthUrlDto {
 	domain: string;
 }
 
-export class CfOAuthCallbackDto {
-	@ApiProperty()
+export class CfOAuthUrlQueryDto {
+	@ApiPropertyOptional({
+		description: 'Full URL của trang FE đang config, để callback redirect về đúng chỗ sau khi xong',
+		example: 'http://localhost:6200/en/tenants/123/custom-domain',
+	})
 	@IsString()
-	@IsNotEmpty()
-	code: string;
+	@IsOptional()
+	returnUrl?: string;
+}
+
+export class CfOAuthCallbackDto {
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	code?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	error?: string;
+
+	@ApiPropertyOptional()
+	@IsString()
+	@IsOptional()
+	error_description?: string;
 
 	@ApiProperty()
 	@IsString()
