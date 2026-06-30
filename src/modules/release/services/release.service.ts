@@ -116,10 +116,12 @@ export class ReleaseService {
 	async updateReleaseReview(
 		releaseId: string,
 		body: UpdateReleaseReviewDecisionDto,
+		reviewerId: string,
 	) {
 		return this.releaseReviewService.handleResultReviewRelease(
 			releaseId,
 			body,
+			reviewerId,
 		);
 	}
 

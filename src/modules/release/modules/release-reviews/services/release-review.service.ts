@@ -9,14 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
-import {
-	ErrorApprovalStatus,
-	ErrorSubmissionStatus,
-	ReleaseError,
-} from 'src/modules/release/modules/release-errors/entities/release-error.entity';
-import { ReleaseExecutionStepStatus } from 'src/modules/release/modules/release-executions3/enums/release-execution3.enum';
+import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
 import { ReleaseExecution3Service } from 'src/modules/release/modules/release-executions3/services/release-execution3.service';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import { ReleaseExecutionStepStatus } from '../../release-executions3/enums/release-execution3.enum';
 import {
 	CreateReleaseReviewDto,
 	FieldOrderReleaseReview,
@@ -35,8 +31,7 @@ export class ReleaseReviewService {
 		@InjectRepository(ReleaseReview)
 		private readonly repo: Repository<ReleaseReview>,
 
-		@InjectRepository(ReleaseError)
-		private readonly releaseErrorRepo: Repository<ReleaseError>,
+		private readonly releaseErrorService: ReleaseErrorService,
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
 		private readonly releaseExecutionService: ReleaseExecution3Service,
@@ -78,6 +73,7 @@ export class ReleaseReviewService {
 				release: true,
 				releaseExecution: true,
 				releaseErrors: true,
+				reviewer: true,
 			},
 		});
 
@@ -100,7 +96,7 @@ export class ReleaseReviewService {
 		});
 	}
 
-	async findLatestByReleaseId(releaseId: string) {
+	async findLatestByReleaseIdOrCreate(releaseId: string) {
 		const filter = new GetListReleaseReviewsDto();
 		filter.releaseId = releaseId;
 		filter.page = 1;
@@ -121,8 +117,9 @@ export class ReleaseReviewService {
 	async handleResultReviewRelease(
 		releaseId: string,
 		body: UpdateReleaseReviewDecisionDto,
+		reviewerId: string,
 	) {
-		const review = await this.findLatestByReleaseId(releaseId);
+		const review = await this.findLatestByReleaseIdOrCreate(releaseId);
 
 		if (
 			![
@@ -139,28 +136,18 @@ export class ReleaseReviewService {
 			throw new BadRequestException('Release review step not found');
 		}
 
-		const stepStatus =
-			body.status === ReleaseReviewStatus.COMPLETED
-				? ReleaseExecutionStepStatus.DONE
-				: ReleaseExecutionStepStatus.FAILED;
-		const approvalStatus =
-			body.status === ReleaseReviewStatus.COMPLETED
-				? ErrorApprovalStatus.APPROVED
-				: ErrorApprovalStatus.REJECTED;
+		const stepStatus = ReleaseReviewStatus.COMPLETED
+			? ReleaseExecutionStepStatus.DONE
+			: ReleaseExecutionStepStatus.FAILED;
 
-		// cập nhật trạng thái của submissionStatus và approvalStatus thành đã xử lý
-		await this.releaseErrorRepo.update(
-			{
-				releaseId,
-				// approvalStatus: ErrorApprovalStatus.PENDING,
-			},
-			{
-				submissionStatus: ErrorSubmissionStatus.FIXED,
-				approvalStatus,
-			},
-		);
+		await this.releaseErrorService.bulkUpdateErrorsByReviewResult({
+			releaseId,
+			status: body.status,
+			reviewerId,
+		});
 
 		review.status = body.status;
+		review.reviewerId = reviewerId;
 		await this.repo.save(review);
 
 		await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
@@ -182,6 +169,7 @@ export class ReleaseReviewService {
 			'releaseExecution',
 		);
 		qb.leftJoinAndSelect('releaseReview.releaseErrors', 'releaseErrors');
+		qb.leftJoinAndSelect('releaseReview.reviewer', 'reviewer');
 		this.applyFilter({ qb, filter });
 		return qb;
 	}

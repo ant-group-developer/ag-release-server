@@ -26,6 +26,7 @@ import {
 } from 'src/common/dtos/common.response.dto';
 
 import { Request, Response } from 'express';
+import { UserId } from 'src/common/decorators/req.decorators';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import {
 	RequirePermissions,
@@ -335,8 +336,13 @@ export class ReleaseController {
 	async updateReleaseReview(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() body: UpdateReleaseReviewDecisionDto,
+		@UserId() userId: string,
 	) {
-		const result = await this.releaseService.updateReleaseReview(id, body);
+		const result = await this.releaseService.updateReleaseReview(
+			id,
+			body,
+			userId,
+		);
 
 		return new ResponseSuccess({ data: result });
 	}
