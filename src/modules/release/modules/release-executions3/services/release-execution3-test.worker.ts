@@ -13,7 +13,6 @@ import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
-import { ReleaseReviewStatus } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
@@ -342,10 +341,11 @@ export class ReleaseExecution3WorkerTest {
 
 			const review =
 				await this.releaseReviewService.findLatestByReleaseIdOrCreate({
-					releaseId,
-					releaseExecutionId: releaseExecution.id,
-					status: ReleaseReviewStatus.PENDING,
-					stepId: step.id,
+					data: {
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+					},
 				});
 
 			step.metadata = {

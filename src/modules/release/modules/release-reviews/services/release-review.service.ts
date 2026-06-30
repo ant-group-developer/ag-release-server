@@ -102,7 +102,13 @@ export class ReleaseReviewService {
 		});
 	}
 
-	async findLatestByReleaseIdOrCreate(data: CreateReleaseReviewDto) {
+	async findLatestByReleaseIdOrCreate({
+		data,
+		orCreate = true,
+	}: {
+		data: CreateReleaseReviewDto;
+		orCreate?: boolean;
+	}) {
 		const { releaseId } = data;
 
 		try {
@@ -138,8 +144,11 @@ export class ReleaseReviewService {
 
 			return review;
 		} catch (error) {
-			console.log(error, 'Đã tạo mới');
-			return await this.create(data);
+			if (orCreate) {
+				console.log(error, 'Đã tạo mới');
+
+				return await this.create(data);
+			} else throw new NotFoundException('Release review not found');
 		}
 	}
 
@@ -148,7 +157,9 @@ export class ReleaseReviewService {
 		body: UpdateReleaseReviewDecisionDto,
 		reviewerId: string,
 	) {
-		const review = await this.findLatestByReleaseIdOrCreate({ releaseId });
+		const review = await this.findLatestByReleaseIdOrCreate({
+			data: { releaseId },
+		});
 
 		const stepStatus =
 			body.status === ReleaseReviewStatus.COMPLETED

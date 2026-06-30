@@ -33,7 +33,7 @@ export class ReleaseErrorService {
 	async bulkCreateErrors(data: CreateReleaseErrorDto[], userId?: string) {
 		const releaseReview =
 			await this.releaseReviewService.findLatestByReleaseIdOrCreate({
-				releaseId: data[0].releaseId,
+				data: { releaseId: data[0].releaseId },
 			});
 
 		const entities = this.repo.create(

@@ -16,13 +16,18 @@ import {
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
 } from '../dto/release.dto';
+import {
+	ReleaseEnrichment,
+	ReleaseEnrichmentStatus,
+} from '../entities/release-enrichment.entity';
 import { Release } from '../entities/release.entity';
-import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import {
 	ReleaseStatus,
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
+import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
+import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -503,6 +508,8 @@ export class ReleaseQueryService {
 			isVariousArtist,
 			isImportedFromReport,
 			isEnrich,
+			hasError,
+			needsReview,
 			tenantIds,
 
 			fieldOrder,
@@ -636,6 +643,43 @@ export class ReleaseQueryService {
 				isEnrich
 					? 'releaseEnrichmentFilter.id IS NOT NULL'
 					: 'releaseEnrichmentFilter.id IS NULL',
+			);
+		}
+
+		if (hasError !== undefined) {
+			const openErrorCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_errors releaseErrorFilter
+					WHERE releaseErrorFilter.release_id = release.id
+					AND releaseErrorFilter.submission_status = :openSubmissionStatus
+				)
+			`;
+
+			queryBuilder.andWhere(
+				hasError ? openErrorCondition : `NOT ${openErrorCondition}`,
+				{ openSubmissionStatus: ErrorSubmissionStatus.OPEN },
+			);
+		}
+
+		if (needsReview !== undefined) {
+			const reviewCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_reviews releaseReviewFilter
+					WHERE releaseReviewFilter.release_id = release.id
+					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+				)
+			`;
+
+			queryBuilder.andWhere(
+				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
+				{
+					pendingReviewStatuses: [
+						ReleaseReviewStatus.PENDING,
+						ReleaseReviewStatus.PROCESSING,
+					],
+				},
 			);
 		}
 
