@@ -11,7 +11,6 @@ import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
-import { ReleaseReviewStatus } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
@@ -334,12 +333,14 @@ export class ReleaseExecution3Worker {
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
-			const review = await this.releaseReviewService.create({
-				releaseId,
-				releaseExecutionId: releaseExecution.id,
-				status: ReleaseReviewStatus.PENDING,
-				stepId: step.id,
-			});
+			const review =
+				await this.releaseReviewService.findLatestByReleaseIdOrCreate({
+					data: {
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+					},
+				});
 
 			step.metadata = {
 				...step.metadata,

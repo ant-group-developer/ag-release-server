@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
+import {
+	IsArray,
+	IsEnum,
+	IsIn,
+	IsOptional,
+	IsString,
+	IsUUID,
+} from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import { ReleaseReviewStatus } from '../entities/release-review.entity';
@@ -20,16 +27,22 @@ export class CreateReleaseReviewDto {
 	@IsUUID()
 	releaseId: string;
 
+	@IsOptional()
 	@IsUUID()
-	releaseExecutionId: string;
+	releaseExecutionId?: string | null;
 
+	@IsOptional()
 	@IsUUID()
-	stepId: string;
+	stepId?: string | null;
 
 	@ApiPropertyOptional({ enum: ReleaseReviewStatus })
 	@IsOptional()
 	@IsEnum(ReleaseReviewStatus)
 	status?: ReleaseReviewStatus;
+
+	@IsOptional()
+	@IsString()
+	note?: string | null;
 }
 
 export class UpdateReleaseReviewDto {
@@ -41,6 +54,10 @@ export class UpdateReleaseReviewDto {
 	@IsOptional()
 	@IsEnum(ReleaseReviewStatus)
 	status?: ReleaseReviewStatus;
+
+	@IsOptional()
+	@IsString()
+	note?: string | null;
 }
 
 export class UpdateReleaseReviewDecisionDto {
@@ -49,32 +66,65 @@ export class UpdateReleaseReviewDecisionDto {
 	})
 	@IsIn([ReleaseReviewStatus.COMPLETED, ReleaseReviewStatus.FAILED])
 	status: ReleaseReviewStatus.COMPLETED | ReleaseReviewStatus.FAILED;
-}
 
+	@IsOptional()
+	@IsString()
+	note?: string | null;
+}
 export class GetListReleaseReviewsDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({
+		description: 'Release ID',
+		type: String,
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
 
+	@ApiPropertyOptional({
+		description: 'Release execution ID',
+		type: String,
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	releaseExecutionId?: string;
 
-	@ApiPropertyOptional({ enum: ReleaseReviewStatus })
+	@ApiPropertyOptional({
+		description: 'Review status',
+		enum: ReleaseReviewStatus,
+	})
 	@IsOptional()
 	@IsEnum(ReleaseReviewStatus)
 	status?: ReleaseReviewStatus;
 
+	@ApiPropertyOptional({
+		description: 'List of release error IDs',
+		type: [String],
+		format: 'uuid',
+		isArray: true,
+		example: ['550e8400-e29b-41d4-a716-446655440000'],
+	})
 	@IsOptional()
 	@Transform(toArray)
 	@IsArray()
 	@IsUUID(undefined, { each: true })
 	releaseErrorIds?: string[];
 
+	@ApiPropertyOptional({
+		description: 'Field used to order release reviews',
+		enum: FieldOrderReleaseReview,
+		default: FieldOrderReleaseReview.createdAt,
+	})
 	@IsOptional()
 	@IsEnum(FieldOrderReleaseReview)
 	fieldOrder: FieldOrderReleaseReview = FieldOrderReleaseReview.createdAt;
 
+	@ApiPropertyOptional({
+		description: 'Order direction',
+		enum: OrderDirection,
+		default: OrderDirection.DESC,
+	})
 	@IsOptional()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.DESC;

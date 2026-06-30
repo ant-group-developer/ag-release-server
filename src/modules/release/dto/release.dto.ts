@@ -439,6 +439,34 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	isEnrich?: boolean;
 
 	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Có lỗi đang mở hay không',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasError?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Có đang cần review hay không',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	needsReview?: boolean;
+
+	@ApiPropertyOptional({
 		type: [String],
 		description: 'Tenant IDs',
 	})
