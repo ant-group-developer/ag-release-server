@@ -124,6 +124,39 @@ WITH map(role_code, permission_code) AS (
     ('release_video.admin', 'release_video.take_down'),
     ('release_video.admin', 'release_video.delete'),
 
+    -- Release Review
+    ('release_review.creator', 'release_review.create'),
+    ('release_review.creator', 'release_review.can_fix'),
+    ('release_review.editor', 'release_review.create'),
+    ('release_review.editor', 'release_review.approve'),
+    ('release_review.editor', 'release_review.reject'),
+    ('release_review.editor', 'release_review.can_fix'),
+    ('release_review.admin', 'release_review.create'),
+    ('release_review.admin', 'release_review.approve'),
+    ('release_review.admin', 'release_review.reject'),
+    ('release_review.admin', 'release_review.can_fix'),
+
+    -- Assign Release Review permissions to Release Audio and Release Video roles
+    ('release_audio.creator', 'release_review.can_fix'),
+    ('release_audio.editor', 'release_review.create'),
+    ('release_audio.editor', 'release_review.approve'),
+    ('release_audio.editor', 'release_review.reject'),
+    ('release_audio.editor', 'release_review.can_fix'),
+    ('release_audio.admin', 'release_review.create'),
+    ('release_audio.admin', 'release_review.approve'),
+    ('release_audio.admin', 'release_review.reject'),
+    ('release_audio.admin', 'release_review.can_fix'),
+
+    ('release_video.creator', 'release_review.can_fix'),
+    ('release_video.editor', 'release_review.create'),
+    ('release_video.editor', 'release_review.approve'),
+    ('release_video.editor', 'release_review.reject'),
+    ('release_video.editor', 'release_review.can_fix'),
+    ('release_video.admin', 'release_review.create'),
+    ('release_video.admin', 'release_review.approve'),
+    ('release_video.admin', 'release_review.reject'),
+    ('release_video.admin', 'release_review.can_fix'),
+
     -- Channel
     ('channel.viewer', 'channel.read'),
     ('channel.creator', 'channel.read'),
