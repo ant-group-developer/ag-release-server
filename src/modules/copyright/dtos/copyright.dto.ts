@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
@@ -77,6 +78,9 @@ export class QueryGetListResultScan extends BaseQueryDto {
 }
 
 export class CompareHistoryScanDto {
+	@ApiProperty({ type: 'string' })
 	scanHistoryId1: string;
+
+	@ApiProperty({ type: 'string' })
 	scanHistoryId2: string;
 }

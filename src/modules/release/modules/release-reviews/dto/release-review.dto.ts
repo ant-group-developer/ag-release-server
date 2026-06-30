@@ -71,31 +71,60 @@ export class UpdateReleaseReviewDecisionDto {
 	@IsString()
 	note?: string | null;
 }
-
 export class GetListReleaseReviewsDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({
+		description: 'Release ID',
+		type: String,
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
 
+	@ApiPropertyOptional({
+		description: 'Release execution ID',
+		type: String,
+		format: 'uuid',
+	})
 	@IsOptional()
 	@IsUUID()
 	releaseExecutionId?: string;
 
-	@ApiPropertyOptional({ enum: ReleaseReviewStatus })
+	@ApiPropertyOptional({
+		description: 'Review status',
+		enum: ReleaseReviewStatus,
+	})
 	@IsOptional()
 	@IsEnum(ReleaseReviewStatus)
 	status?: ReleaseReviewStatus;
 
+	@ApiPropertyOptional({
+		description: 'List of release error IDs',
+		type: [String],
+		format: 'uuid',
+		isArray: true,
+		example: ['550e8400-e29b-41d4-a716-446655440000'],
+	})
 	@IsOptional()
 	@Transform(toArray)
 	@IsArray()
 	@IsUUID(undefined, { each: true })
 	releaseErrorIds?: string[];
 
+	@ApiPropertyOptional({
+		description: 'Field used to order release reviews',
+		enum: FieldOrderReleaseReview,
+		default: FieldOrderReleaseReview.createdAt,
+	})
 	@IsOptional()
 	@IsEnum(FieldOrderReleaseReview)
 	fieldOrder: FieldOrderReleaseReview = FieldOrderReleaseReview.createdAt;
 
+	@ApiPropertyOptional({
+		description: 'Order direction',
+		enum: OrderDirection,
+		default: OrderDirection.DESC,
+	})
 	@IsOptional()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.DESC;
