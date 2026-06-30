@@ -985,6 +985,8 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		let outputDir: string | undefined;
+
 		try {
 			if (!step.parentStepId) {
 				throw new Error(
@@ -1002,7 +1004,7 @@ export class ReleaseExecution3Worker {
 				},
 			);
 
-			const outputDir = createMetadataStep?.metadata?.output?.outputDir;
+			outputDir = createMetadataStep?.metadata?.output?.outputDir;
 			const dspCode = createMetadataStep?.metadata?.input?.dspCode;
 
 			if (!outputDir) {
@@ -1026,8 +1028,6 @@ export class ReleaseExecution3Worker {
 				remoteDir: config.sftp.path ?? '/',
 			});
 
-			await removeFolder(outputDir);
-
 			this.logService.success({
 				message: `[UPLOAD_METADATA_TO_SFTP] DSP ${dspCode} uploaded`,
 				releaseExecutionId: releaseExecution.id,
@@ -1037,12 +1037,16 @@ export class ReleaseExecution3Worker {
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
-				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}`,
+				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}, note: Bước này nếu lỗi sẽ xoá luôn data trên server, để retry cần chạy lại cả step cha của nó để tạo lại data trên server`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
 			});
 			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
+		} finally {
+			if (outputDir) {
+				await removeFolder(outputDir);
+			}
 		}
 	}
 

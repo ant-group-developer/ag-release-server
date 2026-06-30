@@ -7,6 +7,10 @@ import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
+import {
+	ReleaseReview,
+	ReleaseReviewStatus,
+} from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { EntityManager, In, Repository } from 'typeorm';
@@ -538,10 +542,22 @@ export class ReleaseExecution3Service {
 			})
 			.where('release_execution_id IN (:...ids)', { ids: executionIds })
 			.andWhere('status IN (:...jobStatuses)', {
-				jobStatuses: [
-					CiJobStatus3.PENDING,
-					CiJobStatus3.PROCESSING,
-					CiJobStatus3.COMPLETED,
+				jobStatuses: [CiJobStatus3.PENDING, CiJobStatus3.PROCESSING],
+			})
+			.execute();
+
+		// cancel release review
+		await this.manager
+			.createQueryBuilder()
+			.update(ReleaseReview)
+			.set({
+				status: ReleaseReviewStatus.CANCEL,
+			})
+			.where('release_execution_id IN (:...ids)', { ids: executionIds })
+			.andWhere('status IN (:...reviewStatuses)', {
+				reviewStatuses: [
+					ReleaseReviewStatus.PENDING,
+					ReleaseReviewStatus.PROCESSING,
 				],
 			})
 			.execute();
