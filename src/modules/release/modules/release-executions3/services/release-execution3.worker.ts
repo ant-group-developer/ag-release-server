@@ -334,12 +334,13 @@ export class ReleaseExecution3Worker {
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
-			const review = await this.releaseReviewService.create({
-				releaseId,
-				releaseExecutionId: releaseExecution.id,
-				status: ReleaseReviewStatus.PENDING,
-				stepId: step.id,
-			});
+			const review =
+				await this.releaseReviewService.findLatestByReleaseIdOrCreate({
+					releaseId,
+					releaseExecutionId: releaseExecution.id,
+					status: ReleaseReviewStatus.PENDING,
+					stepId: step.id,
+				});
 
 			step.metadata = {
 				...step.metadata,

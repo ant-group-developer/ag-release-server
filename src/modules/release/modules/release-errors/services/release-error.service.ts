@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
 	FieldErrorDetails,
@@ -7,6 +7,7 @@ import {
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { ReleaseReviewStatus } from '../../release-reviews/entities/release-review.entity';
+import { ReleaseReviewService } from '../../release-reviews/services/release-review.service';
 import {
 	CreateReleaseErrorDto,
 	GetListReleaseErrorsDto,
@@ -23,13 +24,23 @@ export class ReleaseErrorService {
 	constructor(
 		@InjectRepository(ReleaseError)
 		private readonly repo: Repository<ReleaseError>,
+
+		@Inject(forwardRef(() => ReleaseReviewService))
+		private readonly releaseReviewService: ReleaseReviewService,
 	) {}
 
+	// nếu dùng cho nhiều release id thì phải sửa lại
 	async bulkCreateErrors(data: CreateReleaseErrorDto[], userId?: string) {
+		const releaseReview =
+			await this.releaseReviewService.findLatestByReleaseIdOrCreate({
+				releaseId: data[0].releaseId,
+			});
+
 		const entities = this.repo.create(
 			data.map((item) => ({
 				...item,
 				reviewerId: userId,
+				releaseReviewId: releaseReview.id,
 			})),
 		);
 		return this.repo.save(entities);
@@ -74,6 +85,7 @@ export class ReleaseErrorService {
 		return this.bulkUpdateErrors(items, reviewerId);
 	}
 
+	// xử lý trạng thái lại submissionStatus và approvalStatus dựa vào status truyền vào
 	private processStatusList(
 		data: UpdateReleaseErrorDto[],
 		userId: string,

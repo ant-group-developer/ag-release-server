@@ -9,7 +9,7 @@ import { ReleaseReviewService } from './services/release-review.service';
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([ReleaseReview]),
-		ReleaseErrorsModule,
+		forwardRef(() => ReleaseErrorsModule),
 		forwardRef(() => ReleaseModule),
 	],
 	controllers: [ReleaseReviewController],

@@ -31,6 +31,7 @@ export class ReleaseReviewService {
 		@InjectRepository(ReleaseReview)
 		private readonly repo: Repository<ReleaseReview>,
 
+		@Inject(forwardRef(() => ReleaseErrorService))
 		private readonly releaseErrorService: ReleaseErrorService,
 
 		@Inject(forwardRef(() => ReleaseExecution3Service))
@@ -43,6 +44,7 @@ export class ReleaseReviewService {
 			releaseExecutionId: data.releaseExecutionId,
 			status: data.status,
 			stepId: data.stepId,
+			note: data.note,
 		});
 
 		const review = await this.repo.save(entity);
@@ -59,6 +61,10 @@ export class ReleaseReviewService {
 
 		if (data.releaseExecutionId !== undefined) {
 			entity.releaseExecutionId = data.releaseExecutionId;
+		}
+
+		if (data.note !== undefined) {
+			entity.note = data.note;
 		}
 
 		await this.repo.save(entity);
@@ -96,22 +102,45 @@ export class ReleaseReviewService {
 		});
 	}
 
-	async findLatestByReleaseIdOrCreate(releaseId: string) {
-		const filter = new GetListReleaseReviewsDto();
-		filter.releaseId = releaseId;
-		filter.page = 1;
-		filter.pageSize = 1;
-		filter.fieldOrder = FieldOrderReleaseReview.createdAt;
-		filter.orderBy = OrderDirection.DESC;
+	async findLatestByReleaseIdOrCreate(data: CreateReleaseReviewDto) {
+		const { releaseId } = data;
 
-		const result = await this.getList(filter);
-		const review = result.items[0];
+		try {
+			const filter = new GetListReleaseReviewsDto();
+			filter.releaseId = releaseId;
+			filter.page = 1;
+			filter.pageSize = 1;
+			filter.fieldOrder = FieldOrderReleaseReview.createdAt;
+			filter.orderBy = OrderDirection.DESC;
 
-		if (!review) {
-			throw new NotFoundException('Release review not found');
+			const result = await this.getList(filter);
+			const review = result.items[0];
+
+			if (!review) {
+				throw new NotFoundException('Release review not found');
+			}
+
+			if (
+				![
+					ReleaseReviewStatus.PENDING,
+					ReleaseReviewStatus.PROCESSING,
+				].includes(review.status)
+			) {
+				throw new BadRequestException(
+					'Review này đã được xử lý hoặc không còn chờ duyệt',
+				);
+			}
+
+			if (!review.stepId && data.stepId) {
+				review.stepId = data.stepId;
+				await this.repo.save(review);
+			}
+
+			return review;
+		} catch (error) {
+			console.log(error, 'Đã tạo mới');
+			return await this.create(data);
 		}
-
-		return review;
 	}
 
 	async handleResultReviewRelease(
@@ -119,26 +148,12 @@ export class ReleaseReviewService {
 		body: UpdateReleaseReviewDecisionDto,
 		reviewerId: string,
 	) {
-		const review = await this.findLatestByReleaseIdOrCreate(releaseId);
+		const review = await this.findLatestByReleaseIdOrCreate({ releaseId });
 
-		if (
-			![
-				ReleaseReviewStatus.PENDING,
-				ReleaseReviewStatus.PROCESSING,
-			].includes(review.status)
-		) {
-			throw new BadRequestException(
-				'Review này đã được xử lý hoặc không còn chờ duyệt',
-			);
-		}
-
-		if (!review.stepId) {
-			throw new BadRequestException('Release review step not found');
-		}
-
-		const stepStatus = ReleaseReviewStatus.COMPLETED
-			? ReleaseExecutionStepStatus.DONE
-			: ReleaseExecutionStepStatus.FAILED;
+		const stepStatus =
+			body.status === ReleaseReviewStatus.COMPLETED
+				? ReleaseExecutionStepStatus.DONE
+				: ReleaseExecutionStepStatus.FAILED;
 
 		await this.releaseErrorService.bulkUpdateErrorsByReviewResult({
 			releaseId,
@@ -148,12 +163,17 @@ export class ReleaseReviewService {
 
 		review.status = body.status;
 		review.reviewerId = reviewerId;
+		review.note = body.note ?? review.note;
 		await this.repo.save(review);
 
-		await this.releaseExecutionService.updateStatusStepAndRerunPipeline({
-			stepId: review.stepId,
-			status: stepStatus,
-		});
+		if (review.stepId) {
+			await this.releaseExecutionService.updateStatusStepAndRerunPipeline(
+				{
+					stepId: review.stepId,
+					status: stepStatus,
+				},
+			);
+		}
 	}
 
 	async remove(id: string) {
@@ -206,6 +226,7 @@ export class ReleaseReviewService {
 			qb.andWhere(
 				`(
 					releaseReview.status::text ILIKE ANY(:keywords)
+					OR releaseReview.note ILIKE ANY(:keywords)
 				)`,
 				{ keywords },
 			);
