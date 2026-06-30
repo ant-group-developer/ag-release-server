@@ -70,6 +70,10 @@ export class ReleaseExecution3Builder {
 						order: order++,
 					},
 					{
+						type: ReleaseExecutionStepType.REVIEW_RELEASE,
+						order: order++,
+					},
+					{
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
 						order: order++,
 						childExecutionMode: 'parallel',

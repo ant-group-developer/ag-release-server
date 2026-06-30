@@ -1,9 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
 	IsArray,
-	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsOptional,
@@ -13,7 +12,11 @@ import {
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
-import { ReleaseErrorType } from '../entities/release-error.entity';
+import {
+	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
+	ReleaseErrorType,
+} from '../entities/release-error.entity';
 
 export enum FieldOrderReleaseError {
 	createdAt = 'releaseError.createdAt',
@@ -21,24 +24,21 @@ export enum FieldOrderReleaseError {
 	message = 'releaseError.message',
 	messageCode = 'releaseError.messageCode',
 	type = 'releaseError.type',
-	isFixed = 'releaseError.isFixed',
+	submissionStatus = 'releaseError.submissionStatus',
+	approvalStatus = 'releaseError.approvalStatus',
 }
-
-export const toBoolean = ({ value }: { value: unknown }) => {
-	if (value === undefined || value === null || value === '') return undefined;
-	if (value === 'true') return true;
-	if (value === 'false') return false;
-	return value;
-};
 
 export class CreateReleaseErrorDto {
 	@IsUUID()
 	releaseId: string;
 
 	@IsOptional()
-	@IsBoolean()
-	@Transform(toBoolean)
-	isFixed?: boolean;
+	@IsEnum(ErrorSubmissionStatus)
+	submissionStatus?: ErrorSubmissionStatus;
+
+	@IsOptional()
+	@IsEnum(ErrorApprovalStatus)
+	approvalStatus?: ErrorApprovalStatus;
 
 	@IsOptional()
 	@IsUUID()
@@ -47,6 +47,10 @@ export class CreateReleaseErrorDto {
 	@IsOptional()
 	@IsUUID()
 	stepId?: string;
+
+	@IsOptional()
+	@IsUUID()
+	releaseReviewId?: string;
 
 	@IsOptional()
 	@IsString()
@@ -86,41 +90,48 @@ export class UpdateReleaseErrorDto {
 	id: string;
 
 	@IsOptional()
-	@IsBoolean()
-	@Transform(toBoolean)
-	isFixed?: boolean;
+	@IsEnum(ErrorSubmissionStatus)
+	submissionStatus?: ErrorSubmissionStatus;
 
 	@IsOptional()
-	@IsUUID()
-	releaseExecutionId?: string;
+	@IsEnum(ErrorApprovalStatus)
+	approvalStatus?: ErrorApprovalStatus;
 
-	@IsOptional()
-	@IsUUID()
-	stepId?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// releaseExecutionId?: string;
 
-	@IsOptional()
-	@IsString()
-	messageCode?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// stepId?: string;
 
-	@IsOptional()
-	@IsString()
-	message?: string;
+	// @IsOptional()
+	// @IsUUID()
+	// releaseReviewId?: string;
 
-	@IsOptional()
-	@IsString()
-	page?: string;
+	// @IsOptional()
+	// @IsString()
+	// messageCode?: string;
 
-	@IsOptional()
-	@IsString()
-	field?: string;
+	// @IsOptional()
+	// @IsString()
+	// message?: string;
 
-	@IsOptional()
-	@IsUUID()
-	trackId?: string;
+	// @IsOptional()
+	// @IsString()
+	// page?: string;
 
-	@IsOptional()
-	@IsEnum(ReleaseErrorType)
-	type?: ReleaseErrorType | null;
+	// @IsOptional()
+	// @IsString()
+	// field?: string;
+
+	// @IsOptional()
+	// @IsUUID()
+	// trackId?: string;
+
+	// @IsOptional()
+	// @IsEnum(ReleaseErrorType)
+	// type?: ReleaseErrorType | null;
 }
 
 export class BulkUpdateReleaseErrorsDto {
@@ -132,13 +143,25 @@ export class BulkUpdateReleaseErrorsDto {
 }
 
 export class GetListReleaseErrorsDto extends BaseQueryDto2 {
+	@ApiPropertyOptional({ type: 'string' })
+	@IsOptional()
 	@IsUUID()
-	releaseId: string;
+	releaseId?: string;
 
 	@ApiPropertyOptional({ enum: ReleaseErrorType, nullable: true })
 	@IsOptional()
 	@IsEnum(ReleaseErrorType)
 	type?: ReleaseErrorType;
+
+	@ApiPropertyOptional({ enum: ErrorSubmissionStatus })
+	@IsOptional()
+	@IsEnum(ErrorSubmissionStatus)
+	submissionStatus?: ErrorSubmissionStatus;
+
+	@ApiPropertyOptional({ enum: ErrorApprovalStatus })
+	@IsOptional()
+	@IsEnum(ErrorApprovalStatus)
+	approvalStatus?: ErrorApprovalStatus;
 
 	@IsOptional()
 	@IsString()
@@ -152,11 +175,9 @@ export class GetListReleaseErrorsDto extends BaseQueryDto2 {
 	@IsUUID()
 	stepId?: string;
 
-	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
-	@IsBoolean()
-	@Transform(toBoolean)
-	isFixed?: boolean;
+	@IsUUID()
+	releaseReviewId?: string;
 
 	@IsOptional()
 	@IsEnum(FieldOrderReleaseError)
@@ -165,12 +186,4 @@ export class GetListReleaseErrorsDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsEnum(OrderDirection)
 	orderBy: OrderDirection = OrderDirection.DESC;
-}
-
-export class GetReleaseValidateErrorsDto {
-	@ApiPropertyOptional({ type: Boolean })
-	@IsOptional()
-	@IsBoolean()
-	@Transform(toBoolean)
-	isFixed?: boolean;
 }

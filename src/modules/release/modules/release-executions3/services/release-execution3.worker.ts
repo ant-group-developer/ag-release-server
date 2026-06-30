@@ -11,6 +11,8 @@ import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
+import { ReleaseReviewStatus } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
+import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
@@ -52,6 +54,7 @@ export class ReleaseExecution3Worker {
 		private readonly logService: LogsService,
 		private readonly ciImportService: CiImportService,
 		private readonly releaseErrorService: ReleaseErrorService,
+		private readonly releaseReviewService: ReleaseReviewService,
 
 		// @Inject(forwardRef(() => CiDistributionJobService))
 		private readonly ciJobService: CiDistributionJob3Service,
@@ -74,6 +77,9 @@ export class ReleaseExecution3Worker {
 
 			case ReleaseExecutionStepType.VALIDATE:
 				return this.validate(context);
+
+			case ReleaseExecutionStepType.REVIEW_RELEASE:
+				return this.reviewRelease(context);
 
 			case ReleaseExecutionStepType.PROCESS_DSPS:
 				return this.processDsps(context);
@@ -321,6 +327,54 @@ export class ReleaseExecution3Worker {
 		}
 	}
 
+	private async reviewRelease({
+		step,
+		releaseExecution,
+	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		try {
+			const releaseId = this.releaseIdFromExecution(releaseExecution);
+
+			const review = await this.releaseReviewService.create({
+				releaseId,
+				releaseExecutionId: releaseExecution.id,
+				status: ReleaseReviewStatus.PENDING,
+				stepId: step.id,
+			});
+
+			step.metadata = {
+				...step.metadata,
+				input: {
+					...step.metadata?.input,
+					releaseId,
+				},
+				output: {
+					...step.metadata?.output,
+					releaseReviewId: review.id,
+					reviewCreated: true,
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
+			this.logService.success({
+				message: `[REVIEW_RELEASE] Review created, waiting for manual review`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+				data: { releaseId, releaseReviewId: review.id },
+			});
+
+			return ReleaseExecutionStepStatus.WAITING_ACTION;
+		} catch (err) {
+			this.logService.error({
+				message: `[REVIEW_RELEASE] ${err.message}`,
+				releaseExecutionId: releaseExecution.id,
+				releaseExecutionStepId: step.id,
+			});
+
+			return ReleaseExecutionStepStatus.FAILED;
+		}
+	}
+
 	private async processDsps(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
@@ -469,9 +523,22 @@ export class ReleaseExecution3Worker {
 				external_identifier: batchId,
 			});
 
+			if (imports.length === 0) {
+				throw new Error(
+					'Không tìm thấy import, có thể do CI chưa xử lý xong',
+				);
+			}
+
 			const errors = imports.flatMap((item: any) =>
 				Array.isArray(item?.errors) ? item.errors : [],
 			);
+			const hasProblemStatus = imports.some(
+				(item: any) =>
+					String(item?.status || '').toLowerCase() === 'problem',
+			);
+			const errorMessages = errors.length
+				? errors
+				: ['Import CI trả về status problem'];
 
 			step.metadata = {
 				...step.metadata,
@@ -484,15 +551,15 @@ export class ReleaseExecution3Worker {
 				output: {
 					imports,
 					errors,
-					hasIssues: errors.length > 0,
+					hasIssues: errors.length > 0 || hasProblemStatus,
 				},
 			};
 
 			await this.manager.save(ReleaseExecutionStep3, step);
 
-			if (errors.length > 0) {
+			if (errors.length > 0 || hasProblemStatus) {
 				await this.releaseErrorService.bulkCreateErrors(
-					errors.map((message: string) => ({
+					errorMessages.map((message: string) => ({
 						releaseId,
 						releaseExecutionId: releaseExecution.id,
 						stepId: step.id,
@@ -502,7 +569,7 @@ export class ReleaseExecution3Worker {
 				);
 
 				this.logService.error({
-					message: `[GET_RESULT_IMPORT_CI] Import CI has ${errors.length} issue(s)`,
+					message: `[GET_RESULT_IMPORT_CI] Import CI has ${errorMessages.length} issue(s)`,
 					releaseExecutionId: releaseExecution.id,
 					releaseExecutionStepId: step.id,
 					data: { upc, batchId, errors },
@@ -952,7 +1019,6 @@ export class ReleaseExecution3Worker {
 			const config =
 				await this.dspRoutingService.resolveFullDeliveryConfig(dspCode);
 
-			// dev
 			await this.sftpConnectService.uploadFolder({
 				sftp: config.sftp,
 				localDir: outputDir,

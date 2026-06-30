@@ -108,15 +108,34 @@ export class CiImportService {
 					: [];
 
 			return descriptions.flatMap((description: any) => {
+				if (typeof description === 'string') {
+					return description.trim() ? [description] : [];
+				}
+
 				const warnings = Array.isArray(description?.warnings)
 					? description.warnings
 					: [];
 
-				return warnings.map((warning: any) =>
-					typeof warning === 'string'
-						? warning
-						: JSON.stringify(warning),
-				);
+				const errors = Array.isArray(description?.errors)
+					? description.errors
+					: [];
+
+				const messages = [
+					description?.message,
+					description?.error,
+					...warnings,
+					...errors,
+				].filter(Boolean);
+
+				if (messages.length) {
+					return messages.map((message: any) =>
+						typeof message === 'string'
+							? message
+							: JSON.stringify(message),
+					);
+				}
+
+				return [];
 			});
 		});
 	}

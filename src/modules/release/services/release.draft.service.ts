@@ -43,6 +43,7 @@ import { ReleaseException } from '../constants/release.constant';
 import { LookupMaps, ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
+	GetReleaseSubmitErrorsDto,
 	SyncReleaseToTracksDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
@@ -447,7 +448,7 @@ export class ReleaseDraftService {
 		});
 	}
 
-	async getErrorsSchemaReleaseById(id: string, isFixed?: boolean) {
+	async getErrorsSchemaReleaseById(id: string) {
 		const release = await this.releaseQueryService.findOneReleaseFull({
 			releaseId: id,
 		});
@@ -455,14 +456,22 @@ export class ReleaseDraftService {
 		const schemaErrors =
 			this.releaseValidateService.getErrorsSchemaRelease(release);
 
+		return [
+			...schemaErrors,
+			// ...storedReleaseErrors
+		];
+	}
+
+	async getErrosSubmit(id: string, query: GetReleaseSubmitErrorsDto) {
 		const storedReleaseErrors =
 			await this.releaseErrorService.getEnrichedErrors({
 				releaseId: id,
 				pageSize: 999,
-				isFixed,
+				submissionStatus: query.submissionStatus,
+				approvalStatus: query.approvalStatus,
 			} as GetListReleaseErrorsDto);
 
-		return [...schemaErrors, ...storedReleaseErrors];
+		return storedReleaseErrors;
 	}
 
 	async getErrorsSchemaReleasesFromSftp(releases: any[]) {

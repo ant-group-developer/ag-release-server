@@ -5,7 +5,7 @@ export class CreateReleaseErrors1781086000001 implements MigrationInterface {
 
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(
-			`CREATE TYPE "public"."release_errors_type_enum" AS ENUM('admin_create', 'import_ci', 'qa_flag_ci')`,
+			`CREATE TYPE "public"."release_errors_type_enum" AS ENUM('ADMIN_CREATE', 'IMPORT_CI', 'QA_FLAG_CI')`,
 		);
 		await queryRunner.query(`
 			CREATE TABLE "release_errors" (

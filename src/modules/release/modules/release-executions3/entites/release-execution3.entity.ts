@@ -10,7 +10,9 @@ import {
 	JoinColumn,
 	ManyToOne,
 	OneToMany,
+	OneToOne,
 } from 'typeorm';
+import { ReleaseReview } from '../../release-reviews/entities/release-review.entity';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import {
 	ExecutionType,
@@ -66,6 +68,9 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 
 	@OneToMany(() => ReleaseError, (error) => error.releaseExecution)
 	releaseErrors: ReleaseError[];
+
+	@OneToOne(() => ReleaseReview, (review) => review.releaseExecution)
+	releaseReview?: ReleaseReview | null;
 
 	@OneToMany(() => Logs, (log) => log.releaseExecution)
 	logs: Logs[];

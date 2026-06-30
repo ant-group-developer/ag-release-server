@@ -34,4 +34,12 @@ export class ReleaseErrorController {
 		const result = await this.service.getListErrors(query);
 		return AppResponseSuccess.COMMON(result);
 	}
+
+	@Get('enriched')
+	@ApiOperation({ summary: 'Get list release errors' })
+	@ApiQuery({ type: GetListReleaseErrorsDto })
+	async getEnrichedErrors(@Query() query: GetListReleaseErrorsDto) {
+		const result = await this.service.getEnrichedErrors(query);
+		return AppResponseSuccess.COMMON(result);
+	}
 }
