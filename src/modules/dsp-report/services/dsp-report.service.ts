@@ -163,14 +163,13 @@ export class DspReportService {
 
      const items = rows.map(mapRawDspsReport);
 
-    // Fetch stats for each report on the current page
-    await Promise.all(
-      items.map(async (item) => {
-        const stats = await this.getImportStats(item.idDspsReport);
-        item.totalReleasesCount = stats.totalReleasesCount;
-        item.pendingReleasesCount = stats.pendingReleasesCount;
-      })
-    );
+    // Batch stats cho cả trang (tránh N+1: trước đây mỗi item gọi getImportStats riêng)
+    const statsMap = await this.getImportStatsBatch(items.map((i) => i.idDspsReport));
+    for (const item of items) {
+      const s = statsMap.get(item.idDspsReport) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
+      item.totalReleasesCount = s.totalReleasesCount;
+      item.pendingReleasesCount = s.pendingReleasesCount;
+    }
 
     return {
       items,
@@ -214,131 +213,145 @@ export class DspReportService {
    * Calculate stats of unique releases in ClickHouse raw metadata vs what is already imported in Postgres
    */
   async getImportStats(idDspsReport: string): Promise<{ totalReleasesCount: number; pendingReleasesCount: number }> {
-    // 1. Resolve dspType
-    let dspType = 'audio';
-    const reportRows = await this.clickHouseService.query<{ pg_uuid: string }>(
-      `SELECT pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report = {id: String}`,
-      { id: idDspsReport }
+    const map = await this.getImportStatsBatch([idDspsReport]);
+    return map.get(idDspsReport) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
+  }
+
+  /**
+   * Batch version: tính stats cho NHIỀU dsps_report cùng lúc (tránh N+1 trong getList).
+   * Gộp toàn bộ thành: 1 query ClickHouse (dsp_id IN), 1 query Dsp, 1 query Release, 1 query Track/Video.
+   */
+  async getImportStatsBatch(
+    ids: string[],
+  ): Promise<Map<string, { totalReleasesCount: number; pendingReleasesCount: number }>> {
+    const result = new Map<string, { totalReleasesCount: number; pendingReleasesCount: number }>();
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return result;
+    for (const id of uniqueIds) {
+      result.set(id, { totalReleasesCount: 0, pendingReleasesCount: 0 });
+    }
+
+    // 1. Resolve pg_uuid + dspType cho từng report (1 query CH + 1 query Dsp)
+    const reportRows = await this.clickHouseService.query<{ id_dsps_report: string; pg_uuid: string }>(
+      `SELECT id_dsps_report, pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report IN ({ids:Array(String)})`,
+      { ids: uniqueIds },
     );
-    if (reportRows.length > 0 && reportRows[0].pg_uuid) {
-      const dsp = await this.entityManager.findOne(Dsp, { where: { id: reportRows[0].pg_uuid } });
-      if (dsp) {
-        dspType = dsp.type;
+    const pgUuidByReport = new Map<string, string>();
+    for (const r of reportRows) {
+      if (r.pg_uuid) pgUuidByReport.set(r.id_dsps_report, r.pg_uuid);
+    }
+    const dspTypeByReport = new Map<string, string>();
+    const pgUuids = Array.from(new Set([...pgUuidByReport.values()]));
+    if (pgUuids.length > 0) {
+      const dsps = await this.entityManager.find(Dsp, { where: { id: In(pgUuids) }, select: ['id', 'type'] });
+      const typeByUuid = new Map(dsps.map((d) => [d.id, d.type]));
+      for (const [reportId, uuid] of pgUuidByReport.entries()) {
+        dspTypeByReport.set(reportId, typeByUuid.get(uuid) ?? 'audio');
       }
     }
 
-    // 2. Query ClickHouse for upc and isrc
-    const clickHouseRows = await this.clickHouseService.query<{ upc: string; isrc: string }>(
+    // 2. 1 query ClickHouse lấy upc/isrc của TẤT CẢ report (kèm dsp_id để gom)
+    const clickHouseRows = await this.clickHouseService.query<{ dsp_id: string; upc: string; isrc: string }>(
       `
-        SELECT trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+        SELECT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
         FROM (
-          SELECT upc, isrc FROM music_analytics.fact_sales_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          SELECT dsp_id, upc, isrc FROM music_analytics.fact_sales_report
+            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
           UNION ALL
-          SELECT upc, isrc FROM music_analytics.fact_dsp_comprehensive_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          SELECT dsp_id, upc, isrc FROM music_analytics.fact_dsp_comprehensive_report
+            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
         )
       `,
-      { dspId: idDspsReport }
+      { ids: uniqueIds },
     );
+    if (clickHouseRows.length === 0) return result;
 
-    if (clickHouseRows.length === 0) {
-      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
-    }
-
-    // 3. Group rows into releases like extractAndImport does
-    const upcMap = new Map<string, Set<string>>(); // Map<upc, Set<isrc>>
+    // 3. Gom upc→Set<isrc> theo từng report (giống logic extractAndImport)
+    const upcMapByReport = new Map<string, Map<string, Set<string>>>();
     for (const row of clickHouseRows) {
       const isrc = hasMeaningfulText(row.isrc) ? row.isrc.trim() : '';
       let upc = normalizeReportUpcOrFallback(hasMeaningfulText(row.upc) ? row.upc.trim() : '', isrc);
-
       if (!isrc && !upc) continue;
+      if (!upc && isrc) upc = `ISRC-${isrc}`;
 
-      if (!upc && isrc) {
-        upc = `ISRC-${isrc}`;
+      let upcMap = upcMapByReport.get(row.dsp_id);
+      if (!upcMap) {
+        upcMap = new Map<string, Set<string>>();
+        upcMapByReport.set(row.dsp_id, upcMap);
       }
-
-      if (!upcMap.has(upc)) {
-        upcMap.set(upc, new Set());
-      }
-      if (isrc) {
-        upcMap.get(upc)!.add(isrc);
-      }
+      if (!upcMap.has(upc)) upcMap.set(upc, new Set());
+      if (isrc) upcMap.get(upc)!.add(isrc);
     }
 
-    const totalReleasesCount = upcMap.size;
-    if (totalReleasesCount === 0) {
-      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
-    }
-
-    // 4. Fetch existing releases in Postgres
-    let existingUpcs = new Set<string>();
-    const allGroupedUpcs = Array.from(upcMap.keys());
-    const normalizedUpcs = allGroupedUpcs.map((u) => normalizeUpc(u)).filter(Boolean);
-    if (normalizedUpcs.length > 0) {
-      const equivalentUpcsSet = new Set<string>();
-      for (const u of normalizedUpcs) {
-        const equivalents = buildEquivalentUpcs(u);
-        for (const eq of equivalents) {
-          equivalentUpcsSet.add(eq);
+    // 4. Gom toàn bộ upc/isrc của cả batch → 1 query Release + 1 query Track + 1 query Video
+    const allEquivalentUpcs = new Set<string>();
+    const allIsrcs = new Set<string>();
+    for (const upcMap of upcMapByReport.values()) {
+      for (const [upc, isrcSet] of upcMap.entries()) {
+        const normalized = normalizeUpc(upc);
+        if (normalized) {
+          for (const eq of buildEquivalentUpcs(normalized)) allEquivalentUpcs.add(eq);
         }
+        for (const isrc of isrcSet) allIsrcs.add(isrc);
       }
-      const allEquivalentUpcs = Array.from(equivalentUpcsSet);
+    }
 
-      const existingReleases = await this.entityManager.find(Release, {
-        where: { upc: In(allEquivalentUpcs) },
+    const existingUpcs = new Set<string>();
+    if (allEquivalentUpcs.size > 0) {
+      const releases = await this.entityManager.find(Release, {
+        where: { upc: In(Array.from(allEquivalentUpcs)) },
         select: ['upc'],
       });
-      existingUpcs = new Set(existingReleases.map((r) => normalizeUpc(r.upc)).filter(Boolean));
-    }
-
-    // 5. Fetch existing tracks/videos in Postgres
-    let existingIsrcs = new Set<string>();
-    const allIsrcs = new Set<string>();
-    for (const isrcSet of upcMap.values()) {
-      for (const isrc of isrcSet) {
-        allIsrcs.add(isrc);
-      }
-    }
-    const allIsrcsList = Array.from(allIsrcs);
-
-    if (allIsrcsList.length > 0) {
-      if (dspType === 'video') {
-        const existingVideos = await this.entityManager.find(Video, {
-          where: { isrc: In(allIsrcsList) },
-          select: ['isrc'],
-        });
-        existingIsrcs = new Set(existingVideos.map((v) => v.isrc).filter((isrc): isrc is string => !!isrc));
-      } else {
-        const existingTracks = await this.entityManager.find(Track, {
-          where: { isrc: In(allIsrcsList) },
-          select: ['isrc'],
-        });
-        existingIsrcs = new Set(existingTracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc));
+      for (const r of releases) {
+        const n = normalizeUpc(r.upc);
+        if (n) existingUpcs.add(n);
       }
     }
 
-    // 6. Calculate pending count
-    let pendingReleasesCount = 0;
-    for (const [upc, isrcSet] of upcMap.entries()) {
-      const hasUpc = !!upc;
-      const upcExists = hasUpc && existingUpcs.has(normalizeUpc(upc));
+    // ISRC tồn tại: cần phân biệt audio (tracks) vs video (videos).
+    // Batch có thể trộn cả 2 loại → query cả Track lẫn Video, đánh dấu theo loại.
+    const existingTrackIsrcs = new Set<string>();
+    const existingVideoIsrcs = new Set<string>();
+    if (allIsrcs.size > 0) {
+      const isrcList = Array.from(allIsrcs);
+      // Chỉ xét các report thực sự có data. Report không phải 'video' (gồm cả
+      // trường hợp default 'audio' khi chưa resolve được type) → cần tra Track.
+      const reportsWithData = [...upcMapByReport.keys()];
+      const needVideo = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') === 'video');
+      const needAudio = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') !== 'video');
+      if (needAudio) {
+        const tracks = await this.entityManager.find(Track, { where: { isrc: In(isrcList) }, select: ['isrc'] });
+        for (const t of tracks) if (t.isrc) existingTrackIsrcs.add(t.isrc);
+      }
+      if (needVideo) {
+        const videos = await this.entityManager.find(Video, { where: { isrc: In(isrcList) }, select: ['isrc'] });
+        for (const v of videos) if (v.isrc) existingVideoIsrcs.add(v.isrc);
+      }
+    }
 
-      let isrcExists = false;
-      for (const isrc of isrcSet) {
-        if (existingIsrcs.has(isrc)) {
-          isrcExists = true;
-          break;
+    // 5. Tính total/pending cho từng report
+    for (const id of uniqueIds) {
+      const upcMap = upcMapByReport.get(id);
+      if (!upcMap || upcMap.size === 0) continue;
+      const isVideo = (dspTypeByReport.get(id) ?? 'audio') === 'video';
+      const existingIsrcs = isVideo ? existingVideoIsrcs : existingTrackIsrcs;
+
+      let pending = 0;
+      for (const [upc, isrcSet] of upcMap.entries()) {
+        const upcExists = !!upc && existingUpcs.has(normalizeUpc(upc));
+        let isrcExists = false;
+        for (const isrc of isrcSet) {
+          if (existingIsrcs.has(isrc)) {
+            isrcExists = true;
+            break;
+          }
         }
+        if (!upcExists && !isrcExists) pending++;
       }
-
-      if (!upcExists && !isrcExists) {
-        pendingReleasesCount++;
-      }
+      result.set(id, { totalReleasesCount: upcMap.size, pendingReleasesCount: pending });
     }
 
-    return {
-      totalReleasesCount,
-      pendingReleasesCount,
-    };
+    return result;
   }
 
   /**
@@ -410,6 +423,22 @@ export class DspReportService {
     this.logger.log(`Assigned dsps_report ${idDspsReport} → pg_uuid ${pgUuid}`);
     await this.dspMappingService.loadCache();
 
+    // Đẩy phần sync metadata (scan 2 fact table + extractAndImport — nặng) sang
+    // background để response trả về ngay. Stats trong getList tính realtime nên
+    // FE thấy pendingReleasesCount cập nhật khi import xong.
+    void this.syncMetadataAfterAssign(idDspsReport, pgUuid).catch((err: any) =>
+      this.logger.error(
+        `Background metadata sync failed for dsp_report ${idDspsReport}: ${err.message}`,
+        err.stack,
+      ),
+    );
+  }
+
+  /**
+   * Scan raw metadata từ ClickHouse và import các release/track/video chưa có vào Postgres.
+   * Chạy nền sau khi assign — không chặn response.
+   */
+  private async syncMetadataAfterAssign(idDspsReport: string, pgUuid: string): Promise<void> {
     // Sync metadata from Clickhouse raw tables to PostgreSQL
     try {
       const dsp = await this.entityManager.findOne(Dsp, { where: { id: pgUuid } });
