@@ -9,6 +9,7 @@ export class AppResponseSuccess {
 		return new ResponseSuccess({
 			data,
 			message: 'Job is processing, will be completed in a few minutes',
+			messageCode: 'common.processing',
 		});
 	}
 }
