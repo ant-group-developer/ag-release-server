@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	ArrayNotEmpty,
@@ -229,7 +229,21 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 	priceTierId?: string | null;
 }
 
-import { ApiPropertyOptional } from '@nestjs/swagger';
+export class ReloadReleaseFormatIdDto {
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Reload release format ID from CI',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	reloadFromCi?: boolean;
+}
 
 export class QueryGetListReleaseDto extends BaseQueryDto {
 	@ApiPropertyOptional({
