@@ -193,7 +193,6 @@ export class MetadataScanService implements OnModuleInit {
 				.leftJoinAndSelect('release.tracks', 'track')
 				.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
 				.leftJoinAndSelect('releaseArtist.artist', 'artist')
-				.leftJoinAndSelect('release.video', 'video')
 				.leftJoin(
 					ReleaseEnrichment,
 					'releaseEnrichmentFilter',
@@ -1041,16 +1040,6 @@ export class MetadataScanService implements OnModuleInit {
 					}
 				}
 
-				// ─── 5b) YouTube enrichment for video releases ─────────────
-				await this.enrichVideoReleasesForChunk(
-					pendingReleases,
-					scanId,
-					now,
-					chunkChangeLogs,
-					dryRun,
-					result,
-				);
-
 				// For releases that were NOT enriched (resolved = false), mark as NOT_FOUND
 				for (const pr of pendingReleases) {
 					await this.throwIfScanCancelled(scanId);
@@ -1118,6 +1107,29 @@ export class MetadataScanService implements OnModuleInit {
 			}
 
 			await this.throwIfScanCancelled(scanId);
+
+			// ═══════════════════════════════════════════════════════════════
+			// Phase B: YouTube enrichment cho video releases
+			// Chay doc lap voi main loop (Spotify/Deezer).
+			// Filter theo videos.youtube_match_status - KHONG dung release_enrichments
+			// -> khong bi chan boi trang thai SUCCESS/NOT_FOUND cua Spotify scan.
+			// ═══════════════════════════════════════════════════════════════
+			try {
+				await this.runYoutubeEnrichmentPhase({
+					scanId,
+					now,
+					force,
+					isImportedFromReport,
+					limit,
+					dryRun,
+					result,
+				});
+			} catch (err: any) {
+				this.logger.error(
+					`[YouTube Phase] failed: ${err.message}`,
+					err.stack,
+				);
+			}
 
 			session.status = ScanSessionStatus.COMPLETED;
 			session.finishedAt = new Date();
@@ -1629,141 +1641,221 @@ export class MetadataScanService implements OnModuleInit {
 	}
 
 	/**
-	 * Enrich channel info cho cac video releases trong 1 chunk.
+	 * Phase B: enrich channel info cho video releases.
 	 *
-	 * - Chi xu ly release co type = 'video' va co video entity.
-	 * - Goi YoutubeEnrichmentService de xac dinh channelId (Postgres UUID).
-	 * - Update videos.channelId + youtubeMatchStatus + youtubeMatchScannedAt.
-	 * - Ghi ChangeLogEntry vao chunkChangeLogs (se duoc flush cuoi chunk).
-	 * - Neu enrich fail (khong con key, error) -> log warn, khong throw de tranh
-	 *   crash toan bo scan.
+	 * Doc lap voi Spotify/Deezer flow:
+	 *   - Query truc tiep bang `videos`, filter theo `youtube_match_status`
+	 *   - KHONG dung `release_enrichments` -> khong bi anh huong boi trang thai
+	 *     SUCCESS/NOT_FOUND cua Spotify scan truoc do
+	 *   - Chi enrich video co isrc, thuoc release type='video'
+	 *   - Skip video da co status = MATCHED (tru khi force=true)
+	 *   - Retry video da NO_MATCH / NO_DATA moi lan scan (co the co channel moi
+	 *     duoc add vao DB tu lan truoc)
+	 *
+	 * Cap nhat:
+	 *   - videos.channelId (chi khi match duoc)
+	 *   - videos.youtube_match_status
+	 *   - videos.youtube_match_scanned_at
+	 *   - Ghi log vao ClickHouse metadata_enrichment_log
 	 */
-	private async enrichVideoReleasesForChunk(
-		pendingReleases: Array<{ release: Release; currentTrackIndex: number; resolved: boolean }>,
-		scanId: string,
-		now: string,
-		chunkChangeLogs: ChangeLogEntry[],
-		dryRun: boolean,
-		result: ScanResult,
-	): Promise<void> {
-		const videoReleases = pendingReleases.filter(
-			(pr) =>
-				pr.release.type === 'video' &&
-				pr.release.video &&
-				pr.release.video.isrc &&
-				pr.release.video.isrc.trim() !== '',
-		);
-		if (videoReleases.length === 0) return;
+	private async runYoutubeEnrichmentPhase(options: {
+		scanId: string;
+		now: string;
+		force: boolean;
+		isImportedFromReport: boolean;
+		limit?: number;
+		dryRun: boolean;
+		result: ScanResult;
+	}): Promise<void> {
+		const { scanId, now, force, limit, dryRun, result } = options;
+		const videoRepo = this.dataSource.getRepository(Video);
 
-		this.logger.log(
-			`[YouTube Enrich] Processing ${videoReleases.length} video release(s) in chunk...`,
-		);
+		// Build query: video co release type='video', co isrc, chua match hoac cho retry.
+		// LUON filter is_imported_from_report = true - CHI enrich data import tu report,
+		// KHONG dung cham data nguoi dung tu tao (isImportedFromReport=false),
+		// bat ke caller truyen gia tri gi.
+		const qb = videoRepo
+			.createQueryBuilder('video')
+			.innerJoinAndSelect('video.release', 'release')
+			.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
+			.leftJoinAndSelect('releaseArtist.artist', 'artist')
+			.where('release.type = :type', { type: 'video' })
+			.andWhere('release.isImportedFromReport = TRUE')
+			.andWhere('video.isrc IS NOT NULL')
+			.andWhere("video.isrc != ''");
 
-		const inputs = videoReleases.map((pr) => {
-			const video = pr.release.video!;
-			const artistNames = (pr.release.releaseArtists ?? [])
-				.map((ra) => ra.artist?.name)
-				.filter((n): n is string => !!n);
-			return {
-				videoId: video.id,
-				isrc: video.isrc!,
-				externalId: video.externalId,
-				videoTitle: pr.release.title ?? '',
-				artistNames,
-			};
-		});
-
-		let results: Awaited<ReturnType<YoutubeEnrichmentService['enrichBatch']>>;
-		try {
-			results = await this.youtubeEnrichmentService.enrichBatch(inputs);
-		} catch (err: any) {
-			this.logger.warn(
-				`[YouTube Enrich] Batch failed: ${err.message}. Skipping video enrichment for this chunk.`,
+		if (!force) {
+			// Skip video da MATCHED. Cho retry NO_MATCH/NO_DATA + NULL (chua scan)
+			qb.andWhere(
+				'(video.youtube_match_status IS NULL OR video.youtube_match_status != :matched)',
+				{ matched: YoutubeMatchStatus.MATCHED },
 			);
+		}
+
+		qb.orderBy('video.updatedAt', 'DESC');
+		if (limit !== undefined) qb.take(limit);
+
+		const videos = await qb.getMany();
+		if (videos.length === 0) {
+			this.logger.log('[YouTube Phase] No video release needs enrichment.');
 			return;
 		}
 
-		const videoRepo = this.dataSource.getRepository(Video);
+		this.logger.log(
+			`[YouTube Phase] Enriching ${videos.length} video release(s) (force=${force})...`,
+		);
 
-		for (const pr of videoReleases) {
-			const video = pr.release.video!;
-			const res = results.get(video.isrc!);
-			if (!res) continue;
+		const CHUNK_SIZE = 50;
+		let totalMatched = 0;
+		let totalNoMatch = 0;
+		let totalNoData = 0;
 
-			const oldChannelId = video.channelId ?? '';
-			const newChannelId = res.matchedChannelPgId ?? '';
+		for (let i = 0; i < videos.length; i += CHUNK_SIZE) {
+			await this.throwIfScanCancelled(scanId);
+			const chunk = videos.slice(i, i + CHUNK_SIZE);
+			this.logger.log(
+				`[YouTube Phase] Processing chunk ${i + 1}-${Math.min(
+					i + CHUNK_SIZE,
+					videos.length,
+				)} of ${videos.length}...`,
+			);
 
-			const updates: Partial<Video> = {
-				youtubeMatchStatus: res.matchStatus,
-				youtubeMatchScannedAt: new Date(),
-			};
+			const inputs = chunk.map((video) => {
+				const artistNames = (video.release.releaseArtists ?? [])
+					.map((ra) => ra.artist?.name)
+					.filter((n): n is string => !!n);
+				return {
+					videoId: video.id,
+					isrc: video.isrc!,
+					externalId: video.externalId,
+					videoTitle: video.release.title ?? '',
+					artistNames,
+				};
+			});
 
-			// Chi update channelId khi match duoc, tranh clear channelId cu neu lan sau khong match
-			if (res.matchStatus === YoutubeMatchStatus.MATCHED && res.matchedChannelPgId) {
-				updates.channelId = res.matchedChannelPgId;
+			let results: Awaited<ReturnType<YoutubeEnrichmentService['enrichBatch']>>;
+			try {
+				results = await this.youtubeEnrichmentService.enrichBatch(inputs);
+			} catch (err: any) {
+				this.logger.warn(
+					`[YouTube Phase] Chunk enrichBatch failed: ${err.message}. Skipping this chunk.`,
+				);
+				continue;
 			}
 
-			if (!dryRun) {
-				try {
-					await videoRepo.update(video.id, updates);
-				} catch (err: any) {
-					this.logger.warn(
-						`[YouTube Enrich] Update video ${video.id} failed: ${err.message}`,
-					);
-					continue;
+			const chunkChangeLogs: ChangeLogEntry[] = [];
+
+			for (const video of chunk) {
+				const res = results.get(video.isrc!);
+				if (!res) continue;
+
+				const oldChannelId = video.channelId ?? '';
+				const newChannelId = res.matchedChannelPgId ?? '';
+
+				const updates: Partial<Video> = {
+					youtubeMatchStatus: res.matchStatus,
+					youtubeMatchScannedAt: new Date(),
+				};
+
+				// Chi update channelId khi match. Khong clear channelId cu neu no_match/no_data
+				if (
+					res.matchStatus === YoutubeMatchStatus.MATCHED &&
+					res.matchedChannelPgId
+				) {
+					updates.channelId = res.matchedChannelPgId;
+				}
+
+				if (!dryRun) {
+					try {
+						await videoRepo.update(video.id, updates);
+					} catch (err: any) {
+						this.logger.warn(
+							`[YouTube Phase] Update video ${video.id} failed: ${err.message}`,
+						);
+						continue;
+					}
+				}
+
+				// Count
+				if (res.matchStatus === YoutubeMatchStatus.MATCHED) totalMatched++;
+				else if (res.matchStatus === YoutubeMatchStatus.NO_MATCH) totalNoMatch++;
+				else totalNoData++;
+
+				// Log channelId change
+				if (
+					oldChannelId !== newChannelId &&
+					res.matchStatus === YoutubeMatchStatus.MATCHED
+				) {
+					chunkChangeLogs.push({
+						id: uuidv4(),
+						scan_id: scanId,
+						entity_type: 'video',
+						entity_id: video.id,
+						release_id: video.release.id,
+						isrc: video.isrc!,
+						upc: video.release.upc ?? '',
+						field_name: 'channel_id',
+						old_value: oldChannelId,
+						new_value: newChannelId,
+						change_type: oldChannelId ? 'update' : 'set',
+						enrichment_source: `youtube:${res.source}`,
+						api_track_id: res.youtubeVideoId ?? '',
+						api_album_id: '',
+						api_artist_id: res.youtubeChannelId ?? '',
+						status: dryRun ? 'dry_run' : 'applied',
+						error_message: '',
+						is_dry_run: dryRun ? 1 : 0,
+						created_at: now,
+						created_by: '',
+					});
+					result.metadataUpdated++;
+				}
+
+				// Log match_status change
+				if (video.youtubeMatchStatus !== res.matchStatus) {
+					chunkChangeLogs.push({
+						id: uuidv4(),
+						scan_id: scanId,
+						entity_type: 'video',
+						entity_id: video.id,
+						release_id: video.release.id,
+						isrc: video.isrc!,
+						upc: video.release.upc ?? '',
+						field_name: 'youtube_match_status',
+						old_value: video.youtubeMatchStatus ?? '',
+						new_value: res.matchStatus,
+						change_type: video.youtubeMatchStatus ? 'update' : 'set',
+						enrichment_source: `youtube:${res.source}`,
+						api_track_id: res.youtubeVideoId ?? '',
+						api_album_id: '',
+						api_artist_id: res.youtubeChannelId ?? '',
+						status: dryRun ? 'dry_run' : 'applied',
+						error_message: '',
+						is_dry_run: dryRun ? 1 : 0,
+						created_at: now,
+						created_by: '',
+					});
 				}
 			}
 
-			// Log channelId change
-			if (oldChannelId !== newChannelId && res.matchStatus === YoutubeMatchStatus.MATCHED) {
-				chunkChangeLogs.push({
-					id: uuidv4(),
-					scan_id: scanId,
-					entity_type: 'video',
-					entity_id: video.id,
-					release_id: pr.release.id,
-					isrc: video.isrc!,
-					upc: pr.release.upc ?? '',
-					field_name: 'channel_id',
-					old_value: oldChannelId,
-					new_value: newChannelId,
-					change_type: oldChannelId ? 'update' : 'set',
-					enrichment_source: `youtube:${res.source}`,
-					api_track_id: res.youtubeVideoId ?? '',
-					api_album_id: '',
-					api_artist_id: res.youtubeChannelId ?? '',
-					status: dryRun ? 'dry_run' : 'applied',
-					error_message: '',
-					is_dry_run: dryRun ? 1 : 0,
-					created_at: now,
-					created_by: '',
-				});
-				result.metadataUpdated++;
+			// Flush change logs cua chunk vao ClickHouse
+			if (chunkChangeLogs.length > 0) {
+				try {
+					await this.clickHouseService.insert(
+						CLICKHOUSE_TABLES.METADATA_ENRICHMENT_LOG,
+						chunkChangeLogs as unknown as Record<string, unknown>[],
+					);
+					result.changesLogged += chunkChangeLogs.length;
+				} catch (err: any) {
+					this.logger.error(
+						`[YouTube Phase] Failed to log chunk changes: ${err.message}`,
+					);
+				}
 			}
-
-			// Log youtubeMatchStatus (always log for auditing)
-			chunkChangeLogs.push({
-				id: uuidv4(),
-				scan_id: scanId,
-				entity_type: 'video',
-				entity_id: video.id,
-				release_id: pr.release.id,
-				isrc: video.isrc!,
-				upc: pr.release.upc ?? '',
-				field_name: 'youtube_match_status',
-				old_value: video.youtubeMatchStatus ?? '',
-				new_value: res.matchStatus,
-				change_type: video.youtubeMatchStatus ? 'update' : 'set',
-				enrichment_source: `youtube:${res.source}`,
-				api_track_id: res.youtubeVideoId ?? '',
-				api_album_id: '',
-				api_artist_id: res.youtubeChannelId ?? '',
-				status: dryRun ? 'dry_run' : 'applied',
-				error_message: '',
-				is_dry_run: dryRun ? 1 : 0,
-				created_at: now,
-				created_by: '',
-			});
 		}
+
+		this.logger.log(
+			`[YouTube Phase] Done. matched=${totalMatched}, no_match=${totalNoMatch}, no_data=${totalNoData}, total=${videos.length}`,
+		);
 	}
 }

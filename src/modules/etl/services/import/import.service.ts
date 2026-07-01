@@ -9,8 +9,9 @@ import { DeezerIllegitimateParser, SoundCloudIllegitimateParser, SpotifyIllegiti
 import { FactDspRow, FactSalesRow, ImportJobSourceType } from '../../interfaces';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
-import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
+
 import { DspReportService } from '../../../dsp-report/services/dsp-report.service';
+import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
 import { normalizeFactRows } from '../../utils/fact-row-normalizer.util';
 
 export interface ImportResult {
@@ -45,8 +46,8 @@ export class ImportService {
     private readonly clickHouseService: ClickHouseService,
     private readonly dspMappingService: DspMappingService,
     private readonly excludePatternService: ExcludePatternService,
-    private readonly reportEntityExtractorService: ReportEntityExtractorService,
     private readonly dspReportService: DspReportService,
+    private readonly reportEntityExtractorService: ReportEntityExtractorService,
   ) { }
 
   /**
@@ -64,6 +65,95 @@ export class ImportService {
         err.stack,
       ),
     );
+  }
+
+  /**
+   * Group parsed rows theo source_file_name.
+   */
+  private groupRowsBySourceFile<T extends { source_file_name?: string }>(rows: T[]): Map<string, T[]> {
+    const grouped = new Map<string, T[]>();
+    for (const row of rows) {
+      const fileName = row.source_file_name?.trim() || 'unknown';
+      const list = grouped.get(fileName) ?? [];
+      list.push(row);
+      grouped.set(fileName, list);
+    }
+    return grouped;
+  }
+
+  /**
+   * Resolve DSP type ('audio' | 'video') từ pg_uuid.
+   * Trả về null nếu dsps_report chưa được assign (pg_uuid rỗng) — caller
+   * dùng `dryRun` giống report-import-worker để không insert bậy vào Postgres.
+   * Pattern giống report-import-worker.service.ts (line 576-588).
+   */
+  private async resolveDspContext(
+    dspsReport: { id_dsps_report: string; pg_uuid: string | null },
+  ): Promise<{ pgUuid: string | null; dspType: 'audio' | 'video' }> {
+    if (!dspsReport.pg_uuid) {
+      return { pgUuid: null, dspType: 'audio' };
+    }
+    const pgDsp = await this.dspMappingService.getPgDspsSyncByUuid(dspsReport.pg_uuid);
+    const dspType = ((pgDsp?.type as string) || 'audio') === 'video' ? 'video' : 'audio';
+    return { pgUuid: dspsReport.pg_uuid, dspType };
+  }
+
+  /**
+   * Gọi extractAndImport cho từng source_file trong batch — reuse cùng pattern
+   * mà report-import-worker.service.ts đang dùng (line 603-627):
+   *   - pg_uuid rỗng → dryRun = true (không insert vào Postgres, chỉ đếm)
+   *   - pg_uuid có → truyền dspType để phân biệt Track/Video
+   * Trả về entityResult aggregate cho buildResult.
+   */
+  private async extractAndImportPerFile(
+    allRows: Array<FactDspRow | FactSalesRow>,
+    context: {
+      folderName: string;
+      batchId: string;
+      dspsReport: { id_dsps_report: string; pg_uuid: string | null };
+    },
+  ): Promise<{ totalReleases: number; created: number; skipped: number; errors: number; inDb: number; pending: number }> {
+    const entityResult = { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
+
+    const { pgUuid, dspType } = await this.resolveDspContext(context.dspsReport);
+    const dryRun = !pgUuid;
+    if (dryRun) {
+      this.logger.log(
+        `[${context.folderName}] Skipping Postgres metadata import (pg_uuid rỗng — dsps_report chưa assign). Chỉ đếm pending.`,
+      );
+    } else {
+      this.logger.log(
+        `[${context.folderName}] Importing release metadata to Postgres (dspType=${dspType}, pg_uuid=${pgUuid}).`,
+      );
+    }
+
+    for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
+      const res = await this.reportEntityExtractorService
+        .extractAndImport(rows, undefined, undefined, undefined, {
+          sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
+          parserCode: context.folderName,
+          fileName: sourceFileName,
+          jobId: context.batchId,
+          dspType,
+          dryRun,
+        })
+        .catch((err: any) => {
+          this.logger.error(
+            `[${context.folderName}] extractAndImport failed for ${sourceFileName}: ${err.message}`,
+            err.stack,
+          );
+          return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
+        });
+
+      entityResult.totalReleases += res.totalReleases;
+      entityResult.created += res.created;
+      entityResult.skipped += res.skipped;
+      entityResult.errors += res.errors;
+      entityResult.inDb += res.inDb;
+      entityResult.pending += res.pending;
+    }
+
+    return entityResult;
   }
 
   /**
@@ -204,8 +294,7 @@ export class ImportService {
       }
     }
 
-    const entityResult = { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
-
+    let entityResult: Awaited<ReturnType<ImportService['extractAndImportPerFile']>> | undefined;
     if (allRows.length > 0) {
       try {
         await this.clickHouseService.insertBatched(
@@ -213,36 +302,16 @@ export class ImportService {
           allRows as unknown as Record<string, unknown>[],
           50_000,
         );
-        // Trích xuất metadata và import release/track sang PostgreSQL
-        for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
-          const res = await this.reportEntityExtractorService.extractAndImport(
-            rows,
-            undefined,
-            undefined,
-            undefined,
-            {
-              sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
-              parserCode: folderName,
-              fileName: sourceFileName,
-              jobId: batchId,
-            },
-          ).catch((err) => {
-            this.logger.error(`Failed to extract/import entities from comprehensive report ${sourceFileName}: ${err.message}`);
-            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
-          });
-
-          if (res) {
-            entityResult.totalReleases += res.totalReleases;
-            entityResult.created += res.created;
-            entityResult.skipped += res.skipped;
-            entityResult.errors += res.errors;
-            entityResult.inDb += res.inDb;
-            entityResult.pending += res.pending;
-          }
-        }
       } catch (err) {
         this.logger.error(`Bulk insert failed for ${folderName}: ${err.message}`);
       }
+
+      // Import metadata (Release/Track/Video) sang Postgres giống report-import.
+      entityResult = await this.extractAndImportPerFile(allRows, {
+        folderName,
+        batchId,
+        dspsReport,
+      });
 
       // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
       this.refreshStatsAfterImport(allRows, folderName);
@@ -251,20 +320,6 @@ export class ImportService {
     return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
   }
 
-  private groupRowsBySourceFile<T extends { source_file_name?: string }>(
-    rows: T[],
-  ): Map<string, T[]> {
-    const grouped = new Map<string, T[]>();
-
-    for (const row of rows) {
-      const fileName = row.source_file_name?.trim() || 'unknown';
-      const fileRows = grouped.get(fileName) ?? [];
-      fileRows.push(row);
-      grouped.set(fileName, fileRows);
-    }
-
-    return grouped;
-  }
 
   /**
    * Import sales data → fact_sales_report (new table).
@@ -306,8 +361,7 @@ export class ImportService {
       }
     }
 
-    const entityResult = { totalReleases: 0, created: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 };
-
+    let entityResult: Awaited<ReturnType<ImportService['extractAndImportPerFile']>> | undefined;
     if (allRows.length > 0) {
       try {
         await this.clickHouseService.insertBatched(
@@ -315,36 +369,16 @@ export class ImportService {
           allRows as unknown as Record<string, unknown>[],
           50_000,
         );
-        // Trích xuất metadata và import release/track sang PostgreSQL
-        for (const [sourceFileName, rows] of this.groupRowsBySourceFile(allRows)) {
-          const res = await this.reportEntityExtractorService.extractAndImport(
-            rows,
-            undefined,
-            undefined,
-            undefined,
-            {
-              sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
-              parserCode: folderName,
-              fileName: sourceFileName,
-              jobId: batchId,
-            },
-          ).catch((err) => {
-            this.logger.error(`Failed to extract/import entities from sales report ${sourceFileName}: ${err.message}`);
-            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
-          });
-
-          if (res) {
-            entityResult.totalReleases += res.totalReleases;
-            entityResult.created += res.created;
-            entityResult.skipped += res.skipped;
-            entityResult.errors += res.errors;
-            entityResult.inDb += res.inDb;
-            entityResult.pending += res.pending;
-          }
-        }
       } catch (err) {
         this.logger.error(`Sales bulk insert failed for ${folderName}: ${err.message}`);
       }
+
+      // Import metadata (Release/Track/Video) sang Postgres giống report-import.
+      entityResult = await this.extractAndImportPerFile(allRows, {
+        folderName,
+        batchId,
+        dspsReport,
+      });
 
       // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
       this.refreshStatsAfterImport(allRows, folderName);
@@ -398,6 +432,7 @@ export class ImportService {
       }
     }
 
+    let entityResult: Awaited<ReturnType<ImportService['extractAndImportPerFile']>> | undefined;
     if (allRows.length > 0) {
       try {
         await this.clickHouseService.insertBatched(
@@ -409,11 +444,18 @@ export class ImportService {
         this.logger.error(`Illegitimate bulk insert failed for ${folderName}: ${err.message}`);
       }
 
+      // Import metadata (Release/Track/Video) sang Postgres giống report-import.
+      entityResult = await this.extractAndImportPerFile(allRows, {
+        folderName,
+        batchId,
+        dspsReport,
+      });
+
       // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
       this.refreshStatsAfterImport(allRows, folderName);
     }
 
-    return this.buildResult(folderName, files, allRows.length, startTime);
+    return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
   }
 
   private buildResult(
