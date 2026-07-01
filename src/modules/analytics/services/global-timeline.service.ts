@@ -87,13 +87,13 @@ export class TimelineAnalyticsService {
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
-    query: { labelId?: string; releaseId?: string },
+    query: { labelId?: string; releaseId?: string; releaseType?: 'audio' | 'video' },
   ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
 
     const isSystem = checkIsSystemTenant(tenantId);
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
     if (isSystem && !hasSubFilter) {
@@ -117,6 +117,11 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     return { joinSql, filterSql, params };
@@ -740,6 +745,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
     }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
 
     if (query.keyword) {
       let matchedArtistIds = await this.isrcResolverService.getArtistIdsByKeyword(query.keyword);
@@ -861,8 +870,12 @@ export class TimelineAnalyticsService {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
       }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
+      }
     } else {
-      if (query.labelId || query.releaseId) {
+      if (query.labelId || query.releaseId || query.releaseType) {
         joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
         filterSql = 'AND t.is_deleted = 0';
         if (query.labelId) {
@@ -872,6 +885,10 @@ export class TimelineAnalyticsService {
         if (query.releaseId) {
           filterSql += ' AND t.release_id = {releaseId:String}';
           params.releaseId = query.releaseId;
+        }
+        if (query.releaseType) {
+          filterSql += ' AND t.release_type = {releaseType:String}';
+          params.releaseType = query.releaseType;
         }
       }
     }
@@ -1022,6 +1039,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
     }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
 
     if (query.keyword) {
       let matchedLabelIds = await this.isrcResolverService.getLabelIdsByKeyword(query.keyword);
@@ -1128,6 +1149,11 @@ export class TimelineAnalyticsService {
       params.tenantId = tenantId;
     }
 
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
+
     if (query.keyword) {
       let matchedTenantIds = await this.isrcResolverService.getTenantIdsByKeyword(query.keyword);
       if (matchedTenantIds.length === 0) {
@@ -1232,6 +1258,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
     }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
 
     // Query 1: views, dsps, tracks, labels
     const mainSql = queries.getTrendsOverviewMainQuery(joinSql, filterSql);
@@ -1282,6 +1312,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     if (query.keyword) {
@@ -1382,7 +1416,7 @@ export class TimelineAnalyticsService {
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1398,6 +1432,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 
@@ -1437,6 +1475,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
@@ -1523,7 +1565,7 @@ export class TimelineAnalyticsService {
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1539,6 +1581,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 
@@ -1573,7 +1619,7 @@ export class TimelineAnalyticsService {
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1589,6 +1635,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 

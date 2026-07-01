@@ -43,7 +43,7 @@ export class RankingService {
     let filterSql = '';
 
     const isSystem = checkIsSystemTenant(tenantId);
-    const hasSubFilter = !!query.labelId;
+    const hasSubFilter = !!(query.labelId || query.releaseType);
 
     // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
     if (isSystem && !hasSubFilter) {
@@ -62,6 +62,11 @@ export class RankingService {
     if (query.labelId) {
       filterSql += ' AND t.label_id = {labelId:String}';
       params.labelId = query.labelId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     return { joinSql, filterSql, params };
@@ -585,6 +590,11 @@ export class RankingService {
       params.matchedTenantIds = matchedTenantIds;
     }
 
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
+
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
 
@@ -672,6 +682,11 @@ export class RankingService {
     if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;

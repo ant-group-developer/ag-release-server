@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsBoolean,
   IsOptional,
@@ -49,6 +50,15 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
   @IsOptional()
   @IsString()
   dspId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+    example: 'audio',
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
 }
 
 /**
@@ -131,6 +141,15 @@ export class ChartQueryDto {
   @IsOptional()
   @IsString()
   releaseId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+    example: 'audio',
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
 }
 
 export class EntityTimelineQueryDto {
@@ -177,6 +196,15 @@ export class EntityTimelineQueryDto {
   })
   @Type(() => Boolean)
   includeOther?: boolean = true;
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+    example: 'audio',
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
 }
 
 export class EntityOverviewQueryDto {
@@ -197,6 +225,15 @@ export class EntityOverviewQueryDto {
   @IsOptional()
   @Type(() => String)
   toDate: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+    example: 'audio',
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
 }
 
 export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {
