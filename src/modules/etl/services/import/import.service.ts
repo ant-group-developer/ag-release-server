@@ -10,6 +10,7 @@ import { FactDspRow, FactSalesRow, ImportJobSourceType } from '../../interfaces'
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
+import { DspReportService } from '../../../dsp-report/services/dsp-report.service';
 import { normalizeFactRows } from '../../utils/fact-row-normalizer.util';
 
 export interface ImportResult {
@@ -45,7 +46,25 @@ export class ImportService {
     private readonly dspMappingService: DspMappingService,
     private readonly excludePatternService: ExcludePatternService,
     private readonly reportEntityExtractorService: ReportEntityExtractorService,
+    private readonly dspReportService: DspReportService,
   ) { }
+
+  /**
+   * Trigger refresh dsp_report_stats sau khi ETL nạp fact tables + import
+   * release/track/video xong. Background để không chặn caller.
+   */
+  private refreshStatsAfterImport(rows: Array<{ dsp_id?: string }>, folder: string): void {
+    const distinctDspIds = Array.from(
+      new Set(rows.map((r) => r.dsp_id).filter((id): id is string => !!id)),
+    );
+    if (distinctDspIds.length === 0) return;
+    void this.dspReportService.refreshStats(distinctDspIds).catch((err: any) =>
+      this.logger.error(
+        `refreshStats after import ${folder} failed for ${distinctDspIds.length} ids: ${err.message}`,
+        err.stack,
+      ),
+    );
+  }
 
   /**
    * Import all DSP data from a folder structure.
@@ -224,6 +243,9 @@ export class ImportService {
       } catch (err) {
         this.logger.error(`Bulk insert failed for ${folderName}: ${err.message}`);
       }
+
+      // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
+      this.refreshStatsAfterImport(allRows, folderName);
     }
 
     return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
@@ -323,6 +345,9 @@ export class ImportService {
       } catch (err) {
         this.logger.error(`Sales bulk insert failed for ${folderName}: ${err.message}`);
       }
+
+      // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
+      this.refreshStatsAfterImport(allRows, folderName);
     }
 
     return this.buildResult(folderName, files, allRows.length, startTime, entityResult);
@@ -383,6 +408,9 @@ export class ImportService {
       } catch (err) {
         this.logger.error(`Illegitimate bulk insert failed for ${folderName}: ${err.message}`);
       }
+
+      // Refresh materialized stats cho các dsp_id vừa nạp thêm data.
+      this.refreshStatsAfterImport(allRows, folderName);
     }
 
     return this.buildResult(folderName, files, allRows.length, startTime);

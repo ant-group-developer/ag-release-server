@@ -10,6 +10,7 @@ export const CLICKHOUSE_TABLES = {
   PG_TRACKS_SYNC: 'pg_tracks_sync',
   PG_DSPS_SYNC: 'pg_dsps_sync',
   DSPS_REPORT: 'dsps_report',
+  DSP_REPORT_STATS: 'dsp_report_stats',
   TRENDS_DSP_MONTHLY: 'trends_dsp_monthly_cube',
   SALES_TER_MONTHLY: 'sales_ter_monthly_cube_v2',
   SALES_EXPORT_MONTHLY: 'sales_export_monthly_cube',

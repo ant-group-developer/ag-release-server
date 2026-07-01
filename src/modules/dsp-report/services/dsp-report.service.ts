@@ -46,7 +46,7 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
       }
     : null;
 
-  return {
+  const response: DspsReportResponse = {
     idDspsReport: row.id_dsps_report,
     pgUuid: row.pg_uuid || null,
     dspName: row.dsp_name,
@@ -55,6 +55,14 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
     updatedAt: row.updated_at,
     pgDspsSync,
   };
+
+  // Stats từ dsp_report_stats (LEFT JOIN có thể trả null → coerce về 0).
+  if (row.total_releases_count !== undefined) {
+    response.totalReleasesCount = Number(row.total_releases_count ?? 0);
+    response.pendingReleasesCount = Number(row.pending_releases_count ?? 0);
+  }
+
+  return response;
 }
 
 @Injectable()
@@ -108,7 +116,9 @@ export class DspReportService {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Count query
+    // Count query.
+    // Note: ClickHouse không cho `LEFT JOIN t FINAL alias ON ...` (parser expect
+    // ON/USING/SAMPLE sau FINAL). Dùng subquery `(SELECT * FROM t FINAL) alias`.
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
@@ -137,7 +147,8 @@ export class DspReportService {
       ? query.orderBy.toUpperCase()
       : 'ASC';
 
-    // Data query with pagination
+    // Data query with pagination — đọc luôn stats từ dsp_report_stats (đã materialize).
+    // Bỏ getImportStatsBatch khỏi hot path: latency giảm từ O(fact_rows) → O(page_size).
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -152,23 +163,24 @@ export class DspReportService {
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
-         p.updated_at AS pg_dsps_sync_updated_at
+         p.updated_at AS pg_dsps_sync_updated_at,
+         s.total_releases_count AS total_releases_count,
+         s.pending_releases_count AS pending_releases_count
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
        LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.DSP_REPORT_STATS} FINAL) s ON r.id_dsps_report = s.id_dsps_report
        ${whereClause}
        ORDER BY ${fieldOrder} ${orderBy}
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );
 
-     const items = rows.map(mapRawDspsReport);
-
-    // Batch stats cho cả trang (tránh N+1: trước đây mỗi item gọi getImportStats riêng)
-    const statsMap = await this.getImportStatsBatch(items.map((i) => i.idDspsReport));
+    const items = rows.map(mapRawDspsReport);
+    // Stats đã có sẵn trong row (nếu report chưa có entry, mapRawDspsReport để
+    // undefined → coerce về 0 ở đây để giữ shape response nhất quán).
     for (const item of items) {
-      const s = statsMap.get(item.idDspsReport) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
-      item.totalReleasesCount = s.totalReleasesCount;
-      item.pendingReleasesCount = s.pendingReleasesCount;
+      if (item.totalReleasesCount === undefined) item.totalReleasesCount = 0;
+      if (item.pendingReleasesCount === undefined) item.pendingReleasesCount = 0;
     }
 
     return {
@@ -352,6 +364,71 @@ export class DspReportService {
     }
 
     return result;
+  }
+
+  /**
+   * Recompute stats cho một tập id_dsps_report và persist vào bảng dsp_report_stats.
+   * Dùng ReplacingMergeTree(updated_at) nên insert row mới sẽ đè phiên bản cũ.
+   * Ids không có data fact vẫn được ghi row (0, 0) để tránh "missing" ở read path.
+   * Gọi từ: syncMetadataAfterAssign, unassign, ETL post-import, cron.
+   */
+  async refreshStats(ids: string[]): Promise<void> {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return;
+
+    try {
+      const statsMap = await this.getImportStatsBatch(uniqueIds);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const rows = uniqueIds.map((id) => {
+        const s = statsMap.get(id) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
+        return {
+          id_dsps_report: id,
+          total_releases_count: s.totalReleasesCount,
+          pending_releases_count: s.pendingReleasesCount,
+          updated_at: now,
+        };
+      });
+
+      await this.clickHouseService.insert(CLICKHOUSE_TABLES.DSP_REPORT_STATS, rows);
+      this.logger.debug(`refreshStats: persisted ${rows.length} rows into ${CLICKHOUSE_TABLES.DSP_REPORT_STATS}`);
+    } catch (err: any) {
+      this.logger.error(
+        `refreshStats failed for ${uniqueIds.length} ids: ${err.message}`,
+        err.stack,
+      );
+    }
+  }
+
+  /**
+   * Refresh stats cho toàn bộ dsps_report. Chunk để không tính batch quá lớn 1 lần.
+   * Dùng ở cron 15p + startup backfill.
+   */
+  async refreshAllStats(): Promise<void> {
+    const startedAt = Date.now();
+    const CHUNK_SIZE = 500;
+
+    try {
+      const idRows = await this.clickHouseService.query<{ id_dsps_report: string }>(
+        `SELECT DISTINCT id_dsps_report FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL`,
+      );
+      const allIds = idRows.map((r) => r.id_dsps_report).filter(Boolean);
+
+      if (allIds.length === 0) {
+        this.logger.log('refreshAllStats: no dsps_report found, skipped');
+        return;
+      }
+
+      this.logger.log(`refreshAllStats: refreshing ${allIds.length} dsps_report entries...`);
+      for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+        const chunk = allIds.slice(i, i + CHUNK_SIZE);
+        await this.refreshStats(chunk);
+      }
+      this.logger.log(
+        `refreshAllStats: done ${allIds.length} entries in ${Date.now() - startedAt}ms`,
+      );
+    } catch (err: any) {
+      this.logger.error(`refreshAllStats failed: ${err.message}`, err.stack);
+    }
   }
 
   /**
@@ -580,6 +657,11 @@ export class DspReportService {
     } catch (err: any) {
       this.logger.error(`Failed to sync metadata after assigning dsp_report: ${err.message}`, err.stack);
     }
+
+    // Sau khi assign + import xong, recompute stats để list API đọc phiên bản mới.
+    // Không dùng void ở đây: syncMetadataAfterAssign đã chạy background từ caller
+    // nên await refreshStats không chặn HTTP response.
+    await this.refreshStats([idDspsReport]);
   }
 
   /**
@@ -591,6 +673,15 @@ export class DspReportService {
       { id: idDspsReport }
     );
     this.logger.log(`Unassigned dsps_report ${idDspsReport}`);
+
+    // Recompute stats: pgUuid rỗng → không match Release/Track/Video → pending = total.
+    // Chạy background để không chặn HTTP response.
+    void this.refreshStats([idDspsReport]).catch((err: any) =>
+      this.logger.error(
+        `Background refreshStats after unassign failed for ${idDspsReport}: ${err.message}`,
+        err.stack,
+      ),
+    );
   }
 
   /**
