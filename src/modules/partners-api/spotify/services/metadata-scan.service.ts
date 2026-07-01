@@ -27,6 +27,9 @@ import {
 	isValidStandardUpc,
 	normalizeUpc,
 } from 'src/utils/upc.util';
+import { Video } from 'src/modules/video/entities/video.entity';
+import { YoutubeEnrichmentService } from 'src/modules/partners-api/youtube/services/youtube-enrichment.service';
+import { YoutubeMatchStatus } from 'src/modules/partners-api/youtube/enum/youtube.enum';
 
 export interface ScanResult {
 	scanId: string;
@@ -56,6 +59,7 @@ export class MetadataScanService implements OnModuleInit {
 		private readonly metadataSyncService: MetadataSyncService,
 		private readonly clickHouseService: ClickHouseService,
 		private readonly enrichEventsGateway: EnrichEventsGateway,
+		private readonly youtubeEnrichmentService: YoutubeEnrichmentService,
 	) {}
 
 	async onModuleInit(): Promise<void> {
@@ -189,6 +193,7 @@ export class MetadataScanService implements OnModuleInit {
 				.leftJoinAndSelect('release.tracks', 'track')
 				.leftJoinAndSelect('release.releaseArtists', 'releaseArtist')
 				.leftJoinAndSelect('releaseArtist.artist', 'artist')
+				.leftJoinAndSelect('release.video', 'video')
 				.leftJoin(
 					ReleaseEnrichment,
 					'releaseEnrichmentFilter',
@@ -1036,6 +1041,16 @@ export class MetadataScanService implements OnModuleInit {
 					}
 				}
 
+				// ─── 5b) YouTube enrichment for video releases ─────────────
+				await this.enrichVideoReleasesForChunk(
+					pendingReleases,
+					scanId,
+					now,
+					chunkChangeLogs,
+					dryRun,
+					result,
+				);
+
 				// For releases that were NOT enriched (resolved = false), mark as NOT_FOUND
 				for (const pr of pendingReleases) {
 					await this.throwIfScanCancelled(scanId);
@@ -1611,5 +1626,144 @@ export class MetadataScanService implements OnModuleInit {
 	async findScanSessionById(id: string): Promise<MetadataScanSession | null> {
 		const sessionRepo = this.dataSource.getRepository(MetadataScanSession);
 		return sessionRepo.findOne({ where: { id } });
+	}
+
+	/**
+	 * Enrich channel info cho cac video releases trong 1 chunk.
+	 *
+	 * - Chi xu ly release co type = 'video' va co video entity.
+	 * - Goi YoutubeEnrichmentService de xac dinh channelId (Postgres UUID).
+	 * - Update videos.channelId + youtubeMatchStatus + youtubeMatchScannedAt.
+	 * - Ghi ChangeLogEntry vao chunkChangeLogs (se duoc flush cuoi chunk).
+	 * - Neu enrich fail (khong con key, error) -> log warn, khong throw de tranh
+	 *   crash toan bo scan.
+	 */
+	private async enrichVideoReleasesForChunk(
+		pendingReleases: Array<{ release: Release; currentTrackIndex: number; resolved: boolean }>,
+		scanId: string,
+		now: string,
+		chunkChangeLogs: ChangeLogEntry[],
+		dryRun: boolean,
+		result: ScanResult,
+	): Promise<void> {
+		const videoReleases = pendingReleases.filter(
+			(pr) =>
+				pr.release.type === 'video' &&
+				pr.release.video &&
+				pr.release.video.isrc &&
+				pr.release.video.isrc.trim() !== '',
+		);
+		if (videoReleases.length === 0) return;
+
+		this.logger.log(
+			`[YouTube Enrich] Processing ${videoReleases.length} video release(s) in chunk...`,
+		);
+
+		const inputs = videoReleases.map((pr) => {
+			const video = pr.release.video!;
+			const artistNames = (pr.release.releaseArtists ?? [])
+				.map((ra) => ra.artist?.name)
+				.filter((n): n is string => !!n);
+			return {
+				videoId: video.id,
+				isrc: video.isrc!,
+				externalId: video.externalId,
+				videoTitle: pr.release.title ?? '',
+				artistNames,
+			};
+		});
+
+		let results: Awaited<ReturnType<YoutubeEnrichmentService['enrichBatch']>>;
+		try {
+			results = await this.youtubeEnrichmentService.enrichBatch(inputs);
+		} catch (err: any) {
+			this.logger.warn(
+				`[YouTube Enrich] Batch failed: ${err.message}. Skipping video enrichment for this chunk.`,
+			);
+			return;
+		}
+
+		const videoRepo = this.dataSource.getRepository(Video);
+
+		for (const pr of videoReleases) {
+			const video = pr.release.video!;
+			const res = results.get(video.isrc!);
+			if (!res) continue;
+
+			const oldChannelId = video.channelId ?? '';
+			const newChannelId = res.matchedChannelPgId ?? '';
+
+			const updates: Partial<Video> = {
+				youtubeMatchStatus: res.matchStatus,
+				youtubeMatchScannedAt: new Date(),
+			};
+
+			// Chi update channelId khi match duoc, tranh clear channelId cu neu lan sau khong match
+			if (res.matchStatus === YoutubeMatchStatus.MATCHED && res.matchedChannelPgId) {
+				updates.channelId = res.matchedChannelPgId;
+			}
+
+			if (!dryRun) {
+				try {
+					await videoRepo.update(video.id, updates);
+				} catch (err: any) {
+					this.logger.warn(
+						`[YouTube Enrich] Update video ${video.id} failed: ${err.message}`,
+					);
+					continue;
+				}
+			}
+
+			// Log channelId change
+			if (oldChannelId !== newChannelId && res.matchStatus === YoutubeMatchStatus.MATCHED) {
+				chunkChangeLogs.push({
+					id: uuidv4(),
+					scan_id: scanId,
+					entity_type: 'video',
+					entity_id: video.id,
+					release_id: pr.release.id,
+					isrc: video.isrc!,
+					upc: pr.release.upc ?? '',
+					field_name: 'channel_id',
+					old_value: oldChannelId,
+					new_value: newChannelId,
+					change_type: oldChannelId ? 'update' : 'set',
+					enrichment_source: `youtube:${res.source}`,
+					api_track_id: res.youtubeVideoId ?? '',
+					api_album_id: '',
+					api_artist_id: res.youtubeChannelId ?? '',
+					status: dryRun ? 'dry_run' : 'applied',
+					error_message: '',
+					is_dry_run: dryRun ? 1 : 0,
+					created_at: now,
+					created_by: '',
+				});
+				result.metadataUpdated++;
+			}
+
+			// Log youtubeMatchStatus (always log for auditing)
+			chunkChangeLogs.push({
+				id: uuidv4(),
+				scan_id: scanId,
+				entity_type: 'video',
+				entity_id: video.id,
+				release_id: pr.release.id,
+				isrc: video.isrc!,
+				upc: pr.release.upc ?? '',
+				field_name: 'youtube_match_status',
+				old_value: video.youtubeMatchStatus ?? '',
+				new_value: res.matchStatus,
+				change_type: video.youtubeMatchStatus ? 'update' : 'set',
+				enrichment_source: `youtube:${res.source}`,
+				api_track_id: res.youtubeVideoId ?? '',
+				api_album_id: '',
+				api_artist_id: res.youtubeChannelId ?? '',
+				status: dryRun ? 'dry_run' : 'applied',
+				error_message: '',
+				is_dry_run: dryRun ? 1 : 0,
+				created_at: now,
+				created_by: '',
+			});
+		}
 	}
 }
