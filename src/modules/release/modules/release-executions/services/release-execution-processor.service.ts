@@ -344,6 +344,7 @@ export class ReleaseExecutionProcessorService {
 				status: ReleaseDspStatus.PROCESSING,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: null as Date | null,
+				hasLiveVersion: false,
 				isSelected: true,
 			};
 			const existed = await this.manager.findOne(ReleaseDspDelivery, {
@@ -365,7 +366,10 @@ export class ReleaseExecutionProcessorService {
 						releaseId: initialExecDsp.execution.releaseId,
 						dspId: initialExecDsp.dspId,
 					},
-					data,
+					{
+						...data,
+						hasLiveVersion: existed.hasLiveVersion,
+					},
 				);
 			}
 		}
@@ -449,6 +453,7 @@ export class ReleaseExecutionProcessorService {
 					{
 						status: ReleaseDspStatus.DISTRIBUTED,
 						lastDeliveredAt: new Date(),
+						hasLiveVersion: true,
 					},
 				);
 			}

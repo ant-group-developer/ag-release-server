@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsEnum,
 	IsOptional,
 	IsString,
@@ -32,6 +33,11 @@ export class CreateReleaseDspDeliveryDto {
 	@ApiPropertyOptional({ type: 'boolean' })
 	@IsOptional()
 	isSelected?: boolean;
+
+	@ApiPropertyOptional({ type: 'boolean' })
+	@IsBoolean()
+	@IsOptional()
+	hasLiveVersion?: boolean;
 }
 
 export class UpdateReleaseDspDeliveryDto extends PartialType(

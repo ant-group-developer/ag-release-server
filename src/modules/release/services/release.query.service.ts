@@ -722,7 +722,11 @@ export class ReleaseQueryService {
 			.leftJoin('release.label', 'label')
 
 			// genre
-			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
+
+			// dsp delivery
+			.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery')
+			.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 	}
 
 	private select(
@@ -791,6 +795,28 @@ export class ReleaseQueryService {
 				'label.code',
 				'label.picture',
 				'label.description',
+			])
+			.addSelect([
+				'releaseDspDelivery.id',
+				'releaseDspDelivery.releaseId',
+				'releaseDspDelivery.dspId',
+				'releaseDspDelivery.status',
+				'releaseDspDelivery.isSelected',
+				'releaseDspDelivery.hasLiveVersion',
+				'releaseDspDelivery.lastEnqueuedAt',
+				'releaseDspDelivery.lastDeliveredAt',
+				'releaseDspDelivery.logs',
+				'releaseDspDelivery.issues',
+				'releaseDspDelivery.metadataPath',
+				'releaseDspDelivery.batchId',
+			])
+			.addSelect([
+				'releaseDspDeliveryDsp.id',
+				'releaseDspDeliveryDsp.name',
+				'releaseDspDeliveryDsp.code',
+				'releaseDspDeliveryDsp.codeCi',
+				'releaseDspDeliveryDsp.picture',
+				'releaseDspDeliveryDsp.type',
 			])
 
 			// virtual

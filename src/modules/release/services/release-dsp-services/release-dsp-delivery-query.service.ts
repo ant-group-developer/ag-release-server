@@ -112,6 +112,7 @@ export class ReleaseDspDeliveryQueryService {
 				dspId: dsp.id,
 				isSelected: false,
 				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				hasLiveVersion: false,
 				lastEnqueuedAt: null,
 				lastDeliveredAt: null,
 			}));
