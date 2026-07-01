@@ -7,6 +7,21 @@ export enum ReleaseCiDataStatus {
 	NOT_FOUND_ON_CI = 'NOT_FOUND_ON_CI',
 }
 
+export interface ReleaseCiExportParsedData {
+	exportOrder: string | number | null;
+	exportTask: string | null;
+	requestorOrganisation: string | null;
+	deliveryPoint: string | null;
+	deliveryPointStatus: string | null;
+	externalBatchId: string | null;
+	transferEndDate: string | null;
+}
+
+export interface ReleaseCiImportParsedData {
+	status: string | null;
+	modify_time: string | null;
+}
+
 @Entity('release_ci_data')
 export class ReleaseCiData extends BaseUUIDEntity {
 	@Column({ name: 'release_id', type: 'uuid', unique: true })
@@ -39,8 +54,8 @@ export class ReleaseCiData extends BaseUUIDEntity {
 	exportRawData: Record<string, any> | null;
 
 	@Column({ name: 'import_parsed_data', type: 'jsonb', nullable: true })
-	importParsedData: Record<string, any> | null;
+	importParsedData: ReleaseCiImportParsedData | null;
 
 	@Column({ name: 'export_parsed_data', type: 'jsonb', nullable: true })
-	exportParsedData: Record<string, any> | null;
+	exportParsedData: ReleaseCiExportParsedData[] | null;
 }

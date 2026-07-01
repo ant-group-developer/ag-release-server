@@ -2,7 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsEnum, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
-import { ReleaseCiDataStatus } from '../entities/release-ci-data.entity';
+import {
+	ReleaseCiDataStatus,
+	ReleaseCiExportParsedData,
+	ReleaseCiImportParsedData,
+} from '../entities/release-ci-data.entity';
 
 export enum FieldOrderReleaseCiData {
 	createdAt = 'releaseCiData.createdAt',
@@ -30,12 +34,12 @@ export class UpsertReleaseCiDataDto {
 	@ApiPropertyOptional({ description: 'Dữ liệu import đã parse' })
 	@IsOptional()
 	@IsObject()
-	importParsedData?: Record<string, any> | null;
+	importParsedData?: ReleaseCiImportParsedData | null;
 
 	@ApiPropertyOptional({ description: 'Dữ liệu export đã parse' })
 	@IsOptional()
-	@IsObject()
-	exportParsedData?: Record<string, any> | null;
+	@IsArray()
+	exportParsedData?: ReleaseCiExportParsedData[] | null;
 }
 
 export class BulkSyncDataCiDto {

@@ -20,6 +20,8 @@ import {
 import {
 	ReleaseCiData,
 	ReleaseCiDataStatus,
+	ReleaseCiExportParsedData,
+	ReleaseCiImportParsedData,
 } from '../entities/release-ci-data.entity';
 
 @Injectable()
@@ -41,6 +43,12 @@ export class ReleaseCiDataService {
 		if (data.importRawData !== undefined) {
 			data.importParsedData = this.getLatestImportRecord(
 				data.importRawData,
+			);
+		}
+
+		if (data.exportRawData !== undefined) {
+			data.exportParsedData = this.getLatestExportRecords(
+				data.exportRawData,
 			);
 		}
 
@@ -320,7 +328,7 @@ export class ReleaseCiDataService {
 
 	private getLatestImportRecord(
 		importRawData?: Record<string, any> | null,
-	): Record<string, any> | null {
+	): ReleaseCiImportParsedData | null {
 		if (!importRawData) {
 			return null;
 		}
@@ -330,11 +338,16 @@ export class ReleaseCiDataService {
 			return null;
 		}
 
-		return items.sort((a, b) => {
+		const importEntity = items.sort((a, b) => {
 			const aTime = new Date(a?.modify_time ?? 0).getTime();
 			const bTime = new Date(b?.modify_time ?? 0).getTime();
 			return bTime - aTime;
 		})[0];
+
+		return {
+			status: importEntity.status ?? null,
+			modify_time: importEntity.modify_time ?? null,
+		};
 	}
 
 	private getImportItems(
@@ -357,6 +370,119 @@ export class ReleaseCiDataService {
 		}
 
 		return [importRawData];
+	}
+
+	private getLatestExportRecords(
+		exportRawData?: Record<string, any> | null,
+	): ReleaseCiExportParsedData[] | null {
+		if (!exportRawData) {
+			return null;
+		}
+
+		const items = this.getExportItems(exportRawData);
+		if (!items.length) {
+			return [];
+		}
+
+		const latestByDsp = new Map<string, Record<string, any>>();
+
+		for (const item of items) {
+			const dspKey = this.getExportDspKey(item);
+			const current = latestByDsp.get(dspKey);
+
+			if (
+				!current ||
+				this.getExportRecordTime(item) >
+					this.getExportRecordTime(current)
+			) {
+				latestByDsp.set(dspKey, item);
+			}
+		}
+
+		return Array.from(latestByDsp.values()).map((item) =>
+			this.mapExportRecord(item),
+		);
+	}
+
+	private getExportItems(
+		exportRawData: Record<string, any>,
+	): Record<string, any>[] {
+		if (Array.isArray(exportRawData)) {
+			return exportRawData;
+		}
+
+		if (Array.isArray(exportRawData._embedded)) {
+			return exportRawData._embedded;
+		}
+
+		if (Array.isArray(exportRawData._embedded?.items)) {
+			return exportRawData._embedded.items;
+		}
+
+		if (Array.isArray(exportRawData.items)) {
+			return exportRawData.items;
+		}
+
+		return [exportRawData];
+	}
+
+	private getExportDspKey(item: Record<string, any>): string {
+		const musicService = item.musicService ?? {};
+		return String(
+			musicService.dpc ??
+				musicService.DPID ??
+				musicService.id ??
+				musicService.name ??
+				item.id,
+		);
+	}
+
+	private getExportRecordTime(item: Record<string, any>): number {
+		const rawTime =
+			item.exportBatch?.transfer_end_time ??
+			item.exportBatch?.modify_time ??
+			item.modify_time ??
+			item.exportRequest?.completion_date ??
+			item.exportRequest?.modify_time ??
+			item.create_time;
+
+		return new Date(rawTime ?? 0).getTime();
+	}
+
+	private mapExportRecord(
+		item: Record<string, any>,
+	): ReleaseCiExportParsedData {
+		const musicService = item.musicService ?? {};
+		const exportRequest = item.exportRequest ?? {};
+		const exportBatch = item.exportBatch ?? {};
+		const dpc = musicService.dpc ? ` (${musicService.dpc})` : '';
+
+		return {
+			exportOrder: exportRequest.export_id ?? exportRequest.id ?? null,
+			exportTask: exportRequest.task ?? null,
+			requestorOrganisation: exportRequest.organisation?.name ?? null,
+			deliveryPoint: musicService.name
+				? `${musicService.name}${dpc}`
+				: null,
+			deliveryPointStatus: musicService.development_status ?? null,
+			externalBatchId: exportBatch.external_batch_id ?? null,
+			transferEndDate: this.formatCiDateTime(
+				exportBatch.transfer_end_time ?? exportBatch.modify_time,
+			),
+		};
+	}
+
+	private formatCiDateTime(value?: string | null): string | null {
+		if (!value) {
+			return null;
+		}
+
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			return value;
+		}
+
+		return date.toISOString().slice(0, 19).replace('T', ' ');
 	}
 
 	private createQbGetList(filter: GetListReleaseCiDataDto) {
