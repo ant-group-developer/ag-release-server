@@ -11,6 +11,7 @@ import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
+import { getFileExcelFromRaw } from 'src/utils/util.file';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
 	BulkSyncDataCiDto,
@@ -105,6 +106,51 @@ export class ReleaseCiDataService {
 		return new PageDto({
 			items,
 			metadata: { page, pageSize, totalItems },
+		});
+	}
+
+	async exportData(filter: GetListReleaseCiDataDto) {
+		const exportFilter = Object.assign(new GetListReleaseCiDataDto(), {
+			...filter,
+			page: 1,
+			pageSize: 9999,
+		});
+		const qb = this.createQbGetList(exportFilter);
+		const items = await qb.getMany();
+
+		const records = items.map((item, index) => {
+			const importLatest = item.importParsedData
+				? `${item.importParsedData.modify_time ?? ''} | ${
+						item.importParsedData.status ?? ''
+					}`
+				: '';
+
+			return {
+				STT: index + 1,
+				Title: item.release?.title ?? '',
+				UPC: item.release?.upc ?? '',
+				Status: item.status ?? '',
+				'Import cuối': importLatest,
+				'DSP Success':
+					item.exportParsedData
+						?.map((data) => data.deliveryPoint)
+						.filter(Boolean)
+						.join(', ') ?? '',
+			};
+		});
+
+		return getFileExcelFromRaw({
+			records,
+			fileName: `release_ci_data_${Date.now()}`,
+			header: [
+				'STT',
+				'Title',
+				'UPC',
+				'Status',
+				'Import cuối',
+				'DSP Success',
+			],
+			sheetName: 'Release CI Data',
 		});
 	}
 
@@ -499,7 +545,13 @@ export class ReleaseCiDataService {
 		qb: SelectQueryBuilder<ReleaseCiData>;
 		filter: GetListReleaseCiDataDto;
 	}) {
-		const { releaseId, status, keyword } = filter;
+		const {
+			releaseId,
+			status,
+			keyword,
+			neverExported,
+			lastImportIsFailed,
+		} = filter;
 
 		if (releaseId) {
 			qb.andWhere('releaseCiData.releaseId = :releaseId', { releaseId });
@@ -507,6 +559,22 @@ export class ReleaseCiDataService {
 
 		if (status) {
 			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (neverExported) {
+			qb.andWhere(
+				`(
+					"releaseCiData"."export_parsed_data" IS NULL
+					OR jsonb_array_length("releaseCiData"."export_parsed_data") = 0
+				)`,
+			);
+		}
+
+		if (lastImportIsFailed) {
+			qb.andWhere(
+				`"releaseCiData"."import_parsed_data" ->> 'status' = :importStatus`,
+				{ importStatus: 'problem' },
+			);
 		}
 
 		if (keyword?.length) {

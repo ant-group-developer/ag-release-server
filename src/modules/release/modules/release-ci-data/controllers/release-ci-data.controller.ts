@@ -7,6 +7,7 @@ import {
 	Post,
 	Put,
 	Query,
+	Res,
 } from '@nestjs/common';
 import {
 	ApiBody,
@@ -15,7 +16,9 @@ import {
 	ApiQuery,
 	ApiTags,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AppResponseSuccess } from 'src/app.const';
+import { streamDownload } from 'src/utils/util';
 import {
 	BulkSyncDataCiDto,
 	GetListReleaseCiDataDto,
@@ -39,6 +42,22 @@ export class ReleaseCiDataController {
 	async getList(@Query() query: GetListReleaseCiDataDto) {
 		const result = await this.service.getList(query);
 		return AppResponseSuccess.COMMON(result);
+	}
+
+	@Post('export')
+	@ApiOperation({
+		summary: 'Export danh sách dữ liệu CI ra Excel',
+	})
+	@ApiBody({
+		type: GetListReleaseCiDataDto,
+		description: 'Bộ lọc danh sách dữ liệu CI cần export',
+	})
+	async exportData(
+		@Body() body: GetListReleaseCiDataDto,
+		@Res() res: Response,
+	) {
+		const file = await this.service.exportData(body);
+		return streamDownload(res, file);
 	}
 
 	@Post('create-missing')

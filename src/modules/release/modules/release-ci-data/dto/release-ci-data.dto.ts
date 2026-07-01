@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsObject, IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+	IsArray,
+	IsBoolean,
+	IsEnum,
+	IsObject,
+	IsOptional,
+	IsUUID,
+} from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
 import {
@@ -83,6 +91,34 @@ export class GetListReleaseCiDataDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsEnum(ReleaseCiDataStatus)
 	status?: ReleaseCiDataStatus;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi chưa từng export',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	neverExported?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi có import cuối bị failed',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	lastImportIsFailed?: boolean;
 
 	@ApiPropertyOptional({
 		enum: FieldOrderReleaseCiData,
