@@ -538,10 +538,13 @@ export class ReleaseService {
 	}
 
 	// get qa flag ci
-	async getReleaseFormatId(id: string): Promise<string> {
+	async getReleaseFormatId(
+		id: string,
+		options?: { reloadFromCi?: boolean },
+	): Promise<string> {
 		const release = await this.releaseQueryService.findOne(id);
 
-		if (release.releaseFormatsIdCi) {
+		if (!options?.reloadFromCi && release.releaseFormatsIdCi) {
 			return release.releaseFormatsIdCi;
 		}
 
@@ -564,6 +567,94 @@ export class ReleaseService {
 		await this.releaseRepo.update(id, { releaseFormatsIdCi });
 
 		return releaseFormatsIdCi;
+	}
+
+	async autoSyncReleaseFormatId(options?: { reloadFromCi?: boolean }) {
+		const batchSize = 5;
+		const query = this.releaseRepo
+			.createQueryBuilder('release')
+			.select(['release.id'])
+			.where('release.isImportedFromReport = :isImportedFromReport', {
+				isImportedFromReport: false,
+			})
+			.orderBy('release.createdAt', 'ASC');
+
+		if (!options?.reloadFromCi) {
+			query.andWhere('release.releaseFormatsIdCi IS NULL');
+		}
+
+		const releases = await query.getMany();
+
+		let synced = 0;
+		const failed: { releaseId: string; message: string }[] = [];
+		const totalBatches = Math.ceil(releases.length / batchSize);
+
+		this.logger.log(
+			`Starting auto sync release format ID. Total pending: ${releases.length}, batch size: ${batchSize}`,
+		);
+
+		for (let index = 0; index < releases.length; index += batchSize) {
+			const batch = releases.slice(index, index + batchSize);
+			const batchNumber = Math.floor(index / batchSize) + 1;
+			const releaseIds = batch.map((release) => release.id);
+
+			this.logger.log(
+				`Processing release format ID batch ${batchNumber}/${totalBatches}. Release IDs: ${releaseIds.join(', ')}`,
+			);
+
+			const results = await Promise.allSettled(
+				batch.map((release) =>
+					this.getReleaseFormatId(release.id, {
+						reloadFromCi: options?.reloadFromCi,
+					}),
+				),
+			);
+
+			results.forEach((result, resultIndex) => {
+				const releaseId = batch[resultIndex].id;
+
+				if (result.status === 'fulfilled') {
+					synced += 1;
+					this.logger.log(
+						`Synced release format ID for release ${releaseId}: ${result.value}. Progress: ${
+							synced + failed.length
+						}/${releases.length}`,
+					);
+					return;
+				}
+
+				const reason = result.reason;
+				const message =
+					reason instanceof Error ? reason.message : String(reason);
+
+				failed.push({
+					releaseId,
+					message,
+				});
+				this.logger.error(
+					`Failed to sync release format ID for release ${releaseId}. Progress: ${
+						synced + failed.length
+					}/${releases.length}. Error: ${message}`,
+				);
+			});
+
+			this.logger.log(
+				`Finished release format ID batch ${batchNumber}/${totalBatches}. Synced: ${synced}, failed: ${failed.length}`,
+			);
+		}
+
+		this.logger.log(
+			`Finished auto sync release format ID. Total: ${releases.length}, synced: ${synced}, failed: ${failed.length}`,
+		);
+
+		return {
+			total: releases.length,
+			batchSize,
+			reloadFromCi: options?.reloadFromCi ?? false,
+			synced,
+			failed: failed.length,
+			errors: failed,
+		};
 	}
 
 	async getQaFlagCi(id: string) {
