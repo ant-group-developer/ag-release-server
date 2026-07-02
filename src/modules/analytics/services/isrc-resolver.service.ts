@@ -7,6 +7,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
+import { Channel } from 'src/modules/channel/entities/channel.entity';
 import {
   TrackMetadata,
   IsrcArtistMapping,
@@ -32,6 +33,8 @@ export class IsrcResolverService {
     private readonly trackArtistRepo: Repository<TrackArtist>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(Channel)
+    private readonly channelRepo: Repository<Channel>,
   ) {}
 
   /**
@@ -303,6 +306,56 @@ export class IsrcResolverService {
           name: l.tenant.name,
           title: l.tenant.title,
           logo: l.tenant.logo || null,
+        } : null,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin (name, thumbnail, youtubeChannelId, tenant) cho danh sách channelIds từ PostgreSQL
+   */
+  async getChannelMetadata(channelIds: string[]): Promise<Map<string, {
+    name: string;
+    thumbUrl: string | null;
+    youtubeChannelId: string | null;
+    tenant: { id: string; name: string; title: string; logo: string | null } | null;
+  }>> {
+    const map = new Map<string, {
+      name: string;
+      thumbUrl: string | null;
+      youtubeChannelId: string | null;
+      tenant: { id: string; name: string; title: string; logo: string | null } | null;
+    }>();
+    if (!channelIds.length) return map;
+
+    const channels = await this.channelRepo.find({
+      where: { id: In(channelIds) },
+      relations: ['tenant'],
+      select: {
+        id: true,
+        name: true,
+        thumbUrl: true,
+        youtubeChannelId: true,
+        tenant: {
+          id: true,
+          name: true,
+          title: true,
+          logo: true,
+        },
+      },
+    });
+
+    for (const c of channels) {
+      map.set(c.id, {
+        name: c.name,
+        thumbUrl: c.thumbUrl || null,
+        youtubeChannelId: c.youtubeChannelId || null,
+        tenant: c.tenant ? {
+          id: c.tenant.id,
+          name: c.tenant.name,
+          title: c.tenant.title,
+          logo: c.tenant.logo || null,
         } : null,
       });
     }

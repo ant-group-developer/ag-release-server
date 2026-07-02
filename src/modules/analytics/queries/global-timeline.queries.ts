@@ -570,6 +570,66 @@ export function getRevenueTopLabelTotalQuery(
   `;
 }
 
+export function getRevenueTopChannelCountQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT uniq(t.channel_id) AS total
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopChannelQuery(
+  joinSql: string,
+  filterSql: string,
+  limit: number,
+  offset: number,
+): string {
+  return `
+    SELECT
+      t.channel_id AS channelId,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity,
+      uniq(t.release_id) AS release_count,
+      uniq(t.isrc) AS track_count
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY channelId
+    ORDER BY revenue_usd DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+export function getRevenueTopChannelTotalQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT
+      sum(s.total_quantity) AS total_qty,
+      sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
 export function getRevenueTopTenantCountQuery(
   joinSql: string,
   filterSql: string,

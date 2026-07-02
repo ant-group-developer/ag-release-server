@@ -12,6 +12,7 @@ import {
   LabelRankingItem,
   TenantRankingItem,
   DspRankingItem,
+  ChannelRankingItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
@@ -458,6 +459,98 @@ export class RankingService {
         releaseCount: Number(l.releaseCount),
         trackCount: Number(l.trackCount),
         totalViews: Number(l.totalViews),
+        tenant: meta?.tenant ?? null,
+      };
+    });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TOP CHANNELS RANKING (trend view, video only, GROUP BY channel_id)
+  // ═══════════════════════════════════════════════════════
+  async getTopChannels(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<ChannelRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
+    if (query.dspId) params.dspId = query.dspId;
+
+    const table = query.dspId
+      ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
+      : CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Query 1: Count unique channels (channel_id != '' de loai audio + video chua enrich)
+    const countSql = `
+      SELECT uniq(t.channel_id) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.channel_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Query 2: Aggregate by channel_id
+    const dataSql = `
+      SELECT
+        t.channel_id AS channelId,
+        uniq(t.release_id) AS releaseCount,
+        uniq(s.isrc) AS trackCount,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.channel_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+      GROUP BY channelId
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      channelId: string;
+      releaseCount: string;
+      trackCount: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const channelIds = paged.map((c) => c.channelId);
+    const channelsMeta = await this.isrcResolverService.getChannelMetadata(channelIds);
+
+    const items: ChannelRankingItem[] = paged.map((c, index) => {
+      const meta = channelsMeta.get(c.channelId);
+      return {
+        rank: query.skip + index + 1,
+        channelId: c.channelId,
+        channelName: meta?.name ?? 'Unknown Channel',
+        thumbUrl: meta?.thumbUrl ?? null,
+        youtubeChannelId: meta?.youtubeChannelId ?? null,
+        releaseCount: Number(c.releaseCount),
+        trackCount: Number(c.trackCount),
+        totalViews: Number(c.totalViews),
         tenant: meta?.tenant ?? null,
       };
     });

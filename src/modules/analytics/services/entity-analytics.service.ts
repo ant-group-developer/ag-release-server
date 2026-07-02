@@ -23,7 +23,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 
-export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant';
+export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant' | 'channel';
 
 @Injectable()
 export class EntityAnalyticsService {
@@ -121,6 +121,9 @@ export class EntityAnalyticsService {
 				break;
 			case 'tenant':
 				filterSql += ' AND t.tenant_id = {entityId:String}';
+				break;
+			case 'channel':
+				filterSql += ' AND t.channel_id = {entityId:String}';
 				break;
 		}
 

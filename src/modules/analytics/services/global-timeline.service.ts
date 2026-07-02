@@ -20,6 +20,7 @@ import {
   RevenueArtistItem,
   RevenueLabelItem,
   RevenueTenantItem,
+  RevenueChannelItem,
   OverviewTrendsResponse,
   RevenueReleaseItem,
   TrendViewLineChartItem,
@@ -1116,6 +1117,113 @@ export class TimelineAnalyticsService {
             labelId: 'other',
             labelName: 'Other',
             picture: null,
+            revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
+            quantity: otherQty > 0 ? otherQty : 0,
+            tenant: null,
+          });
+        }
+      }
+    }
+
+    if (isPaginated) {
+      return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+    } else {
+      return new PageDto({ items, metadata: { page: 0, pageSize: 0, totalItems: 0 } });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVENUE TOP CHANNEL (Top channel theo doanh thu - video only)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopChannel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueChannelItem>> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+    if (query.labelId) {
+      filterSql += ' AND t.label_id = {labelId:String}';
+      params.labelId = query.labelId;
+    }
+    if (query.releaseId) {
+      filterSql += ' AND t.release_id = {releaseId:String}';
+      params.releaseId = query.releaseId;
+    }
+    // releaseType khong can - channel_id chi co o video
+
+    const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+
+    // Count query
+    const countSql = queries.getRevenueTopChannelCountQuery(joinSql, filterSql);
+    const countResult = await this.clickHouseService.query<{ total: string }>(countSql, params);
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    // Data query
+    const sql = queries.getRevenueTopChannelQuery(joinSql, filterSql, limit, offset);
+    const rows = await this.clickHouseService.query<{
+      channelId: string;
+      revenue_usd: string;
+      quantity: string;
+      release_count: string;
+      track_count: string;
+    }>(sql, params);
+
+    const items: RevenueChannelItem[] = [];
+
+    if (rows.length > 0) {
+      const channelIds = rows.map((r) => r.channelId);
+      const channelsMeta = await this.isrcResolverService.getChannelMetadata(channelIds);
+
+      rows.forEach((r, index) => {
+        const meta = channelsMeta.get(r.channelId);
+        items.push({
+          rank: offset + index + 1,
+          channelId: r.channelId,
+          channelName: meta?.name ?? 'Unknown Channel',
+          thumbUrl: meta?.thumbUrl ?? null,
+          youtubeChannelId: meta?.youtubeChannelId ?? null,
+          releaseCount: Number(r.release_count),
+          trackCount: Number(r.track_count),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
+          quantity: Number(r.quantity),
+          tenant: meta?.tenant ?? null,
+        });
+      });
+
+      const shouldIncludeOther = !isPaginated && query.includeOther === true;
+
+      if (shouldIncludeOther) {
+        const totalSql = queries.getRevenueTopChannelTotalQuery(joinSql, filterSql);
+        const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
+        const totalQty = Number(totalResult[0]?.total_qty ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
+
+        const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
+
+        const otherQty = totalQty - itemsQtySum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
+
+        if (otherQty > 0 || otherRev > 0) {
+          items.push({
+            rank: items.length + 1,
+            channelId: 'other',
+            channelName: 'Other',
+            thumbUrl: null,
+            youtubeChannelId: null,
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
