@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ErrorType } from 'src/modules/log/entites/logs.entity';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { Repository } from 'typeorm';
@@ -11,7 +13,7 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
-import { ReleaseExecution3Worker } from './release-execution3.worker';
+import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
 
 @Injectable()
 export class ReleaseExecutionStepEngine {
@@ -22,9 +24,10 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
-		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
+		// private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+		private readonly logService: LogsService,
 	) {}
 
 	// main
@@ -240,7 +243,7 @@ export class ReleaseExecutionStepEngine {
 	private async updateStepStatus(
 		step: ReleaseExecutionStep3,
 		status: ReleaseExecutionStepStatus,
-	): Promise<void> {
+	) {
 		step.status = status;
 
 		if (!step.startedAt) {
@@ -252,7 +255,30 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		await this.stepRepo.save(step);
-		await this.syncDeliveryStatusByStepStatus(step, status);
+
+		// await this.syncDeliveryStatusByStepStatus(step, status);
+
+		try {
+			await this.syncDeliveryStatusByStepStatus(step, status);
+		} catch (error) {
+			this.logService.error({
+				type: ErrorType.SYSTEM,
+				module: ReleaseExecutionStepEngine.name,
+				releaseExecutionId: step.releaseExecutionId,
+				releaseExecutionStepId: step.id,
+				message: `Failed to sync delivery status for step ${step.id}`,
+				data: {
+					error:
+						error instanceof Error
+							? {
+									name: error.name,
+									message: error.message,
+									stack: error.stack,
+								}
+							: error,
+				},
+			});
+		}
 	}
 
 	isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
@@ -264,13 +290,68 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
+	private async syncDeliveryStatusByStepStatus1(
+		step: ReleaseExecutionStep3,
+		stepStatus: ReleaseExecutionStepStatus,
+	): Promise<void> {
+		if (!step.isDeliveryStep) return;
+
+		const deliveryStatus = this.mapStepStatusToDeliveryStatus(
+			step,
+			stepStatus,
+		);
+
+		if (!deliveryStatus) return;
+
+		// lấy các dsp cần xử lí của step
+		const delivery = step.metadata?.input?.delivery;
+		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
+			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
+			.map((item: any) => ({
+				id: item.id,
+				dspId: item.dspId,
+				dspCode: item.dspCode,
+				status: deliveryStatus,
+			}));
+
+		// lưu vào exe, đồng bộ lại vào release dsp delivery
+		await this.updateExecutionOutputResult({
+			executionId: step.releaseExecutionId,
+			results,
+		});
+	}
+
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
 	): Promise<void> {
 		if (!step.isDeliveryStep) return;
 
+		// SYNC_DATA_DSP_CI: status thật per-DSP đã có sẵn trong output (lấy từ CI trả về),
+		// không áp deliveryStatus chung cho toàn bộ step nữa.
+		if (step.type === ReleaseExecutionStepType.SYNC_DATA_DSP_CI) {
+			const outputResults: any[] = step.metadata?.output?.result ?? [];
+
+			const results: ReleaseExecutionResultDto[] = outputResults
+				.filter((item) => !!(item.id || item.dspId || item.dspCode))
+				.map((item) => ({
+					id: item.id,
+					dspId: item.dspId,
+					dspCode: item.dspCode,
+					dspCodeCi: item.dspCodeCi,
+					status: item.status,
+				}));
+
+			if (!results.length) return;
+
+			await this.updateExecutionOutputResult({
+				executionId: step.releaseExecutionId,
+				results,
+			});
+			return;
+		}
+
+		// Các step khác: giữ nguyên logic cũ - áp deliveryStatus chung theo stepStatus
 		const deliveryStatus = this.mapStepStatusToDeliveryStatus(
 			step,
 			stepStatus,

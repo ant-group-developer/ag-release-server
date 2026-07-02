@@ -71,12 +71,15 @@ export class TenantRolesService {
 			where: { tenantId },
 			select: ['roleId', 'isActive'],
 		});
-		console.log("🚀 ~ TenantRolesService ~ getEnabledRoleIds ~ records:", records)
+		// console.log("🚀 ~ TenantRolesService ~ getEnabledRoleIds ~ records:", records)
 
 		// Restrictive default: no records = only default roles allowed
 		if (records.length === 0) {
 			const defaultRoles = await this.roleService.getDefaultRoleIds();
-			console.log("🚀 ~ TenantRolesService ~ getEnabledRoleIds ~ defaultRoles:", defaultRoles)
+			console.log(
+				'🚀 ~ TenantRolesService ~ getEnabledRoleIds ~ defaultRoles:',
+				defaultRoles,
+			);
 			return defaultRoles;
 		}
 
