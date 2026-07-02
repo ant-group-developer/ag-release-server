@@ -1,9 +1,9 @@
 export enum FieldOrderLabel {
-	NAME = 'name',
+	NAME = 'label.name',
 	// PICTURE = 'picture',
 	// DESCRIPTION = 'description',
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
+	CREATED_AT = 'label.createdAt',
+	UPDATED_AT = 'label.updatedAt',
 
 	// virtual
 	TRACK_COUNT = 'track_count',
