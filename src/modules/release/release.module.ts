@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AlbumFormat } from '../album-format/entities/album-format.entity';
 import { AppConfigModule } from '../app-config/app-config.module';
@@ -29,12 +29,18 @@ import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
+import { MetadataScanSession } from './entities/metadata-scan-session.entity';
 import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { ReleaseEnrichment } from './entities/release-enrichment.entity';
 import { Release } from './entities/release.entity';
-import { MetadataScanSession } from './entities/metadata-scan-session.entity';
+import { ReleaseCiData } from './modules/release-ci-data/entities/release-ci-data.entity';
+import { ReleaseCiDataModule } from './modules/release-ci-data/release-ci-data.module';
+import { ReleaseError } from './modules/release-errors/entities/release-error.entity';
+import { ReleaseErrorsModule } from './modules/release-errors/release-errors.module';
 import { ReleaseLog } from './modules/release-log/entities/release-log.entity';
 import { ReleaseLogModule } from './modules/release-log/release-log.module';
+import { ReleaseReview } from './modules/release-reviews/entities/release-review.entity';
+import { ReleaseReviewsModule } from './modules/release-reviews/release-reviews.module';
 import { ReleaseDdexService } from './services/release-ddex.service';
 // import { ReleaseDdexCiService } from './services/release.ddex-ci.service';
 // import { ReleaseSpotifyService2 } from './services/release.ddex-spotify2.service';
@@ -108,6 +114,9 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			ReleaseLog,
 			ReleaseEnrichment,
 			MetadataScanSession,
+			ReleaseCiData,
+			ReleaseError,
+			ReleaseReview,
 
 			ReleaseExecution,
 			ReleaseExecutionDsp,
@@ -134,6 +143,9 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		VideoModule,
 		ReleaseCaptionModule,
 		ReleaseLogModule,
+		ReleaseCiDataModule,
+		ReleaseErrorsModule,
+		forwardRef(() => ReleaseReviewsModule),
 
 		FileExportCiModule,
 
@@ -206,6 +218,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseValidateService,
 		ReportEntityExtractorService,
 		ReleaseExecution3CronJobService,
+		ReleaseExecution3Service,
 	],
 })
-export class ReleaseModule { }
+export class ReleaseModule {}

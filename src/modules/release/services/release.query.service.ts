@@ -16,13 +16,18 @@ import {
 	QueryGetListReleaseDto,
 	QueryGetListReleaseDto2,
 } from '../dto/release.dto';
+import {
+	ReleaseEnrichment,
+	ReleaseEnrichmentStatus,
+} from '../entities/release-enrichment.entity';
 import { Release } from '../entities/release.entity';
-import { ReleaseEnrichment, ReleaseEnrichmentStatus } from '../entities/release-enrichment.entity';
 import {
 	ReleaseStatus,
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
+import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
+import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -503,6 +508,8 @@ export class ReleaseQueryService {
 			isVariousArtist,
 			isImportedFromReport,
 			isEnrich,
+			hasError,
+			needsReview,
 			tenantIds,
 
 			fieldOrder,
@@ -639,6 +646,43 @@ export class ReleaseQueryService {
 			);
 		}
 
+		if (hasError !== undefined) {
+			const openErrorCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_errors releaseErrorFilter
+					WHERE releaseErrorFilter.release_id = release.id
+					AND releaseErrorFilter.submission_status = :openSubmissionStatus
+				)
+			`;
+
+			queryBuilder.andWhere(
+				hasError ? openErrorCondition : `NOT ${openErrorCondition}`,
+				{ openSubmissionStatus: ErrorSubmissionStatus.OPEN },
+			);
+		}
+
+		if (needsReview !== undefined) {
+			const reviewCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_reviews releaseReviewFilter
+					WHERE releaseReviewFilter.release_id = release.id
+					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+				)
+			`;
+
+			queryBuilder.andWhere(
+				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
+				{
+					pendingReviewStatuses: [
+						ReleaseReviewStatus.PENDING,
+						ReleaseReviewStatus.PROCESSING,
+					],
+				},
+			);
+		}
+
 		if (tenantIds?.length) {
 			queryBuilder.andWhere('release.tenantId IN (:...tenantIds)', {
 				tenantIds,
@@ -678,7 +722,11 @@ export class ReleaseQueryService {
 			.leftJoin('release.label', 'label')
 
 			// genre
-			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
+
+			// dsp delivery
+			.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery')
+			.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 	}
 
 	private select(
@@ -747,6 +795,28 @@ export class ReleaseQueryService {
 				'label.code',
 				'label.picture',
 				'label.description',
+			])
+			.addSelect([
+				'releaseDspDelivery.id',
+				'releaseDspDelivery.releaseId',
+				'releaseDspDelivery.dspId',
+				'releaseDspDelivery.status',
+				'releaseDspDelivery.isSelected',
+				'releaseDspDelivery.hasLiveVersion',
+				'releaseDspDelivery.lastEnqueuedAt',
+				'releaseDspDelivery.lastDeliveredAt',
+				'releaseDspDelivery.logs',
+				'releaseDspDelivery.issues',
+				'releaseDspDelivery.metadataPath',
+				'releaseDspDelivery.batchId',
+			])
+			.addSelect([
+				'releaseDspDeliveryDsp.id',
+				'releaseDspDeliveryDsp.name',
+				'releaseDspDeliveryDsp.code',
+				'releaseDspDeliveryDsp.codeCi',
+				'releaseDspDeliveryDsp.picture',
+				'releaseDspDeliveryDsp.type',
 			])
 
 			// virtual

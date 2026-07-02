@@ -43,6 +43,7 @@ import { ReleaseException } from '../constants/release.constant';
 import { LookupMaps, ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
+	GetReleaseSubmitErrorsDto,
 	SyncReleaseToTracksDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
@@ -50,6 +51,8 @@ import { QueryGetListReleaseDto } from '../dto/release.dto';
 import { Release } from '../entities/release.entity';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { IReleaseDetail } from '../interfaces/release.interface';
+import { GetListReleaseErrorsDto } from '../modules/release-errors/dto/release-error.dto';
+import { ReleaseErrorService } from '../modules/release-errors/services/release-error.service';
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
@@ -62,6 +65,7 @@ export class ReleaseDraftService {
 		private readonly releaseRepo: Repository<Release>,
 		private readonly releaseValidateService: ReleaseValidateService,
 		private readonly releaseQueryService: ReleaseQueryService,
+		private readonly releaseErrorService: ReleaseErrorService,
 
 		private readonly releaseCoverArtService: ReleaseCoverArtService,
 		private readonly releaseLanguageDraftService: ReleaseLanguageDraftService,
@@ -449,7 +453,25 @@ export class ReleaseDraftService {
 			releaseId: id,
 		});
 
-		return this.releaseValidateService.getErrorsSchemaRelease(release);
+		const schemaErrors =
+			this.releaseValidateService.getErrorsSchemaRelease(release);
+
+		return [
+			...schemaErrors,
+			// ...storedReleaseErrors
+		];
+	}
+
+	async getErrosSubmit(id: string, query: GetReleaseSubmitErrorsDto) {
+		const storedReleaseErrors =
+			await this.releaseErrorService.getEnrichedErrors({
+				releaseId: id,
+				pageSize: 999,
+				submissionStatus: query.submissionStatus,
+				approvalStatus: query.approvalStatus,
+			} as GetListReleaseErrorsDto);
+
+		return storedReleaseErrors;
 	}
 
 	async getErrorsSchemaReleasesFromSftp(releases: any[]) {

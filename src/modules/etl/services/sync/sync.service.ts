@@ -34,11 +34,27 @@ export interface SyncPeriodResult {
       durationMs: number;
       error?: string;
       reason?: string;
+      releases?: {
+        total: number;
+        imported: number;
+        skipped: number;
+        errors: number;
+        inDb: number;
+        pending: number;
+      } | null;
     }>;
   }>;
   totalRows: number;
   totalFiles: number;
   durationMs: number;
+  releases?: {
+    total: number;
+    imported: number;
+    skipped: number;
+    errors: number;
+    inDb: number;
+    pending: number;
+  };
 }
 
 export interface ImportHistoryRow {
@@ -264,6 +280,7 @@ export class SyncService {
       totalRows: 0,
       totalFiles: 0,
       durationMs: 0,
+      releases: { total: 0, imported: 0, skipped: 0, errors: 0, inDb: 0, pending: 0 },
     };
 
     const categoriesToSync = resolvedCategories;
@@ -407,6 +424,17 @@ export class SyncService {
           // Cleanup temp
           this.ftpService.cleanupTemp(localPath);
 
+          const releases = dspResult && dspResult.releases
+            ? {
+                total: dspResult.releases.totalReleases,
+                imported: dspResult.releases.created,
+                skipped: dspResult.releases.skipped,
+                errors: dspResult.releases.errors,
+                inDb: dspResult.releases.inDb,
+                pending: dspResult.releases.pending,
+              }
+            : null;
+
           categoryResult.folders.push({
             dsp_folder: dspFolder,
             status: isUpdate ? 'updated' : 'done',
@@ -414,7 +442,17 @@ export class SyncService {
             files,
             durationMs,
             reason: isUpdate ? 'new files detected' : undefined,
+            releases,
           });
+
+          if (dspResult && dspResult.releases) {
+            result.releases!.total += dspResult.releases.totalReleases;
+            result.releases!.imported += dspResult.releases.created;
+            result.releases!.skipped += dspResult.releases.skipped;
+            result.releases!.errors += dspResult.releases.errors;
+            result.releases!.inDb += dspResult.releases.inDb;
+            result.releases!.pending += dspResult.releases.pending;
+          }
 
           result.totalRows += rows;
           result.totalFiles += files;

@@ -20,7 +20,7 @@ export class CubeRebuildService {
 
     for (const partition of uniquePeriods) {
       try {
-        // 1. Drop partitions from v2 cubes
+        // 1. Drop partitions from all sales cubes (including export cube)
         await this.clickHouseService.execute(
           `ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} DROP PARTITION '${partition}'`,
         ).catch((err) => this.logger.debug(`DROP PARTITION on sales dsp failed: ${err.message}`));
@@ -28,6 +28,10 @@ export class CubeRebuildService {
         await this.clickHouseService.execute(
           `ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} DROP PARTITION '${partition}'`,
         ).catch((err) => this.logger.debug(`DROP PARTITION on sales ter failed: ${err.message}`));
+
+        await this.clickHouseService.execute(
+          `ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} DROP PARTITION '${partition}'`,
+        ).catch((err) => this.logger.debug(`DROP PARTITION on sales export failed: ${err.message}`));
 
         // 2. Re-insert aggregated data for the partition into sales dsp cube
         await this.clickHouseService.execute(`
@@ -61,6 +65,29 @@ export class CubeRebuildService {
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
           GROUP BY period, f.territory_code, f.isrc
+        `);
+
+        // 4. Re-insert aggregated data for the partition into sales export cube
+        await this.clickHouseService.execute(`
+          INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}
+          SELECT
+              toStartOfMonth(f.reporting_period_start) AS period,
+              f.dsp_id,
+              f.territory_code,
+              f.isrc,
+              any(f.upc) AS upc,
+              any(f.track_title) AS track_title,
+              any(f.album_title) AS album_title,
+              any(f.artist_name) AS artist_name,
+              any(f.label_name) AS label_name,
+              sum(f.quantity) AS total_usage,
+              ${REVENUE_USD_EXPRESSION} AS revenue_usd
+          FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
+          LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
+              ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
+              AND f.revenue_currency = er.currency
+          WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
+          GROUP BY period, f.dsp_id, f.territory_code, f.isrc
         `);
 
         this.logger.log(`Finished rebuilding sales partition: ${partition}`);
@@ -161,16 +188,21 @@ export class CubeRebuildService {
   /**
    * Full truncate and rebuild of sales cubes (original behavior from ExchangeRateService)
    */
-  async rebuildAllSalesCubes(): Promise<{ dspRows: number; terRows: number }> {
-    this.logger.log('Executing full rebuild of sales cubes v2...');
+  async rebuildAllSalesCubes(): Promise<{ dspRows: number; terRows: number; exportRows: number }> {
+    this.logger.log('Executing full rebuild of all sales cubes (DSP + Territory + Export)...');
 
+    // 1. Truncate all 3 sales cubes
     await this.clickHouseService.execute(
       `TRUNCATE TABLE IF EXISTS music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}`,
     );
     await this.clickHouseService.execute(
       `TRUNCATE TABLE IF EXISTS music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}`,
     );
+    await this.clickHouseService.execute(
+      `TRUNCATE TABLE IF EXISTS music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}`,
+    );
 
+    // 2. Rebuild DSP cube
     await this.clickHouseService.execute(`
       INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}
       SELECT
@@ -186,6 +218,7 @@ export class CubeRebuildService {
       GROUP BY period, f.dsp_id, f.isrc
     `);
 
+    // 3. Rebuild Territory cube
     await this.clickHouseService.execute(`
       INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}
       SELECT
@@ -201,18 +234,46 @@ export class CubeRebuildService {
       GROUP BY period, f.territory_code, f.isrc
     `);
 
+    // 4. Rebuild Export cube (was MISSING before — root cause of revenue mismatch)
+    await this.clickHouseService.execute(`
+      INSERT INTO music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}
+      SELECT
+          toStartOfMonth(f.reporting_period_start) AS period,
+          f.dsp_id,
+          f.territory_code,
+          f.isrc,
+          any(f.upc) AS upc,
+          any(f.track_title) AS track_title,
+          any(f.album_title) AS album_title,
+          any(f.artist_name) AS artist_name,
+          any(f.label_name) AS label_name,
+          sum(f.quantity) AS total_usage,
+          ${REVENUE_USD_EXPRESSION} AS revenue_usd
+      FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
+      LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
+          ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
+          AND f.revenue_currency = er.currency
+      GROUP BY period, f.dsp_id, f.territory_code, f.isrc
+    `);
+
     const dspCount = await this.clickHouseService.query<{ cnt: string }>(
       `SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY}`,
     );
     const terCount = await this.clickHouseService.query<{ cnt: string }>(
       `SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY}`,
     );
+    const exportCount = await this.clickHouseService.query<{ cnt: string }>(
+      `SELECT count() AS cnt FROM music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY}`,
+    );
 
     const dspRows = Number(dspCount[0]?.cnt ?? 0);
     const terRows = Number(terCount[0]?.cnt ?? 0);
+    const exportRows = Number(exportCount[0]?.cnt ?? 0);
 
-    this.logger.log(`✅ Full rebuild complete — DSP: ${dspRows} rows, Territory: ${terRows} rows`);
+    this.logger.log(
+      `✅ Full rebuild complete — DSP: ${dspRows} rows, Territory: ${terRows} rows, Export: ${exportRows} rows`,
+    );
 
-    return { dspRows, terRows };
+    return { dspRows, terRows, exportRows };
   }
 }

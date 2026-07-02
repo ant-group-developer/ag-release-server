@@ -97,6 +97,14 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 	})
 	enablePolicy: boolean;
 
+	@Column({
+		type: 'varchar',
+		length: 20,
+		default: 'audio',
+		comment: 'DSP type: audio (releases & tracks) or video (releases & videos)',
+	})
+	type: 'audio' | 'video';
+
 	@Column({ type: 'varchar', length: DEFAULT_LENGTH_NAME, nullable: true })
 	ddexId: string | null;
 

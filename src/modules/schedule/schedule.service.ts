@@ -7,6 +7,7 @@ import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
+import { DspReportService } from '../dsp-report/services/dsp-report.service';
 
 @Injectable()
 export class ScheduleService implements OnModuleInit {
@@ -18,10 +19,22 @@ export class ScheduleService implements OnModuleInit {
 		private readonly appConfigService: AppConfigService,
 
 		private readonly releaseExecution3CronJobService: ReleaseExecution3CronJobService,
+		private readonly dspReportService: DspReportService,
 	) {}
 
 	onModuleInit() {
 		this.reloadConfig();
+
+		// Startup backfill: đảm bảo dsp_report_stats có data ngay sau khi migrate.
+		// Chạy background, không delay boot.
+		void this.dspReportService
+			.refreshAllStats()
+			.catch((err: Error) =>
+				this.logger.error(
+					`[STARTUP] refreshAllStats failed: ${err.message}`,
+					err.stack,
+				),
+			);
 	}
 
 	@OnEvent(AppEvent.UPDATE_APP_CONFIG)
@@ -141,5 +154,22 @@ export class ScheduleService implements OnModuleInit {
 	@Cron('*/10 * * * * *') // mỗi 10 giây
 	async consumeReleaseExecution3RunPipelineQueue() {
 		await this.releaseExecution3CronJobService.consumeRunPipelineQueue();
+	}
+
+	/**
+	 * Refresh materialized dsp_report_stats mỗi 15 phút để chống drift với
+	 * hooks (assign/unassign/ETL post-import). Hooks bao hầu hết trường hợp;
+	 * cron này là safety net.
+	 */
+	@Cron('*/15 * * * *')
+	async refreshDspReportStats() {
+		try {
+			await this.dspReportService.refreshAllStats();
+		} catch (err) {
+			this.logger.error(
+				`[CRON] refreshDspReportStats failed: ${(err as Error).message}`,
+				(err as Error).stack,
+			);
+		}
 	}
 }

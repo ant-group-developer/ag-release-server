@@ -41,6 +41,11 @@ VALUES
   ('Release Video Creator','Create release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.creator', false),
   ('Release Video Editor','Edit release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.editor', false),
   ('Release Video Viewer','Read-only access to release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.viewer', false),
+  -- Release Review
+  ('Release Review Admin','Full control over release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.admin', false),
+  ('Release Review Creator','Create release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.creator', false),
+  ('Release Review Editor','Edit release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.editor', false),
+  ('Release Review Viewer','Read-only access to release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.viewer', false),
 
   -- Channel
   ('Channel Admin','Full control over channels.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'channel.admin', false),

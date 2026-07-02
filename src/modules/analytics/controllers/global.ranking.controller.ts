@@ -14,6 +14,7 @@ import {
   LabelRankingItem,
   TenantRankingItem,
   DspRankingItem,
+  ChannelRankingItem,
 } from '../interfaces/analytics.interface';
 
 /**
@@ -173,6 +174,32 @@ export class RankingController {
     @Body() query: RankingQueryDto,
   ): Promise<ResponseSuccess<PageDto<DspRankingItem>>> {
     const data = await this.rankingService.getTopDsps(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  /**
+   * Top Channels theo lượt xem (video only).
+   * POST /analytics/ranking/channels
+   */
+  @Post('channels')
+  @ApiOperation({
+    summary: 'Get top channels ranking',
+    description:
+      'Returns the most viewed channels (video only) for the tenant, ' +
+      'aggregating play counts from all videos linked to the channel. Metadata from PostgreSQL channels table.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Channels ranking retrieved successfully.',
+  })
+  async getTopChannels(
+    @Req() req: Request,
+    @Body() query: RankingQueryDto,
+  ): Promise<ResponseSuccess<PageDto<ChannelRankingItem>>> {
+    const data = await this.rankingService.getTopChannels(
       req.user!.tenantId,
       query,
     );

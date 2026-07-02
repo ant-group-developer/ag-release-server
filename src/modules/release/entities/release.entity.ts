@@ -32,7 +32,10 @@ import {
 } from 'typeorm';
 import { ReleaseStatus, ReleaseTimeMode } from '../enum/release.enum';
 import { ICoverArtThumbnails } from '../interfaces/release.interface';
+import { ReleaseCiData } from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ReleaseError } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseLog } from '../modules/release-log/entities/release-log.entity';
+import { ReleaseReview } from '../modules/release-reviews/entities/release-review.entity';
 
 @Entity('releases', {
 	comment:
@@ -422,6 +425,15 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => ReleaseLog, (rL) => rL.release)
 	logs: ReleaseLog[];
+
+	@OneToMany(() => ReleaseError, (error) => error.release)
+	errors: ReleaseError[];
+
+	@OneToMany(() => ReleaseReview, (review) => review.release)
+	reviews: ReleaseReview[];
+
+	@OneToOne(() => ReleaseCiData, (ciData) => ciData.release)
+	ciData: ReleaseCiData | null;
 
 	// nếu dùng thì nhớ phải join đủ
 	get listCodeExportCi() {

@@ -21,6 +21,10 @@ import { UpdateReleaseLanguageDraftDto } from 'src/modules/release-language/dto/
 import { UpdateReleaseTerritoryDto } from 'src/modules/release-territory/dto/release-territory.dto';
 import { UpsertReleaseVideoDto } from 'src/modules/video/dto/video.dto';
 import { ReleaseTimeMode } from '../enum/release.enum';
+import {
+	ErrorApprovalStatus,
+	ErrorSubmissionStatus,
+} from '../modules/release-errors/entities/release-error.entity';
 
 export class CreateReleaseDraftDto {
 	@ApiPropertyOptional({
@@ -264,4 +268,15 @@ export class SyncReleaseToTracksDto {
 	@IsOptional()
 	@IsBoolean()
 	syncContributors?: boolean;
+}
+
+export class GetReleaseSubmitErrorsDto {
+	@IsOptional()
+	@IsEnum(ErrorSubmissionStatus)
+	submissionStatus?: ErrorSubmissionStatus;
+
+	@ApiPropertyOptional({ enum: ErrorApprovalStatus })
+	@IsOptional()
+	@IsEnum(ErrorApprovalStatus)
+	approvalStatus?: ErrorApprovalStatus;
 }

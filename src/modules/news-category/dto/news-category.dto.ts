@@ -20,6 +20,10 @@ import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { FieldOrderNewsCategory } from '../enum/news-category.enum';
 
 export class CreateNewsCategoryDto {
+	@IsUUID()
+	@IsOptional()
+	parentId?: string;
+
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()

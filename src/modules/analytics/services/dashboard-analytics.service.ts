@@ -27,14 +27,23 @@ export class DashboardAnalyticsService {
 
     const isSystem = checkIsSystemTenant(tenantId);
 
-    // If system tenant, we don't filter by tenant, so no JOIN pg_tracks_sync is needed for DSP
-    if (isSystem) {
+    // System tenant with no sub-filters → skip JOIN
+    if (isSystem && !query.releaseType) {
       return { joinSql: '', filterSql: '', params };
     }
 
     const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-    filterSql += ' AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
-    params.tenantId = tenantId;
+    filterSql += ' AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
 
     return { joinSql, filterSql, params };
   }
@@ -105,11 +114,17 @@ export class DashboardAnalyticsService {
     const { topN = 5, includeOther = true } = query;
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = {};
-    
+
     let tenantFilter = '';
     if (!isSystem) {
       tenantFilter = 'AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    let releaseTypeFilter = '';
+    if (query.releaseType) {
+      releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     let sql = '';
@@ -126,6 +141,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY labelId
       `;
     } else {
@@ -141,6 +157,7 @@ export class DashboardAnalyticsService {
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY labelId
       `;
     }
@@ -191,6 +208,12 @@ export class DashboardAnalyticsService {
       params.tenantId = tenantId;
     }
 
+    let releaseTypeFilter = '';
+    if (query.releaseType) {
+      releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
+
     let sql = '';
     if (query.type === 'stream') {
       params.from = query.fromDate;
@@ -205,6 +228,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY artistId
       `;
     } else {
@@ -220,6 +244,7 @@ export class DashboardAnalyticsService {
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY artistId
       `;
     }

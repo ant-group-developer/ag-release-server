@@ -12,6 +12,8 @@ import { stringToCode } from 'src/utils/util';
 import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
 import { DataSource, EntityManager, ILike, In, Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
+import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
 
 export const REPORT_IMPORT_FALLBACK_TENANT_ID =
 	'7c2358a0-1a38-4a10-b806-a1531ef71b0c';
@@ -348,5 +350,119 @@ export class ReleaseReportImportService {
 				isImportedFromReport: true,
 			}),
 		);
+	}
+
+	async importVideoRelease(input: ReleaseReportImportInput): Promise<Release> {
+		input = { ...input, upc: normalizeUpc(input.upc) };
+		const equivalentUpcs = buildEquivalentUpcs(input.upc);
+		
+		const existingRelease = await this.releaseRepo.findOne({
+			where: { upc: In(equivalentUpcs), type: 'video' },
+		});
+		if (existingRelease) return existingRelease;
+
+		const existingReleaseByIsrc = await this.findVideoReleaseByExistingIsrc(
+			this.dataSource.manager,
+			input,
+		);
+		if (existingReleaseByIsrc) return existingReleaseByIsrc;
+
+		return this.dataSource.transaction(async (manager) => {
+			const releaseInTransaction = await manager.findOne(Release, {
+				where: { upc: In(equivalentUpcs), type: 'video' },
+			});
+			if (releaseInTransaction) return releaseInTransaction;
+
+			const releaseByIsrcInTransaction =
+				await this.findVideoReleaseByExistingIsrc(manager, input);
+			if (releaseByIsrcInTransaction) return releaseByIsrcInTransaction;
+
+			const { tenantId, label } = await this.resolveOwnership(
+				manager,
+				input,
+			);
+
+			let artist: Artist | null = null;
+			if (input.artistName && input.artistName.trim()) {
+				artist = await this.findOrCreateArtist(
+					manager,
+					input.artistName,
+				);
+			}
+
+			const release = await manager.save(
+				Release,
+				manager.create(Release, {
+					upc: input.upc,
+					title: input.title,
+					type: 'video',
+					labelId: label.id,
+					tenantId,
+					isImportedFromReport: true,
+					importSourceType: input.importSourceType || null,
+					importParserCode: input.importParserCode || null,
+					importFileName: input.importFileName || null,
+					importJobId: input.importJobId || null,
+				}),
+			);
+
+			let releaseArtist: ReleaseArtist | null = null;
+			if (artist) {
+				releaseArtist = await manager.save(
+					ReleaseArtist,
+					manager.create(ReleaseArtist, {
+						releaseId: release.id,
+						artistId: artist.id,
+						addArtistToTracks: true,
+						isImportedFromReport: true,
+					}),
+				);
+			}
+
+			// Save 1:1 Video entity
+			const video = await manager.save(
+				Video,
+				manager.create(Video, {
+					releaseId: release.id,
+					isrc: input.tracks[0]?.isrc || null,
+				}),
+			);
+
+			if (artist) {
+				await manager.save(
+					VideoArtist,
+					manager.create(VideoArtist, {
+						videoId: video.id,
+						artistId: artist.id,
+					}),
+				);
+			}
+
+			return release;
+		});
+	}
+
+	private async findVideoReleaseByExistingIsrc(
+		manager: EntityManager,
+		input: ReleaseReportImportInput,
+	): Promise<Release | null> {
+		const isrcs = [
+			...new Set(
+				input.tracks
+					.map((track) => track.isrc?.trim())
+					.filter((isrc): isrc is string => Boolean(isrc)),
+			),
+		];
+		if (!isrcs.length) return null;
+
+		const existingVideo = await manager.findOne(Video, {
+			where: { isrc: In(isrcs) },
+			order: { createdAt: 'ASC' },
+		});
+		if (!existingVideo) return null;
+
+		return manager.findOne(Release, {
+			where: { id: existingVideo.releaseId },
+		});
 	}
 }

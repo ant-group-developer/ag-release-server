@@ -3,6 +3,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
 import { ReleaseLanguage } from 'src/modules/release-language/entities/release-language.entity';
 
+import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseStatus, ReleaseStatusNonDraft } from '../enum/release.enum';
 
 export interface IRelease {
@@ -75,4 +76,5 @@ export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	primaryGenre: Genre | null;
 	subGenre: Genre | null;
 	releaseLanguage: ReleaseLanguage | null;
+	releaseDspDeliveries?: ReleaseDspDelivery[];
 }

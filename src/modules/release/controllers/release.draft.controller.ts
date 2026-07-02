@@ -33,6 +33,7 @@ import {
 import { ReleaseRawSftp } from '../dto/release-sftp.dto';
 import {
 	CreateReleaseDraftDto,
+	GetReleaseSubmitErrorsDto,
 	SyncReleaseToTracksDto,
 	UpdateReleaseDraftDto,
 } from '../dto/release.draft.dto';
@@ -200,6 +201,15 @@ export class ReleaseDraftController {
 	async getErrorsSchemaReleaseById(@Param('id') id: string) {
 		const result =
 			await this.releaseDraftService.getErrorsSchemaReleaseById(id);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get(':id/errors-submit')
+	async getErrosSubmit(
+		@Param('id') id: string,
+		@Query() query: GetReleaseSubmitErrorsDto,
+	) {
+		const result = await this.releaseDraftService.getErrosSubmit(id, query);
 		return new ResponseSuccess({ data: result });
 	}
 

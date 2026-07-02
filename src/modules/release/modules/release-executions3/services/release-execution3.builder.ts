@@ -70,6 +70,10 @@ export class ReleaseExecution3Builder {
 						order: order++,
 					},
 					{
+						type: ReleaseExecutionStepType.REVIEW_RELEASE,
+						order: order++,
+					},
+					{
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
 						order: order++,
 						childExecutionMode: 'parallel',
@@ -284,7 +288,11 @@ export class ReleaseExecution3Builder {
 							input: { waitMinutes: DEFAULT_WAIT_MINUTES },
 						},
 					},
-					{ type: ReleaseExecutionStepType.VALIDATE_QA_CI, order: 5 },
+					{
+						type: ReleaseExecutionStepType.GET_RESULT_IMPORT_CI,
+						order: 5,
+					},
+					{ type: ReleaseExecutionStepType.VALIDATE_QA_CI, order: 6 },
 				);
 				break;
 

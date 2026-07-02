@@ -22,11 +22,13 @@ import { SpotifyEnrichmentService } from './services/spotify-enrichment.service'
 import { DeezerEnrichmentService } from './services/deezer-enrichment.service';
 import { LocalEnrichmentService } from './services/local-enrichment.service';
 import { MetadataSyncService } from './services/metadata-sync.service';
+import { YoutubeModule } from '../youtube/youtube.module';
 
 @Module({
 	imports: [
 		AppConfigModule,
 		ClickHouseModule,
+		YoutubeModule,
 		TypeOrmModule.forFeature([
 			Release,
 			Track,

@@ -9,6 +9,7 @@ import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
+import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { BucketModule2 } from 'src/modules/bucket2/bucket2.module';
 import { ImportJobsModule } from 'src/modules/etl/import-jobs.module';
 import { TenantModule } from 'src/modules/tenant/tenant.module';
@@ -23,6 +24,7 @@ import { ArtistAnalyticsController } from './controllers/artist-analytics.contro
 import { DashboardAnalyticsController } from './controllers/dashboard-analytics.controller';
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
 import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
+import { ChannelAnalyticsController } from './controllers/channel-analytics.controller';
 
 // Services
 import { IsrcResolverService } from './services/isrc-resolver.service';
@@ -33,13 +35,15 @@ import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service'
 import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { AnalyticsReportExportService } from './services/analytics-report-export.service';
+import { ExportQueueService } from './services/export-queue.service';
+import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({
   imports: [
     BucketModule2,
     ImportJobsModule,
     TenantModule,
-    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp, Tenant]),
+    TypeOrmModule.forFeature([Track, Release, Label, Artist, TrackArtist, Dsp, Tenant, Channel]),
   ],
   controllers: [
     TimelineAnalyticsController,
@@ -51,10 +55,13 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
     DashboardAnalyticsController,
     AnalyticsReportExportController,
     TenantAnalyticsController,
+    ChannelAnalyticsController,
   ],
   providers: [
     EntityAnalyticsService,
     AnalyticsReportExportService,
+    ExportQueueService,
+    ExportWorkerPoolService,
     IsrcResolverService,
     TimelineAnalyticsService,
     RankingService,

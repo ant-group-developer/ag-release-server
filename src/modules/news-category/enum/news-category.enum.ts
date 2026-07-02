@@ -5,3 +5,14 @@ export enum FieldOrderNewsCategory {
 	CREATED_AT = 'newsCategory.createdAt',
 	UPDATED_AT = 'newsCategory.updatedAt',
 }
+
+export interface NewsCategoryTree {
+	id: string;
+	nameVi: string;
+	nameEn: string;
+	descriptionVi: string | null;
+	descriptionEn: string | null;
+	order: number;
+	parentId: string | null;
+	children: NewsCategoryTree[];
+}

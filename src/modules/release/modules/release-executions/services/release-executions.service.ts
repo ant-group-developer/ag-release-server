@@ -212,6 +212,7 @@ export class ReleaseExecutionsService {
 							{
 								status: ReleaseDspStatus.DISTRIBUTED,
 								lastDeliveredAt: now,
+								hasLiveVersion: true,
 							},
 						);
 					}

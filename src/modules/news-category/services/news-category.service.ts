@@ -10,6 +10,7 @@ import {
 	UpdateNewsCategoryDto,
 } from '../dto/news-category.dto';
 import { NewsCategory } from '../entities/news-category.entity';
+import { NewsCategoryTree } from '../enum/news-category.enum';
 import { NewsCategoryQueryService } from './news-category.query.service';
 
 @Injectable()
@@ -21,8 +22,12 @@ export class NewsCategoryService {
 	) {}
 
 	async create(data: CreateNewsCategoryDto, userId: string) {
-		const { nameVi, nameEn } = data;
+		const { nameVi, nameEn, parentId } = data;
 		await this.newsCategoryQueryService.validate({ nameVi, nameEn });
+
+		if (parentId) {
+			await this.findOne(parentId);
+		}
 
 		const entity = this.newsCategoryRepo.create({
 			...data,
@@ -65,6 +70,12 @@ export class NewsCategoryService {
 			await this.newsCategoryQueryService.validate({
 				nameEn: data.nameEn,
 			});
+		if (data?.parentId !== undefined) {
+			if (data?.parentId) {
+				await this.findOne(data.parentId);
+				await this.validateParent(id, data.parentId);
+			}
+		}
 
 		await this.newsCategoryRepo.update(id, { ...data, modifierId: userId });
 		return this.findOne(id);
@@ -83,5 +94,54 @@ export class NewsCategoryService {
 	async delete(id: string): Promise<void> {
 		const entity = await this.findOne(id);
 		await this.newsCategoryRepo.delete(entity.id);
+	}
+
+	buildCategoryTree(
+		categories: NewsCategory[],
+		parentId: string | null = null,
+	): NewsCategoryTree[] {
+		return categories
+			?.filter((cat) => cat.parentId === parentId)
+			.map((cat) => ({
+				...cat,
+				children: this.buildCategoryTree(categories, cat.id),
+			}))
+			.sort((a, b) => a.order - b.order);
+	}
+
+	async getTree(): Promise<NewsCategoryTree[]> {
+		const categories = await this.newsCategoryRepo.find();
+		return this.buildCategoryTree(categories, null);
+	}
+
+	private getAllChildrenIds(
+		parentId: string,
+		allCategories: NewsCategory[],
+	): string[] {
+		const children = allCategories.filter(
+			(cat) => cat.parentId === parentId,
+		);
+
+		let ids = children?.map((cat) => cat.id);
+		for (const child of children) {
+			ids = ids.concat(this.getAllChildrenIds(child.id, allCategories));
+		}
+		return ids;
+	}
+
+	private async validateParent(id: string, parentId: string) {
+		if (id === parentId)
+			throw new ResponseError({
+				message: 'Không thể chọn chính danh mục này làm danh mục cha',
+				statusCode: 400,
+			});
+		const allCategories = await this.newsCategoryRepo.find();
+		const childrenIds = this.getAllChildrenIds(id, allCategories);
+		if (childrenIds.includes(parentId)) {
+			throw new ResponseError({
+				message: 'Không thể chọn danh mục cha đã chứa danh mục này',
+				statusCode: 400,
+			});
+		}
 	}
 }

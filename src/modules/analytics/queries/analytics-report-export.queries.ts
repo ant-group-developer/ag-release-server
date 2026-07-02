@@ -4,7 +4,6 @@ export function getRawDetailsPageQuery(
   resolvedDspName: string,
   commonJoinsSql: string,
   whereSql: string,
-  pagingSql: string,
 ): string {
   return `
     SELECT
@@ -24,13 +23,12 @@ export function getRawDetailsPageQuery(
       any(s.artist_name) AS fallback_artist_name,
       any(s.label_name) AS fallback_label_name,
       sum(s.total_usage) AS total_usage,
-      sum(s.revenue_usd) AS revenue_usd
+      toString(sum(s.revenue_usd)) AS revenue_usd
     FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
     ${commonJoinsSql}
     ${whereSql}
     GROUP BY date, start_date, end_date, s.dsp_id, dsp_name, territory, isrc
     ORDER BY date ASC, dsp_name ASC, territory ASC, isrc ASC
-    ${pagingSql}
   `;
 }
 
@@ -86,5 +84,20 @@ export function getReleaseMetadataByUpcQuery(): string {
     LEFT JOIN artists a ON a.id = ra.artist_id
     WHERE r.upc = ANY($1)
     GROUP BY r.upc, ten.title, ten.name, r.title, r.catalog_id, r.release_date, l.name
+  `;
+}
+
+export function getUniqueIdentifiersQuery(
+  commonJoinsSql: string,
+  whereSql: string,
+): string {
+  return `
+    SELECT
+      s.isrc AS isrc,
+      any(t.tenant_id) AS tenant_id
+    FROM ${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} s
+    ${commonJoinsSql}
+    ${whereSql}
+    GROUP BY s.isrc
   `;
 }
