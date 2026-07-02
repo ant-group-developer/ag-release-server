@@ -5,6 +5,7 @@ import { IsrcResolverService } from './isrc-resolver.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
+import { AnalyticsCacheService } from './analytics-cache.service';
 
 @Injectable()
 export class DashboardAnalyticsService {
@@ -13,6 +14,7 @@ export class DashboardAnalyticsService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
+    private readonly cache: AnalyticsCacheService,
   ) {}
 
   /**
@@ -52,6 +54,11 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan DSP (Stream hoặc Revenue)
    */
   async getDspDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:dsp', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspDashboard(tenantId, query));
+  }
+
+  private async computeDspDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
 
@@ -111,6 +118,11 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan Label (Stream hoặc Revenue)
    */
   async getLabelDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:label', tenantId, query);
+    return this.cache.wrap(key, () => this.computeLabelDashboard(tenantId, query));
+  }
+
+  private async computeLabelDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = {};
@@ -198,6 +210,11 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan Artist (Stream hoặc Revenue)
    */
   async getArtistDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:artist', tenantId, query);
+    return this.cache.wrap(key, () => this.computeArtistDashboard(tenantId, query));
+  }
+
+  private async computeArtistDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = {};

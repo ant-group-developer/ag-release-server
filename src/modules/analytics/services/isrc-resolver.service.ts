@@ -409,11 +409,29 @@ export class IsrcResolverService {
     return map;
   }
 
+  // ─────────────────────────────────────────────────────
+  // Keyword search — HARD CAP 1000 rows để tránh keyword phổ biến (vd "a",
+  // "the") match hàng chục nghìn row → array UUID kéo về Node → làm param
+  // `IN(...)` khổng lồ cho ClickHouse → double RAM hit. Đây là defense-in-depth
+  // ngăn OOM khi client gõ keyword ngắn.
+  // ─────────────────────────────────────────────────────
+  private static readonly KEYWORD_SEARCH_LIMIT = 1000;
+
+  private warnIfHitCeiling(scope: string, keyword: string, count: number): void {
+    if (count >= IsrcResolverService.KEYWORD_SEARCH_LIMIT) {
+      this.logger.warn(
+        `Keyword search "${scope}" hit ceiling ${IsrcResolverService.KEYWORD_SEARCH_LIMIT} for keyword="${keyword}". Kết quả bị cắt — user cần refine query.`,
+      );
+    }
+  }
+
   async getArtistIdsByKeyword(keyword: string): Promise<string[]> {
     const artists = await this.artistRepo.find({
       where: { name: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('artists', keyword, artists.length);
     return artists.map((a) => a.id);
   }
 
@@ -421,7 +439,9 @@ export class IsrcResolverService {
     const labels = await this.labelRepo.find({
       where: { name: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('labels', keyword, labels.length);
     return labels.map((l) => l.id);
   }
 
@@ -432,7 +452,9 @@ export class IsrcResolverService {
         { title: ILike(`%${keyword}%`) },
       ],
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('tenants', keyword, tenants.length);
     return tenants.map((t) => t.id);
   }
 
@@ -440,7 +462,9 @@ export class IsrcResolverService {
     const releases = await this.releaseRepo.find({
       where: { title: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('releases', keyword, releases.length);
     return releases.map((r) => r.id);
   }
 
@@ -448,7 +472,9 @@ export class IsrcResolverService {
     const tracks = await this.trackRepo.find({
       where: { title: ILike(`%${keyword}%`) },
       select: ['isrc'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('tracks', keyword, tracks.length);
     return tracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc);
   }
 }

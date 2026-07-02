@@ -4,6 +4,7 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { AnalyticsCacheService } from './analytics-cache.service';
 import { TimelineQueryDto, ChartQueryDto } from '../dto/analytics-query.dto';
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
@@ -43,6 +44,7 @@ export class TimelineAnalyticsService {
     private readonly isrcResolverService: IsrcResolverService,
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
+    private readonly cache: AnalyticsCacheService,
   ) { }
 
   private revenueNumber(value?: string | null): number {
@@ -138,6 +140,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-sales', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspSalesTimeline(tenantId, query));
+  }
+
+  private async computeDspSalesTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -222,6 +232,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-trends', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspTrendsTimeline(tenantId, query));
+  }
+
+  private async computeDspTrendsTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -299,6 +317,14 @@ export class TimelineAnalyticsService {
   // DSP TRENDS DAILY TIMELINE (Lượt nghe hàng ngày xu hướng)
   // ═══════════════════════════════════════════════════════
   async getDspTrendsDailyTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-trends-daily', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspTrendsDailyTimeline(tenantId, query));
+  }
+
+  private async computeDspTrendsDailyTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
@@ -380,6 +406,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
+    const key = this.cache.buildKey('tl:ter-sales', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTerSalesTimeline(tenantId, query));
+  }
+
+  private async computeTerSalesTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<TerTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -441,6 +475,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
+    const key = this.cache.buildKey('tl:ter-trends', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTerTrendsTimeline(tenantId, query));
+  }
+
+  private async computeTerTrendsTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<TerTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -499,6 +541,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueOverviewResponse> {
+    const key = this.cache.buildKey('tl:rev-overview', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueOverview(tenantId, query));
+  }
+
+  private async computeRevenueOverview(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueOverviewResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
@@ -525,6 +575,14 @@ export class TimelineAnalyticsService {
   // REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng + Top DSPs)
   // ═══════════════════════════════════════════════════════
   async getRevenueTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTimelineResponse> {
+    const key = this.cache.buildKey('tl:rev-timeline', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTimeline(tenantId, query));
+  }
+
+  private async computeRevenueTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTimelineResponse> {
@@ -647,6 +705,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueDspItem>> {
+    const key = this.cache.buildKey('tl:rev-top-dsp', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopDsp(tenantId, query));
+  }
+
+  private async computeRevenueTopDsp(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueDspItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -726,6 +792,14 @@ export class TimelineAnalyticsService {
   // System-tenant: không filter tenant_id → thấy tất cả.
   // ═══════════════════════════════════════════════════════
   async getRevenueTopArtist(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueArtistItem>> {
+    const key = this.cache.buildKey('tl:rev-top-artist', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopArtist(tenantId, query));
+  }
+
+  private async computeRevenueTopArtist(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueArtistItem>> {
@@ -848,6 +922,14 @@ export class TimelineAnalyticsService {
   //   enrich Postgres trước, ISRC thiếu fallback fact_sales_report.
   // ═══════════════════════════════════════════════════════
   async getRevenueTopTrack(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueTrackItem>> {
+    const key = this.cache.buildKey('tl:rev-top-track', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopTrack(tenantId, query));
+  }
+
+  private async computeRevenueTopTrack(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueTrackItem>> {
@@ -1023,6 +1105,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueLabelItem>> {
+    const key = this.cache.buildKey('tl:rev-top-label', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopLabel(tenantId, query));
+  }
+
+  private async computeRevenueTopLabel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueLabelItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -1140,6 +1230,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueChannelItem>> {
+    const key = this.cache.buildKey('tl:rev-top-channel', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopChannel(tenantId, query));
+  }
+
+  private async computeRevenueTopChannel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueChannelItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -1247,6 +1345,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueTenantItem>> {
+    const key = this.cache.buildKey('tl:rev-top-tenant', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopTenant(tenantId, query));
+  }
+
+  private async computeRevenueTopTenant(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueTenantItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -1351,6 +1457,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<OverviewTrendsResponse> {
+    const key = this.cache.buildKey('tl:trends-overview', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendsOverview(tenantId, query));
+  }
+
+  private async computeTrendsOverview(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<OverviewTrendsResponse> {
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = { from: query.fromDate, to: query.toDate };
 
@@ -1401,6 +1515,14 @@ export class TimelineAnalyticsService {
   // REVENUE TOP RELEASE (Top releases by revenue)
   // ═══════════════════════════════════════════════════════
   async getRevenueTopRelease(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueReleaseItem>> {
+    const key = this.cache.buildKey('tl:rev-top-release', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopRelease(tenantId, query));
+  }
+
+  private async computeRevenueTopRelease(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueReleaseItem>> {
@@ -1522,6 +1644,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TrendViewLineChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-line', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewLineChart(tenantId, query));
+  }
+
+  private async computeTrendViewLineChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TrendViewLineChartItem[]> {
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = { from: query.fromDate, to: query.toDate };
 
@@ -1568,6 +1698,14 @@ export class TimelineAnalyticsService {
   // Tổng trend-view theo DSP, top 5 + Other
   // ═══════════════════════════════════════════════════════
   async getTrendViewDspBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<DspBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-dsp-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewDspBarChart(tenantId, query));
+  }
+
+  private async computeTrendViewDspBarChart(
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<DspBarChartItem[]> {
@@ -1635,6 +1773,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TerritoryBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-ter-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewTerritoryBarChart(tenantId, query));
+  }
+
+  private async computeTrendViewTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
@@ -1666,6 +1812,14 @@ export class TimelineAnalyticsService {
   }
 
   async getRevenueLineChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<RevenueLineChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-line', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueLineChart(tenantId, query));
+  }
+
+  private async computeRevenueLineChart(
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<RevenueLineChartItem[]> {
@@ -1720,6 +1874,14 @@ export class TimelineAnalyticsService {
   // Tổng revenue theo DSP, top 5 + Other
   // ═══════════════════════════════════════════════════════
   async getRevenueDspBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<DspBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-dsp-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueDspBarChart(tenantId, query));
+  }
+
+  private async computeRevenueDspBarChart(
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<DspBarChartItem[]> {
@@ -1790,6 +1952,14 @@ export class TimelineAnalyticsService {
   }
 
   async getRevenueTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-ter-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTerritoryBarChart(tenantId, query));
+  }
+
+  private async computeRevenueTerritoryBarChart(
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TerritoryBarChartItem[]> {

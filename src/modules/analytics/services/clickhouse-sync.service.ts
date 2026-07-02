@@ -39,6 +39,16 @@ interface TrackSyncRow {
 	channel_id: string;
 	is_deleted: number;
 	updated_at: string;
+	track_title: string;
+	track_version: string;
+	release_title: string;
+	label_name: string;
+	artist_names: string[];
+	cover_75: string;
+	cover_100: string;
+	cover_160: string;
+	cover_300: string;
+	cover_original: string;
 }
 
 interface DspSyncRow {
@@ -116,15 +126,23 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 
 	private async runInitialSyncIfNeeded() {
 		try {
+			const forceSync = this.configService.get<string>('FORCE_INITIAL_SYNC') === 'true';
+
 			// Dem so ban ghi hien co tren ClickHouse
 			const countResult = await this.clickHouseService.query<{
 				c: string;
 				with_release_upc: string;
+				empty_title: string;
 			}>(
-				`SELECT count() AS c, countIf(release_upc != '') AS with_release_upc FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
+				`SELECT
+					count() AS c,
+					countIf(release_upc != '') AS with_release_upc,
+					countIf(track_title = '' AND is_deleted = 0) AS empty_title
+				 FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
 			);
 			const chCount = Number(countResult[0]?.c ?? 0);
 			const chWithReleaseUpc = Number(countResult[0]?.with_release_upc ?? 0);
+			const chEmptyTitle = Number(countResult[0]?.empty_title ?? 0);
 
 			// Dem so ISRC hop le tren Postgres (tracks + videos)
 			const pgCountResult = await this.entityManager.query(
@@ -142,11 +160,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
 
 			this.logger.log(
-				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, Postgres=${pgCount} ISRCs`,
+				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse empty_title=${chEmptyTitle} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, Postgres=${pgCount} ISRCs, forceSync=${forceSync}`,
 			);
 
-			// Neu ClickHouse trong hoac thieu du lieu (so voi Postgres)
-			if (chCount === 0 || chCount < pgCount || chWithReleaseUpc < pgCount) {
+			// Neu ClickHouse trong, thieu du lieu (so voi Postgres) hoac bi rong track_title, hoac forceSync = true
+			if (forceSync || chCount === 0 || chCount < pgCount || chWithReleaseUpc < pgCount || (chEmptyTitle > 0 && pgCount > 0)) {
 				this.logger.log(
 					`Starting full initial sync from Postgres to ClickHouse (${pgCount} ISRCs)...`,
 				);
@@ -178,7 +196,17 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            label_id,
            artist_ids,
            release_type,
-           channel_id
+           channel_id,
+           track_title,
+           track_version,
+           release_title,
+           label_name,
+           artist_names,
+           cover_75,
+           cover_100,
+           cover_160,
+           cover_300,
+           cover_original
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -195,9 +223,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ''
              ) AS artist_ids,
              'audio' AS release_type,
-             '' AS channel_id
+             '' AS channel_id,
+             COALESCE(t.title, '') AS track_title,
+             COALESCE(t.version, '') AS track_version,
+             COALESCE(r.title, '') AS release_title,
+             COALESCE(l.name, '') AS label_name,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+                 FROM track_artist ta
+                 JOIN artists a ON a.id = ta.artist_id
+                 WHERE ta.track_id = t.id
+               ),
+               ''
+             ) AS artist_names,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
+           LEFT JOIN labels l ON l.id = r.label_id
            WHERE t.isrc IS NOT NULL AND t.isrc != ''
 
            UNION ALL
@@ -217,9 +264,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ''
              ) AS artist_ids,
              'video' AS release_type,
-             COALESCE(v.channel_id::text, '') AS channel_id
+             COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(r.title, '') AS track_title,
+             '' AS track_version,
+             COALESCE(r.title, '') AS release_title,
+             COALESCE(l.name, '') AS label_name,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+                 FROM video_artist va
+                 JOIN artists a ON a.id = va.artist_id
+                 WHERE va.video_id = v.id
+               ),
+               ''
+             ) AS artist_names,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
+           LEFT JOIN labels l ON l.id = r.label_id
            WHERE v.isrc IS NOT NULL AND v.isrc != ''
          ) AS combined
          ORDER BY isrc
@@ -243,6 +309,16 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					.toISOString()
 					.slice(0, 19)
 					.replace('T', ' '),
+				track_title: row.track_title ?? '',
+				track_version: row.track_version ?? '',
+				release_title: row.release_title ?? '',
+				label_name: row.label_name ?? '',
+				artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+				cover_75: row.cover_75 ?? '',
+				cover_100: row.cover_100 ?? '',
+				cover_160: row.cover_160 ?? '',
+				cover_300: row.cover_300 ?? '',
+				cover_original: row.cover_original ?? '',
 			}));
 
 			await this.clickHouseService.insert(
@@ -409,9 +485,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                WHERE track_id = t.id
              ),
              ''
-           ) AS artist_ids
+           ) AS artist_ids,
+           COALESCE(t.title, '') AS track_title,
+           COALESCE(t.version, '') AS track_version,
+           COALESCE(r.title, '') AS release_title,
+           COALESCE(l.name, '') AS label_name,
+           COALESCE(
+             (
+               SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+               FROM track_artist ta
+               JOIN artists a ON a.id = ta.artist_id
+               WHERE ta.track_id = t.id
+             ),
+             ''
+           ) AS artist_names,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
          FROM tracks t
          INNER JOIN releases r ON r.id = t.release_id
+         LEFT JOIN labels l ON l.id = r.label_id
          WHERE t.id = ANY($1)
            AND t.isrc IS NOT NULL AND t.isrc != ''
          ORDER BY t.isrc`,
@@ -430,6 +525,16 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					channel_id: '',
 					is_deleted: 0,
 					updated_at: now,
+					track_title: row.track_title ?? '',
+					track_version: row.track_version ?? '',
+					release_title: row.release_title ?? '',
+					label_name: row.label_name ?? '',
+					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					cover_75: row.cover_75 ?? '',
+					cover_100: row.cover_100 ?? '',
+					cover_160: row.cover_160 ?? '',
+					cover_300: row.cover_300 ?? '',
+					cover_original: row.cover_original ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
@@ -455,9 +560,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ),
              ''
            ) AS artist_ids,
-           COALESCE(v.channel_id::text, '') AS channel_id
+           COALESCE(v.channel_id::text, '') AS channel_id,
+           COALESCE(r.title, '') AS track_title,
+           '' AS track_version,
+           COALESCE(r.title, '') AS release_title,
+           COALESCE(l.name, '') AS label_name,
+           COALESCE(
+             (
+               SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+               FROM video_artist va
+               JOIN artists a ON a.id = va.artist_id
+               WHERE va.video_id = v.id
+             ),
+             ''
+           ) AS artist_names,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
          FROM videos v
          INNER JOIN releases r ON r.id = v.release_id
+         LEFT JOIN labels l ON l.id = r.label_id
          WHERE v.id = ANY($1)
            AND v.isrc IS NOT NULL AND v.isrc != ''
          ORDER BY v.isrc`,
@@ -476,6 +600,16 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					channel_id: row.channel_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
+					track_title: row.track_title ?? '',
+					track_version: row.track_version ?? '',
+					release_title: row.release_title ?? '',
+					label_name: row.label_name ?? '',
+					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					cover_75: row.cover_75 ?? '',
+					cover_100: row.cover_100 ?? '',
+					cover_160: row.cover_160 ?? '',
+					cover_300: row.cover_300 ?? '',
+					cover_original: row.cover_original ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
@@ -495,7 +629,17 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            label_id,
            artist_ids,
            release_type,
-           channel_id
+           channel_id,
+           track_title,
+           track_version,
+           release_title,
+           label_name,
+           artist_names,
+           cover_75,
+           cover_100,
+           cover_160,
+           cover_300,
+           cover_original
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -512,9 +656,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ''
              ) AS artist_ids,
              'audio' AS release_type,
-             '' AS channel_id
+             '' AS channel_id,
+             COALESCE(t.title, '') AS track_title,
+             COALESCE(t.version, '') AS track_version,
+             COALESCE(r.title, '') AS release_title,
+             COALESCE(l.name, '') AS label_name,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+                 FROM track_artist ta
+                 JOIN artists a ON a.id = ta.artist_id
+                 WHERE ta.track_id = t.id
+               ),
+               ''
+             ) AS artist_names,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
+           LEFT JOIN labels l ON l.id = r.label_id
            WHERE r.id = ANY($1)
              AND t.isrc IS NOT NULL AND t.isrc != ''
 
@@ -535,9 +698,28 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ''
              ) AS artist_ids,
              'video' AS release_type,
-             COALESCE(v.channel_id::text, '') AS channel_id
+             COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(r.title, '') AS track_title,
+             '' AS track_version,
+             COALESCE(r.title, '') AS release_title,
+             COALESCE(l.name, '') AS label_name,
+             COALESCE(
+               (
+                 SELECT array_to_string(array_agg(a.name ORDER BY a.name), '||')
+                 FROM video_artist va
+                 JOIN artists a ON a.id = va.artist_id
+                 WHERE va.video_id = v.id
+               ),
+               ''
+             ) AS artist_names,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
+           LEFT JOIN labels l ON l.id = r.label_id
            WHERE r.id = ANY($1)
              AND v.isrc IS NOT NULL AND v.isrc != ''
          ) AS combined
@@ -557,6 +739,16 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					channel_id: row.channel_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
+					track_title: row.track_title ?? '',
+					track_version: row.track_version ?? '',
+					release_title: row.release_title ?? '',
+					label_name: row.label_name ?? '',
+					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					cover_75: row.cover_75 ?? '',
+					cover_100: row.cover_100 ?? '',
+					cover_160: row.cover_160 ?? '',
+					cover_300: row.cover_300 ?? '',
+					cover_original: row.cover_original ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
