@@ -32,7 +32,10 @@ import { EntityManager } from 'typeorm';
 @Injectable()
 export class TimelineAnalyticsService {
   private readonly logger = new Logger(TimelineAnalyticsService.name);
-  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
+  // Audio: yeu cau release_upc chuan (10-14 chu so sau khi strip leading zeros).
+  // Video: bypass filter - luon cho pass du release_upc dang placeholder (ISRC-xxx).
+  private readonly validReleaseUpcFilter =
+    "AND (t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,

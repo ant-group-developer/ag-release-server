@@ -23,7 +23,10 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 @Injectable()
 export class RankingService {
   private readonly logger = new Logger(RankingService.name);
-  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
+  // Audio: yeu cau release_upc chuan (10-14 chu so sau khi strip leading zeros).
+  // Video: bypass filter - luon cho pass du release_upc dang placeholder (ISRC-xxx).
+  private readonly validReleaseUpcFilter =
+    "AND (t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -110,12 +113,13 @@ export class RankingService {
     const dateCol = 'reporting_date';
 
     // Query 1: Đếm tổng số unique tracks
+    // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
     const countSql = `
       SELECT uniq(s.isrc) AS total
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
-        AND s.isrc NOT LIKE 'UPC-%'
+        AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -135,6 +139,7 @@ export class RankingService {
     }
 
     // Query 2: Lấy top tracks đã phân trang trong ClickHouse
+    // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
     const dataSql = `
       SELECT
         s.isrc AS isrc,
@@ -142,7 +147,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
-        AND s.isrc NOT LIKE 'UPC-%'
+        AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
