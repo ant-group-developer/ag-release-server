@@ -326,20 +326,18 @@ export class RankingService {
       trackCount: string;
       totalViews: string;
     }>(dataSql, params);
-    // Enrich release metadata from PostgreSQL (only enrich top N releases)
-    const releasesMeta =
-      await this.isrcResolverService.getAllTrackMetadataForTenant(tenantId);
-    const metaMap = new Map<string, any>();
-    for (const m of releasesMeta) {
-      metaMap.set(m.releaseId, m);
-    }
 
+    // Enrich CHỈ Top N releases đã paged từ Postgres (In(releaseIds)).
+    // Trước đây gọi getAllTrackMetadataForTenant(tenantId) — với system-tenant sẽ
+    // kéo toàn bộ track/release/label metadata cả hệ thống về Node → OOM khi
+    // dashboard fire nhiều request analytics đồng thời. getReleaseMetadata trả
+    // luôn coverArtThumbnails nên bỏ luôn getReleaseImages riêng.
     const releaseIds = paged.map((r) => r.releaseId);
-    const imageMap = await this.isrcResolverService.getReleaseImages(releaseIds);
+    const metaMap = await this.isrcResolverService.getReleaseMetadata(releaseIds);
 
     const items: ReleaseRankingItem[] = paged.map((r, index) => {
       const meta = metaMap.get(r.releaseId);
-      const coverArtThumbnails = imageMap.get(r.releaseId) ?? {
+      const coverArtThumbnails = meta?.coverArtThumbnails ?? {
         '75x75': null,
         '100x100': null,
         '160x160': null,
@@ -349,8 +347,8 @@ export class RankingService {
       return {
         rank: query.skip + index + 1,
         releaseId: r.releaseId,
-        title: meta?.releaseTitle ?? 'Unknown Release',
-        upc: meta?.releaseUpc ?? null,
+        title: meta?.title ?? 'Unknown Release',
+        upc: meta?.upc ?? null,
         labelId: meta?.labelId ?? null,
         labelName: meta?.labelName ?? null,
         trackCount: Number(r.trackCount),
