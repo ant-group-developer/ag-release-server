@@ -53,6 +53,8 @@ export const Permission = {
 	},
 	RELEASE_REVIEW: {
 		CREATE: 'release_review.create',
+		READ: 'release_review.read',
+		DELETE: 'release_review.delete',
 		APPROVE: 'release_review.approve',
 		REJECT: 'release_review.reject',
 		CAN_FIX: 'release_review.can_fix',
