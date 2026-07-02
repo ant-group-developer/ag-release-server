@@ -54,6 +54,7 @@ import { ReleaseModule } from './modules/release/release.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
 import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
+import { VideoCsvImportModule } from './modules/video-csv-import/video-csv-import.module';
 import { ReleaseCaptionModule } from './modules/release-caption/release-caption.module';
 import { RequestTrackingModule } from './modules/request-tracking/request-tracking.module';
 import { RoleModule } from './modules/role/role.module';
@@ -195,6 +196,7 @@ import { ReportImportModule } from './modules/report-import/report-import.module
 		BatchImportModule,
 		PartnersApiModule,
 		WebhookModule,
+		VideoCsvImportModule,
 		// ReleaseSubmitModule,
 	],
 	controllers: [AppController],

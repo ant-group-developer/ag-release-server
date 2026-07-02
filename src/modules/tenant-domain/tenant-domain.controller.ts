@@ -13,7 +13,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from '../../common/dtos/common.response.dto';
 import { PublicRoute, TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
-import { AddDomainDto, CfOAuthCallbackDto, GetCfOAuthUrlDto } from './dtos/tenant-domain.dto';
+import { AddDomainDto, CfOAuthCallbackDto, CfOAuthUrlQueryDto, GetCfOAuthUrlDto } from './dtos/tenant-domain.dto';
 import { TenantDomainService } from './tenant-domain.service';
 
 @ApiTags('Tenant Domain')
@@ -60,12 +60,17 @@ export class TenantDomainController {
 
 	@TenantOwnerOrAdminOnly()
 	@Get('tenants/:tenantId/domain/cf-oauth-url')
-	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup' })
+	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup — uses domain already saved in DB' })
 	async getCfOAuthUrl(
 		@Param('tenantId') tenantId: string,
-		@Query() query: GetCfOAuthUrlDto,
+		@Query() query: CfOAuthUrlQueryDto,
+		@Req() req: Request,
 	) {
-		const url = this.tenantDomainService.getCfOAuthUrl(tenantId, query.domain);
+		const requestOrigin = req.headers.origin ?? req.headers.referer;
+		const url = await this.tenantDomainService.getCfOAuthUrl(tenantId, {
+			returnUrl: query.returnUrl,
+			requestOrigin,
+		});
 		return new ResponseSuccess({ data: { url } });
 	}
 
@@ -84,10 +89,34 @@ export class TenantDomainController {
 	@ApiOperation({ summary: 'Cloudflare OAuth callback — exchanges code and adds DNS records' })
 	@Redirect()
 	async cfOAuthCallback(@Query() query: CfOAuthCallbackDto) {
-		const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
-			query.code,
-			query.state,
-		);
-		return { url: redirectUrl };
+		// Peek returnUrl từ state để redirect về đúng trang admin bắt đầu flow.
+		// handleCfOAuthCallback sẽ tự xóa state khi xử lý thành công.
+		const returnUrl = this.tenantDomainService.resolveCallbackReturnUrl(query.state);
+
+		// Cloudflare trả error trực tiếp (vd: user từ chối authorize, scope sai)
+		if (query.error || !query.code) {
+			return {
+				url: this.tenantDomainService.buildOAuthErrorRedirect(
+					returnUrl,
+					query.error ?? 'missing_code',
+					query.error_description,
+				),
+			};
+		}
+
+		// Mọi lỗi trong quá trình xử lý đều redirect về FE thay vì trả 500,
+		// để user biết chính xác config sai gì.
+		try {
+			const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
+				query.code,
+				query.state,
+			);
+			return { url: redirectUrl };
+		} catch (err) {
+			const { code, description } = this.tenantDomainService.mapCfCallbackError(err);
+			return {
+				url: this.tenantDomainService.buildOAuthErrorRedirect(returnUrl, code, description),
+			};
+		}
 	}
 }

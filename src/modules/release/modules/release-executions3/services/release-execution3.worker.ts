@@ -11,7 +11,6 @@ import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseErrorType } from 'src/modules/release/modules/release-errors/entities/release-error.entity';
 import { ReleaseErrorService } from 'src/modules/release/modules/release-errors/services/release-error.service';
-import { ReleaseReviewStatus } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseReviewService } from 'src/modules/release/modules/release-reviews/services/release-review.service';
 import { ReleaseDdexService } from 'src/modules/release/services/release-ddex.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
@@ -334,12 +333,14 @@ export class ReleaseExecution3Worker {
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
-			const review = await this.releaseReviewService.create({
-				releaseId,
-				releaseExecutionId: releaseExecution.id,
-				status: ReleaseReviewStatus.PENDING,
-				stepId: step.id,
-			});
+			const review =
+				await this.releaseReviewService.findLatestByReleaseIdOrCreate({
+					data: {
+						releaseId,
+						releaseExecutionId: releaseExecution.id,
+						stepId: step.id,
+					},
+				});
 
 			step.metadata = {
 				...step.metadata,
@@ -984,6 +985,8 @@ export class ReleaseExecution3Worker {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		let outputDir: string | undefined;
+
 		try {
 			if (!step.parentStepId) {
 				throw new Error(
@@ -1001,7 +1004,7 @@ export class ReleaseExecution3Worker {
 				},
 			);
 
-			const outputDir = createMetadataStep?.metadata?.output?.outputDir;
+			outputDir = createMetadataStep?.metadata?.output?.outputDir;
 			const dspCode = createMetadataStep?.metadata?.input?.dspCode;
 
 			if (!outputDir) {
@@ -1025,8 +1028,6 @@ export class ReleaseExecution3Worker {
 				remoteDir: config.sftp.path ?? '/',
 			});
 
-			await removeFolder(outputDir);
-
 			this.logService.success({
 				message: `[UPLOAD_METADATA_TO_SFTP] DSP ${dspCode} uploaded`,
 				releaseExecutionId: releaseExecution.id,
@@ -1036,12 +1037,16 @@ export class ReleaseExecution3Worker {
 			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
-				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}`,
+				message: `[UPLOAD_METADATA_TO_SFTP] ${err.message}, note: Bước này nếu lỗi sẽ xoá luôn data trên server, để retry cần chạy lại cả step cha của nó để tạo lại data trên server`,
 				releaseExecutionId: releaseExecution.id,
 				releaseExecutionStepId: step.id,
 			});
 			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
+		} finally {
+			if (outputDir) {
+				await removeFolder(outputDir);
+			}
 		}
 	}
 

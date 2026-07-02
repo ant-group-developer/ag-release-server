@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
 	FieldErrorDetails,
@@ -6,6 +6,8 @@ import {
 } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Repository, SelectQueryBuilder } from 'typeorm';
+import { ReleaseReviewStatus } from '../../release-reviews/entities/release-review.entity';
+import { ReleaseReviewService } from '../../release-reviews/services/release-review.service';
 import {
 	CreateReleaseErrorDto,
 	GetListReleaseErrorsDto,
@@ -22,23 +24,88 @@ export class ReleaseErrorService {
 	constructor(
 		@InjectRepository(ReleaseError)
 		private readonly repo: Repository<ReleaseError>,
+
+		@Inject(forwardRef(() => ReleaseReviewService))
+		private readonly releaseReviewService: ReleaseReviewService,
 	) {}
 
-	async bulkCreateErrors(data: CreateReleaseErrorDto[]) {
-		const entities = this.repo.create(data);
-		return this.repo.save(entities);
-	}
+	// nếu dùng cho nhiều release id thì phải sửa lại
+	async bulkCreateErrors(data: CreateReleaseErrorDto[], userId?: string) {
+		const releaseReview =
+			await this.releaseReviewService.findLatestByReleaseIdOrCreate({
+				data: { releaseId: data[0].releaseId },
+			});
 
-	async bulkUpdateErrors(data: UpdateReleaseErrorDto[]) {
 		const entities = this.repo.create(
 			data.map((item) => ({
 				...item,
-				...(item.submissionStatus === ErrorSubmissionStatus.FIXED && {
-					approvalStatus: ErrorApprovalStatus.PENDING,
-				}),
+				reviewerId: userId,
+				releaseReviewId: releaseReview.id,
 			})),
 		);
 		return this.repo.save(entities);
+	}
+
+	async bulkUpdateErrors(data: UpdateReleaseErrorDto[], userId: string) {
+		const dataParsedStatus = this.processStatusList(data, userId);
+
+		const entities = this.repo.create(dataParsedStatus);
+		return this.repo.save(entities);
+	}
+
+	async bulkUpdateErrorsByReviewResult({
+		releaseId,
+		status,
+		reviewerId,
+	}: {
+		releaseId: string;
+		status: ReleaseReviewStatus.COMPLETED | ReleaseReviewStatus.FAILED;
+		reviewerId: string;
+	}) {
+		const approvalStatus =
+			status === ReleaseReviewStatus.COMPLETED
+				? ErrorApprovalStatus.APPROVED
+				: ErrorApprovalStatus.REJECTED;
+
+		const filter = new GetListReleaseErrorsDto();
+		filter.releaseId = releaseId;
+		filter.page = 1;
+		filter.pageSize = 10000;
+
+		const listErrors = await this.getListErrors(filter);
+		const items = listErrors.items
+			.filter(
+				(item) => item.approvalStatus !== ErrorApprovalStatus.APPROVED,
+			)
+			.map((item) => ({
+				id: item.id,
+				approvalStatus,
+			}));
+
+		return this.bulkUpdateErrors(items, reviewerId);
+	}
+
+	// xử lý trạng thái lại submissionStatus và approvalStatus dựa vào status truyền vào
+	private processStatusList(
+		data: UpdateReleaseErrorDto[],
+		userId: string,
+	): Partial<ReleaseError>[] {
+		return data.map((item) => {
+			const update: Partial<ReleaseError> = { ...item };
+
+			if (item.approvalStatus === ErrorApprovalStatus.APPROVED) {
+				update.submissionStatus = ErrorSubmissionStatus.FIXED;
+				update.reviewerId = userId;
+			} else if (item.approvalStatus === ErrorApprovalStatus.REJECTED) {
+				update.submissionStatus = ErrorSubmissionStatus.OPEN;
+				update.reviewerId = userId;
+			} else if (item.submissionStatus === ErrorSubmissionStatus.FIXED) {
+				update.approvalStatus = ErrorApprovalStatus.PENDING;
+				update.submitterId = userId;
+			}
+
+			return update;
+		});
 	}
 
 	async getListErrors(filter: GetListReleaseErrorsDto) {
@@ -77,6 +144,8 @@ export class ReleaseErrorService {
 	private createQbGetList(filter: GetListReleaseErrorsDto) {
 		const qb = this.repo.createQueryBuilder('releaseError');
 		qb.leftJoinAndSelect('releaseError.release', 'release');
+		qb.leftJoinAndSelect('releaseError.submitter', 'submitter');
+		qb.leftJoinAndSelect('releaseError.reviewer', 'reviewer');
 		this.applyFilter({ qb, filter });
 		return qb;
 	}

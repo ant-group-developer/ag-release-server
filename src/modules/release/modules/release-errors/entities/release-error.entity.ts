@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Release } from '../../../entities/release.entity';
 import { ReleaseExecutionStep3 } from '../../release-executions3/entites/release-execution3-step.entity';
@@ -72,6 +73,20 @@ export class ReleaseError extends BaseUUIDEntity {
 		default: ErrorApprovalStatus.PENDING,
 	})
 	approvalStatus: ErrorApprovalStatus;
+
+	@Column({ name: 'submitter_id', type: 'uuid', nullable: true })
+	submitterId?: string | null;
+
+	@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+	@JoinColumn({ name: 'submitter_id' })
+	submitter?: User | null;
+
+	@Column({ name: 'reviewer_id', type: 'uuid', nullable: true })
+	reviewerId?: string | null;
+
+	@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+	@JoinColumn({ name: 'reviewer_id' })
+	reviewer?: User | null;
 
 	@Column({ type: 'varchar', nullable: true })
 	messageCode?: string | null;

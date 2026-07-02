@@ -22,7 +22,9 @@ async function bootstrap() {
 	// Dynamic CORS: primary domains from env + active custom domains from DB (cached)
 	const tenantDomainService = app.get(TenantDomainService);
 	app.enableCors(
-		createDynamicCorsConfig((domain) => tenantDomainService.findActiveByDomain(domain)),
+		createDynamicCorsConfig((domain) =>
+			tenantDomainService.findActiveByDomain(domain),
+		),
 	);
 
 	const port = process.env.APP_PORT || 3000;

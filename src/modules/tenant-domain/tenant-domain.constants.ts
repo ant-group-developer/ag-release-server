@@ -24,6 +24,11 @@ export const TenantDomainMessages = {
 		message: 'Invalid or expired OAuth state',
 		messageCode: 'tenant_domain.error.oauthInvalidState',
 	},
+	CF_OAUTH_NOT_AVAILABLE: {
+		statusCode: 409,
+		message: 'Auto setup is not available for a domain that is already active or verifying',
+		messageCode: 'tenant_domain.error.oauthNotAvailable',
+	},
 	DOMAIN_RESTRICTED: {
 		statusCode: 403,
 		message: 'Your account does not have access to this workspace',

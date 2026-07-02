@@ -66,8 +66,13 @@ export class CiExportService {
 		try {
 			const endpoint = `/exports/v1/organisations/${this.organisationId}/deliver_desire`;
 			const response = await this.client.get(endpoint, {
-				params: this.buildParams(params),
+				params: this.buildParams({
+					...params,
+					status: 'complete',
+					transfer_batch_status: 'transferred',
+				}),
 			});
+
 			return response.data;
 		} catch (error) {
 			this.logger.error(

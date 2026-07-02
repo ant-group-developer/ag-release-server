@@ -5,6 +5,7 @@ import {
 	Header,
 	Param,
 	ParseUUIDPipe,
+	Patch,
 	Post,
 	Put,
 	Query,
@@ -26,6 +27,7 @@ import {
 } from 'src/common/dtos/common.response.dto';
 
 import { Request, Response } from 'express';
+import { UserId } from 'src/common/decorators/req.decorators';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
 import {
 	RequirePermissions,
@@ -42,6 +44,7 @@ import {
 	BulkSubmitReleaseDto,
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
+	ReloadReleaseFormatIdDto,
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
@@ -127,6 +130,29 @@ export class ReleaseController {
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
 		});
+	}
+
+	@Post('auto-sync-release-format-id')
+	@ApiOperation({
+		summary:
+			'Auto sync release format ID for releases with null CI format ID',
+	})
+	async autoSyncReleaseFormatId(@Body() dto?: ReloadReleaseFormatIdDto) {
+		const result = await this.releaseService.autoSyncReleaseFormatId({
+			reloadFromCi: dto?.reloadFromCi,
+		});
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Patch(':id/release-format-id')
+	async getReleaseFormatId(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto?: ReloadReleaseFormatIdDto,
+	) {
+		const result = await this.releaseService.getReleaseFormatId(id, {
+			reloadFromCi: dto?.reloadFromCi,
+		});
+		return new ResponseSuccess({ data: result });
 	}
 
 	// id
@@ -335,8 +361,13 @@ export class ReleaseController {
 	async updateReleaseReview(
 		@Param('id', ParseUUIDPipe) id: string,
 		@Body() body: UpdateReleaseReviewDecisionDto,
+		@UserId() userId: string,
 	) {
-		const result = await this.releaseService.updateReleaseReview(id, body);
+		const result = await this.releaseService.updateReleaseReview(
+			id,
+			body,
+			userId,
+		);
 
 		return new ResponseSuccess({ data: result });
 	}
