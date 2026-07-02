@@ -89,4 +89,21 @@ export const envValidationSchema = Joi.object({
 	FTP_BASE_PATH: Joi.string().default('/root'),
 	FTP_SYNC_MODE: Joi.string().valid('manual', 'auto').default('manual'),
 	FTP_SYNC_CRON: Joi.string().default('0 2 * * *'),
+
+	// Redis (bắt buộc — cache2.module inject trực tiếp process.env, không có fallback)
+	REDIS_HOST: Joi.string().required(),
+	REDIS_PORT: Joi.number().default(6379),
+	REDIS_PASSWORD: Joi.string().allow('').default(''),
+
+	// Cloudflare SaaS + OAuth (custom domain feature).
+	CF_API_TOKEN: Joi.string().allow('').optional(),
+	CF_ZONE_ID: Joi.string().allow('').optional(),
+	CF_FALLBACK_ORIGIN: Joi.string().default('cname.antmusic.net'),
+	CF_OAUTH_CLIENT_ID: Joi.string().allow('').optional(),
+	CF_OAUTH_CLIENT_SECRET: Joi.string().allow('').optional(),
+	CF_OAUTH_REDIRECT_URI: Joi.string().uri().allow('').optional(),
+
+	// Domains — CSV list, separator `,`. Empty là hợp lệ (fallback trong domain.config).
+	CORS_ORIGINS: Joi.string().allow('').default(''),
+	PRIMARY_DOMAINS: Joi.string().allow('').default(''),
 });
