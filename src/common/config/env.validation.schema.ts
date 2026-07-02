@@ -75,6 +75,11 @@ export const envValidationSchema = Joi.object({
 	CLICKHOUSE_USER: Joi.string().required().default('default'),
 	CLICKHOUSE_PASSWORD: Joi.string().allow('').default(''),
 
+	// YouTube key encryption (AES-256-GCM master key).
+	// Value: base64 32 bytes → 44 chars có padding. Generate: `openssl rand -base64 32`.
+	// Consumed bởi YoutubeEncryptionService.onModuleInit (bắt buộc, không có default).
+	YOUTUBE_KEY_ENCRYPTION_SECRET: Joi.string().base64().length(44).required(),
+
 	// FTP / ETL
 	FTP_HOST: Joi.string().allow('').optional(),
 	FTP_PORT: Joi.number().default(21),
