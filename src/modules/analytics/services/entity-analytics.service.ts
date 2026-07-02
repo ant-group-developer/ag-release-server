@@ -23,7 +23,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 
-export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant';
+export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant' | 'channel';
 
 @Injectable()
 export class EntityAnalyticsService {
@@ -80,6 +80,7 @@ export class EntityAnalyticsService {
 		tenantId: string,
 		entityType: EntityType,
 		entityId?: string,
+		releaseType?: 'audio' | 'video',
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -88,8 +89,8 @@ export class EntityAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = { entityId };
 
-		// Track + system tenant: filter trực tiếp trên s.isrc, không cần JOIN
-		if (entityType === 'track' && isSystem) {
+		// Track + system tenant without releaseType: filter on s.isrc, no JOIN needed
+		if (entityType === 'track' && isSystem && !releaseType) {
 			return {
 				joinSql: '',
 				filterSql: 'AND s.isrc = {entityId:String}',
@@ -116,12 +117,19 @@ export class EntityAnalyticsService {
 				filterSql += ' AND has(t.artist_ids, {entityId:String})';
 				break;
 			case 'track':
-				// Normal tenant: tenant check qua JOIN, entity filter trên isrc
 				filterSql += ' AND s.isrc = {entityId:String}';
 				break;
 			case 'tenant':
 				filterSql += ' AND t.tenant_id = {entityId:String}';
 				break;
+			case 'channel':
+				filterSql += ' AND t.channel_id = {entityId:String}';
+				break;
+		}
+
+		if (releaseType) {
+			filterSql += ' AND t.release_type = {releaseType:String}';
+			params.releaseType = releaseType;
 		}
 
 		return { joinSql, filterSql, params };
@@ -193,6 +201,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -300,6 +309,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -383,6 +393,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -468,6 +479,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -551,6 +563,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -652,6 +665,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -690,6 +704,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -730,6 +745,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -790,6 +806,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -849,6 +866,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -920,6 +938,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;

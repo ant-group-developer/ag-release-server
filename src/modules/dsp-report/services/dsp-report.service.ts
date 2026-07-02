@@ -46,7 +46,7 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
       }
     : null;
 
-  return {
+  const response: DspsReportResponse = {
     idDspsReport: row.id_dsps_report,
     pgUuid: row.pg_uuid || null,
     dspName: row.dsp_name,
@@ -55,6 +55,14 @@ export function mapRawDspsReport(row: any): DspsReportResponse {
     updatedAt: row.updated_at,
     pgDspsSync,
   };
+
+  // Stats từ dsp_report_stats (LEFT JOIN có thể trả null → coerce về 0).
+  if (row.total_releases_count !== undefined) {
+    response.totalReleasesCount = Number(row.total_releases_count ?? 0);
+    response.pendingReleasesCount = Number(row.pending_releases_count ?? 0);
+  }
+
+  return response;
 }
 
 @Injectable()
@@ -108,7 +116,9 @@ export class DspReportService {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Count query
+    // Count query.
+    // Note: ClickHouse không cho `LEFT JOIN t FINAL alias ON ...` (parser expect
+    // ON/USING/SAMPLE sau FINAL). Dùng subquery `(SELECT * FROM t FINAL) alias`.
     const countRows = await this.clickHouseService.query<{ c: string }>(
       `SELECT count() AS c
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
@@ -137,7 +147,8 @@ export class DspReportService {
       ? query.orderBy.toUpperCase()
       : 'ASC';
 
-    // Data query with pagination
+    // Data query with pagination — đọc luôn stats từ dsp_report_stats (đã materialize).
+    // Bỏ getImportStatsBatch khỏi hot path: latency giảm từ O(fact_rows) → O(page_size).
     const rows = await this.clickHouseService.query<any>(
       `SELECT
          r.id_dsps_report AS id_dsps_report,
@@ -152,25 +163,25 @@ export class DspReportService {
          p.dsp_ci_code AS pg_dsps_sync_dsp_ci_code,
          p.picture AS pg_dsps_sync_picture,
          p.created_at AS pg_dsps_sync_created_at,
-         p.updated_at AS pg_dsps_sync_updated_at
+         p.updated_at AS pg_dsps_sync_updated_at,
+         s.total_releases_count AS total_releases_count,
+         s.pending_releases_count AS pending_releases_count
        FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} r FINAL
        LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+       LEFT JOIN (SELECT * FROM ${CLICKHOUSE_TABLES.DSP_REPORT_STATS} FINAL) s ON r.id_dsps_report = s.id_dsps_report
        ${whereClause}
        ORDER BY ${fieldOrder} ${orderBy}
        LIMIT ${pageSize} OFFSET ${offset}`,
       params,
     );
 
-     const items = rows.map(mapRawDspsReport);
-
-    // Fetch stats for each report on the current page
-    await Promise.all(
-      items.map(async (item) => {
-        const stats = await this.getImportStats(item.idDspsReport);
-        item.totalReleasesCount = stats.totalReleasesCount;
-        item.pendingReleasesCount = stats.pendingReleasesCount;
-      })
-    );
+    const items = rows.map(mapRawDspsReport);
+    // Stats đã có sẵn trong row (nếu report chưa có entry, mapRawDspsReport để
+    // undefined → coerce về 0 ở đây để giữ shape response nhất quán).
+    for (const item of items) {
+      if (item.totalReleasesCount === undefined) item.totalReleasesCount = 0;
+      if (item.pendingReleasesCount === undefined) item.pendingReleasesCount = 0;
+    }
 
     return {
       items,
@@ -214,131 +225,210 @@ export class DspReportService {
    * Calculate stats of unique releases in ClickHouse raw metadata vs what is already imported in Postgres
    */
   async getImportStats(idDspsReport: string): Promise<{ totalReleasesCount: number; pendingReleasesCount: number }> {
-    // 1. Resolve dspType
-    let dspType = 'audio';
-    const reportRows = await this.clickHouseService.query<{ pg_uuid: string }>(
-      `SELECT pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report = {id: String}`,
-      { id: idDspsReport }
+    const map = await this.getImportStatsBatch([idDspsReport]);
+    return map.get(idDspsReport) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
+  }
+
+  /**
+   * Batch version: tính stats cho NHIỀU dsps_report cùng lúc (tránh N+1 trong getList).
+   * Gộp toàn bộ thành: 1 query ClickHouse (dsp_id IN), 1 query Dsp, 1 query Release, 1 query Track/Video.
+   */
+  async getImportStatsBatch(
+    ids: string[],
+  ): Promise<Map<string, { totalReleasesCount: number; pendingReleasesCount: number }>> {
+    const result = new Map<string, { totalReleasesCount: number; pendingReleasesCount: number }>();
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return result;
+    for (const id of uniqueIds) {
+      result.set(id, { totalReleasesCount: 0, pendingReleasesCount: 0 });
+    }
+
+    // 1. Resolve pg_uuid + dspType cho từng report (1 query CH + 1 query Dsp)
+    const reportRows = await this.clickHouseService.query<{ id_dsps_report: string; pg_uuid: string }>(
+      `SELECT id_dsps_report, pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report IN ({ids:Array(String)})`,
+      { ids: uniqueIds },
     );
-    if (reportRows.length > 0 && reportRows[0].pg_uuid) {
-      const dsp = await this.entityManager.findOne(Dsp, { where: { id: reportRows[0].pg_uuid } });
-      if (dsp) {
-        dspType = dsp.type;
+    const pgUuidByReport = new Map<string, string>();
+    for (const r of reportRows) {
+      if (r.pg_uuid) pgUuidByReport.set(r.id_dsps_report, r.pg_uuid);
+    }
+    const dspTypeByReport = new Map<string, string>();
+    const pgUuids = Array.from(new Set([...pgUuidByReport.values()]));
+    if (pgUuids.length > 0) {
+      const dsps = await this.entityManager.find(Dsp, { where: { id: In(pgUuids) }, select: ['id', 'type'] });
+      const typeByUuid = new Map(dsps.map((d) => [d.id, d.type]));
+      for (const [reportId, uuid] of pgUuidByReport.entries()) {
+        dspTypeByReport.set(reportId, typeByUuid.get(uuid) ?? 'audio');
       }
     }
 
-    // 2. Query ClickHouse for upc and isrc
-    const clickHouseRows = await this.clickHouseService.query<{ upc: string; isrc: string }>(
+    // 2. 1 query ClickHouse lấy upc/isrc của TẤT CẢ report (kèm dsp_id để gom)
+    const clickHouseRows = await this.clickHouseService.query<{ dsp_id: string; upc: string; isrc: string }>(
       `
-        SELECT trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+        SELECT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
         FROM (
-          SELECT upc, isrc FROM music_analytics.fact_sales_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          SELECT dsp_id, upc, isrc FROM music_analytics.fact_sales_report
+            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
           UNION ALL
-          SELECT upc, isrc FROM music_analytics.fact_dsp_comprehensive_report WHERE dsp_id = {dspId: String} AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          SELECT dsp_id, upc, isrc FROM music_analytics.fact_dsp_comprehensive_report
+            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
         )
       `,
-      { dspId: idDspsReport }
+      { ids: uniqueIds },
     );
+    if (clickHouseRows.length === 0) return result;
 
-    if (clickHouseRows.length === 0) {
-      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
-    }
-
-    // 3. Group rows into releases like extractAndImport does
-    const upcMap = new Map<string, Set<string>>(); // Map<upc, Set<isrc>>
+    // 3. Gom upc→Set<isrc> theo từng report (giống logic extractAndImport)
+    const upcMapByReport = new Map<string, Map<string, Set<string>>>();
     for (const row of clickHouseRows) {
       const isrc = hasMeaningfulText(row.isrc) ? row.isrc.trim() : '';
       let upc = normalizeReportUpcOrFallback(hasMeaningfulText(row.upc) ? row.upc.trim() : '', isrc);
-
       if (!isrc && !upc) continue;
+      if (!upc && isrc) upc = `ISRC-${isrc}`;
 
-      if (!upc && isrc) {
-        upc = `ISRC-${isrc}`;
+      let upcMap = upcMapByReport.get(row.dsp_id);
+      if (!upcMap) {
+        upcMap = new Map<string, Set<string>>();
+        upcMapByReport.set(row.dsp_id, upcMap);
       }
-
-      if (!upcMap.has(upc)) {
-        upcMap.set(upc, new Set());
-      }
-      if (isrc) {
-        upcMap.get(upc)!.add(isrc);
-      }
+      if (!upcMap.has(upc)) upcMap.set(upc, new Set());
+      if (isrc) upcMap.get(upc)!.add(isrc);
     }
 
-    const totalReleasesCount = upcMap.size;
-    if (totalReleasesCount === 0) {
-      return { totalReleasesCount: 0, pendingReleasesCount: 0 };
-    }
-
-    // 4. Fetch existing releases in Postgres
-    let existingUpcs = new Set<string>();
-    const allGroupedUpcs = Array.from(upcMap.keys());
-    const normalizedUpcs = allGroupedUpcs.map((u) => normalizeUpc(u)).filter(Boolean);
-    if (normalizedUpcs.length > 0) {
-      const equivalentUpcsSet = new Set<string>();
-      for (const u of normalizedUpcs) {
-        const equivalents = buildEquivalentUpcs(u);
-        for (const eq of equivalents) {
-          equivalentUpcsSet.add(eq);
+    // 4. Gom toàn bộ upc/isrc của cả batch → 1 query Release + 1 query Track + 1 query Video
+    const allEquivalentUpcs = new Set<string>();
+    const allIsrcs = new Set<string>();
+    for (const upcMap of upcMapByReport.values()) {
+      for (const [upc, isrcSet] of upcMap.entries()) {
+        const normalized = normalizeUpc(upc);
+        if (normalized) {
+          for (const eq of buildEquivalentUpcs(normalized)) allEquivalentUpcs.add(eq);
         }
+        for (const isrc of isrcSet) allIsrcs.add(isrc);
       }
-      const allEquivalentUpcs = Array.from(equivalentUpcsSet);
+    }
 
-      const existingReleases = await this.entityManager.find(Release, {
-        where: { upc: In(allEquivalentUpcs) },
+    const existingUpcs = new Set<string>();
+    if (allEquivalentUpcs.size > 0) {
+      const releases = await this.entityManager.find(Release, {
+        where: { upc: In(Array.from(allEquivalentUpcs)) },
         select: ['upc'],
       });
-      existingUpcs = new Set(existingReleases.map((r) => normalizeUpc(r.upc)).filter(Boolean));
-    }
-
-    // 5. Fetch existing tracks/videos in Postgres
-    let existingIsrcs = new Set<string>();
-    const allIsrcs = new Set<string>();
-    for (const isrcSet of upcMap.values()) {
-      for (const isrc of isrcSet) {
-        allIsrcs.add(isrc);
-      }
-    }
-    const allIsrcsList = Array.from(allIsrcs);
-
-    if (allIsrcsList.length > 0) {
-      if (dspType === 'video') {
-        const existingVideos = await this.entityManager.find(Video, {
-          where: { isrc: In(allIsrcsList) },
-          select: ['isrc'],
-        });
-        existingIsrcs = new Set(existingVideos.map((v) => v.isrc).filter((isrc): isrc is string => !!isrc));
-      } else {
-        const existingTracks = await this.entityManager.find(Track, {
-          where: { isrc: In(allIsrcsList) },
-          select: ['isrc'],
-        });
-        existingIsrcs = new Set(existingTracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc));
+      for (const r of releases) {
+        const n = normalizeUpc(r.upc);
+        if (n) existingUpcs.add(n);
       }
     }
 
-    // 6. Calculate pending count
-    let pendingReleasesCount = 0;
-    for (const [upc, isrcSet] of upcMap.entries()) {
-      const hasUpc = !!upc;
-      const upcExists = hasUpc && existingUpcs.has(normalizeUpc(upc));
+    // ISRC tồn tại: cần phân biệt audio (tracks) vs video (videos).
+    // Batch có thể trộn cả 2 loại → query cả Track lẫn Video, đánh dấu theo loại.
+    const existingTrackIsrcs = new Set<string>();
+    const existingVideoIsrcs = new Set<string>();
+    if (allIsrcs.size > 0) {
+      const isrcList = Array.from(allIsrcs);
+      // Chỉ xét các report thực sự có data. Report không phải 'video' (gồm cả
+      // trường hợp default 'audio' khi chưa resolve được type) → cần tra Track.
+      const reportsWithData = [...upcMapByReport.keys()];
+      const needVideo = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') === 'video');
+      const needAudio = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') !== 'video');
+      if (needAudio) {
+        const tracks = await this.entityManager.find(Track, { where: { isrc: In(isrcList) }, select: ['isrc'] });
+        for (const t of tracks) if (t.isrc) existingTrackIsrcs.add(t.isrc);
+      }
+      if (needVideo) {
+        const videos = await this.entityManager.find(Video, { where: { isrc: In(isrcList) }, select: ['isrc'] });
+        for (const v of videos) if (v.isrc) existingVideoIsrcs.add(v.isrc);
+      }
+    }
 
-      let isrcExists = false;
-      for (const isrc of isrcSet) {
-        if (existingIsrcs.has(isrc)) {
-          isrcExists = true;
-          break;
+    // 5. Tính total/pending cho từng report
+    for (const id of uniqueIds) {
+      const upcMap = upcMapByReport.get(id);
+      if (!upcMap || upcMap.size === 0) continue;
+      const isVideo = (dspTypeByReport.get(id) ?? 'audio') === 'video';
+      const existingIsrcs = isVideo ? existingVideoIsrcs : existingTrackIsrcs;
+
+      let pending = 0;
+      for (const [upc, isrcSet] of upcMap.entries()) {
+        const upcExists = !!upc && existingUpcs.has(normalizeUpc(upc));
+        let isrcExists = false;
+        for (const isrc of isrcSet) {
+          if (existingIsrcs.has(isrc)) {
+            isrcExists = true;
+            break;
+          }
         }
+        if (!upcExists && !isrcExists) pending++;
       }
-
-      if (!upcExists && !isrcExists) {
-        pendingReleasesCount++;
-      }
+      result.set(id, { totalReleasesCount: upcMap.size, pendingReleasesCount: pending });
     }
 
-    return {
-      totalReleasesCount,
-      pendingReleasesCount,
-    };
+    return result;
+  }
+
+  /**
+   * Recompute stats cho một tập id_dsps_report và persist vào bảng dsp_report_stats.
+   * Dùng ReplacingMergeTree(updated_at) nên insert row mới sẽ đè phiên bản cũ.
+   * Ids không có data fact vẫn được ghi row (0, 0) để tránh "missing" ở read path.
+   * Gọi từ: syncMetadataAfterAssign, unassign, ETL post-import, cron.
+   */
+  async refreshStats(ids: string[]): Promise<void> {
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    if (uniqueIds.length === 0) return;
+
+    try {
+      const statsMap = await this.getImportStatsBatch(uniqueIds);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const rows = uniqueIds.map((id) => {
+        const s = statsMap.get(id) ?? { totalReleasesCount: 0, pendingReleasesCount: 0 };
+        return {
+          id_dsps_report: id,
+          total_releases_count: s.totalReleasesCount,
+          pending_releases_count: s.pendingReleasesCount,
+          updated_at: now,
+        };
+      });
+
+      await this.clickHouseService.insert(CLICKHOUSE_TABLES.DSP_REPORT_STATS, rows);
+      this.logger.debug(`refreshStats: persisted ${rows.length} rows into ${CLICKHOUSE_TABLES.DSP_REPORT_STATS}`);
+    } catch (err: any) {
+      this.logger.error(
+        `refreshStats failed for ${uniqueIds.length} ids: ${err.message}`,
+        err.stack,
+      );
+    }
+  }
+
+  /**
+   * Refresh stats cho toàn bộ dsps_report. Chunk để không tính batch quá lớn 1 lần.
+   * Dùng ở cron 15p + startup backfill.
+   */
+  async refreshAllStats(): Promise<void> {
+    const startedAt = Date.now();
+    const CHUNK_SIZE = 500;
+
+    try {
+      const idRows = await this.clickHouseService.query<{ id_dsps_report: string }>(
+        `SELECT DISTINCT id_dsps_report FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL`,
+      );
+      const allIds = idRows.map((r) => r.id_dsps_report).filter(Boolean);
+
+      if (allIds.length === 0) {
+        this.logger.log('refreshAllStats: no dsps_report found, skipped');
+        return;
+      }
+
+      this.logger.log(`refreshAllStats: refreshing ${allIds.length} dsps_report entries...`);
+      for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+        const chunk = allIds.slice(i, i + CHUNK_SIZE);
+        await this.refreshStats(chunk);
+      }
+      this.logger.log(
+        `refreshAllStats: done ${allIds.length} entries in ${Date.now() - startedAt}ms`,
+      );
+    } catch (err: any) {
+      this.logger.error(`refreshAllStats failed: ${err.message}`, err.stack);
+    }
   }
 
   /**
@@ -410,6 +500,22 @@ export class DspReportService {
     this.logger.log(`Assigned dsps_report ${idDspsReport} → pg_uuid ${pgUuid}`);
     await this.dspMappingService.loadCache();
 
+    // Đẩy phần sync metadata (scan 2 fact table + extractAndImport — nặng) sang
+    // background để response trả về ngay. Stats trong getList tính realtime nên
+    // FE thấy pendingReleasesCount cập nhật khi import xong.
+    void this.syncMetadataAfterAssign(idDspsReport, pgUuid).catch((err: any) =>
+      this.logger.error(
+        `Background metadata sync failed for dsp_report ${idDspsReport}: ${err.message}`,
+        err.stack,
+      ),
+    );
+  }
+
+  /**
+   * Scan raw metadata từ ClickHouse và import các release/track/video chưa có vào Postgres.
+   * Chạy nền sau khi assign — không chặn response.
+   */
+  private async syncMetadataAfterAssign(idDspsReport: string, pgUuid: string): Promise<void> {
     // Sync metadata from Clickhouse raw tables to PostgreSQL
     try {
       const dsp = await this.entityManager.findOne(Dsp, { where: { id: pgUuid } });
@@ -551,6 +657,11 @@ export class DspReportService {
     } catch (err: any) {
       this.logger.error(`Failed to sync metadata after assigning dsp_report: ${err.message}`, err.stack);
     }
+
+    // Sau khi assign + import xong, recompute stats để list API đọc phiên bản mới.
+    // Không dùng void ở đây: syncMetadataAfterAssign đã chạy background từ caller
+    // nên await refreshStats không chặn HTTP response.
+    await this.refreshStats([idDspsReport]);
   }
 
   /**
@@ -562,6 +673,15 @@ export class DspReportService {
       { id: idDspsReport }
     );
     this.logger.log(`Unassigned dsps_report ${idDspsReport}`);
+
+    // Recompute stats: pgUuid rỗng → không match Release/Track/Video → pending = total.
+    // Chạy background để không chặn HTTP response.
+    void this.refreshStats([idDspsReport]).catch((err: any) =>
+      this.logger.error(
+        `Background refreshStats after unassign failed for ${idDspsReport}: ${err.message}`,
+        err.stack,
+      ),
+    );
   }
 
   /**

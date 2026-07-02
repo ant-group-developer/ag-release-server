@@ -36,6 +36,7 @@ interface TrackSyncRow {
 	label_id: string;
 	artist_ids: string[];
 	release_type: string;
+	channel_id: string;
 	is_deleted: number;
 	updated_at: string;
 }
@@ -176,7 +177,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            release_upc,
            label_id,
            artist_ids,
-           release_type
+           release_type,
+           channel_id
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -192,7 +194,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_ids,
-             'audio' AS release_type
+             'audio' AS release_type,
+             '' AS channel_id
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            WHERE t.isrc IS NOT NULL AND t.isrc != ''
@@ -213,7 +216,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_ids,
-             'video' AS release_type
+             'video' AS release_type,
+             COALESCE(v.channel_id::text, '') AS channel_id
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            WHERE v.isrc IS NOT NULL AND v.isrc != ''
@@ -233,6 +237,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				label_id: row.label_id ?? '',
 				artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 				release_type: row.release_type ?? 'audio',
+				channel_id: row.channel_id ?? '',
 				is_deleted: 0,
 				updated_at: new Date()
 					.toISOString()
@@ -422,6 +427,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'audio',
+					channel_id: '',
 					is_deleted: 0,
 					updated_at: now,
 				}));
@@ -448,7 +454,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                WHERE video_id = v.id
              ),
              ''
-           ) AS artist_ids
+           ) AS artist_ids,
+           COALESCE(v.channel_id::text, '') AS channel_id
          FROM videos v
          INNER JOIN releases r ON r.id = v.release_id
          WHERE v.id = ANY($1)
@@ -466,6 +473,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'video',
+					channel_id: row.channel_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 				}));
@@ -486,7 +494,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            release_upc,
            label_id,
            artist_ids,
-           release_type
+           release_type,
+           channel_id
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -502,7 +511,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_ids,
-             'audio' AS release_type
+             'audio' AS release_type,
+             '' AS channel_id
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            WHERE r.id = ANY($1)
@@ -524,7 +534,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_ids,
-             'video' AS release_type
+             'video' AS release_type,
+             COALESCE(v.channel_id::text, '') AS channel_id
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            WHERE r.id = ANY($1)
@@ -543,6 +554,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					label_id: row.label_id ?? '',
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: row.release_type ?? 'audio',
+					channel_id: row.channel_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 				}));

@@ -441,12 +441,13 @@ export function getRevenueTopTrackCountQuery(
   joinSql: string,
   filterSql: string,
 ): string {
+  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
   return `
     SELECT uniq(s.isrc) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
-      AND s.isrc NOT LIKE 'UPC-%'
+      AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -459,6 +460,7 @@ export function getRevenueTopTrackQuery(
   limit: number,
   offset: number,
 ): string {
+  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
   return `
     SELECT
       s.isrc AS isrc,
@@ -467,7 +469,7 @@ export function getRevenueTopTrackQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
-      AND s.isrc NOT LIKE 'UPC-%'
+      AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -493,6 +495,7 @@ export function getRevenueTopTrackTotalQuery(
   joinSql: string,
   filterSql: string,
 ): string {
+  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
   return `
     SELECT
       sum(s.total_quantity) AS total_qty,
@@ -500,7 +503,7 @@ export function getRevenueTopTrackTotalQuery(
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
-      AND s.isrc NOT LIKE 'UPC-%'
+      AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
@@ -561,6 +564,66 @@ export function getRevenueTopLabelTotalQuery(
     ${joinSql}
     WHERE t.is_deleted = 0
       AND t.label_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopChannelCountQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT uniq(t.channel_id) AS total
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopChannelQuery(
+  joinSql: string,
+  filterSql: string,
+  limit: number,
+  offset: number,
+): string {
+  return `
+    SELECT
+      t.channel_id AS channelId,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity,
+      uniq(t.release_id) AS release_count,
+      uniq(t.isrc) AS track_count
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY channelId
+    ORDER BY revenue_usd DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+export function getRevenueTopChannelTotalQuery(
+  joinSql: string,
+  filterSql: string,
+): string {
+  return `
+    SELECT
+      sum(s.total_quantity) AS total_qty,
+      sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND t.channel_id != ''
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}

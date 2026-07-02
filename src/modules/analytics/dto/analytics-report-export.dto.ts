@@ -94,6 +94,15 @@ export class AnalyticsReportExportDto {
   @IsOptional()
   @IsIn(['month', 'quarter', 'none'])
   periodUnit?: 'month' | 'quarter' | 'none' = 'none';
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+    example: 'audio',
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
 }
 
 export class CancelAnalyticsReportExportJobsDto {

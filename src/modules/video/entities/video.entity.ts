@@ -237,4 +237,22 @@ export class Video extends BaseUserTrackedUUIDEntity {
 
 	@OneToMany(() => VideoGenre, (videoGenre) => videoGenre.video)
 	videoGenres: VideoGenre[];
+
+	@Column({
+		type: 'varchar',
+		length: 20,
+		name: 'youtube_match_status',
+		nullable: true,
+		comment:
+			'Trang thai map channel tu YouTube: matched | no_match | no_data (NULL = chua xu ly)',
+	})
+	youtubeMatchStatus: string | null;
+
+	@Column({
+		type: 'timestamptz',
+		name: 'youtube_match_scanned_at',
+		nullable: true,
+		comment: 'Thoi diem enrich YouTube lan cuoi',
+	})
+	youtubeMatchScannedAt: Date | null;
 }

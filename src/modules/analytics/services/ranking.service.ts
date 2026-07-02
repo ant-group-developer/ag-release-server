@@ -12,6 +12,7 @@ import {
   LabelRankingItem,
   TenantRankingItem,
   DspRankingItem,
+  ChannelRankingItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 
@@ -23,7 +24,10 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 @Injectable()
 export class RankingService {
   private readonly logger = new Logger(RankingService.name);
-  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
+  // Audio: yeu cau release_upc chuan (10-14 chu so sau khi strip leading zeros).
+  // Video: bypass filter - luon cho pass du release_upc dang placeholder (ISRC-xxx).
+  private readonly validReleaseUpcFilter =
+    "AND (t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
@@ -43,7 +47,7 @@ export class RankingService {
     let filterSql = '';
 
     const isSystem = checkIsSystemTenant(tenantId);
-    const hasSubFilter = !!query.labelId;
+    const hasSubFilter = !!(query.labelId || query.releaseType);
 
     // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
     if (isSystem && !hasSubFilter) {
@@ -62,6 +66,11 @@ export class RankingService {
     if (query.labelId) {
       filterSql += ' AND t.label_id = {labelId:String}';
       params.labelId = query.labelId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     return { joinSql, filterSql, params };
@@ -105,12 +114,13 @@ export class RankingService {
     const dateCol = 'reporting_date';
 
     // Query 1: Đếm tổng số unique tracks
+    // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
     const countSql = `
       SELECT uniq(s.isrc) AS total
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
-        AND s.isrc NOT LIKE 'UPC-%'
+        AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -130,6 +140,7 @@ export class RankingService {
     }
 
     // Query 2: Lấy top tracks đã phân trang trong ClickHouse
+    // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
     const dataSql = `
       SELECT
         s.isrc AS isrc,
@@ -137,7 +148,7 @@ export class RankingService {
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
-        AND s.isrc NOT LIKE 'UPC-%'
+        AND (t.release_type = 'video' OR s.isrc NOT LIKE 'UPC-%')
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${dspFilter}
@@ -456,6 +467,98 @@ export class RankingService {
   }
 
   // ═══════════════════════════════════════════════════════
+  // TOP CHANNELS RANKING (trend view, video only, GROUP BY channel_id)
+  // ═══════════════════════════════════════════════════════
+  async getTopChannels(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<ChannelRankingItem>> {
+    const { fromDate, toDate, page, pageSize } = query;
+    let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+    params.from = fromDate;
+    params.to = toDate;
+
+    const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
+    if (query.dspId) params.dspId = query.dspId;
+
+    const table = query.dspId
+      ? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
+      : CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
+    const dateCol = 'reporting_date';
+
+    // Query 1: Count unique channels (channel_id != '' de loai audio + video chua enrich)
+    const countSql = `
+      SELECT uniq(t.channel_id) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.channel_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+    `;
+    const countResult = await this.clickHouseService.query<{ total: string }>(
+      countSql,
+      params,
+    );
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    if (totalItems === 0) {
+      return new PageDto({
+        items: [],
+        metadata: { page, pageSize, totalItems: 0 },
+      });
+    }
+
+    // Query 2: Aggregate by channel_id
+    const dataSql = `
+      SELECT
+        t.channel_id AS channelId,
+        uniq(t.release_id) AS releaseCount,
+        uniq(s.isrc) AS trackCount,
+        sum(s.total_quantity) AS totalViews
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.channel_id != ''
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+      GROUP BY channelId
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+    const paged = await this.clickHouseService.query<{
+      channelId: string;
+      releaseCount: string;
+      trackCount: string;
+      totalViews: string;
+    }>(dataSql, params);
+
+    const channelIds = paged.map((c) => c.channelId);
+    const channelsMeta = await this.isrcResolverService.getChannelMetadata(channelIds);
+
+    const items: ChannelRankingItem[] = paged.map((c, index) => {
+      const meta = channelsMeta.get(c.channelId);
+      return {
+        rank: query.skip + index + 1,
+        channelId: c.channelId,
+        channelName: meta?.name ?? 'Unknown Channel',
+        thumbUrl: meta?.thumbUrl ?? null,
+        youtubeChannelId: meta?.youtubeChannelId ?? null,
+        releaseCount: Number(c.releaseCount),
+        trackCount: Number(c.trackCount),
+        totalViews: Number(c.totalViews),
+        tenant: meta?.tenant ?? null,
+      };
+    });
+
+    return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+  }
+
+  // ═══════════════════════════════════════════════════════
   // 4. TOP ARTISTS RANKING (NATIVE OLAP với arrayJoin)
   // ═══════════════════════════════════════════════════════
   async getTopArtists(
@@ -585,6 +688,11 @@ export class RankingService {
       params.matchedTenantIds = matchedTenantIds;
     }
 
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
+
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
     if (query.dspId) params.dspId = query.dspId;
 
@@ -672,6 +780,11 @@ export class RankingService {
     if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
