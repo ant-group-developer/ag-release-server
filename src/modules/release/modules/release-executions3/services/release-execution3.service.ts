@@ -11,7 +11,6 @@ import {
 	ReleaseReview,
 	ReleaseReviewStatus,
 } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
-import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { EntityManager, In, Repository } from 'typeorm';
 import {
@@ -28,6 +27,7 @@ import {
 	ReleaseExecutionStepStatus,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
+import { ReleaseExecution3ResultService } from './release-execution3-result.service';
 import { ReleaseExecution3Builder } from './release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './release-execution3.engine';
 import { ReleaseExecution3QueryService } from './release-execution3.query.service';
@@ -47,7 +47,6 @@ export class ReleaseExecution3Service {
 		@InjectRepository(ReleaseExecutionStep3)
 		private readonly stepRepo: Repository<ReleaseExecutionStep3>,
 		private readonly dspRoutingService: DspRoutingConfigsService,
-		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 
 		@Inject(forwardRef(() => ReleaseService))
 		private readonly releaseService: ReleaseService,
@@ -57,6 +56,7 @@ export class ReleaseExecution3Service {
 		private readonly builder: ReleaseExecution3Builder,
 		private readonly engine: ReleaseExecutionStepEngine,
 		private readonly queryService: ReleaseExecution3QueryService,
+		private readonly releaseExecution3ResultService: ReleaseExecution3ResultService,
 	) {}
 
 	// đẩy vào queue, consumer tự quét và xử lí
@@ -215,14 +215,6 @@ export class ReleaseExecution3Service {
 			),
 		};
 
-		execution.metadata.output = {
-			result: allDeliveryDsps.map((dsp) => ({
-				dspId: dsp.id,
-				dspCode: dsp.code,
-				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
-			})),
-		};
-
 		for (const dsp of ciDsps) {
 			if (!dsp.code) {
 				continue;
@@ -241,6 +233,18 @@ export class ReleaseExecution3Service {
 		}
 
 		await this.executionRepo.save(execution);
+
+		await this.releaseExecution3ResultService.updateExecutionOutputResult({
+			releaseExecutionId: execution.id,
+			releaseId: execution.metadata.input.releaseSnapshot.id,
+			results: allDeliveryDsps.map((dsp) => ({
+				dspId: dsp.id,
+				dspCode: dsp.code,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+			})),
+		});
+
+		return;
 	}
 
 	private buildDeliveryMetadataInput(releaseId: string, dsps: Dsp[]) {
@@ -338,9 +342,10 @@ export class ReleaseExecution3Service {
 
 		const status = this.mapExecutionStatusToDeliveryStatus(executionStatus);
 
-		await this.releaseDspDeliveryService.updateDeliveryStatus({
-			releaseIds: [delivery.releaseId],
-			items: delivery.items.map((item) => ({
+		await this.releaseExecution3ResultService.updateExecutionOutputResult({
+			releaseExecutionId: execution.id,
+			releaseId: delivery.releaseId,
+			results: delivery.items.map((item) => ({
 				...item,
 				dspCode: item.dspCode,
 				status,

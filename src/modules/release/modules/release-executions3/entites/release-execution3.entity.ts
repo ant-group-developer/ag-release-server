@@ -13,11 +13,11 @@ import {
 	OneToOne,
 } from 'typeorm';
 import { ReleaseReview } from '../../release-reviews/entities/release-review.entity';
-import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import {
 	ExecutionType,
 	ReleaseExecutionStatus,
 } from '../enums/release-execution3.enum';
+import { ReleaseExecutionResult3 } from './release-execution3-result.entity';
 import { ReleaseExecutionStep3 } from './release-execution3-step.entity';
 
 @Entity('release_excutions3')
@@ -66,6 +66,12 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 	@OneToMany(() => ReleaseExecutionStep3, (step) => step.releaseExecution)
 	steps: ReleaseExecutionStep3[];
 
+	@OneToMany(
+		() => ReleaseExecutionResult3,
+		(result) => result.releaseExecution,
+	)
+	results: ReleaseExecutionResult3[];
+
 	@OneToMany(() => ReleaseError, (error) => error.releaseExecution)
 	releaseErrors: ReleaseError[];
 
@@ -98,9 +104,6 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 				aggCi?: ReleaseExecutionDeliveryInput;
 			};
 			upcAutoIfReleaseSnapshotNull?: string;
-		};
-		output: {
-			result: ReleaseExecutionResultDto[];
 		};
 	};
 

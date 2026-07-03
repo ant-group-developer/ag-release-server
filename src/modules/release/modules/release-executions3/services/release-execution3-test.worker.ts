@@ -1099,6 +1099,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.FAILED;
 		return ReleaseExecutionStepStatus.DONE;
 		try {
 			// console.log('Syncing data from DSP...');
@@ -1287,6 +1288,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.FAILED;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 			const ciDspStatuses =
