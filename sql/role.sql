@@ -35,7 +35,6 @@ VALUES
   ('Release Audio Creator','Create audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.creator', false),
   ('Release Audio Editor','Edit audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.editor', false),
   ('Release Audio Viewer','Read-only access to audio releases.','#2563EB', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_audio.viewer', true),
-
   -- Release Video
   ('Release Video Admin','Full control over release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.admin', false),
   ('Release Video Creator','Create release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.creator', false),
@@ -43,10 +42,9 @@ VALUES
   ('Release Video Viewer','Read-only access to release videos.','#1D4ED8', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_video.viewer', false),
   -- Release Review
   ('Release Review Admin','Full control over release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.admin', false),
-  ('Release Review Creator','Create release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.creator', false),
-  ('Release Review Editor','Edit release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.editor', false),
+  ('Release Review Fixer','Only view and fix release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.fixer', false),
+  ('Release Review Approver','Approve, reject, create and delete release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.approver', false),
   ('Release Review Viewer','Read-only access to release reviews.','#EF4444', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'release_review.viewer', false),
-
   -- Channel
   ('Channel Admin','Full control over channels.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'channel.admin', false),
   ('Channel Creator','Create channels.','#0EA5E9', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'channel.creator', false),
