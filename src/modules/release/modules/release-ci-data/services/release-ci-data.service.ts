@@ -305,6 +305,7 @@ export class ReleaseCiDataService {
 
 		const pendingItems = await qb.getMany();
 		let synced = 0;
+		let liveVersionSynced = 0;
 		const failed: { id: string; releaseId: string; message: string }[] = [];
 		const totalBatches = Math.ceil(pendingItems.length / batchSize);
 
@@ -324,12 +325,14 @@ export class ReleaseCiDataService {
 			const results = await Promise.allSettled(
 				batch.map((item) => this.syncCiDataById(item.id)),
 			);
+			const syncedReleaseIds: string[] = [];
 
 			results.forEach((result, resultIndex) => {
 				const item = batch[resultIndex];
 
 				if (result.status === 'fulfilled') {
 					synced += 1;
+					syncedReleaseIds.push(item.releaseId);
 					this.logger.log(
 						`Bulk synced data CI ${item.id} for release ${item.releaseId}. Progress: ${
 							synced + failed.length
@@ -354,6 +357,11 @@ export class ReleaseCiDataService {
 				);
 			});
 
+			liveVersionSynced +=
+				await this.syncReleaseDspDeliveryLiveVersionFromCiData(
+					syncedReleaseIds,
+				);
+
 			this.logger.log(
 				`Finished bulk sync data CI batch ${batchNumber}/${totalBatches}. Synced: ${synced}, failed: ${failed.length}`,
 			);
@@ -367,9 +375,44 @@ export class ReleaseCiDataService {
 			total: pendingItems.length,
 			batchSize,
 			synced,
+			liveVersionSynced,
 			failed: failed.length,
 			errors: failed,
 		};
+	}
+
+	private async syncReleaseDspDeliveryLiveVersionFromCiData(
+		releaseIds: string[],
+	): Promise<number> {
+		const uniqueReleaseIds = [...new Set(releaseIds)].filter(Boolean);
+		if (!uniqueReleaseIds.length) return 0;
+
+		const rows = await this.repo.query(
+			`
+				UPDATE "release_dsp_delivery" rdd
+				SET "has_live_version" = true
+				FROM "release_ci_data" rcd
+				INNER JOIN LATERAL jsonb_array_elements(rcd."export_parsed_data") AS export_item("value") ON true
+				INNER JOIN "dsps" dsp
+					ON upper(trim(dsp."code_ci")) = upper(trim(substring(
+						export_item."value" ->> 'deliveryPoint'
+						FROM '\\(([^()]*)\\)\\s*$'
+					)))
+				WHERE rdd."release_id" = rcd."release_id"
+				AND rdd."dsp_id" = dsp."id"
+				AND rcd."release_id" = ANY($1::uuid[])
+				AND lower(coalesce(export_item."value" ->> 'deliveryPointStatus', '')) = 'live'
+				AND substring(
+					export_item."value" ->> 'deliveryPoint'
+					FROM '\\(([^()]*)\\)\\s*$'
+				) IS NOT NULL
+				AND rdd."has_live_version" = false
+				RETURNING rdd."id"
+			`,
+			[uniqueReleaseIds],
+		);
+
+		return Array.isArray(rows) ? rows.length : 0;
 	}
 
 	private getLatestImportRecord(

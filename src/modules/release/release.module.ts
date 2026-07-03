@@ -69,6 +69,7 @@ import { ReportEntityExtractorService } from './services/report-entity-extractor
 
 import { ReleaseExecution3Controller } from './modules/release-executions3/controllers/release-execution3.controller';
 import { ReleaseExecutionStepTestController } from './modules/release-executions3/controllers/release-execution3.engine.controller';
+import { ReleaseExecutionResult3 } from './modules/release-executions3/entites/release-execution3-result.entity';
 import { ReleaseExecutionStep3 } from './modules/release-executions3/entites/release-execution3-step.entity';
 import { ReleaseExecution3 } from './modules/release-executions3/entites/release-execution3.entity';
 import { ReleaseExecution3Service } from './modules/release-executions3/services/release-execution3.service';
@@ -86,6 +87,7 @@ import { CiDistributionJob3 } from './modules/release-executions3/entites/ci-dis
 import { CiDistributionJob3Service } from './modules/release-executions3/services/ci-distribution-job3.service';
 import { ReleaseExecution3Consumer } from './modules/release-executions3/services/queue/release-execution3.consumer';
 import { ReleaseExecution3Queue } from './modules/release-executions3/services/queue/release-execution3.queue';
+import { ReleaseExecution3ResultService } from './modules/release-executions3/services/release-execution3-result.service';
 import { ReleaseExecution3Builder } from './modules/release-executions3/services/release-execution3.builder';
 import { ReleaseExecution3CronJobService } from './modules/release-executions3/services/release-execution3.cron-job.service';
 import { ReleaseExecutionStepEngine } from './modules/release-executions3/services/release-execution3.engine';
@@ -124,6 +126,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
+			ReleaseExecutionResult3,
 			CiDistributionJob3,
 			ReleaseExecution3RunPipelineQueue,
 
@@ -205,6 +208,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecutionStepEngine,
 		ReleaseExecution3Service,
 		ReleaseExecution3QueryService,
+		ReleaseExecution3ResultService,
 		ReleaseExecution3Queue,
 		ReleaseExecution3Consumer,
 		ReleaseExecution3Worker,
@@ -219,6 +223,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReportEntityExtractorService,
 		ReleaseExecution3CronJobService,
 		ReleaseExecution3Service,
+		ReleaseExecution3ResultService,
 	],
 })
 export class ReleaseModule {}

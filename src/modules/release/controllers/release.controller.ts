@@ -339,6 +339,7 @@ export class ReleaseController {
 		});
 	}
 
+	// api submit
 	@RequirePermissions(
 		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,

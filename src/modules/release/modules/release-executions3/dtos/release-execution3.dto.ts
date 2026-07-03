@@ -5,7 +5,7 @@ export class ReleaseExecutionResultDto {
 	dspId?: string;
 	dspCode: string;
 	dspCodeCi?: string | null;
-	status?: ReleaseDspStatus;
+	status: ReleaseDspStatus;
 }
 
 export class ReleaseExecution3Metadata extends Metadata {

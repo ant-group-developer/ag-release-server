@@ -43,7 +43,7 @@ export class ReleaseDspDeliveryService {
 			id?: string;
 			dspId?: string;
 			dspCode: string;
-			status?: ReleaseDspStatus;
+			status: ReleaseDspStatus;
 		}[];
 	}): Promise<void> {
 		const { releaseIds } = input;
@@ -391,8 +391,8 @@ export class ReleaseDspDeliveryService {
 		items: {
 			id?: string;
 			dspId?: string;
-			dspCode?: string;
-			status?: ReleaseDspStatus;
+			dspCode: string;
+			status: ReleaseDspStatus;
 		}[],
 	): Promise<{ dspId: string; status: ReleaseDspStatus }[]> {
 		if (!items.length) return [];
@@ -401,7 +401,7 @@ export class ReleaseDspDeliveryService {
 			...new Set(
 				items
 					.filter((item) => !item.id && !item.dspId && item.dspCode)
-					.map((item) => item.dspCode!),
+					.map((item) => item.dspCode),
 			),
 		];
 
@@ -417,17 +417,18 @@ export class ReleaseDspDeliveryService {
 			}
 		}
 
-		return items
+		const result = items
 			.map((item) => ({
 				dspId:
-					item.id ??
 					item.dspId ??
 					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
-				status: item.status ?? ReleaseDspStatus.ISSUES,
+				// status: item.status ?? ReleaseDspStatus.ISSUES,
+				status: item.status,
 			}))
 			.filter(
 				(item): item is { dspId: string; status: ReleaseDspStatus } =>
 					!!item.dspId,
 			);
+		return result;
 	}
 }

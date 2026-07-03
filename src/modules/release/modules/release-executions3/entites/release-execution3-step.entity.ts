@@ -13,6 +13,7 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
+import { ReleaseExecutionResult3 } from './release-execution3-result.entity';
 import { ReleaseExecution3 } from './release-execution3.entity';
 
 @Entity('release_execution_steps3')
@@ -51,6 +52,12 @@ export class ReleaseExecutionStep3 extends BaseUUIDEntity {
 
 	@OneToMany(() => ReleaseError, (error) => error.step)
 	releaseErrors: ReleaseError[];
+
+	@OneToMany(
+		() => ReleaseExecutionResult3,
+		(result) => result.releaseExecutionStep,
+	)
+	results: ReleaseExecutionResult3[];
 
 	@Column({ type: 'varchar', length: 50 })
 	type: ReleaseExecutionStepType;

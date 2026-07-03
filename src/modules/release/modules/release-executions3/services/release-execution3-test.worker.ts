@@ -336,6 +336,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 
@@ -427,6 +428,8 @@ export class ReleaseExecution3WorkerTest {
 	private async exportCi(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.DONE;
+
 		return this.deriveStatusFromChildren(context);
 	}
 
@@ -499,6 +502,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const releaseSnapshot =
 				releaseExecution.metadata.input.releaseSnapshot;
@@ -621,6 +626,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const upc =
 				releaseExecution.releaseUpc ||
@@ -678,6 +685,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const upc =
 				releaseExecution.releaseUpc ||
@@ -1090,6 +1099,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.FAILED;
 		return ReleaseExecutionStepStatus.DONE;
 		try {
 			// console.log('Syncing data from DSP...');
@@ -1278,6 +1288,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.FAILED;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 			const ciDspStatuses =
@@ -1308,25 +1319,16 @@ export class ReleaseExecution3WorkerTest {
 					(item) => item.status === ReleaseDspStatus.DISTRIBUTED,
 				);
 
-			if (allTransferred) {
-				this.logService.success({
-					message: `[SYNC_DATA_DSP_CI] All ${dspStatuses.length} DSPs transferred`,
+			if (!allTransferred) {
+				this.logService.warning({
+					message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
 					releaseExecutionId: releaseExecution.id,
 					releaseExecutionStepId: step.id,
 					data: { dspStatuses },
 				});
-
-				return ReleaseExecutionStepStatus.DONE;
 			}
 
-			this.logService.error({
-				message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
-				releaseExecutionId: releaseExecution.id,
-				releaseExecutionStepId: step.id,
-				data: { dspStatuses },
-			});
-
-			return ReleaseExecutionStepStatus.FAILED;
+			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,

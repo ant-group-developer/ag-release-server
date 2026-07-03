@@ -263,9 +263,10 @@ export class DspReportService {
     }
 
     // 2. 1 query ClickHouse lấy upc/isrc của TẤT CẢ report (kèm dsp_id để gom)
+    // DISTINCT ở tầng CH trước khi gửi về Node — tránh kéo hàng triệu raw fact rows vào heap.
     const clickHouseRows = await this.clickHouseService.query<{ dsp_id: string; upc: string; isrc: string }>(
       `
-        SELECT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+        SELECT DISTINCT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
         FROM (
           SELECT dsp_id, upc, isrc FROM music_analytics.fact_sales_report
             WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
@@ -405,7 +406,8 @@ export class DspReportService {
    */
   async refreshAllStats(): Promise<void> {
     const startedAt = Date.now();
-    const CHUNK_SIZE = 500;
+    // Small chunk so GC can reclaim between iterations — 500 DSPs × millions of fact rows = OOM.
+    const CHUNK_SIZE = 10;
 
     try {
       const idRows = await this.clickHouseService.query<{ id_dsps_report: string }>(

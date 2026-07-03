@@ -5,10 +5,7 @@ import { FindOneOptions, Repository } from 'typeorm';
 import { LabelMessage } from '../constants/label.constant';
 import { QueryGetListLabelDto } from '../dto/label.dto';
 import { Label } from '../entities/label.entity';
-import {
-	VirtualColumnsLabel,
-	VirtualColumnsLabelArr,
-} from '../enum/label.enum';
+import { VirtualColumnsLabel } from '../enum/label.enum';
 import { IDataFromDb } from '../interfaces/label.interface';
 
 @Injectable()
@@ -104,11 +101,13 @@ export class LabelQueryService {
 			);
 		}
 
-		if (VirtualColumnsLabelArr.includes(fieldOrder)) {
-			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
-		} else {
-			queryBuilder.orderBy(`label.${fieldOrder}`, orderBy);
-		}
+		// if (VirtualColumnsLabelArr.includes(fieldOrder)) {
+		// 	queryBuilder.orderBy(`${fieldOrder}`, orderBy);
+		// } else {
+		// 	queryBuilder.orderBy(`label.${fieldOrder}`, orderBy);
+		// }
+
+		queryBuilder.orderBy(`${fieldOrder}`, orderBy);
 
 		queryBuilder.skip(skip).take(pageSize);
 

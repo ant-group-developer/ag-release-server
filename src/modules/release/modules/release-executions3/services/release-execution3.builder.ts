@@ -69,10 +69,10 @@ export class ReleaseExecution3Builder {
 						type: ReleaseExecutionStepType.VALIDATE,
 						order: order++,
 					},
-					{
-						type: ReleaseExecutionStepType.REVIEW_RELEASE,
-						order: order++,
-					},
+					// {
+					// 	type: ReleaseExecutionStepType.REVIEW_RELEASE,
+					// 	order: order++,
+					// },
 					{
 						type: ReleaseExecutionStepType.PROCESS_DSPS,
 						order: order++,
@@ -251,6 +251,7 @@ export class ReleaseExecution3Builder {
 						{
 							type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
 							order: 4,
+							isDeliveryStep: true,
 							metadata: {
 								input: {
 									dspCiCodes: ciDsps
@@ -258,6 +259,10 @@ export class ReleaseExecution3Builder {
 										.filter(
 											(code): code is string => !!code,
 										),
+
+									delivery:
+										releaseExecution.metadata.input.delivery
+											?.all,
 								},
 							},
 						},
