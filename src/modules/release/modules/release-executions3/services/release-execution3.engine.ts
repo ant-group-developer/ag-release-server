@@ -11,7 +11,6 @@ import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
-	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
 
@@ -288,37 +287,6 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	// private async syncDeliveryStatusByStepStatus1(
-	// 	step: ReleaseExecutionStep3,
-	// 	stepStatus: ReleaseExecutionStepStatus,
-	// ): Promise<void> {
-	// 	if (!step.isDeliveryStep) return;
-
-	// 	const deliveryStatus = this.mapStepStatusToDeliveryStatus(
-	// 		step,
-	// 		stepStatus,
-	// 	);
-
-	// 	if (!deliveryStatus) return;
-
-	// 	// lấy các dsp cần xử lí của step từ input
-	// 	const delivery = step.metadata?.input?.delivery;
-	// 	const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
-	// 		.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
-	// 		.map((item: any) => ({
-	// 			id: item.id,
-	// 			dspId: item.dspId,
-	// 			dspCode: item.dspCode,
-	// 			status: deliveryStatus,
-	// 		}));
-
-	// 	// lưu vào exe, đồng bộ lại vào release dsp delivery
-	// 	await this.updateExecutionOutputResult({
-	// 		executionId: step.releaseExecutionId,
-	// 		results,
-	// 	});
-	// }
-
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
@@ -527,11 +495,11 @@ export class ReleaseExecutionStepEngine {
 	): ReleaseDspStatus | null {
 		// PROCESS_DSPS chỉ đánh dấu bắt đầu quá trình phân phối, cập nhật status bên release dsp delivery
 		// Step này DONE chưa có nghĩa là release đã được phân phối thành công.
-		if (step.type === ReleaseExecutionStepType.PROCESS_DSPS) {
-			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
-				? ReleaseDspStatus.PROCESSING
-				: null;
-		}
+		// if (step.type === ReleaseExecutionStepType.PROCESS_DSPS) {
+		// 	return stepStatus === ReleaseExecutionStepStatus.PROCESSING
+		// 		? ReleaseDspStatus.PROCESSING
+		// 		: null;
+		// }
 
 		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {
