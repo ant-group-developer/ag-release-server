@@ -91,9 +91,17 @@ export class CiReleaseService {
 	async getReleaseFormatsV2(params?: GetCiReleaseFormatsDto): Promise<any> {
 		try {
 			const endpoint = `/releases/v2/organisations/${this.organisationId}/releaseformats`;
+
 			const response = await this.client.get(endpoint, {
-				params: this.buildParams(params),
+				params: this.buildParams({
+					...params,
+					status: 'live',
+					order_by: 'create_desc',
+					page: 0,
+					page_size: 200,
+				}),
 			});
+
 			return response.data;
 		} catch (error) {
 			this.logger.error(

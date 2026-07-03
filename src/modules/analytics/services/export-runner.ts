@@ -522,6 +522,12 @@ export class ExportRunner {
       params.artistId = dto.artistId;
     }
 
+    if (dto.releaseType) {
+      filters.push('t.is_deleted = 0');
+      filters.push('t.release_type = {releaseType:String}');
+      params.releaseType = dto.releaseType;
+    }
+
     if (trackIsrc) {
       filters.push('s.isrc = {trackIsrc:String}');
       params.trackIsrc = trackIsrc;

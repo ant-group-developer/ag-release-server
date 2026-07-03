@@ -16,6 +16,7 @@ import {
   RevenueTenantItem,
   OverviewTrendsResponse,
   RevenueReleaseItem,
+  RevenueChannelItem,
   TrendViewLineChartItem,
   DspBarChartItem,
   TerritoryBarChartItem,
@@ -313,6 +314,29 @@ export class TimelineAnalyticsController {
     @Body() query: TimelineQueryDto,
   ): Promise<ResponseSuccess<PageDto<RevenueReleaseItem>>> {
     const data = await this.timelineService.getRevenueTopRelease(
+      req.user!.tenantId,
+      query,
+    );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('revenue/top-channel')
+  @ApiOperation({
+    summary: 'Get top channels by revenue for tenant',
+    description:
+      'Returns top channels (video only) sorted by USD revenue. ' +
+      'Channel metadata resolved from Postgres channels table. ' +
+      'System-tenant sees all; normal tenant sees only their own.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Top channels by revenue retrieved successfully.',
+  })
+  async getRevenueTopChannel(
+    @Req() req: Request,
+    @Body() query: TimelineQueryDto,
+  ): Promise<ResponseSuccess<PageDto<RevenueChannelItem>>> {
+    const data = await this.timelineService.getRevenueTopChannel(
       req.user!.tenantId,
       query,
     );

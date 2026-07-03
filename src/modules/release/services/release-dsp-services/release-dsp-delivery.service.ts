@@ -51,6 +51,10 @@ export class ReleaseDspDeliveryService {
 
 		if (!releaseIds.length || !items.length) return;
 
+		const existingLiveVersionMap = await this.getExistingLiveVersionMap(
+			releaseIds,
+			items,
+		);
 		const now = new Date();
 		const values = releaseIds.flatMap((releaseId) =>
 			items.map((item) => ({
@@ -58,6 +62,12 @@ export class ReleaseDspDeliveryService {
 				dspId: item.dspId,
 				status: item.status,
 				isSelected: true,
+				hasLiveVersion: this.resolveHasLiveVersion(
+					item.status,
+					existingLiveVersionMap.get(
+						this.getDeliveryKey(releaseId, item.dspId),
+					) ?? false,
+				),
 				lastEnqueuedAt:
 					item.status === ReleaseDspStatus.PROCESSING ? now : null,
 				lastDeliveredAt:
@@ -74,6 +84,7 @@ export class ReleaseDspDeliveryService {
 				[
 					'status',
 					'is_selected',
+					'has_live_version',
 					'last_enqueued_at',
 					'last_delivered_at',
 				],
@@ -97,6 +108,7 @@ export class ReleaseDspDeliveryService {
 			status: ReleaseDspStatus.PROCESSING,
 			lastEnqueuedAt: new Date(),
 			lastDeliveredAt: null as Date | null,
+			hasLiveVersion: existed?.hasLiveVersion ?? false,
 			isSelected: true,
 		};
 
@@ -114,6 +126,7 @@ export class ReleaseDspDeliveryService {
 				status: ReleaseDspStatus.DISTRIBUTED,
 				lastEnqueuedAt: new Date(),
 				lastDeliveredAt: new Date(),
+				hasLiveVersion: true,
 			},
 		);
 	}
@@ -215,6 +228,7 @@ export class ReleaseDspDeliveryService {
 				releaseId,
 				dspId,
 				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
+				hasLiveVersion: false,
 				lastEnqueuedAt: null as Date | null,
 				lastDeliveredAt: null as Date | null,
 			}));
@@ -334,6 +348,45 @@ export class ReleaseDspDeliveryService {
 		return manager ? manager.getRepository(ReleaseDspDelivery) : this.repo;
 	}
 
+	private async getExistingLiveVersionMap(
+		releaseIds: string[],
+		items: { dspId: string; status: ReleaseDspStatus }[],
+	): Promise<Map<string, boolean>> {
+		const existing = await this.repo.find({
+			where: {
+				releaseId: In(releaseIds),
+				dspId: In(items.map((item) => item.dspId)),
+			},
+			select: ['releaseId', 'dspId', 'hasLiveVersion'],
+		});
+
+		return new Map(
+			existing.map((delivery) => [
+				this.getDeliveryKey(delivery.releaseId, delivery.dspId),
+				delivery.hasLiveVersion,
+			]),
+		);
+	}
+
+	private getDeliveryKey(releaseId: string, dspId: string) {
+		return `${releaseId}:${dspId}`;
+	}
+
+	private resolveHasLiveVersion(
+		status: ReleaseDspStatus,
+		currentHasLiveVersion: boolean,
+	) {
+		if (status === ReleaseDspStatus.DISTRIBUTED) return true;
+		if (
+			status === ReleaseDspStatus.TAKEN_DOWN ||
+			status === ReleaseDspStatus.NEVER_DISTRIBUTED
+		) {
+			return false;
+		}
+
+		return currentHasLiveVersion;
+	}
+
 	private async resolveDeliveryStatusItems(
 		items: {
 			id?: string;
@@ -366,10 +419,7 @@ export class ReleaseDspDeliveryService {
 
 		return items
 			.map((item) => ({
-				dspId:
-					item.id ??
-					item.dspId ??
-					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
+				dspId: item.dspId,
 				status: item.status ?? ReleaseDspStatus.ISSUES,
 			}))
 			.filter(

@@ -36,6 +36,15 @@ export class ReleaseDspDelivery extends BaseUUIDEntity {
 	status: ReleaseDspStatus;
 
 	@Column({
+		name: 'has_live_version',
+		type: 'boolean',
+		default: false,
+		comment:
+			'True nếu DSP vẫn đang có một phiên bản release live từ lần distribute thành công trước đó',
+	})
+	hasLiveVersion: boolean;
+
+	@Column({
 		type: 'timestamp with time zone',
 		nullable: true,
 		comment: `

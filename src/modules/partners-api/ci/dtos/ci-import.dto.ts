@@ -15,7 +15,7 @@ export enum CiImportOrderBy {
 export class GetCiImportsDto {
 	@IsOptional()
 	@IsString()
-	package_id?: string;
+	package_id?: string; // upc
 
 	@IsOptional()
 	@IsString()

@@ -1320,6 +1320,7 @@ export class ReleaseExecution3Worker {
 				data: { dspStatuses },
 			});
 
+			// return ReleaseExecutionStepStatus.DONE;
 			return ReleaseExecutionStepStatus.FAILED;
 		} catch (err) {
 			this.logService.error({
@@ -1347,6 +1348,12 @@ export class ReleaseExecution3Worker {
 		releaseExecution: ReleaseExecution3;
 		ciDspStatuses: ReleaseExecutionResultDto[];
 	}): ReleaseExecutionResultDto[] {
+		// Merge kết quả CI trả về với danh sách DSP mà step đã yêu cầu kiểm tra.
+		// Mục tiêu là đảm bảo output.result luôn có đủ từng DSP expected:
+		// DSP nào CI trả status thì dùng status đó, DSP nào thiếu thì gán issues.
+		// Danh sách CI code mà step này kỳ vọng phải kiểm tra.
+		// CI có thể không trả status cho một vài DSP, nhưng các DSP đó vẫn cần
+		// xuất hiện trong output để engine sync về release_dsp_delivery.
 		const expectedCiCodes: string[] =
 			step.metadata?.input?.dspCiCodes ?? [];
 
@@ -1354,12 +1361,15 @@ export class ReleaseExecution3Worker {
 			return ciDspStatuses;
 		}
 
+		// Lấy metadata DSP đã được builder phân nhóm cho CI/State51 để map
+		// codeCi từ CI về dspId/dspCode nội bộ.
 		const allCiDsps: Dsp[] = [
 			...(releaseExecution.metadata.input.dspAggregator?.ci?.ci ?? []),
 			...(releaseExecution.metadata.input.dspAggregator?.ci?.state51 ??
 				[]),
 		];
 
+		// Kết quả CI trả về đang dùng dspCode nội bộ làm key.
 		const statusByDspCode = new Map(
 			ciDspStatuses.map((item) => [item.dspCode, item]),
 		);
@@ -1374,6 +1384,8 @@ export class ReleaseExecution3Worker {
 				: undefined;
 			if (existing) return existing;
 
+			// Nếu CI không trả status cho DSP đã kỳ vọng, coi là issues để UI
+			// nhìn thấy DSP đó vẫn cần kiểm tra thay vì bị mất khỏi result.
 			return {
 				dspId: dsp?.id,
 				dspCode: dsp?.code ?? ciCode,
