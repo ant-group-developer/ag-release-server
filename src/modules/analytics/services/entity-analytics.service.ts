@@ -12,6 +12,7 @@ import {
 	EntityOverviewQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
+import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	DspBarChartItem,
 	DspTimelinePeriod,
@@ -23,7 +24,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 
-export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant';
+export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant' | 'channel';
 
 @Injectable()
 export class EntityAnalyticsService {
@@ -31,6 +32,7 @@ export class EntityAnalyticsService {
 		private readonly clickHouseService: ClickHouseService,
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
+		private readonly cache: AnalyticsCacheService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -80,6 +82,7 @@ export class EntityAnalyticsService {
 		tenantId: string,
 		entityType: EntityType,
 		entityId?: string,
+		releaseType?: 'audio' | 'video',
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -88,8 +91,8 @@ export class EntityAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = { entityId };
 
-		// Track + system tenant: filter trực tiếp trên s.isrc, không cần JOIN
-		if (entityType === 'track' && isSystem) {
+		// Track + system tenant without releaseType: filter on s.isrc, no JOIN needed
+		if (entityType === 'track' && isSystem && !releaseType) {
 			return {
 				joinSql: '',
 				filterSql: 'AND s.isrc = {entityId:String}',
@@ -116,12 +119,19 @@ export class EntityAnalyticsService {
 				filterSql += ' AND has(t.artist_ids, {entityId:String})';
 				break;
 			case 'track':
-				// Normal tenant: tenant check qua JOIN, entity filter trên isrc
 				filterSql += ' AND s.isrc = {entityId:String}';
 				break;
 			case 'tenant':
 				filterSql += ' AND t.tenant_id = {entityId:String}';
 				break;
+			case 'channel':
+				filterSql += ' AND t.channel_id = {entityId:String}';
+				break;
+		}
+
+		if (releaseType) {
+			filterSql += ' AND t.release_type = {releaseType:String}';
+			params.releaseType = releaseType;
 		}
 
 		return { joinSql, filterSql, params };
@@ -187,12 +197,23 @@ export class EntityAnalyticsService {
 		dto: EntityOverviewQueryDto,
 		tenantId: string,
 	): Promise<EntityOverviewResponse> {
+		const key = this.cache.buildKey('ent:overview', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeOverview(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeOverview(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityOverviewQueryDto,
+		tenantId: string,
+	): Promise<EntityOverviewResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -293,6 +314,16 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
+		const key = this.cache.buildKey('ent:trend-dsp-tl', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeTrendViewDspTimeline(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeTrendViewDspTimeline(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityTimelineQueryDto,
+		tenantId: string,
+	): Promise<DspTimelineResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { topN = 5, includeOther = true } = dto;
@@ -300,6 +331,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -376,6 +408,16 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
+		const key = this.cache.buildKey('ent:sales-dsp-tl', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeSalesViewDspTimeline(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeSalesViewDspTimeline(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityTimelineQueryDto,
+		tenantId: string,
+	): Promise<DspTimelineResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { topN = 5, includeOther = true } = dto;
@@ -383,6 +425,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -463,11 +506,22 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
+		const key = this.cache.buildKey('ent:trend-dsp-daily-tl', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeTrendViewDspDailyTimeline(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeTrendViewDspDailyTimeline(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityTimelineQueryDto,
+		tenantId: string,
+	): Promise<DspTimelineResponse> {
 		const { fromDate, toDate, topN = 5, includeOther = true } = dto;
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -544,6 +598,16 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<RevenueTimelineResponse> {
+		const key = this.cache.buildKey('ent:rev-tl', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeRevenueTimeline(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeRevenueTimeline(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityTimelineQueryDto,
+		tenantId: string,
+	): Promise<RevenueTimelineResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { topN = 5, includeOther = true } = dto;
@@ -551,6 +615,7 @@ export class EntityAnalyticsService {
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -648,10 +713,21 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
+		const key = this.cache.buildKey('ent:trend-line-chart', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeTrendViewLineChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeTrendViewLineChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<TrendViewLineChartItem[]> {
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -684,12 +760,23 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
+		const key = this.cache.buildKey('ent:rev-line-chart', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeRevenueLineChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeRevenueLineChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -726,10 +813,21 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
+		const key = this.cache.buildKey('ent:trend-dsp-bar', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeTrendViewDspBarChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeTrendViewDspBarChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<DspBarChartItem[]> {
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -784,12 +882,23 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
+		const key = this.cache.buildKey('ent:trend-ter-bar', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeTrendViewTerritoryBarChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeTrendViewTerritoryBarChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -843,12 +952,23 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
+		const key = this.cache.buildKey('ent:rev-dsp-bar', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeRevenueDspBarChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeRevenueDspBarChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -914,12 +1034,23 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
+		const key = this.cache.buildKey('ent:rev-ter-bar', tenantId, { entityType, entityId, ...dto });
+		return this.cache.wrap(key, () => this.computeRevenueTerritoryBarChart(entityType, entityId, dto, tenantId));
+	}
+
+	private async computeRevenueTerritoryBarChart(
+		entityType: EntityType,
+		entityId: string,
+		dto: ChartQueryDto,
+		tenantId: string,
+	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
 			entityId,
+			dto.releaseType,
 		);
 		params.from = fromDate;
 		params.to = toDate;

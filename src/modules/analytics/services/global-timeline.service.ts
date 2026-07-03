@@ -4,6 +4,7 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { AnalyticsCacheService } from './analytics-cache.service';
 import { TimelineQueryDto, ChartQueryDto } from '../dto/analytics-query.dto';
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
@@ -20,6 +21,7 @@ import {
   RevenueArtistItem,
   RevenueLabelItem,
   RevenueTenantItem,
+  RevenueChannelItem,
   OverviewTrendsResponse,
   RevenueReleaseItem,
   TrendViewLineChartItem,
@@ -32,13 +34,17 @@ import { EntityManager } from 'typeorm';
 @Injectable()
 export class TimelineAnalyticsService {
   private readonly logger = new Logger(TimelineAnalyticsService.name);
-  private readonly validReleaseUpcFilter = "AND match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$')";
+  // Audio: yeu cau release_upc chuan (10-14 chu so sau khi strip leading zeros).
+  // Video: bypass filter - luon cho pass du release_upc dang placeholder (ISRC-xxx).
+  private readonly validReleaseUpcFilter =
+    "AND (t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
 
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
+    private readonly cache: AnalyticsCacheService,
   ) { }
 
   private revenueNumber(value?: string | null): number {
@@ -87,13 +93,13 @@ export class TimelineAnalyticsService {
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
-    query: { labelId?: string; releaseId?: string },
+    query: { labelId?: string; releaseId?: string; releaseType?: 'audio' | 'video' },
   ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
 
     const isSystem = checkIsSystemTenant(tenantId);
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
     if (isSystem && !hasSubFilter) {
@@ -119,6 +125,11 @@ export class TimelineAnalyticsService {
       params.releaseId = query.releaseId;
     }
 
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
+
     return { joinSql, filterSql, params };
   }
 
@@ -126,6 +137,14 @@ export class TimelineAnalyticsService {
   // DSP SALES TIMELINE (Có Doanh thu + Lượt nghe đối soát)
   // ═══════════════════════════════════════════════════════
   async getDspSalesTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-sales', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspSalesTimeline(tenantId, query));
+  }
+
+  private async computeDspSalesTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
@@ -213,6 +232,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-trends', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspTrendsTimeline(tenantId, query));
+  }
+
+  private async computeDspTrendsTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -290,6 +317,14 @@ export class TimelineAnalyticsService {
   // DSP TRENDS DAILY TIMELINE (Lượt nghe hàng ngày xu hướng)
   // ═══════════════════════════════════════════════════════
   async getDspTrendsDailyTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<DspTimelineResponse> {
+    const key = this.cache.buildKey('tl:dsp-trends-daily', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspTrendsDailyTimeline(tenantId, query));
+  }
+
+  private async computeDspTrendsDailyTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<DspTimelineResponse> {
@@ -371,6 +406,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
+    const key = this.cache.buildKey('tl:ter-sales', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTerSalesTimeline(tenantId, query));
+  }
+
+  private async computeTerSalesTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<TerTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -432,6 +475,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<TerTimelineResponse> {
+    const key = this.cache.buildKey('tl:ter-trends', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTerTrendsTimeline(tenantId, query));
+  }
+
+  private async computeTerTrendsTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<TerTimelineResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { topN = 5, includeOther = true } = query;
@@ -490,6 +541,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueOverviewResponse> {
+    const key = this.cache.buildKey('tl:rev-overview', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueOverview(tenantId, query));
+  }
+
+  private async computeRevenueOverview(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueOverviewResponse> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
@@ -516,6 +575,14 @@ export class TimelineAnalyticsService {
   // REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng + Top DSPs)
   // ═══════════════════════════════════════════════════════
   async getRevenueTimeline(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<RevenueTimelineResponse> {
+    const key = this.cache.buildKey('tl:rev-timeline', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTimeline(tenantId, query));
+  }
+
+  private async computeRevenueTimeline(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<RevenueTimelineResponse> {
@@ -638,6 +705,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueDspItem>> {
+    const key = this.cache.buildKey('tl:rev-top-dsp', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopDsp(tenantId, query));
+  }
+
+  private async computeRevenueTopDsp(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueDspItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -720,6 +795,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueArtistItem>> {
+    const key = this.cache.buildKey('tl:rev-top-artist', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopArtist(tenantId, query));
+  }
+
+  private async computeRevenueTopArtist(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueArtistItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -739,6 +822,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     if (query.keyword) {
@@ -838,6 +925,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueTrackItem>> {
+    const key = this.cache.buildKey('tl:rev-top-track', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopTrack(tenantId, query));
+  }
+
+  private async computeRevenueTopTrack(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueTrackItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -861,8 +956,12 @@ export class TimelineAnalyticsService {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
       }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
+      }
     } else {
-      if (query.labelId || query.releaseId) {
+      if (query.labelId || query.releaseId || query.releaseType) {
         joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
         filterSql = 'AND t.is_deleted = 0';
         if (query.labelId) {
@@ -872,6 +971,10 @@ export class TimelineAnalyticsService {
         if (query.releaseId) {
           filterSql += ' AND t.release_id = {releaseId:String}';
           params.releaseId = query.releaseId;
+        }
+        if (query.releaseType) {
+          filterSql += ' AND t.release_type = {releaseType:String}';
+          params.releaseType = query.releaseType;
         }
       }
     }
@@ -1002,6 +1105,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueLabelItem>> {
+    const key = this.cache.buildKey('tl:rev-top-label', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopLabel(tenantId, query));
+  }
+
+  private async computeRevenueTopLabel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueLabelItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -1021,6 +1132,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     if (query.keyword) {
@@ -1109,9 +1224,132 @@ export class TimelineAnalyticsService {
   }
 
   // ═══════════════════════════════════════════════════════
+  // REVENUE TOP CHANNEL (Top channel theo doanh thu - video only)
+  // ═══════════════════════════════════════════════════════
+  async getRevenueTopChannel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueChannelItem>> {
+    const key = this.cache.buildKey('tl:rev-top-channel', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopChannel(tenantId, query));
+  }
+
+  private async computeRevenueTopChannel(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueChannelItem>> {
+    const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+    const toDate = normalizeDateToFirstOfMonth(query.toDate);
+    const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
+    const isSystem = checkIsSystemTenant(tenantId);
+
+    const params: Record<string, any> = { from: fromDate, to: toDate };
+    let filterSql = 'AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+    if (query.labelId) {
+      filterSql += ' AND t.label_id = {labelId:String}';
+      params.labelId = query.labelId;
+    }
+    if (query.releaseId) {
+      filterSql += ' AND t.release_id = {releaseId:String}';
+      params.releaseId = query.releaseId;
+    }
+    // releaseType khong can - channel_id chi co o video
+
+    const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+
+    // Count query
+    const countSql = queries.getRevenueTopChannelCountQuery(joinSql, filterSql);
+    const countResult = await this.clickHouseService.query<{ total: string }>(countSql, params);
+    const totalItems = Number(countResult[0]?.total ?? 0);
+
+    // Data query
+    const sql = queries.getRevenueTopChannelQuery(joinSql, filterSql, limit, offset);
+    const rows = await this.clickHouseService.query<{
+      channelId: string;
+      revenue_usd: string;
+      quantity: string;
+      release_count: string;
+      track_count: string;
+    }>(sql, params);
+
+    const items: RevenueChannelItem[] = [];
+
+    if (rows.length > 0) {
+      const channelIds = rows.map((r) => r.channelId);
+      const channelsMeta = await this.isrcResolverService.getChannelMetadata(channelIds);
+
+      rows.forEach((r, index) => {
+        const meta = channelsMeta.get(r.channelId);
+        items.push({
+          rank: offset + index + 1,
+          channelId: r.channelId,
+          channelName: meta?.name ?? 'Unknown Channel',
+          thumbUrl: meta?.thumbUrl ?? null,
+          youtubeChannelId: meta?.youtubeChannelId ?? null,
+          releaseCount: Number(r.release_count),
+          trackCount: Number(r.track_count),
+          revenueUsd: this.revenueNumber(r.revenue_usd),
+          revenueUsdExact: this.revenueExact(r.revenue_usd),
+          quantity: Number(r.quantity),
+          tenant: meta?.tenant ?? null,
+        });
+      });
+
+      const shouldIncludeOther = !isPaginated && query.includeOther === true;
+
+      if (shouldIncludeOther) {
+        const totalSql = queries.getRevenueTopChannelTotalQuery(joinSql, filterSql);
+        const totalResult = await this.clickHouseService.query<{ total_qty: string; total_rev: string }>(totalSql, params);
+        const totalQty = Number(totalResult[0]?.total_qty ?? 0);
+        const totalRevExact = this.revenueExact(totalResult[0]?.total_rev);
+
+        const itemsQtySum = items.reduce((acc, it) => acc + it.quantity, 0);
+        const itemsRevSumExact = this.addRevenueExact(items.map((it) => it.revenueUsdExact));
+
+        const otherQty = totalQty - itemsQtySum;
+        const otherRevExact = this.subtractRevenueExact(totalRevExact, itemsRevSumExact);
+        const otherRev = this.revenueNumber(otherRevExact);
+
+        if (otherQty > 0 || otherRev > 0) {
+          items.push({
+            rank: items.length + 1,
+            channelId: 'other',
+            channelName: 'Other',
+            thumbUrl: null,
+            youtubeChannelId: null,
+            revenueUsd: otherRev > 0 ? otherRev : 0,
+            revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
+            quantity: otherQty > 0 ? otherQty : 0,
+            tenant: null,
+          });
+        }
+      }
+    }
+
+    if (isPaginated) {
+      return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+    } else {
+      return new PageDto({ items, metadata: { page: 0, pageSize: 0, totalItems: 0 } });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
   // REVENUE TOP TENANT (Top tenant theo doanh thu)
   // ═══════════════════════════════════════════════════════
   async getRevenueTopTenant(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueTenantItem>> {
+    const key = this.cache.buildKey('tl:rev-top-tenant', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopTenant(tenantId, query));
+  }
+
+  private async computeRevenueTopTenant(
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueTenantItem>> {
@@ -1126,6 +1364,11 @@ export class TimelineAnalyticsService {
     if (!isSystem) {
       filterSql += ' AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     if (query.keyword) {
@@ -1214,6 +1457,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<OverviewTrendsResponse> {
+    const key = this.cache.buildKey('tl:trends-overview', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendsOverview(tenantId, query));
+  }
+
+  private async computeTrendsOverview(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<OverviewTrendsResponse> {
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = { from: query.fromDate, to: query.toDate };
 
@@ -1231,6 +1482,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     // Query 1: views, dsps, tracks, labels
@@ -1263,6 +1518,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: TimelineQueryDto,
   ): Promise<PageDto<RevenueReleaseItem>> {
+    const key = this.cache.buildKey('tl:rev-top-release', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTopRelease(tenantId, query));
+  }
+
+  private async computeRevenueTopRelease(
+    tenantId: string,
+    query: TimelineQueryDto,
+  ): Promise<PageDto<RevenueReleaseItem>> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { limit, offset, page, pageSize, isPaginated } = this.getPaginationParams(query);
@@ -1282,6 +1545,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     if (query.keyword) {
@@ -1377,12 +1644,20 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TrendViewLineChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-line', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewLineChart(tenantId, query));
+  }
+
+  private async computeTrendViewLineChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TrendViewLineChartItem[]> {
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = { from: query.fromDate, to: query.toDate };
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1398,6 +1673,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 
@@ -1422,6 +1701,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<DspBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-dsp-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewDspBarChart(tenantId, query));
+  }
+
+  private async computeTrendViewDspBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<DspBarChartItem[]> {
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = { from: query.fromDate, to: query.toDate };
 
@@ -1437,6 +1724,10 @@ export class TimelineAnalyticsService {
     if (query.releaseId) {
       filterSql += ' AND t.release_id = {releaseId:String}';
       params.releaseId = query.releaseId;
+    }
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
@@ -1482,6 +1773,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TerritoryBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-trend-ter-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTrendViewTerritoryBarChart(tenantId, query));
+  }
+
+  private async computeTrendViewTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
@@ -1516,6 +1815,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<RevenueLineChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-line', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueLineChart(tenantId, query));
+  }
+
+  private async computeRevenueLineChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<RevenueLineChartItem[]> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const isSystem = checkIsSystemTenant(tenantId);
@@ -1523,7 +1830,7 @@ export class TimelineAnalyticsService {
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1539,6 +1846,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 
@@ -1566,6 +1877,14 @@ export class TimelineAnalyticsService {
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<DspBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-dsp-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueDspBarChart(tenantId, query));
+  }
+
+  private async computeRevenueDspBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<DspBarChartItem[]> {
     const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
     const toDate = normalizeDateToFirstOfMonth(query.toDate);
     const isSystem = checkIsSystemTenant(tenantId);
@@ -1573,7 +1892,7 @@ export class TimelineAnalyticsService {
 
     let joinSql = '';
     let filterSql = '';
-    const hasSubFilter = !!(query.labelId || query.releaseId);
+    const hasSubFilter = !!(query.labelId || query.releaseId || query.releaseType);
 
     if (!isSystem || hasSubFilter) {
       joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -1589,6 +1908,10 @@ export class TimelineAnalyticsService {
       if (query.releaseId) {
         filterSql += ' AND t.release_id = {releaseId:String}';
         params.releaseId = query.releaseId;
+      }
+      if (query.releaseType) {
+        filterSql += ' AND t.release_type = {releaseType:String}';
+        params.releaseType = query.releaseType;
       }
     }
 
@@ -1629,6 +1952,14 @@ export class TimelineAnalyticsService {
   }
 
   async getRevenueTerritoryBarChart(
+    tenantId: string,
+    query: ChartQueryDto,
+  ): Promise<TerritoryBarChartItem[]> {
+    const key = this.cache.buildKey('tl:chart-rev-ter-bar', tenantId, query);
+    return this.cache.wrap(key, () => this.computeRevenueTerritoryBarChart(tenantId, query));
+  }
+
+  private async computeRevenueTerritoryBarChart(
     tenantId: string,
     query: ChartQueryDto,
   ): Promise<TerritoryBarChartItem[]> {

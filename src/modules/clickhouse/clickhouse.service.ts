@@ -16,11 +16,27 @@ export class ClickHouseService implements OnModuleDestroy {
   ) {}
 
   /**
+   * Default hard cap resultset để tránh caller quên LIMIT → OOM.
+   * ClickHouse tự throw với `result_overflow_mode='throw'` khi vượt.
+   * Caller nào cần vượt ngưỡng (export lớn) truyền `settings` override.
+   */
+  private static readonly DEFAULT_MAX_RESULT_ROWS = 200_000;
+  private static readonly WARN_RESULT_ROWS = 10_000;
+
+  /**
    * Execute a SELECT query and return typed results.
+   *
+   * IMPORTANT: query() buffer TOÀN BỘ resultset vào RAM (result.json()) → nguy
+   * cơ OOM khi query quên LIMIT hoặc aggregation trả về nhiều row hơn dự kiến.
+   * Guard: `max_result_rows=200_000` + `result_overflow_mode='throw'` → CH throw
+   * fail-fast thay vì Node OOM. Nếu caller cần vượt ngưỡng (export lớn), truyền
+   * `settings: { max_result_rows: N }` để override. Cho dataset lớn thực sự,
+   * NÊN dùng queryStream() thay vì bump giới hạn.
    */
   async query<T = Record<string, unknown>>(
     sql: string,
     params?: Record<string, unknown>,
+    settings?: Record<string, string | number | boolean>,
   ): Promise<T[]> {
     const startTime = Date.now();
     try {
@@ -28,11 +44,23 @@ export class ClickHouseService implements OnModuleDestroy {
         query: sql,
         query_params: params,
         format: 'JSONEachRow',
+        clickhouse_settings: {
+          max_result_rows: String(ClickHouseService.DEFAULT_MAX_RESULT_ROWS),
+          result_overflow_mode: 'throw',
+          ...settings,
+        },
       });
       const data = await result.json<T>();
-      this.logger.debug(
-        `Query executed in ${Date.now() - startTime}ms | ${sql.substring(0, 100)}...`,
-      );
+      const elapsed = Date.now() - startTime;
+      if (data.length >= ClickHouseService.WARN_RESULT_ROWS) {
+        this.logger.warn(
+          `Query returned ${data.length} rows (>= ${ClickHouseService.WARN_RESULT_ROWS}) in ${elapsed}ms — cân nhắc thêm LIMIT hoặc chuyển sang queryStream. SQL: ${sql.substring(0, 120)}...`,
+        );
+      } else {
+        this.logger.debug(
+          `Query executed in ${elapsed}ms | ${sql.substring(0, 100)}...`,
+        );
+      }
       return data;
     } catch (error) {
       this.logger.error(`Query failed: ${error.message}`, error.stack);

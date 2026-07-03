@@ -7,6 +7,7 @@ import { Label } from 'src/modules/label/entities/label.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
+import { Channel } from 'src/modules/channel/entities/channel.entity';
 import {
   TrackMetadata,
   IsrcArtistMapping,
@@ -32,6 +33,8 @@ export class IsrcResolverService {
     private readonly trackArtistRepo: Repository<TrackArtist>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(Channel)
+    private readonly channelRepo: Repository<Channel>,
   ) {}
 
   /**
@@ -183,71 +186,6 @@ export class IsrcResolverService {
 
 
   /**
-   * Lấy full track metadata cho tenant (bao gồm release, label info).
-   * Dùng cho ranking Release/Label khi cần aggregate toàn bộ ISRCs.
-   */
-  async getAllTrackMetadataForTenant(
-    tenantId: string,
-    filters?: { labelId?: string },
-  ): Promise<TrackMetadata[]> {
-    const qb = this.trackRepo
-      .createQueryBuilder('t')
-      .select([
-        't.isrc AS isrc',
-        't.title AS "trackTitle"',
-        't.version AS "trackVersion"',
-        'r.id AS "releaseId"',
-        'r.title AS "releaseTitle"',
-        'r.upc AS "releaseUpc"',
-        'l.id AS "labelId"',
-        'l.name AS "labelName"',
-      ])
-      .innerJoin('t.release', 'r')
-      .leftJoin('r.label', 'l')
-      .where('t.isrc IS NOT NULL')
-      .andWhere("t.isrc != ''");
-
-    if (!checkIsSystemTenant(tenantId)) {
-      qb.andWhere('r.tenantId = :tenantId', { tenantId });
-    }
-
-    if (filters?.labelId) {
-      qb.andWhere('r.labelId = :labelId', { labelId: filters.labelId });
-    }
-
-    return qb.getRawMany<TrackMetadata>();
-  }
-
-  /**
-   * Lấy ISRC → Artist mappings cho toàn bộ tenant.
-   * Dùng cho ranking Artist.
-   */
-  async getAllIsrcArtistMappingsForTenant(
-    tenantId: string,
-  ): Promise<IsrcArtistMapping[]> {
-    const qb = this.trackRepo
-      .createQueryBuilder('t')
-      .select([
-        't.isrc AS isrc',
-        'a.id AS "artistId"',
-        'a.name AS "artistName"',
-        'a.picture AS "artistPicture"',
-      ])
-      .innerJoin('t.release', 'r')
-      .innerJoin('t.trackArtists', 'ta')
-      .innerJoin('ta.artist', 'a')
-      .where('t.isrc IS NOT NULL')
-      .andWhere("t.isrc != ''");
-
-    if (!checkIsSystemTenant(tenantId)) {
-      qb.andWhere('r.tenantId = :tenantId', { tenantId });
-    }
-
-    const results = await qb.getRawMany<IsrcArtistMapping>();
-    return results;
-  }
-
-  /**
    * Lấy ảnh bìa (cover art) dạng thumbnails cho danh sách releaseIds từ PostgreSQL
    */
   async getReleaseImages(releaseIds: string[]): Promise<Map<string, ICoverArtThumbnails>> {
@@ -303,6 +241,56 @@ export class IsrcResolverService {
           name: l.tenant.name,
           title: l.tenant.title,
           logo: l.tenant.logo || null,
+        } : null,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Lấy thông tin (name, thumbnail, youtubeChannelId, tenant) cho danh sách channelIds từ PostgreSQL
+   */
+  async getChannelMetadata(channelIds: string[]): Promise<Map<string, {
+    name: string;
+    thumbUrl: string | null;
+    youtubeChannelId: string | null;
+    tenant: { id: string; name: string; title: string; logo: string | null } | null;
+  }>> {
+    const map = new Map<string, {
+      name: string;
+      thumbUrl: string | null;
+      youtubeChannelId: string | null;
+      tenant: { id: string; name: string; title: string; logo: string | null } | null;
+    }>();
+    if (!channelIds.length) return map;
+
+    const channels = await this.channelRepo.find({
+      where: { id: In(channelIds) },
+      relations: ['tenant'],
+      select: {
+        id: true,
+        name: true,
+        thumbUrl: true,
+        youtubeChannelId: true,
+        tenant: {
+          id: true,
+          name: true,
+          title: true,
+          logo: true,
+        },
+      },
+    });
+
+    for (const c of channels) {
+      map.set(c.id, {
+        name: c.name,
+        thumbUrl: c.thumbUrl || null,
+        youtubeChannelId: c.youtubeChannelId || null,
+        tenant: c.tenant ? {
+          id: c.tenant.id,
+          name: c.tenant.name,
+          title: c.tenant.title,
+          logo: c.tenant.logo || null,
         } : null,
       });
     }
@@ -421,11 +409,29 @@ export class IsrcResolverService {
     return map;
   }
 
+  // ─────────────────────────────────────────────────────
+  // Keyword search — HARD CAP 1000 rows để tránh keyword phổ biến (vd "a",
+  // "the") match hàng chục nghìn row → array UUID kéo về Node → làm param
+  // `IN(...)` khổng lồ cho ClickHouse → double RAM hit. Đây là defense-in-depth
+  // ngăn OOM khi client gõ keyword ngắn.
+  // ─────────────────────────────────────────────────────
+  private static readonly KEYWORD_SEARCH_LIMIT = 1000;
+
+  private warnIfHitCeiling(scope: string, keyword: string, count: number): void {
+    if (count >= IsrcResolverService.KEYWORD_SEARCH_LIMIT) {
+      this.logger.warn(
+        `Keyword search "${scope}" hit ceiling ${IsrcResolverService.KEYWORD_SEARCH_LIMIT} for keyword="${keyword}". Kết quả bị cắt — user cần refine query.`,
+      );
+    }
+  }
+
   async getArtistIdsByKeyword(keyword: string): Promise<string[]> {
     const artists = await this.artistRepo.find({
       where: { name: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('artists', keyword, artists.length);
     return artists.map((a) => a.id);
   }
 
@@ -433,7 +439,9 @@ export class IsrcResolverService {
     const labels = await this.labelRepo.find({
       where: { name: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('labels', keyword, labels.length);
     return labels.map((l) => l.id);
   }
 
@@ -444,7 +452,9 @@ export class IsrcResolverService {
         { title: ILike(`%${keyword}%`) },
       ],
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('tenants', keyword, tenants.length);
     return tenants.map((t) => t.id);
   }
 
@@ -452,7 +462,9 @@ export class IsrcResolverService {
     const releases = await this.releaseRepo.find({
       where: { title: ILike(`%${keyword}%`) },
       select: ['id'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('releases', keyword, releases.length);
     return releases.map((r) => r.id);
   }
 
@@ -460,7 +472,9 @@ export class IsrcResolverService {
     const tracks = await this.trackRepo.find({
       where: { title: ILike(`%${keyword}%`) },
       select: ['isrc'],
+      take: IsrcResolverService.KEYWORD_SEARCH_LIMIT,
     });
+    this.warnIfHitCeiling('tracks', keyword, tracks.length);
     return tracks.map((t) => t.isrc).filter((isrc): isrc is string => !!isrc);
   }
 }
