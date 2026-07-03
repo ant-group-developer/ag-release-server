@@ -3,6 +3,7 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { AnalyticsCacheService } from './analytics-cache.service';
 import { RankingQueryDto } from '../dto/analytics-query.dto';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
@@ -32,6 +33,7 @@ export class RankingService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
+    private readonly cache: AnalyticsCacheService,
   ) {}
 
   // ═══════════════════════════════════════════════════════
@@ -80,6 +82,14 @@ export class RankingService {
   // 1. TOP TRACKS RANKING
   // ═══════════════════════════════════════════════════════
   async getTopTracks(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<TrackRankingItem>> {
+    const key = this.cache.buildKey('rank:tracks', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopTracks(tenantId, query));
+  }
+
+  private async computeTopTracks(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<TrackRankingItem>> {
@@ -144,7 +154,17 @@ export class RankingService {
     const dataSql = `
       SELECT
         s.isrc AS isrc,
-        sum(s.total_quantity) AS totalViews
+        sum(s.total_quantity) AS totalViews,
+        any(t.track_title) AS trackTitle,
+        any(t.track_version) AS trackVersion,
+        any(t.release_id) AS releaseId,
+        any(t.release_title) AS releaseTitle,
+        any(t.artist_names) AS artistNames,
+        any(t.cover_75) AS cover75,
+        any(t.cover_100) AS cover100,
+        any(t.cover_160) AS cover160,
+        any(t.cover_300) AS cover300,
+        any(t.cover_original) AS coverOriginal
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
@@ -160,29 +180,25 @@ export class RankingService {
     const paged = await this.clickHouseService.query<{
       isrc: string;
       totalViews: string;
+      trackTitle: string;
+      trackVersion: string;
+      releaseId: string;
+      releaseTitle: string;
+      artistNames: string[];
+      cover75: string;
+      cover100: string;
+      cover160: string;
+      cover300: string;
+      coverOriginal: string;
     }>(dataSql, params);
 
-    // Enrich metadata từ Postgres (chỉ enrich Top N đã paged -> cực nhanh)
-    const topIsrcs = paged.map((r) => r.isrc);
-    const [metadataMap, artistMappings] = await Promise.all([
-      this.isrcResolverService.getTrackMetadataMap(topIsrcs),
-      this.isrcResolverService.getIsrcArtistMappings(topIsrcs),
-    ]);
-
-    const artistNameMap = new Map<string, string>();
-    for (const mapping of artistMappings) {
-      const current = artistNameMap.get(mapping.isrc);
-      artistNameMap.set(
-        mapping.isrc,
-        current ? `${current}, ${mapping.artistName}` : mapping.artistName,
-      );
-    }
-
-    // Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse
+    // Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse fact table
     // Chỉ xảy ra với system-tenant (query tất cả ISRCs, không giới hạn pg_tracks_sync)
     const fallbackMap = new Map<string, { trackTitle: string; artistName: string; albumTitle: string }>();
     if (isSystem) {
-      const missingIsrcs = topIsrcs.filter((isrc) => !metadataMap.has(isrc));
+      const missingIsrcs = paged
+        .filter((r) => !r.trackTitle)
+        .map((r) => r.isrc);
       if (missingIsrcs.length > 0) {
         const fbParams = { isrcs: missingIsrcs };
         const fbSql = `
@@ -211,38 +227,27 @@ export class RankingService {
       }
     }
 
-    const releaseIds = Array.from(metadataMap.values())
-      .map((m) => m.releaseId)
-      .filter(Boolean);
-    const releaseImageMap = await this.isrcResolverService.getReleaseImages(releaseIds);
-
     const items: TrackRankingItem[] = paged.map((row, index) => {
-      const meta = metadataMap.get(row.isrc);
       const fallback = fallbackMap.get(row.isrc);
-      const releaseId = meta?.releaseId ?? '';
-      
-      let releaseObj: { coverArtThumbnails: ICoverArtThumbnails } | null = null;
-      if (releaseId) {
-        const coverArtThumbnails = releaseImageMap.get(releaseId) ?? {
-          '75x75': null,
-          '100x100': null,
-          '160x160': null,
-          '300x300': null,
-          original: null,
-        };
-        releaseObj = { coverArtThumbnails };
-      }
-
+      const artistNames: string[] = Array.isArray(row.artistNames) ? row.artistNames : [];
+      const artistName = artistNames.join(', ') || fallback?.artistName || '';
+      const coverArtThumbnails: ICoverArtThumbnails = {
+        '75x75': row.cover75 || null,
+        '100x100': row.cover100 || null,
+        '160x160': row.cover160 || null,
+        '300x300': row.cover300 || null,
+        original: row.coverOriginal || null,
+      };
       return {
         rank: query.skip + index + 1,
         isrc: row.isrc,
-        title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
-        version: meta?.trackVersion ?? null,
-        artistName: artistNameMap.get(row.isrc) ?? fallback?.artistName ?? '',
-        releaseId,
-        releaseTitle: meta?.releaseTitle ?? fallback?.albumTitle ?? '',
+        title: row.trackTitle || fallback?.trackTitle || '',
+        version: row.trackVersion || null,
+        artistName,
+        releaseId: row.releaseId || '',
+        releaseTitle: row.releaseTitle || fallback?.albumTitle || '',
         totalViews: Number(row.totalViews),
-        release: releaseObj,
+        release: { coverArtThumbnails },
       };
     });
 
@@ -253,6 +258,14 @@ export class RankingService {
   // 2. TOP RELEASES RANKING (NATIVE OLAP GROUP BY release_id)
   // ═══════════════════════════════════════════════════════
   async getTopReleases(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<ReleaseRankingItem>> {
+    const key = this.cache.buildKey('rank:releases', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopReleases(tenantId, query));
+  }
+
+  private async computeTopReleases(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<ReleaseRankingItem>> {
@@ -308,7 +321,16 @@ export class RankingService {
       SELECT
         t.release_id AS releaseId,
         uniq(s.isrc) AS trackCount,
-        sum(s.total_quantity) AS totalViews
+        sum(s.total_quantity) AS totalViews,
+        any(t.release_title) AS releaseTitle,
+        any(t.release_upc) AS releaseUpc,
+        any(t.label_id) AS labelId,
+        any(t.label_name) AS labelName,
+        any(t.cover_75) AS cover75,
+        any(t.cover_100) AS cover100,
+        any(t.cover_160) AS cover160,
+        any(t.cover_300) AS cover300,
+        any(t.cover_original) AS coverOriginal
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
@@ -325,37 +347,35 @@ export class RankingService {
       releaseId: string;
       trackCount: string;
       totalViews: string;
+      releaseTitle: string;
+      releaseUpc: string;
+      labelId: string;
+      labelName: string;
+      cover75: string;
+      cover100: string;
+      cover160: string;
+      cover300: string;
+      coverOriginal: string;
     }>(dataSql, params);
 
-    // Enrich CHỈ Top N releases đã paged từ Postgres (In(releaseIds)).
-    // Trước đây gọi getAllTrackMetadataForTenant(tenantId) — với system-tenant sẽ
-    // kéo toàn bộ track/release/label metadata cả hệ thống về Node → OOM khi
-    // dashboard fire nhiều request analytics đồng thời. getReleaseMetadata trả
-    // luôn coverArtThumbnails nên bỏ luôn getReleaseImages riêng.
-    const releaseIds = paged.map((r) => r.releaseId);
-    const metaMap = await this.isrcResolverService.getReleaseMetadata(releaseIds);
-
     const items: ReleaseRankingItem[] = paged.map((r, index) => {
-      const meta = metaMap.get(r.releaseId);
-      const coverArtThumbnails = meta?.coverArtThumbnails ?? {
-        '75x75': null,
-        '100x100': null,
-        '160x160': null,
-        '300x300': null,
-        original: null,
+      const coverArtThumbnails: ICoverArtThumbnails = {
+        '75x75': r.cover75 || null,
+        '100x100': r.cover100 || null,
+        '160x160': r.cover160 || null,
+        '300x300': r.cover300 || null,
+        original: r.coverOriginal || null,
       };
       return {
         rank: query.skip + index + 1,
         releaseId: r.releaseId,
-        title: meta?.title ?? 'Unknown Release',
-        upc: meta?.upc ?? null,
-        labelId: meta?.labelId ?? null,
-        labelName: meta?.labelName ?? null,
+        title: r.releaseTitle || 'Unknown Release',
+        upc: r.releaseUpc || null,
+        labelId: r.labelId || null,
+        labelName: r.labelName || null,
         trackCount: Number(r.trackCount),
         totalViews: Number(r.totalViews),
-        release: {
-          coverArtThumbnails,
-        },
+        release: { coverArtThumbnails },
       };
     });
 
@@ -366,6 +386,14 @@ export class RankingService {
   // 3. TOP LABELS RANKING (NATIVE OLAP GROUP BY label_id)
   // ═══════════════════════════════════════════════════════
   async getTopLabels(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<LabelRankingItem>> {
+    const key = this.cache.buildKey('rank:labels', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopLabels(tenantId, query));
+  }
+
+  private async computeTopLabels(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<LabelRankingItem>> {
@@ -422,7 +450,8 @@ export class RankingService {
         t.label_id AS labelId,
         uniq(t.release_id) AS releaseCount,
         uniq(s.isrc) AS trackCount,
-        sum(s.total_quantity) AS totalViews
+        sum(s.total_quantity) AS totalViews,
+        any(t.label_name) AS labelName
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
@@ -440,8 +469,9 @@ export class RankingService {
       releaseCount: string;
       trackCount: string;
       totalViews: string;
+      labelName: string;
     }>(dataSql, params);
-    // Enrich label metadata from PostgreSQL (only enrich top N labels)
+    // Enrich label picture + tenant from Postgres (only top N labels, small set)
     const labelIds = paged.map((l) => l.labelId);
     const labelsMeta = await this.isrcResolverService.getLabelMetadata(labelIds);
 
@@ -451,7 +481,7 @@ export class RankingService {
       return {
         rank: query.skip + index + 1,
         labelId: l.labelId,
-        labelName: meta?.name ?? 'Unknown Label',
+        labelName: l.labelName || meta?.name || 'Unknown Label',
         picture: pictureUrl,
         image: pictureUrl,
         releaseCount: Number(l.releaseCount),
@@ -468,6 +498,14 @@ export class RankingService {
   // TOP CHANNELS RANKING (trend view, video only, GROUP BY channel_id)
   // ═══════════════════════════════════════════════════════
   async getTopChannels(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<ChannelRankingItem>> {
+    const key = this.cache.buildKey('rank:channels', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopChannels(tenantId, query));
+  }
+
+  private async computeTopChannels(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<ChannelRankingItem>> {
@@ -560,6 +598,14 @@ export class RankingService {
   // 4. TOP ARTISTS RANKING (NATIVE OLAP với arrayJoin)
   // ═══════════════════════════════════════════════════════
   async getTopArtists(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<ArtistRankingItem>> {
+    const key = this.cache.buildKey('rank:artists', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopArtists(tenantId, query));
+  }
+
+  private async computeTopArtists(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<ArtistRankingItem>> {
@@ -667,6 +713,14 @@ export class RankingService {
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<TenantRankingItem>> {
+    const key = this.cache.buildKey('rank:tenants', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopTenants(tenantId, query));
+  }
+
+  private async computeTopTenants(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<TenantRankingItem>> {
     const { fromDate, toDate, page, pageSize } = query;
     const isSystem = checkIsSystemTenant(tenantId);
 
@@ -767,6 +821,14 @@ export class RankingService {
   // 6. TOP DSPS RANKING (Trend play counts/views)
   // ═══════════════════════════════════════════════════════
   async getTopDsps(
+    tenantId: string,
+    query: RankingQueryDto,
+  ): Promise<PageDto<DspRankingItem>> {
+    const key = this.cache.buildKey('rank:dsps', tenantId, query);
+    return this.cache.wrap(key, () => this.computeTopDsps(tenantId, query));
+  }
+
+  private async computeTopDsps(
     tenantId: string,
     query: RankingQueryDto,
   ): Promise<PageDto<DspRankingItem>> {

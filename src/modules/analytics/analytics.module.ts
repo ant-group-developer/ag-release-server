@@ -37,6 +37,7 @@ import { DashboardAnalyticsService } from './services/dashboard-analytics.servic
 import { AnalyticsReportExportService } from './services/analytics-report-export.service';
 import { ExportQueueService } from './services/export-queue.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
+import { AnalyticsCacheService } from './services/analytics-cache.service';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
     ClickHouseSyncService,
     DspSeedingService,
     DashboardAnalyticsService,
+    AnalyticsCacheService,
   ],
   exports: [IsrcResolverService],
 })
