@@ -59,6 +59,25 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
   @IsOptional()
   @IsIn(['audio', 'video'])
   releaseType?: 'audio' | 'video';
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify). Extensible — pass any raw source value.',
+    example: 'wmg_report',
+  })
+  @IsOptional()
+  @IsString()
+  importSource?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'If true, each item in the response includes a bySource breakdown showing views/revenue split by import_source.',
+    default: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  groupBySource?: boolean;
 }
 
 /**
@@ -117,7 +136,7 @@ export class DspAnalyticsBaseDto {
     format: 'uuid',
   })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   pgDspId?: string;
 
   @ApiPropertyOptional({
@@ -202,6 +221,14 @@ export class ChartQueryDto {
   @IsOptional()
   @IsIn(['audio', 'video'])
   releaseType?: 'audio' | 'video';
+
+  @ApiPropertyOptional({
+    description: 'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+    example: 'wmg_report',
+  })
+  @IsOptional()
+  @IsString()
+  importSource?: string;
 }
 
 export class EntityTimelineQueryDto {
@@ -257,6 +284,14 @@ export class EntityTimelineQueryDto {
   @IsOptional()
   @IsIn(['audio', 'video'])
   releaseType?: 'audio' | 'video';
+
+  @ApiPropertyOptional({
+    description: 'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+    example: 'wmg_report',
+  })
+  @IsOptional()
+  @IsString()
+  importSource?: string;
 }
 
 export class EntityOverviewQueryDto {
@@ -286,6 +321,14 @@ export class EntityOverviewQueryDto {
   @IsOptional()
   @IsIn(['audio', 'video'])
   releaseType?: 'audio' | 'video';
+
+  @ApiPropertyOptional({
+    description: 'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+    example: 'wmg_report',
+  })
+  @IsOptional()
+  @IsString()
+  importSource?: string;
 }
 
 export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {

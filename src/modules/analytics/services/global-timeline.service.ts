@@ -28,7 +28,9 @@ import {
   DspBarChartItem,
   TerritoryBarChartItem,
   RevenueLineChartItem,
+  SourceBreakdownItem,
 } from '../interfaces/analytics.interface';
+import { getImportSourceLabel } from '../constants/import-source.constants';
 import { EntityManager } from 'typeorm';
 
 @Injectable()
@@ -86,6 +88,52 @@ export class TimelineAnalyticsService {
     ]);
   }
 
+  /**
+   * Fetch breakdown by import_source cho 1 group key (dsp, artist, track, label...).
+   * groupFilter: SQL fragment thêm vào WHERE để scope về 1 entity (e.g. "AND s.dsp_id = 'xxx'")
+   * groupParams: params tương ứng
+   * includeRevenue: true cho sales cube, false cho trends cube
+   */
+  private async fetchSourceBreakdown(
+    table: string,
+    dateCol: string,
+    joinSql: string,
+    baseFilterSql: string,
+    baseParams: Record<string, any>,
+    groupFilter: string,
+    groupParams: Record<string, any>,
+    includeRevenue: boolean,
+  ): Promise<SourceBreakdownItem[]> {
+    const params = { ...baseParams, ...groupParams };
+    const revSelect = includeRevenue ? ', sum(s.total_revenue_usd) AS revenue_usd' : '';
+    const sql = `
+      SELECT
+        s.import_source AS source,
+        sum(s.total_quantity) AS quantity
+        ${revSelect}
+      FROM ${table} s
+      ${joinSql}
+      WHERE ${dateCol} >= toDate({from:String}) AND ${dateCol} <= toDate({to:String})
+        ${baseFilterSql} ${groupFilter}
+      GROUP BY s.import_source
+      ORDER BY quantity DESC
+    `;
+    const rows = await this.clickHouseService.query<{
+      source: string;
+      quantity: string;
+      revenue_usd?: string;
+    }>(sql, params);
+    return rows.map((r) => ({
+      source: r.source,
+      sourceLabel: getImportSourceLabel(r.source),
+      quantity: Number(r.quantity),
+      ...(includeRevenue && {
+        revenueUsd: this.revenueNumber(r.revenue_usd),
+        revenueUsdExact: this.revenueExact(r.revenue_usd),
+      }),
+    }));
+  }
+
   // ═══════════════════════════════════════════════════════
   // Helper: Xay dung menh de WHERE cho phan quyen Tenant
   // System-tenant không có sub-filter → bỏ JOIN pg_tracks_sync
@@ -93,7 +141,7 @@ export class TimelineAnalyticsService {
   // ═══════════════════════════════════════════════════════
   private buildTenantFilters(
     tenantId: string,
-    query: { labelId?: string; releaseId?: string; releaseType?: 'audio' | 'video' },
+    query: { labelId?: string; releaseId?: string; releaseType?: 'audio' | 'video'; importSource?: string },
   ): { joinSql: string; filterSql: string; params: Record<string, any> } {
     const params: Record<string, any> = {};
     let filterSql = '';
@@ -103,7 +151,11 @@ export class TimelineAnalyticsService {
 
     // System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
     if (isSystem && !hasSubFilter) {
-      return { joinSql: '', filterSql: '', params };
+      if (query.importSource) {
+        filterSql += ' AND s.import_source = {importSource:String}';
+        params.importSource = query.importSource;
+      }
+      return { joinSql: '', filterSql, params };
     }
 
     // All other cases: JOIN pg_tracks_sync for tenant/label/release filtering
@@ -128,6 +180,11 @@ export class TimelineAnalyticsService {
     if (query.releaseType) {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
+    }
+
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
     }
 
     return { joinSql, filterSql, params };
@@ -757,6 +814,27 @@ export class TimelineAnalyticsService {
       quantity: Number(r.quantity),
     }));
 
+    // groupBySource: fetch breakdown per DSP
+    if (query.groupBySource && items.length > 0) {
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          item.dspReportId
+            ? this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                `${joinSql} ${joinExpr}`,
+                filterSql,
+                { ...params },
+                'AND s.dsp_id = {_dspId:String}',
+                { _dspId: item.dspReportId },
+                true,
+              )
+            : Promise.resolve([]),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
     if (shouldIncludeOther && items.length > 0) {
@@ -774,14 +852,28 @@ export class TimelineAnalyticsService {
       const otherRev = this.revenueNumber(otherRevExact);
 
       if (otherQty > 0 || otherRev > 0) {
-        items.push({
+        const otherItem: RevenueDspItem = {
           pgDspId: null,
           dspReportId: '',
           dspName: 'Other',
           revenueUsd: otherRev > 0 ? otherRev : 0,
           revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
           quantity: otherQty > 0 ? otherQty : 0,
-        });
+        };
+        if (query.groupBySource) {
+          const topDspIds = items.filter((it) => it.dspReportId).map((it) => it.dspReportId);
+          otherItem.bySource = await this.fetchSourceBreakdown(
+            CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+            's.period',
+            `${joinSql} ${joinExpr}`,
+            filterSql,
+            { ...params },
+            topDspIds.length > 0 ? 'AND s.dsp_id NOT IN ({_topDspIds:Array(String)})' : '',
+            topDspIds.length > 0 ? { _topDspIds: topDspIds } : {},
+            true,
+          );
+        }
+        items.push(otherItem);
       }
     }
 
@@ -833,6 +925,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
     }
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
+    }
 
     if (query.keyword) {
       let matchedArtistIds = await this.isrcResolverService.getArtistIdsByKeyword(query.keyword);
@@ -880,6 +976,28 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per artist
+      if (query.groupBySource) {
+        const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.artistId !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                joinSql,
+                filterSql,
+                { ...params },
+                'AND has(t.artist_ids, {_artistId:String})',
+                { _artistId: item.artistId },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.artistId !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -897,7 +1015,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueArtistItem = {
             rank: items.length + 1,
             artistId: 'other',
             artistName: 'Other',
@@ -909,7 +1027,24 @@ export class TimelineAnalyticsService {
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
-          });
+          };
+          if (query.groupBySource) {
+            const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+            const topArtistIds = items.filter((it) => it.artistId !== 'other').map((it) => it.artistId);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              joinSql,
+              filterSql,
+              { ...params },
+              topArtistIds.length > 0
+                ? 'AND NOT hasAny(t.artist_ids, {_topArtistIds:Array(String)})'
+                : '',
+              topArtistIds.length > 0 ? { _topArtistIds: topArtistIds } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }
@@ -966,8 +1101,12 @@ export class TimelineAnalyticsService {
         filterSql += ' AND t.release_type = {releaseType:String}';
         params.releaseType = query.releaseType;
       }
+      if (query.importSource) {
+        filterSql += ' AND s.import_source = {importSource:String}';
+        params.importSource = query.importSource;
+      }
     } else {
-      if (query.labelId || query.releaseId || query.releaseType) {
+      if (query.labelId || query.releaseId || query.releaseType || query.importSource) {
         joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
         filterSql = 'AND t.is_deleted = 0';
         if (query.labelId) {
@@ -981,6 +1120,10 @@ export class TimelineAnalyticsService {
         if (query.releaseType) {
           filterSql += ' AND t.release_type = {releaseType:String}';
           params.releaseType = query.releaseType;
+        }
+        if (query.importSource) {
+          filterSql += ' AND s.import_source = {importSource:String}';
+          params.importSource = query.importSource;
         }
       }
     }
@@ -1065,6 +1208,27 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per track
+      if (query.groupBySource) {
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.isrc !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                joinSql,
+                filterSql,
+                { ...params },
+                'AND s.isrc = {_isrc:String}',
+                { _isrc: item.isrc },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.isrc !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -1081,7 +1245,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueTrackItem = {
             rank: items.length + 1,
             isrc: 'other',
             title: 'Other',
@@ -1092,7 +1256,21 @@ export class TimelineAnalyticsService {
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
-          });
+          };
+          if (query.groupBySource) {
+            const topIsrcs = items.filter((it) => it.isrc !== 'other').map((it) => it.isrc);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              joinSql,
+              filterSql,
+              { ...params },
+              topIsrcs.length > 0 ? 'AND s.isrc NOT IN ({_topIsrcs:Array(String)})' : '',
+              topIsrcs.length > 0 ? { _topIsrcs: topIsrcs } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }
@@ -1143,6 +1321,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
     }
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
+    }
 
     if (query.keyword) {
       let matchedLabelIds = await this.isrcResolverService.getLabelIdsByKeyword(query.keyword);
@@ -1192,6 +1374,27 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per label
+      if (query.groupBySource) {
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.labelId !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                joinSql,
+                filterSql,
+                { ...params },
+                'AND t.label_id = {_labelId:String}',
+                { _labelId: item.labelId },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.labelId !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -1208,7 +1411,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueLabelItem = {
             rank: items.length + 1,
             labelId: 'other',
             labelName: 'Other',
@@ -1217,7 +1420,21 @@ export class TimelineAnalyticsService {
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
             tenant: null,
-          });
+          };
+          if (query.groupBySource) {
+            const topLabelIds = items.filter((it) => it.labelId !== 'other').map((it) => it.labelId);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              joinSql,
+              filterSql,
+              { ...params },
+              topLabelIds.length > 0 ? 'AND t.label_id NOT IN ({_topLabelIds:Array(String)})' : '',
+              topLabelIds.length > 0 ? { _topLabelIds: topLabelIds } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }
@@ -1265,6 +1482,10 @@ export class TimelineAnalyticsService {
       params.releaseId = query.releaseId;
     }
     // releaseType khong can - channel_id chi co o video
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
+    }
 
     const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
@@ -1306,6 +1527,27 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per channel
+      if (query.groupBySource) {
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.channelId !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                joinSql,
+                filterSql,
+                { ...params },
+                'AND t.channel_id = {_channelId:String}',
+                { _channelId: item.channelId },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.channelId !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -1322,7 +1564,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueChannelItem = {
             rank: items.length + 1,
             channelId: 'other',
             channelName: 'Other',
@@ -1332,7 +1574,21 @@ export class TimelineAnalyticsService {
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
             tenant: null,
-          });
+          };
+          if (query.groupBySource) {
+            const topChannelIds = items.filter((it) => it.channelId !== 'other').map((it) => it.channelId);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              joinSql,
+              filterSql,
+              { ...params },
+              topChannelIds.length > 0 ? 'AND t.channel_id NOT IN ({_topChannelIds:Array(String)})' : '',
+              topChannelIds.length > 0 ? { _topChannelIds: topChannelIds } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }
@@ -1375,6 +1631,10 @@ export class TimelineAnalyticsService {
     if (query.releaseType) {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
+    }
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
     }
 
     if (query.keyword) {
@@ -1420,6 +1680,27 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per tenant
+      if (query.groupBySource) {
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.tenantId !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                joinSql,
+                filterSql,
+                { ...params },
+                'AND t.tenant_id = {_tenantId:String}',
+                { _tenantId: item.tenantId },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.tenantId !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -1436,7 +1717,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueTenantItem = {
             rank: items.length + 1,
             tenantId: 'other',
             tenantName: 'Other',
@@ -1444,7 +1725,21 @@ export class TimelineAnalyticsService {
             revenueUsd: otherRev > 0 ? otherRev : 0,
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
-          });
+          };
+          if (query.groupBySource) {
+            const topTenantIds = items.filter((it) => it.tenantId !== 'other').map((it) => it.tenantId);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              joinSql,
+              filterSql,
+              { ...params },
+              topTenantIds.length > 0 ? 'AND t.tenant_id NOT IN ({_topTenantIds:Array(String)})' : '',
+              topTenantIds.length > 0 ? { _topTenantIds: topTenantIds } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }
@@ -1556,6 +1851,10 @@ export class TimelineAnalyticsService {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
     }
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
+    }
 
     if (query.keyword) {
       let matchedReleaseIds = await this.isrcResolverService.getReleaseIdsByKeyword(query.keyword);
@@ -1580,6 +1879,7 @@ export class TimelineAnalyticsService {
     }>(sql, params);
 
     const items: RevenueReleaseItem[] = [];
+    const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
     if (rows.length > 0) {
       const releaseIds = rows.map((r) => r.releaseId);
@@ -1602,6 +1902,27 @@ export class TimelineAnalyticsService {
         });
       });
 
+      // groupBySource: fetch breakdown per release
+      if (query.groupBySource) {
+        const breakdowns = await Promise.all(
+          items
+            .filter((item) => item.releaseId !== 'other')
+            .map((item) =>
+              this.fetchSourceBreakdown(
+                CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+                's.period',
+                releaseJoinSql,
+                filterSql,
+                { ...params },
+                'AND t.release_id = {_releaseId:String}',
+                { _releaseId: item.releaseId },
+                true,
+              ),
+            ),
+        );
+        items.filter((it) => it.releaseId !== 'other').forEach((item, i) => { item.bySource = breakdowns[i]; });
+      }
+
       const shouldIncludeOther = !isPaginated && query.includeOther === true;
 
       if (shouldIncludeOther) {
@@ -1618,7 +1939,7 @@ export class TimelineAnalyticsService {
         const otherRev = this.revenueNumber(otherRevExact);
 
         if (otherQty > 0 || otherRev > 0) {
-          items.push({
+          const otherItem: RevenueReleaseItem = {
             rank: items.length + 1,
             releaseId: 'other',
             title: 'Other',
@@ -1630,7 +1951,21 @@ export class TimelineAnalyticsService {
             revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
             quantity: otherQty > 0 ? otherQty : 0,
             release: null,
-          });
+          };
+          if (query.groupBySource) {
+            const topReleaseIds = items.filter((it) => it.releaseId !== 'other').map((it) => it.releaseId);
+            otherItem.bySource = await this.fetchSourceBreakdown(
+              CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+              's.period',
+              releaseJoinSql,
+              filterSql,
+              { ...params },
+              topReleaseIds.length > 0 ? 'AND t.release_id NOT IN ({_topReleaseIds:Array(String)})' : '',
+              topReleaseIds.length > 0 ? { _topReleaseIds: topReleaseIds } : {},
+              true,
+            );
+          }
+          items.push(otherItem);
         }
       }
     }

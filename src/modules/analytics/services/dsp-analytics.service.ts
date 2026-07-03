@@ -82,6 +82,7 @@ export class DspAnalyticsService {
     pgDspId?: string,
     dspReportId?: string,
     releaseType?: 'audio' | 'video',
+    opts?: { tableHasDspId?: boolean },
   ): {
     joinSql: string;
     filterSql: string;
@@ -94,24 +95,47 @@ export class DspAnalyticsService {
     }
 
     const isSystem = checkIsSystemTenant(tenantId);
+    // Territory-level cubes (trends_ter, sales_ter) không có cột dsp_id — filter DSP
+    // phải đi qua isrc JOIN pg_tracks_sync → dsps_report thay vì s.dsp_id trực tiếp.
+    const tableHasDspId = opts?.tableHasDspId !== false;
     const params: Record<string, any> = {};
 
-    // DSP filter clause
-    const dspClauses: string[] = [];
-    if (pgDspId) {
-      dspClauses.push(
-        `s.dsp_id IN (SELECT id_dsps_report FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE pg_uuid = {pgDspId:String})`,
-      );
-      params.pgDspId = pgDspId;
+    let dspFilter: string;
+    if (tableHasDspId) {
+      // DSP-level cube: filter trực tiếp qua s.dsp_id
+      const dspClauses: string[] = [];
+      if (pgDspId) {
+        dspClauses.push(
+          `s.dsp_id IN (SELECT id_dsps_report FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE pg_uuid = {pgDspId:String})`,
+        );
+        params.pgDspId = pgDspId;
+      }
+      if (dspReportId) {
+        dspClauses.push(`s.dsp_id = {dspReportId:String}`);
+        params.dspReportId = dspReportId;
+      }
+      dspFilter = ` AND (${dspClauses.join(' OR ')})`;
+    } else {
+      // Territory-level cube: không có dsp_id — filter qua isrc thuộc DSP
+      // (join pg_tracks_sync bên dưới cung cấp alias t, dùng t.isrc để scope)
+      const dspIsrcClauses: string[] = [];
+      if (pgDspId) {
+        dspIsrcClauses.push(
+          `t.isrc IN (SELECT pts.isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} pts FINAL INNER JOIN music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} dr FINAL ON pts.tenant_id = dr.pg_uuid WHERE dr.pg_uuid = {pgDspId:String} AND pts.is_deleted = 0)`,
+        );
+        params.pgDspId = pgDspId;
+      }
+      if (dspReportId) {
+        dspIsrcClauses.push(
+          `t.isrc IN (SELECT pts.isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} pts FINAL INNER JOIN music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} dr FINAL ON dr.id_dsps_report = {dspReportId:String} WHERE pts.is_deleted = 0)`,
+        );
+        params.dspReportId = dspReportId;
+      }
+      dspFilter = dspIsrcClauses.length ? ` AND (${dspIsrcClauses.join(' OR ')})` : '';
     }
-    if (dspReportId) {
-      dspClauses.push(`s.dsp_id = {dspReportId:String}`);
-      params.dspReportId = dspReportId;
-    }
-    const dspFilter = ` AND (${dspClauses.join(' OR ')})`;
 
-    // Cần JOIN pg_tracks_sync để filter tenant (trừ system tenant + không có releaseType)
-    if (isSystem && !releaseType) {
+    // System tenant + no releaseType: skip pg_tracks_sync join
+    if (isSystem && !releaseType && tableHasDspId) {
       return {
         joinSql: '',
         filterSql: dspFilter,
@@ -405,6 +429,7 @@ export class DspAnalyticsService {
       dto.pgDspId,
       dto.dspReportId,
       dto.releaseType,
+      { tableHasDspId: false },
     );
     params.from = fromDate;
     params.to = toDate;
@@ -475,6 +500,7 @@ export class DspAnalyticsService {
       dto.pgDspId,
       dto.dspReportId,
       dto.releaseType,
+      { tableHasDspId: false },
     );
     params.from = fromDate;
     params.to = toDate;

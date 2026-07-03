@@ -83,6 +83,7 @@ export class EntityAnalyticsService {
 		entityType: EntityType,
 		entityId?: string,
 		releaseType?: 'audio' | 'video',
+		importSource?: string,
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -93,11 +94,12 @@ export class EntityAnalyticsService {
 
 		// Track + system tenant without releaseType: filter on s.isrc, no JOIN needed
 		if (entityType === 'track' && isSystem && !releaseType) {
-			return {
-				joinSql: '',
-				filterSql: 'AND s.isrc = {entityId:String}',
-				params,
-			};
+			let filterSql = 'AND s.isrc = {entityId:String}';
+			if (importSource) {
+				filterSql += ' AND s.import_source = {importSource:String}';
+				params.importSource = importSource;
+			}
+			return { joinSql: '', filterSql, params };
 		}
 
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
@@ -132,6 +134,11 @@ export class EntityAnalyticsService {
 		if (releaseType) {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = releaseType;
+		}
+
+		if (importSource) {
+			filterSql += ' AND s.import_source = {importSource:String}';
+			params.importSource = importSource;
 		}
 
 		return { joinSql, filterSql, params };
@@ -214,6 +221,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -332,6 +340,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -426,6 +435,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -522,6 +532,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -616,6 +627,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -728,6 +740,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -777,6 +790,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -828,6 +842,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -899,6 +914,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -969,6 +985,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -1051,6 +1068,7 @@ export class EntityAnalyticsService {
 			entityType,
 			entityId,
 			dto.releaseType,
+			dto.importSource,
 		);
 		params.from = fromDate;
 		params.to = toDate;

@@ -10,6 +10,15 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
  * - Rankings: ResponseSuccess<PageDto<*RankingItem>>
  */
 
+/** Một phần tử trong breakdown theo import_source (groupBySource=true) */
+export interface SourceBreakdownItem {
+  source: string;       // raw value: 'ftp', 'wmg_report', 'spotify_report', ...
+  sourceLabel: string;  // human-readable: 'Merlin', 'WMG', 'Spotify', ...
+  quantity: number;
+  revenueUsd?: number;
+  revenueUsdExact?: string;
+}
+
 // ═══════════════════════════════════════════════════════
 // Timelines (DSP and Territory)
 // ═══════════════════════════════════════════════════════
@@ -71,6 +80,7 @@ export interface RevenueDspItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopDspResponse = RevenueDspItem[];
@@ -109,6 +119,7 @@ export interface TrackRankingItem {
   releaseId: string;
   releaseTitle: string;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
   release: {
     coverArtThumbnails: ICoverArtThumbnails;
   } | null;
@@ -123,6 +134,7 @@ export interface ReleaseRankingItem {
   labelName: string | null;
   trackCount: number;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
   release: {
     coverArtThumbnails: ICoverArtThumbnails;
   } | null;
@@ -139,6 +151,7 @@ export interface ArtistRankingItem {
   genre: string | null;
   trackCount: number;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export interface LabelRankingItem {
@@ -150,6 +163,7 @@ export interface LabelRankingItem {
   releaseCount: number;
   trackCount: number;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
   tenant?: {
     id: string;
     name: string;
@@ -204,6 +218,7 @@ export interface RevenueArtistItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopArtistResponse = RevenueArtistItem[];
@@ -219,6 +234,7 @@ export interface RevenueTrackItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopTrackResponse = RevenueTrackItem[];
@@ -254,6 +270,7 @@ export interface RevenueLabelItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
   tenant?: {
     id: string;
     name: string;
@@ -270,6 +287,7 @@ export interface RevenueTenantItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export interface ChannelRankingItem {
@@ -281,6 +299,7 @@ export interface ChannelRankingItem {
   releaseCount: number;
   trackCount: number;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
   tenant?: {
     id: string;
     name: string;
@@ -300,6 +319,7 @@ export interface RevenueChannelItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
   tenant?: {
     id: string;
     name: string;
@@ -322,6 +342,7 @@ export interface TenantRankingItem {
   tenantName: string;
   logo: string | null;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export interface DspRankingItem {
@@ -330,6 +351,7 @@ export interface DspRankingItem {
   dspReportId: string;
   dspName: string;
   totalViews: number;
+  bySource?: SourceBreakdownItem[];
 }
 
 export interface RevenueReleaseItem {
@@ -343,6 +365,7 @@ export interface RevenueReleaseItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+  bySource?: SourceBreakdownItem[];
   release: {
     coverArtThumbnails: ICoverArtThumbnails;
   } | null;
