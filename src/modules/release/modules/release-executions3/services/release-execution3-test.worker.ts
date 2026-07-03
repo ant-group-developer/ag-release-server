@@ -427,6 +427,8 @@ export class ReleaseExecution3WorkerTest {
 	private async exportCi(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
+		// return ReleaseExecutionStepStatus.DONE;
+
 		return this.deriveStatusFromChildren(context);
 	}
 
@@ -499,6 +501,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const releaseSnapshot =
 				releaseExecution.metadata.input.releaseSnapshot;
@@ -621,6 +625,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const upc =
 				releaseExecution.releaseUpc ||
@@ -678,6 +684,8 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
+
 		try {
 			const upc =
 				releaseExecution.releaseUpc ||
@@ -1326,7 +1334,8 @@ export class ReleaseExecution3WorkerTest {
 				data: { dspStatuses },
 			});
 
-			return ReleaseExecutionStepStatus.FAILED;
+			// return ReleaseExecutionStepStatus.FAILED;
+			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,

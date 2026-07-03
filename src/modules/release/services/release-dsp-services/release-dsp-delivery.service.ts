@@ -419,10 +419,7 @@ export class ReleaseDspDeliveryService {
 
 		return items
 			.map((item) => ({
-				dspId:
-					item.id ??
-					item.dspId ??
-					(item.dspCode ? dspCodeToId.get(item.dspCode) : undefined),
+				dspId: item.dspId,
 				status: item.status ?? ReleaseDspStatus.ISSUES,
 			}))
 			.filter(

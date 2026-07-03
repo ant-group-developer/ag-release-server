@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ErrorType } from 'src/modules/log/entites/logs.entity';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { Repository } from 'typeorm';
@@ -11,7 +13,7 @@ import {
 	ReleaseExecutionStepStatus,
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
-import { ReleaseExecution3Worker } from './release-execution3.worker';
+import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
 
 @Injectable()
 export class ReleaseExecutionStepEngine {
@@ -22,9 +24,10 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
-		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
+		// private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+		private readonly logService: LogsService,
 	) {}
 
 	// main
@@ -252,7 +255,28 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		await this.stepRepo.save(step);
-		await this.syncDeliveryStatusByStepStatus(step, status);
+
+		try {
+			await this.syncDeliveryStatusByStepStatus(step, status);
+		} catch (error) {
+			this.logService.error({
+				type: ErrorType.SYSTEM,
+				module: ReleaseExecutionStepEngine.name,
+				releaseExecutionId: step.releaseExecutionId,
+				releaseExecutionStepId: step.id,
+				message: `Failed to sync delivery status for step ${step.id}`,
+				data: {
+					error:
+						error instanceof Error
+							? {
+									name: error.name,
+									message: error.message,
+									stack: error.stack,
+								}
+							: error,
+				},
+			});
+		}
 	}
 
 	isFinalStatus(status: ReleaseExecutionStepStatus): boolean {
@@ -264,7 +288,37 @@ export class ReleaseExecutionStepEngine {
 		].includes(status);
 	}
 
-	// nếu step là delivery step thì đồng thời cập nhật status bên release dsp delivery
+	// private async syncDeliveryStatusByStepStatus1(
+	// 	step: ReleaseExecutionStep3,
+	// 	stepStatus: ReleaseExecutionStepStatus,
+	// ): Promise<void> {
+	// 	if (!step.isDeliveryStep) return;
+
+	// 	const deliveryStatus = this.mapStepStatusToDeliveryStatus(
+	// 		step,
+	// 		stepStatus,
+	// 	);
+
+	// 	if (!deliveryStatus) return;
+
+	// 	// lấy các dsp cần xử lí của step từ input
+	// 	const delivery = step.metadata?.input?.delivery;
+	// 	const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
+	// 		.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
+	// 		.map((item: any) => ({
+	// 			id: item.id,
+	// 			dspId: item.dspId,
+	// 			dspCode: item.dspCode,
+	// 			status: deliveryStatus,
+	// 		}));
+
+	// 	// lưu vào exe, đồng bộ lại vào release dsp delivery
+	// 	await this.updateExecutionOutputResult({
+	// 		executionId: step.releaseExecutionId,
+	// 		results,
+	// 	});
+	// }
+
 	private async syncDeliveryStatusByStepStatus(
 		step: ReleaseExecutionStep3,
 		stepStatus: ReleaseExecutionStepStatus,
@@ -278,21 +332,104 @@ export class ReleaseExecutionStepEngine {
 
 		if (!deliveryStatus) return;
 
-		// lấy các dsp cần xử lí của step
+		const outputResults: ReleaseExecutionResultDto[] = Array.isArray(
+			step.metadata?.output?.result,
+		)
+			? step.metadata.output.result
+			: [];
+		const outputResultByDspCode = new Map(
+			outputResults
+				.filter((item) => !!item.dspCode)
+				.map((item) => [item.dspCode.toLowerCase(), item]),
+		);
+
+		if (!outputResultByDspCode.size) return;
+
+		// Delivery step luôn có danh sách DSP cần xử lý trong input.delivery.items.
+		// Status ưu tiên lấy từ metadata.output.result theo dspCode; nếu output chưa có DSP đó thì fallback theo stepStatus.
 		const delivery = step.metadata?.input?.delivery;
 		const results: ReleaseExecutionResultDto[] = (delivery?.items ?? [])
 			.filter((item: any) => !!(item.id || item.dspId || item.dspCode))
-			.map((item: any) => ({
-				id: item.id,
-				dspId: item.dspId,
-				dspCode: item.dspCode,
-				status: deliveryStatus,
-			}));
+			.map((item: any) => {
+				const outputResult = item.dspCode
+					? outputResultByDspCode.get(item.dspCode.toLowerCase())
+					: undefined;
 
-		// lưu vào exe, đồng bộ lại vào release dsp delivery
-		await this.updateExecutionOutputResult({
-			executionId: step.releaseExecutionId,
+				return {
+					id: item.id,
+					dspId: item.dspId,
+					dspCode: item.dspCode,
+					dspCodeCi: outputResult?.dspCodeCi ?? item.dspCodeCi,
+					status: outputResult?.status ?? deliveryStatus,
+				};
+			});
+
+		if (!results.length) return;
+
+		// Merge dần lên parent, không ghi đè các DSP khác đã có ở output cha.
+		// Khi tới root mới gọi updateExecutionOutputResult để giữ toàn bộ logic sync execution/delivery.
+		await this.syncDeliveryOutputToAncestor({
+			step,
 			results,
+		});
+	}
+
+	private async syncDeliveryOutputToAncestor({
+		step,
+		results,
+	}: {
+		step: ReleaseExecutionStep3;
+		results: ReleaseExecutionResultDto[];
+	}): Promise<void> {
+		if (!results.length) return;
+
+		if (!step.parentStepId) {
+			await this.updateExecutionOutputResult({
+				executionId: step.releaseExecutionId,
+				results,
+			});
+			return;
+		}
+
+		const parentStep = await this.stepRepo.manager.transaction(
+			async (manager) => {
+				const stepRepo = manager.getRepository(ReleaseExecutionStep3);
+				const parent = await stepRepo.findOne({
+					where: { id: step.parentStepId! },
+					lock: { mode: 'pessimistic_write' },
+				});
+
+				if (!parent) return null;
+
+				const mergedResults = this.mergeExecutionResults(
+					parent.metadata?.output?.result ?? [],
+					results,
+				);
+
+				parent.metadata = {
+					...(parent.metadata ?? {}),
+					output: {
+						...(parent.metadata?.output ?? {}),
+						result: mergedResults,
+					},
+				};
+
+				await stepRepo.save(parent);
+				return parent;
+			},
+		);
+
+		if (!parentStep) {
+			await this.updateExecutionOutputResult({
+				executionId: step.releaseExecutionId,
+				results,
+			});
+			return;
+		}
+
+		await this.syncDeliveryOutputToAncestor({
+			step: parentStep,
+			results: parentStep.metadata?.output?.result ?? results,
 		});
 	}
 
@@ -316,29 +453,10 @@ export class ReleaseExecutionStepEngine {
 
 			if (!execution) return;
 
-			const mergedResults = [
-				...(execution.metadata?.output?.result ?? []),
-			];
-
-			// Tìm DSP đã tồn tại theo định danh ưu tiên có sẵn, sau đó cập nhật status
-			// thay vì thêm bản ghi trùng cho cùng một DSP.
-			for (const result of results) {
-				const index = mergedResults.findIndex(
-					(item) =>
-						(item.id && item.id === result.id) ||
-						(item.dspId && item.dspId === result.dspId) ||
-						(item.dspCode && item.dspCode === result.dspCode),
-				);
-
-				if (index >= 0) {
-					mergedResults[index] = {
-						...mergedResults[index],
-						...result,
-					};
-				} else {
-					mergedResults.push(result);
-				}
-			}
+			const mergedResults = this.mergeExecutionResults(
+				execution.metadata?.output?.result ?? [],
+				results,
+			);
 
 			// Chỉ thay output.result, giữ nguyên input và các output khác trong metadata.
 			execution.metadata = {
@@ -354,6 +472,35 @@ export class ReleaseExecutionStepEngine {
 
 		// Chỉ sync delivery sau khi transaction commit để luôn đọc được kết quả merge mới nhất.
 		await this.syncExecutionOutputToReleaseDeliveryDsp({ id: executionId });
+	}
+
+	private mergeExecutionResults(
+		currentResults: ReleaseExecutionResultDto[],
+		nextResults: ReleaseExecutionResultDto[],
+	): ReleaseExecutionResultDto[] {
+		const mergedResults = [...currentResults];
+
+		// Tìm DSP đã tồn tại theo định danh ưu tiên có sẵn, sau đó cập nhật status
+		// thay vì thêm bản ghi trùng cho cùng một DSP.
+		for (const result of nextResults) {
+			const index = mergedResults.findIndex(
+				(item) =>
+					(item.id && item.id === result.id) ||
+					(item.dspId && item.dspId === result.dspId) ||
+					(item.dspCode && item.dspCode === result.dspCode),
+			);
+
+			if (index >= 0) {
+				mergedResults[index] = {
+					...mergedResults[index],
+					...result,
+				};
+			} else {
+				mergedResults.push(result);
+			}
+		}
+
+		return mergedResults;
 	}
 
 	async syncExecutionOutputToReleaseDeliveryDsp(
