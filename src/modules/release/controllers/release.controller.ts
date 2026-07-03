@@ -41,6 +41,7 @@ import { streamDownload } from 'src/utils/util';
 import { Readable } from 'stream';
 import { ReleaseSuccess } from '../constants/release.constant';
 import {
+	AutoSubmitUndistributedMusicReleaseDto,
 	BulkSubmitReleaseDto,
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
@@ -130,6 +131,44 @@ export class ReleaseController {
 		return new ResponseSuccess({
 			messageCode: 'common.processing',
 		});
+	}
+
+	@ApiOperation({
+		summary:
+			'Auto submit audio releases whose DSP delivery is not distributed',
+	})
+	@ApiBody({ type: AutoSubmitUndistributedMusicReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	// @RequirePermissions(Permission.RELEASE_AUDIO.UPDATE)
+	@Post('auto-submit-undistributed-music')
+	autoSubmitUndistributedMusic(
+		@Body() dto: AutoSubmitUndistributedMusicReleaseDto,
+	) {
+		// const result =
+		// await
+		this.releaseService
+			.autoSubmitUndistributedMusicReleases(dto)
+			.catch((error) => {});
+
+		return new ResponseSuccess({});
+	}
+
+	@ApiOperation({
+		summary: 'Preview audio releases whose DSP delivery is not distributed',
+	})
+	@ApiBody({ type: AutoSubmitUndistributedMusicReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	// @RequirePermissions(Permission.RELEASE_AUDIO.UPDATE)
+	@Post('auto-submit-undistributed-music/preview')
+	async previewAutoSubmitUndistributedMusic(
+		@Body() dto: AutoSubmitUndistributedMusicReleaseDto,
+	) {
+		const result =
+			await this.releaseService.previewAutoSubmitUndistributedMusicReleases(
+				dto,
+			);
+
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Post('auto-sync-release-format-id')

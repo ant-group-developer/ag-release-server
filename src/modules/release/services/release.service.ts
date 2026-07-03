@@ -23,6 +23,7 @@ import {
 import { PassThrough } from 'stream';
 import { Repository } from 'typeorm';
 import {
+	AutoSubmitUndistributedMusicReleaseDto,
 	BulkSubmitReleaseDto,
 	FileExportReleaseCiDto,
 	QueryGetListReleaseDto,
@@ -502,6 +503,126 @@ export class ReleaseService {
 
 			await this.submit3(id, { code: dto.codes });
 		}
+	}
+
+	async autoSubmitUndistributedMusicReleases(
+		dto: AutoSubmitUndistributedMusicReleaseDto,
+	) {
+		const items =
+			await this.getAutoSubmitUndistributedMusicReleaseItems(dto);
+		const errors: {
+			releaseId: string;
+			dspCodes: string[];
+			message: string;
+		}[] = [];
+		let submitted = 0;
+
+		for (const item of items) {
+			try {
+				await this.submit3(item.releaseId, { code: item.dspCodes });
+				submitted++;
+			} catch (error) {
+				errors.push({
+					releaseId: item.releaseId,
+					dspCodes: item.dspCodes,
+					message:
+						error instanceof Error ? error.message : String(error),
+				});
+			}
+		}
+
+		return {
+			totalReleases: items.length,
+			submitted,
+			failed: errors.length,
+			errors,
+		};
+	}
+
+	async previewAutoSubmitUndistributedMusicReleases(
+		dto: AutoSubmitUndistributedMusicReleaseDto,
+	) {
+		const items =
+			await this.getAutoSubmitUndistributedMusicReleaseItems(dto);
+
+		return {
+			totalReleases: items.length,
+			items,
+		};
+	}
+
+	private async getAutoSubmitUndistributedMusicReleaseItems(
+		dto: AutoSubmitUndistributedMusicReleaseDto,
+	): Promise<
+		{ releaseId: string; upc: string | null; dspCodes: string[] }[]
+	> {
+		const batchSize = 30;
+		const dspCodes = [
+			...new Set(
+				dto.dspCodes
+					.map((code) => code?.trim().toUpperCase())
+					.filter(Boolean),
+			),
+		];
+		const items: {
+			releaseId: string;
+			upc: string | null;
+			dspCodes: string[];
+		}[] = [];
+		let offset = 0;
+		let batchNumber = 0;
+
+		this.logger.log(
+			`Start parsing auto-submit undistributed music releases. DSP codes: ${dspCodes.join(', ')}`,
+		);
+
+		while (true) {
+			batchNumber++;
+			const rows = await this.releaseRepo.query(
+				`
+					SELECT
+						r."id" AS "releaseId",
+						r."upc" AS "upc",
+						array_agg(dsp."code" ORDER BY dsp."code") AS "dspCodes"
+					FROM "release_ci_data" rcd
+					INNER JOIN "releases" r
+						ON r."id" = rcd."release_id"
+					INNER JOIN "dsps" dsp
+						ON upper(trim(dsp."code")) = ANY($1::text[])
+					LEFT JOIN "release_dsp_delivery" rdd
+						ON rdd."release_id" = r."id"
+						AND rdd."dsp_id" = dsp."id"
+					WHERE r."type" = 'audio'
+					AND rcd."status" = 'NOT_FOUND_ON_CI'
+					AND (
+						rcd."export_parsed_data" IS NULL
+						OR jsonb_array_length(rcd."export_parsed_data") = 0
+					)
+					AND (
+						rdd."id" IS NULL
+						OR rdd."status" != $2
+					)
+					GROUP BY r."id", r."upc", rcd."updated_at"
+					ORDER BY rcd."updated_at" DESC, r."id" ASC
+					LIMIT $3 OFFSET $4
+				`,
+				[dspCodes, ReleaseDspStatus.DISTRIBUTED, batchSize, offset],
+			);
+
+			if (!rows.length) break;
+
+			items.push(...rows);
+			this.logger.log(
+				`Parsed auto-submit batch ${batchNumber}. Batch items: ${rows.length}, total parsed: ${items.length}`,
+			);
+			offset += batchSize;
+		}
+
+		this.logger.log(
+			`Finished parsing auto-submit undistributed music releases. Total parsed: ${items.length}`,
+		);
+
+		return items;
 	}
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
