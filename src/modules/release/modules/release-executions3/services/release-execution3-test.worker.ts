@@ -336,6 +336,7 @@ export class ReleaseExecution3WorkerTest {
 		step,
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 

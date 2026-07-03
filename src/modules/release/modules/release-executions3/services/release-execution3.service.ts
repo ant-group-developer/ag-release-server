@@ -219,7 +219,7 @@ export class ReleaseExecution3Service {
 			result: allDeliveryDsps.map((dsp) => ({
 				dspId: dsp.id,
 				dspCode: dsp.code,
-				status: undefined,
+				status: ReleaseDspStatus.NEVER_DISTRIBUTED,
 			})),
 		};
 

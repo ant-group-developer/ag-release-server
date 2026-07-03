@@ -515,55 +515,10 @@ export class ReleaseExecutionStepEngine {
 
 		if (!latestExecution || !results.length) return;
 
-		// Đồng bộ toàn bộ kết quả hiện tại. Metadata là dữ liệu runtime/jsonb nên
-		// normalize status về enum trước khi gọi delivery service.
-		const deliveryItems = results.map((result) => ({
-			...result,
-			status: this.normalizeDeliveryStatus(result.status),
-		}));
-
 		await this.releaseDspDeliveryService.updateDeliveryStatus({
 			releaseIds: [latestExecution.releaseId],
-			items: deliveryItems,
+			items: results,
 		});
-	}
-
-	private normalizeDeliveryStatus(
-		status?: ReleaseDspStatus | string,
-	): ReleaseDspStatus {
-		if (
-			status &&
-			Object.values(ReleaseDspStatus).includes(status as ReleaseDspStatus)
-		) {
-			return status as ReleaseDspStatus;
-		}
-
-		switch (status?.toLowerCase()) {
-			case 'success':
-			case 'succeeded':
-			case 'completed':
-			case 'done':
-			case 'transferred':
-				return ReleaseDspStatus.DISTRIBUTED;
-
-			case 'processing':
-			case 'pending':
-			case 'in_progress':
-			case 'waiting':
-			case 'waiting_action':
-			case 'waiting_partner':
-				return ReleaseDspStatus.PROCESSING;
-
-			case 'failed':
-			case 'failure':
-			case 'error':
-			case 'issues':
-			case 'cancelled':
-			case 'canceled':
-			case 'skipped':
-			default:
-				return ReleaseDspStatus.ISSUES;
-		}
 	}
 
 	private mapStepStatusToDeliveryStatus(
