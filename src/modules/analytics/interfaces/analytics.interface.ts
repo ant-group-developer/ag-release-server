@@ -65,7 +65,7 @@ export interface RevenueOverviewResponse {
 }
 
 export interface RevenueDspItem {
-  dspId: string | null;
+  pgDspId: string | null;
   dspReportId: string;
   dspName: string;
   revenueUsd: number;
@@ -326,7 +326,7 @@ export interface TenantRankingItem {
 
 export interface DspRankingItem {
   rank: number;
-  dspId: string | null;
+  pgDspId: string | null;
   dspReportId: string;
   dspName: string;
   totalViews: number;
@@ -379,4 +379,24 @@ export interface RevenueLineChartItem {
   revenueUsd: number;
   revenueUsdExact?: string;
   quantity: number;
+}
+
+/** Metadata của DSP entity (lookup từ Postgres nếu có pgDspId) */
+export interface DspMeta {
+  pgDspId: string | null;
+  dspReportId: string | null;
+  name: string;
+  code: string | null;
+  picture: string | null;
+  isActive: boolean | null;
+  type: string | null;
+}
+
+/** Response cho POST /analytics/dsp/overview */
+export interface DspOverviewResponse {
+  totalTrendViews: number;
+  totalSalesViews: number;
+  totalRevenueUsd: number;
+  totalRevenueUsdExact?: string;
+  dsp: DspMeta | null;
 }

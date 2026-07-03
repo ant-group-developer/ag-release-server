@@ -913,7 +913,7 @@ export class RankingService {
 
     const items: DspRankingItem[] = paged.map((r, index) => ({
       rank: query.skip + index + 1,
-      dspId: r.pgDspId || null,
+      pgDspId: r.pgDspId || null,
       dspReportId: r.dspReportId,
       dspName: r.dspName,
       totalViews: Number(r.totalViews),

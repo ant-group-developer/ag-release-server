@@ -109,12 +109,11 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 export class RankingQueryDto extends BaseAnalyticsQueryDto { }
 
 /**
- * DTO cho DSP detail analytics.
- * Truyền pgDspId (Postgres UUID) hoặc dspReportId (raw ClickHouse ID) — ưu tiên pgDspId.
+ * Base DTO cho DSP analytics. Truyền cả pgDspId + dspReportId — ưu tiên pgDspId.
  */
-export class DspDetailQueryDto extends BaseAnalyticsQueryDto {
+export class DspAnalyticsBaseDto {
   @ApiPropertyOptional({
-    description: 'Postgres DSP UUID — lấy từ field dspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
+    description: 'Postgres DSP UUID — lấy từ field pgDspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
     format: 'uuid',
   })
   @IsOptional()
@@ -128,6 +127,38 @@ export class DspDetailQueryDto extends BaseAnalyticsQueryDto {
   @IsString()
   dspReportId?: string;
 }
+
+/**
+ * DTO cho DSP overview endpoint. Chỉ cần fromDate/toDate + DSP ID.
+ */
+export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
+  @ApiProperty({
+    description: 'Start date of the filter range (inclusive)',
+    example: '2026-01-01',
+  })
+  @IsDateString()
+  fromDate: string;
+
+  @ApiProperty({
+    description: 'End date of the filter range (inclusive)',
+    example: '2026-06-30',
+  })
+  @IsDateString()
+  toDate: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by release type: audio or video. Omit to include both.',
+    enum: ['audio', 'video'],
+  })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
+}
+
+/**
+ * DTO cho DSP chart endpoints (line-chart, bar-chart).
+ */
+export class DspChartQueryDto extends DspOverviewQueryDto {}
 
 /**
  * DTO cho các Chart APIs (line-chart, bar-chart).

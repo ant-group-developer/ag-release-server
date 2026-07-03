@@ -749,7 +749,7 @@ export class TimelineAnalyticsService {
     }>(sql, params);
 
     const items: RevenueDspItem[] = rows.map((r) => ({
-      dspId: r.pg_dsp_id || null,
+      pgDspId: r.pg_dsp_id || null,
       dspReportId: r.dsp_report_id,
       dspName: r.dsp_name,
       revenueUsd: this.revenueNumber(r.revenue_usd),
@@ -775,7 +775,7 @@ export class TimelineAnalyticsService {
 
       if (otherQty > 0 || otherRev > 0) {
         items.push({
-          dspId: null,
+          pgDspId: null,
           dspReportId: '',
           dspName: 'Other',
           revenueUsd: otherRev > 0 ? otherRev : 0,
