@@ -8,9 +8,10 @@ import {
 	Post,
 	Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
+import { AppResponseSuccess } from 'src/app.const';
 import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
 import { ReleaseExecution3Service } from '../services/release-execution3.service';
 
@@ -23,6 +24,8 @@ export class ReleaseExecution3Controller {
 	) {}
 
 	@Get('sync-output/:id')
+	@ApiOperation({ summary: 'Sync execution output to release DSP delivery' })
+	@ApiParam({ name: 'id', type: String })
 	async syncExecutionOutputToReleaseDeliveryDsp(
 		@Param('id', ParseUUIDPipe) id: string,
 	) {
@@ -34,6 +37,7 @@ export class ReleaseExecution3Controller {
 	}
 
 	@Get()
+	@ApiOperation({ summary: 'Get release execution list' })
 	async getList(@Query() query: QueryGetListReleaseExecution3Dto) {
 		const result = await this.releaseExecution3Service.getList(query);
 
@@ -41,6 +45,8 @@ export class ReleaseExecution3Controller {
 	}
 
 	@Get(':id')
+	@ApiOperation({ summary: 'Get release execution detail' })
+	@ApiParam({ name: 'id', type: String })
 	async findOne(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.releaseExecution3Service.findOne(id);
 
@@ -48,9 +54,29 @@ export class ReleaseExecution3Controller {
 	}
 
 	@Post('steps/:stepId/retry')
+	@ApiOperation({ summary: 'Retry a release execution step' })
+	@ApiParam({ name: 'stepId', type: String })
 	async retryStep(@Param('stepId', ParseUUIDPipe) stepId: string) {
 		const result = await this.releaseExecution3Service.retryStep(stepId);
 		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('auto-retry-sync-data-dsp-ci')
+	@ApiOperation({
+		summary:
+			'Auto retry failed SYNC_DATA_DSP_CI steps in latest executions',
+	})
+	autoRetrySyncDataDspCi() {
+		this.releaseExecution3Service
+			.autoRetrySyncDataDspCiFailedSteps()
+			.catch((err) => {
+				console.error(
+					'Error auto retry sync data DSP CI failed steps:',
+					err,
+				);
+			});
+
+		return AppResponseSuccess.JOB_PROCESSING();
 	}
 
 	// @Post('steps/:stepId/run')

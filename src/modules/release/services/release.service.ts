@@ -513,13 +513,13 @@ export class ReleaseService {
 			releaseEndDate: null,
 		});
 
-		await this.releaseDspDeliveryService.updateDeliveryStatus({
-			releaseIds: [id],
-			items: dto.code.map((dspCode) => ({
-				dspCode,
-				status: ReleaseDspStatus.PROCESSING,
-			})),
-		});
+		// await this.releaseDspDeliveryService.updateDeliveryStatus({
+		// 	releaseIds: [id],
+		// 	items: dto.code.map((dspCode) => ({
+		// 		dspCode,
+		// 		status: ReleaseDspStatus.PROCESSING,
+		// 	})),
+		// });
 
 		return this.releaseExecution3Service.newReleaseExecution({
 			release,

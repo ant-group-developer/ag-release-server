@@ -1302,26 +1302,16 @@ export class ReleaseExecution3Worker {
 					(item) => item.status === ReleaseDspStatus.DISTRIBUTED,
 				);
 
-			if (allTransferred) {
-				this.logService.success({
-					message: `[SYNC_DATA_DSP_CI] All ${dspStatuses.length} DSPs transferred`,
+			if (!allTransferred) {
+				this.logService.warning({
+					message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
 					releaseExecutionId: releaseExecution.id,
 					releaseExecutionStepId: step.id,
 					data: { dspStatuses },
 				});
-
-				return ReleaseExecutionStepStatus.DONE;
 			}
 
-			this.logService.error({
-				message: `[SYNC_DATA_DSP_CI] Not all DSPs are transferred`,
-				releaseExecutionId: releaseExecution.id,
-				releaseExecutionStepId: step.id,
-				data: { dspStatuses },
-			});
-
-			// return ReleaseExecutionStepStatus.DONE;
-			return ReleaseExecutionStepStatus.FAILED;
+			return ReleaseExecutionStepStatus.DONE;
 		} catch (err) {
 			this.logService.error({
 				message: `[SYNC_DATA_DSP_CI] ${err.message}`,

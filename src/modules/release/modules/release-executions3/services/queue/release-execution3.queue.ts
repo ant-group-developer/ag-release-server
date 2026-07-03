@@ -43,9 +43,6 @@ export class ReleaseExecution3Queue {
 						releaseSnapshot: body.release,
 						dspCodes: body.dspCodes,
 					},
-					output: {
-						result: [],
-					},
 				},
 			}),
 		);
