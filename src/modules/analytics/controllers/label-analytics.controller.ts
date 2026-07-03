@@ -14,6 +14,7 @@ import { EntityManager } from 'typeorm';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
@@ -293,5 +294,33 @@ export class LabelAnalyticsController {
 			data,
 			tenant,
 		});
+	}
+
+	@Post('top-tracks')
+	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | revenue)' })
+	async topTracks(
+		@Param('labelId') labelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const [data, tenant] = await Promise.all([
+			this.entitySvc.getTopTracks('label', labelId, dto, req.user!.tenantId),
+			this.getLabelTenant(labelId),
+		]);
+		return new ResponseSuccess({ data, tenant });
+	}
+
+	@Post('top-releases')
+	@ApiOperation({ summary: 'Top releases của label (sortBy: views | revenue)' })
+	async topReleases(
+		@Param('labelId') labelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const [data, tenant] = await Promise.all([
+			this.entitySvc.getTopReleases('label', labelId, dto, req.user!.tenantId),
+			this.getLabelTenant(labelId),
+		]);
+		return new ResponseSuccess({ data, tenant });
 	}
 }

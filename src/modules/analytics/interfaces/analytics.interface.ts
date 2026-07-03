@@ -423,3 +423,31 @@ export interface DspOverviewResponse {
   totalRevenueUsdExact?: string;
   dsp: DspMeta | null;
 }
+
+/** Item trong top-tracks của DSP */
+export interface DspTopTrackItem {
+  rank: number;
+  isrc: string;
+  title: string;
+  version: string | null;
+  artistName: string;
+  releaseId: string;
+  releaseTitle: string;
+  totalViews: number;
+  totalRevenueUsd: string;
+  release: { coverArtThumbnails: ICoverArtThumbnails } | null;
+}
+
+/** Item trong top-releases của DSP hoặc channel */
+export interface DspTopReleaseItem {
+  rank: number;
+  releaseId: string;
+  title: string;
+  upc: string | null;
+  labelId: string | null;
+  labelName: string | null;
+  trackCount: number;
+  totalViews: number;
+  totalRevenueUsd: string;
+  release: { coverArtThumbnails: ICoverArtThumbnails } | null;
+}

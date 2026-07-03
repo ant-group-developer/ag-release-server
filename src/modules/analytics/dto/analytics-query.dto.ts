@@ -180,6 +180,56 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
 export class DspChartQueryDto extends DspOverviewQueryDto {}
 
 /**
+ * DTO cho DSP top-tracks / top-releases endpoints.
+ */
+export class DspTopQueryDto extends DspAnalyticsBaseDto {
+  @ApiProperty({ description: 'Start date (inclusive)', example: '2026-01-01' })
+  @IsDateString()
+  fromDate: string;
+
+  @ApiProperty({ description: 'End date (inclusive)', example: '2026-06-30' })
+  @IsDateString()
+  toDate: string;
+
+  @ApiPropertyOptional({ description: 'Filter by release type', enum: ['audio', 'video'] })
+  @IsOptional()
+  @IsIn(['audio', 'video'])
+  releaseType?: 'audio' | 'video';
+
+  @ApiPropertyOptional({
+    description: 'Sort order: views (default) or revenue',
+    enum: ['views', 'revenue'],
+    default: 'views',
+  })
+  @IsOptional()
+  @IsIn(['views', 'revenue'])
+  sortBy?: 'views' | 'revenue';
+
+  @ApiPropertyOptional({ description: 'Filter by import source', example: 'ftp' })
+  @IsOptional()
+  @IsString()
+  importSource?: string;
+
+  @ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Items per page', minimum: 1, maximum: 100, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+
+  get limit(): number { return this.pageSize ?? 20; }
+  get skip(): number { return ((this.page ?? 1) - 1) * this.limit; }
+}
+
+/**
  * DTO cho các Chart APIs (line-chart, bar-chart).
  * Chỉ cần fromDate / toDate, không cần pagination.
  */
@@ -340,4 +390,36 @@ export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {
     example: 'stream',
   })
   type: 'stream' | 'revenue';
+}
+
+/**
+ * DTO cho entity top-releases (channel).
+ */
+export class EntityRankingQueryDto extends ChartQueryDto {
+  @ApiPropertyOptional({
+    description: 'Sort order: views (default) or revenue',
+    enum: ['views', 'revenue'],
+    default: 'views',
+  })
+  @IsOptional()
+  @IsIn(['views', 'revenue'])
+  sortBy?: 'views' | 'revenue';
+
+  @ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Items per page', minimum: 1, maximum: 100, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+
+  get limit(): number { return this.pageSize ?? 20; }
+  get skip(): number { return ((this.page ?? 1) - 1) * this.limit; }
 }

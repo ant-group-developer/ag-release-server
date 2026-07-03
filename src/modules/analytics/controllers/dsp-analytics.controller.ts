@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
   DspChartQueryDto,
   DspOverviewQueryDto,
+  DspTopQueryDto,
 } from '../dto/analytics-query.dto';
 import { DspAnalyticsService } from '../services/dsp-analytics.service';
 
@@ -77,6 +78,26 @@ export class DspAnalyticsController {
       dto,
       req.user!.tenantId,
     );
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('top-tracks')
+  @ApiOperation({ summary: 'Top tracks của 1 DSP (sortBy: views | revenue, trả cả 2 metric)' })
+  async topTracks(
+    @Body() dto: DspTopQueryDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.dspSvc.getTopTracks(dto, req.user!.tenantId);
+    return new ResponseSuccess({ data });
+  }
+
+  @Post('top-releases')
+  @ApiOperation({ summary: 'Top releases của 1 DSP (sortBy: views | revenue, trả cả 2 metric)' })
+  async topReleases(
+    @Body() dto: DspTopQueryDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.dspSvc.getTopReleases(dto, req.user!.tenantId);
     return new ResponseSuccess({ data });
   }
 }

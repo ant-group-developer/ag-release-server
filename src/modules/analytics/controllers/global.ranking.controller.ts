@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
@@ -16,6 +16,8 @@ import {
   DspRankingItem,
   ChannelRankingItem,
 } from '../interfaces/analytics.interface';
+import { ClickHouseSyncService } from '../services/clickhouse-sync.service';
+import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 
 /**
  * Controller bảng xếp hạng — dữ liệu từ bảng Trends (ClickHouse).
@@ -25,7 +27,10 @@ import {
 @ApiTags('Analytics')
 @Controller('analytics/ranking')
 export class RankingController {
-  constructor(private readonly rankingService: RankingService) {}
+  constructor(
+    private readonly rankingService: RankingService,
+    private readonly syncService: ClickHouseSyncService,
+  ) {}
 
   /**
    * Top Tracks theo lượt nghe.
@@ -204,5 +209,19 @@ export class RankingController {
       query,
     );
     return new ResponseSuccess({ data });
+  }
+
+  @Post('/admin/resync-tracks')
+  @ApiOperation({
+    summary: '[System only] Force re-sync toàn bộ pg_tracks_sync từ Postgres',
+    description: 'Chạy lại performFullSync để cập nhật cover art và metadata. Chỉ system tenant mới được gọi.',
+  })
+  async resyncTracks(@Req() req: Request) {
+    if (!checkIsSystemTenant(req.user!.tenantId)) {
+      throw new ForbiddenException('System tenant only');
+    }
+    // Fire and forget — full sync có thể mất vài phút
+    this.syncService.performFullSync().catch(() => {});
+    return new ResponseSuccess({ data: { message: 'Full sync started in background' } });
   }
 }
