@@ -647,3 +647,15 @@ export class BulkSubmitReleaseDto {
 	@IsString({ each: true })
 	codes: string[];
 }
+
+export class AutoSubmitUndistributedMusicReleaseDto {
+	@ApiProperty({
+		description: 'Danh sách DSP code cần kiểm tra và submit lại',
+		example: ['SPOTIFY', 'APPLE_MUSIC'],
+		type: [String],
+	})
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsString({ each: true })
+	dspCodes: string[];
+}
