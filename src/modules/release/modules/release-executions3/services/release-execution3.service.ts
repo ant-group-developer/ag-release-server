@@ -25,6 +25,7 @@ import {
 	ExecutionType,
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
+	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
 import { ReleaseExecution3ResultService } from './release-execution3-result.service';
@@ -653,6 +654,81 @@ export class ReleaseExecution3Service {
 
 		// enqueue pipeline để xử lý async vì runPipeline nặng
 		await this.queueService.queueRunPipeline(step.releaseExecutionId);
+	}
+
+	async autoRetrySyncDataDspCiFailedSteps() {
+		const errors: { stepId: string; message: string }[] = [];
+		const processedExecutionIds = new Set<string>();
+		let totalExecutions = 0;
+		let retried = 0;
+
+		while (true) {
+			const listQuery = Object.assign(
+				new QueryGetListReleaseExecution3Dto(),
+				{
+					page: 1,
+					pageSize: 100,
+					latestOnly: true,
+					steps: [
+						{
+							type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
+							status: ReleaseExecutionStepStatus.FAILED,
+						},
+					],
+				},
+			);
+
+			const qb = this.queryService.createQbGetList(listQuery);
+
+			if (processedExecutionIds.size) {
+				qb.andWhere('execution.id NOT IN (:...processedExecutionIds)', {
+					processedExecutionIds: [...processedExecutionIds],
+				});
+			}
+
+			orderAndPaging2({ qb, filter: listQuery });
+
+			const executions = await qb.getMany();
+			const executionIds = executions.map((item) => item.id);
+
+			if (!executionIds.length) break;
+
+			for (const executionId of executionIds) {
+				processedExecutionIds.add(executionId);
+			}
+
+			totalExecutions += executionIds.length;
+
+			const steps = await this.stepRepo.find({
+				where: {
+					releaseExecutionId: In(executionIds),
+					type: ReleaseExecutionStepType.SYNC_DATA_DSP_CI,
+					status: ReleaseExecutionStepStatus.FAILED,
+				},
+			});
+
+			for (const step of steps) {
+				try {
+					await this.retryStep(step.id);
+					retried++;
+				} catch (error) {
+					errors.push({
+						stepId: step.id,
+						message:
+							error instanceof Error
+								? error.message
+								: String(error),
+					});
+				}
+			}
+		}
+
+		return {
+			totalExecutions,
+			retried,
+			failed: errors.length,
+			errors,
+		};
 	}
 
 	async updateStatusStepAndRerunPipeline({
