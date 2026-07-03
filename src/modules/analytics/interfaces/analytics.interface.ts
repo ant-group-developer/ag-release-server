@@ -270,6 +270,42 @@ export interface RevenueTenantItem {
   quantity: number;
 }
 
+export interface ChannelRankingItem {
+  rank: number;
+  channelId: string;
+  channelName: string;
+  thumbUrl: string | null;
+  youtubeChannelId: string | null;
+  releaseCount: number;
+  trackCount: number;
+  totalViews: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
+}
+
+export interface RevenueChannelItem {
+  rank: number;
+  channelId: string;
+  channelName: string;
+  thumbUrl: string | null;
+  youtubeChannelId: string | null;
+  releaseCount?: number;
+  trackCount?: number;
+  revenueUsd: number;
+  revenueUsdExact?: string;
+  quantity: number;
+  tenant?: {
+    id: string;
+    name: string;
+    title: string;
+    logo: string | null;
+  } | null;
+}
+
 export interface OverviewTrendsResponse {
   totalViews: number;
   totalDsps: number;

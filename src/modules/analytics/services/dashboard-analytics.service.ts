@@ -5,6 +5,7 @@ import { IsrcResolverService } from './isrc-resolver.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
+import { AnalyticsCacheService } from './analytics-cache.service';
 
 @Injectable()
 export class DashboardAnalyticsService {
@@ -13,6 +14,7 @@ export class DashboardAnalyticsService {
   constructor(
     private readonly clickHouseService: ClickHouseService,
     private readonly isrcResolverService: IsrcResolverService,
+    private readonly cache: AnalyticsCacheService,
   ) {}
 
   /**
@@ -27,14 +29,23 @@ export class DashboardAnalyticsService {
 
     const isSystem = checkIsSystemTenant(tenantId);
 
-    // If system tenant, we don't filter by tenant, so no JOIN pg_tracks_sync is needed for DSP
-    if (isSystem) {
+    // System tenant with no sub-filters → skip JOIN
+    if (isSystem && !query.releaseType) {
       return { joinSql: '', filterSql: '', params };
     }
 
     const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-    filterSql += ' AND t.is_deleted = 0 AND t.tenant_id = {tenantId:String}';
-    params.tenantId = tenantId;
+    filterSql += ' AND t.is_deleted = 0';
+
+    if (!isSystem) {
+      filterSql += ' AND t.tenant_id = {tenantId:String}';
+      params.tenantId = tenantId;
+    }
+
+    if (query.releaseType) {
+      filterSql += ' AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
+    }
 
     return { joinSql, filterSql, params };
   }
@@ -43,6 +54,11 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan DSP (Stream hoặc Revenue)
    */
   async getDspDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:dsp', tenantId, query);
+    return this.cache.wrap(key, () => this.computeDspDashboard(tenantId, query));
+  }
+
+  private async computeDspDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const { joinSql, filterSql, params } = this.buildTenantFilters(tenantId, query);
 
@@ -102,14 +118,25 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan Label (Stream hoặc Revenue)
    */
   async getLabelDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:label', tenantId, query);
+    return this.cache.wrap(key, () => this.computeLabelDashboard(tenantId, query));
+  }
+
+  private async computeLabelDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = {};
-    
+
     let tenantFilter = '';
     if (!isSystem) {
       tenantFilter = 'AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    let releaseTypeFilter = '';
+    if (query.releaseType) {
+      releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     let sql = '';
@@ -126,6 +153,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY labelId
       `;
     } else {
@@ -141,6 +169,7 @@ export class DashboardAnalyticsService {
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY labelId
       `;
     }
@@ -181,6 +210,11 @@ export class DashboardAnalyticsService {
    * Thống kê tổng quan Artist (Stream hoặc Revenue)
    */
   async getArtistDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
+    const key = this.cache.buildKey('dash:artist', tenantId, query);
+    return this.cache.wrap(key, () => this.computeArtistDashboard(tenantId, query));
+  }
+
+  private async computeArtistDashboard(tenantId: string, query: DashboardAnalyticsQueryDto) {
     const { topN = 5, includeOther = true } = query;
     const isSystem = checkIsSystemTenant(tenantId);
     const params: Record<string, any> = {};
@@ -189,6 +223,12 @@ export class DashboardAnalyticsService {
     if (!isSystem) {
       tenantFilter = 'AND t.tenant_id = {tenantId:String}';
       params.tenantId = tenantId;
+    }
+
+    let releaseTypeFilter = '';
+    if (query.releaseType) {
+      releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
+      params.releaseType = query.releaseType;
     }
 
     let sql = '';
@@ -205,6 +245,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date >= toDate({from:String})
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY artistId
       `;
     } else {
@@ -220,6 +261,7 @@ export class DashboardAnalyticsService {
           AND s.period >= toDate({from:String})
           AND s.period <= toDate({to:String})
           ${tenantFilter}
+          ${releaseTypeFilter}
         GROUP BY artistId
       `;
     }
