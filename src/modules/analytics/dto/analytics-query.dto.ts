@@ -109,6 +109,27 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 export class RankingQueryDto extends BaseAnalyticsQueryDto { }
 
 /**
+ * DTO cho DSP detail analytics.
+ * Truyền pgDspId (Postgres UUID) hoặc dspReportId (raw ClickHouse ID) — ưu tiên pgDspId.
+ */
+export class DspDetailQueryDto extends BaseAnalyticsQueryDto {
+  @ApiPropertyOptional({
+    description: 'Postgres DSP UUID — lấy từ field dspId trong response ranking/revenue API. Ưu tiên hơn dspReportId.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  pgDspId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Raw ClickHouse DSP ID (id_dsps_report) — lấy từ field dspReportId. Dùng khi pgDspId = null.',
+  })
+  @IsOptional()
+  @IsString()
+  dspReportId?: string;
+}
+
+/**
  * DTO cho các Chart APIs (line-chart, bar-chart).
  * Chỉ cần fromDate / toDate, không cần pagination.
  */

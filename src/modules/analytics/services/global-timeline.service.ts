@@ -741,12 +741,16 @@ export class TimelineAnalyticsService {
     // Data query
     const sql = queries.getRevenueTopDspQuery(joinSql, joinExpr, filterSql, resolvedDspName, limit, offset);
     const rows = await this.clickHouseService.query<{
+      pg_dsp_id: string;
+      dsp_report_id: string;
       dsp_name: string;
       quantity: string;
       revenue_usd: string;
     }>(sql, params);
 
     const items: RevenueDspItem[] = rows.map((r) => ({
+      dspId: r.pg_dsp_id || null,
+      dspReportId: r.dsp_report_id,
       dspName: r.dsp_name,
       revenueUsd: this.revenueNumber(r.revenue_usd),
       revenueUsdExact: this.revenueExact(r.revenue_usd),
@@ -771,6 +775,8 @@ export class TimelineAnalyticsService {
 
       if (otherQty > 0 || otherRev > 0) {
         items.push({
+          dspId: null,
+          dspReportId: '',
           dspName: 'Other',
           revenueUsd: otherRev > 0 ? otherRev : 0,
           revenueUsdExact: otherRev > 0 ? otherRevExact : '0',

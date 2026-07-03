@@ -889,7 +889,8 @@ export class RankingService {
     // Data query
     const dataSql = `
       SELECT
-        s.dsp_id AS dspId,
+        s.dsp_id AS dspReportId,
+        r.pg_uuid AS pgDspId,
         ${resolvedDspName} AS dspName,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
@@ -899,19 +900,21 @@ export class RankingService {
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${filterSql}
-      GROUP BY dspId, dspName
+      GROUP BY dspReportId, pgDspId, dspName
       ORDER BY totalViews DESC
       LIMIT ${query.limit} OFFSET ${query.skip}
     `;
     const paged = await this.clickHouseService.query<{
-      dspId: string;
+      dspReportId: string;
+      pgDspId: string;
       dspName: string;
       totalViews: string;
     }>(dataSql, params);
 
     const items: DspRankingItem[] = paged.map((r, index) => ({
       rank: query.skip + index + 1,
-      dspId: r.dspId,
+      dspId: r.pgDspId || null,
+      dspReportId: r.dspReportId,
       dspName: r.dspName,
       totalViews: Number(r.totalViews),
     }));

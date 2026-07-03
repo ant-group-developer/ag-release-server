@@ -65,6 +65,8 @@ export interface RevenueOverviewResponse {
 }
 
 export interface RevenueDspItem {
+  dspId: string | null;
+  dspReportId: string;
   dspName: string;
   revenueUsd: number;
   revenueUsdExact?: string;
@@ -324,7 +326,8 @@ export interface TenantRankingItem {
 
 export interface DspRankingItem {
   rank: number;
-  dspId: string;
+  dspId: string | null;
+  dspReportId: string;
   dspName: string;
   totalViews: number;
 }
