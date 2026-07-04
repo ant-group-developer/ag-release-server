@@ -4,6 +4,7 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -204,6 +205,30 @@ export class ArtistAnalyticsController {
 				dto,
 				req.user!.tenantId,
 			),
+		});
+	}
+
+	@Post('top-tracks')
+	@ApiOperation({ summary: 'Top tracks của artist (sortBy: views | revenue)' })
+	async topTracks(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTracks('artist', artistId, dto, req.user!.tenantId),
+		});
+	}
+
+	@Post('top-releases')
+	@ApiOperation({ summary: 'Top releases của artist (sortBy: views | revenue)' })
+	async topReleases(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopReleases('artist', artistId, dto, req.user!.tenantId),
 		});
 	}
 }

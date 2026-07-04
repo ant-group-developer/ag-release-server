@@ -135,6 +135,8 @@ export class TenantDomainService {
 
 		const dnsVerified = cfStatus.status === 'active';
 		const sslActive = cfStatus.ssl?.status === 'active';
+		// CF terminal failure states — anything else (pending, moved, etc.) is transient
+		const cfFailed = cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
 
 		if (dnsVerified && sslActive) {
 			domain.status = DomainStatus.ACTIVE;
@@ -148,8 +150,12 @@ export class TenantDomainService {
 		} else if (dnsVerified) {
 			domain.status = DomainStatus.VERIFYING;
 			domain.sslStatus = SslStatus.INITIALIZING;
-		} else {
+		} else if (cfFailed) {
 			domain.status = DomainStatus.FAILED;
+		} else {
+			// CF status is still "pending" — DNS/SSL propagation in progress, keep verifying
+			domain.status = DomainStatus.VERIFYING;
+			domain.sslStatus = SslStatus.PENDING;
 		}
 
 		return this.repo.save(domain);
@@ -397,11 +403,30 @@ export class TenantDomainService {
 			domain.lastCheckedAt = new Date();
 			domain.lastCheckResult = cfStatus as unknown as Record<string, any>;
 
-			if (cfStatus.status !== 'active' && domain.status === DomainStatus.ACTIVE) {
+			const dnsVerified = cfStatus.status === 'active';
+			const sslActive = cfStatus.ssl?.status === 'active';
+			const cfFailed = cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
+
+			if (dnsVerified && sslActive) {
+				if (domain.status !== DomainStatus.ACTIVE) {
+					domain.status = DomainStatus.ACTIVE;
+					domain.sslStatus = SslStatus.ACTIVE;
+					domain.verifiedAt = domain.verifiedAt ?? new Date();
+					domain.sslActiveAt = new Date();
+					await this.tenantRepo.update(domain.tenantId, { domain: domain.domain });
+					this.invalidateDomainCache(domain.domain);
+				}
+			} else if (domain.status === DomainStatus.ACTIVE && !dnsVerified) {
 				domain.status = DomainStatus.EXPIRED;
 				await this.tenantRepo.update(domain.tenantId, { domain: undefined });
 				this.invalidateDomainCache(domain.domain);
 				// TODO: emit notification event to tenant admin
+			} else if (cfFailed) {
+				domain.status = DomainStatus.FAILED;
+			} else {
+				// Still pending DNS/SSL propagation
+				domain.status = DomainStatus.VERIFYING;
+				domain.sslStatus = dnsVerified ? SslStatus.INITIALIZING : SslStatus.PENDING;
 			}
 
 			await this.repo.save(domain);

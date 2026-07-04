@@ -14,6 +14,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
@@ -234,6 +235,32 @@ export class TenantAnalyticsController {
 				dto,
 				req.user!.tenantId,
 			),
+		});
+	}
+
+	@Post('top-tracks')
+	@ApiOperation({ summary: 'Top tracks của tenant (sortBy: views | revenue)' })
+	async topTracks(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTracks('tenant', tenantId, dto, req.user!.tenantId),
+		});
+	}
+
+	@Post('top-releases')
+	@ApiOperation({ summary: 'Top releases của tenant (sortBy: views | revenue)' })
+	async topReleases(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopReleases('tenant', tenantId, dto, req.user!.tenantId),
 		});
 	}
 }

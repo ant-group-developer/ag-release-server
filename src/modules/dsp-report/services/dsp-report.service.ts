@@ -230,8 +230,7 @@ export class DspReportService {
   }
 
   /**
-   * Batch version: tính stats cho NHIỀU dsps_report cùng lúc (tránh N+1 trong getList).
-   * Gộp toàn bộ thành: 1 query ClickHouse (dsp_id IN), 1 query Dsp, 1 query Release, 1 query Track/Video.
+   * Batch version: tính stats cho NHIỀU dsps_report cùng lúc.
    */
   async getImportStatsBatch(
     ids: string[],
@@ -243,125 +242,80 @@ export class DspReportService {
       result.set(id, { totalReleasesCount: 0, pendingReleasesCount: 0 });
     }
 
-    // 1. Resolve pg_uuid + dspType cho từng report (1 query CH + 1 query Dsp)
-    const reportRows = await this.clickHouseService.query<{ id_dsps_report: string; pg_uuid: string }>(
-      `SELECT id_dsps_report, pg_uuid FROM ${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report IN ({ids:Array(String)})`,
-      { ids: uniqueIds },
-    );
-    const pgUuidByReport = new Map<string, string>();
-    for (const r of reportRows) {
-      if (r.pg_uuid) pgUuidByReport.set(r.id_dsps_report, r.pg_uuid);
-    }
-    const dspTypeByReport = new Map<string, string>();
-    const pgUuids = Array.from(new Set([...pgUuidByReport.values()]));
-    if (pgUuids.length > 0) {
-      const dsps = await this.entityManager.find(Dsp, { where: { id: In(pgUuids) }, select: ['id', 'type'] });
-      const typeByUuid = new Map(dsps.map((d) => [d.id, d.type]));
-      for (const [reportId, uuid] of pgUuidByReport.entries()) {
-        dspTypeByReport.set(reportId, typeByUuid.get(uuid) ?? 'audio');
-      }
-    }
-
-    // 2. 1 query ClickHouse lấy upc/isrc của TẤT CẢ report (kèm dsp_id để gom)
-    // DISTINCT ở tầng CH trước khi gửi về Node — tránh kéo hàng triệu raw fact rows vào heap.
-    const clickHouseRows = await this.clickHouseService.query<{ dsp_id: string; upc: string; isrc: string }>(
+    const rows = await this.clickHouseService.query<{
+      dsp_id: string;
+      total: string | number;
+      pending: string | number;
+    }>(
       `
-        SELECT DISTINCT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+        SELECT
+          dsp_id,
+          count() AS total,
+          countIf(any_upc_match = 0 AND any_isrc_match = 0) AS pending
         FROM (
-          SELECT dsp_id, upc, isrc FROM music_analytics.fact_sales_report
-            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
-          UNION ALL
-          SELECT dsp_id, upc, isrc FROM music_analytics.fact_dsp_comprehensive_report
-            WHERE dsp_id IN ({ids:Array(String)}) AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+          SELECT
+            dsp_id,
+            upc_key,
+            max(isrc_matched) AS any_isrc_match,
+            max(upc_matched)  AS any_upc_match
+          FROM (
+            SELECT
+              dsp_id,
+              upc_key,
+              if(
+                isrc_norm != '' AND isrc_norm IN (
+                  SELECT upper(isrc)
+                  FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
+                  WHERE is_deleted = 0 AND isrc != ''
+                ), 1, 0
+              ) AS isrc_matched,
+              if(
+                match(upc_key, '^[0-9]+$')
+                AND toString(toUInt64OrZero(upc_key)) IN (
+                  SELECT DISTINCT
+                    if(match(release_upc, '^[0-9]+$'),
+                       toString(toUInt64OrZero(release_upc)),
+                       release_upc)
+                  FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL
+                  WHERE is_deleted = 0 AND release_upc != ''
+                ), 1, 0
+              ) AS upc_matched
+            FROM (
+              SELECT
+                dsp_id,
+                multiIf(
+                  upc != '' AND upc != 'N/A', upc,
+                  isrc != '' AND isrc != 'N/A', concat('ISRC-', upper(isrc)),
+                  ''
+                ) AS upc_key,
+                if(isrc != '' AND isrc != 'N/A', upper(isrc), '') AS isrc_norm
+              FROM (
+                SELECT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+                FROM music_analytics.fact_sales_report
+                WHERE dsp_id IN ({ids:Array(String)})
+                  AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+                UNION ALL
+                SELECT dsp_id, trimBoth(toString(upc)) AS upc, trimBoth(toString(isrc)) AS isrc
+                FROM music_analytics.fact_dsp_comprehensive_report
+                WHERE dsp_id IN ({ids:Array(String)})
+                  AND (trimBoth(toString(upc)) != '' OR trimBoth(toString(isrc)) != '')
+              )
+              WHERE (upc != '' AND upc != 'N/A') OR (isrc != '' AND isrc != 'N/A')
+            )
+            WHERE upc_key != ''
+          )
+          GROUP BY dsp_id, upc_key
         )
+        GROUP BY dsp_id
       `,
       { ids: uniqueIds },
     );
-    if (clickHouseRows.length === 0) return result;
 
-    // 3. Gom upc→Set<isrc> theo từng report (giống logic extractAndImport)
-    const upcMapByReport = new Map<string, Map<string, Set<string>>>();
-    for (const row of clickHouseRows) {
-      const isrc = hasMeaningfulText(row.isrc) ? row.isrc.trim() : '';
-      let upc = normalizeReportUpcOrFallback(hasMeaningfulText(row.upc) ? row.upc.trim() : '', isrc);
-      if (!isrc && !upc) continue;
-      if (!upc && isrc) upc = `ISRC-${isrc}`;
-
-      let upcMap = upcMapByReport.get(row.dsp_id);
-      if (!upcMap) {
-        upcMap = new Map<string, Set<string>>();
-        upcMapByReport.set(row.dsp_id, upcMap);
-      }
-      if (!upcMap.has(upc)) upcMap.set(upc, new Set());
-      if (isrc) upcMap.get(upc)!.add(isrc);
-    }
-
-    // 4. Gom toàn bộ upc/isrc của cả batch → 1 query Release + 1 query Track + 1 query Video
-    const allEquivalentUpcs = new Set<string>();
-    const allIsrcs = new Set<string>();
-    for (const upcMap of upcMapByReport.values()) {
-      for (const [upc, isrcSet] of upcMap.entries()) {
-        const normalized = normalizeUpc(upc);
-        if (normalized) {
-          for (const eq of buildEquivalentUpcs(normalized)) allEquivalentUpcs.add(eq);
-        }
-        for (const isrc of isrcSet) allIsrcs.add(isrc);
-      }
-    }
-
-    const existingUpcs = new Set<string>();
-    if (allEquivalentUpcs.size > 0) {
-      const releases = await this.entityManager.find(Release, {
-        where: { upc: In(Array.from(allEquivalentUpcs)) },
-        select: ['upc'],
+    for (const row of rows) {
+      result.set(row.dsp_id, {
+        totalReleasesCount: Number(row.total ?? 0),
+        pendingReleasesCount: Number(row.pending ?? 0),
       });
-      for (const r of releases) {
-        const n = normalizeUpc(r.upc);
-        if (n) existingUpcs.add(n);
-      }
-    }
-
-    // ISRC tồn tại: cần phân biệt audio (tracks) vs video (videos).
-    // Batch có thể trộn cả 2 loại → query cả Track lẫn Video, đánh dấu theo loại.
-    const existingTrackIsrcs = new Set<string>();
-    const existingVideoIsrcs = new Set<string>();
-    if (allIsrcs.size > 0) {
-      const isrcList = Array.from(allIsrcs);
-      // Chỉ xét các report thực sự có data. Report không phải 'video' (gồm cả
-      // trường hợp default 'audio' khi chưa resolve được type) → cần tra Track.
-      const reportsWithData = [...upcMapByReport.keys()];
-      const needVideo = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') === 'video');
-      const needAudio = reportsWithData.some((id) => (dspTypeByReport.get(id) ?? 'audio') !== 'video');
-      if (needAudio) {
-        const tracks = await this.entityManager.find(Track, { where: { isrc: In(isrcList) }, select: ['isrc'] });
-        for (const t of tracks) if (t.isrc) existingTrackIsrcs.add(t.isrc);
-      }
-      if (needVideo) {
-        const videos = await this.entityManager.find(Video, { where: { isrc: In(isrcList) }, select: ['isrc'] });
-        for (const v of videos) if (v.isrc) existingVideoIsrcs.add(v.isrc);
-      }
-    }
-
-    // 5. Tính total/pending cho từng report
-    for (const id of uniqueIds) {
-      const upcMap = upcMapByReport.get(id);
-      if (!upcMap || upcMap.size === 0) continue;
-      const isVideo = (dspTypeByReport.get(id) ?? 'audio') === 'video';
-      const existingIsrcs = isVideo ? existingVideoIsrcs : existingTrackIsrcs;
-
-      let pending = 0;
-      for (const [upc, isrcSet] of upcMap.entries()) {
-        const upcExists = !!upc && existingUpcs.has(normalizeUpc(upc));
-        let isrcExists = false;
-        for (const isrc of isrcSet) {
-          if (existingIsrcs.has(isrc)) {
-            isrcExists = true;
-            break;
-          }
-        }
-        if (!upcExists && !isrcExists) pending++;
-      }
-      result.set(id, { totalReleasesCount: upcMap.size, pendingReleasesCount: pending });
     }
 
     return result;

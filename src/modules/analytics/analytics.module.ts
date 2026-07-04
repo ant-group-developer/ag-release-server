@@ -25,6 +25,7 @@ import { DashboardAnalyticsController } from './controllers/dashboard-analytics.
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
 import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
 import { ChannelAnalyticsController } from './controllers/channel-analytics.controller';
+import { DspAnalyticsController } from './controllers/dsp-analytics.controller';
 
 // Services
 import { IsrcResolverService } from './services/isrc-resolver.service';
@@ -38,6 +39,7 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
 import { ExportQueueService } from './services/export-queue.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 import { AnalyticsCacheService } from './services/analytics-cache.service';
+import { DspAnalyticsService } from './services/dsp-analytics.service';
 
 @Module({
   imports: [
@@ -57,6 +59,7 @@ import { AnalyticsCacheService } from './services/analytics-cache.service';
     AnalyticsReportExportController,
     TenantAnalyticsController,
     ChannelAnalyticsController,
+    DspAnalyticsController,
   ],
   providers: [
     EntityAnalyticsService,
@@ -70,6 +73,7 @@ import { AnalyticsCacheService } from './services/analytics-cache.service';
     DspSeedingService,
     DashboardAnalyticsService,
     AnalyticsCacheService,
+    DspAnalyticsService,
   ],
   exports: [IsrcResolverService],
 })
