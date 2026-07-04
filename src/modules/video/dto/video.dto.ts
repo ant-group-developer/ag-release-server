@@ -9,13 +9,44 @@ import {
 	IsString,
 	IsUUID,
 	MaxLength,
+	registerDecorator,
 	ValidateIf,
+	ValidationArguments,
+	ValidationOptions,
 } from 'class-validator';
 import {
 	VideoAiContent,
 	VideoMadeForKids,
 	VideoVisibility,
 } from '../entities/video.entity';
+
+export function IsKeywordsLength(
+	maxLength: number,
+	validationOptions?: ValidationOptions,
+) {
+	return function (object: object, propertyName: string) {
+		registerDecorator({
+			name: 'isKeywordsLength',
+			target: object.constructor,
+			propertyName: propertyName,
+			constraints: [maxLength],
+			options: validationOptions,
+			validator: {
+				validate(value: any, args: ValidationArguments) {
+					if (!value) return true;
+					if (!Array.isArray(value)) return false;
+					const [max] = args.constraints;
+					const joined = value.join(',');
+					return joined.length <= max;
+				},
+				defaultMessage(args: ValidationArguments) {
+					const [max] = args.constraints;
+					return `Tổng độ dài các từ khóa không được vượt quá ${max} ký tự`;
+				},
+			},
+		});
+	};
+}
 
 export class CreateVideoDto {
 	@ApiProperty({ format: 'uuid' })
@@ -67,9 +98,10 @@ export class CreateVideoDto {
 	)
 	channelId?: string | null;
 
-	@ApiPropertyOptional()
+	@ApiPropertyOptional({ maxLength: 5000 })
 	@IsOptional()
 	@IsString()
+	@MaxLength(5000)
 	@Transform(({ value }: { value: undefined | string }) =>
 		value === undefined ? null : value,
 	)
@@ -79,6 +111,7 @@ export class CreateVideoDto {
 	@IsOptional()
 	@IsArray()
 	@IsString({ each: true })
+	@IsKeywordsLength(500)
 	keywords?: string[] | null;
 
 	@ApiPropertyOptional({
