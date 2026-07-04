@@ -181,7 +181,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	private async performFullSync() {
+	async performFullSync() {
 		let offset = 0;
 		let totalSynced = 0;
 
@@ -237,11 +237,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_names,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -278,11 +278,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_names,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -499,11 +499,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ),
              ''
            ) AS artist_names,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
          FROM tracks t
          INNER JOIN releases r ON r.id = t.release_id
          LEFT JOIN labels l ON l.id = r.label_id
@@ -574,11 +574,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ),
              ''
            ) AS artist_names,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-           COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
          FROM videos v
          INNER JOIN releases r ON r.id = v.release_id
          LEFT JOIN labels l ON l.id = r.label_id
@@ -670,11 +670,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_names,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -712,11 +712,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
                ),
                ''
              ) AS artist_names,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT f.key FROM release_cover_art rca JOIN files f ON f.id = rca.file_id WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '75x75' LIMIT 1), '') AS cover_75,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id

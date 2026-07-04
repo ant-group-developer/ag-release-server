@@ -14,8 +14,10 @@ import {
   TenantRankingItem,
   DspRankingItem,
   ChannelRankingItem,
+  SourceBreakdownItem,
 } from '../interfaces/analytics.interface';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
+import { getImportSourceLabel } from '../constants/import-source.constants';
 
 /**
  * Service xếp hạng hiệu năng (Rankings) cho Tracks, Releases, Artists, Labels.
@@ -75,7 +77,45 @@ export class RankingService {
       params.releaseType = query.releaseType;
     }
 
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
+    }
+
     return { joinSql, filterSql, params };
+  }
+
+  private async fetchTrendSourceBreakdown(
+    table: string,
+    joinSql: string,
+    dateFilterSql: string,
+    baseFilterSql: string,
+    baseParams: Record<string, any>,
+    groupFilter: string,
+    groupParams: Record<string, any>,
+  ): Promise<SourceBreakdownItem[]> {
+    const sql = `
+      SELECT
+        s.import_source AS source,
+        sum(s.total_quantity) AS quantity
+      FROM ${table} s
+      ${joinSql}
+      WHERE 1=1
+        ${dateFilterSql}
+        ${baseFilterSql}
+        ${groupFilter}
+      GROUP BY source
+      ORDER BY quantity DESC
+    `;
+    const rows = await this.clickHouseService.query<{ source: string; quantity: string }>(
+      sql,
+      { ...baseParams, ...groupParams },
+    );
+    return rows.map((r) => ({
+      source: r.source || 'ftp',
+      sourceLabel: getImportSourceLabel(r.source || 'ftp'),
+      quantity: Number(r.quantity),
+    }));
   }
 
   // ═══════════════════════════════════════════════════════
@@ -251,6 +291,25 @@ export class RankingService {
       };
     });
 
+    // groupBySource: fetch breakdown per track
+    if (query.groupBySource && items.length > 0) {
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            joinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND s.isrc = {_isrc:String}',
+            { _isrc: item.isrc },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 
@@ -379,6 +438,26 @@ export class RankingService {
       };
     });
 
+    // groupBySource: fetch breakdown per release
+    if (query.groupBySource && items.length > 0) {
+      const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            releaseJoinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND t.release_id = {_releaseId:String}',
+            { _releaseId: item.releaseId },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 
@@ -491,6 +570,26 @@ export class RankingService {
       };
     });
 
+    // groupBySource: fetch breakdown per label
+    if (query.groupBySource && items.length > 0) {
+      const labelJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            labelJoinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND t.label_id = {_labelId:String}',
+            { _labelId: item.labelId },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 
@@ -590,6 +689,26 @@ export class RankingService {
         tenant: meta?.tenant ?? null,
       };
     });
+
+    // groupBySource: fetch breakdown per channel
+    if (query.groupBySource && items.length > 0) {
+      const channelJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            channelJoinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND t.channel_id = {_channelId:String}',
+            { _channelId: item.channelId },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
 
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
@@ -703,6 +822,26 @@ export class RankingService {
       };
     });
 
+    // groupBySource: fetch breakdown per artist
+    if (query.groupBySource && items.length > 0) {
+      const artistJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            artistJoinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND has(t.artist_ids, {_artistId:String})',
+            { _artistId: item.artistId },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 
@@ -743,6 +882,11 @@ export class RankingService {
     if (query.releaseType) {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
+    }
+
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
     }
 
     const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
@@ -814,6 +958,26 @@ export class RankingService {
       };
     });
 
+    // groupBySource: fetch breakdown per tenant
+    if (query.groupBySource && items.length > 0) {
+      const tenantJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items.map((item) =>
+          this.fetchTrendSourceBreakdown(
+            table,
+            tenantJoinSql,
+            dateFilterSql,
+            `${dspFilter} ${filterSql}`,
+            params,
+            'AND t.tenant_id = {_tenantId:String}',
+            { _tenantId: item.tenantId },
+          ),
+        ),
+      );
+      items.forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
+
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
 
@@ -845,6 +1009,11 @@ export class RankingService {
     if (query.releaseType) {
       filterSql += ' AND t.release_type = {releaseType:String}';
       params.releaseType = query.releaseType;
+    }
+
+    if (query.importSource) {
+      filterSql += ' AND s.import_source = {importSource:String}';
+      params.importSource = query.importSource;
     }
 
     const table = CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
@@ -889,7 +1058,8 @@ export class RankingService {
     // Data query
     const dataSql = `
       SELECT
-        s.dsp_id AS dspId,
+        s.dsp_id AS dspReportId,
+        r.pg_uuid AS pgDspId,
         ${resolvedDspName} AS dspName,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
@@ -899,22 +1069,46 @@ export class RankingService {
         AND s.${dateCol} >= toDate({from:String})
         AND s.${dateCol} <= toDate({to:String})
         ${filterSql}
-      GROUP BY dspId, dspName
+      GROUP BY dspReportId, pgDspId, dspName
       ORDER BY totalViews DESC
       LIMIT ${query.limit} OFFSET ${query.skip}
     `;
     const paged = await this.clickHouseService.query<{
-      dspId: string;
+      dspReportId: string;
+      pgDspId: string;
       dspName: string;
       totalViews: string;
     }>(dataSql, params);
 
     const items: DspRankingItem[] = paged.map((r, index) => ({
       rank: query.skip + index + 1,
-      dspId: r.dspId,
+      pgDspId: r.pgDspId || null,
+      dspReportId: r.dspReportId,
       dspName: r.dspName,
       totalViews: Number(r.totalViews),
     }));
+
+    // groupBySource: fetch breakdown per DSP
+    if (query.groupBySource && items.length > 0) {
+      const dspTenantJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc ${joinExpr}`;
+      const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+      const breakdowns = await Promise.all(
+        items
+          .filter((item) => item.dspReportId)
+          .map((item) =>
+            this.fetchTrendSourceBreakdown(
+              table,
+              dspTenantJoinSql,
+              dateFilterSql,
+              filterSql,
+              params,
+              'AND s.dsp_id = {_dspId:String}',
+              { _dspId: item.dspReportId },
+            ),
+          ),
+      );
+      items.filter((it) => it.dspReportId).forEach((item, i) => { item.bySource = breakdowns[i]; });
+    }
 
     return new PageDto({ items, metadata: { page, pageSize, totalItems } });
   }
