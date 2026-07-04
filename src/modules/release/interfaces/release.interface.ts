@@ -5,6 +5,7 @@ import { ReleaseLanguage } from 'src/modules/release-language/entities/release-l
 
 import { ReleaseDspDelivery } from '../entities/release-dsp-delivery.entity';
 import { ReleaseStatus, ReleaseStatusNonDraft } from '../enum/release.enum';
+import { ReleaseCiData } from '../modules/release-ci-data/entities/release-ci-data.entity';
 
 export interface IRelease {
 	albumFormatId: string;
@@ -80,4 +81,5 @@ export interface IReleaseDetail extends Omit<IRelease, 'releaseCoverArt'> {
 	subGenre: Genre | null;
 	releaseLanguage: ReleaseLanguage | null;
 	releaseDspDeliveries?: ReleaseDspDelivery[];
+	ciData: ReleaseCiData | null;
 }

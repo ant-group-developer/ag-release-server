@@ -58,4 +58,8 @@ export class ReleaseCiData extends BaseUUIDEntity {
 
 	@Column({ name: 'export_parsed_data', type: 'jsonb', nullable: true })
 	exportParsedData: ReleaseCiExportParsedData[] | null;
+
+	dspsLive?: string;
+	dspsLiveCount?: number;
+	dspsTotalCount?: number;
 }

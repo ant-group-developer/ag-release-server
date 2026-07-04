@@ -94,6 +94,12 @@ export class ReleaseQueryService {
 		const [dataFromDb, totalItems]: [IDataFromDb, number] =
 			await Promise.all([qb.getRawAndEntities(), qb.getCount()]);
 
+		console.log(
+			`Raw rows count: ${dataFromDb.raw.length}, Entities count: ${dataFromDb.entities.length}, Total items: ${totalItems}`,
+		);
+
+		// console.log(qb.getQueryAndParameters());
+
 		const releases = this.assigneeVirtualColumn(dataFromDb);
 
 		return {
@@ -521,6 +527,9 @@ export class ReleaseQueryService {
 			hasError,
 			needsReview,
 			tenantIds,
+			ciDataStatus,
+			neverExported,
+			lastImportIsFailed,
 
 			fieldOrder,
 			orderBy,
@@ -703,6 +712,32 @@ export class ReleaseQueryService {
 				.addSelect(['tenant.id', 'tenant.name']);
 		}
 
+		if (ciDataStatus) {
+			queryBuilder.andWhere('releaseCiData.status = :ciDataStatus', {
+				ciDataStatus,
+			});
+		}
+
+		if (neverExported) {
+			queryBuilder.andWhere(
+				`
+				(
+					"releaseCiData"."export_parsed_data" IS NULL
+					OR jsonb_array_length("releaseCiData"."export_parsed_data") = 0
+				)
+			`,
+			);
+		}
+
+		if (lastImportIsFailed) {
+			queryBuilder.andWhere(
+				`
+				"releaseCiData"."import_parsed_data" ->> 'status' = :failedImportStatus
+			`,
+				{ failedImportStatus: 'problem' },
+			);
+		}
+
 		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
 			queryBuilder.orderBy('dsps_live_count', orderBy);
 		} else if (VirtualColumnReleaseArr.includes(fieldOrder)) {
@@ -720,6 +755,7 @@ export class ReleaseQueryService {
 		queryBuilder
 			.leftJoin('release.albumFormat', 'albumFormat')
 			.leftJoin('release.releaseCoverArts', 'releaseCoverArt')
+			// .leftJoinAndSelect('release.ciData', 'releaseCiData')
 
 			// artist
 			.leftJoin('release.releaseArtists', 'releaseArtist')
@@ -1224,6 +1260,7 @@ export class ReleaseQueryService {
 		relations?: string[];
 	}) {
 		qb.leftJoinAndSelect('release.label', 'label')
+			.leftJoinAndSelect('release.ciData', 'releaseCiData')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
 
