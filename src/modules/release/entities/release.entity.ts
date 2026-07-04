@@ -353,6 +353,9 @@ export class Release extends BaseUserTrackedUUIDEntity {
 
 	tracksCount?: number;
 	totalDuration?: number;
+	dspsLive?: string;
+	dspsLiveCount?: number;
+	dspsTotalCount?: number;
 
 	coverArtThumbnails?: ICoverArtThumbnails;
 

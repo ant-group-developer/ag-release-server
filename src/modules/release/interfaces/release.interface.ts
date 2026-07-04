@@ -22,6 +22,9 @@ export interface IRelease {
 	releaseDate: Date | null;
 	releaseTime: string | null;
 	totalDuration?: number;
+	dspsLive?: string;
+	dspsLiveCount?: number;
+	dspsTotalCount?: number;
 	tenantId?: string;
 }
 
