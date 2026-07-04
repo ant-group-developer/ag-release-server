@@ -1,4 +1,5 @@
 import {
+	CopyObjectCommand,
 	DeleteObjectCommand,
 	GetObjectCommand,
 	HeadObjectCommand,
@@ -320,5 +321,24 @@ export class BucketR2Service {
 		await this.client.send(
 			new DeleteObjectCommand({ Bucket: bucketName, Key: key }),
 		);
+	}
+
+	async moveObject({
+		bucketName,
+		fromKey,
+		toKey,
+	}: {
+		bucketName: string;
+		fromKey: string;
+		toKey: string;
+	}): Promise<void> {
+		await this.client.send(
+			new CopyObjectCommand({
+				Bucket: bucketName,
+				CopySource: `${bucketName}/${encodeURIComponent(fromKey)}`,
+				Key: toKey,
+			}),
+		);
+		await this.delete({ bucketName, key: fromKey });
 	}
 }

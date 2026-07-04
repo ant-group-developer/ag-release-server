@@ -160,12 +160,13 @@ export class JobController {
 }
 
 function formatJob(job: ImportJob) {
-	const isImportOrSync =
-		job.sourceType === ImportJobSourceType.REPORT_UPLOAD ||
-		job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
-		job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
-		job.sourceType === ImportJobSourceType.FTP_RETRY ||
-		job.sourceType === ImportJobSourceType.FTP_AUTO_CRON;
+  const isImportOrSync =
+    job.sourceType === ImportJobSourceType.REPORT_UPLOAD ||
+    job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
+    job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
+    job.sourceType === ImportJobSourceType.FTP_RETRY ||
+    job.sourceType === ImportJobSourceType.FTP_AUTO_CRON ||
+    job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
 
 	return {
 		id: job.id,

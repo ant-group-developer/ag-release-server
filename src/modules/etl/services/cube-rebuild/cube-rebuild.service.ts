@@ -62,6 +62,7 @@ export class CubeRebuildService {
               toStartOfMonth(f.reporting_period_start) AS period,
               f.dsp_id,
               f.isrc,
+              if(f.import_source = '', 'ftp', f.import_source) AS import_source,
               sum(f.quantity) AS total_quantity,
               ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
@@ -69,7 +70,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.dsp_id, f.isrc
+          GROUP BY period, f.dsp_id, f.isrc, import_source
         `);
 
 				// 3. Re-insert aggregated data for the partition into sales ter cube
@@ -79,6 +80,7 @@ export class CubeRebuildService {
               toStartOfMonth(f.reporting_period_start) AS period,
               f.territory_code,
               f.isrc,
+              if(f.import_source = '', 'ftp', f.import_source) AS import_source,
               sum(f.quantity) AS total_quantity,
               ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
@@ -86,7 +88,7 @@ export class CubeRebuildService {
               ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
               AND f.revenue_currency = er.currency
           WHERE toYYYYMM(f.reporting_period_start) = '${partition}'
-          GROUP BY period, f.territory_code, f.isrc
+          GROUP BY period, f.territory_code, f.isrc, import_source
         `);
 
 				// 4. Re-insert aggregated data for the partition into sales export cube
@@ -275,13 +277,14 @@ export class CubeRebuildService {
           toStartOfMonth(f.reporting_period_start) AS period,
           f.dsp_id,
           f.isrc,
+          if(f.import_source = '', 'ftp', f.import_source) AS import_source,
           sum(f.quantity) AS total_quantity,
           ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.dsp_id, f.isrc
+      GROUP BY period, f.dsp_id, f.isrc, import_source
     `);
 
 		// 3. Rebuild Territory cube
@@ -291,13 +294,14 @@ export class CubeRebuildService {
           toStartOfMonth(f.reporting_period_start) AS period,
           f.territory_code,
           f.isrc,
+          if(f.import_source = '', 'ftp', f.import_source) AS import_source,
           sum(f.quantity) AS total_quantity,
           ${REVENUE_USD_EXPRESSION} AS total_revenue_usd
       FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT} f
       LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.EXCHANGE_RATES} FINAL) er
           ON formatDateTime(f.reporting_period_start, '%Y-%m') = er.rate_month
           AND f.revenue_currency = er.currency
-      GROUP BY period, f.territory_code, f.isrc
+      GROUP BY period, f.territory_code, f.isrc, import_source
     `);
 
 		// 4. Rebuild Export cube (was MISSING before — root cause of revenue mismatch)

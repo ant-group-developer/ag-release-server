@@ -1,18 +1,28 @@
 import {
-	Body,
-	Controller,
-	Get,
-	MessageEvent,
-	NotFoundException,
-	Param,
-	Post,
-	Sse,
-	UseInterceptors,
+  Body,
+  Controller,
+  Get,
+  MessageEvent,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Sse,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { concat, from, interval, merge, Observable, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
+import { ReportImportService } from '../services/report-import.service';
+import {
+  DeleteImportedReleasesDto,
+  PreValidateRequestDto,
+  ReportImportStartResponseDto,
+  ReportImportStatusResponseDto,
+} from '../dto/report-import.dto';
+import { UpdateSpotifyR2SyncConfigDto } from '../dto/spotify-r2-sync-config.dto';
 import { User } from '../../../common/decorators/req.decorators';
 import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../../auth/decorators/auth.decorator';
@@ -23,28 +33,22 @@ import {
 } from '../../etl/services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from '../../etl/services/import-jobs/job-events.gateway';
 import {
-	DeleteImportedReleasesDto,
-	PreValidateRequestDto,
-	ReportImportStartResponseDto,
-	ReportImportStatusResponseDto,
-} from '../dto/report-import.dto';
-import {
 	ReportImportPreValidateResponse,
 	ReportImportStartResponse,
 	ReportImportStatusResponse,
 } from '../interfaces/report-import.interface';
 import { ImportedReleaseDeleteService } from '../services/imported-release-delete.service';
-import { ReportImportService } from '../services/report-import.service';
-
+import { SpotifyR2SyncService } from '../services/spotify-r2-sync.service';
 @ApiTags('Report Import')
 @Controller('report-import')
 export class ReportImportController {
-	constructor(
-		private readonly reportImportService: ReportImportService,
-		private readonly importJobsService: ImportJobsService,
-		private readonly importedReleaseDeleteService: ImportedReleaseDeleteService,
-		private readonly jobEvents: JobEventsGateway,
-	) {}
+  constructor(
+    private readonly reportImportService: ReportImportService,
+    private readonly importJobsService: ImportJobsService,
+    private readonly importedReleaseDeleteService: ImportedReleaseDeleteService,
+    private readonly jobEvents: JobEventsGateway,
+    private readonly spotifyR2SyncService: SpotifyR2SyncService,
+  ) {}
 
 	@SystemAdminOnly()
 	@Post('pre-validate')
@@ -179,16 +183,72 @@ export class ReportImportController {
 			}),
 		);
 
-		return merge(initial$, heartbeat$).pipe(
-			takeWhile((evt) => {
-				return (
-					evt.type !== 'completed' &&
-					evt.type !== 'failed' &&
-					evt.type !== 'cancelled'
-				);
-			}, true),
-		);
-	}
+    return merge(initial$, heartbeat$).pipe(
+      takeWhile((evt) => {
+        return (
+          evt.type !== 'completed' &&
+          evt.type !== 'failed' &&
+          evt.type !== 'cancelled'
+        );
+      }, true),
+    );
+  }
+
+  @SystemAdminOnly()
+  @Get('spotify/r2-sync-config')
+  @ApiOperation({
+    summary: 'Get Spotify R2 auto-sync config',
+    description: 'Returns enabled/cron/prefix, backed by etl_config in ClickHouse.',
+  })
+  async getSpotifyR2SyncConfig(): Promise<ResponseSuccess<any>> {
+    return new ResponseSuccess({
+      data: await this.spotifyR2SyncService.getConfig(),
+    });
+  }
+
+  @SystemAdminOnly()
+  @Put('spotify/r2-sync-config')
+  @Patch('spotify/r2-sync-config')
+  @ApiOperation({
+    summary: 'Update Spotify R2 auto-sync config',
+    description: 'Updates enabled/cron/prefix. Reschedules the cron job immediately if cron changes.',
+  })
+  async setSpotifyR2SyncConfig(
+    @Body() body: UpdateSpotifyR2SyncConfigDto,
+  ): Promise<ResponseSuccess<any>> {
+    const updated = await this.spotifyR2SyncService.setConfig(body);
+    if (body.cron) {
+      await this.spotifyR2SyncService.rescheduleCron(body.cron);
+    }
+    return new ResponseSuccess({ data: updated });
+  }
+
+  @SystemAdminOnly()
+  @Post('spotify/sync-r2')
+  @ApiOperation({
+    summary: 'Trigger Spotify R2 sync now',
+    description:
+      'Returns immediately with a jobId and runs the scan/extract/import in the background ' +
+      '(avoids HTTP timeout on large zips). Poll GET /report-import/jobs/:jobId/status for progress and result.',
+  })
+  async triggerSpotifyR2Sync(): Promise<ResponseSuccess<ReportImportStartResponseDto>> {
+    const job = await this.spotifyR2SyncService.triggerManualSync();
+    return new ResponseSuccess({ data: new ReportImportStartResponseDto(job) });
+  }
+
+  @SystemAdminOnly()
+  @Post('spotify/cleanup-processed')
+  @ApiOperation({
+    summary: 'Delete expired zips from spotify-reports/processed/ now',
+    description:
+      'Runs the same retention cleanup as the daily cron immediately, based on the configured retentionDays. ' +
+      'Runs synchronously (fast, just a list + delete of already-processed zips).',
+  })
+  async cleanupSpotifyProcessed(): Promise<ResponseSuccess<{ deleted: number }>> {
+    const config = await this.spotifyR2SyncService.getConfig();
+    const result = await this.spotifyR2SyncService.cleanupProcessedZips(config.prefix, config.retentionDays);
+    return new ResponseSuccess({ data: result });
+  }
 }
 
 function formatReportImportJob(job: ImportJob) {

@@ -10,33 +10,35 @@ import { ReleaseModule } from '../release/release.module';
 import { ReportImportController } from './controllers/report-import.controller';
 import { ReportSourceConfigController } from './controllers/report-source-config.controller';
 import { ConfigSyncService } from './services/config-sync.service';
-import { ImportedReleaseDeleteService } from './services/imported-release-delete.service';
 import { ReportDetectorService } from './services/report-detector.service';
 import { ReportImportQueueService } from './services/report-import-queue.service';
 import { ReportImportWorkerService } from './services/report-import-worker.service';
 import { ReportImportService } from './services/report-import.service';
 import { ReportSourceConfigService } from './services/report-source-config.service';
+import { ImportedReleaseDeleteService } from './services/imported-release-delete.service';
+import { SpotifyR2SyncService } from './services/spotify-r2-sync.service';
 
 @Module({
-	imports: [
-		ClickHouseModule,
-		BucketModule2,
-		EtlModule,
-		DspModule,
-		ReleaseModule,
-		SpotifyModule,
-		TypeOrmModule.forFeature([Label]),
-	],
-	controllers: [ReportImportController, ReportSourceConfigController],
-	providers: [
-		ReportImportService,
-		ReportDetectorService,
-		ReportImportQueueService,
-		ReportImportWorkerService,
-		ConfigSyncService,
-		ReportSourceConfigService,
-		ImportedReleaseDeleteService,
-	],
-	exports: [ReportImportService],
+  imports: [
+    ClickHouseModule,
+    BucketModule2,
+    EtlModule,
+    DspModule,
+    ReleaseModule,
+    SpotifyModule,
+    TypeOrmModule.forFeature([Label]),
+  ],
+  controllers: [ReportImportController, ReportSourceConfigController],
+  providers: [
+    ReportImportService,
+    ReportDetectorService,
+    ReportImportQueueService,
+    ReportImportWorkerService,
+    ConfigSyncService,
+    ReportSourceConfigService,
+    ImportedReleaseDeleteService,
+    SpotifyR2SyncService,
+  ],
+  exports: [ReportImportService],
 })
 export class ReportImportModule {}
