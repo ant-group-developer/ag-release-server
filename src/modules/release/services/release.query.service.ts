@@ -22,6 +22,7 @@ import {
 } from '../entities/release-enrichment.entity';
 import { Release } from '../entities/release.entity';
 import {
+	FieldOrderRelease,
 	ReleaseStatus,
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
@@ -34,6 +35,8 @@ interface IDataFromDb {
 		release_id: string;
 		tracks_count: string;
 		total_duration: string;
+		dsps_live_count: string;
+		dsps_total_count: string;
 	}[];
 }
 
@@ -174,6 +177,13 @@ export class ReleaseQueryService {
 
 			entity.tracksCount = Number(dataRawOfRelease?.tracks_count);
 			entity.totalDuration = Number(dataRawOfRelease?.total_duration);
+			entity.dspsLiveCount = Number(
+				dataRawOfRelease?.dsps_live_count ?? 0,
+			);
+			entity.dspsTotalCount = Number(
+				dataRawOfRelease?.dsps_total_count ?? 0,
+			);
+			entity.dspsLive = `${entity.dspsLiveCount}/${entity.dspsTotalCount}`;
 
 			return entity;
 		});
@@ -693,7 +703,9 @@ export class ReleaseQueryService {
 				.addSelect(['tenant.id', 'tenant.name']);
 		}
 
-		if (VirtualColumnReleaseArr.includes(fieldOrder)) {
+		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
+			queryBuilder.orderBy('dsps_live_count', orderBy);
+		} else if (VirtualColumnReleaseArr.includes(fieldOrder)) {
 			queryBuilder.orderBy(`${fieldOrder}`, orderBy);
 		} else {
 			queryBuilder.orderBy(`release.${fieldOrder}`, orderBy);
@@ -853,7 +865,38 @@ export class ReleaseQueryService {
 				}
 
 				return subQuery;
-			}, VirtualColumnRelease.TOTAL_DURATION);
+			}, VirtualColumnRelease.TOTAL_DURATION)
+
+			.addSelect((subQuery) => {
+				subQuery
+					.select('COUNT(DISTINCT release_dsp_delivery_live_sub.id)')
+					.from(
+						'release_dsp_delivery',
+						'release_dsp_delivery_live_sub',
+					)
+					.where(
+						'release_dsp_delivery_live_sub.release_id = release.id',
+					)
+					.andWhere(
+						"release_dsp_delivery_live_sub.status = 'distributed'",
+					);
+
+				return subQuery;
+			}, 'dsps_live_count')
+
+			.addSelect((subQuery) => {
+				subQuery
+					.select('COUNT(DISTINCT release_dsp_delivery_total_sub.id)')
+					.from(
+						'release_dsp_delivery',
+						'release_dsp_delivery_total_sub',
+					)
+					.where(
+						'release_dsp_delivery_total_sub.release_id = release.id',
+					);
+
+				return subQuery;
+			}, 'dsps_total_count');
 	}
 
 	async findOneWithRelation(id: string) {

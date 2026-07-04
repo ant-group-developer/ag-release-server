@@ -340,6 +340,8 @@ export function getRevenueTopDspQuery(
 ): string {
   return `
     SELECT
+      any(r.pg_uuid) AS pg_dsp_id,
+      any(s.dsp_id) AS dsp_report_id,
       ${resolvedDspName} AS dsp_name,
       sum(s.total_quantity) AS quantity,
       sum(s.total_revenue_usd) AS revenue_usd

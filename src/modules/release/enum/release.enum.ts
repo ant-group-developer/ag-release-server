@@ -27,11 +27,13 @@ export enum FieldOrderRelease {
 	// virtual
 	TRACKS_COUNT = 'tracks_count',
 	TOTAL_DURATION = 'total_duration',
+	DSPS_LIVE = 'dsps_live',
 }
 
 export enum VirtualColumnRelease {
 	TRACKS_COUNT = FieldOrderRelease.TRACKS_COUNT,
 	TOTAL_DURATION = FieldOrderRelease.TOTAL_DURATION,
+	DSPS_LIVE = FieldOrderRelease.DSPS_LIVE,
 }
 
 export const VirtualColumnReleaseArr = Object.values(

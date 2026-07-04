@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
@@ -191,6 +192,22 @@ export class ChannelAnalyticsController {
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueTerritoryBarChart(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('top-releases')
+	@ApiOperation({ summary: 'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)' })
+	async topReleases(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopReleases(
 			'channel',
 			channelId,
 			dto,

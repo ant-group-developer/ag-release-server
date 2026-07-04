@@ -1,24 +1,27 @@
 // cache/cache.service.ts
 
 import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
 @Injectable()
 export class Cache2Service {
+	private readonly logger = new Logger(Cache2Service.name);
+
 	constructor(
 		@InjectRedis()
 		private readonly redis: Redis,
 	) {}
 
 	async get<T>({ key }: { key: string }): Promise<T | null> {
-		const value = await this.redis.get(key);
-
-		if (!value) {
+		try {
+			const value = await this.redis.get(key);
+			if (!value) return null;
+			return JSON.parse(value) as T;
+		} catch (err) {
+			this.logger.warn(`Redis get failed for key "${key}": ${err.message}`);
 			return null;
 		}
-
-		return JSON.parse(value) as T;
 	}
 
 	async set<T>({
@@ -30,38 +33,45 @@ export class Cache2Service {
 		value: T;
 		ttl?: number;
 	}): Promise<void> {
-		const data = JSON.stringify(value);
-
-		if (ttl) {
-			await this.redis.set(key, data, 'EX', ttl);
-			return;
+		try {
+			const data = JSON.stringify(value);
+			if (ttl) {
+				await this.redis.set(key, data, 'EX', ttl);
+			} else {
+				await this.redis.set(key, data);
+			}
+		} catch (err) {
+			this.logger.warn(`Redis set failed for key "${key}": ${err.message}`);
 		}
-
-		await this.redis.set(key, data);
 	}
 
 	async delete({ key }: { key: string }): Promise<void> {
-		await this.redis.del(key);
+		try {
+			await this.redis.del(key);
+		} catch (err) {
+			this.logger.warn(`Redis delete failed for key "${key}": ${err.message}`);
+		}
 	}
 
 	async deleteByPattern({ pattern }: { pattern: string }): Promise<void> {
-		let cursor = '0';
-
-		do {
-			const [nextCursor, keys] = await this.redis.scan(
-				cursor,
-				'MATCH',
-				pattern,
-				'COUNT',
-				100,
-			);
-
-			cursor = nextCursor;
-
-			if (keys.length > 0) {
-				await this.redis.del(...keys);
-			}
-		} while (cursor !== '0');
+		try {
+			let cursor = '0';
+			do {
+				const [nextCursor, keys] = await this.redis.scan(
+					cursor,
+					'MATCH',
+					pattern,
+					'COUNT',
+					100,
+				);
+				cursor = nextCursor;
+				if (keys.length > 0) {
+					await this.redis.del(...keys);
+				}
+			} while (cursor !== '0');
+		} catch (err) {
+			this.logger.warn(`Redis deleteByPattern failed for pattern "${pattern}": ${err.message}`);
+		}
 	}
 
 	async wrap<T>({
@@ -69,7 +79,7 @@ export class Cache2Service {
 		ttl,
 		factory,
 	}: {
-		key: string; // {module}:{resource}:{identifier}:{extra}
+		key: string;
 		ttl?: number;
 		factory: () => Promise<T>;
 	}): Promise<T> {
@@ -81,11 +91,7 @@ export class Cache2Service {
 
 		const value = await factory();
 
-		await this.set<T>({
-			key,
-			value,
-			ttl,
-		});
+		await this.set<T>({ key, value, ttl });
 
 		return value;
 	}
