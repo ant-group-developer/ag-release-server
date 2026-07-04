@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { YoutubeApiKeyAdminController } from './admin/youtube-api-key.controller';
@@ -14,7 +13,6 @@ import { YoutubeSearchCacheService } from './services/youtube-search-cache.servi
 
 @Module({
 	imports: [
-		ScheduleModule.forRoot(),
 		TypeOrmModule.forFeature([YoutubeApiKey, YoutubeSearchCache, Channel]),
 	],
 	controllers: [YoutubeApiKeyAdminController],
