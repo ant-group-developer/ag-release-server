@@ -23,6 +23,8 @@ import {
   ReportImportStatusResponseDto,
 } from '../dto/report-import.dto';
 import { UpdateSpotifyR2SyncConfigDto } from '../dto/spotify-r2-sync-config.dto';
+import { TriggerSpotifyExportDto } from '../dto/spotify-export-tool.dto';
+import { SpotifyExportToolService } from '../services/spotify-export-tool.service';
 import { User } from '../../../common/decorators/req.decorators';
 import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../../auth/decorators/auth.decorator';
@@ -48,6 +50,7 @@ export class ReportImportController {
     private readonly importedReleaseDeleteService: ImportedReleaseDeleteService,
     private readonly jobEvents: JobEventsGateway,
     private readonly spotifyR2SyncService: SpotifyR2SyncService,
+    private readonly spotifyExportToolService: SpotifyExportToolService,
   ) {}
 
 	@SystemAdminOnly()
@@ -233,6 +236,23 @@ export class ReportImportController {
   })
   async triggerSpotifyR2Sync(): Promise<ResponseSuccess<ReportImportStartResponseDto>> {
     const job = await this.spotifyR2SyncService.triggerManualSync();
+    return new ResponseSuccess({ data: new ReportImportStartResponseDto(job) });
+  }
+
+  @SystemAdminOnly()
+  @Post('spotify/export-trigger')
+  @ApiOperation({
+    summary: 'Trigger Box -> R2 export on ag-release-tool-export',
+    description:
+      'Gọi sang ag-release-tool-export (POST /api/spotify/sync) để đăng nhập Box.com, tải toàn bộ folder con và upload zip đã chuẩn hoá lên R2 (spotify-reports/). ' +
+      'Trả về ngay jobId nội bộ, tự poll jobSpoId phía ag-release-tool-export tới khi xong. ' +
+      'Poll GET /report-import/jobs/:jobId/status (hoặc GET /etl/jobs/:jobId) để theo dõi. ' +
+      'Sau khi job COMPLETED, cron riêng của service này (spotify-r2-auto-sync) sẽ tự phát hiện file mới trên R2 và import, không cần gọi thêm gì.',
+  })
+  async triggerSpotifyExport(
+    @Body() body: TriggerSpotifyExportDto,
+  ): Promise<ResponseSuccess<ReportImportStartResponseDto>> {
+    const job = await this.spotifyExportToolService.triggerExport(body);
     return new ResponseSuccess({ data: new ReportImportStartResponseDto(job) });
   }
 

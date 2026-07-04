@@ -7,6 +7,7 @@ export enum ImportJobSourceType {
   FTP_RETRY = 'FTP_RETRY',
   FTP_AUTO_CRON = 'FTP_AUTO_CRON',
   SPOTIFY_R2_SYNC = 'SPOTIFY_R2_SYNC',
+  SPOTIFY_EXPORT_TRIGGER = 'SPOTIFY_EXPORT_TRIGGER',
 }
 
 export enum ImportJobStatus {
