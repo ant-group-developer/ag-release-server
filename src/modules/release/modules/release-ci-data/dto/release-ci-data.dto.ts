@@ -21,6 +21,7 @@ export enum FieldOrderReleaseCiData {
 	updatedAt = 'releaseCiData.updatedAt',
 	latestSyncedAt = 'releaseCiData.latestSyncedAt',
 	status = 'releaseCiData.status',
+	dspsLive = 'dsps_live',
 }
 
 export class UpsertReleaseCiDataDto {

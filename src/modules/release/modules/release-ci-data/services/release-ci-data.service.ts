@@ -1,8 +1,10 @@
 import {
 	BadRequestException,
+	Inject,
 	Injectable,
 	Logger,
 	NotFoundException,
+	forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
@@ -11,10 +13,12 @@ import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
+import { ReleaseService } from 'src/modules/release/services/release.service';
 import { getFileExcelFromRaw } from 'src/utils/util.file';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
 	BulkSyncDataCiDto,
+	FieldOrderReleaseCiData,
 	GetListReleaseCiDataDto,
 	UpsertReleaseCiDataDto,
 } from '../dto/release-ci-data.dto';
@@ -38,6 +42,9 @@ export class ReleaseCiDataService {
 
 		private readonly ciImportService: CiImportService,
 		private readonly ciExportService: CiExportService,
+
+		@Inject(forwardRef(() => ReleaseService))
+		private readonly releaseService: ReleaseService,
 	) {}
 
 	async upsertByReleaseId(releaseId: string, data: UpsertReleaseCiDataDto) {
@@ -102,11 +109,21 @@ export class ReleaseCiDataService {
 		const { page, pageSize } = filter;
 		const qb = this.createQbGetList(filter);
 		const [items, totalItems] = await qb.getManyAndCount();
+		this.assignDspsLive(items);
 
 		return new PageDto({
 			items,
 			metadata: { page, pageSize, totalItems },
 		});
+	}
+
+	private assignDspsLive(items: ReleaseCiData[]): void {
+		for (const item of items) {
+			const count = item.exportParsedData?.length ?? 0;
+			item.dspsLiveCount = count;
+			item.dspsTotalCount = count;
+			item.dspsLive = String(count);
+		}
 	}
 
 	async exportData(filter: GetListReleaseCiDataDto) {
@@ -215,7 +232,6 @@ export class ReleaseCiDataService {
 			select: {
 				id: true,
 				upc: true,
-				releaseFormatsIdCi: true,
 			},
 		});
 
@@ -227,9 +243,10 @@ export class ReleaseCiDataService {
 			throw new BadRequestException('Release UPC is missing');
 		}
 
-		if (!release.releaseFormatsIdCi) {
-			throw new BadRequestException('Release CI format ID is missing');
-		}
+		const releaseFormatId = await this.releaseService.getReleaseFormatId(
+			release.id,
+			{ reloadFromCi: true },
+		);
 
 		const [importRawData, exportRawData] = await Promise.all([
 			this.ciImportService.getImports({
@@ -237,7 +254,7 @@ export class ReleaseCiDataService {
 				page_size: 999,
 			}),
 			this.ciExportService.getDeliverDesire({
-				release_id: release.releaseFormatsIdCi,
+				release_id: releaseFormatId,
 				pageSize: 999,
 			}),
 		]);
@@ -265,13 +282,26 @@ export class ReleaseCiDataService {
 		return this.syncCiDataByReleaseId(ciData.releaseId);
 	}
 
-	// có thể truyền vào release ids sẽ parse ra mảng ids, merge với ids truyền vào
+	/**
+	 * Dong bo lai du lieu CI cho nhieu release_ci_data record.
+	 *
+	 * Cach chon record can sync:
+	 * - filter.ids: danh sach ID cua bang release_ci_data.
+	 * - filter.releaseIds: danh sach release ID, se duoc doi sang release_ci_data ID
+	 *   va merge chung voi filter.ids.
+	 * - filter.latestSyncedAt = null: chi lay cac record chua tung sync.
+	 * - Khong truyen filter: sync tat ca record release_ci_data.
+	 *
+	 * Ham xu ly theo batch nho de tranh goi CI API qua nhieu cung luc.
+	 * Tung item trong batch duoc sync doc lap; item loi se duoc ghi vao errors
+	 * nhung khong lam dung ca job.
+	 */
 	async bulkSyncDataCi(filter?: BulkSyncDataCiDto) {
 		const batchSize = 5;
 		const targetIds = new Set(filter?.ids ?? []);
 
-		// FE can pass release IDs or release_ci_data IDs. Convert release IDs to
-		// release_ci_data IDs first, then merge both inputs into one target set.
+		// FE co the truyen release ID hoac release_ci_data ID. Doi release ID
+		// sang release_ci_data ID truoc de query chi can dung mot tap targetIds.
 		if (filter?.releaseIds?.length) {
 			const ciDataItems = await this.repo
 				.createQueryBuilder('releaseCiData')
@@ -289,8 +319,8 @@ export class ReleaseCiDataService {
 			.select(['releaseCiData.id', 'releaseCiData.releaseId'])
 			.orderBy('releaseCiData.createdAt', 'ASC');
 
-		// When specific IDs are provided, sync only those records. Otherwise,
-		// fall back to the optional latestSyncedAt filter, or all records.
+		// Neu co targetIds thi chi sync dung cac record duoc chi dinh.
+		// Neu khong co, tiep tuc ap dung latestSyncedAt filter hoac sync tat ca.
 		if (targetIds.size) {
 			qb.where('releaseCiData.id IN (:...ids)', {
 				ids: Array.from(targetIds),
@@ -322,6 +352,8 @@ export class ReleaseCiDataService {
 				`Processing bulk sync data CI batch ${batchNumber}/${totalBatches}. IDs: ${ids.join(', ')}`,
 			);
 
+			// Goi sync song song trong tung batch; Promise.allSettled giup batch
+			// tiep tuc xu ly cac item con lai neu mot item bi loi.
 			const results = await Promise.allSettled(
 				batch.map((item) => this.syncCiDataById(item.id)),
 			);
@@ -357,6 +389,8 @@ export class ReleaseCiDataService {
 				);
 			});
 
+			// Sau khi sync CI thanh cong, cap nhat flag has_live_version cho
+			// release_dsp_delivery dua tren exportParsedData moi nhat.
 			liveVersionSynced +=
 				await this.syncReleaseDspDeliveryLiveVersionFromCiData(
 					syncedReleaseIds,
@@ -577,6 +611,10 @@ export class ReleaseCiDataService {
 	private createQbGetList(filter: GetListReleaseCiDataDto) {
 		const qb = this.repo.createQueryBuilder('releaseCiData');
 		qb.leftJoinAndSelect('releaseCiData.release', 'release');
+		qb.addSelect(
+			`COALESCE(jsonb_array_length("releaseCiData"."export_parsed_data"), 0)`,
+			'dsps_live_count',
+		);
 		this.applyFilter({ qb, filter });
 		return qb;
 	}
@@ -631,6 +669,13 @@ export class ReleaseCiDataService {
 				)`,
 				{ keywords },
 			);
+		}
+
+		if (filter.fieldOrder === FieldOrderReleaseCiData.dspsLive) {
+			qb.orderBy('dsps_live_count', filter.orderBy)
+				.skip(filter.skip)
+				.take(filter.limit);
+			return;
 		}
 
 		orderAndPaging2({ qb, filter });

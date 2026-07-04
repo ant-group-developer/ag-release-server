@@ -13,6 +13,7 @@ import { YoutubeSearchCacheService } from './services/youtube-search-cache.servi
 
 @Module({
 	imports: [
+		// ScheduleModule.forRoot(),
 		TypeOrmModule.forFeature([YoutubeApiKey, YoutubeSearchCache, Channel]),
 	],
 	controllers: [YoutubeApiKeyAdminController],

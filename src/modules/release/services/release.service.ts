@@ -31,6 +31,7 @@ import {
 	UpdateReleaseDto,
 } from '../dto/release.dto';
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
+import { AutoSubmitHistory } from '../entities/auto-submit-history.entity';
 import { Release } from '../entities/release.entity';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
@@ -50,12 +51,27 @@ import { ReleaseDspDeliveryService } from './release-dsp-services/release-dsp-de
 import { ReleaseQueryService } from './release.query.service';
 import { ReleaseValidateService } from './release.validate.service';
 
+type AutoSubmitUndistributedMusicReleaseItem = {
+	releaseId: string;
+	upc: string | null;
+	dspCodes: string[];
+	releaseDspDeliveries: {
+		id: string | null;
+		dspId: string;
+		dspCode: string;
+		status: ReleaseDspStatus | null;
+	}[];
+};
+
 @Injectable()
 export class ReleaseService {
 	private readonly logger = new Logger('ReleaseSpotifyService');
 	constructor(
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
+
+		@InjectRepository(AutoSubmitHistory)
+		private readonly autoSubmitHistoryRepo: Repository<AutoSubmitHistory>,
 
 		private readonly releaseLogService: ReleaseLogService,
 
@@ -510,6 +526,8 @@ export class ReleaseService {
 	) {
 		const items =
 			await this.getAutoSubmitUndistributedMusicReleaseItems(dto);
+		await this.saveAutoSubmitHistory(dto, items);
+
 		const errors: {
 			releaseId: string;
 			dspCodes: string[];
@@ -531,12 +549,14 @@ export class ReleaseService {
 			}
 		}
 
-		return {
+		const result = {
 			totalReleases: items.length,
 			submitted,
 			failed: errors.length,
 			errors,
 		};
+
+		return result;
 	}
 
 	async previewAutoSubmitUndistributedMusicReleases(
@@ -545,17 +565,19 @@ export class ReleaseService {
 		const items =
 			await this.getAutoSubmitUndistributedMusicReleaseItems(dto);
 
-		return {
+		const result = {
 			totalReleases: items.length,
 			items,
 		};
+
+		await this.saveAutoSubmitHistory(dto, items);
+
+		return result;
 	}
 
 	private async getAutoSubmitUndistributedMusicReleaseItems(
 		dto: AutoSubmitUndistributedMusicReleaseDto,
-	): Promise<
-		{ releaseId: string; upc: string | null; dspCodes: string[] }[]
-	> {
+	): Promise<AutoSubmitUndistributedMusicReleaseItem[]> {
 		const batchSize = 30;
 		const dspCodes = [
 			...new Set(
@@ -564,11 +586,7 @@ export class ReleaseService {
 					.filter(Boolean),
 			),
 		];
-		const items: {
-			releaseId: string;
-			upc: string | null;
-			dspCodes: string[];
-		}[] = [];
+		const items: AutoSubmitUndistributedMusicReleaseItem[] = [];
 		let offset = 0;
 		let batchNumber = 0;
 
@@ -583,7 +601,16 @@ export class ReleaseService {
 					SELECT
 						r."id" AS "releaseId",
 						r."upc" AS "upc",
-						array_agg(dsp."code" ORDER BY dsp."code") AS "dspCodes"
+						array_agg(dsp."code" ORDER BY dsp."code") AS "dspCodes",
+						jsonb_agg(
+							jsonb_build_object(
+								'id', rdd."id",
+								'dspId', dsp."id",
+								'dspCode', dsp."code",
+								'status', rdd."status"
+							)
+							ORDER BY dsp."code"
+						) AS "releaseDspDeliveries"
 					FROM "release_ci_data" rcd
 					INNER JOIN "releases" r
 						ON r."id" = rcd."release_id"
@@ -593,10 +620,17 @@ export class ReleaseService {
 						ON rdd."release_id" = r."id"
 						AND rdd."dsp_id" = dsp."id"
 					WHERE r."type" = 'audio'
-					AND rcd."status" = 'NOT_FOUND_ON_CI'
+					AND ($3::text IS NULL OR rcd."status"::text = $3)
 					AND (
+						$4::boolean IS NOT TRUE
+						OR (
 						rcd."export_parsed_data" IS NULL
 						OR jsonb_array_length(rcd."export_parsed_data") = 0
+						)
+					)
+					AND (
+						$5::boolean IS NOT TRUE
+						OR rcd."import_parsed_data" ->> 'status' = 'problem'
 					)
 					AND (
 						rdd."id" IS NULL
@@ -604,9 +638,17 @@ export class ReleaseService {
 					)
 					GROUP BY r."id", r."upc", rcd."updated_at"
 					ORDER BY rcd."updated_at" DESC, r."id" ASC
-					LIMIT $3 OFFSET $4
+					LIMIT $6 OFFSET $7
 				`,
-				[dspCodes, ReleaseDspStatus.DISTRIBUTED, batchSize, offset],
+				[
+					dspCodes,
+					ReleaseDspStatus.DISTRIBUTED,
+					dto.status ?? null,
+					dto.neverExported ?? false,
+					dto.lastImportIsFailed ?? false,
+					batchSize,
+					offset,
+				],
 			);
 
 			if (!rows.length) break;
@@ -623,6 +665,20 @@ export class ReleaseService {
 		);
 
 		return items;
+	}
+
+	private async saveAutoSubmitHistory(
+		dto: AutoSubmitUndistributedMusicReleaseDto,
+		items: AutoSubmitUndistributedMusicReleaseItem[],
+	) {
+		await this.autoSubmitHistoryRepo.save({
+			input: dto as unknown as Record<string, any>,
+			previewData: {
+				totalReleases: items.length,
+				items,
+			},
+			totalReleases: items.length,
+		});
 	}
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
