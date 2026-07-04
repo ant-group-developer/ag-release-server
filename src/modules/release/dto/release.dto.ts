@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
 	ArrayNotEmpty,
+	Equals,
 	IsArray,
 	IsBoolean,
 	IsDate,
@@ -19,7 +20,9 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
+import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
 
 export class CreateReleaseDto {
 	@IsOptional()
@@ -494,6 +497,39 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	)
 	@IsArray()
 	tenantIds?: string[];
+
+	@ApiPropertyOptional({ enum: ReleaseCiDataStatus })
+	@IsOptional()
+	@IsEnum(ReleaseCiDataStatus)
+	ciDataStatus?: ReleaseCiDataStatus;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi chưa từng export',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	neverExported?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi có import cuối bị failed',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	lastImportIsFailed?: boolean;
 }
 
 export class QueryGetListReleaseDto2 extends BaseQueryDto {
@@ -619,6 +655,28 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	isVariousArtist?: boolean;
 
 	tenantIds?: string[];
+
+	@IsOptional()
+	@IsEnum(ReleaseCiDataStatus)
+	ciDataStatus?: ReleaseCiDataStatus;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	neverExported?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	lastImportIsFailed?: boolean;
 }
 
 export class FileExportReleaseCiDto {
@@ -649,6 +707,7 @@ export class BulkSubmitReleaseDto {
 }
 
 export class AutoSubmitUndistributedMusicReleaseDto {
+	// các dsp cần được xử lý
 	@ApiProperty({
 		description: 'Danh sách DSP code cần kiểm tra và submit lại',
 		example: ['SPOTIFY', 'APPLE_MUSIC'],
@@ -658,4 +717,78 @@ export class AutoSubmitUndistributedMusicReleaseDto {
 	@ArrayNotEmpty()
 	@IsString({ each: true })
 	dspCodes: string[];
+
+	@ApiPropertyOptional({ enum: ReleaseCiDataStatus })
+	@IsOptional()
+	@IsEnum(ReleaseCiDataStatus)
+	status?: ReleaseCiDataStatus;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi chưa từng export',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	neverExported?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Chỉ lấy bản ghi có import cuối bị failed',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	lastImportIsFailed?: boolean;
+
+	// các trạng thái cần được xử lý
+	// @ApiProperty({
+	// 	description: 'Danh sách trạng thái hiện tại được phép submit lại',
+	// 	enum: ReleaseDspStatus,
+	// 	isArray: true,
+	// 	example: [ReleaseDspStatus.NEVER_DISTRIBUTED, ReleaseDspStatus.ISSUES],
+	// })
+	// @IsArray()
+	// @ArrayNotEmpty()
+	// @IsEnum(ReleaseDspStatus, { each: true })
+	// fromStatuses: ReleaseDspStatus[];
+
+	// trạng thái đích sau khi xử lý
+	@ApiProperty({
+		description:
+			'Trạng thái sau khi submit lại, hiện tại chỉ cho phép DISTRIBUTED',
+		enum: [ReleaseDspStatus.DISTRIBUTED],
+		example: ReleaseDspStatus.DISTRIBUTED,
+	})
+	@IsOptional()
+	@Equals(ReleaseDspStatus.DISTRIBUTED)
+	toStatus: ReleaseDspStatus.DISTRIBUTED;
+
+	//
+	@ApiProperty({
+		description: 'Bộ lọc danh sách release',
+		type: QueryGetListReleaseDto2,
+	})
+	@IsOptional()
+	filter: QueryGetListReleaseDto2;
+
+	@IsOptional()
+	@ApiProperty({ type: [String], format: 'uuid' })
+	@IsUUID('4', { each: true })
+	ids: string[];
+
+	@ApiProperty({ type: [String], format: 'uuid', required: false })
+	@IsOptional()
+	@IsUUID('4', { each: true })
+	idsExclude?: string[];
 }

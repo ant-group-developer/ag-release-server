@@ -29,6 +29,7 @@ import { Timezone } from '../timezone/entities/timezone.entity';
 import { TrackModule } from '../track/track.module';
 import { ReleaseController } from './controllers/release.controller';
 import { ReleaseDraftController } from './controllers/release.draft.controller';
+import { AutoSubmitHistory } from './entities/auto-submit-history.entity';
 import { MetadataScanSession } from './entities/metadata-scan-session.entity';
 import { ReleaseDspDelivery } from './entities/release-dsp-delivery.entity';
 import { ReleaseEnrichment } from './entities/release-enrichment.entity';
@@ -116,6 +117,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			ReleaseLog,
 			ReleaseEnrichment,
 			MetadataScanSession,
+			AutoSubmitHistory,
 			ReleaseCiData,
 			ReleaseError,
 			ReleaseReview,
@@ -146,7 +148,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		VideoModule,
 		ReleaseCaptionModule,
 		ReleaseLogModule,
-		ReleaseCiDataModule,
+		forwardRef(() => ReleaseCiDataModule),
 		ReleaseErrorsModule,
 		forwardRef(() => ReleaseReviewsModule),
 
@@ -217,6 +219,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 	],
 	exports: [
 		ReleaseDdexService,
+		ReleaseService,
 		ReleaseQueryService,
 		ReleaseReportImportService,
 		ReleaseValidateService,
