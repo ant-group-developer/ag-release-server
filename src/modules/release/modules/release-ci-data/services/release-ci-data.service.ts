@@ -15,6 +15,7 @@ import { getFileExcelFromRaw } from 'src/utils/util.file';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
 	BulkSyncDataCiDto,
+	FieldOrderReleaseCiData,
 	GetListReleaseCiDataDto,
 	UpsertReleaseCiDataDto,
 } from '../dto/release-ci-data.dto';
@@ -102,11 +103,21 @@ export class ReleaseCiDataService {
 		const { page, pageSize } = filter;
 		const qb = this.createQbGetList(filter);
 		const [items, totalItems] = await qb.getManyAndCount();
+		this.assignDspsLive(items);
 
 		return new PageDto({
 			items,
 			metadata: { page, pageSize, totalItems },
 		});
+	}
+
+	private assignDspsLive(items: ReleaseCiData[]): void {
+		for (const item of items) {
+			const count = item.exportParsedData?.length ?? 0;
+			item.dspsLiveCount = count;
+			item.dspsTotalCount = count;
+			item.dspsLive = String(count);
+		}
 	}
 
 	async exportData(filter: GetListReleaseCiDataDto) {
@@ -577,6 +588,10 @@ export class ReleaseCiDataService {
 	private createQbGetList(filter: GetListReleaseCiDataDto) {
 		const qb = this.repo.createQueryBuilder('releaseCiData');
 		qb.leftJoinAndSelect('releaseCiData.release', 'release');
+		qb.addSelect(
+			`COALESCE(jsonb_array_length("releaseCiData"."export_parsed_data"), 0)`,
+			'dsps_live_count',
+		);
 		this.applyFilter({ qb, filter });
 		return qb;
 	}
@@ -631,6 +646,13 @@ export class ReleaseCiDataService {
 				)`,
 				{ keywords },
 			);
+		}
+
+		if (filter.fieldOrder === FieldOrderReleaseCiData.dspsLive) {
+			qb.orderBy('dsps_live_count', filter.orderBy)
+				.skip(filter.skip)
+				.take(filter.limit);
+			return;
 		}
 
 		orderAndPaging2({ qb, filter });
