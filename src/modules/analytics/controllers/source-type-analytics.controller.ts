@@ -10,22 +10,25 @@ import {
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
-@ApiTags('Analytics - Artist')
-@Controller('analytics/artist/:artistId')
-export class ArtistAnalyticsController {
+@ApiTags('Analytics - Source Type')
+@Controller('analytics/source-type/:sourceType')
+export class SourceTypeAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
 
 	@Post('overview')
-	@ApiOperation({ summary: 'Overview stats for an artist' })
+	@ApiOperation({
+		summary:
+			'Overview stats for a source type (ftp, wmg_report, spotify_report, ...)',
+	})
 	async overview(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityOverviewQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getOverview(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -34,17 +37,17 @@ export class ArtistAnalyticsController {
 
 	@Post('trend-view/dsp/timeline')
 	@ApiOperation({
-		summary: 'Trend view DSP timeline for an artist (monthly)',
+		summary: 'Trend view DSP timeline for a source type (monthly)',
 	})
 	async trendViewTimeline(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTrendViewDspTimeline(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -53,17 +56,17 @@ export class ArtistAnalyticsController {
 
 	@Post('sales-view/dsp/timeline')
 	@ApiOperation({
-		summary: 'Sales view DSP timeline for an artist (monthly)',
+		summary: 'Sales view DSP timeline for a source type (monthly)',
 	})
 	async salesViewTimeline(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getSalesViewDspTimeline(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -71,16 +74,18 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for an artist' })
+	@ApiOperation({
+		summary: 'Trend view DSP daily timeline for a source type',
+	})
 	async trendViewDailyTimeline(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -89,17 +94,17 @@ export class ArtistAnalyticsController {
 
 	@Post('revenue/timeline')
 	@ApiOperation({
-		summary: 'Revenue timeline for an artist (monthly, DSP breakdown)',
+		summary: 'Revenue timeline for a source type (monthly, DSP breakdown)',
 	})
 	async revenueTimeline(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityTimelineQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTimeline(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -107,16 +112,16 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('trend-view/line-chart')
-	@ApiOperation({ summary: 'Trend view line chart for an artist' })
+	@ApiOperation({ summary: 'Trend view line chart for a source type' })
 	async trendViewLineChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTrendViewLineChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -124,16 +129,16 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('revenue/line-chart')
-	@ApiOperation({ summary: 'Revenue line chart for an artist' })
+	@ApiOperation({ summary: 'Revenue line chart for a source type' })
 	async revenueLineChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueLineChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -141,16 +146,16 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('trend-view/dsp/bar-chart')
-	@ApiOperation({ summary: 'Trend view DSP bar chart for an artist' })
+	@ApiOperation({ summary: 'Trend view DSP bar chart for a source type' })
 	async trendViewDspBarChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTrendViewDspBarChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -158,16 +163,18 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('trend-view/ter/bar-chart')
-	@ApiOperation({ summary: 'Trend view territory bar chart for an artist' })
+	@ApiOperation({
+		summary: 'Trend view territory bar chart for a source type',
+	})
 	async trendViewTerritoryBarChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTrendViewTerritoryBarChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -175,16 +182,16 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('revenue/dsp/bar-chart')
-	@ApiOperation({ summary: 'Revenue DSP bar chart for an artist' })
+	@ApiOperation({ summary: 'Revenue DSP bar chart for a source type' })
 	async revenueDspBarChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueDspBarChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -192,16 +199,16 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('revenue/ter/bar-chart')
-	@ApiOperation({ summary: 'Revenue territory bar chart for an artist' })
+	@ApiOperation({ summary: 'Revenue territory bar chart for a source type' })
 	async revenueTerritoryBarChart(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: ChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTerritoryBarChart(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -210,17 +217,17 @@ export class ArtistAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của artist (sortBy: views | revenue)',
+		summary: 'Top tracks của source type (sortBy: views | revenue)',
 	})
 	async topTracks(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTopTracks(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),
@@ -229,17 +236,17 @@ export class ArtistAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của artist (sortBy: views | revenue)',
+		summary: 'Top releases của source type (sortBy: views | revenue)',
 	})
 	async topReleases(
-		@Param('artistId') artistId: string,
+		@Param('sourceType') sourceType: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getTopReleases(
-				'artist',
-				artistId,
+				'sourceType',
+				sourceType,
 				dto,
 				req.user!.tenantId,
 			),

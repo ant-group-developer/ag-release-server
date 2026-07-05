@@ -137,6 +137,6 @@ export class TrackLanguageValidateService {
 		// 	});
 		// }
 
-		return trackLanguage as ITrackLanguageDraft;
+		return trackLanguage;
 	}
 }

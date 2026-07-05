@@ -18,33 +18,33 @@ import { VevoParser } from './trends-usage/vevo.parser';
  * Supports both prefix-based (e.g. "aum-audiomack") and exact name (e.g. "tiktok").
  */
 export const PARSER_REGISTRY: Record<string, () => BaseParser> = {
-  'aum': () => new AudiomackParser(),
-  'awa': () => new AwaParser(),
-  'boo': () => new BoomplayParser(),
-  'dzr': () => new DeezerParser(),
-  'fbk': () => new FacebookParser(),
-  'ncm': () => new NeteaseParser(),
-  'snp': () => new SnapParser(),
-  'scu': () => new SoundCloudParser(),
-  'spo': () => new SpotifyParser(),
-  'tme': () => new TencentParser(),
-  'tiktok': () => new TiktokParser(),
-  'uma': () => new UmaParser(),
-  'vvo': () => new VevoParser(),
+	aum: () => new AudiomackParser(),
+	awa: () => new AwaParser(),
+	boo: () => new BoomplayParser(),
+	dzr: () => new DeezerParser(),
+	fbk: () => new FacebookParser(),
+	ncm: () => new NeteaseParser(),
+	snp: () => new SnapParser(),
+	scu: () => new SoundCloudParser(),
+	spo: () => new SpotifyParser(),
+	tme: () => new TencentParser(),
+	tiktok: () => new TiktokParser(),
+	uma: () => new UmaParser(),
+	vvo: () => new VevoParser(),
 };
 
 /**
  * Resolve parser from folder name like "aum-audiomack", "spo-spotify", "tiktok", etc.
  */
 export function getParserForFolder(folderName: string): BaseParser | null {
-  // Try exact match first (e.g. "tiktok")
-  if (PARSER_REGISTRY[folderName]) {
-    return PARSER_REGISTRY[folderName]();
-  }
-  // Then try prefix before first dash (e.g. "aum" from "aum-audiomack")
-  const prefix = folderName.split('-')[0];
-  const factory = PARSER_REGISTRY[prefix];
-  return factory ? factory() : null;
+	// Try exact match first (e.g. "tiktok")
+	if (PARSER_REGISTRY[folderName]) {
+		return PARSER_REGISTRY[folderName]();
+	}
+	// Then try prefix before first dash (e.g. "aum" from "aum-audiomack")
+	const prefix = folderName.split('-')[0];
+	const factory = PARSER_REGISTRY[prefix];
+	return factory ? factory() : null;
 }
 
 export { BaseParser } from './base.parser';

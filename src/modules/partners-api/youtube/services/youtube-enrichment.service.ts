@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
+import { Repository } from 'typeorm';
 import { YOUTUBE_VIDEO_ID_REGEX } from '../constants/youtube.constants';
 import {
 	YoutubeEnrichmentInput,
@@ -10,7 +10,6 @@ import {
 import { YoutubeLookupKind, YoutubeMatchStatus } from '../enum/youtube.enum';
 import {
 	YoutubeApiClientService,
-	YoutubeSearchResultItem,
 	YoutubeVideoSnippet,
 } from './youtube-api-client.service';
 import { NoAvailableYoutubeKeyError } from './youtube-api-key-pool.service';
@@ -77,7 +76,10 @@ export class YoutubeEnrichmentService {
 				this.logger.warn(
 					`Enrich search failed isrc=${input.isrc}: ${err.message}`,
 				);
-				results.set(input.isrc, this.buildNoDataResult(input, 'youtube_search'));
+				results.set(
+					input.isrc,
+					this.buildNoDataResult(input, 'youtube_search'),
+				);
 			}
 		}
 
@@ -189,7 +191,9 @@ export class YoutubeEnrichmentService {
 					matchStatus,
 					youtubeVideoId: vid,
 					youtubeChannelId: snippet.channelId,
-					youtubeChannelTitle: this.decodeHtmlEntities(snippet.channelTitle),
+					youtubeChannelTitle: this.decodeHtmlEntities(
+						snippet.channelTitle,
+					),
 					matchedChannelPgId: matched?.pgChannelId ?? null,
 					source: 'youtube_id_lookup',
 				});
@@ -199,7 +203,9 @@ export class YoutubeEnrichmentService {
 				lookupKind: YoutubeLookupKind.BY_ID,
 				youtubeVideoId: vid,
 				youtubeChannelId: snippet.channelId,
-				youtubeChannelTitle: this.decodeHtmlEntities(snippet.channelTitle),
+				youtubeChannelTitle: this.decodeHtmlEntities(
+					snippet.channelTitle,
+				),
 				matchedChannelId: matched?.pgChannelId ?? null,
 				matchStatus,
 				rawResponse: snippet,

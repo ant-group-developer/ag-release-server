@@ -1,6 +1,6 @@
-import { BaseParser } from '../base.parser';
-import { FactDspRow } from '../../interfaces';
 import * as path from 'path';
+import { FactDspRow } from '../../interfaces';
+import { BaseParser } from '../base.parser';
 
 /**
  * Snap (Snapchat) Parser
@@ -16,44 +16,52 @@ import * as path from 'path';
  *          Number_of_Label_Library_Messages_Viewed (VIEWS)
  */
 export class SnapParser extends BaseParser {
-  constructor() {
-    super('snap');
-  }
+	constructor() {
+		super('snap');
+	}
 
-  protected parseRow(
-    record: Record<string, string>,
-    batchId: string,
-    filePath: string,
-  ): FactDspRow | null {
-    const isrc = record['ISRC'];
-    if (!isrc) return null;
+	protected parseRow(
+		record: Record<string, string>,
+		batchId: string,
+		filePath: string,
+	): FactDspRow | null {
+		const isrc = record['ISRC'];
+		if (!isrc) return null;
 
-    const isViews = path.basename(filePath).includes('_VIEWS');
+		const isViews = path.basename(filePath).includes('_VIEWS');
 
-    const row = this.createBaseRow(batchId);
-    // Use ReportStartDate (not Stream_Date) for reporting period
-    row.reporting_period = this.normalizeDate(record['ReportStartDate'] || record['Report_End_Date']);
-    row.isrc = isrc;
-    row.territory_code = this.normalizeCountryCode(record['Country_Key']);
-    row.track_title = record['Track_Title'] || '';
-    row.artist_name = record['Track_Artist'] || '';
-    row.label_name = record['Label_Name'] || '';
-    row.partner_id = record['DDEX_Party_Id'] || '';
-    row.licensor = record['Merlin_Member_Name'] || '';
+		const row = this.createBaseRow(batchId);
+		// Use ReportStartDate (not Stream_Date) for reporting period
+		row.reporting_period = this.normalizeDate(
+			record['ReportStartDate'] || record['Report_End_Date'],
+		);
+		row.isrc = isrc;
+		row.territory_code = this.normalizeCountryCode(record['Country_Key']);
+		row.track_title = record['Track_Title'] || '';
+		row.artist_name = record['Track_Artist'] || '';
+		row.label_name = record['Label_Name'] || '';
+		row.partner_id = record['DDEX_Party_Id'] || '';
+		row.licensor = record['Merlin_Member_Name'] || '';
 
-    if (isViews) {
-      row.quantity_total = this.safeInt(record['Number_of_Label_Library_Messages_Viewed']);
-      row.usage_type = 'view';
-    } else {
-      row.quantity_total = this.safeInt(record['Number_of_Label_Library_Messages_Created']);
-      row.usage_type = 'creation';
-    }
+		if (isViews) {
+			row.quantity_total = this.safeInt(
+				record['Number_of_Label_Library_Messages_Viewed'],
+			);
+			row.usage_type = 'view';
+		} else {
+			row.quantity_total = this.safeInt(
+				record['Number_of_Label_Library_Messages_Created'],
+			);
+			row.usage_type = 'creation';
+		}
 
-    row.metadata = {
-      ...(record['releaseDate'] ? { release_date: record['releaseDate'] } : {}),
-      snap_type: isViews ? 'views' : 'creations',
-    };
+		row.metadata = {
+			...(record['releaseDate']
+				? { release_date: record['releaseDate'] }
+				: {}),
+			snap_type: isViews ? 'views' : 'creations',
+		};
 
-    return row;
-  }
+		return row;
+	}
 }

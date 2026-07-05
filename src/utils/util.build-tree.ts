@@ -16,8 +16,8 @@ export function buildTree<
 >(
 	items: T[],
 	{
-		idKey = 'id' as keyof T,
-		parentKey = 'parent' as keyof T,
+		idKey = 'id',
+		parentKey = 'parent',
 		childrenKey = 'children' as K,
 	}: BuildTreeOptions<T, K> = {},
 ): TreeNode<T, K>[] {

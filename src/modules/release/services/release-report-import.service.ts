@@ -8,12 +8,12 @@ import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artis
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
-import { stringToCode } from 'src/utils/util';
+import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import { stringToCode } from 'src/utils/util';
 import { DataSource, EntityManager, ILike, In, Repository } from 'typeorm';
 import { Release } from '../entities/release.entity';
-import { Video } from 'src/modules/video/entities/video.entity';
-import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
 
 export const REPORT_IMPORT_FALLBACK_TENANT_ID =
 	'7c2358a0-1a38-4a10-b806-a1531ef71b0c';
@@ -352,10 +352,12 @@ export class ReleaseReportImportService {
 		);
 	}
 
-	async importVideoRelease(input: ReleaseReportImportInput): Promise<Release> {
+	async importVideoRelease(
+		input: ReleaseReportImportInput,
+	): Promise<Release> {
 		input = { ...input, upc: normalizeUpc(input.upc) };
 		const equivalentUpcs = buildEquivalentUpcs(input.upc);
-		
+
 		const existingRelease = await this.releaseRepo.findOne({
 			where: { upc: In(equivalentUpcs), type: 'video' },
 		});

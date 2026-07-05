@@ -112,7 +112,7 @@ export class ReleaseService {
 		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		}) as IReleaseDetail;
+		});
 	}
 
 	async findOneFull(id: string) {
@@ -672,7 +672,7 @@ export class ReleaseService {
 		items: AutoSubmitUndistributedMusicReleaseItem[],
 	) {
 		await this.autoSubmitHistoryRepo.save({
-			input: dto as unknown as Record<string, any>,
+			input: dto,
 			previewData: {
 				totalReleases: items.length,
 				items,

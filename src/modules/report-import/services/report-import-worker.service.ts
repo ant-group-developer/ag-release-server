@@ -1,261 +1,312 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import {
+	Injectable,
+	Logger,
+	OnApplicationBootstrap,
+	OnApplicationShutdown,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as os from 'os';
+import * as path from 'path';
 import { pipeline } from 'stream/promises';
 import { Repository } from 'typeorm';
-import { ReportImportQueueService } from './report-import-queue.service';
 import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
-import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
-import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild.service';
-import { DspMappingService } from '../../dsp/services/dsp-mapping.service';
-import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from '../../clickhouse/clickhouse.constants';
+import { ClickHouseService } from '../../clickhouse/clickhouse.service';
+import { DspMappingService } from '../../dsp/services/dsp-mapping.service';
 import {
-  FactSalesRow,
-  ImportJob,
-  ImportJobSourceType,
-  ImportJobStatus,
+	FactSalesRow,
+	ImportJob,
+	ImportJobSourceType,
+	ImportJobStatus,
 } from '../../etl/interfaces';
-import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { SpotifyReportSalesParser } from '../../etl/parsers/sales/spotify-report-sales.parser';
-import { ExtractedRow, ReportEntityExtractorService } from '../../release/services/report-entity-extractor.service';
+import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
+import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild.service';
 import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
-import { hasMeaningfulText, normalizeFactRows } from '../../etl/utils/fact-row-normalizer.util';
+import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
+import {
+	hasMeaningfulText,
+	normalizeFactRows,
+} from '../../etl/utils/fact-row-normalizer.util';
 import { Label } from '../../label/entities/label.entity';
+import {
+	ExtractedRow,
+	ReportEntityExtractorService,
+} from '../../release/services/report-entity-extractor.service';
+import { ReportImportQueueService } from './report-import-queue.service';
 
 type ReportImportStage =
-  | 'FACT_IMPORT'
-  | 'METADATA_IMPORT'
-  | 'EXCHANGE_RATE'
-  | 'CUBE_REBUILD'
-  | 'COMPLETED';
+	| 'FACT_IMPORT'
+	| 'METADATA_IMPORT'
+	| 'EXCHANGE_RATE'
+	| 'CUBE_REBUILD'
+	| 'COMPLETED';
 
 type ReportImportFileStatus = 'PENDING' | 'IMPORTING' | 'FACT_IMPORTED';
 
 interface ReportImportFileCheckpoint {
-  status: ReportImportFileStatus;
-  sourceFileName: string;
-  importSource: string;
-  parserCode?: string;
-  factTable: string;
-  rows: number;
-  affectedPeriods: string[];
-  updatedAt: string;
+	status: ReportImportFileStatus;
+	sourceFileName: string;
+	importSource: string;
+	parserCode?: string;
+	factTable: string;
+	rows: number;
+	affectedPeriods: string[];
+	updatedAt: string;
 }
 
 interface ReportImportState {
-  stage: ReportImportStage;
-  files: Record<string, ReportImportFileCheckpoint>;
+	stage: ReportImportStage;
+	files: Record<string, ReportImportFileCheckpoint>;
 }
 
 @Injectable()
-export class ReportImportWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private readonly logger = new Logger(ReportImportWorkerService.name);
-  private isRunning = true;
-  private workerPromise: Promise<void> | null = null;
+export class ReportImportWorkerService
+	implements OnApplicationBootstrap, OnApplicationShutdown
+{
+	private readonly logger = new Logger(ReportImportWorkerService.name);
+	private isRunning = true;
+	private workerPromise: Promise<void> | null = null;
 
-  constructor(
-    private readonly queueService: ReportImportQueueService,
-    private readonly r2Service: BucketR2Service,
-    private readonly importJobsService: ImportJobsService,
-    private readonly cubeRebuildService: CubeRebuildService,
-    private readonly dspMappingService: DspMappingService,
-    private readonly clickHouseService: ClickHouseService,
-    private readonly reportEntityExtractorService: ReportEntityExtractorService,
-    private readonly exchangeRateService: ExchangeRateService,
-    @InjectRepository(Label)
-    private readonly labelRepo: Repository<Label>,
-    private readonly clickHouseMigrationService: ClickHouseMigrationService,
-  ) {}
+	constructor(
+		private readonly queueService: ReportImportQueueService,
+		private readonly r2Service: BucketR2Service,
+		private readonly importJobsService: ImportJobsService,
+		private readonly cubeRebuildService: CubeRebuildService,
+		private readonly dspMappingService: DspMappingService,
+		private readonly clickHouseService: ClickHouseService,
+		private readonly reportEntityExtractorService: ReportEntityExtractorService,
+		private readonly exchangeRateService: ExchangeRateService,
+		@InjectRepository(Label)
+		private readonly labelRepo: Repository<Label>,
+		private readonly clickHouseMigrationService: ClickHouseMigrationService,
+	) {}
 
-  onApplicationBootstrap() {
-    this.initializeWorkerInBackground().catch((err) => {
-      this.logger.error(`Failed to initialize Report Import Worker: ${err.message}`, err.stack);
-    });
-  }
+	onApplicationBootstrap() {
+		this.initializeWorkerInBackground().catch((err) => {
+			this.logger.error(
+				`Failed to initialize Report Import Worker: ${err.message}`,
+				err.stack,
+			);
+		});
+	}
 
-  private async initializeWorkerInBackground() {
-    await this.clickHouseMigrationService.waitForMigrations();
+	private async initializeWorkerInBackground() {
+		await this.clickHouseMigrationService.waitForMigrations();
 
-    // Redeliver any jobs stuck in processing from a previous crash
-    await this.queueService.redeliverStuckJobs().catch((err) => {
-      this.logger.error(`Failed to redeliver stuck jobs: ${err.message}`);
-    });
+		// Redeliver any jobs stuck in processing from a previous crash
+		await this.queueService.redeliverStuckJobs().catch((err) => {
+			this.logger.error(`Failed to redeliver stuck jobs: ${err.message}`);
+		});
 
-    await this.recoverReportUploadJobs().catch((err) => {
-      this.logger.error(`Failed to recover report upload jobs: ${err.message}`);
-    });
-    
-    // Start worker loop
-    this.workerPromise = this.runWorkerLoop();
-  }
+		await this.recoverReportUploadJobs().catch((err) => {
+			this.logger.error(
+				`Failed to recover report upload jobs: ${err.message}`,
+			);
+		});
 
-  async onApplicationShutdown() {
-    this.logger.log('Stopping Report Import Worker...');
-    this.isRunning = false;
-    if (this.workerPromise) {
-      await this.workerPromise;
-    }
-  }
+		// Start worker loop
+		this.workerPromise = this.runWorkerLoop();
+	}
 
-  private async runWorkerLoop() {
-    while (this.isRunning) {
-      try {
-        const jobId = await this.queueService.popJob();
-        if (jobId) {
-          this.logger.log(`Worker picked up Job ID: ${jobId}`);
-          await this.processJob(jobId);
-        } else {
-          // Sleep for 5 seconds if no jobs
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-        }
-      } catch (err) {
-        this.logger.error(`Error in worker loop: ${err.message}`, err.stack);
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-    }
-  }
+	async onApplicationShutdown() {
+		this.logger.log('Stopping Report Import Worker...');
+		this.isRunning = false;
+		if (this.workerPromise) {
+			await this.workerPromise;
+		}
+	}
 
-  private async recoverReportUploadJobs(): Promise<void> {
-    const jobs = await this.importJobsService.findRecoverableReportUploadJobs();
-    if (!jobs.length) return;
+	private async runWorkerLoop() {
+		while (this.isRunning) {
+			try {
+				const jobId = await this.queueService.popJob();
+				if (jobId) {
+					this.logger.log(`Worker picked up Job ID: ${jobId}`);
+					await this.processJob(jobId);
+				} else {
+					// Sleep for 5 seconds if no jobs
+					await new Promise((resolve) => setTimeout(resolve, 5000));
+				}
+			} catch (err) {
+				this.logger.error(
+					`Error in worker loop: ${err.message}`,
+					err.stack,
+				);
+				await new Promise((resolve) => setTimeout(resolve, 5000));
+			}
+		}
+	}
 
-    this.logger.warn(`Recovering ${jobs.length} report import job(s) after startup`);
-    for (const job of jobs) {
-      if (await this.queueService.hasJob(job.id)) continue;
-      await this.queueService.pushJob(job.id);
-    }
-  }
+	private async recoverReportUploadJobs(): Promise<void> {
+		const jobs =
+			await this.importJobsService.findRecoverableReportUploadJobs();
+		if (!jobs.length) return;
 
-  private getFileKey(file: { r2Key?: string; path?: string }): string {
-    return file.r2Key || file.path || '';
-  }
+		this.logger.warn(
+			`Recovering ${jobs.length} report import job(s) after startup`,
+		);
+		for (const job of jobs) {
+			if (await this.queueService.hasJob(job.id)) continue;
+			await this.queueService.pushJob(job.id);
+		}
+	}
 
-  private getReportImportState(job: ImportJob, files: any[]): ReportImportState {
-    const raw = job.params?.reportImportState as Partial<ReportImportState> | undefined;
-    const state: ReportImportState = {
-      stage: this.isReportImportStage(raw?.stage) ? raw!.stage! : 'FACT_IMPORT',
-      files: raw?.files && typeof raw.files === 'object' ? { ...raw.files } : {},
-    };
+	private getFileKey(file: { r2Key?: string; path?: string }): string {
+		return file.r2Key || file.path || '';
+	}
 
-    for (const file of files) {
-      const key = this.getFileKey(file);
-      if (!key || state.files[key]) continue;
+	private getReportImportState(
+		job: ImportJob,
+		files: any[],
+	): ReportImportState {
+		const raw = job.params?.reportImportState as
+			| Partial<ReportImportState>
+			| undefined;
+		const state: ReportImportState = {
+			stage: this.isReportImportStage(raw?.stage)
+				? raw.stage
+				: 'FACT_IMPORT',
+			files:
+				raw?.files && typeof raw.files === 'object'
+					? { ...raw.files }
+					: {},
+		};
 
-      const sourceFileName = path.basename(file.path);
-      state.files[key] = {
-        status: 'PENDING',
-        sourceFileName,
-        importSource: `${file.sourceCode}_report`,
-        parserCode: file.parserCode,
-        factTable: file.reportType === 'sales'
-          ? CLICKHOUSE_TABLES.FACT_SALES_REPORT
-          : CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
-        rows: 0,
-        affectedPeriods: [],
-        updatedAt: new Date().toISOString(),
-      };
-    }
+		for (const file of files) {
+			const key = this.getFileKey(file);
+			if (!key || state.files[key]) continue;
 
-    return state;
-  }
+			const sourceFileName = path.basename(file.path);
+			state.files[key] = {
+				status: 'PENDING',
+				sourceFileName,
+				importSource: `${file.sourceCode}_report`,
+				parserCode: file.parserCode,
+				factTable:
+					file.reportType === 'sales'
+						? CLICKHOUSE_TABLES.FACT_SALES_REPORT
+						: CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT,
+				rows: 0,
+				affectedPeriods: [],
+				updatedAt: new Date().toISOString(),
+			};
+		}
 
-  private isReportImportStage(value: unknown): value is ReportImportStage {
-    return value === 'FACT_IMPORT'
-      || value === 'METADATA_IMPORT'
-      || value === 'EXCHANGE_RATE'
-      || value === 'CUBE_REBUILD'
-      || value === 'COMPLETED';
-  }
+		return state;
+	}
 
-  private async saveReportImportState(jobId: string, state: ReportImportState): Promise<void> {
-    await this.importJobsService.patchParams(jobId, { reportImportState: state });
-  }
+	private isReportImportStage(value: unknown): value is ReportImportStage {
+		return (
+			value === 'FACT_IMPORT' ||
+			value === 'METADATA_IMPORT' ||
+			value === 'EXCHANGE_RATE' ||
+			value === 'CUBE_REBUILD' ||
+			value === 'COMPLETED'
+		);
+	}
 
-  private getImportedFileCheckpoints(state: ReportImportState): ReportImportFileCheckpoint[] {
-    return Object.values(state.files).filter((file) => file.status === 'FACT_IMPORTED');
-  }
+	private async saveReportImportState(
+		jobId: string,
+		state: ReportImportState,
+	): Promise<void> {
+		await this.importJobsService.patchParams(jobId, {
+			reportImportState: state,
+		});
+	}
 
-  private escapeSqlString(value: string): string {
-    return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  }
+	private getImportedFileCheckpoints(
+		state: ReportImportState,
+	): ReportImportFileCheckpoint[] {
+		return Object.values(state.files).filter(
+			(file) => file.status === 'FACT_IMPORTED',
+		);
+	}
 
-  private async resolveFallbackLabelName(labelId?: string): Promise<string | undefined> {
-    if (!labelId?.trim()) return undefined;
+	private escapeSqlString(value: string): string {
+		return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+	}
 
-    const label = await this.labelRepo.findOne({
-      where: { id: labelId.trim() },
-    });
+	private async resolveFallbackLabelName(
+		labelId?: string,
+	): Promise<string | undefined> {
+		if (!labelId?.trim()) return undefined;
 
-    return hasMeaningfulText(label?.name) ? label!.name.trim() : undefined;
-  }
+		const label = await this.labelRepo.findOne({
+			where: { id: labelId.trim() },
+		});
 
-  private applyWmgLabelNames(
-    rows: FactSalesRow[],
-    fallbackLabelName: string | undefined,
-  ): void {
-    for (const row of rows) {
-      row.label_name = fallbackLabelName || 'N/A';
-    }
-  }
+		return hasMeaningfulText(label?.name) ? label!.name.trim() : undefined;
+	}
 
-  private async deleteFactRowsForFile(
-    factTable: string,
-    filename: string,
-    importSource: string,
-  ): Promise<void> {
-    const countRows = await this.clickHouseService.query<{ cnt: string }>(
-      `SELECT count() AS cnt FROM music_analytics.${factTable}
+	private applyWmgLabelNames(
+		rows: FactSalesRow[],
+		fallbackLabelName: string | undefined,
+	): void {
+		for (const row of rows) {
+			row.label_name = fallbackLabelName || 'N/A';
+		}
+	}
+
+	private async deleteFactRowsForFile(
+		factTable: string,
+		filename: string,
+		importSource: string,
+	): Promise<void> {
+		const countRows = await this.clickHouseService.query<{ cnt: string }>(
+			`SELECT count() AS cnt FROM music_analytics.${factTable}
        WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
-      { filename, source: importSource },
-    );
+			{ filename, source: importSource },
+		);
 
-    if (Number(countRows[0]?.cnt ?? 0) === 0) return;
+		if (Number(countRows[0]?.cnt ?? 0) === 0) return;
 
-    this.logger.warn(`Deleting existing fact rows for ${filename} (${importSource}) before import/resume`);
-    await this.clickHouseService.execute(
-      `ALTER TABLE music_analytics.${factTable} DELETE
+		this.logger.warn(
+			`Deleting existing fact rows for ${filename} (${importSource}) before import/resume`,
+		);
+		await this.clickHouseService.execute(
+			`ALTER TABLE music_analytics.${factTable} DELETE
        WHERE source_file_name = '${this.escapeSqlString(filename)}'
          AND import_source = '${this.escapeSqlString(importSource)}'`,
-    );
-    await this.clickHouseService.waitForTableMutations(factTable);
-  }
+		);
+		await this.clickHouseService.waitForTableMutations(factTable);
+	}
 
-  private buildSourceFilter(
-    checkpoints: ReportImportFileCheckpoint[],
-  ): { where: string; params: Record<string, string> } {
-    const params: Record<string, string> = {};
-    const clauses = checkpoints.map((checkpoint, index) => {
-      params[`filename${index}`] = checkpoint.sourceFileName;
-      params[`source${index}`] = checkpoint.importSource;
-      return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String})`;
-    });
+	private buildSourceFilter(checkpoints: ReportImportFileCheckpoint[]): {
+		where: string;
+		params: Record<string, string>;
+	} {
+		const params: Record<string, string> = {};
+		const clauses = checkpoints.map((checkpoint, index) => {
+			params[`filename${index}`] = checkpoint.sourceFileName;
+			params[`source${index}`] = checkpoint.importSource;
+			return `(source_file_name = {filename${index}:String} AND import_source = {source${index}:String})`;
+		});
 
-    return {
-      where: clauses.length ? clauses.join(' OR ') : '0',
-      params,
-    };
-  }
+		return {
+			where: clauses.length ? clauses.join(' OR ') : '0',
+			params,
+		};
+	}
 
-  private async loadMetadataRowsFromClickHouse(
-    checkpoints: ReportImportFileCheckpoint[],
-  ): Promise<ExtractedRow[]> {
-    const rows: ExtractedRow[] = [];
-    const byTable = new Map<string, ReportImportFileCheckpoint[]>();
+	private async loadMetadataRowsFromClickHouse(
+		checkpoints: ReportImportFileCheckpoint[],
+	): Promise<ExtractedRow[]> {
+		const rows: ExtractedRow[] = [];
+		const byTable = new Map<string, ReportImportFileCheckpoint[]>();
 
-    for (const checkpoint of checkpoints) {
-      const tableCheckpoints = byTable.get(checkpoint.factTable) ?? [];
-      tableCheckpoints.push(checkpoint);
-      byTable.set(checkpoint.factTable, tableCheckpoints);
-    }
+		for (const checkpoint of checkpoints) {
+			const tableCheckpoints = byTable.get(checkpoint.factTable) ?? [];
+			tableCheckpoints.push(checkpoint);
+			byTable.set(checkpoint.factTable, tableCheckpoints);
+		}
 
-    for (const [factTable, tableCheckpoints] of byTable) {
-      const { where, params } = this.buildSourceFilter(tableCheckpoints);
-      const tableRows = await this.clickHouseService.query<ExtractedRow>(
-        `
+		for (const [factTable, tableCheckpoints] of byTable) {
+			const { where, params } = this.buildSourceFilter(tableCheckpoints);
+			const tableRows = await this.clickHouseService.query<ExtractedRow>(
+				`
           SELECT
             isrc,
             upc,
@@ -281,437 +332,560 @@ export class ReportImportWorkerService implements OnApplicationBootstrap, OnAppl
           )
           GROUP BY upc, isrc
         `,
-        params,
-      );
-      rows.push(...tableRows);
-    }
+				params,
+			);
+			rows.push(...tableRows);
+		}
 
-    return rows;
-  }
+		return rows;
+	}
 
-  private async loadAffectedPeriodsFromClickHouse(
-    checkpoints: ReportImportFileCheckpoint[],
-  ): Promise<string[]> {
-    const periods = new Set<string>();
-    const byTable = new Map<string, ReportImportFileCheckpoint[]>();
+	private async loadAffectedPeriodsFromClickHouse(
+		checkpoints: ReportImportFileCheckpoint[],
+	): Promise<string[]> {
+		const periods = new Set<string>();
+		const byTable = new Map<string, ReportImportFileCheckpoint[]>();
 
-    for (const checkpoint of checkpoints) {
-      const tableCheckpoints = byTable.get(checkpoint.factTable) ?? [];
-      tableCheckpoints.push(checkpoint);
-      byTable.set(checkpoint.factTable, tableCheckpoints);
-    }
+		for (const checkpoint of checkpoints) {
+			const tableCheckpoints = byTable.get(checkpoint.factTable) ?? [];
+			tableCheckpoints.push(checkpoint);
+			byTable.set(checkpoint.factTable, tableCheckpoints);
+		}
 
-    for (const [factTable, tableCheckpoints] of byTable) {
-      const { where, params } = this.buildSourceFilter(tableCheckpoints);
-      const rows = await this.clickHouseService.query<{ period: string }>(
-        `
+		for (const [factTable, tableCheckpoints] of byTable) {
+			const { where, params } = this.buildSourceFilter(tableCheckpoints);
+			const rows = await this.clickHouseService.query<{ period: string }>(
+				`
           SELECT DISTINCT substring(toString(reporting_period_start), 1, 7) AS period
           FROM music_analytics.${factTable}
           WHERE (${where})
             AND period != ''
           ORDER BY period ASC
         `,
-        params,
-      );
-      for (const row of rows) {
-        if (row.period) periods.add(row.period);
-      }
-    }
+				params,
+			);
+			for (const row of rows) {
+				if (row.period) periods.add(row.period);
+			}
+		}
 
-    return Array.from(periods);
-  }
+		return Array.from(periods);
+	}
 
-  private async cleanupR2Files(files: Array<{ r2Key?: string }>): Promise<void> {
-    for (const file of files) {
-      if (!file.r2Key) continue;
-      await this.r2Service.deletePrivate(file.r2Key).catch((err) => {
-        this.logger.warn(`Failed to clean up R2 file ${file.r2Key}: ${err.message}`);
-      });
-    }
-  }
+	private async cleanupR2Files(
+		files: Array<{ r2Key?: string }>,
+	): Promise<void> {
+		for (const file of files) {
+			if (!file.r2Key) continue;
+			await this.r2Service.deletePrivate(file.r2Key).catch((err) => {
+				this.logger.warn(
+					`Failed to clean up R2 file ${file.r2Key}: ${err.message}`,
+				);
+			});
+		}
+	}
 
-  private async processJob(jobId: string) {
-    const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
-    let totalProcessedRows = 0;
-    
-    try {
-      const currentJob = this.importJobsService.getSnapshot(jobId) ?? await this.importJobsService.findById(jobId);
-      if (
-        currentJob &&
-        currentJob.status !== ImportJobStatus.PENDING &&
-        currentJob.status !== ImportJobStatus.QUEUED &&
-        currentJob.status !== ImportJobStatus.PROCESSING
-      ) {
-        this.logger.warn(`Skipping queued job ${jobId} because current status is ${currentJob.status}.`);
-        await this.queueService.ackJob(jobId);
-        return;
-      }
+	private async processJob(jobId: string) {
+		const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
+		let totalProcessedRows = 0;
 
-      await this.importJobsService.markProcessing(jobId);
-      let job = this.importJobsService.getSnapshot(jobId);
-      if (!job) {
-        job = await this.importJobsService.findById(jobId);
-      }
-      if (!job) {
-        throw new Error(`Job ${jobId} not found in database.`);
-      }
+		try {
+			const currentJob =
+				this.importJobsService.getSnapshot(jobId) ??
+				(await this.importJobsService.findById(jobId));
+			if (
+				currentJob &&
+				currentJob.status !== ImportJobStatus.PENDING &&
+				currentJob.status !== ImportJobStatus.QUEUED &&
+				currentJob.status !== ImportJobStatus.PROCESSING
+			) {
+				this.logger.warn(
+					`Skipping queued job ${jobId} because current status is ${currentJob.status}.`,
+				);
+				await this.queueService.ackJob(jobId);
+				return;
+			}
 
-      await fs.promises.mkdir(tempDir, { recursive: true });
-      const bucketName = this.r2Service.getBucketName({ isPublic: false });
-      const files = (job.params?.files as any[]) || [];
-      const labelIdParam = job.params?.labelId;
-      const labelId = typeof labelIdParam === 'string' ? labelIdParam : undefined;
-      const fallbackLabelName = await this.resolveFallbackLabelName(labelId);
-      const state = this.getReportImportState(job, files);
-      await this.saveReportImportState(jobId, state);
+			await this.importJobsService.markProcessing(jobId);
+			let job = this.importJobsService.getSnapshot(jobId);
+			if (!job) {
+				job = await this.importJobsService.findById(jobId);
+			}
+			if (!job) {
+				throw new Error(`Job ${jobId} not found in database.`);
+			}
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileKey = this.getFileKey(file);
-        const checkpoint = state.files[fileKey];
-        const filename = path.basename(file.path);
-        const localFilePath = path.join(tempDir, filename);
-        const isSales = file.reportType === 'sales';
-        const factTable = isSales
-          ? CLICKHOUSE_TABLES.FACT_SALES_REPORT
-          : CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT;
-        const importSource = `${file.sourceCode}_report`;
+			await fs.promises.mkdir(tempDir, { recursive: true });
+			const bucketName = this.r2Service.getBucketName({
+				isPublic: false,
+			});
+			const files = (job.params?.files as any[]) || [];
+			const labelIdParam = job.params?.labelId;
+			const labelId =
+				typeof labelIdParam === 'string' ? labelIdParam : undefined;
+			const fallbackLabelName =
+				await this.resolveFallbackLabelName(labelId);
+			const state = this.getReportImportState(job, files);
+			await this.saveReportImportState(jobId, state);
 
-        if (checkpoint?.status === 'FACT_IMPORTED') {
-          this.logger.log(`Skipping ${filename}; fact rows already imported for job ${jobId}`);
-          totalProcessedRows += checkpoint.rows;
-          await this.importJobsService.updateProgress(jobId, {
-            progressCurrent: i + 1,
-            processedRows: totalProcessedRows,
-            totalRows: totalProcessedRows,
-            progressLabel: `Imported: ${filename}`,
-          }, true);
-          continue;
-        }
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i];
+				const fileKey = this.getFileKey(file);
+				const checkpoint = state.files[fileKey];
+				const filename = path.basename(file.path);
+				const localFilePath = path.join(tempDir, filename);
+				const isSales = file.reportType === 'sales';
+				const factTable = isSales
+					? CLICKHOUSE_TABLES.FACT_SALES_REPORT
+					: CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT;
+				const importSource = `${file.sourceCode}_report`;
 
-        state.stage = 'FACT_IMPORT';
-        state.files[fileKey] = {
-          status: 'IMPORTING',
-          sourceFileName: filename,
-          importSource,
-          factTable,
-          rows: 0,
-          affectedPeriods: [],
-          updatedAt: new Date().toISOString(),
-        };
-        await this.saveReportImportState(jobId, state);
+				if (checkpoint?.status === 'FACT_IMPORTED') {
+					this.logger.log(
+						`Skipping ${filename}; fact rows already imported for job ${jobId}`,
+					);
+					totalProcessedRows += checkpoint.rows;
+					await this.importJobsService.updateProgress(
+						jobId,
+						{
+							progressCurrent: i + 1,
+							processedRows: totalProcessedRows,
+							totalRows: totalProcessedRows,
+							progressLabel: `Imported: ${filename}`,
+						},
+						true,
+					);
+					continue;
+				}
 
-        this.logger.log(`Downloading ${filename} from R2...`);
-        await this.importJobsService.updateProgress(jobId, {
-          progressCurrent: i,
-          progressLabel: `Downloading: ${filename}`,
-        }, true);
+				state.stage = 'FACT_IMPORT';
+				state.files[fileKey] = {
+					status: 'IMPORTING',
+					sourceFileName: filename,
+					importSource,
+					factTable,
+					rows: 0,
+					affectedPeriods: [],
+					updatedAt: new Date().toISOString(),
+				};
+				await this.saveReportImportState(jobId, state);
 
-        // Download from R2 to local temp disk
-        const stream = await this.r2Service.getObjectStream({
-          bucketName,
-          key: file.r2Key,
-        });
-        const writeStream = fs.createWriteStream(localFilePath);
-        await pipeline(stream, writeStream);
+				this.logger.log(`Downloading ${filename} from R2...`);
+				await this.importJobsService.updateProgress(
+					jobId,
+					{
+						progressCurrent: i,
+						progressLabel: `Downloading: ${filename}`,
+					},
+					true,
+				);
 
-        await this.deleteFactRowsForFile(factTable, filename, importSource);
+				// Download from R2 to local temp disk
+				const stream = await this.r2Service.getObjectStream({
+					bucketName,
+					key: file.r2Key,
+				});
+				const writeStream = fs.createWriteStream(localFilePath);
+				await pipeline(stream, writeStream);
 
-        // 2. Parse and batch stream import
-        this.logger.log(`Streaming import for file: ${filename}`);
-        await this.importJobsService.updateProgress(jobId, {
-          progressLabel: `Importing: ${filename}`,
-        }, true);
+				await this.deleteFactRowsForFile(
+					factTable,
+					filename,
+					importSource,
+				);
 
-        let fileProcessedRows = 0;
-        const fileAffectedPeriods = new Set<string>();
+				// 2. Parse and batch stream import
+				this.logger.log(`Streaming import for file: ${filename}`);
+				await this.importJobsService.updateProgress(
+					jobId,
+					{
+						progressLabel: `Importing: ${filename}`,
+					},
+					true,
+				);
 
-        if (file.parserCode === 'wmg-sales') {
-          const parser = new WmgSalesParser();
-          
-          await parser.parseFileStreaming(
-            localFilePath,
-            jobId,
-            async (batch: FactSalesRow[]) => {
-              this.applyWmgLabelNames(batch, fallbackLabelName);
+				let fileProcessedRows = 0;
+				const fileAffectedPeriods = new Set<string>();
 
-              // Populate audit fields on the batch rows
-              for (const r of batch) {
-                r.import_source = importSource;
-                r.source_file_name = filename;
-                normalizeFactRows([r]);
-                
-                // Collect period
-                if (r.reporting_period_start) {
-                  fileAffectedPeriods.add(r.reporting_period_start.substring(0, 7)); // YYYY-MM
-                }
-              }
+				if (file.parserCode === 'wmg-sales') {
+					const parser = new WmgSalesParser();
 
-              // Batch insert into ClickHouse
-              await this.clickHouseService.insertBatched(
-                factTable,
-                batch as unknown as Record<string, unknown>[],
-                50000
-              );
+					await parser.parseFileStreaming(
+						localFilePath,
+						jobId,
+						async (batch: FactSalesRow[]) => {
+							this.applyWmgLabelNames(batch, fallbackLabelName);
 
-              fileProcessedRows += batch.length;
-              totalProcessedRows += batch.length;
+							// Populate audit fields on the batch rows
+							for (const r of batch) {
+								r.import_source = importSource;
+								r.source_file_name = filename;
+								normalizeFactRows([r]);
 
-              await this.importJobsService.updateProgress(jobId, {
-                processedRows: totalProcessedRows,
-                totalRows: totalProcessedRows,
-              });
-            },
-            {
-              batchSize: 50000,
-              resolveDspId: async (dspName: string) => {
-                const r = await this.dspMappingService.resolveOrCreateDspReport(dspName, 'wmg_report');
-                return r.id_dsps_report;
-              },
-              revenueCurrency: file.defaultCurrency || 'VND',
-              memberName: file.defaultMember || 'AMG GROUP',
-            }
-          );
-        } else if (file.parserCode === 'spotify-report-sales') {
-          const parser = new SpotifyReportSalesParser();
-          const spotifyDsp = await this.dspMappingService.resolveOrCreateDspReport('Spotify', 'spotify_report');
-          const spotifyDspId = spotifyDsp.id_dsps_report;
+								// Collect period
+								if (r.reporting_period_start) {
+									fileAffectedPeriods.add(
+										r.reporting_period_start.substring(
+											0,
+											7,
+										),
+									); // YYYY-MM
+								}
+							}
 
-          await parser.parseFileStreaming(
-            localFilePath,
-            jobId,
-            async (batch: FactSalesRow[]) => {
-              // Populate audit/fallback fields on the batch rows
-              for (const r of batch) {
-                r.import_source = importSource;
-                r.source_file_name = filename;
-                r.label_name = r.label_name || fallbackLabelName || 'N/A';
-                r.dsp_id = spotifyDspId;
-                normalizeFactRows([r]);
+							// Batch insert into ClickHouse
+							await this.clickHouseService.insertBatched(
+								factTable,
+								batch as unknown as Record<string, unknown>[],
+								50000,
+							);
 
-                // Collect period
-                if (r.reporting_period_start) {
-                  fileAffectedPeriods.add(r.reporting_period_start.substring(0, 7)); // YYYY-MM
-                }
-              }
+							fileProcessedRows += batch.length;
+							totalProcessedRows += batch.length;
 
-              // Batch insert into ClickHouse
-              await this.clickHouseService.insertBatched(
-                factTable,
-                batch as unknown as Record<string, unknown>[],
-                50000
-              );
+							await this.importJobsService.updateProgress(jobId, {
+								processedRows: totalProcessedRows,
+								totalRows: totalProcessedRows,
+							});
+						},
+						{
+							batchSize: 50000,
+							resolveDspId: async (dspName: string) => {
+								const r =
+									await this.dspMappingService.resolveOrCreateDspReport(
+										dspName,
+										'wmg_report',
+									);
+								return r.id_dsps_report;
+							},
+							revenueCurrency: file.defaultCurrency || 'VND',
+							memberName: file.defaultMember || 'AMG GROUP',
+						},
+					);
+				} else if (file.parserCode === 'spotify-report-sales') {
+					const parser = new SpotifyReportSalesParser();
+					const spotifyDsp =
+						await this.dspMappingService.resolveOrCreateDspReport(
+							'Spotify',
+							'spotify_report',
+						);
+					const spotifyDspId = spotifyDsp.id_dsps_report;
 
-              fileProcessedRows += batch.length;
-              totalProcessedRows += batch.length;
+					await parser.parseFileStreaming(
+						localFilePath,
+						jobId,
+						async (batch: FactSalesRow[]) => {
+							// Populate audit/fallback fields on the batch rows
+							for (const r of batch) {
+								r.import_source = importSource;
+								r.source_file_name = filename;
+								r.label_name =
+									r.label_name || fallbackLabelName || 'N/A';
+								r.dsp_id = spotifyDspId;
+								normalizeFactRows([r]);
 
-              await this.importJobsService.updateProgress(jobId, {
-                processedRows: totalProcessedRows,
-                totalRows: totalProcessedRows,
-              });
-            },
-            {
-              batchSize: 50000,
-              memberName: file.defaultMember || 'ANT MUSIC LLC',
-            }
-          );
-        } else {
-          throw new Error(`Unsupported parser code: ${file.parserCode}`);
-        }
+								// Collect period
+								if (r.reporting_period_start) {
+									fileAffectedPeriods.add(
+										r.reporting_period_start.substring(
+											0,
+											7,
+										),
+									); // YYYY-MM
+								}
+							}
 
-        // Delete processed local file
-        await fs.promises.unlink(localFilePath).catch(() => {});
+							// Batch insert into ClickHouse
+							await this.clickHouseService.insertBatched(
+								factTable,
+								batch as unknown as Record<string, unknown>[],
+								50000,
+							);
 
-        state.files[fileKey] = {
-          status: 'FACT_IMPORTED',
-          sourceFileName: filename,
-          importSource,
-          parserCode: file.parserCode,
-          factTable,
-          rows: fileProcessedRows,
-          affectedPeriods: Array.from(fileAffectedPeriods),
-          updatedAt: new Date().toISOString(),
-        };
-        await this.saveReportImportState(jobId, state);
-      }
+							fileProcessedRows += batch.length;
+							totalProcessedRows += batch.length;
 
-      const importedCheckpoints = this.getImportedFileCheckpoints(state);
+							await this.importJobsService.updateProgress(jobId, {
+								processedRows: totalProcessedRows,
+								totalRows: totalProcessedRows,
+							});
+						},
+						{
+							batchSize: 50000,
+							memberName: file.defaultMember || 'ANT MUSIC LLC',
+						},
+					);
+				} else {
+					throw new Error(
+						`Unsupported parser code: ${file.parserCode}`,
+					);
+				}
 
-      // 3. Extract and import entities into PostgreSQL
-      const entityResult = {
-        totalReleases: 0,
-        created: 0,
-        skipped: 0,
-        errors: 0,
-        inDb: 0,
-        pending: 0,
-      };
+				// Delete processed local file
+				await fs.promises.unlink(localFilePath).catch(() => {});
 
-      const totalMetadataRows = importedCheckpoints.reduce(
-        (sum, checkpoint) => sum + checkpoint.rows,
-        0,
-      );
-      if (totalMetadataRows > 0) {
-        state.stage = 'METADATA_IMPORT';
-        await this.saveReportImportState(jobId, state);
+				state.files[fileKey] = {
+					status: 'FACT_IMPORTED',
+					sourceFileName: filename,
+					importSource,
+					parserCode: file.parserCode,
+					factTable,
+					rows: fileProcessedRows,
+					affectedPeriods: Array.from(fileAffectedPeriods),
+					updatedAt: new Date().toISOString(),
+				};
+				await this.saveReportImportState(jobId, state);
+			}
 
-        this.logger.log(`Extracting and importing metadata entities to PostgreSQL for ${importedCheckpoints.length} file(s)...`);
-        await this.importJobsService.updateProgress(jobId, {
-          progressCurrent: 0,
-          progressTotal: importedCheckpoints.length,
-          progressLabel: `Importing metadata to PostgreSQL`,
-        }, true);
+			const importedCheckpoints = this.getImportedFileCheckpoints(state);
 
-        for (let index = 0; index < importedCheckpoints.length; index += 1) {
-          const checkpoint = importedCheckpoints[index];
+			// 3. Extract and import entities into PostgreSQL
+			const entityResult = {
+				totalReleases: 0,
+				created: 0,
+				skipped: 0,
+				errors: 0,
+				inDb: 0,
+				pending: 0,
+			};
 
-          // Fetch dsp_id from Clickhouse fact table
-          const dspIdRows = await this.clickHouseService.query<{ dsp_id: string }>(
-            `SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable}
+			const totalMetadataRows = importedCheckpoints.reduce(
+				(sum, checkpoint) => sum + checkpoint.rows,
+				0,
+			);
+			if (totalMetadataRows > 0) {
+				state.stage = 'METADATA_IMPORT';
+				await this.saveReportImportState(jobId, state);
+
+				this.logger.log(
+					`Extracting and importing metadata entities to PostgreSQL for ${importedCheckpoints.length} file(s)...`,
+				);
+				await this.importJobsService.updateProgress(
+					jobId,
+					{
+						progressCurrent: 0,
+						progressTotal: importedCheckpoints.length,
+						progressLabel: `Importing metadata to PostgreSQL`,
+					},
+					true,
+				);
+
+				for (
+					let index = 0;
+					index < importedCheckpoints.length;
+					index += 1
+				) {
+					const checkpoint = importedCheckpoints[index];
+
+					// Fetch dsp_id from Clickhouse fact table
+					const dspIdRows = await this.clickHouseService.query<{
+						dsp_id: string;
+					}>(
+						`SELECT DISTINCT dsp_id FROM music_analytics.${checkpoint.factTable}
              WHERE source_file_name = {filename: String} AND import_source = {source: String} LIMIT 1`,
-            { filename: checkpoint.sourceFileName, source: checkpoint.importSource }
-          );
-          const dspId = dspIdRows[0]?.dsp_id;
+						{
+							filename: checkpoint.sourceFileName,
+							source: checkpoint.importSource,
+						},
+					);
+					const dspId = dspIdRows[0]?.dsp_id;
 
-          let pgUuid: string | null = null;
-          let dspType: 'audio' | 'video' = 'audio';
+					let pgUuid: string | null = null;
+					let dspType: 'audio' | 'video' = 'audio';
 
-          if (dspId) {
-            const dspsReport = await this.dspMappingService.getDspsReportById(dspId);
-            if (dspsReport && dspsReport.pg_uuid) {
-              pgUuid = dspsReport.pg_uuid;
-              const pgDsp = await this.dspMappingService.getPgDspsSyncByUuid(pgUuid);
-              if (pgDsp) {
-                dspType = (pgDsp.type as 'audio' | 'video') || 'audio';
-              }
-            }
-          }
+					if (dspId) {
+						const dspsReport =
+							await this.dspMappingService.getDspsReportById(
+								dspId,
+							);
+						if (dspsReport && dspsReport.pg_uuid) {
+							pgUuid = dspsReport.pg_uuid;
+							const pgDsp =
+								await this.dspMappingService.getPgDspsSyncByUuid(
+									pgUuid,
+								);
+							if (pgDsp) {
+								dspType =
+									(pgDsp.type as 'audio' | 'video') ||
+									'audio';
+							}
+						}
+					}
 
-          let dryRun = false;
-          if (!pgUuid) {
-            this.logger.log(
-              `Skipping metadata import for checkpoint ${checkpoint.sourceFileName} as it has no assigned Postgres DSP (pg_uuid is empty). Status is kept as Pending.`
-            );
-            dryRun = true;
-          }
+					let dryRun = false;
+					if (!pgUuid) {
+						this.logger.log(
+							`Skipping metadata import for checkpoint ${checkpoint.sourceFileName} as it has no assigned Postgres DSP (pg_uuid is empty). Status is kept as Pending.`,
+						);
+						dryRun = true;
+					}
 
-          const rowsToImport = await this.loadMetadataRowsFromClickHouse([
-            checkpoint,
-          ]);
-          if (!rowsToImport.length) continue;
+					const rowsToImport =
+						await this.loadMetadataRowsFromClickHouse([checkpoint]);
+					if (!rowsToImport.length) continue;
 
-          const result = await this.reportEntityExtractorService.extractAndImport(
-            rowsToImport,
-            job.tenantId, // The default tenant ID chosen on pre-validate upload form
-            labelId,
-            async (progress) => {
-              if (!dryRun) {
-                await this.importJobsService.updateProgress(jobId, {
-                  progressCurrent: progress.current,
-                  progressTotal: progress.total,
-                  progressLabel: progress.label,
-                }, true);
-              }
-            },
-            {
-              sourceType: ImportJobSourceType.REPORT_UPLOAD,
-              parserCode: checkpoint.parserCode,
-              fileName: checkpoint.sourceFileName,
-              jobId,
-              dspType,
-              dryRun,
-            },
-          ).catch((err) => {
-            this.logger.error(`Failed to extract/import entities to PostgreSQL for ${checkpoint.sourceFileName}: ${err.message}`);
-            return { totalReleases: 0, created: 0, skipped: 0, errors: 1, inDb: 0, pending: 0 };
-          });
+					const result = await this.reportEntityExtractorService
+						.extractAndImport(
+							rowsToImport,
+							job.tenantId, // The default tenant ID chosen on pre-validate upload form
+							labelId,
+							async (progress) => {
+								if (!dryRun) {
+									await this.importJobsService.updateProgress(
+										jobId,
+										{
+											progressCurrent: progress.current,
+											progressTotal: progress.total,
+											progressLabel: progress.label,
+										},
+										true,
+									);
+								}
+							},
+							{
+								sourceType: ImportJobSourceType.REPORT_UPLOAD,
+								parserCode: checkpoint.parserCode,
+								fileName: checkpoint.sourceFileName,
+								jobId,
+								dspType,
+								dryRun,
+							},
+						)
+						.catch((err) => {
+							this.logger.error(
+								`Failed to extract/import entities to PostgreSQL for ${checkpoint.sourceFileName}: ${err.message}`,
+							);
+							return {
+								totalReleases: 0,
+								created: 0,
+								skipped: 0,
+								errors: 1,
+								inDb: 0,
+								pending: 0,
+							};
+						});
 
-          entityResult.totalReleases += result.totalReleases;
-          entityResult.created += result.created;
-          entityResult.skipped += result.skipped;
-          entityResult.errors += result.errors;
-          entityResult.inDb += result.inDb;
-          entityResult.pending += result.pending;
+					entityResult.totalReleases += result.totalReleases;
+					entityResult.created += result.created;
+					entityResult.skipped += result.skipped;
+					entityResult.errors += result.errors;
+					entityResult.inDb += result.inDb;
+					entityResult.pending += result.pending;
 
-          await this.importJobsService.updateProgress(jobId, {
-            progressLabel: `Importing metadata to PostgreSQL`,
-          }, true);
-        }
+					await this.importJobsService.updateProgress(
+						jobId,
+						{
+							progressLabel: `Importing metadata to PostgreSQL`,
+						},
+						true,
+					);
+				}
 
-        this.logger.log(
-          `Entity import completed: ${entityResult.created} created, ` +
-          `${entityResult.skipped} skipped, ${entityResult.errors} errors, ` +
-          `${entityResult.inDb} inDb, ${entityResult.pending} pending.`,
-        );
-      }
+				this.logger.log(
+					`Entity import completed: ${entityResult.created} created, ` +
+						`${entityResult.skipped} skipped, ${entityResult.errors} errors, ` +
+						`${entityResult.inDb} inDb, ${entityResult.pending} pending.`,
+				);
+			}
 
-      const affectedPeriods = new Set<string>(
-        importedCheckpoints.flatMap((checkpoint) => checkpoint.affectedPeriods),
-      );
-      for (const period of await this.loadAffectedPeriodsFromClickHouse(importedCheckpoints)) {
-        affectedPeriods.add(period);
-      }
+			const affectedPeriods = new Set<string>(
+				importedCheckpoints.flatMap(
+					(checkpoint) => checkpoint.affectedPeriods,
+				),
+			);
+			for (const period of await this.loadAffectedPeriodsFromClickHouse(
+				importedCheckpoints,
+			)) {
+				affectedPeriods.add(period);
+			}
 
-      // 3. Rebuild cubes for all affected month partitions
-      if (affectedPeriods.size > 0) {
-        const periods = Array.from(affectedPeriods);
-        
-        // Auto-sync missing exchange rates before rebuilding cubes
-        this.logger.log(`Syncing missing exchange rates for periods: ${periods.join(', ')}`);
-        state.stage = 'EXCHANGE_RATE';
-        await this.saveReportImportState(jobId, state);
-        await this.importJobsService.updateProgress(jobId, {
-          progressLabel: `Syncing exchange rates...`,
-        }, true);
-        await this.exchangeRateService.syncMonthsForPeriods(periods).catch((err) => {
-          this.logger.error(`Failed to sync exchange rates for periods: ${err.message}`);
-        });
+			// 3. Rebuild cubes for all affected month partitions
+			if (affectedPeriods.size > 0) {
+				const periods = Array.from(affectedPeriods);
 
-        this.logger.log(`Rebuilding cubes for affected periods: ${periods.join(', ')}`);
-        state.stage = 'CUBE_REBUILD';
-        await this.saveReportImportState(jobId, state);
-        await this.importJobsService.updateProgress(jobId, {
-          progressLabel: `Rebuilding Cubes...`,
-        }, true);
+				// Auto-sync missing exchange rates before rebuilding cubes
+				this.logger.log(
+					`Syncing missing exchange rates for periods: ${periods.join(', ')}`,
+				);
+				state.stage = 'EXCHANGE_RATE';
+				await this.saveReportImportState(jobId, state);
+				await this.importJobsService.updateProgress(
+					jobId,
+					{
+						progressLabel: `Syncing exchange rates...`,
+					},
+					true,
+				);
+				await this.exchangeRateService
+					.syncMonthsForPeriods(periods)
+					.catch((err) => {
+						this.logger.error(
+							`Failed to sync exchange rates for periods: ${err.message}`,
+						);
+					});
 
-        // Sales report (WMG, Spotify)
-        await this.cubeRebuildService.rebuildSalesCubesForPeriods(periods);
-      }
+				this.logger.log(
+					`Rebuilding cubes for affected periods: ${periods.join(', ')}`,
+				);
+				state.stage = 'CUBE_REBUILD';
+				await this.saveReportImportState(jobId, state);
+				await this.importJobsService.updateProgress(
+					jobId,
+					{
+						progressLabel: `Rebuilding Cubes...`,
+					},
+					true,
+				);
 
-      state.stage = 'COMPLETED';
-      await this.saveReportImportState(jobId, state);
+				// Sales report (WMG, Spotify)
+				await this.cubeRebuildService.rebuildSalesCubesForPeriods(
+					periods,
+				);
+			}
 
-      // Mark Job as COMPLETED
-      await this.importJobsService.markCompleted(jobId, {
-        totalProcessedRows,
-        affectedPeriods: Array.from(affectedPeriods),
-        releases: {
-          total: entityResult.totalReleases,
-          imported: entityResult.created,
-          skipped: entityResult.skipped,
-          errors: entityResult.errors,
-          inDb: entityResult.inDb,
-          pending: entityResult.pending,
-        },
-      });
+			state.stage = 'COMPLETED';
+			await this.saveReportImportState(jobId, state);
 
-      await this.cleanupR2Files(files);
+			// Mark Job as COMPLETED
+			await this.importJobsService.markCompleted(jobId, {
+				totalProcessedRows,
+				affectedPeriods: Array.from(affectedPeriods),
+				releases: {
+					total: entityResult.totalReleases,
+					imported: entityResult.created,
+					skipped: entityResult.skipped,
+					errors: entityResult.errors,
+					inDb: entityResult.inDb,
+					pending: entityResult.pending,
+				},
+			});
 
-      // Ack Job to remove from processing queue
-      await this.queueService.ackJob(jobId);
-    } catch (err) {
-      this.logger.error(`Failed to process Job ${jobId}: ${err.message}`, err.stack);
-      
-      // Update job status in database to FAILED
-      await this.importJobsService.markFailed(jobId, err.message).catch((dbErr) => {
-        this.logger.error(`Failed to update job status to FAILED in ClickHouse: ${dbErr.message}`);
-      });
+			await this.cleanupR2Files(files);
 
-      // Remove from processing queue to prevent loop block
-      await this.queueService.ackJob(jobId).catch(() => {});
-    } finally {
-      // Clean up temp directory
-      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-  }
+			// Ack Job to remove from processing queue
+			await this.queueService.ackJob(jobId);
+		} catch (err) {
+			this.logger.error(
+				`Failed to process Job ${jobId}: ${err.message}`,
+				err.stack,
+			);
+
+			// Update job status in database to FAILED
+			await this.importJobsService
+				.markFailed(jobId, err.message)
+				.catch((dbErr) => {
+					this.logger.error(
+						`Failed to update job status to FAILED in ClickHouse: ${dbErr.message}`,
+					);
+				});
+
+			// Remove from processing queue to prevent loop block
+			await this.queueService.ackJob(jobId).catch(() => {});
+		} finally {
+			// Clean up temp directory
+			await fs.promises
+				.rm(tempDir, { recursive: true, force: true })
+				.catch(() => {});
+		}
+	}
 }

@@ -1,4 +1,11 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -201,7 +208,10 @@ export class ChannelAnalyticsController {
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)' })
+	@ApiOperation({
+		summary:
+			'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)',
+	})
 	async topReleases(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
 		@Body() dto: EntityRankingQueryDto,

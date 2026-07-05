@@ -122,6 +122,6 @@ export class ReleaseLanguageValidateService {
 		// 	});
 		// }
 
-		return releaseLanguage as IReleaseLanguageDraft;
+		return releaseLanguage;
 	}
 }

@@ -1,6 +1,6 @@
 export {
-  BaseAnalyticsQueryDto,
-  TimelineQueryDto,
-  RankingQueryDto,
-  ChartQueryDto,
+	BaseAnalyticsQueryDto,
+	ChartQueryDto,
+	RankingQueryDto,
+	TimelineQueryDto,
 } from './analytics-query.dto';

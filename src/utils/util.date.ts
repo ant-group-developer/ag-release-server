@@ -31,4 +31,3 @@ export function normalizeDateToFirstOfMonth(dateStr: string): string {
 	}
 	return dateStr;
 }
-

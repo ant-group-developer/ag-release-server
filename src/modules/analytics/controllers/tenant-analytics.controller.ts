@@ -27,14 +27,20 @@ export class TenantAnalyticsController {
 		private readonly tenantService: TenantService,
 	) {}
 
-	private async validateTenantAccess(userTenantId: string, targetTenantId: string) {
+	private async validateTenantAccess(
+		userTenantId: string,
+		targetTenantId: string,
+	) {
 		const isSystem = checkIsSystemTenant(userTenantId);
 		if (isSystem) {
 			return;
 		}
-		const allowedDescendants = await this.tenantService.getDescendantIds(userTenantId);
+		const allowedDescendants =
+			await this.tenantService.getDescendantIds(userTenantId);
 		if (!allowedDescendants.includes(targetTenantId)) {
-			throw new ForbiddenException(`You do not have access to tenant ${targetTenantId}`);
+			throw new ForbiddenException(
+				`You do not have access to tenant ${targetTenantId}`,
+			);
 		}
 	}
 
@@ -239,7 +245,9 @@ export class TenantAnalyticsController {
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks của tenant (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top tracks của tenant (sortBy: views | revenue)',
+	})
 	async topTracks(
 		@Param('tenantId') tenantId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -247,12 +255,19 @@ export class TenantAnalyticsController {
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
 		return new ResponseSuccess({
-			data: await this.entitySvc.getTopTracks('tenant', tenantId, dto, req.user!.tenantId),
+			data: await this.entitySvc.getTopTracks(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases của tenant (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top releases của tenant (sortBy: views | revenue)',
+	})
 	async topReleases(
 		@Param('tenantId') tenantId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -260,7 +275,12 @@ export class TenantAnalyticsController {
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
 		return new ResponseSuccess({
-			data: await this.entitySvc.getTopReleases('tenant', tenantId, dto, req.user!.tenantId),
+			data: await this.entitySvc.getTopReleases(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
 }

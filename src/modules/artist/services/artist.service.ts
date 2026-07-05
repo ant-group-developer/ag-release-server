@@ -395,7 +395,7 @@ export class ArtistService {
 			);
 
 			offset += BATCH_SIZE;
-			if (artists.length < BATCH_SIZE) break;	
+			if (artists.length < BATCH_SIZE) break;
 		}
 
 		return { updatedCount };

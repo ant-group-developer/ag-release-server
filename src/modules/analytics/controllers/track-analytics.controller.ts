@@ -1,13 +1,13 @@
 import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { EntityAnalyticsService } from '../services/entity-analytics.service';
+import { Request } from 'express';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { Request } from 'express';
+import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
 @ApiTags('Analytics - Track')
 @Controller('analytics/track/:isrc')

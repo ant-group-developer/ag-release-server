@@ -51,7 +51,8 @@ export class CreateMetadataScanScheduleDto {
 
 	@ApiProperty({
 		example: true,
-		description: 'true: report-import enrichment, false: links-only enrichment',
+		description:
+			'true: report-import enrichment, false: links-only enrichment',
 	})
 	@IsBoolean()
 	isImportedFromReport: boolean;

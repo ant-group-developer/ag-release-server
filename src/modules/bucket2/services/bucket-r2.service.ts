@@ -133,7 +133,10 @@ export class BucketR2Service {
 				return;
 			} catch (error) {
 				lastError = error;
-				if (attempt >= maxAttempts || !this.isRetryableUploadError(error)) {
+				if (
+					attempt >= maxAttempts ||
+					!this.isRetryableUploadError(error)
+				) {
 					throw error;
 				}
 				await this.sleep(500 * attempt);

@@ -1,10 +1,4 @@
-import {
-	Body,
-	Controller,
-	Param,
-	Post,
-	Req,
-} from '@nestjs/common';
+import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { Request } from 'express';
@@ -48,7 +42,7 @@ export class LabelAnalyticsController {
 					name: label.tenant.name,
 					title: label.tenant.title,
 					logo: label.tenant.logo || null,
-			  }
+				}
 			: null;
 	}
 
@@ -304,21 +298,33 @@ export class LabelAnalyticsController {
 		@Req() req: Request,
 	) {
 		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTopTracks('label', labelId, dto, req.user!.tenantId),
+			this.entitySvc.getTopTracks(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
 			this.getLabelTenant(labelId),
 		]);
 		return new ResponseSuccess({ data, tenant });
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases của label (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top releases của label (sortBy: views | revenue)',
+	})
 	async topReleases(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTopReleases('label', labelId, dto, req.user!.tenantId),
+			this.entitySvc.getTopReleases(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
 			this.getLabelTenant(labelId),
 		]);
 		return new ResponseSuccess({ data, tenant });

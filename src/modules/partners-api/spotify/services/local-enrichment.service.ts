@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource, ILike, In } from 'typeorm';
+import {
+	ReleaseEnrichment,
+	ReleaseEnrichmentStatus,
+} from 'src/modules/release/entities/release-enrichment.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { ReleaseEnrichment, ReleaseEnrichmentStatus } from 'src/modules/release/entities/release-enrichment.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { buildEquivalentUpcs, normalizeUpc } from 'src/utils/upc.util';
+import { DataSource, ILike, In } from 'typeorm';
 import { EnrichedMetadata } from './metadata-enrichment.service';
 
 @Injectable()
@@ -44,7 +47,9 @@ export class LocalEnrichmentService {
 
 			return this.buildLocalEnrichedMetadata(release, isrc);
 		} catch (err) {
-			this.logger.warn(`[Local Cache] Failed to query local DB for ISRC ${isrc}: ${err.message}`);
+			this.logger.warn(
+				`[Local Cache] Failed to query local DB for ISRC ${isrc}: ${err.message}`,
+			);
 			return null;
 		}
 	}
@@ -58,26 +63,42 @@ export class LocalEnrichmentService {
 			const releaseRepo = this.dataSource.getRepository(Release);
 			const release = await releaseRepo.findOne({
 				where: { upc: In(buildEquivalentUpcs(upc)) },
-				relations: ['releaseArtists', 'releaseArtists.artist', 'label', 'tracks'],
+				relations: [
+					'releaseArtists',
+					'releaseArtists.artist',
+					'label',
+					'tracks',
+				],
 			});
 
 			if (!release) return null;
 
 			// Only use local data if UPC is a real UPC/EAN and title is present.
-			if (!this.isValidStandardUpc(release.upc) || !release.title?.trim()) {
+			if (
+				!this.isValidStandardUpc(release.upc) ||
+				!release.title?.trim()
+			) {
 				return null;
 			}
 			if (!(await this.hasSuccessfulEnrichment(release.id))) {
 				return null;
 			}
 
-			const primaryIsrc = (release.tracks || [])
-				.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
-				.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0]?.isrc || '';
+			const primaryIsrc =
+				(release.tracks || [])
+					.filter(
+						(t) =>
+							t.isrc &&
+							!t.isrc.trim().toUpperCase().startsWith('UPC-'),
+					)
+					.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))[0]?.isrc ||
+				'';
 
 			return this.buildLocalEnrichedMetadata(release, primaryIsrc);
 		} catch (err) {
-			this.logger.warn(`[Local Cache] Failed to query local DB for UPC ${upc}: ${err.message}`);
+			this.logger.warn(
+				`[Local Cache] Failed to query local DB for UPC ${upc}: ${err.message}`,
+			);
 			return null;
 		}
 	}
@@ -85,14 +106,21 @@ export class LocalEnrichmentService {
 	/**
 	 * Build EnrichedMetadata from a local Release entity.
 	 */
-	private buildLocalEnrichedMetadata(release: Release, primaryIsrc: string): EnrichedMetadata {
-		const primaryArtist = (release.releaseArtists || [])
-			.find(ra => ra.artist)?.artist;
+	private buildLocalEnrichedMetadata(
+		release: Release,
+		primaryIsrc: string,
+	): EnrichedMetadata {
+		const primaryArtist = (release.releaseArtists || []).find(
+			(ra) => ra.artist,
+		)?.artist;
 
 		const tracks = (release.tracks || [])
-			.filter(t => t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'))
+			.filter(
+				(t) =>
+					t.isrc && !t.isrc.trim().toUpperCase().startsWith('UPC-'),
+			)
 			.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-			.map(t => ({
+			.map((t) => ({
 				isrc: t.isrc!,
 				title: t.title || '',
 				trackNumber: t.order,
@@ -105,7 +133,9 @@ export class LocalEnrichmentService {
 			artistName: primaryArtist?.name || '',
 			upc: normalizeUpc(release.upc),
 			albumTitle: release.title || '',
-			releaseDate: release.releaseDate ? new Date(release.releaseDate).toISOString().slice(0, 10) : undefined,
+			releaseDate: release.releaseDate
+				? new Date(release.releaseDate).toISOString().slice(0, 10)
+				: undefined,
 			totalTracks: tracks.length || undefined,
 			labelName: release.label?.name,
 			tracks,

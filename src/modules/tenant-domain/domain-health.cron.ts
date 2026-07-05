@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DomainStatus, TenantDomain } from './entities/tenant-domain.entity';
 import { TenantDomainService } from './tenant-domain.service';
@@ -20,7 +20,9 @@ export class DomainHealthCron {
 		this.logger.log('Starting domain health check');
 
 		const domains = await this.repo.find({
-			where: { status: In([DomainStatus.ACTIVE, DomainStatus.VERIFYING]) },
+			where: {
+				status: In([DomainStatus.ACTIVE, DomainStatus.VERIFYING]),
+			},
 		});
 
 		if (!domains.length) {
@@ -31,12 +33,14 @@ export class DomainHealthCron {
 		const CHUNK = 20;
 		for (let i = 0; i < domains.length; i += CHUNK) {
 			await Promise.all(
-				domains.slice(i, i + CHUNK).map((d) =>
-					this.tenantDomainService.checkDomainHealth(d),
-				),
+				domains
+					.slice(i, i + CHUNK)
+					.map((d) => this.tenantDomainService.checkDomainHealth(d)),
 			);
 		}
 
-		this.logger.log(`Domain health check completed for ${domains.length} domains`);
+		this.logger.log(
+			`Domain health check completed for ${domains.length} domains`,
+		);
 	}
 }

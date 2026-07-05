@@ -30,7 +30,7 @@ export class FileNodeService {
 
 		const parent = await this.repo.findOne({
 			where: { id: parentId },
-			select: { id: true, type: true } as any,
+			select: { id: true, type: true },
 		});
 		if (!parent) throw FileNodeException.PARENT_NOT_FOUND();
 		if (parent.type !== FileNodeType.FOLDER)
@@ -54,7 +54,7 @@ export class FileNodeService {
 
 		const existed = await this.repo.findOne({
 			where,
-			select: { id: true } as any,
+			select: { id: true },
 		});
 		if (existed) throw FileNodeException.NAME_EXISTED();
 	}
@@ -72,7 +72,7 @@ export class FileNodeService {
 
 			const p = await this.repo.findOne({
 				where: { id: current },
-				select: { id: true, parentId: true } as any,
+				select: { id: true, parentId: true },
 			});
 			if (!p) break;
 			current = p.parentId ?? null;
@@ -154,7 +154,7 @@ export class FileNodeService {
 			patch.size = data.size ?? node.size ?? 0;
 		}
 
-		await this.repo.update({ id } as any, patch);
+		await this.repo.update({ id }, patch);
 		const updated = await this.repo.findOne({ where: { id } });
 		if (!updated) throw FileNodeException.NOT_FOUND();
 		return updated;
@@ -200,7 +200,7 @@ export class FileNodeService {
 				'createdAt',
 				'updatedAt',
 			] as any,
-			order: { createdAt: 'ASC' as any },
+			order: { createdAt: 'ASC' },
 		});
 
 		const byId = new Map<string, FileNodeTree>();

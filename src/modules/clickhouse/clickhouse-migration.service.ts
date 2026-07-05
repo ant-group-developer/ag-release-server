@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClickHouseClient } from '@clickhouse/client';
-import { CLICKHOUSE_CLIENT } from './clickhouse.constants';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { CLICKHOUSE_CLIENT } from './clickhouse.constants';
 
 const MIGRATIONS_TABLE = 'clickhouse_migrations';
 
@@ -21,40 +21,40 @@ const MIGRATIONS_TABLE = 'clickhouse_migrations';
  */
 @Injectable()
 export class ClickHouseMigrationService implements OnModuleInit {
-  private readonly logger = new Logger(ClickHouseMigrationService.name);
-  private migrationPromise: Promise<void> = Promise.resolve();
+	private readonly logger = new Logger(ClickHouseMigrationService.name);
+	private migrationPromise: Promise<void> = Promise.resolve();
 
-  constructor(
-    @Inject(CLICKHOUSE_CLIENT)
-    private readonly client: ClickHouseClient,
-  ) {}
+	constructor(
+		@Inject(CLICKHOUSE_CLIENT)
+		private readonly client: ClickHouseClient,
+	) {}
 
-  onModuleInit() {
-    this.migrationPromise = this.runMigrations();
-  }
+	onModuleInit() {
+		this.migrationPromise = this.runMigrations();
+	}
 
-  private async runMigrations(): Promise<void> {
-    try {
-      await this.ensureMigrationsTable();
-      await this.runPendingMigrations();
-    } catch (error) {
-      this.logger.error(
-        `ClickHouse connection or migration failed. ClickHouse features will be unavailable. Error: ${error.message}`,
-        error.stack,
-      );
-    }
-  }
+	private async runMigrations(): Promise<void> {
+		try {
+			await this.ensureMigrationsTable();
+			await this.runPendingMigrations();
+		} catch (error) {
+			this.logger.error(
+				`ClickHouse connection or migration failed. ClickHouse features will be unavailable. Error: ${error.message}`,
+				error.stack,
+			);
+		}
+	}
 
-  async waitForMigrations(): Promise<void> {
-    await this.migrationPromise;
-  }
+	async waitForMigrations(): Promise<void> {
+		await this.migrationPromise;
+	}
 
-  /**
-   * Create the migrations tracking table if it doesn't exist.
-   */
-  private async ensureMigrationsTable(): Promise<void> {
-    await this.client.command({
-      query: `
+	/**
+	 * Create the migrations tracking table if it doesn't exist.
+	 */
+	private async ensureMigrationsTable(): Promise<void> {
+		await this.client.command({
+			query: `
         CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE}
         (
             version    String,
@@ -65,148 +65,171 @@ export class ClickHouseMigrationService implements OnModuleInit {
         ORDER BY (version)
         COMMENT 'Tracks applied ClickHouse schema migrations'
       `,
-    });
-  }
+		});
+	}
 
-  /**
-   * Scan migration files, compare with applied, execute pending ones.
-   */
-  private async runPendingMigrations(): Promise<void> {
-    // 1. Get list of already applied migrations
-    const applied = await this.getAppliedMigrations();
-    this.logger.log(`Applied migrations: [${applied.join(', ')}]`);
+	/**
+	 * Scan migration files, compare with applied, execute pending ones.
+	 */
+	private async runPendingMigrations(): Promise<void> {
+		// 1. Get list of already applied migrations
+		const applied = await this.getAppliedMigrations();
+		this.logger.log(`Applied migrations: [${applied.join(', ')}]`);
 
-    // 2. Scan migration files
-    const migrationFiles = this.scanMigrationFiles();
-    if (migrationFiles.length === 0) {
-      this.logger.warn('No migration files found');
-      return;
-    }
+		// 2. Scan migration files
+		const migrationFiles = this.scanMigrationFiles();
+		if (migrationFiles.length === 0) {
+			this.logger.warn('No migration files found');
+			return;
+		}
 
-    // 3. Find pending migrations
-    const pending = migrationFiles.filter((f) => !applied.includes(f.version));
+		// 3. Find pending migrations
+		const pending = migrationFiles.filter(
+			(f) => !applied.includes(f.version),
+		);
 
-    if (pending.length === 0) {
-      this.logger.log('All migrations are up to date ✅');
-      return;
-    }
+		if (pending.length === 0) {
+			this.logger.log('All migrations are up to date ✅');
+			return;
+		}
 
-    this.logger.log(`Pending migrations: ${pending.map((p) => p.version).join(', ')}`);
+		this.logger.log(
+			`Pending migrations: ${pending.map((p) => p.version).join(', ')}`,
+		);
 
-    // 4. Execute each pending migration
-    for (const migration of pending) {
-      await this.executeMigration(migration);
-    }
+		// 4. Execute each pending migration
+		for (const migration of pending) {
+			await this.executeMigration(migration);
+		}
 
-    this.logger.log(`Migration complete — applied ${pending.length} new migration(s) ✅`);
-  }
+		this.logger.log(
+			`Migration complete — applied ${pending.length} new migration(s) ✅`,
+		);
+	}
 
-  /**
-   * Get versions of already applied migrations from the tracking table.
-   */
-  private async getAppliedMigrations(): Promise<string[]> {
-    const result = await this.client.query({
-      query: `SELECT version FROM ${MIGRATIONS_TABLE} ORDER BY version`,
-      format: 'JSONEachRow',
-    });
+	/**
+	 * Get versions of already applied migrations from the tracking table.
+	 */
+	private async getAppliedMigrations(): Promise<string[]> {
+		const result = await this.client.query({
+			query: `SELECT version FROM ${MIGRATIONS_TABLE} ORDER BY version`,
+			format: 'JSONEachRow',
+		});
 
-    const rows = await result.json<{ version: string }>();
-    return rows.map((r) => r.version);
-  }
+		const rows = await result.json<{ version: string }>();
+		return rows.map((r) => r.version);
+	}
 
-  /**
-   * Scan the migrations directory for .sql files.
-   * Returns sorted list of { version, name, filePath }.
-   */
-  private scanMigrationFiles(): Array<{
-    version: string;
-    name: string;
-    filePath: string;
-  }> {
-    // Resolve migrations directory relative to this file's location
-    // In dev: src/migrations/clickhouse/
-    // In prod (compiled): dist/src/migrations/clickhouse/ — but SQL files need to be copied
-    const possiblePaths = [
-      path.resolve(process.cwd(), 'src', 'migrations', 'clickhouse'),
-      path.resolve(__dirname, '..', '..', 'migrations', 'clickhouse'),
-    ];
+	/**
+	 * Scan the migrations directory for .sql files.
+	 * Returns sorted list of { version, name, filePath }.
+	 */
+	private scanMigrationFiles(): Array<{
+		version: string;
+		name: string;
+		filePath: string;
+	}> {
+		// Resolve migrations directory relative to this file's location
+		// In dev: src/migrations/clickhouse/
+		// In prod (compiled): dist/src/migrations/clickhouse/ — but SQL files need to be copied
+		const possiblePaths = [
+			path.resolve(process.cwd(), 'src', 'migrations', 'clickhouse'),
+			path.resolve(__dirname, '..', '..', 'migrations', 'clickhouse'),
+		];
 
-    let migrationsDir: string | null = null;
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        migrationsDir = p;
-        break;
-      }
-    }
+		let migrationsDir: string | null = null;
+		for (const p of possiblePaths) {
+			if (fs.existsSync(p)) {
+				migrationsDir = p;
+				break;
+			}
+		}
 
-    if (!migrationsDir) {
-      this.logger.warn(`Migrations directory not found. Searched: ${possiblePaths.join(', ')}`);
-      return [];
-    }
+		if (!migrationsDir) {
+			this.logger.warn(
+				`Migrations directory not found. Searched: ${possiblePaths.join(', ')}`,
+			);
+			return [];
+		}
 
-    this.logger.log(`Migrations directory: ${migrationsDir}`);
+		this.logger.log(`Migrations directory: ${migrationsDir}`);
 
-    const files = fs.readdirSync(migrationsDir)
-      .filter((f) => f.endsWith('.sql'))
-      .sort(); // Alphabetical = version order (001_, 002_, ...)
+		const files = fs
+			.readdirSync(migrationsDir)
+			.filter((f) => f.endsWith('.sql'))
+			.sort(); // Alphabetical = version order (001_, 002_, ...)
 
-    return files.map((fileName) => {
-      const match = fileName.match(/^(\d+)_(.+)\.sql$/);
-      if (!match) {
-        this.logger.warn(`Skipping invalid migration file: ${fileName}`);
-        return null;
-      }
+		return files
+			.map((fileName) => {
+				const match = fileName.match(/^(\d+)_(.+)\.sql$/);
+				if (!match) {
+					this.logger.warn(
+						`Skipping invalid migration file: ${fileName}`,
+					);
+					return null;
+				}
 
-      return {
-        version: match[1],       // "001"
-        name: match[2],          // "initial_schema"
-        filePath: path.join(migrationsDir!, fileName),
-      };
-    }).filter(Boolean) as Array<{ version: string; name: string; filePath: string }>;
-  }
+				return {
+					version: match[1], // "001"
+					name: match[2], // "initial_schema"
+					filePath: path.join(migrationsDir, fileName),
+				};
+			})
+			.filter(Boolean) as Array<{
+			version: string;
+			name: string;
+			filePath: string;
+		}>;
+	}
 
-  /**
-   * Execute a single migration: read SQL, split by `;`, execute each statement.
-   */
-  private async executeMigration(migration: {
-    version: string;
-    name: string;
-    filePath: string;
-  }): Promise<void> {
-    this.logger.log(`▶ Running migration ${migration.version}: ${migration.name}`);
-    const startTime = Date.now();
+	/**
+	 * Execute a single migration: read SQL, split by `;`, execute each statement.
+	 */
+	private async executeMigration(migration: {
+		version: string;
+		name: string;
+		filePath: string;
+	}): Promise<void> {
+		this.logger.log(
+			`▶ Running migration ${migration.version}: ${migration.name}`,
+		);
+		const startTime = Date.now();
 
-    const sql = fs.readFileSync(migration.filePath, 'utf-8');
+		const sql = fs.readFileSync(migration.filePath, 'utf-8');
 
-    // Split by semicolons, filtering empty statements and comments-only blocks
-    const statements = sql
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => {
-        // Remove empty and comment-only statements
-        const withoutComments = s.replace(/--.*$/gm, '').trim();
-        return withoutComments.length > 0;
-      });
+		// Split by semicolons, filtering empty statements and comments-only blocks
+		const statements = sql
+			.split(';')
+			.map((s) => s.trim())
+			.filter((s) => {
+				// Remove empty and comment-only statements
+				const withoutComments = s.replace(/--.*$/gm, '').trim();
+				return withoutComments.length > 0;
+			});
 
-    for (let i = 0; i < statements.length; i++) {
-      const stmt = statements[i];
-      try {
-        await this.client.command({ query: stmt });
-        this.logger.debug(`  Statement ${i + 1}/${statements.length} OK`);
-      } catch (error) {
-        this.logger.error(
-          `  Statement ${i + 1}/${statements.length} FAILED:\n${stmt.substring(0, 200)}...\n${error.message}`,
-        );
-        throw error;
-      }
-    }
+		for (let i = 0; i < statements.length; i++) {
+			const stmt = statements[i];
+			try {
+				await this.client.command({ query: stmt });
+				this.logger.debug(
+					`  Statement ${i + 1}/${statements.length} OK`,
+				);
+			} catch (error) {
+				this.logger.error(
+					`  Statement ${i + 1}/${statements.length} FAILED:\n${stmt.substring(0, 200)}...\n${error.message}`,
+				);
+				throw error;
+			}
+		}
 
-    // Record migration as applied
-    await this.client.command({
-      query: `INSERT INTO ${MIGRATIONS_TABLE} (version, name) VALUES ('${migration.version}', '${migration.name}')`,
-    });
+		// Record migration as applied
+		await this.client.command({
+			query: `INSERT INTO ${MIGRATIONS_TABLE} (version, name) VALUES ('${migration.version}', '${migration.name}')`,
+		});
 
-    const duration = Date.now() - startTime;
-    this.logger.log(`✅ Migration ${migration.version} applied (${duration}ms, ${statements.length} statements)`);
-  }
+		const duration = Date.now() - startTime;
+		this.logger.log(
+			`✅ Migration ${migration.version} applied (${duration}ms, ${statements.length} statements)`,
+		);
+	}
 }
