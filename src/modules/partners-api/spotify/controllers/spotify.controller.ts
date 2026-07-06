@@ -111,7 +111,8 @@ export class SpotifyController {
 		name: 'isImportedFromReport',
 		required: false,
 		type: Boolean,
-		description: 'true: full report-import enrichment, false: links only',
+		description:
+			'true: report-import enrichment only, false: links-only enrichment only, omit: scan both',
 	})
 	async scanAndEnrich(
 		@Query('limit') limit?: string,
@@ -121,7 +122,7 @@ export class SpotifyController {
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
 		const isForce = force === 'true';
 		const parsedIsImportedFromReport =
-			this.parseOptionalBoolean(isImportedFromReport) ?? true;
+			this.parseOptionalBoolean(isImportedFromReport);
 		const scanId = uuidv4();
 
 		// Always run the scan asynchronously in the background

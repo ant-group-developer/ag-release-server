@@ -144,7 +144,10 @@ export class MetadataScanService implements OnModuleInit {
 		const dryRun = false;
 		const scanId = options?.scanId ?? uuidv4();
 		const force = options?.force ?? false;
-		const isImportedFromReport = options?.isImportedFromReport ?? true;
+		const isImportedFromReport =
+			options?.isImportedFromReport !== undefined
+				? options.isImportedFromReport
+				: undefined; // undefined = scan both
 		const triggerType =
 			options?.triggerType ?? MetadataScanTriggerType.MANUAL;
 		const scheduleId = options?.scheduleId ?? null;
@@ -169,7 +172,7 @@ export class MetadataScanService implements OnModuleInit {
 			force,
 			triggerType,
 			scheduleId,
-			isImportedFromReport,
+			isImportedFromReport: isImportedFromReport ?? null, // null = scan both
 			limitCount: limit,
 			startedAt: new Date(),
 		});
@@ -2270,7 +2273,7 @@ export class MetadataScanService implements OnModuleInit {
 		scanId: string;
 		now: string;
 		force: boolean;
-		isImportedFromReport: boolean;
+		isImportedFromReport?: boolean;
 		limit?: number;
 		dryRun: boolean;
 		result: ScanResult;

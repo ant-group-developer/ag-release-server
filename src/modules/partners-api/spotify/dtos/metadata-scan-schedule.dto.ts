@@ -49,13 +49,14 @@ export class CreateMetadataScanScheduleDto {
 	@MaxLength(80)
 	timezone?: string;
 
-	@ApiProperty({
+	@ApiPropertyOptional({
 		example: true,
 		description:
-			'true: report-import enrichment, false: links-only enrichment',
+			'true: report-import enrichment, false: links-only enrichment, omit: scan both',
 	})
+	@IsOptional()
 	@IsBoolean()
-	isImportedFromReport: boolean;
+	isImportedFromReport?: boolean;
 
 	@ApiPropertyOptional({ example: 500, default: 500, nullable: true })
 	@IsOptional()
