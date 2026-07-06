@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	Equals,
@@ -18,12 +18,73 @@ import {
 	MaxLength,
 	Min,
 	ValidateIf,
+	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
+
+const parseJsonObjectQueryValue = (value: unknown): object | undefined => {
+	if (!value) return undefined;
+	if (typeof value === 'object') return value;
+
+	try {
+		const parsed = JSON.parse(String(value));
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+			? parsed
+			: undefined;
+	} catch {
+		return undefined;
+	}
+};
+
+const parseArrayQueryValue = (value: unknown): unknown[] => {
+	if (!value) return [];
+	if (Array.isArray(value)) return value;
+	if (typeof value === 'object') return [value];
+
+	try {
+		const parsed = JSON.parse(String(value));
+		return Array.isArray(parsed) ? parsed : [parsed];
+	} catch {
+		return [];
+	}
+};
+
+const parseStringArrayQueryValue = (value: unknown): string[] => {
+	if (!value) return [];
+	if (Array.isArray(value)) {
+		return value.flatMap((item) => parseStringArrayQueryValue(item));
+	}
+	if (typeof value === 'object') {
+		return Object.values(value).flatMap((item) =>
+			parseStringArrayQueryValue(item),
+		);
+	}
+
+	try {
+		const parsed = JSON.parse(String(value));
+		if (typeof parsed === 'string') {
+			return parsed
+				.split(',')
+				.map((item) => item.trim())
+				.filter(Boolean);
+		}
+
+		if (Array.isArray(parsed) || (parsed && typeof parsed === 'object')) {
+			return parseStringArrayQueryValue(parsed);
+		}
+
+		return parsed ? [String(parsed)] : [];
+	} catch {
+		return String(value)
+			.split(',')
+			.map((item) => item.trim())
+			.filter(Boolean);
+	}
+};
 
 export class CreateReleaseDto {
 	@IsOptional()
@@ -247,6 +308,36 @@ export class ReloadReleaseFormatIdDto {
 		return value;
 	})
 	reloadFromCi?: boolean;
+}
+
+export class QueryReleaseDspDeliveryItemDto {
+	@ApiProperty({ type: String, description: 'DSP code' })
+	@IsString()
+	code: string;
+
+	@ApiProperty({ enum: ReleaseDspStatus, isArray: true })
+	@Transform(({ value }) => parseStringArrayQueryValue(value))
+	@IsArray()
+	@IsEnum(ReleaseDspStatus, { each: true })
+	status: ReleaseDspStatus[];
+}
+
+export class QueryReleaseDspDeliveryDto {
+	@ApiPropertyOptional({ type: [QueryReleaseDspDeliveryItemDto] })
+	@IsOptional()
+	@Transform(({ value }) => parseArrayQueryValue(value))
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => QueryReleaseDspDeliveryItemDto)
+	include?: QueryReleaseDspDeliveryItemDto[];
+
+	@ApiPropertyOptional({ type: [QueryReleaseDspDeliveryItemDto] })
+	@IsOptional()
+	@Transform(({ value }) => parseArrayQueryValue(value))
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => QueryReleaseDspDeliveryItemDto)
+	exclude?: QueryReleaseDspDeliveryItemDto[];
 }
 
 export class QueryGetListReleaseDto extends BaseQueryDto {
@@ -531,6 +622,13 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 		return value;
 	})
 	lastImportIsFailed?: boolean;
+
+	@ApiPropertyOptional({ type: QueryReleaseDspDeliveryDto })
+	@IsOptional()
+	@Transform(({ value }) => parseJsonObjectQueryValue(value))
+	@ValidateNested()
+	@Type(() => QueryReleaseDspDeliveryDto)
+	dspDelivery?: QueryReleaseDspDeliveryDto;
 }
 
 export class QueryGetListReleaseDto2 extends BaseQueryDto {
@@ -678,6 +776,12 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 		return value;
 	})
 	lastImportIsFailed?: boolean;
+
+	@IsOptional()
+	@Transform(({ value }) => parseJsonObjectQueryValue(value))
+	@ValidateNested()
+	@Type(() => QueryReleaseDspDeliveryDto)
+	dspDelivery?: QueryReleaseDspDeliveryDto;
 }
 
 export class FileExportReleaseCiDto {

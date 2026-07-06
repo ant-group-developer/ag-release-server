@@ -12,7 +12,10 @@ import {
 	SelectQueryBuilder,
 } from 'typeorm';
 import { ReleaseException } from '../constants/release.constant';
-import { QueryGetListReleaseDto } from '../dto/release.dto';
+import {
+	QueryGetListReleaseDto,
+	QueryReleaseDspDeliveryItemDto,
+} from '../dto/release.dto';
 import {
 	ReleaseEnrichment,
 	ReleaseEnrichmentStatus,
@@ -85,8 +88,10 @@ export class ReleaseQueryService {
 		const qb = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
 		// filter và select sẽ trả ra mảng cần join
-		const { itemsToJoin } = this.filterByQuery({ qb, query });
-		this.select(qb, query);
+		const { itemsToJoin: items1 } = this.filterByQuery({ qb, query });
+		const { itemsToJoin: items2 } = this.select(qb, query);
+
+		const itemsToJoin = [...new Set([...items1, ...items2])];
 
 		this.leftJoin({ qb, relations: itemsToJoin });
 
@@ -513,6 +518,7 @@ export class ReleaseQueryService {
 			ciDataStatus,
 			neverExported,
 			lastImportIsFailed,
+			dspDelivery,
 
 			fieldOrder,
 			orderBy,
@@ -563,6 +569,41 @@ export class ReleaseQueryService {
 					{ failedImportStatus: 'problem' },
 				);
 			}
+		}
+
+		const dspDeliveryInclude = (dspDelivery?.include ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+		const dspDeliveryExclude = (dspDelivery?.exclude ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+
+		if (dspDeliveryInclude.length || dspDeliveryExclude.length) {
+			itemsToJoin.push('release.releaseDspDeliveries');
+		}
+
+		if (dspDeliveryExclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryExclude,
+					prefix: 'excludeDspDelivery',
+					deliveryAlias: 'excludeDspDeliveryFilter',
+					dspAlias: 'excludeDspFilter',
+				});
+
+			qb.andWhere(`NOT ${condition}`, parameters);
+		}
+
+		if (dspDeliveryInclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryInclude,
+					prefix: 'includeDspDelivery',
+					deliveryAlias: 'includeDspDeliveryFilter',
+					dspAlias: 'includeDspFilter',
+				});
+
+			qb.andWhere(condition, parameters);
 		}
 
 		if (ids && ids.length > 0) {
@@ -744,6 +785,46 @@ export class ReleaseQueryService {
 		return { itemsToJoin };
 	}
 
+	private buildDspDeliveryExistsCondition({
+		items,
+		prefix,
+		deliveryAlias,
+		dspAlias,
+	}: {
+		items: QueryReleaseDspDeliveryItemDto[];
+		prefix: string;
+		deliveryAlias: string;
+		dspAlias: string;
+	}) {
+		const parameters: Record<string, string | string[]> = {};
+		const pairConditions = items.map((item, index) => {
+			const codeParam = `${prefix}Code${index}`;
+			const statusParam = `${prefix}Status${index}`;
+
+			parameters[codeParam] = item.code.trim().toUpperCase();
+			parameters[statusParam] = item.status;
+
+			return `(
+				UPPER(TRIM(${dspAlias}.code)) = :${codeParam}
+				AND ${deliveryAlias}.status IN (:...${statusParam})
+			)`;
+		});
+
+		return {
+			condition: `
+				EXISTS (
+					SELECT 1
+					FROM release_dsp_delivery ${deliveryAlias}
+					INNER JOIN dsps ${dspAlias}
+						ON ${dspAlias}.id = ${deliveryAlias}.dsp_id
+					WHERE ${deliveryAlias}.release_id = release.id
+						AND (${pairConditions.join(' OR ')})
+				)
+			`,
+			parameters,
+		};
+	}
+
 	private leftJoin({
 		qb,
 		relations,
@@ -767,14 +848,19 @@ export class ReleaseQueryService {
 			.leftJoin('release.label', 'label')
 
 			// genre
-			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
 
-			// dsp delivery
-			.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery')
-			.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
-
+		// ci data
 		if (relations?.includes('release.ciData')) {
 			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
+		}
+
+		// dsp delivery
+		if (relations?.includes('release.releaseDspDeliveries')) {
+			qb.leftJoin(
+				'release.releaseDspDeliveries',
+				'releaseDspDelivery',
+			).leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 		}
 	}
 
@@ -783,6 +869,7 @@ export class ReleaseQueryService {
 		query: QueryGetListReleaseDto,
 	) {
 		const { tenantIds } = query;
+		const itemsToJoin: string[] = [];
 
 		queryBuilder
 			.addSelect([
@@ -934,6 +1021,10 @@ export class ReleaseQueryService {
 
 				return subQuery;
 			}, 'dsps_total_count');
+
+		itemsToJoin.push('release.releaseDspDeliveries');
+
+		return { itemsToJoin };
 	}
 
 	async findOneWithRelation(id: string) {
