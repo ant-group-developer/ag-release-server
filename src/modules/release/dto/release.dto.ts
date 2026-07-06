@@ -473,6 +473,22 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	artistId?: string[];
 
 	@ApiPropertyOptional({
+		type: [String],
+		description: 'Channel IDs',
+	})
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	channelId?: string[];
+
+	@ApiPropertyOptional({
 		type: String,
 		format: 'date-time',
 		description: 'Start release date',
@@ -751,6 +767,18 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	)
 	@Length(10, 10, { each: true })
 	artistId?: string[];
+
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	channelId?: string[];
 
 	@IsOptional()
 	// @IsDate()
