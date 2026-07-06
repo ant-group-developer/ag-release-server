@@ -229,18 +229,14 @@ export class ReleaseExecutionStepEngine {
 			return ReleaseExecutionStepStatus.PROCESSING;
 		}
 
-		// ===== SKIP =====
-		if (
-			children.every(
-				(c) => c.status === ReleaseExecutionStepStatus.SKIPPED,
-			)
-		) {
-			return ReleaseExecutionStepStatus.DONE;
-		}
-
 		// ===== DONE =====
 		if (
-			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+			children.every((c) =>
+				[
+					ReleaseExecutionStepStatus.DONE,
+					ReleaseExecutionStepStatus.SKIPPED,
+				].includes(c.status),
+			)
 		) {
 			return ReleaseExecutionStepStatus.DONE;
 		}

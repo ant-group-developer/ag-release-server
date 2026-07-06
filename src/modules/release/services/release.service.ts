@@ -526,8 +526,8 @@ export class ReleaseService {
 	async previewBulkSubmitResult(dto: BulkSubmitReleaseDto) {
 		const targets = dto.codes
 			.map((code) => ({
-				code: code?.trim(),
-				targetStatus: dto.status,
+				code: code?.trim().toUpperCase(),
+				targetStatus: dto.status ?? ReleaseDspStatus.DISTRIBUTED,
 			}))
 			.filter(
 				(
@@ -548,29 +548,33 @@ export class ReleaseService {
 
 		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
 
-		const releaseDspDeliveries = (release.releaseDspDeliveries ?? [])
-			.filter((delivery) =>
-				targetStatusByDspCode.has(
-					delivery.dsp?.code?.trim().toUpperCase(),
-				),
-			)
-			.map((delivery) => {
+		const releaseDspDeliveries = (release.releaseDspDeliveries ?? []).map(
+			(delivery) => {
 				const { status, ...rest } = delivery;
 				const dspCode = delivery.dsp?.code?.trim().toUpperCase() ?? '';
+				const targetStatus = targetStatusByDspCode.get(dspCode);
+				const shouldChangeStatus =
+					targetStatus && status !== targetStatus;
 
 				return {
 					...rest,
 					status,
-					targetStatus: targetStatusByDspCode.get(dspCode),
+					...(shouldChangeStatus ? { targetStatus } : {}),
 				};
-			});
+			},
+		);
 		release.releaseDspDeliveries = releaseDspDeliveries;
 		const submitCodes = releaseDspDeliveries
-			.filter((delivery) => delivery.status !== delivery.targetStatus)
+			.filter((delivery) => Boolean(delivery.targetStatus))
 			.map((delivery) => delivery.dsp?.code)
 			.filter((code): code is string => Boolean(code));
 		const skipCodes = releaseDspDeliveries
-			.filter((delivery) => delivery.status === delivery.targetStatus)
+			.filter(
+				(delivery) =>
+					targetStatusByDspCode.has(
+						delivery.dsp?.code?.trim().toUpperCase() ?? '',
+					) && !delivery.targetStatus,
+			)
 			.map((delivery) => delivery.dsp?.code)
 			.filter((code): code is string => Boolean(code));
 

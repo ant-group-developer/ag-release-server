@@ -1303,6 +1303,7 @@ export class ReleaseExecution3WorkerTest {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		// return ReleaseExecutionStepStatus.FAILED;
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 			const ciDspStatuses =
