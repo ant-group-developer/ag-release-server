@@ -519,7 +519,12 @@ export class ReleaseService {
 		for (const id of dto.ids) {
 			if (idsExclude.has(id)) continue;
 
-			await this.submit3(id, { code: dto.codes });
+			const { submitData } = await this.previewBulkSubmitResult({
+				...dto,
+				ids: [id],
+			});
+
+			await this.submit3(id, submitData);
 		}
 	}
 
@@ -554,7 +559,9 @@ export class ReleaseService {
 				const dspCode = delivery.dsp?.code?.trim().toUpperCase() ?? '';
 				const targetStatus = targetStatusByDspCode.get(dspCode);
 				const shouldChangeStatus =
-					targetStatus && status !== targetStatus;
+					targetStatus &&
+					(!(dto.skipDistributed ?? true) ||
+						status !== ReleaseDspStatus.DISTRIBUTED);
 
 				return {
 					...rest,
@@ -564,10 +571,12 @@ export class ReleaseService {
 			},
 		);
 		release.releaseDspDeliveries = releaseDspDeliveries;
+
 		const submitCodes = releaseDspDeliveries
 			.filter((delivery) => Boolean(delivery.targetStatus))
 			.map((delivery) => delivery.dsp?.code)
 			.filter((code): code is string => Boolean(code));
+
 		const skipCodes = releaseDspDeliveries
 			.filter(
 				(delivery) =>

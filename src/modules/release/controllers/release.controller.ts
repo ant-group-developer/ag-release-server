@@ -73,6 +73,20 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('get-list')
+	async getListByBody(
+		@Body() query: QueryGetListReleaseDto,
+		@Req() req: Request,
+	): Promise<ResponseSuccess<PageDto<IReleaseDetail>>> {
+		const tenantId = req.user!.tenantId;
+		if (checkIsNotSystemTenant(tenantId)) {
+			query.tenantIds = [tenantId];
+		}
+
+		const result = await this.releaseService.getList(query);
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get('list-data-export-ci')
 	async listDataExportCi(
 		@Query() query: QueryGetListReleaseDto,

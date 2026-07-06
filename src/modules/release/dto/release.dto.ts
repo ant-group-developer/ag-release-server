@@ -819,6 +819,20 @@ export class BulkSubmitReleaseDto {
 	status?: ReleaseDspStatus = ReleaseDspStatus.DISTRIBUTED;
 
 	@ApiPropertyOptional({
+		type: Boolean,
+		default: true,
+		description: 'Bỏ qua DSP delivery đã DISTRIBUTED khi bulk submit',
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	skipDistributed?: boolean = true;
+
+	@ApiPropertyOptional({
 		enum: CiImportAction,
 		default: CiImportAction.KEEP_CURRENT_STATUS,
 	})
