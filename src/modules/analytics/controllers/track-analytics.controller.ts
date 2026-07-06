@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
@@ -195,6 +196,40 @@ export class TrackAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTerritoryBarChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('isrc') isrc: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của track (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('isrc') isrc: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
 				'track',
 				isrc,
 				dto,

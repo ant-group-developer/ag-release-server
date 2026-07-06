@@ -408,9 +408,26 @@ export interface DspBarChartItem {
 /** Một điểm trên line-chart revenue theo tháng */
 export interface TerritoryBarChartItem {
 	territory: string;
+	isoCode?: string;
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
+}
+
+export interface EntityTopDspItem {
+	rank: number;
+	dspId: string;
+	dspName: string;
+	totalViews: number;
+	totalRevenueUsd: string;
+}
+
+export interface EntityTopTerItem {
+	rank: number;
+	isoCode: string;
+	territory: string;
+	totalViews: number;
+	totalRevenueUsd: string;
 }
 
 export interface RevenueLineChartItem {

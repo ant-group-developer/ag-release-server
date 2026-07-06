@@ -245,4 +245,38 @@ export class ArtistAnalyticsController {
 			),
 		});
 	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của artist (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 }

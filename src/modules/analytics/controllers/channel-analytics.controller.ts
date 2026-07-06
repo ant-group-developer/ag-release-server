@@ -225,4 +225,36 @@ export class ChannelAnalyticsController {
 		);
 		return new ResponseSuccess({ data });
 	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của channel (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopDsps(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của channel (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopTerritories(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
 }

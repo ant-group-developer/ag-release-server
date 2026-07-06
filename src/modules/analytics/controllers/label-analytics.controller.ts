@@ -329,4 +329,36 @@ export class LabelAnalyticsController {
 		]);
 		return new ResponseSuccess({ data, tenant });
 	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của label (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('labelId') labelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopDsps(
+			'label',
+			labelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của label (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('labelId') labelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopTerritories(
+			'label',
+			labelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
 }

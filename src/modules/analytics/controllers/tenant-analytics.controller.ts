@@ -283,4 +283,40 @@ export class TenantAnalyticsController {
 			),
 		});
 	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của tenant (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của tenant (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 }

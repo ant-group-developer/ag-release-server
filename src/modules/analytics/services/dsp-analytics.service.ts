@@ -194,13 +194,14 @@ export class DspAnalyticsService {
 		const nameByIso2 = new Map(countries.map((c: { iso2: string; name: string }) => [c.iso2, c.name]));
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
-			const territory =
-				(iso2 && iso2 !== 'OTHER'
-					? (nameByIso2.get(iso2) ?? item.territory)
-					: item.territory) as string;
+			const isOther = !iso2 || iso2 === 'OTHER';
+			const territory = (isOther
+				? item.territory
+				: (nameByIso2.get(iso2) ?? item.territory)) as string;
 			return {
 				...item,
 				territory,
+				isoCode: isOther ? undefined : iso2,
 			};
 		});
 	}
