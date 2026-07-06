@@ -23,8 +23,10 @@ import {
   ReportImportStatusResponseDto,
 } from '../dto/report-import.dto';
 import { UpdateSpotifyR2SyncConfigDto } from '../dto/spotify-r2-sync-config.dto';
+import { UpdateSpotifyExportSchedulerConfigDto } from '../dto/spotify-export-scheduler-config.dto';
 import { TriggerSpotifyExportDto } from '../dto/spotify-export-tool.dto';
 import { SpotifyExportToolService } from '../services/spotify-export-tool.service';
+import { SpotifyExportSchedulerService } from '../services/spotify-export-scheduler.service';
 import { User } from '../../../common/decorators/req.decorators';
 import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { SystemAdminOnly } from '../../auth/decorators/auth.decorator';
@@ -51,6 +53,7 @@ export class ReportImportController {
     private readonly jobEvents: JobEventsGateway,
     private readonly spotifyR2SyncService: SpotifyR2SyncService,
     private readonly spotifyExportToolService: SpotifyExportToolService,
+    private readonly spotifyExportSchedulerService: SpotifyExportSchedulerService,
   ) {}
 
 	@SystemAdminOnly()
@@ -268,6 +271,35 @@ export class ReportImportController {
     const config = await this.spotifyR2SyncService.getConfig();
     const result = await this.spotifyR2SyncService.cleanupProcessedZips(config.prefix, config.retentionDays);
     return new ResponseSuccess({ data: result });
+  }
+
+  @SystemAdminOnly()
+  @Get('spotify/export-scheduler-config')
+  @ApiOperation({
+    summary: 'Get Spotify export auto-trigger scheduler config',
+    description: 'Returns enabled/cron cho scheduler tự động gọi CI tool (Box -> R2), backed by etl_config.',
+  })
+  async getSpotifyExportSchedulerConfig(): Promise<ResponseSuccess<any>> {
+    return new ResponseSuccess({
+      data: await this.spotifyExportSchedulerService.getConfig(),
+    });
+  }
+
+  @SystemAdminOnly()
+  @Put('spotify/export-scheduler-config')
+  @Patch('spotify/export-scheduler-config')
+  @ApiOperation({
+    summary: 'Update Spotify export auto-trigger scheduler config',
+    description: 'Updates enabled/cron. Reschedules cron job ngay nếu cron thay đổi.',
+  })
+  async setSpotifyExportSchedulerConfig(
+    @Body() body: UpdateSpotifyExportSchedulerConfigDto,
+  ): Promise<ResponseSuccess<any>> {
+    const updated = await this.spotifyExportSchedulerService.setConfig(body);
+    if (body.cron) {
+      await this.spotifyExportSchedulerService.rescheduleCron(body.cron);
+    }
+    return new ResponseSuccess({ data: updated });
   }
 }
 

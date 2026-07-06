@@ -19,6 +19,7 @@ import { ReportSourceConfigService } from './services/report-source-config.servi
 import { ImportedReleaseDeleteService } from './services/imported-release-delete.service';
 import { SpotifyR2SyncService } from './services/spotify-r2-sync.service';
 import { SpotifyExportToolService } from './services/spotify-export-tool.service';
+import { SpotifyExportSchedulerService } from './services/spotify-export-scheduler.service';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SpotifyExportToolService } from './services/spotify-export-tool.service
     ImportedReleaseDeleteService,
     SpotifyR2SyncService,
     SpotifyExportToolService,
+    SpotifyExportSchedulerService,
   ],
   exports: [ReportImportService],
 })
