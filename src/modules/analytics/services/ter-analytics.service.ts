@@ -238,14 +238,21 @@ export class TerAnalyticsService {
 
 		const timelineSql = `
 			SELECT
-				toStartOfMonth(s.period) AS period,
-				multiIf(${this.resolvedDspName} IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name,
-				sum(s.total_quantity) AS total_views
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-			${this.dspNameJoin}
-			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${terFilter} ${trackFilter}
+				period,
+				multiIf(dsp_name_resolved IN ({topDsps:Array(String)}), dsp_name_resolved, 'Other') AS dsp_name,
+				sum(total_views) AS total_views
+			FROM (
+				SELECT
+					toStartOfMonth(s.period) AS period,
+					${this.resolvedDspName} AS dsp_name_resolved,
+					sum(s.total_quantity) AS total_views
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+				${this.dspNameJoin}
+				${trackJoin}
+				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+					${terFilter} ${trackFilter}
+				GROUP BY period, s.dsp_id, dsp_name_resolved
+			)
 			GROUP BY period, dsp_name
 			ORDER BY period ASC
 		`;
@@ -302,15 +309,23 @@ export class TerAnalyticsService {
 
 		const timelineSql = `
 			SELECT
-				toStartOfMonth(s.period) AS period,
-				multiIf(${this.resolvedDspName} IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name,
-				sum(s.total_revenue_usd) AS revenue_usd,
-				sum(s.total_quantity) AS quantity
-			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-			${this.dspNameJoin}
-			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${terFilter} ${trackFilter}
+				period,
+				multiIf(dsp_name_resolved IN ({topDsps:Array(String)}), dsp_name_resolved, 'Other') AS dsp_name,
+				sum(revenue_usd) AS revenue_usd,
+				sum(quantity) AS quantity
+			FROM (
+				SELECT
+					toStartOfMonth(s.period) AS period,
+					${this.resolvedDspName} AS dsp_name_resolved,
+					sum(s.total_revenue_usd) AS revenue_usd,
+					sum(s.total_quantity) AS quantity
+				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+				${this.dspNameJoin}
+				${trackJoin}
+				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+					${terFilter} ${trackFilter}
+				GROUP BY period, s.dsp_id, dsp_name_resolved
+			)
 			GROUP BY period, dsp_name
 			ORDER BY period ASC
 		`;
@@ -590,24 +605,52 @@ export class TerAnalyticsService {
 		const page = dto.page ?? 1;
 		const limit = dto.limit;
 		const skip = dto.skip;
-		const sortCol = dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const sortByRevenue = dto.sortBy === 'revenue';
+		const sortCol = sortByRevenue ? 'total_revenue_usd' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const importFilter = dto.importSource ? 'AND s.import_source = {importSource:String}' : '';
+		const importFilterSal = dto.importSource ? 'AND sal.import_source = {importSource:String}' : '';
 		const { trackJoin, trackFilter, params } = this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 		const terFilter = 'AND s.territory_code = {isoCode:String}';
 
+		// When sorting by revenue, drive from sales table so DSPs with revenue but no trend rows appear
+		const primaryTable = sortByRevenue
+			? CLICKHOUSE_TABLES.SALES_TER_MONTHLY
+			: CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY;
+
 		const countSql = `
 			SELECT uniq(s.dsp_id) AS total
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+			FROM music_analytics.${primaryTable} s
 			${trackJoin}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${terFilter} ${importFilter} ${trackFilter}
 		`;
 
-		const dataSql = `
+		const dataSql = sortByRevenue ? `
+			SELECT
+				s.dsp_id AS dsp_id,
+				${this.resolvedDspName} AS dsp_name,
+				toString(sum(s.total_revenue_usd)) AS total_revenue_usd,
+				coalesce(sum(tr.total_views), 0) AS total_views
+			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+			${this.dspNameJoin}
+			${trackJoin}
+			LEFT JOIN (
+				SELECT dsp_id, isrc, sum(total_quantity) AS total_views
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
+				WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+					AND tr_sub.territory_code = {isoCode:String} ${importFilterSal}
+				GROUP BY dsp_id, isrc
+			) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
+			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				${terFilter} ${importFilter} ${trackFilter}
+			GROUP BY s.dsp_id, dsp_name
+			ORDER BY ${sortCol} DESC
+			LIMIT ${limit} OFFSET ${skip}
+		` : `
 			SELECT
 				s.dsp_id AS dsp_id,
 				${this.resolvedDspName} AS dsp_name,
@@ -618,14 +661,14 @@ export class TerAnalyticsService {
 			${trackJoin}
 			LEFT JOIN (
 				SELECT dsp_id, isrc, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-					${terFilter} ${importFilter}
+				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} sal
+				WHERE sal.period >= toDate({fromMonth:String}) AND sal.period <= toDate({toMonth:String})
+					AND sal.territory_code = {isoCode:String} ${importFilterSal}
 				GROUP BY dsp_id, isrc
 			) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${terFilter} ${importFilter} ${trackFilter}
-			GROUP BY s.dsp_id
+			GROUP BY s.dsp_id, dsp_name
 			ORDER BY ${sortCol} DESC
 			LIMIT ${limit} OFFSET ${skip}
 		`;
