@@ -3069,17 +3069,18 @@ export class TimelineAnalyticsService {
 			[iso2Codes],
 		);
 		const countryNameByIso2 = new Map(
-			countries.map((country) => [country.iso2, country.name]),
+			countries.map((country: { iso2: string; name: string }) => [country.iso2, country.name]),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const territory =
+				(iso2 && iso2 !== 'OTHER'
+					? (countryNameByIso2.get(iso2) ?? item.territory)
+					: item.territory) as string;
 			return {
 				...item,
-				territory:
-					iso2 && iso2 !== 'OTHER'
-						? (countryNameByIso2.get(iso2) ?? item.territory)
-						: item.territory,
+				territory,
 			};
 		});
 	}

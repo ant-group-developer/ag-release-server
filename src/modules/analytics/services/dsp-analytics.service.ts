@@ -191,15 +191,16 @@ export class DspAnalyticsService {
 			`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
 			[iso2Codes],
 		);
-		const nameByIso2 = new Map(countries.map((c) => [c.iso2, c.name]));
+		const nameByIso2 = new Map(countries.map((c: { iso2: string; name: string }) => [c.iso2, c.name]));
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const territory =
+				(iso2 && iso2 !== 'OTHER'
+					? (nameByIso2.get(iso2) ?? item.territory)
+					: item.territory) as string;
 			return {
 				...item,
-				territory:
-					iso2 && iso2 !== 'OTHER'
-						? (nameByIso2.get(iso2) ?? item.territory)
-						: item.territory,
+				territory,
 			};
 		});
 	}

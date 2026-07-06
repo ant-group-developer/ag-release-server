@@ -268,7 +268,7 @@ export class SpotifyController {
 				page: parsedPage,
 				pageSize: parsedPageSize,
 			}),
-			this.metadataScanService.getEnrichmentSummary(),
+			this.metadataScanService.getEnrichmentSummary(scanId),
 			scanId
 				? this.metadataScanService.findScanSessionById(scanId)
 				: Promise.resolve(null),

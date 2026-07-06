@@ -1867,9 +1867,52 @@ export class MetadataScanService implements OnModuleInit {
 	}
 
 	/**
-	 * Get general statistics summary of enrichment progress
+	 * Get enrichment statistics summary.
+	 * - If scanId is provided: returns stats of that specific scan session only.
+	 * - If not: returns global stats across all release_enrichments.
 	 */
-	async getEnrichmentSummary() {
+	async getEnrichmentSummary(scanId?: string) {
+		if (scanId) {
+			const sessionRepo =
+				this.dataSource.getRepository(MetadataScanSession);
+			const session = await sessionRepo.findOne({ where: { id: scanId } });
+
+			if (!session) {
+				return null;
+			}
+
+			const successCount = session.successCount ?? 0;
+			const failedCount = session.failedCount ?? 0;
+			const notFoundCount = session.notFoundCount ?? 0;
+			const totalReleases = session.totalReleases ?? 0;
+			const processedReleases = session.processedReleases ?? 0;
+			const totalDone = successCount + failedCount + notFoundCount;
+			const totalRemaining = Math.max(0, totalReleases - processedReleases);
+
+			return {
+				totalReleases,
+				totalDone,
+				totalRemaining,
+				successCount,
+				failedCount,
+				notFoundCount,
+				pendingCount: Math.max(0, totalReleases - processedReleases),
+				processingCount:
+					session.status === ScanSessionStatus.PROCESSING ? 1 : 0,
+
+				totalReleasesCount: totalReleases,
+				totalReleasesDone: totalDone,
+				totalReleasesRemaining: totalRemaining,
+				successReleasesCount: successCount,
+				failedReleasesCount: failedCount,
+				notFoundReleasesCount: notFoundCount,
+				pendingReleasesCount: Math.max(0, totalReleases - processedReleases),
+				processingReleasesCount:
+					session.status === ScanSessionStatus.PROCESSING ? 1 : 0,
+			};
+		}
+
+		// Global summary (no scanId)
 		const releaseRepo = this.dataSource.getRepository(Release);
 		const enrichmentRepo = this.dataSource.getRepository(ReleaseEnrichment);
 
@@ -1907,7 +1950,6 @@ export class MetadataScanService implements OnModuleInit {
 		const totalRemaining = Math.max(0, totalReleases - totalDone);
 
 		return {
-			// Old fields (kept for backward compatibility)
 			totalReleases,
 			totalDone,
 			totalRemaining,
@@ -1917,7 +1959,6 @@ export class MetadataScanService implements OnModuleInit {
 			pendingCount,
 			processingCount,
 
-			// New descriptive fields (clear and explicit for frontend)
 			totalReleasesCount: totalReleases,
 			totalReleasesDone: totalDone,
 			totalReleasesRemaining: totalRemaining,
