@@ -212,7 +212,7 @@ export class MetadataScanScheduleService implements OnModuleInit {
 				scanId,
 				force: schedule.force,
 				limit: schedule.limitCount ?? undefined,
-				isImportedFromReport: schedule.isImportedFromReport,
+				isImportedFromReport: schedule.isImportedFromReport ?? undefined,
 				triggerType: MetadataScanTriggerType.CRON,
 				scheduleId: schedule.id,
 			})
