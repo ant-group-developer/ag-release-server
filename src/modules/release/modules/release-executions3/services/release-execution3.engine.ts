@@ -28,8 +28,8 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
-		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
+		// private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseExecution3ResultService: ReleaseExecution3ResultService,
 		private readonly logService: LogsService,
 	) {}
@@ -46,7 +46,7 @@ export class ReleaseExecutionStepEngine {
 
 		const hasChildren = !!STEP.childSteps?.length;
 
-		// ===== STEP LÁ =====
+		// nếu ko có con thì xử lý step
 		if (!hasChildren) {
 			if (await this.isExecutionCancelled(releaseExecution.id)) {
 				return ReleaseExecutionStepStatus.CANCELLED;
@@ -95,8 +95,7 @@ export class ReleaseExecutionStepEngine {
 			return status;
 		}
 
-		// ===== STEP CHA =====
-
+		// nếu có con thì xử lý con
 		// Check WAITING_PARTNER trước khi chạy vào children
 		if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
 			const scheduledAt = STEP.metadata?.scheduledAt;
@@ -228,6 +227,15 @@ export class ReleaseExecutionStepEngine {
 			)
 		) {
 			return ReleaseExecutionStepStatus.PROCESSING;
+		}
+
+		// ===== SKIP =====
+		if (
+			children.every(
+				(c) => c.status === ReleaseExecutionStepStatus.SKIPPED,
+			)
+		) {
+			return ReleaseExecutionStepStatus.DONE;
 		}
 
 		// ===== DONE =====

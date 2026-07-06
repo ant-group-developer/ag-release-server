@@ -415,6 +415,20 @@ export class ReleaseExecution3Worker {
 	private async importCi(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
+		console.log('importCi context', context);
+
+		if (
+			context.releaseExecution.metadata.input.dspAggregator?.ci
+				?.isSkipImport
+		) {
+			this.logService.log({
+				message: `[IMPORT_CI] Skipping import`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: context.step.id,
+			});
+			return ReleaseExecutionStepStatus.SKIPPED;
+		}
+
 		return this.deriveStatusFromChildren(context);
 	}
 

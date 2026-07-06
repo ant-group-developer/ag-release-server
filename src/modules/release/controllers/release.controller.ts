@@ -117,6 +117,16 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Preview release DSP delivery status changes' })
+	@ApiBody({ type: BulkSubmitReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
+	@Post('bulk-submit/preview-result')
+	async previewBulkSubmitResult(@Body() dto: BulkSubmitReleaseDto) {
+		const result = await this.releaseService.previewBulkSubmitResult(dto);
+
+		return new ResponseSuccess({ data: result });
+	}
+
 	@ApiOperation({ summary: 'Bulk submit releases' })
 	@ApiBody({ type: BulkSubmitReleaseDto })
 	@ApiResponse({ status: 200, type: ResponseSuccess })

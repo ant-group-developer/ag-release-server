@@ -96,6 +96,7 @@ export class ReleaseExecution3 extends BaseUUIDEntity {
 					ci: Dsp[];
 					state51: Dsp[];
 					primaryDsp?: Dsp | null;
+					isSkipImport?: boolean;
 				};
 			};
 			delivery?: {

@@ -33,9 +33,11 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { AutoSubmitHistory } from '../entities/auto-submit-history.entity';
 import { Release } from '../entities/release.entity';
+import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
+import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
 import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
@@ -521,6 +523,68 @@ export class ReleaseService {
 		}
 	}
 
+	async previewBulkSubmitResult(dto: BulkSubmitReleaseDto) {
+		const targets = dto.codes
+			.map((code) => ({
+				code: code?.trim(),
+				targetStatus: dto.status,
+			}))
+			.filter(
+				(
+					item,
+				): item is {
+					code: string;
+					targetStatus: ReleaseDspStatus;
+				} => Boolean(item.code) && Boolean(item.targetStatus),
+			);
+		const targetStatusByDspCode = new Map(
+			targets.map((item) => [item.code, item.targetStatus]),
+		);
+
+		const release = await this.releaseQueryService.findOneReleaseFull({
+			releaseId: dto.ids[0],
+			relations: ['release.releaseDspDeliveries'],
+		});
+
+		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+
+		const releaseDspDeliveries = (release.releaseDspDeliveries ?? [])
+			.filter((delivery) =>
+				targetStatusByDspCode.has(
+					delivery.dsp?.code?.trim().toUpperCase(),
+				),
+			)
+			.map((delivery) => {
+				const { status, ...rest } = delivery;
+				const dspCode = delivery.dsp?.code?.trim().toUpperCase() ?? '';
+
+				return {
+					...rest,
+					status,
+					targetStatus: targetStatusByDspCode.get(dspCode),
+				};
+			});
+		release.releaseDspDeliveries = releaseDspDeliveries;
+		const submitCodes = releaseDspDeliveries
+			.filter((delivery) => delivery.status !== delivery.targetStatus)
+			.map((delivery) => delivery.dsp?.code)
+			.filter((code): code is string => Boolean(code));
+		const skipCodes = releaseDspDeliveries
+			.filter((delivery) => delivery.status === delivery.targetStatus)
+			.map((delivery) => delivery.dsp?.code)
+			.filter((code): code is string => Boolean(code));
+
+		return {
+			...release,
+			submitData: {
+				id: release.id,
+				code: submitCodes,
+				skipCodes,
+				ciImportAction: dto.ciImportAction,
+			},
+		};
+	}
+
 	async autoSubmitUndistributedMusicReleases(
 		dto: AutoSubmitUndistributedMusicReleaseDto,
 	) {
@@ -681,22 +745,37 @@ export class ReleaseService {
 		});
 	}
 
+	private applyCiImportActionToReleaseSnapshot(
+		release: Release | null | undefined,
+		ciImportAction?: CiImportAction,
+	) {
+		if (!release?.ciData) return;
+
+		let status = release.ciData.status;
+
+		if (ciImportAction === CiImportAction.SKIP_CI_IMPORT) {
+			if (status === ReleaseCiDataStatus.EXISTS_ON_CI) {
+				status = ReleaseCiDataStatus.EXISTS_ON_CI; // chỉ có thể skip khi đã tồn tại trên CI
+			}
+		} else if (ciImportAction === CiImportAction.FORCE_CI_IMPORT) {
+			status = ReleaseCiDataStatus.NOT_FOUND_ON_CI; // luôn import
+		}
+
+		release.ciData = { status } as typeof release.ciData;
+	}
+
 	async submit3(id: string, dto: SubmitReleaseDto) {
 		const release = await this.releaseQueryService.findOneReleaseFull({
 			releaseId: id,
 		});
+
+		// truyền động từ fe để bỏ qua bước import ci, chứ ko lưu hay cập nhật release gốc
+		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+
 		await this.releaseRepo.update(id, {
 			status: ReleaseStatus.SUBMITTED,
 			releaseEndDate: null,
 		});
-
-		// await this.releaseDspDeliveryService.updateDeliveryStatus({
-		// 	releaseIds: [id],
-		// 	items: dto.code.map((dspCode) => ({
-		// 		dspCode,
-		// 		status: ReleaseDspStatus.PROCESSING,
-		// 	})),
-		// });
 
 		return this.releaseExecution3Service.newReleaseExecution({
 			release,

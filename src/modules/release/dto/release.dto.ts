@@ -20,6 +20,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
@@ -704,7 +705,58 @@ export class BulkSubmitReleaseDto {
 	@ApiProperty({ type: [String] })
 	@IsString({ each: true })
 	codes: string[];
+
+	@ApiPropertyOptional({
+		enum: ReleaseDspStatus,
+		default: ReleaseDspStatus.DISTRIBUTED,
+	})
+	@IsOptional()
+	@IsEnum(ReleaseDspStatus)
+	status?: ReleaseDspStatus = ReleaseDspStatus.DISTRIBUTED;
+
+	@ApiPropertyOptional({
+		enum: CiImportAction,
+		default: CiImportAction.KEEP_CURRENT_STATUS,
+	})
+	@IsOptional()
+	@IsEnum(CiImportAction)
+	ciImportAction?: CiImportAction = CiImportAction.SKIP_CI_IMPORT;
 }
+
+// export class BulkSubmitPreviewTargetDto {
+// 	@ApiProperty({ type: String, description: 'DSP code' })
+// 	@IsString()
+// 	code: string;
+
+// 	@ApiPropertyOptional({
+// 		enum: ReleaseDspStatus,
+// 		default: ReleaseDspStatus.DISTRIBUTED,
+// 	})
+// 	@IsOptional()
+// 	@IsEnum(ReleaseDspStatus)
+// 	status?: ReleaseDspStatus = ReleaseDspStatus.DISTRIBUTED;
+// }
+
+// export class BulkSubmitPreviewResultDto {
+// 	@ApiProperty({ type: String, format: 'uuid' })
+// 	@IsUUID('4')
+// 	releaseId: string;
+
+// 	@ApiPropertyOptional({
+// 		enum: CiImportAction,
+// 		default: CiImportAction.KEEP_CURRENT_STATUS,
+// 	})
+// 	@IsOptional()
+// 	@IsEnum(CiImportAction)
+// 	ciImportAction?: CiImportAction = CiImportAction.SKIP_CI_IMPORT;
+
+// 	@ApiProperty({ type: [BulkSubmitPreviewTargetDto] })
+// 	@IsArray()
+// 	@ArrayNotEmpty()
+// 	@ValidateNested({ each: true })
+// 	@Type(() => BulkSubmitPreviewTargetDto)
+// 	data: BulkSubmitPreviewTargetDto[];
+// }
 
 export class AutoSubmitUndistributedMusicReleaseDto {
 	// các dsp cần được xử lý

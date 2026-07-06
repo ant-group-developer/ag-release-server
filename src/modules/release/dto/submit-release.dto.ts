@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import { CiImportAction } from '../enum/ci-import-action.enum';
 
 export class SubmitReleaseDto {
 	@ApiProperty({
@@ -10,4 +11,12 @@ export class SubmitReleaseDto {
 	@IsArray()
 	@IsString({ each: true })
 	code: string[];
+
+	@ApiPropertyOptional({
+		enum: CiImportAction,
+		default: CiImportAction.KEEP_CURRENT_STATUS,
+	})
+	@IsOptional()
+	@IsEnum(CiImportAction)
+	ciImportAction?: CiImportAction = CiImportAction.FORCE_CI_IMPORT;
 }

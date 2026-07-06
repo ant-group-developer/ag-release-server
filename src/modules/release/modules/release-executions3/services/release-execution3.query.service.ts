@@ -22,9 +22,11 @@ export class ReleaseExecution3QueryService {
 	async getPendingExecutions({
 		releaseId,
 		excludeExecutionId,
+		dspCodes,
 	}: {
 		releaseId: string;
 		excludeExecutionId?: string;
+		dspCodes?: string[];
 	}) {
 		const pendingStatuses = [
 			ReleaseExecutionStatus.NEW,
@@ -40,6 +42,32 @@ export class ReleaseExecution3QueryService {
 			.andWhere('execution.status IN (:...statuses)', {
 				statuses: pendingStatuses,
 			});
+
+		const normalizedDspCodes = [
+			...new Set(
+				(dspCodes ?? [])
+					.map((code) => code?.trim().toUpperCase())
+					.filter(Boolean),
+			),
+		];
+
+		if (normalizedDspCodes.length) {
+			qb.andWhere(
+				`
+				EXISTS (
+					SELECT 1
+					FROM jsonb_array_elements_text(
+						COALESCE(
+							execution.metadata -> 'input' -> 'dspCodes',
+							'[]'::jsonb
+						)
+					) AS pending_dsp("code")
+					WHERE upper(trim(pending_dsp."code")) IN (:...dspCodes)
+				)
+				`,
+				{ dspCodes: normalizedDspCodes },
+			);
+		}
 
 		if (excludeExecutionId) {
 			const excludeExecution = await this.executionRepo.findOne({

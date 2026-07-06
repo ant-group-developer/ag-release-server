@@ -1133,6 +1133,9 @@ export class ReleaseQueryService {
 				'videoContributors.artistRole',
 				'videoContributorRole',
 			)
+
+			.leftJoinAndSelect('release.ciData', 'releaseCiData')
+
 			.where('release.id = :releaseId', { releaseId })
 			.getOne();
 

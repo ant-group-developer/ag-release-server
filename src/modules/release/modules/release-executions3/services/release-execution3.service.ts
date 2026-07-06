@@ -13,6 +13,7 @@ import {
 } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { EntityManager, In, Repository } from 'typeorm';
+import { ReleaseCiDataStatus } from '../../release-ci-data/entities/release-ci-data.entity';
 import {
 	QueryGetListReleaseExecution3Dto,
 	ReleaseExecutionPageDto,
@@ -96,10 +97,11 @@ export class ReleaseExecution3Service {
 			throw new Error('Only execution with NEW status can be started');
 		}
 
-		// cancel job cũ
+		// cancel job cũ nếu trùng ít nhất 1 dsp
 		await this.cancelPendingExecutions({
 			releaseId: execution.metadata.input.releaseSnapshot.id,
 			excludeExecutionId: id,
+			dspCodes: execution.metadata.input.dspCodes,
 		});
 
 		execution.status = ReleaseExecutionStatus.PROCESSING;
@@ -149,7 +151,7 @@ export class ReleaseExecution3Service {
 	}
 
 	private async parseMetadata(execution: ReleaseExecution3): Promise<void> {
-		const { dspCodes } = execution.metadata.input;
+		const { dspCodes, releaseSnapshot } = execution.metadata.input;
 
 		if (!dspCodes?.length) {
 			return;
@@ -190,6 +192,11 @@ export class ReleaseExecution3Service {
 				ci: ciDealDsps,
 				state51: state51Dsps,
 				primaryDsp: null,
+				isSkipImport:
+					releaseSnapshot.ciData?.status ===
+					ReleaseCiDataStatus.EXISTS_ON_CI
+						? true
+						: false,
 			},
 		};
 
@@ -500,6 +507,7 @@ export class ReleaseExecution3Service {
 	async cancelPendingExecutions(input: {
 		releaseId: string;
 		excludeExecutionId?: string;
+		dspCodes?: string[];
 	}) {
 		const pendingExecutions =
 			await this.queryService.getPendingExecutions(input);
