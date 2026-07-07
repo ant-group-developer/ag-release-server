@@ -599,10 +599,9 @@ export class DspAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<DspTopTrackItem>> {
 		const page = dto.page ?? 1;
-		const limit = dto.limit;
-		const skip = dto.skip;
-		const sortCol =
-			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const sortByRevenue = dto.sortBy === 'revenue';
+		// sort on numeric column, cast to string only in SELECT
+		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -623,9 +622,7 @@ export class DspAnalyticsService {
 			: '';
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const tenantFilter = isSystem
-			? ''
-			: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = isSystem ? '' : 'AND t.tenant_id = {tenantId:String}';
 		if (!isSystem) baseParams.tenantId = tenantId;
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
@@ -634,6 +631,10 @@ export class DspAnalyticsService {
 
 		const validUpcFilter =
 			"(t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
+
+		const useTopN = dto.topN != null;
+		const topNLimit = dto.topN ?? dto.limit;
+		const topNSkip = useTopN ? 0 : dto.skip;
 
 		const countSql = `
       SELECT uniq(t.isrc) AS total
@@ -668,6 +669,7 @@ export class DspAnalyticsService {
         t.cover_300 AS cover_300,
         t.cover_original AS cover_original,
         coalesce(tr.total_views, 0) AS total_views,
+        coalesce(sa.total_revenue_usd, 0) AS total_revenue_usd_raw,
         toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
@@ -685,14 +687,11 @@ export class DspAnalyticsService {
       WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
         AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
       ORDER BY ${sortCol} DESC
-      LIMIT ${limit} OFFSET ${skip}
+      LIMIT ${topNLimit} OFFSET ${topNSkip}
     `;
 
 		const [countRows, dataRows] = await Promise.all([
-			this.clickHouseService.query<{ total: string }>(
-				countSql,
-				baseParams,
-			),
+			this.clickHouseService.query<{ total: string }>(countSql, baseParams),
 			this.clickHouseService.query<{
 				isrc: string;
 				track_title: string;
@@ -711,8 +710,74 @@ export class DspAnalyticsService {
 		]);
 
 		const totalItems = Number(countRows[0]?.total ?? 0);
+
+		if (useTopN && dto.includeOther && dataRows.length > 0) {
+			const totalsSql = `
+        SELECT sum(coalesce(tr.total_views, 0)) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+        FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
+        LEFT JOIN (
+          SELECT isrc, sum(total_quantity) AS total_views
+          FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+          WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
+          GROUP BY isrc
+        ) tr ON t.isrc = tr.isrc
+        LEFT JOIN (
+          SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+          FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+          WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
+          GROUP BY isrc
+        ) sa ON t.isrc = sa.isrc
+        WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+      `;
+			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, baseParams))[0];
+			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
+			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
+			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
+			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const otherViews = Math.max(0, grandTotalViews - topViews);
+
+			const items: DspTopTrackItem[] = dataRows.map((row, i) => ({
+				rank: i + 1,
+				isrc: row.isrc,
+				title: row.track_title || '',
+				version: row.track_version || null,
+				artistName: row.artist_name || '',
+				releaseId: row.release_id || '',
+				releaseTitle: row.release_title || '',
+				totalViews: Number(row.total_views),
+				totalRevenueUsd: row.total_revenue_usd || '0',
+				release: {
+					coverArtThumbnails: {
+						'75x75': row.cover_75 || null,
+						'100x100': row.cover_100 || null,
+						'160x160': row.cover_160 || null,
+						'300x300': row.cover_300 || null,
+						original: row.cover_original || null,
+					},
+				},
+			}));
+			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+				items.push({
+					rank: items.length + 1,
+					isrc: 'other',
+					title: 'Other',
+					version: null,
+					artistName: '',
+					releaseId: '',
+					releaseTitle: '',
+					totalViews: otherViews,
+					totalRevenueUsd: otherRevExact,
+					release: { coverArtThumbnails: { '75x75': null, '100x100': null, '160x160': null, '300x300': null, original: null } },
+				});
+			}
+			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+		}
+
+		const rankOffset = useTopN ? 0 : dto.skip;
 		const items: DspTopTrackItem[] = dataRows.map((row, i) => ({
-			rank: skip + i + 1,
+			rank: rankOffset + i + 1,
 			isrc: row.isrc,
 			title: row.track_title || '',
 			version: row.track_version || null,
@@ -732,10 +797,7 @@ export class DspAnalyticsService {
 			},
 		}));
 
-		return new PageDto({
-			items,
-			metadata: { page, pageSize: limit, totalItems },
-		});
+		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
 	}
 
 	// ─────────────────────────────────────────────────────
@@ -757,10 +819,8 @@ export class DspAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<DspTopReleaseItem>> {
 		const page = dto.page ?? 1;
-		const limit = dto.limit;
-		const skip = dto.skip;
-		const sortCol =
-			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const sortByRevenue = dto.sortBy === 'revenue';
+		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -781,9 +841,7 @@ export class DspAnalyticsService {
 			: '';
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const tenantFilter = isSystem
-			? ''
-			: 'AND t.tenant_id = {tenantId:String}';
+		const tenantFilter = isSystem ? '' : 'AND t.tenant_id = {tenantId:String}';
 		if (!isSystem) baseParams.tenantId = tenantId;
 		const releaseTypeFilter = dto.releaseType
 			? 'AND t.release_type = {releaseType:String}'
@@ -792,6 +850,10 @@ export class DspAnalyticsService {
 
 		const validUpcFilter =
 			"(t.release_type = 'video' OR match(replaceRegexpOne(t.release_upc, '^0+', ''), '^[0-9]{10,14}$'))";
+
+		const useTopN = dto.topN != null;
+		const topNLimit = dto.topN ?? dto.limit;
+		const topNSkip = useTopN ? 0 : dto.skip;
 
 		const countSql = `
       SELECT uniq(t.release_id) AS total
@@ -827,6 +889,7 @@ export class DspAnalyticsService {
         any(t.cover_original) AS cover_original,
         uniq(t.isrc) AS track_count,
         sum(coalesce(tr.total_views, 0)) AS total_views,
+        sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
         toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
       LEFT JOIN (
@@ -846,14 +909,11 @@ export class DspAnalyticsService {
         AND t.release_id != ''
       GROUP BY t.release_id
       ORDER BY ${sortCol} DESC
-      LIMIT ${limit} OFFSET ${skip}
+      LIMIT ${topNLimit} OFFSET ${topNSkip}
     `;
 
 		const [countRows, dataRows] = await Promise.all([
-			this.clickHouseService.query<{ total: string }>(
-				countSql,
-				baseParams,
-			),
+			this.clickHouseService.query<{ total: string }>(countSql, baseParams),
 			this.clickHouseService.query<{
 				release_id: string;
 				release_title: string;
@@ -872,8 +932,75 @@ export class DspAnalyticsService {
 		]);
 
 		const totalItems = Number(countRows[0]?.total ?? 0);
+
+		if (useTopN && dto.includeOther && dataRows.length > 0) {
+			const totalsSql = `
+        SELECT sum(coalesce(tr.total_views, 0)) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+        FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
+        LEFT JOIN (
+          SELECT isrc, sum(total_quantity) AS total_views
+          FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+          WHERE ${dspSubquery} AND s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String}) ${importFilter}
+          GROUP BY isrc
+        ) tr ON t.isrc = tr.isrc
+        LEFT JOIN (
+          SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+          FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+          WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
+          GROUP BY isrc
+        ) sa ON t.isrc = sa.isrc
+        WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
+          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+          AND t.release_id != ''
+      `;
+			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, baseParams))[0];
+			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
+			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
+			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
+			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const otherViews = Math.max(0, grandTotalViews - topViews);
+
+			const items: DspTopReleaseItem[] = dataRows.map((row, i) => ({
+				rank: i + 1,
+				releaseId: row.release_id,
+				title: row.release_title || '',
+				upc: row.release_upc || null,
+				labelId: row.label_id || null,
+				labelName: row.label_name || null,
+				trackCount: Number(row.track_count),
+				totalViews: Number(row.total_views),
+				totalRevenueUsd: row.total_revenue_usd || '0',
+				release: {
+					coverArtThumbnails: {
+						'75x75': row.cover_75 || null,
+						'100x100': row.cover_100 || null,
+						'160x160': row.cover_160 || null,
+						'300x300': row.cover_300 || null,
+						original: row.cover_original || null,
+					},
+				},
+			}));
+			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+				items.push({
+					rank: items.length + 1,
+					releaseId: 'other',
+					title: 'Other',
+					upc: null,
+					labelId: null,
+					labelName: null,
+					trackCount: 0,
+					totalViews: otherViews,
+					totalRevenueUsd: otherRevExact,
+					release: { coverArtThumbnails: { '75x75': null, '100x100': null, '160x160': null, '300x300': null, original: null } },
+				});
+			}
+			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+		}
+
+		const rankOffset = useTopN ? 0 : dto.skip;
 		const items: DspTopReleaseItem[] = dataRows.map((row, i) => ({
-			rank: skip + i + 1,
+			rank: rankOffset + i + 1,
 			releaseId: row.release_id,
 			title: row.release_title || '',
 			upc: row.release_upc || null,
@@ -893,9 +1020,6 @@ export class DspAnalyticsService {
 			},
 		}));
 
-		return new PageDto({
-			items,
-			metadata: { page, pageSize: limit, totalItems },
-		});
+		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
 	}
 }
