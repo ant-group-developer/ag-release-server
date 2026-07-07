@@ -1,9 +1,4 @@
-import {
-	Column,
-	Entity,
-	JoinColumn,
-	ManyToOne,
-} from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseUserTrackedUUIDEntity } from '../../../common/entities/user-tracked.entity';
 import { Tenant } from '../../tenant/tenant.entity';
 
@@ -31,7 +26,11 @@ export enum DomainSetupMode {
 	comment: 'Custom domain của từng tenant',
 })
 export class TenantDomain extends BaseUserTrackedUUIDEntity {
-	@Column({ length: 253, unique: true, comment: 'Domain name, vd: release.betamusic.net' })
+	@Column({
+		length: 253,
+		unique: true,
+		comment: 'Domain name, vd: release.betamusic.net',
+	})
 	domain: string;
 
 	@Column({ type: 'uuid', unique: true, comment: '1 tenant = 1 domain (v1)' })
@@ -55,7 +54,12 @@ export class TenantDomain extends BaseUserTrackedUUIDEntity {
 	})
 	setupMode: DomainSetupMode;
 
-	@Column({ type: 'varchar', length: 255, nullable: true, comment: 'Cloudflare SaaS custom hostname ID' })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'Cloudflare SaaS custom hostname ID',
+	})
 	cfCustomHostnameId: string | null;
 
 	@Column({
@@ -65,10 +69,21 @@ export class TenantDomain extends BaseUserTrackedUUIDEntity {
 	})
 	sslStatus: SslStatus;
 
-	@Column({ type: 'varchar', length: 255, nullable: true, comment: 'Zone ID từ CF OAuth của tenant (dùng cho cloudflare_auto mode)' })
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment:
+			'Zone ID từ CF OAuth của tenant (dùng cho cloudflare_auto mode)',
+	})
 	cfTenantZoneId: string | null;
 
-	@Column({ type: 'varchar', length: 512, nullable: true, comment: 'Ownership verification token từ Cloudflare SaaS' })
+	@Column({
+		type: 'varchar',
+		length: 512,
+		nullable: true,
+		comment: 'Ownership verification token từ Cloudflare SaaS',
+	})
 	verificationToken: string | null;
 
 	@Column({ type: 'timestamp', nullable: true })
@@ -80,6 +95,10 @@ export class TenantDomain extends BaseUserTrackedUUIDEntity {
 	@Column({ type: 'timestamp', nullable: true })
 	lastCheckedAt: Date | null;
 
-	@Column({ type: 'jsonb', nullable: true, comment: 'Raw response từ Cloudflare API' })
+	@Column({
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Raw response từ Cloudflare API',
+	})
 	lastCheckResult: Record<string, any> | null;
 }

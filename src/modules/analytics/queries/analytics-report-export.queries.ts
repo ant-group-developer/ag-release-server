@@ -1,11 +1,11 @@
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 
 export function getRawDetailsPageQuery(
-  resolvedDspName: string,
-  commonJoinsSql: string,
-  whereSql: string,
+	resolvedDspName: string,
+	commonJoinsSql: string,
+	whereSql: string,
 ): string {
-  return `
+	return `
     SELECT
       formatDateTime(s.period, '%Y-%m') AS date,
       formatDateTime(s.period, '%Y-%m-01') AS start_date,
@@ -33,7 +33,7 @@ export function getRawDetailsPageQuery(
 }
 
 export function getTrackMetadataQuery(): string {
-  return `
+	return `
     SELECT
       t.isrc AS isrc,
       COALESCE(NULLIF(ten.title, ''), ten.name, '') AS workspace_name,
@@ -56,7 +56,7 @@ export function getTrackMetadataQuery(): string {
 }
 
 export function getTenantNamesQuery(): string {
-  return `
+	return `
     SELECT
       id::text AS id,
       COALESCE(NULLIF(title, ''), name, id::text) AS tenant_name
@@ -66,7 +66,7 @@ export function getTenantNamesQuery(): string {
 }
 
 export function getReleaseMetadataByUpcQuery(): string {
-  return `
+	return `
     SELECT
       r.upc AS upc,
       COALESCE(NULLIF(ten.title, ''), ten.name, '') AS workspace_name,
@@ -88,10 +88,10 @@ export function getReleaseMetadataByUpcQuery(): string {
 }
 
 export function getUniqueIdentifiersQuery(
-  commonJoinsSql: string,
-  whereSql: string,
+	commonJoinsSql: string,
+	whereSql: string,
 ): string {
-  return `
+	return `
     SELECT
       s.isrc AS isrc,
       any(t.tenant_id) AS tenant_id

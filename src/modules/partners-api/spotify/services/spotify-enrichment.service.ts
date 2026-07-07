@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
-import { SpotifyService } from './spotify.service';
 import { EnrichedMetadata } from './metadata-enrichment.service';
+import { SpotifyService } from './spotify.service';
 
 const DEFAULT_MAX_RATE_LIMIT_WAIT_MS = 30_000;
 const DEFAULT_MAX_RETRY_DELAY_MS = 30_000;
@@ -18,14 +18,13 @@ export class SpotifyEnrichmentService {
 
 		// Step 1: Search track by ISRC
 		const searchRes = await this.spotifyService.enqueue(() =>
-			this.requestWithRetry(() => axios.get(
-				'https://api.spotify.com/v1/search',
-				{
+			this.requestWithRetry(() =>
+				axios.get('https://api.spotify.com/v1/search', {
 					params: { type: 'track', q: `isrc:${isrc}` },
 					headers: { Authorization: `Bearer ${token}` },
 					timeout: 15000,
-				},
-			))
+				}),
+			),
 		);
 
 		const items = searchRes.data?.tracks?.items;
@@ -40,13 +39,15 @@ export class SpotifyEnrichmentService {
 		if (album?.id) {
 			try {
 				const albumRes = await this.spotifyService.enqueue(() =>
-					this.requestWithRetry(() => axios.get(
-						`https://api.spotify.com/v1/albums/${album.id}`,
-						{
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
-					))
+					this.requestWithRetry(() =>
+						axios.get(
+							`https://api.spotify.com/v1/albums/${album.id}`,
+							{
+								headers: { Authorization: `Bearer ${token}` },
+								timeout: 15000,
+							},
+						),
+					),
 				);
 				albumDetail = albumRes.data;
 			} catch (err) {
@@ -71,14 +72,13 @@ export class SpotifyEnrichmentService {
 
 				for (const chunk of chunks) {
 					const tracksRes = await this.spotifyService.enqueue(() =>
-						this.requestWithRetry(() => axios.get(
-							'https://api.spotify.com/v1/tracks',
-							{
+						this.requestWithRetry(() =>
+							axios.get('https://api.spotify.com/v1/tracks', {
 								params: { ids: chunk.join(',') },
 								headers: { Authorization: `Bearer ${token}` },
 								timeout: 15000,
-							},
-						))
+							}),
+						),
 					);
 					if (tracksRes.data?.tracks) {
 						tracksWithIsrc.push(...tracksRes.data.tracks);
@@ -110,12 +110,16 @@ export class SpotifyEnrichmentService {
 			upc,
 			albumTitle: albumDetail?.name || album?.name || '',
 			albumSpotifyId: album?.id,
-			albumSpotifyUrl: albumDetail?.external_urls?.spotify || album?.external_urls?.spotify,
+			albumSpotifyUrl:
+				albumDetail?.external_urls?.spotify ||
+				album?.external_urls?.spotify,
 			releaseDate: albumDetail?.release_date || album?.release_date,
 			albumType: albumDetail?.album_type || album?.album_type,
 			totalTracks: albumDetail?.total_tracks || album?.total_tracks,
 			albumCoverUrl: (albumDetail?.images || album?.images)?.[0]?.url,
-			albumCoverImages: this.buildSpotifyCoverImages(albumDetail?.images || album?.images),
+			albumCoverImages: this.buildSpotifyCoverImages(
+				albumDetail?.images || album?.images,
+			),
 
 			// Label & Copyright
 			labelName: albumDetail?.label,
@@ -137,19 +141,20 @@ export class SpotifyEnrichmentService {
 		};
 	}
 
-	async enrichFromSpotifyByUpc(upc: string): Promise<EnrichedMetadata | null> {
+	async enrichFromSpotifyByUpc(
+		upc: string,
+	): Promise<EnrichedMetadata | null> {
 		const token = await this.spotifyService.getCacheToken();
 
 		// Step 1: Search album by UPC
 		const searchRes = await this.spotifyService.enqueue(() =>
-			this.requestWithRetry(() => axios.get(
-				'https://api.spotify.com/v1/search',
-				{
+			this.requestWithRetry(() =>
+				axios.get('https://api.spotify.com/v1/search', {
 					params: { type: 'album', q: `upc:${upc}` },
 					headers: { Authorization: `Bearer ${token}` },
 					timeout: 15000,
-				},
-			))
+				}),
+			),
 		);
 
 		const items = searchRes.data?.albums?.items;
@@ -162,13 +167,15 @@ export class SpotifyEnrichmentService {
 		if (album?.id) {
 			try {
 				const albumRes = await this.spotifyService.enqueue(() =>
-					this.requestWithRetry(() => axios.get(
-						`https://api.spotify.com/v1/albums/${album.id}`,
-						{
-							headers: { Authorization: `Bearer ${token}` },
-							timeout: 15000,
-						},
-					))
+					this.requestWithRetry(() =>
+						axios.get(
+							`https://api.spotify.com/v1/albums/${album.id}`,
+							{
+								headers: { Authorization: `Bearer ${token}` },
+								timeout: 15000,
+							},
+						),
+					),
 				);
 				albumDetail = albumRes.data;
 			} catch (err) {
@@ -196,14 +203,13 @@ export class SpotifyEnrichmentService {
 
 				for (const chunk of chunks) {
 					const tracksRes = await this.spotifyService.enqueue(() =>
-						this.requestWithRetry(() => axios.get(
-							'https://api.spotify.com/v1/tracks',
-							{
+						this.requestWithRetry(() =>
+							axios.get('https://api.spotify.com/v1/tracks', {
 								params: { ids: chunk.join(',') },
 								headers: { Authorization: `Bearer ${token}` },
 								timeout: 15000,
-							},
-						))
+							}),
+						),
 					);
 					if (tracksRes.data?.tracks) {
 						tracksWithIsrc.push(...tracksRes.data.tracks);
@@ -237,7 +243,9 @@ export class SpotifyEnrichmentService {
 			upc,
 			albumTitle: albumDetail.name || '',
 			albumSpotifyId: albumDetail.id,
-			albumSpotifyUrl: albumDetail.external_urls?.spotify || album.external_urls?.spotify,
+			albumSpotifyUrl:
+				albumDetail.external_urls?.spotify ||
+				album.external_urls?.spotify,
 			releaseDate: albumDetail.release_date,
 			albumType: albumDetail.album_type,
 			totalTracks: albumDetail.total_tracks,
@@ -264,14 +272,19 @@ export class SpotifyEnrichmentService {
 		};
 	}
 
-	buildSpotifyCoverImages(images?: any[]): EnrichedMetadata['albumCoverImages'] {
+	buildSpotifyCoverImages(
+		images?: any[],
+	): EnrichedMetadata['albumCoverImages'] {
 		return (images || [])
 			.filter((image) => image?.url)
 			.map((image) => ({
 				url: image.url,
 				width: image.width ?? null,
 				height: image.height ?? null,
-				size: image.width && image.height ? `${image.width}x${image.height}` : null,
+				size:
+					image.width && image.height
+						? `${image.width}x${image.height}`
+						: null,
 				source: 'spotify' as const,
 			}));
 	}
@@ -282,9 +295,15 @@ export class SpotifyEnrichmentService {
 		delayMs = 1000,
 	): Promise<T> {
 		if (Date.now() < this.spotifyBlockedUntil) {
-			const remainingTime = Math.ceil((this.spotifyBlockedUntil - Date.now()) / 1000);
-			this.logger.warn(`[Spotify API] Circuit open. Spotify API is rate-limited. Skipping request. Try again in ${remainingTime}s.`);
-			throw new Error(`Spotify rate limit active. Blocked for another ${remainingTime}s.`);
+			const remainingTime = Math.ceil(
+				(this.spotifyBlockedUntil - Date.now()) / 1000,
+			);
+			this.logger.warn(
+				`[Spotify API] Circuit open. Spotify API is rate-limited. Skipping request. Try again in ${remainingTime}s.`,
+			);
+			throw new Error(
+				`Spotify rate limit active. Blocked for another ${remainingTime}s.`,
+			);
 		}
 
 		try {
@@ -292,10 +311,15 @@ export class SpotifyEnrichmentService {
 		} catch (err) {
 			const axiosError = err as AxiosError;
 			if (axiosError.response?.status === 429) {
-				const retryAfterHeader = axiosError.response.headers?.['retry-after'];
+				const retryAfterHeader =
+					axiosError.response.headers?.['retry-after'];
 				const retryAfterMs = this.parseRetryAfterMs(retryAfterHeader);
-				const maxWaitMs = this.getPositiveEnvMs('SPOTIFY_MAX_RATE_LIMIT_WAIT_MS', DEFAULT_MAX_RATE_LIMIT_WAIT_MS);
-				const requestedWaitMs = retryAfterMs !== null ? retryAfterMs + 500 : delayMs;
+				const maxWaitMs = this.getPositiveEnvMs(
+					'SPOTIFY_MAX_RATE_LIMIT_WAIT_MS',
+					DEFAULT_MAX_RATE_LIMIT_WAIT_MS,
+				);
+				const requestedWaitMs =
+					retryAfterMs !== null ? retryAfterMs + 500 : delayMs;
 
 				// If the required wait is longer than our max wait tolerance (e.g. 30s),
 				// we trip the circuit breaker so subsequent calls fail fast immediately.
@@ -315,15 +339,31 @@ export class SpotifyEnrichmentService {
 					`[Spotify API] 429 Too Many Requests. Retrying after ${waitTime}ms (retry-after=${retryAfterHeader ?? 'n/a'}, remaining retries: ${retries})...`,
 				);
 				await new Promise((resolve) => setTimeout(resolve, waitTime));
-				return this.requestWithRetry(fn, retries - 1, Math.min(delayMs * 2, maxWaitMs));
+				return this.requestWithRetry(
+					fn,
+					retries - 1,
+					Math.min(delayMs * 2, maxWaitMs),
+				);
 			}
 
-			if (retries > 0 && (!axiosError.response || axiosError.response.status >= 500)) {
-				const maxRetryDelayMs = this.getPositiveEnvMs('SPOTIFY_MAX_RETRY_DELAY_MS', DEFAULT_MAX_RETRY_DELAY_MS);
+			if (
+				retries > 0 &&
+				(!axiosError.response || axiosError.response.status >= 500)
+			) {
+				const maxRetryDelayMs = this.getPositiveEnvMs(
+					'SPOTIFY_MAX_RETRY_DELAY_MS',
+					DEFAULT_MAX_RETRY_DELAY_MS,
+				);
 				const waitTime = Math.min(delayMs, maxRetryDelayMs);
-				this.logger.warn(`[Spotify API] Request failed (${axiosError.response?.status || 'network error'}). Retrying in ${waitTime}ms...`);
+				this.logger.warn(
+					`[Spotify API] Request failed (${axiosError.response?.status || 'network error'}). Retrying in ${waitTime}ms...`,
+				);
 				await new Promise((resolve) => setTimeout(resolve, waitTime));
-				return this.requestWithRetry(fn, retries - 1, Math.min(delayMs * 2, maxRetryDelayMs));
+				return this.requestWithRetry(
+					fn,
+					retries - 1,
+					Math.min(delayMs * 2, maxRetryDelayMs),
+				);
 			}
 
 			throw err;

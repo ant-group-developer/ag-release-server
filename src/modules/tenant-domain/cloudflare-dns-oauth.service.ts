@@ -72,7 +72,10 @@ export class CloudflareDnsOAuthService {
 			} catch {
 				// body không phải JSON — bỏ qua, dùng description mặc định
 			}
-			throw new CfOAuthError('token_exchange_failed', description ?? 'Failed to exchange Cloudflare OAuth code');
+			throw new CfOAuthError(
+				'token_exchange_failed',
+				description ?? 'Failed to exchange Cloudflare OAuth code',
+			);
 		}
 
 		return res.json();
@@ -95,7 +98,10 @@ export class CloudflareDnsOAuthService {
 
 		const json = await res.json();
 		if (!json.success || !json.result?.length) {
-			this.logger.error(`CF getZoneId: no zone found for ${rootDomain}`, json.errors);
+			this.logger.error(
+				`CF getZoneId: no zone found for ${rootDomain}`,
+				json.errors,
+			);
 			throw new CfOAuthError(
 				'zone_not_found',
 				`No Cloudflare zone found for "${rootDomain}". The authorized Cloudflare account must manage this domain.`,
@@ -145,15 +151,24 @@ export class CloudflareDnsOAuthService {
 			}),
 		]);
 
-		const [cnameJson, txtJson] = await Promise.all([cnameRes.json(), txtRes.json()]);
+		const [cnameJson, txtJson] = await Promise.all([
+			cnameRes.json(),
+			txtRes.json(),
+		]);
 
 		if (!cnameJson.success) {
-			this.logger.error(`CF addDnsRecords: CNAME failed for ${opts.domain}`, cnameJson.errors);
+			this.logger.error(
+				`CF addDnsRecords: CNAME failed for ${opts.domain}`,
+				cnameJson.errors,
+			);
 			throw this.toDnsError(cnameJson.errors, 'CNAME', opts.domain);
 		}
 
 		if (!txtJson.success) {
-			this.logger.error(`CF addDnsRecords: TXT failed for ${opts.txtName}`, txtJson.errors);
+			this.logger.error(
+				`CF addDnsRecords: TXT failed for ${opts.txtName}`,
+				txtJson.errors,
+			);
 			throw this.toDnsError(txtJson.errors, 'TXT', opts.txtName);
 		}
 	}
@@ -168,12 +183,19 @@ export class CloudflareDnsOAuthService {
 		host: string,
 	): CfOAuthError {
 		const first = errors?.[0];
-		if (first?.code === 81053 || first?.code === 81057 || first?.code === 81058) {
+		if (
+			first?.code === 81053 ||
+			first?.code === 81057 ||
+			first?.code === 81058
+		) {
 			return new CfOAuthError(
 				'record_exists',
 				`A ${recordType} record for "${host}" already exists in this zone. Please review the existing DNS records.`,
 			);
 		}
-		return new CfOAuthError('dns_add_failed', first?.message ?? `Failed to add ${recordType} record`);
+		return new CfOAuthError(
+			'dns_add_failed',
+			first?.message ?? `Failed to add ${recordType} record`,
+		);
 	}
 }

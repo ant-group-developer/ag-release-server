@@ -6,8 +6,8 @@ import { CronJob } from 'cron';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
-import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
 import { DspReportService } from '../dsp-report/services/dsp-report.service';
+import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
 
 @Injectable()
 export class ScheduleService implements OnModuleInit {

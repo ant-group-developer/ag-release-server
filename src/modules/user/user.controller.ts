@@ -42,7 +42,10 @@ import { User } from './entities/user.entity';
 import { TenantUserType } from './enum/user.enum';
 import { TenantUserService } from './services/tenant-user.service';
 import { UserService } from './services/user.service';
-import { checkIsSystemAdmin, checkIsSystemTenant } from './utils/user-type.util';
+import {
+	checkIsSystemAdmin,
+	checkIsSystemTenant,
+} from './utils/user-type.util';
 
 @ApiTags('Users')
 @Controller('users')
@@ -270,9 +273,7 @@ export class UserController {
 		// Field-level permission: strip fields user cannot change (system admins bypass)
 		if (!isSysAdmin) {
 			const userPerms = new Set<string>(
-				Array.isArray(req.user!.permission)
-					? req.user!.permission
-					: [],
+				Array.isArray(req.user!.permission) ? req.user!.permission : [],
 			);
 
 			if (!userPerms.has(Permission.USER.UPDATE_STATUS)) {

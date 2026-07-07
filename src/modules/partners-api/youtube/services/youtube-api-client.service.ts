@@ -144,7 +144,9 @@ export class YoutubeApiClientService {
 			}
 
 			try {
-				const res = await this.requestWithRetry(() => fn(acquired.plaintextKey));
+				const res = await this.requestWithRetry(() =>
+					fn(acquired.plaintextKey),
+				);
 				// Success -> ghi nhan consume
 				this.pool.recordUsage(acquired.id, estimatedCost);
 				return res;
@@ -153,7 +155,8 @@ export class YoutubeApiClientService {
 				const status = axiosErr.response?.status;
 				const errData = axiosErr.response?.data as any;
 				const reason: string | undefined =
-					errData?.error?.errors?.[0]?.reason ?? errData?.error?.status;
+					errData?.error?.errors?.[0]?.reason ??
+					errData?.error?.status;
 
 				if (status === 403) {
 					if (
@@ -213,14 +216,19 @@ export class YoutubeApiClientService {
 			const status = axiosErr.response?.status;
 
 			if (status === 429 && retries > 0) {
-				const retryAfterHeader = axiosErr.response?.headers?.['retry-after'];
+				const retryAfterHeader =
+					axiosErr.response?.headers?.['retry-after'];
 				const retryAfterMs = this.parseRetryAfterMs(retryAfterHeader);
 				const waitTime = Math.min(retryAfterMs ?? delayMs, 30_000);
 				this.logger.warn(
 					`[YouTube API] 429 Too Many Requests. Retrying after ${waitTime}ms (retries=${retries})`,
 				);
 				await new Promise((r) => setTimeout(r, waitTime));
-				return this.requestWithRetry(fn, retries - 1, Math.min(delayMs * 2, 30_000));
+				return this.requestWithRetry(
+					fn,
+					retries - 1,
+					Math.min(delayMs * 2, 30_000),
+				);
 			}
 
 			if (retries > 0 && (!status || status >= 500)) {
@@ -228,7 +236,11 @@ export class YoutubeApiClientService {
 					`[YouTube API] Transient error (${status ?? 'network'}). Retrying in ${delayMs}ms...`,
 				);
 				await new Promise((r) => setTimeout(r, delayMs));
-				return this.requestWithRetry(fn, retries - 1, Math.min(delayMs * 2, 30_000));
+				return this.requestWithRetry(
+					fn,
+					retries - 1,
+					Math.min(delayMs * 2, 30_000),
+				);
 			}
 
 			throw err;

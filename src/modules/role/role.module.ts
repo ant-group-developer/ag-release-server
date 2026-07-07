@@ -17,4 +17,4 @@ import { RoleService } from './services/role.service';
 	providers: [RoleService, RoleQueryService],
 	exports: [RoleService, RoleQueryService],
 })
-export class RoleModule { }
+export class RoleModule {}

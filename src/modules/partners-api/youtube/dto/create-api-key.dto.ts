@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator';
+import {
+	IsInt,
+	IsOptional,
+	IsString,
+	Matches,
+	MaxLength,
+	Min,
+	MinLength,
+} from 'class-validator';
 import { GOOGLE_API_KEY_REGEX } from '../constants/youtube.constants';
 
 export class CreateYoutubeApiKeyDto {
@@ -13,7 +21,8 @@ export class CreateYoutubeApiKeyDto {
 	alias: string;
 
 	@ApiProperty({
-		description: 'Google/YouTube Data API v3 key (plaintext, se duoc encrypt truoc khi luu)',
+		description:
+			'Google/YouTube Data API v3 key (plaintext, se duoc encrypt truoc khi luu)',
 		example: 'AIzaSyAcqaXZiKrlZXKVLeZS6wHPSydHJztryHY',
 	})
 	@IsString()

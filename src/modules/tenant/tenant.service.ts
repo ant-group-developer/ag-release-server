@@ -222,7 +222,7 @@ export class TenantService {
 				!cat.name.toLowerCase().includes(keyword.toLowerCase())
 			)
 				return false;
-			if (type?.length && !type.includes(cat.type as any)) return false;
+			if (type?.length && !type.includes(cat.type)) return false;
 			return true;
 		});
 

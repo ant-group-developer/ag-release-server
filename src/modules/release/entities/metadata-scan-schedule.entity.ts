@@ -39,9 +39,12 @@ export class MetadataScanSchedule extends BaseUUIDEntity {
 	@Column({
 		name: 'is_imported_from_report',
 		type: 'boolean',
-		comment: 'true: quét release import từ report, false: quét release không import từ report',
+		nullable: true,
+		default: null,
+		comment:
+			'true: quét release import từ report, false: quét release không import từ report, null: quét cả 2',
 	})
-	isImportedFromReport: boolean;
+	isImportedFromReport: boolean | null;
 
 	@Column({
 		name: 'limit_count',

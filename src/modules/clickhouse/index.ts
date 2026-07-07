@@ -1,4 +1,4 @@
-export * from './clickhouse.service';
+export * from './clickhouse-migration.service';
 export * from './clickhouse.constants';
 export * from './clickhouse.module';
-export * from './clickhouse-migration.service';
+export * from './clickhouse.service';

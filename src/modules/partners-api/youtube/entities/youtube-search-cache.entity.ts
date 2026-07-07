@@ -1,12 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
-import {
-	Column,
-	Entity,
-	Index,
-	JoinColumn,
-	ManyToOne,
-} from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { YoutubeLookupKind, YoutubeMatchStatus } from '../enum/youtube.enum';
 
 @Entity('youtube_search_cache', {
@@ -65,7 +59,8 @@ export class YoutubeSearchCache extends BaseUUIDEntity {
 		type: 'uuid',
 		name: 'matched_channel_id',
 		nullable: true,
-		comment: 'UUID cua channels Postgres neu tim thay match, NULL neu chua co',
+		comment:
+			'UUID cua channels Postgres neu tim thay match, NULL neu chua co',
 	})
 	matchedChannelId: string | null;
 

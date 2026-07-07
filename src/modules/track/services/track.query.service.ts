@@ -386,7 +386,7 @@ export class TrackQueryService {
 		// 	});
 		// }
 
-		return track as ITrackDraft;
+		return track;
 	}
 
 	async validateDataUpdate({

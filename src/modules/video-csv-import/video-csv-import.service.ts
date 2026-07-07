@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { parse } from 'csv-parse/sync';
-import { Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
-import { Channel } from 'src/modules/channel/entities/channel.entity';
-import { Video } from 'src/modules/video/entities/video.entity';
-import { ReleaseReportImportService } from 'src/modules/release/services/release-report-import.service';
 import { ChangeLogEntry } from 'src/modules/partners-api/spotify/services/metadata-sync.service';
+import { ReleaseReportImportService } from 'src/modules/release/services/release-report-import.service';
+import { Video } from 'src/modules/video/entities/video.entity';
+import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { VideoCsvImportResult } from './dto/video-csv-import-result.dto';
 import { VideoCsvRow } from './types';
 
@@ -42,7 +42,7 @@ export class VideoCsvImportService {
 				trim: true,
 				relax_quotes: true,
 				bom: true,
-			}) as VideoCsvRow[];
+			});
 		} catch (err: any) {
 			this.logger.error(`CSV parse failed: ${err.message}`);
 			throw new Error(`Invalid CSV: ${err.message}`);
@@ -158,15 +158,16 @@ export class VideoCsvImportService {
 		}
 
 		// 2. Create new Release + Video via existing service (auto fallback tenant+label)
-		const release = await this.releaseReportImportService.importVideoRelease({
-			upc: `ISRC-${isrc}`,
-			title,
-			artistName: artistName || undefined,
-			tracks: [{ title, isrc }],
-			importSourceType: 'CSV',
-			importParserCode: 'video-csv-import',
-			importFileName: 'videoExports.csv',
-		});
+		const release =
+			await this.releaseReportImportService.importVideoRelease({
+				upc: `ISRC-${isrc}`,
+				title,
+				artistName: artistName || undefined,
+				tracks: [{ title, isrc }],
+				importSourceType: 'CSV',
+				importParserCode: 'video-csv-import',
+				importFileName: 'videoExports.csv',
+			});
 		result.createdVideoRelease++;
 
 		if (!channel) return;
@@ -185,7 +186,13 @@ export class VideoCsvImportService {
 		await this.videoRepo.update(newVideo.id, { channelId: channel.id });
 		result.channelLinked++;
 		changeLogs.push(
-			this.buildLogEntry(newVideo.id, release.id, isrc, channel.id, nowStr),
+			this.buildLogEntry(
+				newVideo.id,
+				release.id,
+				isrc,
+				channel.id,
+				nowStr,
+			),
 		);
 	}
 

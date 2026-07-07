@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { YoutubeApiKeyService } from './youtube-api-key.service';
-import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
+import { Cron } from '@nestjs/schedule';
 import { YOUTUBE_KEY_SAFETY_MARGIN_UNITS } from '../constants/youtube.constants';
+import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
+import { YoutubeApiKeyService } from './youtube-api-key.service';
 
 interface PooledKey {
 	id: string;
@@ -16,7 +16,9 @@ interface PooledKey {
 }
 
 export class NoAvailableYoutubeKeyError extends Error {
-	constructor(message = 'No YouTube API key available (all disabled/exhausted)') {
+	constructor(
+		message = 'No YouTube API key available (all disabled/exhausted)',
+	) {
 		super(message);
 		this.name = NoAvailableYoutubeKeyError.name;
 	}
@@ -63,7 +65,8 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 			const newMap = new Map<string, PooledKey>();
 			for (const row of rows) {
 				const existing = this.keys.get(row.id);
-				const plaintext = existing?.plaintextKey ?? this.keyService.decryptKey(row);
+				const plaintext =
+					existing?.plaintextKey ?? this.keyService.decryptKey(row);
 				// Uu tien counter DB neu > in-memory (co the co instance khac update)
 				const unitsFromDb = row.unitsConsumedToday;
 				const unitsInMem = existing?.unitsConsumedToday ?? 0;
@@ -89,12 +92,17 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 	 * Pick 1 key co du quota (>= estimatedCost + safety margin), least-used first.
 	 * Throw NoAvailableYoutubeKeyError neu khong con key nao.
 	 */
-	acquire(estimatedCost: number): { id: string; plaintextKey: string; alias: string } {
+	acquire(estimatedCost: number): {
+		id: string;
+		plaintextKey: string;
+		alias: string;
+	} {
 		const candidates: PooledKey[] = [];
 		for (const key of this.keys.values()) {
 			if (key.status !== YoutubeApiKeyStatus.ACTIVE) continue;
 			const remaining = key.dailyQuotaLimit - key.unitsConsumedToday;
-			if (remaining < estimatedCost + YOUTUBE_KEY_SAFETY_MARGIN_UNITS) continue;
+			if (remaining < estimatedCost + YOUTUBE_KEY_SAFETY_MARGIN_UNITS)
+				continue;
 			candidates.push(key);
 		}
 		if (candidates.length === 0) {
@@ -125,7 +133,9 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 				consecutiveErrorCount: 0,
 			})
 			.catch((err) => {
-				this.logger.warn(`Persist usage id=${id} failed: ${err.message}`);
+				this.logger.warn(
+					`Persist usage id=${id} failed: ${err.message}`,
+				);
 			});
 	}
 
@@ -149,7 +159,9 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 				lastError: key.lastError,
 			})
 			.catch((err) => {
-				this.logger.warn(`Persist exhausted id=${id} failed: ${err.message}`);
+				this.logger.warn(
+					`Persist exhausted id=${id} failed: ${err.message}`,
+				);
 			});
 	}
 
@@ -173,7 +185,9 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 				consecutiveErrorCount: key.consecutiveErrorCount,
 			})
 			.catch((err) => {
-				this.logger.warn(`Persist invalid id=${id} failed: ${err.message}`);
+				this.logger.warn(
+					`Persist invalid id=${id} failed: ${err.message}`,
+				);
 			});
 	}
 
@@ -187,14 +201,19 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 			status: k.status,
 			unitsConsumedToday: k.unitsConsumedToday,
 			dailyQuotaLimit: k.dailyQuotaLimit,
-			unitsRemaining: Math.max(0, k.dailyQuotaLimit - k.unitsConsumedToday),
+			unitsRemaining: Math.max(
+				0,
+				k.dailyQuotaLimit - k.unitsConsumedToday,
+			),
 		}));
 		const totalRemaining = items
 			.filter((i) => i.status === YoutubeApiKeyStatus.ACTIVE)
 			.reduce((s, i) => s + i.unitsRemaining, 0);
 		return {
 			totalKeys: items.length,
-			activeKeys: items.filter((i) => i.status === YoutubeApiKeyStatus.ACTIVE).length,
+			activeKeys: items.filter(
+				(i) => i.status === YoutubeApiKeyStatus.ACTIVE,
+			).length,
 			totalRemainingUnits: totalRemaining,
 			keys: items,
 		};
@@ -208,7 +227,9 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 		try {
 			this.logger.log('Running daily YouTube quota reset...');
 			const { affected } = await this.keyService.resetAllQuotaCounters();
-			this.logger.log(`Reset ${affected} YouTube API key(s) counter to 0`);
+			this.logger.log(
+				`Reset ${affected} YouTube API key(s) counter to 0`,
+			);
 			await this.reload();
 		} catch (err: any) {
 			this.logger.error(`Daily quota reset failed: ${err.message}`);

@@ -36,13 +36,19 @@ export class DeezerEnrichmentService {
 		const upc = albumDetail?.upc || '';
 
 		// Fetch ALL tracks (Deezer paginates at 25 per page)
-		const allTrackItems = albumDetail ? await this.fetchAllDeezerAlbumTracks(albumDetail) : [];
+		const allTrackItems = albumDetail
+			? await this.fetchAllDeezerAlbumTracks(albumDetail)
+			: [];
 
 		// Fetch full track details (with ISRC) in chunks
-		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
+		const tracksWithIsrc =
+			await this.fetchDeezerTrackDetails(allTrackItems);
 
 		// Extract genres from album detail
-		const genres = albumDetail?.genres?.data?.map((g: any) => g.name).filter(Boolean) || [];
+		const genres =
+			albumDetail?.genres?.data
+				?.map((g: any) => g.name)
+				.filter(Boolean) || [];
 
 		return {
 			source: 'deezer',
@@ -52,7 +58,9 @@ export class DeezerEnrichmentService {
 			trackTitle: trackData.title_short || trackData.title || '',
 			trackDeezerId: trackData.id?.toString(),
 			trackDeezerUrl: trackData.link,
-			trackDuration: trackData.duration ? trackData.duration * 1000 : undefined, // Deezer returns seconds
+			trackDuration: trackData.duration
+				? trackData.duration * 1000
+				: undefined, // Deezer returns seconds
 
 			// Artist
 			artistName: artist?.name || '',
@@ -69,7 +77,9 @@ export class DeezerEnrichmentService {
 			albumType: albumDetail?.record_type,
 			totalTracks: albumDetail?.nb_tracks,
 			albumCoverUrl: albumRef?.cover_big || albumRef?.cover_xl,
-			albumCoverImages: this.buildDeezerCoverImages(albumDetail || albumRef),
+			albumCoverImages: this.buildDeezerCoverImages(
+				albumDetail || albumRef,
+			),
 
 			// Label & Copyright
 			labelName: albumDetail?.label,
@@ -104,7 +114,8 @@ export class DeezerEnrichmentService {
 		const allTrackItems = await this.fetchAllDeezerAlbumTracks(albumDetail);
 
 		// Step 3: Fetch full track details (with ISRC) in chunks
-		const tracksWithIsrc = await this.fetchDeezerTrackDetails(allTrackItems);
+		const tracksWithIsrc =
+			await this.fetchDeezerTrackDetails(allTrackItems);
 
 		const primaryIsrc = tracksWithIsrc[0]?.isrc || '';
 
@@ -113,10 +124,15 @@ export class DeezerEnrichmentService {
 			isrc: primaryIsrc,
 
 			// Track
-			trackTitle: tracksWithIsrc[0]?.title_short || tracksWithIsrc[0]?.title || '',
+			trackTitle:
+				tracksWithIsrc[0]?.title_short ||
+				tracksWithIsrc[0]?.title ||
+				'',
 			trackDeezerId: tracksWithIsrc[0]?.id?.toString(),
 			trackDeezerUrl: tracksWithIsrc[0]?.link,
-			trackDuration: tracksWithIsrc[0]?.duration ? tracksWithIsrc[0]?.duration * 1000 : undefined,
+			trackDuration: tracksWithIsrc[0]?.duration
+				? tracksWithIsrc[0]?.duration * 1000
+				: undefined,
 
 			// Artist
 			artistName: artist?.name || '',
@@ -138,7 +154,10 @@ export class DeezerEnrichmentService {
 			// Label & Copyright
 			labelName: albumDetail.label,
 			copyrights: albumDetail.copyrights || undefined,
-			genres: albumDetail.genres?.data?.map((g: any) => g.name).filter(Boolean) || [],
+			genres:
+				albumDetail.genres?.data
+					?.map((g: any) => g.name)
+					.filter(Boolean) || [],
 
 			// Track list
 			tracks: tracksWithIsrc.map((t) => ({
@@ -192,7 +211,9 @@ export class DeezerEnrichmentService {
 				}
 				nextUrl = res.data?.next;
 			} catch (err) {
-				this.logger.warn(`Deezer album tracks pagination failed: ${err.message}`);
+				this.logger.warn(
+					`Deezer album tracks pagination failed: ${err.message}`,
+				);
 				break;
 			}
 		}
@@ -212,12 +233,17 @@ export class DeezerEnrichmentService {
 			const chunk = trackItems.slice(i, i + chunkSize);
 			const promises = chunk.map(async (t: any) => {
 				try {
-					const tRes = await axios.get(`https://api.deezer.com/track/${t.id}`, { timeout: 15000 });
+					const tRes = await axios.get(
+						`https://api.deezer.com/track/${t.id}`,
+						{ timeout: 15000 },
+					);
 					if (tRes.data && !tRes.data.error) {
 						tracksWithIsrc.push(tRes.data);
 					}
 				} catch (err) {
-					this.logger.warn(`Deezer track detail fetch failed for track ${t.id}: ${err.message}`);
+					this.logger.warn(
+						`Deezer track detail fetch failed for track ${t.id}: ${err.message}`,
+					);
 				}
 			});
 			await Promise.all(promises);
@@ -228,7 +254,9 @@ export class DeezerEnrichmentService {
 			}
 		}
 
-		tracksWithIsrc.sort((a, b) => (a.track_position || 0) - (b.track_position || 0));
+		tracksWithIsrc.sort(
+			(a, b) => (a.track_position || 0) - (b.track_position || 0),
+		);
 		return tracksWithIsrc;
 	}
 }

@@ -27,7 +27,8 @@ export const normalizeDomain = (value?: string | null): string => {
 };
 
 export const getPrimaryDomains = (): string[] => {
-	const source = process.env.PRIMARY_DOMAINS || process.env.CORS_ORIGINS || '';
+	const source =
+		process.env.PRIMARY_DOMAINS || process.env.CORS_ORIGINS || '';
 	return Array.from(new Set(splitDomainList(source)));
 };
 

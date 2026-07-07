@@ -1,5 +1,5 @@
-import { BaseParser } from '../base.parser';
 import { FactDspRow } from '../../interfaces';
+import { BaseParser } from '../base.parser';
 
 /**
  * Boomplay Parser
@@ -14,72 +14,80 @@ import { FactDspRow } from '../../interfaces';
  *          playlist, device
  */
 export class BoomplayParser extends BaseParser {
-  constructor() {
-    super('boomplay');
-  }
+	constructor() {
+		super('boomplay');
+	}
 
-  /**
-   * Override parseFile to aggregate individual play events.
-   */
-  async parseFile(filePath: string, batchId: string): Promise<FactDspRow[]> {
-    const rawRows = await super.parseFile(filePath, batchId);
+	/**
+	 * Override parseFile to aggregate individual play events.
+	 */
+	async parseFile(filePath: string, batchId: string): Promise<FactDspRow[]> {
+		const rawRows = await super.parseFile(filePath, batchId);
 
-    // Aggregate by (reporting_period, isrc, territory_code, monetisation_type, gender, age)
-    const aggregated = new Map<string, FactDspRow>();
+		// Aggregate by (reporting_period, isrc, territory_code, monetisation_type, gender, age)
+		const aggregated = new Map<string, FactDspRow>();
 
-    for (const row of rawRows) {
-      const gender = row.metadata['gender'] || '';
-      const age = row.metadata['age'] || '';
-      const key = `${row.reporting_period}|${row.isrc}|${row.territory_code}|${row.monetisation_type}|${gender}|${age}`;
+		for (const row of rawRows) {
+			const gender = row.metadata['gender'] || '';
+			const age = row.metadata['age'] || '';
+			const key = `${row.reporting_period}|${row.isrc}|${row.territory_code}|${row.monetisation_type}|${gender}|${age}`;
 
-      if (aggregated.has(key)) {
-        const existing = aggregated.get(key)!;
-        existing.quantity_total += row.quantity_total;
-      } else {
-        aggregated.set(key, { ...row });
-      }
-    }
+			if (aggregated.has(key)) {
+				const existing = aggregated.get(key)!;
+				existing.quantity_total += row.quantity_total;
+			} else {
+				aggregated.set(key, { ...row });
+			}
+		}
 
-    return Array.from(aggregated.values());
-  }
+		return Array.from(aggregated.values());
+	}
 
-  protected parseRow(
-    record: Record<string, string>,
-    batchId: string,
-  ): FactDspRow | null {
-    let isrc = record['isrc']?.trim() || '';
-    const upc = record['upc']?.trim() || '';
-    if (!isrc && !upc) return null;
+	protected parseRow(
+		record: Record<string, string>,
+		batchId: string,
+	): FactDspRow | null {
+		let isrc = record['isrc']?.trim() || '';
+		const upc = record['upc']?.trim() || '';
+		if (!isrc && !upc) return null;
 
-    if (!isrc && upc) {
-      isrc = `UPC-${upc}`;
-    }
+		if (!isrc && upc) {
+			isrc = `UPC-${upc}`;
+		}
 
-    const row = this.createBaseRow(batchId);
-    // Boomplay date format: DD/MM/YYYY
-    row.reporting_period = this.normalizeDate(record['report_date']);
-    row.isrc = isrc;
-    row.territory_code = this.normalizeCountryCode(record['country']);
-    row.track_title = record['title'] || '';
-    row.album_title = record['album'] || '';
-    row.upc = record['upc'] || '';
-    row.label_name = record['label'] || '';
-    row.partner_id = record['member_id'] || '';
-    row.licensor = record['merlin_member'] || '';
-    row.quantity_total = 1; // Each row = 1 play event
-    row.monetisation_type = (record['service_type'] || '').toUpperCase(); // Free / Premium
-    row.usage_type = 'stream';
-    row.track_id_internal = record['song_id'] || '';
+		const row = this.createBaseRow(batchId);
+		// Boomplay date format: DD/MM/YYYY
+		row.reporting_period = this.normalizeDate(record['report_date']);
+		row.isrc = isrc;
+		row.territory_code = this.normalizeCountryCode(record['country']);
+		row.track_title = record['title'] || '';
+		row.album_title = record['album'] || '';
+		row.upc = record['upc'] || '';
+		row.label_name = record['label'] || '';
+		row.partner_id = record['member_id'] || '';
+		row.licensor = record['merlin_member'] || '';
+		row.quantity_total = 1; // Each row = 1 play event
+		row.monetisation_type = (record['service_type'] || '').toUpperCase(); // Free / Premium
+		row.usage_type = 'stream';
+		row.track_id_internal = record['song_id'] || '';
 
-    row.metadata = {
-      ...(record['gender'] && record['gender'] !== 'Unknown' ? { gender: record['gender'] } : {}),
-      ...(record['age'] && record['age'] !== 'Unknown' ? { age: record['age'] } : {}),
-      ...(record['device'] ? { device: record['device'] } : {}),
-      ...(record['platform_classified_genre'] ? { genre: record['platform_classified_genre'] } : {}),
-      ...(record['playlist'] ? { playlist: record['playlist'] } : {}),
-      ...(record['release_date'] ? { release_date: record['release_date'] } : {}),
-    };
+		row.metadata = {
+			...(record['gender'] && record['gender'] !== 'Unknown'
+				? { gender: record['gender'] }
+				: {}),
+			...(record['age'] && record['age'] !== 'Unknown'
+				? { age: record['age'] }
+				: {}),
+			...(record['device'] ? { device: record['device'] } : {}),
+			...(record['platform_classified_genre']
+				? { genre: record['platform_classified_genre'] }
+				: {}),
+			...(record['playlist'] ? { playlist: record['playlist'] } : {}),
+			...(record['release_date']
+				? { release_date: record['release_date'] }
+				: {}),
+		};
 
-    return row;
-  }
+		return row;
+	}
 }

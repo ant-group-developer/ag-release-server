@@ -3,7 +3,8 @@ import { Column, Entity, Index } from 'typeorm';
 import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
 
 @Entity('youtube_api_keys', {
-	comment: 'Danh sach Google/YouTube Data API keys de rotate tranh quota limit',
+	comment:
+		'Danh sach Google/YouTube Data API keys de rotate tranh quota limit',
 })
 @Index('IDX_youtube_api_keys_status_used', ['status', 'unitsConsumedToday'])
 export class YoutubeApiKey extends BaseUUIDEntity {
@@ -18,7 +19,8 @@ export class YoutubeApiKey extends BaseUUIDEntity {
 	@Column({
 		type: 'text',
 		name: 'key_encrypted',
-		comment: 'API key duoc encrypt AES-256-GCM: iv:authTag:ciphertext (base64)',
+		comment:
+			'API key duoc encrypt AES-256-GCM: iv:authTag:ciphertext (base64)',
 	})
 	keyEncrypted: string;
 

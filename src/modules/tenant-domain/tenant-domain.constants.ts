@@ -26,7 +26,8 @@ export const TenantDomainMessages = {
 	},
 	CF_OAUTH_NOT_AVAILABLE: {
 		statusCode: 409,
-		message: 'Auto setup is not available for a domain that is already active or verifying',
+		message:
+			'Auto setup is not available for a domain that is already active or verifying',
 		messageCode: 'tenant_domain.error.oauthNotAvailable',
 	},
 	DOMAIN_RESTRICTED: {

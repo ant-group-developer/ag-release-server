@@ -1,13 +1,14 @@
 import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { EntityAnalyticsService } from '../services/entity-analytics.service';
+import { Request } from 'express';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { Request } from 'express';
+import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
 @ApiTags('Analytics - Track')
 @Controller('analytics/track/:isrc')
@@ -195,6 +196,40 @@ export class TrackAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getRevenueTerritoryBarChart(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('isrc') isrc: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của track (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('isrc') isrc: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
 				'track',
 				isrc,
 				dto,
