@@ -293,7 +293,6 @@ export class ReleaseService {
 	}
 
 	//
-
 	async update(
 		id: string,
 		data: UpdateReleaseDto,

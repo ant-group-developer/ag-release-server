@@ -415,8 +415,6 @@ export class ReleaseExecution3Worker {
 	private async importCi(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
-		console.log('importCi context', context);
-
 		if (
 			context.releaseExecution.metadata.input.dspAggregator?.ci
 				?.isSkipImport

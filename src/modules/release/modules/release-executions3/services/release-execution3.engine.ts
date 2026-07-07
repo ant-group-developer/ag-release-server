@@ -28,8 +28,8 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
-		// private readonly releaseExecution3Worker: ReleaseExecution3Worker,
-		private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
+		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
+		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseExecution3ResultService: ReleaseExecution3ResultService,
 		private readonly logService: LogsService,
 	) {}
