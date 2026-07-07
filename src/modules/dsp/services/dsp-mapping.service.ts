@@ -16,7 +16,7 @@ export interface DspsReport {
 @Injectable()
 export class DspMappingService implements OnModuleInit {
 	private readonly logger = new Logger(DspMappingService.name);
-	private dspsReportCache: Map<string, DspsReport> = new Map(); // dsp_name (lowercase) -> DspsReport object
+	private dspsReportCache: Map<string, DspsReport> = new Map(); // "dspName:source" -> DspsReport
 
 	constructor(
 		private readonly clickHouseService: ClickHouseService,
@@ -39,9 +39,10 @@ export class DspMappingService implements OnModuleInit {
 
 	/**
 	 * Resolve or create a dsps_report entry
-	 * @param input - DSP name from folder/file/report (e.g., 'aud-audiomack', 'Audiomack (WMG)')
-	 * @param source - Source type: 'ftp_folder', 'ci_report', 'excel_report', etc.
+	 * @param input - DSP name from folder/file/report (e.g., 'aud-audiomack', 'Spotify')
+	 * @param source - Source type: 'ftp_folder', 'wmg_report', 'spotify_report', etc.
 	 * @returns The dsps_report record with id_dsps_report
+	 * Note: Same dsp_name with different source values will create separate records
 	 */
 	async resolveOrCreateDspReport(
 		input: string,
@@ -49,8 +50,8 @@ export class DspMappingService implements OnModuleInit {
 	): Promise<DspsReport> {
 		const normalizedInput = input.toLowerCase().trim();
 
-		// Try to find existing by dsp_name
-		const existing = await this.findByDspName(normalizedInput);
+		// Try to find existing by dsp_name AND source
+		const existing = await this.findByDspNameAndSource(normalizedInput, source);
 		if (existing) {
 			return existing;
 		}
@@ -60,26 +61,31 @@ export class DspMappingService implements OnModuleInit {
 	}
 
 	/**
-	 * Find dsps_report by dsp_name (case-insensitive)
+	 * Find dsps_report by dsp_name (case-insensitive) AND source
+	 * Each (dsp_name, source) pair is unique
 	 */
-	private async findByDspName(dspName: string): Promise<DspsReport | null> {
-		// Check cache first
-		const cached = this.dspsReportCache.get(dspName);
+	private async findByDspNameAndSource(
+		dspName: string,
+		source: string,
+	): Promise<DspsReport | null> {
+		// Check cache first (key = "dspName:source")
+		const cacheKey = `${dspName}:${source}`;
+		const cached = this.dspsReportCache.get(cacheKey);
 		if (cached) {
 			return cached;
 		}
 
-		// Query by dsp_name (case-insensitive)
+		// Query by dsp_name (case-insensitive) AND source
 		const rows = await this.clickHouseService.query<DspsReport>(
 			`SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-       WHERE lower(dsp_name) = {name: String}
-       LIMIT 1`,
-			{ name: dspName },
+	       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
+	       WHERE lower(dsp_name) = {name: String} AND source = {source: String}
+	       LIMIT 1`,
+			{ name: dspName, source },
 		);
 
 		if (rows.length > 0) {
-			this.dspsReportCache.set(dspName, rows[0]);
+			this.dspsReportCache.set(cacheKey, rows[0]);
 			return rows[0];
 		}
 
@@ -109,11 +115,11 @@ export class DspMappingService implements OnModuleInit {
 			newRecord as any,
 		]);
 
-		// Update cache
-		this.dspsReportCache.set(dspName.toLowerCase(), newRecord);
+		// Update cache with (dspName:source) key
+		this.dspsReportCache.set(`${dspName.toLowerCase()}:${source}`, newRecord);
 
 		this.logger.log(
-			`Created new dsps_report for '${dspName}': ${idDspsReport}`,
+			`Created new dsps_report for '${dspName}' from source '${source}': ${idDspsReport}`,
 		);
 		return newRecord;
 	}
@@ -124,8 +130,8 @@ export class DspMappingService implements OnModuleInit {
 	async getDspsReportById(id: string): Promise<DspsReport | null> {
 		const rows = await this.clickHouseService.query<DspsReport>(
 			`SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-       WHERE id_dsps_report = {id: String}`,
+	       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
+	       WHERE id_dsps_report = {id: String}`,
 			{ id },
 		);
 		return rows.length > 0 ? rows[0] : null;
@@ -138,17 +144,17 @@ export class DspMappingService implements OnModuleInit {
 		if (pgUuid) {
 			return this.clickHouseService.query<DspsReport>(
 				`SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-         FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-         WHERE pg_uuid = {uuid: String}
-         ORDER BY created_at DESC`,
+	         FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
+	         WHERE pg_uuid = {uuid: String}
+	         ORDER BY created_at DESC`,
 				{ uuid: pgUuid },
 			);
 		}
 
 		return this.clickHouseService.query<DspsReport>(
 			`SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-       ORDER BY created_at DESC`,
+	       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
+	       ORDER BY created_at DESC`,
 		);
 	}
 
@@ -158,9 +164,9 @@ export class DspMappingService implements OnModuleInit {
 	async getUnassignedDspsReports(): Promise<DspsReport[]> {
 		return this.clickHouseService.query<DspsReport>(
 			`SELECT id_dsps_report, pg_uuid, dsp_name, source, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
-       WHERE pg_uuid IS NULL
-       ORDER BY created_at DESC`,
+	       FROM ${CLICKHOUSE_TABLES.DSPS_REPORT}
+	       WHERE pg_uuid IS NULL
+	       ORDER BY created_at DESC`,
 		);
 	}
 
@@ -188,8 +194,8 @@ export class DspMappingService implements OnModuleInit {
 	): Promise<Record<string, unknown> | null> {
 		const rows = await this.clickHouseService.query(
 			`SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, type, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
-       WHERE pg_uuid = {uuid: String}`,
+	       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
+	       WHERE pg_uuid = {uuid: String}`,
 			{ uuid: pgUuid },
 		);
 		return rows.length > 0 ? rows[0] : null;
@@ -201,8 +207,8 @@ export class DspMappingService implements OnModuleInit {
 	async getAllPgDspsSync(): Promise<Record<string, unknown>[]> {
 		return this.clickHouseService.query(
 			`SELECT pg_uuid, dsp_code, dsp_name, dsp_ci_code, created_at, updated_at
-       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
-       ORDER BY dsp_name ASC`,
+	       FROM ${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL
+	       ORDER BY dsp_name ASC`,
 		);
 	}
 
@@ -215,7 +221,9 @@ export class DspMappingService implements OnModuleInit {
 		);
 		this.dspsReportCache.clear();
 		for (const row of rows) {
-			this.dspsReportCache.set(row.dsp_name.toLowerCase(), row);
+			// Cache key: "dspName:source" to support same DSP from different sources
+			const cacheKey = `${row.dsp_name.toLowerCase()}:${row.source}`;
+			this.dspsReportCache.set(cacheKey, row);
 		}
 		this.logger.log(
 			`Loaded ${this.dspsReportCache.size} dsps_report entries into cache`,
