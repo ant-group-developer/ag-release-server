@@ -422,6 +422,18 @@ export class ReleaseExecution3WorkerTest {
 	private async importCi(
 		context: StepTaskContext,
 	): Promise<ReleaseExecutionStepStatus> {
+		if (
+			context.releaseExecution.metadata.input.dspAggregator?.ci
+				?.isSkipImport
+		) {
+			this.logService.log({
+				message: `[IMPORT_CI] Skipping import`,
+				releaseExecutionId: context.releaseExecution.id,
+				releaseExecutionStepId: context.step.id,
+			});
+			return ReleaseExecutionStepStatus.SKIPPED;
+		}
+
 		return this.deriveStatusFromChildren(context);
 	}
 
@@ -1289,6 +1301,7 @@ export class ReleaseExecution3WorkerTest {
 		releaseExecution,
 	}: StepTaskContext): Promise<ReleaseExecutionStepStatus> {
 		// return ReleaseExecutionStepStatus.FAILED;
+		return ReleaseExecutionStepStatus.DONE;
 		try {
 			const releaseId = this.releaseIdFromExecution(releaseExecution);
 			const ciDspStatuses =

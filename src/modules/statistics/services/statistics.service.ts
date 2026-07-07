@@ -67,7 +67,9 @@ export class StatisticsService {
 		this.andWhereTenantIssueCreatedAt({ qb, ...filter });
 
 		if (tenantId) {
-			qb.andWhere(`${this.tenantIssueAlias}.tenantId = :tenantId`, { tenantId });
+			qb.andWhere(`${this.tenantIssueAlias}.tenantId = :tenantId`, {
+				tenantId,
+			});
 		}
 
 		const raw = await qb.getRawMany<{
@@ -83,7 +85,10 @@ export class StatisticsService {
 		}));
 	}
 
-	async getOverviewCounts(filter: QueryGetOverviewCountDto, tenantId?: string) {
+	async getOverviewCounts(
+		filter: QueryGetOverviewCountDto,
+		tenantId?: string,
+	) {
 		const [
 			releasesCount,
 			tracksCount,
@@ -110,7 +115,10 @@ export class StatisticsService {
 		};
 	}
 
-	async getStreamCountsByCountry(filter: QueryGetStreamCountByCountryDto, tenantId?: string) {
+	async getStreamCountsByCountry(
+		filter: QueryGetStreamCountByCountryDto,
+		tenantId?: string,
+	) {
 		const qb = this.trackRevenueRepo
 			.createQueryBuilder('trackRevenue')
 			.select('trackRevenue.countryCode', 'countryCode')
@@ -140,7 +148,10 @@ export class StatisticsService {
 		});
 	}
 
-	async getReleasesImportCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
+	async getReleasesImportCount(
+		filter: BaseQueryStatisticsDto,
+		tenantId?: string,
+	) {
 		const { startDate, endDate } = filter;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),
@@ -169,7 +180,10 @@ export class StatisticsService {
 		});
 	}
 
-	async getTracksImportCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
+	async getTracksImportCount(
+		filter: BaseQueryStatisticsDto,
+		tenantId?: string,
+	) {
 		const { startDate, endDate } = filter;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),

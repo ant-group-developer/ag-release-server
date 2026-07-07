@@ -50,7 +50,8 @@ export const YOUTUBE_KEY_SAFETY_MARGIN_UNITS = 100;
  * Env var chua master key encrypt AES-256-GCM cho youtube_api_keys.
  * Format: base64 32 bytes (openssl rand -base64 32).
  */
-export const YOUTUBE_KEY_ENCRYPTION_SECRET_ENV = 'YOUTUBE_KEY_ENCRYPTION_SECRET';
+export const YOUTUBE_KEY_ENCRYPTION_SECRET_ENV =
+	'YOUTUBE_KEY_ENCRYPTION_SECRET';
 
 /**
  * Retry limits copy pattern Spotify.

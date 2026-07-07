@@ -54,18 +54,18 @@ import { ReleaseModule } from './modules/release/release.module';
 import { Cache2Module } from './modules/cache2/cache2.module';
 import { LogsModule } from './modules/log/logs.module';
 import { PartnersApiModule } from './modules/partners-api/partners-api.module';
-import { VideoCsvImportModule } from './modules/video-csv-import/video-csv-import.module';
 import { ReleaseCaptionModule } from './modules/release-caption/release-caption.module';
+import { ReportImportModule } from './modules/report-import/report-import.module';
 import { RequestTrackingModule } from './modules/request-tracking/request-tracking.module';
 import { RoleModule } from './modules/role/role.module';
 import { ScheduleModule } from './modules/schedule/schedule.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { TenantDspModule } from './modules/tenant-dsp/tenant-dsp.module';
 import { TenantIssueModule } from './modules/tenant-issue/tenant-issue.module';
 import { TenantRolesModule } from './modules/tenant-roles/tenant-roles.module';
 import { TenantTierModule } from './modules/tenant-tiers/tenant-tiers.module';
 import { TenantModule } from './modules/tenant/tenant.module';
-import { TenantDomainModule } from './modules/tenant-domain/tenant-domain.module';
 import { TimezoneModule } from './modules/timezone/timezone.module';
 import { TokenModule } from './modules/token/token.module';
 import { TrackArtistModule } from './modules/track-artist/track-artist.module';
@@ -80,9 +80,9 @@ import { TrackModule } from './modules/track/track.module';
 import { UserModule } from './modules/user/user.module';
 import { VideoArtistModule } from './modules/video-artist/video-artist.module';
 import { VideoContributorModule } from './modules/video-contributor/video-contributor.module';
+import { VideoCsvImportModule } from './modules/video-csv-import/video-csv-import.module';
 import { VideoGenreModule } from './modules/video-genre/video-genre.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
-import { ReportImportModule } from './modules/report-import/report-import.module';
 
 @Module({
 	imports: [

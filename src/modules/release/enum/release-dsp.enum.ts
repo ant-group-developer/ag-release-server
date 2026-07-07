@@ -1,5 +1,5 @@
 export enum ReleaseDspStatus {
-	// DRAFT = 'draft',
+	DRAFT = 'draft',
 	NEVER_DISTRIBUTED = 'never_distributed',
 	PROCESSING = 'processing',
 

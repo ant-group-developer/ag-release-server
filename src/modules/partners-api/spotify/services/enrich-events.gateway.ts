@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Subject, Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 export interface EnrichEvent {
@@ -18,8 +18,8 @@ export class EnrichEventsGateway {
 	}
 
 	subscribe(scanId: string): Observable<EnrichEvent> {
-		return this.stream$.asObservable().pipe(
-			filter((evt) => evt.scanId === scanId),
-		);
+		return this.stream$
+			.asObservable()
+			.pipe(filter((evt) => evt.scanId === scanId));
 	}
 }

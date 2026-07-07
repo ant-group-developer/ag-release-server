@@ -19,7 +19,9 @@ export class Cache2Service {
 			if (!value) return null;
 			return JSON.parse(value) as T;
 		} catch (err) {
-			this.logger.warn(`Redis get failed for key "${key}": ${err.message}`);
+			this.logger.warn(
+				`Redis get failed for key "${key}": ${err.message}`,
+			);
 			return null;
 		}
 	}
@@ -41,7 +43,9 @@ export class Cache2Service {
 				await this.redis.set(key, data);
 			}
 		} catch (err) {
-			this.logger.warn(`Redis set failed for key "${key}": ${err.message}`);
+			this.logger.warn(
+				`Redis set failed for key "${key}": ${err.message}`,
+			);
 		}
 	}
 
@@ -49,7 +53,9 @@ export class Cache2Service {
 		try {
 			await this.redis.del(key);
 		} catch (err) {
-			this.logger.warn(`Redis delete failed for key "${key}": ${err.message}`);
+			this.logger.warn(
+				`Redis delete failed for key "${key}": ${err.message}`,
+			);
 		}
 	}
 
@@ -70,7 +76,9 @@ export class Cache2Service {
 				}
 			} while (cursor !== '0');
 		} catch (err) {
-			this.logger.warn(`Redis deleteByPattern failed for pattern "${pattern}": ${err.message}`);
+			this.logger.warn(
+				`Redis deleteByPattern failed for pattern "${pattern}": ${err.message}`,
+			);
 		}
 	}
 

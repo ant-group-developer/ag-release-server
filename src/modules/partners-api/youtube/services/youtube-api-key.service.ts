@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { YoutubeApiKey } from '../entities/youtube-api-key.entity';
-import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
 import { CreateYoutubeApiKeyDto } from '../dto/create-api-key.dto';
 import { UpdateYoutubeApiKeyDto } from '../dto/update-api-key.dto';
+import { YoutubeApiKey } from '../entities/youtube-api-key.entity';
+import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
 import { YoutubeEncryptionService } from './youtube-encryption.service';
 
 export interface YoutubeApiKeyPublicView {
@@ -39,8 +39,12 @@ export class YoutubeApiKeyService {
 		private readonly encryptionService: YoutubeEncryptionService,
 	) {}
 
-	async create(dto: CreateYoutubeApiKeyDto): Promise<YoutubeApiKeyPublicView> {
-		const existing = await this.repo.findOne({ where: { alias: dto.alias } });
+	async create(
+		dto: CreateYoutubeApiKeyDto,
+	): Promise<YoutubeApiKeyPublicView> {
+		const existing = await this.repo.findOne({
+			where: { alias: dto.alias },
+		});
 		if (existing) {
 			throw new ConflictException(`Alias '${dto.alias}' da ton tai`);
 		}
@@ -59,7 +63,9 @@ export class YoutubeApiKeyService {
 		});
 
 		const saved = await this.repo.save(key);
-		this.logger.log(`Created YouTube API key alias=${saved.alias} id=${saved.id}`);
+		this.logger.log(
+			`Created YouTube API key alias=${saved.alias} id=${saved.id}`,
+		);
 		return this.toPublicView(saved);
 	}
 
@@ -70,7 +76,8 @@ export class YoutubeApiKeyService {
 
 	async findOne(id: string): Promise<YoutubeApiKeyPublicView> {
 		const key = await this.repo.findOne({ where: { id } });
-		if (!key) throw new NotFoundException(`YouTube API key ${id} not found`);
+		if (!key)
+			throw new NotFoundException(`YouTube API key ${id} not found`);
 		return this.toPublicView(key);
 	}
 
@@ -79,11 +86,15 @@ export class YoutubeApiKeyService {
 		dto: UpdateYoutubeApiKeyDto,
 	): Promise<YoutubeApiKeyPublicView> {
 		const key = await this.repo.findOne({ where: { id } });
-		if (!key) throw new NotFoundException(`YouTube API key ${id} not found`);
+		if (!key)
+			throw new NotFoundException(`YouTube API key ${id} not found`);
 
 		if (dto.alias !== undefined && dto.alias !== key.alias) {
-			const dup = await this.repo.findOne({ where: { alias: dto.alias } });
-			if (dup) throw new ConflictException(`Alias '${dto.alias}' da ton tai`);
+			const dup = await this.repo.findOne({
+				where: { alias: dto.alias },
+			});
+			if (dup)
+				throw new ConflictException(`Alias '${dto.alias}' da ton tai`);
 			key.alias = dto.alias;
 		}
 		if (dto.status !== undefined) {
@@ -114,7 +125,8 @@ export class YoutubeApiKeyService {
 
 	async resetQuota(id: string): Promise<YoutubeApiKeyPublicView> {
 		const key = await this.repo.findOne({ where: { id } });
-		if (!key) throw new NotFoundException(`YouTube API key ${id} not found`);
+		if (!key)
+			throw new NotFoundException(`YouTube API key ${id} not found`);
 		key.unitsConsumedToday = 0;
 		key.lastResetAt = new Date();
 		if (key.status === YoutubeApiKeyStatus.QUOTA_EXCEEDED) {
@@ -178,7 +190,10 @@ export class YoutubeApiKeyService {
 					`CASE WHEN status = '${YoutubeApiKeyStatus.QUOTA_EXCEEDED}' THEN '${YoutubeApiKeyStatus.ACTIVE}' ELSE status END`,
 			})
 			.where('status IN (:...statuses)', {
-				statuses: [YoutubeApiKeyStatus.ACTIVE, YoutubeApiKeyStatus.QUOTA_EXCEEDED],
+				statuses: [
+					YoutubeApiKeyStatus.ACTIVE,
+					YoutubeApiKeyStatus.QUOTA_EXCEEDED,
+				],
 			})
 			.execute();
 		return { affected: result.affected ?? 0 };
@@ -192,7 +207,10 @@ export class YoutubeApiKeyService {
 			status: k.status,
 			dailyQuotaLimit: k.dailyQuotaLimit,
 			unitsConsumedToday: k.unitsConsumedToday,
-			unitsRemaining: Math.max(0, k.dailyQuotaLimit - k.unitsConsumedToday),
+			unitsRemaining: Math.max(
+				0,
+				k.dailyQuotaLimit - k.unitsConsumedToday,
+			),
 			lastResetAt: k.lastResetAt,
 			lastUsedAt: k.lastUsedAt,
 			lastError: k.lastError,

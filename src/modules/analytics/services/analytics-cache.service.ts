@@ -19,7 +19,8 @@ export class AnalyticsCacheService {
 	}
 
 	private stableStringify(value: unknown): string {
-		if (value === null || typeof value !== 'object') return JSON.stringify(value);
+		if (value === null || typeof value !== 'object')
+			return JSON.stringify(value);
 		if (Array.isArray(value)) {
 			return `[${value.map((v) => this.stableStringify(v)).join(',')}]`;
 		}
@@ -36,7 +37,10 @@ export class AnalyticsCacheService {
 		this.cache.set(key, value);
 	}
 
-	async wrap<T extends object>(key: string, loader: () => Promise<T>): Promise<T> {
+	async wrap<T extends object>(
+		key: string,
+		loader: () => Promise<T>,
+	): Promise<T> {
 		const cached = this.cache.get(key);
 		if (cached !== undefined) {
 			return cached as T;

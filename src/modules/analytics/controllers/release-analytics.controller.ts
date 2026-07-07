@@ -1,10 +1,18 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
+	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
@@ -191,6 +199,38 @@ export class ReleaseAnalyticsController {
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueTerritoryBarChart(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của release (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopDsps(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của release (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopTerritories(
 			'release',
 			releaseId,
 			dto,

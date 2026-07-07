@@ -1,4 +1,11 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Param,
+	ParseUUIDPipe,
+	Post,
+	Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -201,13 +208,48 @@ export class ChannelAnalyticsController {
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)' })
+	@ApiOperation({
+		summary:
+			'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)',
+	})
 	async topReleases(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getTopReleases(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của channel (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopDsps(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của channel (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getTopTerritories(
 			'channel',
 			channelId,
 			dto,

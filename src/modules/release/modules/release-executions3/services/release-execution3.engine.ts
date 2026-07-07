@@ -46,7 +46,7 @@ export class ReleaseExecutionStepEngine {
 
 		const hasChildren = !!STEP.childSteps?.length;
 
-		// ===== STEP LÁ =====
+		// nếu ko có con thì xử lý step
 		if (!hasChildren) {
 			if (await this.isExecutionCancelled(releaseExecution.id)) {
 				return ReleaseExecutionStepStatus.CANCELLED;
@@ -95,8 +95,7 @@ export class ReleaseExecutionStepEngine {
 			return status;
 		}
 
-		// ===== STEP CHA =====
-
+		// nếu có con thì xử lý con
 		// Check WAITING_PARTNER trước khi chạy vào children
 		if (STEP.status === ReleaseExecutionStepStatus.WAITING_PARTNER) {
 			const scheduledAt = STEP.metadata?.scheduledAt;
@@ -232,7 +231,12 @@ export class ReleaseExecutionStepEngine {
 
 		// ===== DONE =====
 		if (
-			children.every((c) => c.status === ReleaseExecutionStepStatus.DONE)
+			children.every((c) =>
+				[
+					ReleaseExecutionStepStatus.DONE,
+					ReleaseExecutionStepStatus.SKIPPED,
+				].includes(c.status),
+			)
 		) {
 			return ReleaseExecutionStepStatus.DONE;
 		}

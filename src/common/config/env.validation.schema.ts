@@ -85,7 +85,9 @@ export const envValidationSchema = Joi.object({
 	FTP_PORT: Joi.number().default(21),
 	FTP_USER: Joi.string().allow('').optional(),
 	FTP_PASSWORD: Joi.string().allow('').optional(),
-	FTP_SECURE: Joi.string().allow('true', 'false', 'explicit', 'implicit').default('explicit'),
+	FTP_SECURE: Joi.string()
+		.allow('true', 'false', 'explicit', 'implicit')
+		.default('explicit'),
 	FTP_BASE_PATH: Joi.string().default('/root'),
 	FTP_SYNC_MODE: Joi.string().valid('manual', 'auto').default('manual'),
 	FTP_SYNC_CRON: Joi.string().default('0 2 * * *'),

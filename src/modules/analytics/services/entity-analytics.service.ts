@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
-import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
+import { PageDto } from 'src/common/dtos/common.response.dto';
+import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
+import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
-import { Artist } from 'src/modules/artist/entities/artist.entity';
-import { Tenant } from 'src/modules/tenant/tenant.entity';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
-import { AnalyticsCacheService } from './analytics-cache.service';
 import {
 	DspBarChartItem,
 	DspTimelinePeriod,
@@ -21,14 +21,23 @@ import {
 	DspTopReleaseItem,
 	DspTopTrackItem,
 	EntityOverviewResponse,
+	EntityTopDspItem,
+	EntityTopTerItem,
 	RevenueLineChartItem,
 	RevenueTimelineResponse,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
-import { PageDto } from 'src/common/dtos/common.response.dto';
+import { AnalyticsCacheService } from './analytics-cache.service';
 
-export type EntityType = 'release' | 'label' | 'artist' | 'track' | 'tenant' | 'channel';
+export type EntityType =
+	| 'release'
+	| 'label'
+	| 'artist'
+	| 'track'
+	| 'tenant'
+	| 'channel'
+	| 'sourceType';
 
 @Injectable()
 export class EntityAnalyticsService {
@@ -49,14 +58,19 @@ export class EntityAnalyticsService {
 
 	private addRevenueExact(values: Array<string | null | undefined>): string {
 		const decimals = values.map((value) => this.revenueExact(value));
-		const scale = Math.max(0, ...decimals.map((value) => (value.split('.')[1] || '').length));
+		const scale = Math.max(
+			0,
+			...decimals.map((value) => (value.split('.')[1] || '').length),
+		);
 		let sum = 0n;
 
 		for (const value of decimals) {
 			const negative = value.trim().startsWith('-');
 			const unsigned = negative ? value.trim().slice(1) : value.trim();
 			const [whole = '0', frac = ''] = unsigned.split('.');
-			const units = BigInt(`${whole || '0'}${frac.padEnd(scale, '0') || ''}`);
+			const units = BigInt(
+				`${whole || '0'}${frac.padEnd(scale, '0') || ''}`,
+			);
 			sum += negative ? -units : units;
 		}
 
@@ -70,7 +84,10 @@ export class EntityAnalyticsService {
 		return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
 	}
 
-	private subtractRevenueExact(left?: string | null, right?: string | null): string {
+	private subtractRevenueExact(
+		left?: string | null,
+		right?: string | null,
+	): string {
 		const rightValue = this.revenueExact(right);
 		return this.addRevenueExact([
 			left,
@@ -133,6 +150,9 @@ export class EntityAnalyticsService {
 			case 'channel':
 				filterSql += ' AND t.channel_id = {entityId:String}';
 				break;
+			case 'sourceType':
+				filterSql += ' AND s.import_source = {entityId:String}';
+				break;
 		}
 
 		if (releaseType) {
@@ -162,37 +182,37 @@ export class EntityAnalyticsService {
 			new Set(
 				items
 					.map((item) => item.territory?.trim().toUpperCase())
-					.filter((territory): territory is string =>
-						!!territory && territory !== 'OTHER',
+					.filter(
+						(territory): territory is string =>
+							!!territory && territory !== 'OTHER',
 					),
 			),
 		);
 
 		if (!iso2Codes.length) return items;
 
-		const countries = (await this.entityManager.query(
+		const countries = await this.entityManager.query(
 			`
         SELECT UPPER(iso2) AS iso2, name
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
-		)) as Array<{
-			iso2: string;
-			name: string;
-		}>;
+		);
 		const countryNameByIso2 = new Map(
-			countries.map((country) => [country.iso2, country.name]),
+			countries.map((country: { iso2: string; name: string }) => [country.iso2, country.name]),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const isOther = !iso2 || iso2 === 'OTHER';
+			const territory = (isOther
+				? item.territory
+				: (countryNameByIso2.get(iso2) ?? item.territory)) as string;
 			return {
 				...item,
-				territory:
-					iso2 && iso2 !== 'OTHER'
-						? countryNameByIso2.get(iso2) ?? item.territory
-						: item.territory,
+				territory,
+				isoCode: isOther ? undefined : iso2,
 			};
 		});
 	}
@@ -208,8 +228,14 @@ export class EntityAnalyticsService {
 		dto: EntityOverviewQueryDto,
 		tenantId: string,
 	): Promise<EntityOverviewResponse> {
-		const key = this.cache.buildKey('ent:overview', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeOverview(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:overview', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeOverview(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeOverview(
@@ -262,7 +288,12 @@ export class EntityAnalyticsService {
 		if (entityType === 'artist') {
 			const artist = await this.entityManager.findOne(Artist, {
 				where: { id: entityId },
-				relations: ['artistProfiles', 'artistProfiles.dsp', 'country', 'genre'],
+				relations: [
+					'artistProfiles',
+					'artistProfiles.dsp',
+					'country',
+					'genre',
+				],
 			});
 			if (artist) {
 				const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
@@ -284,7 +315,8 @@ export class EntityAnalyticsService {
 					name: artist.name,
 					picture: pictureUrl,
 					profiles,
-					country: artist.country?.name ?? artist.originCountry ?? null,
+					country:
+						artist.country?.name ?? artist.originCountry ?? null,
 					genre: artist.genre?.name ?? artist.primaryGenre ?? null,
 				};
 			}
@@ -309,8 +341,12 @@ export class EntityAnalyticsService {
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
-			totalRevenueUsd: this.revenueNumber(salesRows[0]?.total_revenue_usd),
-			totalRevenueUsdExact: this.revenueExact(salesRows[0]?.total_revenue_usd),
+			totalRevenueUsd: this.revenueNumber(
+				salesRows[0]?.total_revenue_usd,
+			),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRows[0]?.total_revenue_usd,
+			),
 			artist: artistMeta,
 			tenant: tenantMeta,
 		};
@@ -326,8 +362,19 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:trend-dsp-tl', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewDspTimeline(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:trend-dsp-tl', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewDspTimeline(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeTrendViewDspTimeline(
@@ -421,8 +468,19 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:sales-dsp-tl', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeSalesViewDspTimeline(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:sales-dsp-tl', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeSalesViewDspTimeline(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeSalesViewDspTimeline(
@@ -520,8 +578,19 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:trend-dsp-daily-tl', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewDspDailyTimeline(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:trend-dsp-daily-tl', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewDspDailyTimeline(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeTrendViewDspDailyTimeline(
@@ -613,8 +682,14 @@ export class EntityAnalyticsService {
 		dto: EntityTimelineQueryDto,
 		tenantId: string,
 	): Promise<RevenueTimelineResponse> {
-		const key = this.cache.buildKey('ent:rev-tl', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueTimeline(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:rev-tl', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueTimeline(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeRevenueTimeline(
@@ -690,7 +765,12 @@ export class EntityAnalyticsService {
 			{
 				revenueUsdExactParts: string[];
 				quantity: number;
-				series: { dsp: string; revenueUsd: number; revenueUsdExact: string; quantity: number }[];
+				series: {
+					dsp: string;
+					revenueUsd: number;
+					revenueUsdExact: string;
+					quantity: number;
+				}[];
 			}
 		>();
 		for (const row of rows) {
@@ -715,7 +795,9 @@ export class EntityAnalyticsService {
 			topDsps,
 			items: Array.from(periodMap.entries()).map(([key, val]) => ({
 				period: key,
-				revenueUsd: this.revenueNumber(this.addRevenueExact(val.revenueUsdExactParts)),
+				revenueUsd: this.revenueNumber(
+					this.addRevenueExact(val.revenueUsdExactParts),
+				),
 				revenueUsdExact: this.addRevenueExact(val.revenueUsdExactParts),
 				quantity: val.quantity,
 				series: val.series,
@@ -729,8 +811,14 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TrendViewLineChartItem[]> {
-		const key = this.cache.buildKey('ent:trend-line-chart', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewLineChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:trend-line-chart', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewLineChart(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeTrendViewLineChart(
@@ -777,8 +865,14 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
-		const key = this.cache.buildKey('ent:rev-line-chart', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueLineChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:rev-line-chart', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueLineChart(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeRevenueLineChart(
@@ -831,8 +925,19 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
-		const key = this.cache.buildKey('ent:trend-dsp-bar', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewDspBarChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:trend-dsp-bar', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewDspBarChart(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeTrendViewDspBarChart(
@@ -858,10 +963,9 @@ export class EntityAnalyticsService {
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
     `;
-		const totalRows = await this.clickHouseService.query<{ total_views: string }>(
-			totalSql,
-			params,
-		);
+		const totalRows = await this.clickHouseService.query<{
+			total_views: string;
+		}>(totalSql, params);
 		const grandTotal = Number(totalRows[0]?.total_views ?? 0);
 
 		const sql = `
@@ -886,7 +990,10 @@ export class EntityAnalyticsService {
 			dspName: row.dsp_name,
 			totalViews: Number(row.total_views),
 		}));
-		const top5Total = items.reduce((acc, item) => acc + (item.totalViews ?? 0), 0);
+		const top5Total = items.reduce(
+			(acc, item) => acc + (item.totalViews ?? 0),
+			0,
+		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
 			items.push({ dspName: 'Other', totalViews: otherViews });
@@ -901,8 +1008,19 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const key = this.cache.buildKey('ent:trend-ter-bar', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewTerritoryBarChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:trend-ter-bar', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewTerritoryBarChart(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeTrendViewTerritoryBarChart(
@@ -930,10 +1048,9 @@ export class EntityAnalyticsService {
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
     `;
-		const totalRows = await this.clickHouseService.query<{ total_views: string }>(
-			totalSql,
-			params,
-		);
+		const totalRows = await this.clickHouseService.query<{
+			total_views: string;
+		}>(totalSql, params);
 		const grandTotal = Number(totalRows[0]?.total_views ?? 0);
 
 		const sql = `
@@ -957,7 +1074,10 @@ export class EntityAnalyticsService {
 			territory: row.territory,
 			totalViews: Number(row.total_views),
 		}));
-		const top5Total = items.reduce((acc, item) => acc + (item.totalViews ?? 0), 0);
+		const top5Total = items.reduce(
+			(acc, item) => acc + (item.totalViews ?? 0),
+			0,
+		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
 			items.push({ territory: 'Other', totalViews: otherViews });
@@ -972,8 +1092,14 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
-		const key = this.cache.buildKey('ent:rev-dsp-bar', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueDspBarChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:rev-dsp-bar', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueDspBarChart(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeRevenueDspBarChart(
@@ -1001,10 +1127,9 @@ export class EntityAnalyticsService {
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
     `;
-		const totalRows = await this.clickHouseService.query<{ total_rev: string }>(
-			totalSql,
-			params,
-		);
+		const totalRows = await this.clickHouseService.query<{
+			total_rev: string;
+		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
 
 		const sql = `
@@ -1055,8 +1180,19 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const key = this.cache.buildKey('ent:rev-ter-bar', tenantId, { entityType, entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueTerritoryBarChart(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey('ent:rev-ter-bar', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueTerritoryBarChart(
+				entityType,
+				entityId,
+				dto,
+				tenantId,
+			),
+		);
 	}
 
 	private async computeRevenueTerritoryBarChart(
@@ -1084,10 +1220,9 @@ export class EntityAnalyticsService {
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
     `;
-		const totalRows = await this.clickHouseService.query<{ total_rev: string }>(
-			totalSql,
-			params,
-		);
+		const totalRows = await this.clickHouseService.query<{
+			total_rev: string;
+		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
 
 		const sql = `
@@ -1141,8 +1276,14 @@ export class EntityAnalyticsService {
 		dto: EntityRankingQueryDto,
 		tenantId: string,
 	): Promise<PageDto<DspTopReleaseItem>> {
-		const key = this.cache.buildKey(`ent:top-releases:${entityType}`, tenantId, { entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTopReleases(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey(
+			`ent:top-releases:${entityType}`,
+			tenantId,
+			{ entityId, ...dto },
+		);
+		return this.cache.wrap(key, () =>
+			this.computeTopReleases(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeTopReleases(
@@ -1154,26 +1295,48 @@ export class EntityAnalyticsService {
 		const page = dto.page ?? 1;
 		const limit = dto.limit;
 		const skip = dto.skip;
-		const sortCol = dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const baseParams: Record<string, any> = { entityId, from: dto.fromDate, to: dto.toDate, fromMonth, toMonth };
-		if (!isSystem && entityType !== 'tenant') baseParams.tenantId = tenantId;
-		if (dto.importSource) baseParams.importSource = dto.importSource;
-		const importFilter = dto.importSource ? 'AND s.import_source = {importSource:String}' : '';
-		const tenantFilter = (isSystem || entityType === 'tenant') ? '' : 'AND t.tenant_id = {tenantId:String}';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
+		const baseParams: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
+		if (!isSystem && entityType !== 'tenant')
+			baseParams.tenantId = tenantId;
+		const effectiveImportSource =
+			entityType === 'sourceType' ? entityId : dto.importSource;
+		if (effectiveImportSource)
+			baseParams.importSource = effectiveImportSource;
+		const importFilter = effectiveImportSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const tenantFilter =
+			isSystem || entityType === 'tenant'
+				? ''
+				: 'AND t.tenant_id = {tenantId:String}';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
 		if (dto.releaseType) baseParams.releaseType = dto.releaseType;
 
-		const entityFilter = ({
-			channel: 'AND t.channel_id = {entityId:String}',
-			release: 'AND t.release_id = {entityId:String}',
-			artist:  'AND has(t.artist_ids, {entityId:String})',
-			label:   'AND t.label_id = {entityId:String}',
-			tenant:  'AND t.tenant_id = {entityId:String}',
-		} as Record<string, string>)[entityType] ?? 'AND t.release_id = {entityId:String}';
+		const entityFilter =
+			(
+				{
+					channel: 'AND t.channel_id = {entityId:String}',
+					release: 'AND t.release_id = {entityId:String}',
+					artist: 'AND has(t.artist_ids, {entityId:String})',
+					label: 'AND t.label_id = {entityId:String}',
+					tenant: 'AND t.tenant_id = {entityId:String}',
+					sourceType: '',
+				} as Record<string, string>
+			)[entityType] ?? 'AND t.release_id = {entityId:String}';
 
 		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
 
@@ -1234,13 +1397,24 @@ export class EntityAnalyticsService {
 		`;
 
 		const [countRows, dataRows] = await Promise.all([
-			this.clickHouseService.query<{ total: string }>(countSql, baseParams),
+			this.clickHouseService.query<{ total: string }>(
+				countSql,
+				baseParams,
+			),
 			this.clickHouseService.query<{
-				release_id: string; release_title: string; release_upc: string;
-				label_id: string; label_name: string;
-				cover_75: string; cover_100: string; cover_160: string;
-				cover_300: string; cover_original: string;
-				track_count: string; total_views: string; total_revenue_usd: string;
+				release_id: string;
+				release_title: string;
+				release_upc: string;
+				label_id: string;
+				label_name: string;
+				cover_75: string;
+				cover_100: string;
+				cover_160: string;
+				cover_300: string;
+				cover_original: string;
+				track_count: string;
+				total_views: string;
+				total_revenue_usd: string;
 			}>(dataSql, baseParams),
 		]);
 
@@ -1266,7 +1440,10 @@ export class EntityAnalyticsService {
 			},
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: { page, pageSize: limit, totalItems },
+		});
 	}
 
 	// ─────────────────────────────────────────────────────
@@ -1279,8 +1456,14 @@ export class EntityAnalyticsService {
 		dto: EntityRankingQueryDto,
 		tenantId: string,
 	): Promise<PageDto<DspTopTrackItem>> {
-		const key = this.cache.buildKey(`ent:top-tracks:${entityType}`, tenantId, { entityId, ...dto });
-		return this.cache.wrap(key, () => this.computeTopTracks(entityType, entityId, dto, tenantId));
+		const key = this.cache.buildKey(
+			`ent:top-tracks:${entityType}`,
+			tenantId,
+			{ entityId, ...dto },
+		);
+		return this.cache.wrap(key, () =>
+			this.computeTopTracks(entityType, entityId, dto, tenantId),
+		);
 	}
 
 	private async computeTopTracks(
@@ -1292,26 +1475,48 @@ export class EntityAnalyticsService {
 		const page = dto.page ?? 1;
 		const limit = dto.limit;
 		const skip = dto.skip;
-		const sortCol = dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const baseParams: Record<string, any> = { entityId, from: dto.fromDate, to: dto.toDate, fromMonth, toMonth };
-		if (!isSystem && entityType !== 'tenant') baseParams.tenantId = tenantId;
-		if (dto.importSource) baseParams.importSource = dto.importSource;
-		const importFilter = dto.importSource ? 'AND s.import_source = {importSource:String}' : '';
-		const tenantFilter = (isSystem || entityType === 'tenant') ? '' : 'AND t.tenant_id = {tenantId:String}';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
+		const baseParams: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
+		if (!isSystem && entityType !== 'tenant')
+			baseParams.tenantId = tenantId;
+		const effectiveImportSource =
+			entityType === 'sourceType' ? entityId : dto.importSource;
+		if (effectiveImportSource)
+			baseParams.importSource = effectiveImportSource;
+		const importFilter = effectiveImportSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const tenantFilter =
+			isSystem || entityType === 'tenant'
+				? ''
+				: 'AND t.tenant_id = {tenantId:String}';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
 		if (dto.releaseType) baseParams.releaseType = dto.releaseType;
 
-		const entityFilter = ({
-			channel: 'AND t.channel_id = {entityId:String}',
-			release: 'AND t.release_id = {entityId:String}',
-			artist:  'AND has(t.artist_ids, {entityId:String})',
-			label:   'AND t.label_id = {entityId:String}',
-			tenant:  'AND t.tenant_id = {entityId:String}',
-		} as Record<string, string>)[entityType] ?? 'AND t.isrc = {entityId:String}';
+		const entityFilter =
+			(
+				{
+					channel: 'AND t.channel_id = {entityId:String}',
+					release: 'AND t.release_id = {entityId:String}',
+					artist: 'AND has(t.artist_ids, {entityId:String})',
+					label: 'AND t.label_id = {entityId:String}',
+					tenant: 'AND t.tenant_id = {entityId:String}',
+					sourceType: '',
+				} as Record<string, string>
+			)[entityType] ?? 'AND t.isrc = {entityId:String}';
 
 		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
 
@@ -1369,13 +1574,24 @@ export class EntityAnalyticsService {
 		`;
 
 		const [countRows, dataRows] = await Promise.all([
-			this.clickHouseService.query<{ total: string }>(countSql, baseParams),
+			this.clickHouseService.query<{ total: string }>(
+				countSql,
+				baseParams,
+			),
 			this.clickHouseService.query<{
-				isrc: string; track_title: string; track_version: string;
-				release_id: string; release_title: string; artist_name: string;
-				cover_75: string; cover_100: string; cover_160: string;
-				cover_300: string; cover_original: string;
-				total_views: string; total_revenue_usd: string;
+				isrc: string;
+				track_title: string;
+				track_version: string;
+				release_id: string;
+				release_title: string;
+				artist_name: string;
+				cover_75: string;
+				cover_100: string;
+				cover_160: string;
+				cover_300: string;
+				cover_original: string;
+				total_views: string;
+				total_revenue_usd: string;
 			}>(dataSql, baseParams),
 		]);
 
@@ -1401,6 +1617,228 @@ export class EntityAnalyticsService {
 			},
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: { page, pageSize: limit, totalItems },
+		});
+	}
+
+	// ─────────────────────────────────────────────────────
+	// TOP DSPs (all entity types)
+	// ─────────────────────────────────────────────────────
+
+	async getTopDsps(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityRankingQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopDspItem>> {
+		const key = this.cache.buildKey(
+			`ent:top-dsps:${entityType}`,
+			tenantId,
+			{ entityId, ...dto },
+		);
+		return this.cache.wrap(key, () =>
+			this.computeTopDsps(entityType, entityId, dto, tenantId),
+		);
+	}
+
+	private async computeTopDsps(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityRankingQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopDspItem>> {
+		const page = dto.page ?? 1;
+		const limit = dto.limit;
+		const skip = dto.skip;
+		const sortCol =
+			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
+
+		const { joinSql, filterSql, params } = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+		);
+		params.from = dto.fromDate;
+		params.to = dto.toDate;
+		params.fromMonth = fromMonth;
+		params.toMonth = toMonth;
+
+		const dspNameExpr = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), td.dsp_id)`;
+		const dspJoin = `
+			LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r ON td.dsp_id = r.id_dsps_report
+			LEFT JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+		`;
+
+		const countSql = `
+			SELECT uniq(td.dsp_id) AS total
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} td
+			${joinSql.replace(/\bs\.isrc\b/g, 'td.isrc')}
+			WHERE td.period >= toDate({fromMonth:String}) AND td.period <= toDate({toMonth:String})
+				${filterSql.replace(/\bs\./g, 'td.')}
+		`;
+
+		const dataSql = `
+			SELECT
+				td.dsp_id AS dsp_id,
+				${dspNameExpr} AS dsp_name,
+				sum(td.total_quantity) AS total_views,
+				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} td
+			${dspJoin}
+			${joinSql.replace(/\bs\.isrc\b/g, 'td.isrc')}
+			LEFT JOIN (
+				SELECT dsp_id, isrc, sum(total_revenue_usd) AS total_revenue_usd
+				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				GROUP BY dsp_id, isrc
+			) sa ON td.dsp_id = sa.dsp_id AND td.isrc = sa.isrc
+			WHERE td.period >= toDate({fromMonth:String}) AND td.period <= toDate({toMonth:String})
+				${filterSql.replace(/\bs\./g, 'td.')}
+			GROUP BY td.dsp_id
+			ORDER BY ${sortCol} DESC
+			LIMIT ${limit} OFFSET ${skip}
+		`;
+
+		const [countRows, dataRows] = await Promise.all([
+			this.clickHouseService.query<{ total: string }>(countSql, params),
+			this.clickHouseService.query<{
+				dsp_id: string;
+				dsp_name: string;
+				total_views: string;
+				total_revenue_usd: string;
+			}>(dataSql, params),
+		]);
+
+		const totalItems = Number(countRows[0]?.total ?? 0);
+		const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
+			rank: skip + i + 1,
+			dspId: row.dsp_id,
+			dspName: row.dsp_name || row.dsp_id,
+			totalViews: Number(row.total_views),
+			totalRevenueUsd: row.total_revenue_usd || '0',
+		}));
+
+		return new PageDto({
+			items,
+			metadata: { page, pageSize: limit, totalItems },
+		});
+	}
+
+	// ─────────────────────────────────────────────────────
+	// TOP TERRITORIES (all entity types)
+	// ─────────────────────────────────────────────────────
+
+	async getTopTerritories(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityRankingQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopTerItem>> {
+		const key = this.cache.buildKey(
+			`ent:top-ters:${entityType}`,
+			tenantId,
+			{ entityId, ...dto },
+		);
+		return this.cache.wrap(key, () =>
+			this.computeTopTerritories(entityType, entityId, dto, tenantId),
+		);
+	}
+
+	private async computeTopTerritories(
+		entityType: EntityType,
+		entityId: string,
+		dto: EntityRankingQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopTerItem>> {
+		const page = dto.page ?? 1;
+		const limit = dto.limit;
+		const skip = dto.skip;
+		const sortCol =
+			dto.sortBy === 'revenue' ? 'total_revenue_usd' : 'total_views';
+		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
+
+		const { joinSql, filterSql, params } = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+		);
+		params.fromMonth = fromMonth;
+		params.toMonth = toMonth;
+
+		const countSql = `
+			SELECT uniq(tt.territory_code) AS total
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tt
+			${joinSql.replace(/\bs\.isrc\b/g, 'tt.isrc')}
+			WHERE tt.period >= toDate({fromMonth:String}) AND tt.period <= toDate({toMonth:String})
+				${filterSql.replace(/\bs\./g, 'tt.')}
+		`;
+
+		const dataSql = `
+			SELECT
+				tt.territory_code AS iso_code,
+				sum(tt.total_quantity) AS total_views,
+				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tt
+			${joinSql.replace(/\bs\.isrc\b/g, 'tt.isrc')}
+			LEFT JOIN (
+				SELECT territory_code, isrc, sum(total_revenue_usd) AS total_revenue_usd
+				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				GROUP BY territory_code, isrc
+			) sa ON tt.territory_code = sa.territory_code AND tt.isrc = sa.isrc
+			WHERE tt.period >= toDate({fromMonth:String}) AND tt.period <= toDate({toMonth:String})
+				${filterSql.replace(/\bs\./g, 'tt.')}
+			GROUP BY tt.territory_code
+			ORDER BY ${sortCol} DESC
+			LIMIT ${limit} OFFSET ${skip}
+		`;
+
+		const [countRows, dataRows] = await Promise.all([
+			this.clickHouseService.query<{ total: string }>(countSql, params),
+			this.clickHouseService.query<{
+				iso_code: string;
+				total_views: string;
+				total_revenue_usd: string;
+			}>(dataSql, params),
+		]);
+
+		const totalItems = Number(countRows[0]?.total ?? 0);
+		const iso2Codes = dataRows
+			.map((r) => r.iso_code?.trim().toUpperCase())
+			.filter(Boolean);
+
+		let nameMap = new Map<string, string>();
+		if (iso2Codes.length) {
+			const countries = await this.entityManager.query(
+				`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+				[iso2Codes],
+			);
+			nameMap = new Map(countries.map((c: { iso2: string; name: string }) => [c.iso2, c.name]));
+		}
+
+		const items: EntityTopTerItem[] = dataRows.map((row, i) => {
+			const isoCode = row.iso_code?.trim().toUpperCase() || '';
+			return {
+				rank: skip + i + 1,
+				isoCode,
+				territory: nameMap.get(isoCode) ?? isoCode,
+				totalViews: Number(row.total_views),
+				totalRevenueUsd: row.total_revenue_usd || '0',
+			};
+		});
+
+		return new PageDto({
+			items,
+			metadata: { page, pageSize: limit, totalItems },
+		});
 	}
 }

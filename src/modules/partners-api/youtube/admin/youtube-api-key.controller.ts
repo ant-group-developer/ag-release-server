@@ -14,11 +14,11 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { CreateYoutubeApiKeyDto } from '../dto/create-api-key.dto';
 import { UpdateYoutubeApiKeyDto } from '../dto/update-api-key.dto';
+import { YoutubeApiKeyPoolService } from '../services/youtube-api-key-pool.service';
 import {
 	YoutubeApiKeyPublicView,
 	YoutubeApiKeyService,
 } from '../services/youtube-api-key.service';
-import { YoutubeApiKeyPoolService } from '../services/youtube-api-key-pool.service';
 
 @ApiTags('Admin - YouTube API Keys')
 @Controller('admin/youtube-api-keys')
@@ -39,15 +39,21 @@ export class YoutubeApiKeyAdminController {
 	}
 
 	@Get()
-	@ApiOperation({ summary: 'List all YouTube API keys (no plaintext exposed)' })
+	@ApiOperation({
+		summary: 'List all YouTube API keys (no plaintext exposed)',
+	})
 	async findAll(): Promise<ResponseSuccess<YoutubeApiKeyPublicView[]>> {
 		const data = await this.keyService.findAll();
 		return new ResponseSuccess({ data });
 	}
 
 	@Get('stats')
-	@ApiOperation({ summary: 'Pool stats: quota consumed per key today, total remaining' })
-	async stats(): Promise<ResponseSuccess<ReturnType<YoutubeApiKeyPoolService['getPoolStats']>>> {
+	@ApiOperation({
+		summary: 'Pool stats: quota consumed per key today, total remaining',
+	})
+	async stats(): Promise<
+		ResponseSuccess<ReturnType<YoutubeApiKeyPoolService['getPoolStats']>>
+	> {
 		return new ResponseSuccess({ data: this.poolService.getPoolStats() });
 	}
 
@@ -61,7 +67,9 @@ export class YoutubeApiKeyAdminController {
 	}
 
 	@Patch(':id')
-	@ApiOperation({ summary: 'Update alias / status (active|disabled) / dailyQuotaLimit' })
+	@ApiOperation({
+		summary: 'Update alias / status (active|disabled) / dailyQuotaLimit',
+	})
 	async update(
 		@Param('id', new ParseUUIDPipe()) id: string,
 		@Body() dto: UpdateYoutubeApiKeyDto,

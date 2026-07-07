@@ -89,7 +89,10 @@ export class YoutubeEncryptionService implements OnModuleInit {
 		decipher.setAuthTag(authTag);
 
 		try {
-			const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+			const decrypted = Buffer.concat([
+				decipher.update(data),
+				decipher.final(),
+			]);
 			return decrypted.toString('utf8');
 		} catch (err: any) {
 			this.logger.error(

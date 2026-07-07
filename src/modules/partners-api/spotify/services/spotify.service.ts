@@ -155,7 +155,9 @@ class RequestQueue {
 	private getRequestsInWindow(): number {
 		const now = Date.now();
 		const cutoff = now - this.windowMs;
-		this.requestTimestamps = this.requestTimestamps.filter((t) => t > cutoff);
+		this.requestTimestamps = this.requestTimestamps.filter(
+			(t) => t > cutoff,
+		);
 		return this.requestTimestamps.length;
 	}
 
@@ -171,14 +173,17 @@ class RequestQueue {
 		if (waitMs > 0) {
 			this.logger.warn(
 				`[Rate Limit] Hit ${currentRate}/${this.maxRequestsPerMinute} req/min cap. ` +
-				`Pausing ${waitMs}ms. Queue depth: ${this.queue.length}`,
+					`Pausing ${waitMs}ms. Queue depth: ${this.queue.length}`,
 			);
 			await new Promise((r) => setTimeout(r, waitMs));
 		}
 	}
 
 	private async next() {
-		if (this.activeCount >= this.maxConcurrency || this.queue.length === 0) {
+		if (
+			this.activeCount >= this.maxConcurrency ||
+			this.queue.length === 0
+		) {
 			return;
 		}
 
@@ -195,7 +200,9 @@ class RequestQueue {
 
 			// Log every 10th request to reduce spam
 			if (rpm % 10 === 0 || rpm >= this.maxRequestsPerMinute - 5) {
-				this.logger.log(`[Spotify API] Rate: ${rpm}/${this.maxRequestsPerMinute} req/min | Queue: ${this.queue.length} | Active: ${this.activeCount}`);
+				this.logger.log(
+					`[Spotify API] Rate: ${rpm}/${this.maxRequestsPerMinute} req/min | Queue: ${this.queue.length} | Active: ${this.activeCount}`,
+				);
 			}
 
 			const result = await fn();

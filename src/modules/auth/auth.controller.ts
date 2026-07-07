@@ -27,7 +27,8 @@ export class AuthController {
 	@ApiHeader({
 		name: 'x-custom-domain',
 		required: false,
-		description: 'Custom domain (e.g. test.quizonline.website). If sent, must be an active tenant domain — primary domains and unknown domains are rejected.',
+		description:
+			'Custom domain (e.g. test.quizonline.website). If sent, must be an active tenant domain — primary domains and unknown domains are rejected.',
 	})
 	@Post('login')
 	async login(
@@ -41,7 +42,8 @@ export class AuthController {
 	@ApiHeader({
 		name: 'x-custom-domain',
 		required: false,
-		description: 'Custom domain (e.g. test.quizonline.website). If sent, must be an active tenant domain — primary domains and unknown domains are rejected.',
+		description:
+			'Custom domain (e.g. test.quizonline.website). If sent, must be an active tenant domain — primary domains and unknown domains are rejected.',
 	})
 	@Post('switch-tenant')
 	async switchTenant(

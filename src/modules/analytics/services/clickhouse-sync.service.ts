@@ -8,9 +8,9 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { Client } from 'pg';
+import { ClickHouseMigrationService } from 'src/modules/clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
-import { ClickHouseMigrationService } from 'src/modules/clickhouse/clickhouse-migration.service';
 import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
 import { EntityManager } from 'typeorm';
 
@@ -126,7 +126,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 
 	private async runInitialSyncIfNeeded() {
 		try {
-			const forceSync = this.configService.get<string>('FORCE_INITIAL_SYNC') === 'true';
+			const forceSync =
+				this.configService.get<string>('FORCE_INITIAL_SYNC') === 'true';
 
 			// Dem so ban ghi hien co tren ClickHouse
 			const countResult = await this.clickHouseService.query<{
@@ -141,7 +142,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				 FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
 			);
 			const chCount = Number(countResult[0]?.c ?? 0);
-			const chWithReleaseUpc = Number(countResult[0]?.with_release_upc ?? 0);
+			const chWithReleaseUpc = Number(
+				countResult[0]?.with_release_upc ?? 0,
+			);
 			const chEmptyTitle = Number(countResult[0]?.empty_title ?? 0);
 
 			// Dem so ISRC hop le tren Postgres (tracks + videos)
@@ -164,7 +167,13 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 			);
 
 			// Neu ClickHouse trong, thieu du lieu (so voi Postgres) hoac bi rong track_title, hoac forceSync = true
-			if (forceSync || chCount === 0 || chCount < pgCount || chWithReleaseUpc < pgCount || (chEmptyTitle > 0 && pgCount > 0)) {
+			if (
+				forceSync ||
+				chCount === 0 ||
+				chCount < pgCount ||
+				chWithReleaseUpc < pgCount ||
+				(chEmptyTitle > 0 && pgCount > 0)
+			) {
 				this.logger.log(
 					`Starting full initial sync from Postgres to ClickHouse (${pgCount} ISRCs)...`,
 				);
@@ -313,7 +322,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				track_version: row.track_version ?? '',
 				release_title: row.release_title ?? '',
 				label_name: row.label_name ?? '',
-				artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+				artist_names: row.artist_names
+					? row.artist_names.split('||').filter(Boolean)
+					: [],
 				cover_75: row.cover_75 ?? '',
 				cover_100: row.cover_100 ?? '',
 				cover_160: row.cover_160 ?? '',
@@ -529,7 +540,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					track_version: row.track_version ?? '',
 					release_title: row.release_title ?? '',
 					label_name: row.label_name ?? '',
-					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					artist_names: row.artist_names
+						? row.artist_names.split('||').filter(Boolean)
+						: [],
 					cover_75: row.cover_75 ?? '',
 					cover_100: row.cover_100 ?? '',
 					cover_160: row.cover_160 ?? '',
@@ -604,7 +617,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					track_version: row.track_version ?? '',
 					release_title: row.release_title ?? '',
 					label_name: row.label_name ?? '',
-					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					artist_names: row.artist_names
+						? row.artist_names.split('||').filter(Boolean)
+						: [],
 					cover_75: row.cover_75 ?? '',
 					cover_100: row.cover_100 ?? '',
 					cover_160: row.cover_160 ?? '',
@@ -743,7 +758,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					track_version: row.track_version ?? '',
 					release_title: row.release_title ?? '',
 					label_name: row.label_name ?? '',
-					artist_names: row.artist_names ? row.artist_names.split('||').filter(Boolean) : [],
+					artist_names: row.artist_names
+						? row.artist_names.split('||').filter(Boolean)
+						: [],
 					cover_75: row.cover_75 ?? '',
 					cover_100: row.cover_100 ?? '',
 					cover_160: row.cover_160 ?? '',

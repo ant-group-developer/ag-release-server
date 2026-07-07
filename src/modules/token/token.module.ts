@@ -44,7 +44,7 @@ const PublicKeysProvider: Provider = {
 						algorithm: 'RS256',
 						issuer: cfg.get<string>('JWT_ISSUER'),
 						audience: cfg.get<string>('JWT_AUDIENCE'),
-						expiresIn: (cfg.get('JWT_EXPIRES_IN') || '15m') as any,
+						expiresIn: cfg.get('JWT_EXPIRES_IN') || '15m',
 						keyid: cfg.get<string>('JWT_KID') || 'v1',
 					},
 					verifyOptions: {

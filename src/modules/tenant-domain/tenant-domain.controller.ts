@@ -12,8 +12,15 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from '../../common/dtos/common.response.dto';
-import { PublicRoute, TenantOwnerOrAdminOnly } from '../auth/decorators/auth.decorator';
-import { AddDomainDto, CfOAuthCallbackDto, CfOAuthUrlQueryDto, GetCfOAuthUrlDto } from './dtos/tenant-domain.dto';
+import {
+	PublicRoute,
+	TenantOwnerOrAdminOnly,
+} from '../auth/decorators/auth.decorator';
+import {
+	AddDomainDto,
+	CfOAuthCallbackDto,
+	CfOAuthUrlQueryDto,
+} from './dtos/tenant-domain.dto';
 import { TenantDomainService } from './tenant-domain.service';
 
 @ApiTags('Tenant Domain')
@@ -38,7 +45,10 @@ export class TenantDomainController {
 		@Param('tenantId') tenantId: string,
 		@Body() dto: AddDomainDto,
 	) {
-		const data = await this.tenantDomainService.addDomain(tenantId, dto.domain);
+		const data = await this.tenantDomainService.addDomain(
+			tenantId,
+			dto.domain,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -60,7 +70,10 @@ export class TenantDomainController {
 
 	@TenantOwnerOrAdminOnly()
 	@Get('tenants/:tenantId/domain/cf-oauth-url')
-	@ApiOperation({ summary: 'Get Cloudflare OAuth URL for auto DNS setup — uses domain already saved in DB' })
+	@ApiOperation({
+		summary:
+			'Get Cloudflare OAuth URL for auto DNS setup — uses domain already saved in DB',
+	})
 	async getCfOAuthUrl(
 		@Param('tenantId') tenantId: string,
 		@Query() query: CfOAuthUrlQueryDto,
@@ -86,12 +99,17 @@ export class TenantDomainController {
 
 	@PublicRoute()
 	@Get('public/cf-oauth-callback')
-	@ApiOperation({ summary: 'Cloudflare OAuth callback — exchanges code and adds DNS records' })
+	@ApiOperation({
+		summary:
+			'Cloudflare OAuth callback — exchanges code and adds DNS records',
+	})
 	@Redirect()
 	async cfOAuthCallback(@Query() query: CfOAuthCallbackDto) {
 		// Peek returnUrl từ state để redirect về đúng trang admin bắt đầu flow.
 		// handleCfOAuthCallback sẽ tự xóa state khi xử lý thành công.
-		const returnUrl = this.tenantDomainService.resolveCallbackReturnUrl(query.state);
+		const returnUrl = this.tenantDomainService.resolveCallbackReturnUrl(
+			query.state,
+		);
 
 		// Cloudflare trả error trực tiếp (vd: user từ chối authorize, scope sai)
 		if (query.error || !query.code) {
@@ -107,15 +125,21 @@ export class TenantDomainController {
 		// Mọi lỗi trong quá trình xử lý đều redirect về FE thay vì trả 500,
 		// để user biết chính xác config sai gì.
 		try {
-			const redirectUrl = await this.tenantDomainService.handleCfOAuthCallback(
-				query.code,
-				query.state,
-			);
+			const redirectUrl =
+				await this.tenantDomainService.handleCfOAuthCallback(
+					query.code,
+					query.state,
+				);
 			return { url: redirectUrl };
 		} catch (err) {
-			const { code, description } = this.tenantDomainService.mapCfCallbackError(err);
+			const { code, description } =
+				this.tenantDomainService.mapCfCallbackError(err);
 			return {
-				url: this.tenantDomainService.buildOAuthErrorRedirect(returnUrl, code, description),
+				url: this.tenantDomainService.buildOAuthErrorRedirect(
+					returnUrl,
+					code,
+					description,
+				),
 			};
 		}
 	}

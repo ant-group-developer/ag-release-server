@@ -67,6 +67,7 @@ export class ReleaseExecution3Consumer {
 						this.executionService.cancelPendingExecutions({
 							releaseId: execution.releaseId,
 							excludeExecutionId: execution.id,
+							dspCodes: execution.metadata?.input?.dspCodes,
 						}),
 					),
 				);

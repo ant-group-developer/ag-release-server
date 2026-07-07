@@ -83,7 +83,7 @@ export class YoutubeSearchCacheService {
 					rawResponse: (entry.rawResponse ?? null) as any,
 					cachedAt: new Date(),
 					expiresAt,
-				} as any)
+				})
 				.orUpdate(
 					[
 						'query_text',

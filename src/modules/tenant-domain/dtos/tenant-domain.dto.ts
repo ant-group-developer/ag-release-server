@@ -1,9 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
-import { DomainSetupMode } from '../entities/tenant-domain.entity';
+import {
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	Length,
+	Matches,
+} from 'class-validator';
 
 export class AddDomainDto {
-	@ApiProperty({ example: 'release.betamusic.net', description: 'Custom domain (without http/https)' })
+	@ApiProperty({
+		example: 'release.betamusic.net',
+		description: 'Custom domain (without http/https)',
+	})
 	@IsString()
 	@IsNotEmpty()
 	@Length(4, 253)
@@ -20,7 +28,8 @@ export class GetCfOAuthUrlDto {
 
 export class CfOAuthUrlQueryDto {
 	@ApiPropertyOptional({
-		description: 'Full URL của trang FE đang config, để callback redirect về đúng chỗ sau khi xong',
+		description:
+			'Full URL của trang FE đang config, để callback redirect về đúng chỗ sau khi xong',
 		example: 'http://localhost:6200/en/tenants/123/custom-domain',
 	})
 	@IsString()

@@ -1,6 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
-import { Release } from './release.entity';
 import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { Release } from './release.entity';
 
 export enum ReleaseEnrichmentStatus {
 	PENDING = 'PENDING',

@@ -9,9 +9,7 @@ import { TenantDomainController } from './tenant-domain.controller';
 import { TenantDomainService } from './tenant-domain.service';
 
 @Module({
-	imports: [
-		TypeOrmModule.forFeature([TenantDomain, Tenant]),
-	],
+	imports: [TypeOrmModule.forFeature([TenantDomain, Tenant])],
 	controllers: [TenantDomainController],
 	providers: [
 		TenantDomainService,
