@@ -34,6 +34,10 @@ export class SpotifyExportSchedulerService implements OnApplicationBootstrap {
   ) {}
 
   onApplicationBootstrap() {
+    if (process.env.APP_ROLE !== 'worker') {
+      this.logger.debug('Skipping Spotify export scheduler (not worker role)');
+      return;
+    }
     this.initializeInBackground().catch((err) => {
       this.logger.error(`Failed to initialize Spotify export scheduler: ${err.message}`, err.stack);
     });
