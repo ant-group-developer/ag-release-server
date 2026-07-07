@@ -1,5 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+	BadGatewayException,
+	Inject,
+	Injectable,
+	Logger,
+	forwardRef,
+} from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
+import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { GetCiQaFlagsDto, GetCiReleaseFormatsDto } from '../dtos/ci.dto';
 
@@ -7,7 +14,10 @@ import { GetCiQaFlagsDto, GetCiReleaseFormatsDto } from '../dtos/ci.dto';
 export class CiReleaseService {
 	private readonly logger = new Logger(CiReleaseService.name);
 
-	constructor(private readonly appConfigService: AppConfigService) {}
+	constructor(
+		@Inject(forwardRef(() => AppConfigService))
+		private readonly appConfigService: AppConfigService,
+	) {}
 
 	private get client(): AxiosInstance {
 		const baseUrl = this.appConfigService.getValue<string>(
@@ -64,6 +74,44 @@ export class CiReleaseService {
 				error?.message || error,
 			);
 			throw error;
+		}
+	}
+
+	// ko cần token
+	async getStatusV1(): Promise<any> {
+		try {
+			const endpoint = '/releases/v1/status';
+			const response = await this.client.get(endpoint);
+			const data = response.data;
+
+			if (data?.status !== 'ok') {
+				throw new BadGatewayException({
+					message: 'CI release service status is not ok',
+					data,
+				});
+			}
+
+			return response.data;
+		} catch (error) {
+			this.logger.error(`Error getStatusV1`, error?.message || error);
+			throw error;
+		}
+	}
+
+	// cần token, dùng để check token
+	async getChangesUserV1(): Promise<any> {
+		try {
+			const endpoint = '/releases/v1/changes/user';
+			const response = await this.client.get(endpoint);
+			return response.data;
+		} catch (error) {
+			this.logger.error(
+				`Error getChangesUserV1`,
+				error?.message || error,
+			);
+			return new ResponseError({
+				data: error,
+			});
 		}
 	}
 

@@ -272,7 +272,12 @@ export class ReleaseExecution3Builder {
 				break;
 			}
 
-			case ReleaseExecutionStepType.IMPORT_CI:
+			case ReleaseExecutionStepType.IMPORT_CI: {
+				if (
+					releaseExecution.metadata.input.dspAggregator?.ci
+						?.isSkipImport
+				)
+					return;
 				stepResult.push(
 					{
 						type: ReleaseExecutionStepType.CREATE_METADATA_ON_SERVER,
@@ -300,6 +305,7 @@ export class ReleaseExecution3Builder {
 					{ type: ReleaseExecutionStepType.VALIDATE_QA_CI, order: 6 },
 				);
 				break;
+			}
 
 			case ReleaseExecutionStepType.EXPORT_CI: {
 				const ciDsps =

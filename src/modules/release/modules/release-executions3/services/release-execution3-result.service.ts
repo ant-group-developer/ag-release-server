@@ -19,6 +19,7 @@ const RELEASE_DSP_STATUS_PRIORITY: Record<ReleaseDspStatus, number> = {
 	[ReleaseDspStatus.ISSUES]: 1,
 	[ReleaseDspStatus.PROCESSING]: 2,
 	[ReleaseDspStatus.NEVER_DISTRIBUTED]: 3,
+	[ReleaseDspStatus.DRAFT]: 4,
 };
 
 @Injectable()
