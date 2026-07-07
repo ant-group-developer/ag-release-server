@@ -1,10 +1,17 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+	Inject,
+	Injectable,
+	Logger,
+	OnModuleInit,
+	forwardRef,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AppEvent } from 'src/common/enums/common';
 import { ArtistRole } from 'src/modules/artist-role/entities/artist-role.entity';
 import { Repository } from 'typeorm';
 import { CiToolService } from '../partners-api/ci-tool/ci-tool.service';
+import { CiReleaseService } from '../partners-api/ci/services/ci-release.service';
 import { appConfigDefault } from './constants/app-config.constant';
 import { UpdateConfigDto } from './dtos/app-config.dto';
 import { AppConfig } from './entities/app-config.entity';
@@ -23,6 +30,8 @@ export class AppConfigService implements OnModuleInit {
 		private readonly artistRoleRepo: Repository<ArtistRole>,
 		private readonly eventEmitter: EventEmitter2,
 		private readonly ciToolService: CiToolService,
+		@Inject(forwardRef(() => CiReleaseService))
+		private readonly ciReleaseService: CiReleaseService,
 	) {}
 
 	getCache(): AppConfig {
@@ -138,10 +147,12 @@ export class AppConfigService implements OnModuleInit {
 	async refreshCiToolToken() {
 		const token = await this.ciToolService.getTokenCi();
 
+		// const token = 'await this.ciToolService.getTokenCi();';
+
 		const dataDb = this.getCache();
 		const partners = dataDb.config.partners;
 
-		return this.update({
+		await this.update({
 			partners: {
 				...partners,
 				ci: {
@@ -150,6 +161,12 @@ export class AppConfigService implements OnModuleInit {
 				},
 			},
 		});
+
+		return token;
+	}
+
+	async testCiToken() {
+		return this.ciReleaseService.getChangesUserV1();
 	}
 
 	// private

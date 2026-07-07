@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put } from '@nestjs/common';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	PublicRoute,
@@ -29,6 +29,20 @@ export class AppConfigController {
 	@Put()
 	async update(@Body() payload: UpdateConfigDto) {
 		const data = await this.appConfigService.update(payload);
+		return new ResponseSuccess({ data });
+	}
+
+	// @SystemAdminOnly()
+	@Post('refresh-ci-tool-token')
+	async refreshCiToolToken() {
+		const data = await this.appConfigService.refreshCiToolToken();
+		return new ResponseSuccess({ data });
+	}
+
+	// @SystemAdminOnly()
+	@Post('test-ci-token')
+	async testCiToken() {
+		const data = await this.appConfigService.testCiToken();
 		return new ResponseSuccess({ data });
 	}
 }

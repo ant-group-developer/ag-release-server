@@ -1,4 +1,6 @@
 import { Controller, Get, Logger, Param, Query } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	GetCiQaFlagsDto,
 	GetCiReleaseFormatsDto,
@@ -7,6 +9,7 @@ import {
 import { CiReleaseService } from '../services/ci-release.service';
 import { CiService } from '../services/ci.service';
 
+@ApiTags('Partners - CI Releases')
 @Controller('partners/ci/releases')
 export class CiReleaseController {
 	private readonly logger = new Logger(CiReleaseController.name);
@@ -29,6 +32,20 @@ export class CiReleaseController {
 	@Get('releaseformats/one')
 	async getReleaseFormatOne(@Query() query: GetCiReleaseFormatsDto) {
 		return this.ciReleaseService.getReleaseFormatOneV1(query);
+	}
+
+	@ApiOperation({ summary: 'Status of the CI releases backend system' })
+	@Get('status')
+	async getStatus() {
+		const result = await this.ciReleaseService.getStatusV1();
+		return new ResponseSuccess({ data: result });
+	}
+
+	@ApiOperation({ summary: 'List CI release PATCH operations for user role' })
+	@Get('changes/user')
+	async getChangesUser() {
+		const result = await this.ciReleaseService.getChangesUserV1();
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get('releaseformats-v2')
