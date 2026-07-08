@@ -165,8 +165,10 @@ function formatJob(job: ImportJob) {
     job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
     job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
     job.sourceType === ImportJobSourceType.FTP_RETRY ||
-    job.sourceType === ImportJobSourceType.FTP_AUTO_CRON ||
-    job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
+    job.sourceType === ImportJobSourceType.FTP_AUTO_CRON;
+
+  const isR2Sync = job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
+  const isExportTrigger = job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
 
 	return {
 		id: job.id,
@@ -199,7 +201,27 @@ function formatJob(job: ImportJob) {
 				}
 			: null,
 		params: job.params,
-		result: job.result,
+		...(isR2Sync
+			? {
+					detailR2Sync: job.result
+						? {
+								zipsFound: job.result.zipsFound ?? 0,
+								zipsImported: job.result.zipsImported ?? 0,
+								zipsSkipped: job.result.zipsSkipped ?? 0,
+							}
+						: null,
+				}
+			: isExportTrigger
+				? {
+						detailExport: job.result
+							? {
+									jobSpoId: job.result.jobSpoId ?? null,
+									foldersUploaded: job.result.foldersUploaded ?? 0,
+									r2ObjectKeys: job.result.r2ObjectKeys ?? [],
+								}
+							: null,
+					}
+				: { result: job.result }),
 		error: job.errorMessage || null,
 		batchId: job.batchId || null,
 		tenantId: job.tenantId || null,

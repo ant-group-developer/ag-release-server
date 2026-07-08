@@ -73,8 +73,10 @@ export class MetadataScanService implements OnModuleInit {
 		private readonly youtubeEnrichmentService: YoutubeEnrichmentService,
 	) {}
 
-	async onModuleInit(): Promise<void> {
-		await this.failInterruptedProcessingScans();
+	onModuleInit(): void {
+		this.failInterruptedProcessingScans().catch((err) => {
+			this.logger.error(`Failed to mark interrupted scans: ${err.message}`);
+		});
 	}
 
 	private async failInterruptedProcessingScans(): Promise<void> {

@@ -52,6 +52,10 @@ export class SpotifyR2SyncService implements OnApplicationBootstrap {
   ) {}
 
   onApplicationBootstrap() {
+    if (process.env.APP_ROLE !== 'worker') {
+      this.logger.debug('Skipping Spotify R2 sync cron (not worker role)');
+      return;
+    }
     this.initializeInBackground().catch((err) => {
       this.logger.error(`Failed to initialize Spotify R2 sync cron: ${err.message}`, err.stack);
     });

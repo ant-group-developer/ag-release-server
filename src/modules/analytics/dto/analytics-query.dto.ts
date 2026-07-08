@@ -243,6 +243,31 @@ export class DspTopQueryDto extends DspAnalyticsBaseDto {
 	@Max(100)
 	pageSize?: number;
 
+	@ApiPropertyOptional({
+		description:
+			'Limit results to top N items. When set, overrides pageSize. Combine with includeOther to aggregate the rest.',
+		minimum: 1,
+		maximum: 100,
+		example: 5,
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	topN?: number;
+
+	@ApiPropertyOptional({
+		description:
+			'When true, appends an aggregated "Other" item that sums all entries beyond the top N.',
+		default: false,
+		example: true,
+	})
+	@IsOptional()
+	@Type(() => Boolean)
+	@IsBoolean()
+	includeOther?: boolean;
+
 	get limit(): number {
 		return this.pageSize ?? 20;
 	}
@@ -451,6 +476,31 @@ export class EntityRankingQueryDto extends ChartQueryDto {
 	@Min(1)
 	@Max(100)
 	pageSize?: number;
+
+	@ApiPropertyOptional({
+		description:
+			'Limit results to top N items. When set, overrides pageSize for /dsp and /ter endpoints. Combine with includeOther to aggregate the rest.',
+		minimum: 1,
+		maximum: 100,
+		example: 5,
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	topN?: number;
+
+	@ApiPropertyOptional({
+		description:
+			'When true, appends an aggregated "Other" item that sums all entries beyond the top N.',
+		default: false,
+		example: true,
+	})
+	@IsOptional()
+	@Type(() => Boolean)
+	@IsBoolean()
+	includeOther?: boolean;
 
 	get limit(): number {
 		return this.pageSize ?? 20;

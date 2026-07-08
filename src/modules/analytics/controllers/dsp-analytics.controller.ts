@@ -101,4 +101,13 @@ export class DspAnalyticsController {
 		const data = await this.dspSvc.getTopReleases(dto, req.user!.tenantId);
 		return new ResponseSuccess({ data });
 	}
+
+	@Post('ter')
+	@ApiOperation({
+		summary: 'Top territories của 1 DSP (sortBy: views | revenue)',
+	})
+	async topTerritories(@Body() dto: DspTopQueryDto, @Req() req: Request) {
+		const data = await this.dspSvc.getTopTerritories(dto, req.user!.tenantId);
+		return new ResponseSuccess({ data });
+	}
 }

@@ -83,6 +83,10 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	// ======================================================
 
 	onModuleInit() {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug('Skipping ClickHouse sync listener (not worker role)');
+			return;
+		}
 		this.initializeSyncInBackground().catch((err) => {
 			this.logger.error(
 				`ClickHouse background sync initialization failed: ${err.message}`,
