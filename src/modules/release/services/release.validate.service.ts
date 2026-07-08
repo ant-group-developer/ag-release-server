@@ -464,21 +464,22 @@ export class ReleaseValidateService {
 			);
 		}
 
-		// const hasExplicitTrack = release.tracks?.some((track) =>
-		// 	this.isExplicitContent(track.trackSensitive?.code),
-		// );
-		//
-		// if (release.isInstrumental && hasExplicitTrack) {
-		// 	result.push(
-		// 		new FieldErrorDetails({
-		// 			messageCode: 'NOVOCALSETFOREXPLICITCONTENT',
-		// 			message:
-		// 				'Explicit Content has been indicated on this release, but the metadata says there are no vocals. Update the release metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
-		// 			page: 'core-detail',
-		// 			field: 'isInstrumental',
-		// 		}),
-		// 	);
-		// }
+		const hasExplicitTrack = release.tracks?.some((track) =>
+			this.isExplicitContent(track.trackSensitive?.code),
+		);
+
+		if (release.isInstrumental && hasExplicitTrack) {
+			result.push(
+				new FieldErrorDetails({
+					messageCode:
+						'formFields.validate.noLinguisticContentHasExplicitContent',
+					message:
+						'Explicit Content has been indicated on this release, but the metadata says there are no vocals. Update the release metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
+					page: 'core-detail',
+					field: 'isInstrumental',
+				}),
+			);
+		}
 
 		const LYRICIST_ROLE_CODE = 'Lyricist';
 
@@ -706,21 +707,22 @@ export class ReleaseValidateService {
 				track.trackLanguage?.audioLanguage?.code ===
 					NO_LINGUISTIC_CONTENT_LANGUAGE;
 
-			// if (
-			// 	isNoLinguisticContent &&
-			// 	this.isExplicitContent(track.trackSensitive?.code)
-			// ) {
-			// 	result.push(
-			// 		new FieldErrorDetails({
-			// 			messageCode: 'NOVOCALSETFOREXPLICITCONTENT',
-			// 			message:
-			// 				'Explicit Content has been indicated on this track, but the metadata says there are no vocals. Update the track metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
-			// 			page: 'tracks',
-			// 			field: `tracks.${index}.trackSensitiveId`,
-			// 			trackId: track.id,
-			// 		}),
-			// 	);
-			// }
+			if (
+				isNoLinguisticContent &&
+				this.isExplicitContent(track.trackSensitive?.code)
+			) {
+				result.push(
+					new FieldErrorDetails({
+						messageCode:
+							'formFields.validate.noLinguisticContentHasExplicitContent',
+						message:
+							'Explicit Content has been indicated on this track, but the metadata says there are no vocals. Update the track metadata to indicate the presence of vocals and language, or remove the Explicit Content flag.',
+						page: 'tracks',
+						field: `tracks.${index}.trackSensitiveId`,
+						trackId: track.id,
+					}),
+				);
+			}
 
 			if (isNoLinguisticContent) {
 				const hasLyricist = track.trackContributors?.some(
@@ -838,14 +840,9 @@ export class ReleaseValidateService {
 		return result;
 	}
 
-	// private isExplicitContent(code?: string | null): boolean {
-	// 	const normalizedCode = code?.replace(/[^a-zA-Z]/g, '').toUpperCase();
-	//
-	// 	return [
-	// 		'EXPLICIT',
-	// 		'EXPLICITCONTENT',
-	// 		'EXPLICITCONTENTEDITED',
-	// 		'PARENTALADVISORY',
-	// 	].includes(normalizedCode ?? '');
-	// }
+	private isExplicitContent(code?: string | null): boolean {
+		return ['Explicit', 'ExplicitContentEdited', 'NoAdviceAvailable'].includes(
+			code?.trim() ?? '',
+		);
+	}
 }
