@@ -623,6 +623,34 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	})
 	lastImportIsFailed?: boolean;
 
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Filter releases that will skip CI import',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isSkipImport?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Filter releases that have CI QA flags',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasQaFlag?: boolean;
+
 	@ApiPropertyOptional({ type: QueryReleaseDspDeliveryDto })
 	@IsOptional()
 	@Transform(({ value }) => parseJsonObjectQueryValue(value))
@@ -776,6 +804,24 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 		return value;
 	})
 	lastImportIsFailed?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isSkipImport?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasQaFlag?: boolean;
 
 	@IsOptional()
 	@Transform(({ value }) => parseJsonObjectQueryValue(value))

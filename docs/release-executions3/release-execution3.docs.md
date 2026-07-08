@@ -16,7 +16,7 @@ Input chính khi submit:
 }
 ```
 
-Sau submit, `submit3()` cập nhật `release.status = submitted`, gọi `ReleaseDspDeliveryService.updateDeliveryStatus()` với danh sách `dspCode` để đưa các DSP được chọn sang `processing`, rồi tạo một bản ghi `release_excutions3` ở status `NEW`. Cron consumer sẽ lấy execution `NEW`, đổi sang `PROCESSING`, phân loại DSP, build cây step và đẩy một job vào queue `run_pipeline`.
+Sau submit, `submit3()` cập nhật `release.status = submitted`, reset `releaseEndDate = null`, áp dụng `ciImportAction` lên snapshot release nếu FE truyền lên, rồi tạo một bản ghi `release_excutions3` ở status `NEW`. Code hiện tại không gọi trực tiếp `ReleaseDspDeliveryService.updateDeliveryStatus()` trong `submit3()`. Cron consumer sẽ lấy execution `NEW`, đổi sang `PROCESSING`, phân loại DSP, build cây step và đẩy một job vào queue `run_pipeline`.
 
 DSP được phân thành 2 nhóm:
 
@@ -25,9 +25,9 @@ DSP được phân thành 2 nhóm:
 | Direct        | DSP đi thẳng qua routing config riêng, SFTP hoặc S3 | Mỗi DSP là một nhánh độc lập `PROCESS_DIRECT_CHILD`                                        | Mỗi DSP được cập nhật status độc lập                                |
 | Aggregator CI | DSP đi qua aggregator CI                            | Gom lại thành một nhánh `PROCESS_AGG_CI`, sau đó tách `CI Deal` và `State51` ở bước export | Kết quả là một mảng DSP trong delivery metadata của nhánh aggregate |
 
-Status ở bảng `release_dsp_delivery` được cập nhật ngay khi submit và tiếp tục được đồng bộ theo các step có `isDeliveryStep = true`.
+Status ở bảng `release_dsp_delivery` không được cập nhật trực tiếp ngay trong `submit3()`. Status DSP được đồng bộ gián tiếp qua `ReleaseExecution3ResultService`: `parseMetadata()` khởi tạo result cho các DSP trong execution, engine cập nhật result theo các step có `isDeliveryStep = true`, rồi result service sync latest-state sang `release_dsp_delivery`.
 
-Với các step này, `metadata.input.delivery` chứa `releaseId` và danh sách `items` theo dạng `{ id }`, `{ dspId }` hoặc `{ dspCode }`. Khi step đổi status, engine map status của step sang status của delivery, tạo lại danh sách `{ id | dspId | dspCode, status }`, rồi gọi `ReleaseDspDeliveryService.updateDeliveryStatus({ releaseIds, items })` để upsert vào bảng `release_dsp_delivery`. Vì vậy step direct có thể cập nhật từng DSP riêng lẻ, còn step aggregator có thể cập nhật cả nhóm DSP đi qua CI trong cùng một lần sync.
+Với các step này, `metadata.input.delivery` chứa `releaseId` và danh sách `items` theo dạng `{ id }`, `{ dspId }` hoặc `{ dspCode }`. Khi step đổi status, engine map status của step sang status của delivery, tạo lại danh sách `{ id | dspId | dspCode, status }`, rồi gọi `ReleaseExecution3ResultService.updateExecutionOutputResult()`. Service này upsert vào `release_execution_results3`, sau đó gọi `syncToReleaseDspDelivery()` để đẩy latest result sang `ReleaseDspDeliveryService.updateDeliveryStatus({ releaseIds, items })`. Vì vậy step direct có thể cập nhật từng DSP riêng lẻ, còn step aggregator có thể cập nhật cả nhóm DSP đi qua CI trong cùng một lần sync.
 
 ## 2. Sơ đồ nghiệp vụ
 
@@ -37,8 +37,7 @@ Flowchart tổng quan cho admin:
 flowchart TD
   A[Admin bấm Submit] --> B[FE truyền release + dspCodes]
   B --> C[release.status -> submitted]
-  C --> D[release_dsp_delivery -> processing]
-  D --> E[Create release_excutions3 status NEW]
+  C --> E[Create release_excutions3 status NEW]
   E --> F[Cron consumerExecutions pick NEW]
   F --> G[Cancel execution cũ cùng release]
   G --> H[Execution status PROCESSING]
@@ -84,26 +83,27 @@ sequenceDiagram
   participant RQ as run_pipeline_queue
   participant Engine as ReleaseExecutionStepEngine
   participant Worker as ReleaseExecution3Worker
+  participant Result as release_execution_results3
   participant Delivery as release_dsp_delivery
 
   FE->>ReleaseSvc: submit3(releaseId, dspCodes)
   ReleaseSvc->>Release: status = submitted
-  ReleaseSvc->>Delivery: updateDeliveryStatus({ releaseIds, items: dspCodes })
   ReleaseSvc->>ExecSvc: newReleaseExecution(release, dspCodes)
   ExecSvc->>EQ: insert status NEW
-  Consumer->>EQ: scan NEW mỗi 1 phút
+  Consumer->>EQ: scan NEW mỗi 10 giây
   Consumer->>ExecSvc: startProcessing(executionId)
   ExecSvc->>EQ: status PROCESSING
   ExecSvc->>ExecSvc: parseMetadata direct/CI
   ExecSvc->>Builder: buildStepsChild()
   Builder->>EQ: insert release_execution_steps3 tree
   ExecSvc->>RQ: insert run_pipeline NEW
-  Consumer->>RQ: scan NEW mỗi 30 giây
+  Consumer->>RQ: scan NEW mỗi 10 giây
   Consumer->>ExecSvc: runPipeline(executionId)
   ExecSvc->>Engine: processStep(root)
   Engine->>Worker: dispatchStepTask(leaf)
   Worker-->>Engine: step status
-  Engine->>Delivery: sync delivery status nếu isDeliveryStep
+  Engine->>Result: updateExecutionOutputResult nếu isDeliveryStep
+  Result->>Delivery: syncToReleaseDspDelivery()
   ExecSvc->>EQ: refresh execution status
 ```
 
@@ -174,7 +174,7 @@ sequenceDiagram
       ExecSvc->>Queue: queueRunPipeline(executionId)
     else CI Tool failed
       JobSvc->>JobDB: status FAILED, note
-      JobSvc->>ExecSvc: updateStatusStepAndRerunPipeline(stepId, DONE hiện tại / nên là FAILED)
+      JobSvc->>ExecSvc: updateStatusStepAndRerunPipeline(stepId, FAILED)
       ExecSvc->>Queue: queueRunPipeline(executionId)
     else CI Tool vẫn processing
       JobSvc->>JobDB: nextCiToolCheckAt = now + interval
@@ -184,7 +184,7 @@ sequenceDiagram
     JobSvc->>Mail: sendEmail(to, subject, attachment)
     alt Send success
       JobSvc->>JobDB: status COMPLETED, sentAt
-      JobSvc->>ExecSvc: updateStatusStepAndRerunPipeline(stepId, NEW)
+      JobSvc->>ExecSvc: updateStatusStepAndRerunPipeline(stepId, DONE)
       ExecSvc->>Queue: queueRunPipeline(executionId)
     else Send failed
       JobSvc->>JobDB: giữ PROCESSING/PENDING tùy nhánh xử lý lỗi hiện tại
@@ -207,9 +207,9 @@ Enum: `ReleaseStatus` trong `src/modules/release/enum/release.enum.ts`.
 | `failed`      | Thất bại                              |
 | `taken_down`  | Đã takedown                           |
 
-Note: enum hiện có `awaiting_action` và `partial_done`, nhưng đây không phải status user cần quan tâm ở màn release. Với v3, phần chờ thao tác và hoàn thành một phần nên đọc ở execution/step/delivery thay vì hiển thị như status chính của release.
+Note: enum release có thể có các status phục vụ UI/legacy như `awaiting_action` hoặc `partial_done`, nhưng v3 hiện đọc trạng thái chi tiết ở execution/step/delivery. Phần chờ thao tác nên đọc từ `ReleaseExecutionStatus.WAITING_ACTION` hoặc step/job liên quan.
 
-Trong module v3 hiện tại, `submit3()` set `release.status = submitted`. Status chính của từng DSP được cập nhật rõ nhất ở `release_dsp_delivery`. Nếu muốn UI release list đổi theo execution v3, cần thêm bước derive release status từ các delivery status.
+Trong module v3 hiện tại, `submit3()` set `release.status = submitted`. Sau đó status từng DSP được cập nhật ở `release_dsp_delivery` thông qua `ReleaseExecution3ResultService`. Khi `ReleaseDspDeliveryService.updateDeliveryStatus()` chạy, service này cũng gọi `ReleaseService.syncReleaseStatus()` để derive lại status tổng của release từ delivery hiện có.
 
 ### 3.2 Release DSP Delivery
 
@@ -228,11 +228,18 @@ Mapping từ submit/step sang delivery:
 
 ```text
 submit3(dspCodes)
-  -> ReleaseDspDeliveryService.updateDeliveryStatus()
-  -> updateDeliveryStatus({ releaseIds: [releaseId], items status=processing })
+  -> không update trực tiếp release_dsp_delivery
+  -> ReleaseExecution3Queue.queueExecution()
+  -> insert release_excutions3 status NEW
+
+startProcessing()
+  -> parseMetadata()
+  -> ReleaseExecution3ResultService.updateExecutionOutputResult()
+  -> khởi tạo result các DSP trong execution với status never_distributed
+  -> syncToReleaseDspDelivery()
 
 PROCESS_DSPS PROCESSING
-  -> có thể re-sync processing idempotently nếu engine chạy tới step này
+  -> không sync delivery vì trạng thái trung gian không map sang ReleaseDspStatus
 
 PROCESS_DIRECT_CHILD DONE
   -> đúng DSP direct đó: distributed
@@ -257,7 +264,6 @@ Enum: `ReleaseExecutionStatus`.
 | `PROCESSING`      | Đang build/rerun pipeline                              |
 | `WAITING_ACTION`  | Có step chờ admin hoặc tác vụ thủ công                 |
 | `WAITING_PARTNER` | Có step chờ partner tới `scheduledAt`                  |
-| `PARTIAL_DONE`    | Có root step `DONE` và có root step `FAILED/CANCELLED` |
 | `DONE`            | Tất cả root step `DONE`                                |
 | `FAILED`          | Root step thất bại theo rule tổng                      |
 | `CANCELLED`       | Execution bị hủy                                       |
@@ -269,10 +275,10 @@ Rule `deriveExecutionStatusFromSteps()`:
 | 1       | Có `WAITING_ACTION`                | `WAITING_ACTION` |
 | 2       | Có `PROCESSING` hoặc `NEW`         | `PROCESSING`     |
 | 3       | Tất cả `DONE`                      | `DONE`           |
-| 4       | Có `DONE` và có `FAILED/CANCELLED` | `PARTIAL_DONE`   |
-| 5       | Tất cả `FAILED`                    | `FAILED`         |
-| 6       | Tất cả `CANCELLED`                 | `CANCELLED`      |
-| 7       | Có cả `FAILED` và `CANCELLED`      | `FAILED`         |
+| 4       | Tất cả `FAILED`                    | `FAILED`         |
+| 5       | Tất cả `CANCELLED`                 | `CANCELLED`      |
+| 6       | Có cả `FAILED` và `CANCELLED`      | `FAILED`         |
+| 7       | Các trạng thái hỗn hợp còn lại     | `PROCESSING`     |
 
 ### 3.4 Release Execution Step
 
@@ -336,7 +342,7 @@ Entity: `ReleaseExecution3`.
 | `releaseId`                                  | Release đang được xử lý                                             |
 | `releaseTitle`, `releaseUpc`                 | Snapshot nhanh để query/list                                        |
 | `status`                                     | Status tổng của execution                                           |
-| `completedAt`                                | Set khi status final: `DONE`, `FAILED`, `CANCELLED`, `PARTIAL_DONE` |
+| `completedAt`                                | Set khi status final: `DONE`, `FAILED`, `CANCELLED` |
 | `summary`                                    | Summary/error message                                               |
 | `metadata.input.releaseSnapshot`             | Snapshot release tại thời điểm submit                               |
 | `metadata.input.dspCodes`                    | Mảng code DSP FE truyền vào                                         |
@@ -543,7 +549,7 @@ Vì vậy gọi lại full pipeline giúp đơn giản hóa resume: không cần
 
 ### 8.1 Retry step
 
-API: `POST /release-submits/steps/:stepId/retry`.
+API: `POST /release-executions3/steps/:stepId/retry`.
 
 `retryStep(stepId)`:
 
@@ -602,7 +608,7 @@ Khi submit:
 insert execution status NEW
 ```
 
-Cron `consumerExecutions()` chạy mỗi 1 phút:
+Cron `consumerExecutions()` chạy mỗi 10 giây:
 
 ```text
 find executions where status = NEW order by createdAt ASC
@@ -626,7 +632,7 @@ Bảng: `release_execution3_run_pipeline_queue`.
 | `updateStatusStepAndRerunPipeline()` | Admin/job external vừa cập nhật step |
 | `resumeWaitingSteps()`               | Step `WAITING_PARTNER` đã tới giờ    |
 
-Cron `consumeRunPipelineQueue()` chạy mỗi 30 giây:
+Cron `consumeRunPipelineQueue()` chạy mỗi 10 giây:
 
 ```text
 find jobs where status = NEW order by createdAt ASC
@@ -690,7 +696,7 @@ Hàm liên quan:
 | `checkCiToolJobStatus()`             | Poll CI Tool bằng `ciToolService.getExportJobStatus()`                                                |
 | `updateStatusStepAndRerunPipeline()` | Set status cho step chờ, rồi enqueue lại `run_pipeline`                                               |
 
-Note code hiện tại: branch CI Tool `failed` đang update job `FAILED` nhưng gọi `updateStatusStepAndRerunPipeline(stepId, DONE)`, trong khi log ghi step failed. Nếu muốn đúng nghiệp vụ lỗi thì status truyền vào nên là `FAILED`.
+Code hiện tại: branch CI Tool `failed` update job `FAILED` và gọi `updateStatusStepAndRerunPipeline(stepId, FAILED)`.
 
 ### 10.2 EMAIL_STATE51
 
@@ -724,7 +730,7 @@ Hàm liên quan:
 | `autoSendEmail(ids)`                 | Group job theo email, tạo Excel, gửi mail bằng `notificationResendService.sendEmail()`                   |
 | `updateStatusStepAndRerunPipeline()` | Sau khi gửi thành công, update step rồi enqueue lại `run_pipeline`                                       |
 
-Code hiện tại khi gửi mail thành công gọi `updateStatusStepAndRerunPipeline(stepId, NEW)`, tức là step được mở lại để pipeline chạy qua lần nữa. Nếu nghiệp vụ muốn xác nhận step đã xong ngay sau khi gửi mail, có thể đổi thành `DONE`.
+Code hiện tại khi gửi mail thành công gọi `updateStatusStepAndRerunPipeline(stepId, DONE)`, tức là step chờ email được xác nhận xong và pipeline được enqueue để chạy tiếp.
 
 ### 10.3 VALIDATE_QA_CI
 
@@ -847,4 +853,4 @@ Nên log theo nguyên tắc:
 2. `parallel` hiện là isolation mode, chưa phải concurrent runtime.
 3. Nếu hệ thống chạy nhiều instance, flag `isConsumingExecutions` và `isConsumingRunPipeline` chỉ lock trong một process; cần distributed lock hoặc DB row locking để tránh nhiều instance cùng consume.
 4. V3 hiện sync rõ status `release_dsp_delivery`; nếu cần release status tổng (`release.status`) phải thêm derive từ delivery hoặc execution.
-5. CI Tool `failed` branch trong code nên set step `FAILED` thay vì `DONE` nếu muốn đúng rule nghiệp vụ trong tài liệu này.
+5. `submit3()` hiện không update trực tiếp `release_dsp_delivery`; mọi sync DSP delivery của v3 đi qua `release_execution_results3` và `ReleaseExecution3ResultService.syncToReleaseDspDelivery()`.

@@ -52,12 +52,17 @@ export class ReleaseCiDataService {
 			data.importParsedData = this.getLatestImportRecord(
 				data.importRawData,
 			);
+			data.importCount = this.getImportCount(data.importRawData);
 		}
 
 		if (data.exportRawData !== undefined) {
 			data.exportParsedData = this.getLatestExportRecords(
 				data.exportRawData,
 			);
+		}
+
+		if (data.status === ReleaseCiDataStatus.NOT_FOUND_ON_CI) {
+			data.needImportAgain = true;
 		}
 
 		const entity = await this.repo.findOne({ where: { releaseId } });
@@ -147,6 +152,7 @@ export class ReleaseCiDataService {
 				Title: item.release?.title ?? '',
 				UPC: item.release?.upc ?? '',
 				Status: item.status ?? '',
+				'Import count': item.importCount ?? 0,
 				'Import cuối': importLatest,
 				'DSP Success':
 					item.exportParsedData
@@ -164,6 +170,7 @@ export class ReleaseCiDataService {
 				'Title',
 				'UPC',
 				'Status',
+				'Import count',
 				'Import cuối',
 				'DSP Success',
 			],
@@ -207,6 +214,7 @@ export class ReleaseCiDataService {
 					batchReleaseIds.map((releaseId) => ({
 						releaseId,
 						status: ReleaseCiDataStatus.NOT_FOUND_ON_CI,
+						needImportAgain: true,
 					})),
 				)
 				.orIgnore()
@@ -243,12 +251,22 @@ export class ReleaseCiDataService {
 			throw new BadRequestException('Release UPC is missing');
 		}
 
-		const releaseFormatId = await this.releaseService.getReleaseFormatId(
-			release.id,
-			{ reloadFromCi: true },
-		);
+		let releaseFormatId: string;
+		try {
+			releaseFormatId = await this.releaseService.getReleaseFormatId(
+				release.id,
+				{ reloadFromCi: true },
+			);
+		} catch {
+			return this.upsertByReleaseId(release.id, {
+				status: ReleaseCiDataStatus.NOT_FOUND_ON_CI,
+				importRawData: null,
+				exportRawData: null,
+				qaFlagsCi: null,
+			});
+		}
 
-		const [importRawData, exportRawData] = await Promise.all([
+		const [importRawData, exportRawData, qaFlagsCi] = await Promise.all([
 			this.ciImportService.getImports({
 				package_id: release.upc,
 				page_size: 999,
@@ -257,12 +275,24 @@ export class ReleaseCiDataService {
 				release_id: releaseFormatId,
 				pageSize: 999,
 			}),
+			this.releaseService.getQaFlagsCi(release.id, {
+				reloadFromCi: true,
+			}),
 		]);
+
+		const needImportAgain = this.shouldNeedImportAgain(
+			ReleaseCiDataStatus.EXISTS_ON_CI,
+			importRawData,
+			exportRawData,
+			qaFlagsCi,
+		);
 
 		return this.upsertByReleaseId(release.id, {
 			status: ReleaseCiDataStatus.EXISTS_ON_CI,
 			importRawData,
 			exportRawData,
+			qaFlagsCi,
+			needImportAgain,
 		});
 	}
 
@@ -473,6 +503,34 @@ export class ReleaseCiDataService {
 		};
 	}
 
+	private getImportCount(importRawData?: Record<string, any> | null): number {
+		if (!importRawData) {
+			return 0;
+		}
+
+		return this.getImportItems(importRawData).length;
+	}
+
+	private shouldNeedImportAgain(
+		status: ReleaseCiDataStatus,
+		importRawData?: Record<string, any> | null,
+		exportRawData?: Record<string, any> | null,
+		qaFlagsCi?: Record<string, any>[] | null,
+	): boolean {
+		if (status === ReleaseCiDataStatus.NOT_FOUND_ON_CI) {
+			return true;
+		}
+
+		const latestImport = this.getLatestImportRecord(importRawData);
+		const lastImportIsFailed = latestImport?.status === 'problem';
+		const hasQaFlag = (qaFlagsCi?.length ?? 0) > 0;
+		const hasExportOnCi = exportRawData
+			? this.getExportItems(exportRawData).length > 0
+			: false;
+
+		return lastImportIsFailed && hasQaFlag && !hasExportOnCi;
+	}
+
 	private getImportItems(
 		importRawData: Record<string, any>,
 	): Record<string, any>[] {
@@ -632,6 +690,9 @@ export class ReleaseCiDataService {
 			keyword,
 			neverExported,
 			lastImportIsFailed,
+			needImportAgain,
+			isSkipImport,
+			hasQaFlag,
 		} = filter;
 
 		if (releaseId) {
@@ -658,6 +719,30 @@ export class ReleaseCiDataService {
 			);
 		}
 
+		if (needImportAgain !== undefined) {
+			qb.andWhere(
+				`"releaseCiData"."need_import_again" = :needImportAgain`,
+				{ needImportAgain },
+			);
+		}
+
+		if (isSkipImport !== undefined) {
+			qb.andWhere(
+				`"releaseCiData"."need_import_again" = :isNeedImportAgain`,
+				{ isNeedImportAgain: !isSkipImport },
+			);
+		}
+
+		if (hasQaFlag !== undefined) {
+			const hasQaFlagCondition = `
+				COALESCE(jsonb_array_length("releaseCiData"."qa_flags_ci"), 0) > 0
+			`;
+
+			qb.andWhere(
+				hasQaFlag ? hasQaFlagCondition : `NOT (${hasQaFlagCondition})`,
+			);
+		}
+
 		if (keyword?.length) {
 			const keywords = keyword.map((k) => `%${k}%`);
 
@@ -666,6 +751,7 @@ export class ReleaseCiDataService {
 					"releaseCiData"."status"::text ILIKE ANY(:keywords)
 					OR release.title ILIKE ANY(:keywords)
 					OR release.upc ILIKE ANY(:keywords)
+					OR "releaseCiData"."qa_flags_ci"::text ILIKE ANY(:keywords)
 				)`,
 				{ keywords },
 			);

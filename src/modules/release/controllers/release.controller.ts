@@ -59,6 +59,8 @@ import { ReleaseService } from '../services/release.service';
 export class ReleaseController {
 	constructor(private readonly releaseService: ReleaseService) {}
 
+	@ApiOperation({ summary: 'Get paginated release list' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get()
 	async getList(
 		@Query() query: QueryGetListReleaseDto,
@@ -73,6 +75,9 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get paginated release list by request body' })
+	@ApiBody({ type: QueryGetListReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Post('get-list')
 	async getListByBody(
 		@Body() query: QueryGetListReleaseDto,
@@ -87,6 +92,8 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get release list data for CI export' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get('list-data-export-ci')
 	async listDataExportCi(
 		@Query() query: QueryGetListReleaseDto,
@@ -97,6 +104,11 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Download release list CI export file' })
+	@ApiResponse({
+		status: 200,
+		description: 'XLSX file stream',
+	})
 	@Get('file-export-list-release-ci')
 	async getFileExportListReleaseCi(
 		@Query() query: QueryGetListReleaseDto,
@@ -116,6 +128,8 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Get simple release list for system admin' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@SystemAdminOnly()
 	@Get('simple')
 	async getListSimple(
@@ -200,6 +214,8 @@ export class ReleaseController {
 		summary:
 			'Auto sync release format ID for releases with null CI format ID',
 	})
+	@ApiBody({ type: ReloadReleaseFormatIdDto, required: false })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	async autoSyncReleaseFormatId(@Body() dto?: ReloadReleaseFormatIdDto) {
 		const result = await this.releaseService.autoSyncReleaseFormatId({
 			reloadFromCi: dto?.reloadFromCi,
@@ -207,6 +223,10 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get or reload release format ID from CI' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiBody({ type: ReloadReleaseFormatIdDto, required: false })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Patch(':id/release-format-id')
 	async getReleaseFormatId(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -219,6 +239,9 @@ export class ReleaseController {
 	}
 
 	// id
+	@ApiOperation({ summary: 'Get release detail by ID' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id')
 	async getOne(
 		@Param('id') id: string,
@@ -234,6 +257,9 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get full release detail by ID' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id/full')
 	async findOneFull(@Param('id') id: string, @Req() req: Request) {
 		const result = await this.releaseService.findOneFull(id);
@@ -271,6 +297,9 @@ export class ReleaseController {
 		);
 	}
 
+	@ApiOperation({ summary: 'Get CI export DSP codes for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id/list-code-export-ci')
 	async listCodeExportCiById(@Param('id') id: string, @Req() req: Request) {
 		const result = await this.releaseService.listCodeExportCiById(id);
@@ -278,6 +307,9 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get CI export record for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id/record-export-ci')
 	async dataExportCiById(@Param('id') id: string, @Req() req: Request) {
 		const result = await this.releaseService.dataExportCiById(id);
@@ -285,13 +317,19 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get QA flags from CI for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id/qa-flag-ci')
-	async getQaFlagCi(@Param('id', ParseUUIDPipe) id: string) {
-		const result = await this.releaseService.getQaFlagCi(id);
+	async getQaFlagsCi(@Param('id', ParseUUIDPipe) id: string) {
+		const result = await this.releaseService.getQaFlagsCi(id);
 
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Get DSP statuses from CI for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Get(':id/status-dsps-ci')
 	async getStatusDspsCi(@Param('id', ParseUUIDPipe) id: string) {
 		const result = await this.releaseService.getStatusDspsCi(id);
@@ -305,6 +343,12 @@ export class ReleaseController {
 	// 	return new ResponseSuccess({ data: result });
 	// }
 
+	@ApiOperation({ summary: 'Download CI export file for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({
+		status: 200,
+		description: 'XLSX file stream',
+	})
 	@Get(':id/file-export-ci')
 	async getFileExportCiById(@Param('id') id: string, @Res() res: Response) {
 		const buffer = await this.releaseService.getFileExportCiById(id);
@@ -319,6 +363,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Download release metadata as CSV' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, description: 'CSV file stream' })
 	@Get(':id/download/csv-metadata')
 	async downloadCsvMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileCsvMetadata(id);
@@ -328,6 +375,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Download release metadata as XLSX' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, description: 'XLSX file stream' })
 	@Get(':id/download/xlsx-metadata')
 	async downloadXlsxMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileXlsxMetadata(id);
@@ -337,6 +387,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Download release metadata as TXT' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, description: 'TXT file stream' })
 	@Get(':id/download/txt-metadata')
 	async downloadTxtMetadata(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getFileTxtMetadata(id);
@@ -346,6 +399,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Download release assets archive' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, description: 'Assets file stream' })
 	@Get(':id/download/assets')
 	async downloadAssets(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getAssets(id);
@@ -355,6 +411,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Download release cover art' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, description: 'Cover art file stream' })
 	@Get(':id/download/cover-art')
 	async downloadCoverArt(@Param('id') id: string, @Res() res: Response) {
 		const data = await this.releaseService.getCoverArtStream(id);
@@ -364,6 +423,10 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Update release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiBody({ type: UpdateReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@RequirePermissions(
 		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
@@ -383,6 +446,12 @@ export class ReleaseController {
 		return ReleaseSuccess.UPDATE(result);
 	}
 
+	@ApiOperation({ summary: 'Download CI export file by DSP codes' })
+	@ApiBody({ type: FileExportReleaseCiDto })
+	@ApiResponse({
+		status: 200,
+		description: 'XLSX file stream',
+	})
 	@Post('file-export-release-ci')
 	async getFileExportListReleaseCiByDspCode(
 		@Body() data: FileExportReleaseCiDto,
@@ -403,6 +472,10 @@ export class ReleaseController {
 	}
 
 	// api submit
+	@ApiOperation({ summary: 'Submit release to selected DSPs' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiBody({ type: SubmitReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@RequirePermissions(
 		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
@@ -421,6 +494,10 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Update release review decision' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiBody({ type: UpdateReleaseReviewDecisionDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@Post(':id/release-review')
 	async updateReleaseReview(
 		@Param('id', ParseUUIDPipe) id: string,
@@ -436,6 +513,10 @@ export class ReleaseController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@ApiOperation({ summary: 'Takedown release from selected DSPs' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiBody({ type: SubmitReleaseDto })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@RequirePermissions(
 		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
@@ -454,6 +535,9 @@ export class ReleaseController {
 		});
 	}
 
+	@ApiOperation({ summary: 'Generate UPC for release' })
+	@ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+	@ApiResponse({ status: 200, type: ResponseSuccess })
 	@RequirePermissions(
 		Permission.RELEASE_AUDIO.UPDATE,
 		Permission.RELEASE_VIDEO.UPDATE,
