@@ -1254,7 +1254,7 @@ export class ReleaseExecution3WorkerTest {
 				releaseExecutionStepId: step.id,
 			});
 
-			const qaFlags = await this.releaseService.getQaFlagCi(releaseId);
+			const qaFlags = await this.releaseService.getQaFlagsCi(releaseId);
 
 			const hasIssues = Array.isArray(qaFlags) && qaFlags.length > 0;
 

@@ -12,16 +12,16 @@ Code liên quan:
 
 ## 1. API
 
-| Method | Path | Mục đích |
-| --- | --- | --- |
+| Method | Path                                   | Mục đích                                        |
+| ------ | -------------------------------------- | ----------------------------------------------- |
 | `POST` | `/releases/bulk-submit/preview-result` | Preview DSP nào sẽ được submit, DSP nào bị skip |
-| `POST` | `/releases/bulk-submit` | Submit nhiều release theo cùng bộ DSP code |
+| `POST` | `/releases/bulk-submit`                | Submit nhiều release theo cùng bộ DSP code      |
 
 `bulk-submit` có permission:
 
 ```ts
-Permission.RELEASE_AUDIO.UPDATE
-Permission.RELEASE_VIDEO.UPDATE
+Permission.RELEASE_AUDIO.UPDATE;
+Permission.RELEASE_VIDEO.UPDATE;
 ```
 
 ## 2. Request body
@@ -39,14 +39,14 @@ export class BulkSubmitReleaseDto {
 }
 ```
 
-| Field | Bắt buộc | Ý nghĩa |
-| --- | --- | --- |
-| `ids` | Có | Danh sách release ID cần xử lý |
-| `idsExclude` | Không | Release ID cần bỏ qua trong danh sách `ids` |
-| `codes` | Có | Danh sách DSP code muốn submit |
-| `status` | Không | Target status gắn vào preview, mặc định `distributed` |
-| `skipDistributed` | Không | Nếu `true`, DSP đã `distributed` sẽ không submit lại |
-| `ciImportAction` | Không | Cách xử lý trạng thái CI trong snapshot submit |
+| Field             | Bắt buộc | Ý nghĩa                                               |
+| ----------------- | -------- | ----------------------------------------------------- |
+| `ids`             | Có       | Danh sách release ID cần xử lý                        |
+| `idsExclude`      | Không    | Release ID cần bỏ qua trong danh sách `ids`           |
+| `codes`           | Có       | Danh sách DSP code muốn submit                        |
+| `status`          | Không    | Target status gắn vào preview, mặc định `distributed` |
+| `skipDistributed` | Không    | Nếu `true`, DSP đã `distributed` sẽ không submit lại  |
+| `ciImportAction`  | Không    | Cách xử lý trạng thái CI trong snapshot submit        |
 
 Ví dụ:
 
@@ -75,7 +75,7 @@ Preview dùng chung DTO `BulkSubmitReleaseDto`.
 Service gọi:
 
 ```ts
-releaseService.previewBulkSubmitResult(dto)
+releaseService.previewBulkSubmitResult(dto);
 ```
 
 Luồng chính:
@@ -105,18 +105,17 @@ Code logic:
 ```ts
 const shouldChangeStatus =
 	targetStatus &&
-	(!(dto.skipDistributed ?? true) ||
-		status !== ReleaseDspStatus.DISTRIBUTED);
+	(!(dto.skipDistributed ?? true) || status !== ReleaseDspStatus.DISTRIBUTED);
 ```
 
 Ý nghĩa:
 
-| `skipDistributed` | Status hiện tại | Có submit lại không |
-| --- | --- | --- |
-| `true` | `distributed` | Không |
-| `true` | khác `distributed` | Có |
-| `false` | `distributed` | Có |
-| `false` | khác `distributed` | Có |
+| `skipDistributed` | Status hiện tại    | Có submit lại không |
+| ----------------- | ------------------ | ------------------- |
+| `true`            | `distributed`      | Không               |
+| `true`            | khác `distributed` | Có                  |
+| `false`           | `distributed`      | Có                  |
+| `false`           | khác `distributed` | Có                  |
 
 ## 5. `submitData` trả về từ preview
 
@@ -131,12 +130,12 @@ submitData: {
 }
 ```
 
-| Field | Ý nghĩa |
-| --- | --- |
-| `id` | Release ID |
-| `code` | DSP code sẽ submit thật |
-| `skipCodes` | DSP code nằm trong request nhưng bị skip, thường do đã `distributed` |
-| `ciImportAction` | Action CI sẽ truyền tiếp vào submit |
+| Field            | Ý nghĩa                                                              |
+| ---------------- | -------------------------------------------------------------------- |
+| `id`             | Release ID                                                           |
+| `code`           | DSP code sẽ submit thật                                              |
+| `skipCodes`      | DSP code nằm trong request nhưng bị skip, thường do đã `distributed` |
+| `ciImportAction` | Action CI sẽ truyền tiếp vào submit                                  |
 
 Ví dụ response rút gọn:
 
@@ -164,7 +163,7 @@ POST /releases/bulk-submit
 Service gọi:
 
 ```ts
-releaseService.bulkSubmit(dto)
+releaseService.bulkSubmit(dto);
 ```
 
 Luồng chính:
@@ -200,7 +199,7 @@ Bulk submit không tự xử lý DSP delivery đến cuối.
 Bulk submit chỉ chuẩn bị danh sách DSP cần submit rồi gọi:
 
 ```ts
-submit3(id, submitData)
+submit3(id, submitData);
 ```
 
 `submit3` sẽ:
@@ -233,18 +232,20 @@ export enum CiImportAction {
 Trong `bulk-submit`, default DTO là:
 
 ```ts
-ciImportAction = CiImportAction.SKIP_CI_IMPORT
+ciImportAction = CiImportAction.SKIP_CI_IMPORT;
 ```
 
 `applyCiImportActionToReleaseSnapshot` chỉ sửa snapshot dùng cho execution, không update trực tiếp release gốc.
 
 Logic hiện tại:
 
-| Action | Hiệu ứng trên snapshot CI |
-| --- | --- |
-| `SKIP_CI_IMPORT` | Nếu CI status đang `EXISTS_ON_CI` thì giữ `EXISTS_ON_CI` |
-| `FORCE_CI_IMPORT` | Set CI status snapshot thành `NOT_FOUND_ON_CI` để buộc import |
-| `KEEP_CURRENT_STATUS` | Giữ nguyên status hiện tại |
+| Action                | Hiệu ứng trên snapshot CI                                                                                                                          |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SKIP_CI_IMPORT`      | Chỉ giữ `EXISTS_ON_CI` khi CI status đang `EXISTS_ON_CI` và `importParsedData.status = success`; nếu không thì set `NOT_FOUND_ON_CI` để import lại |
+| `FORCE_CI_IMPORT`     | Set CI status snapshot thành `NOT_FOUND_ON_CI` để buộc import                                                                                      |
+| `KEEP_CURRENT_STATUS` | Giữ nguyên status hiện tại                                                                                                                         |
+
+Điều kiện `SKIP_CI_IMPORT` cần check cả `importParsedData.status` vì release có thể đã tồn tại trên CI nhưng lần import gần nhất bị lỗi. Trường hợp đó không được skip import, nếu không execution sẽ bỏ qua bước cần chạy lại.
 
 ## 9. Lưu ý khi dùng API
 
@@ -254,4 +255,3 @@ Logic hiện tại:
 - Response của `bulk-submit` là `common.processing`, không trả chi tiết từng release.
 - Muốn xem trước DSP nào sẽ bị skip, gọi `preview-result` trước.
 - Status thật cuối cùng của DSP không đến từ request `status` ngay lập tức; status sẽ được sync sau khi execution chạy xong.
-

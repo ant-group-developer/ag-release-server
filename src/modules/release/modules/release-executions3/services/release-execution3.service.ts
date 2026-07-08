@@ -68,6 +68,7 @@ export class ReleaseExecution3Service {
 		type: ExecutionType;
 	}) {
 		return await this.queueService.queueExecution(body);
+		// await this.startProcessing();
 	}
 
 	async resumeWaitingSteps(): Promise<void> {
@@ -86,6 +87,7 @@ export class ReleaseExecution3Service {
 
 		for (const executionId of executionIds) {
 			await this.queueService.queueRunPipeline(executionId);
+			// await this.runPipeline('');
 		}
 	}
 
@@ -194,9 +196,8 @@ export class ReleaseExecution3Service {
 				primaryDsp: null,
 				isSkipImport:
 					releaseSnapshot.ciData?.status ===
-					ReleaseCiDataStatus.EXISTS_ON_CI
-						? true
-						: false,
+						ReleaseCiDataStatus.EXISTS_ON_CI &&
+					releaseSnapshot.ciData?.needImportAgain === false,
 			},
 		};
 
