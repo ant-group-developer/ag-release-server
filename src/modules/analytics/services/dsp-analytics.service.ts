@@ -17,6 +17,7 @@ import {
 	DspOverviewResponse,
 	DspTopReleaseItem,
 	DspTopTrackItem,
+	EntityTopTerItem,
 	RevenueLineChartItem,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
@@ -1020,6 +1021,178 @@ export class DspAnalyticsService {
 			},
 		}));
 
+		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+	}
+
+	// ─────────────────────────────────────────────────────
+	// TOP TERRITORIES
+	// ─────────────────────────────────────────────────────
+
+	async getTopTerritories(
+		dto: DspTopQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopTerItem>> {
+		const key = this.cache.buildKey('dsp:top-ters', tenantId, dto);
+		return this.cache.wrap(key, () => this.computeTopTerritories(dto, tenantId));
+	}
+
+	private async computeTopTerritories(
+		dto: DspTopQueryDto,
+		tenantId: string,
+	): Promise<PageDto<EntityTopTerItem>> {
+		const page = dto.page ?? 1;
+		const sortByRevenue = dto.sortBy === 'revenue';
+		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
+		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
+
+		const { joinSql, filterSql, params } = this.buildDspFilters(
+			tenantId,
+			dto.pgDspId,
+			dto.dspReportId,
+			dto.releaseType,
+			{ tableHasDspId: false },
+		);
+		params.fromMonth = fromMonth;
+		params.toMonth = toMonth;
+
+		const useTopN = dto.topN != null;
+		const topNLimit = dto.topN ?? dto.limit;
+		const topNSkip = useTopN ? 0 : dto.skip;
+
+		const primaryTable = sortByRevenue
+			? CLICKHOUSE_TABLES.SALES_TER_MONTHLY
+			: CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY;
+
+		const countSql = `
+      SELECT uniq(s.territory_code) AS total
+      FROM music_analytics.${primaryTable} s
+      ${joinSql}
+      WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+        ${filterSql}
+    `;
+
+		const dataSql = sortByRevenue ? `
+      SELECT
+        s.territory_code AS iso_code,
+        sum(s.total_revenue_usd) AS total_revenue_usd_raw,
+        toString(sum(s.total_revenue_usd)) AS total_revenue_usd,
+        coalesce(sum(tr.total_views), 0) AS total_views
+      FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+      ${joinSql}
+      LEFT JOIN (
+        SELECT territory_code, sum(total_quantity) AS total_views
+        FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
+        WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+      ) tr ON s.territory_code = tr.territory_code
+      WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+        ${filterSql}
+      GROUP BY iso_code
+      ORDER BY ${sortCol} DESC
+      LIMIT ${topNLimit} OFFSET ${topNSkip}
+    ` : `
+      SELECT
+        s.territory_code AS iso_code,
+        sum(s.total_quantity) AS total_views,
+        coalesce(sum(sa.total_revenue_usd), 0) AS total_revenue_usd_raw,
+        toString(coalesce(sum(sa.total_revenue_usd), 0)) AS total_revenue_usd
+      FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+      ${joinSql}
+      LEFT JOIN (
+        SELECT territory_code, sum(total_revenue_usd) AS total_revenue_usd
+        FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} sal_sub
+        WHERE sal_sub.period >= toDate({fromMonth:String}) AND sal_sub.period <= toDate({toMonth:String})
+      ) sa ON s.territory_code = sa.territory_code
+      WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+        ${filterSql}
+      GROUP BY iso_code
+      ORDER BY ${sortCol} DESC
+      LIMIT ${topNLimit} OFFSET ${topNSkip}
+    `;
+
+		const [countRows, dataRows] = await Promise.all([
+			this.clickHouseService.query<{ total: string }>(countSql, params),
+			this.clickHouseService.query<{
+				iso_code: string;
+				total_views: string;
+				total_revenue_usd: string;
+			}>(dataSql, params),
+		]);
+
+		const totalItems = Number(countRows[0]?.total ?? 0);
+
+		// Resolve country names
+		const isoCodes = dataRows.map((r) => r.iso_code).filter(Boolean);
+		const nameByIso2 = new Map<string, string>();
+		if (isoCodes.length > 0) {
+			const nameRows = await this.entityManager.query(
+				`SELECT iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+				[isoCodes.map((c) => c.toUpperCase())],
+			);
+			for (const row of nameRows) {
+				nameByIso2.set(row.iso2?.toUpperCase(), row.name);
+			}
+		}
+
+		if (useTopN && dto.includeOther && dataRows.length > 0) {
+			const totalsSql = sortByRevenue ? `
+        SELECT toString(sum(s.total_revenue_usd)) AS total_revenue_usd, coalesce(sum(tr.total_views), 0) AS total_views
+        FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+        ${joinSql}
+        LEFT JOIN (
+          SELECT territory_code, sum(total_quantity) AS total_views
+          FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
+          WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+        ) tr ON s.territory_code = tr.territory_code
+        WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+          ${filterSql}
+      ` : `
+        SELECT sum(s.total_quantity) AS total_views, toString(coalesce(sum(sa.total_revenue_usd), 0)) AS total_revenue_usd
+        FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+        ${joinSql}
+        LEFT JOIN (
+          SELECT territory_code, sum(total_revenue_usd) AS total_revenue_usd
+          FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} sal_sub
+          WHERE sal_sub.period >= toDate({fromMonth:String}) AND sal_sub.period <= toDate({toMonth:String})
+        ) sa ON s.territory_code = sa.territory_code
+        WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+          ${filterSql}
+      `;
+			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, params))[0];
+			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
+			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
+			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
+			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const otherViews = Math.max(0, grandTotalViews - topViews);
+
+			const items: EntityTopTerItem[] = dataRows.map((row, i) => ({
+				rank: i + 1,
+				isoCode: row.iso_code,
+				territory: nameByIso2.get(row.iso_code?.toUpperCase()) ?? row.iso_code,
+				totalViews: Number(row.total_views),
+				totalRevenueUsd: row.total_revenue_usd || '0',
+			}));
+			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+				items.push({
+					rank: items.length + 1,
+					isoCode: 'other',
+					territory: 'Other',
+					totalViews: otherViews,
+					totalRevenueUsd: otherRevExact,
+				});
+			}
+			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+		}
+
+		const rankOffset = useTopN ? 0 : dto.skip;
+		const items: EntityTopTerItem[] = dataRows.map((row, i) => ({
+			rank: rankOffset + i + 1,
+			isoCode: row.iso_code,
+			territory: nameByIso2.get(row.iso_code?.toUpperCase()) ?? row.iso_code,
+			totalViews: Number(row.total_views),
+			totalRevenueUsd: row.total_revenue_usd || '0',
+		}));
 		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
 	}
 }

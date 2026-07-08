@@ -252,4 +252,42 @@ export class SourceTypeAnalyticsController {
 			),
 		});
 	}
+
+	@Post('dsp')
+	@ApiOperation({
+		summary: 'Top DSPs của source type (sortBy: views | revenue)',
+	})
+	async topDsps(
+		@Param('sourceType') sourceType: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'sourceType',
+				sourceType,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({
+		summary: 'Top territories của source type (sortBy: views | revenue)',
+	})
+	async topTerritories(
+		@Param('sourceType') sourceType: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
+				'sourceType',
+				sourceType,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 }
