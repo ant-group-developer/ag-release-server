@@ -27,8 +27,8 @@ import {
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
-import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 interface IDataFromDb {
 	entities: Release[];
@@ -376,6 +376,7 @@ export class ReleaseQueryService {
 				'video.id',
 				'video.releaseId',
 				'video.isrc',
+				'video.externalId',
 				'video.label',
 				'video.explicit',
 				'video.aiContent',
@@ -509,6 +510,7 @@ export class ReleaseQueryService {
 			subGenreId,
 			labelId,
 			artistId,
+			channelId,
 			isVariousArtist,
 			isImportedFromReport,
 			isEnrich,
@@ -654,6 +656,7 @@ export class ReleaseQueryService {
 						.orWhere('artist.name ILIKE :keyword')
 						.orWhere('label.name ILIKE :keyword')
 						.orWhere('release.upc ILIKE :keyword')
+						.orWhere('video.isrc ILIKE :keyword')
 						.orWhere(
 							'CAST(release.status AS VARCHAR) ILIKE :keyword',
 						);
@@ -723,6 +726,12 @@ export class ReleaseQueryService {
 		if (artistId?.length) {
 			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
 				artistId,
+			});
+		}
+
+		if (channelId?.length) {
+			qb.andWhere('video.channelId IN (:...channelId)', {
+				channelId,
 			});
 		}
 
@@ -882,6 +891,8 @@ export class ReleaseQueryService {
 			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
 
 			.leftJoin('release.label', 'label')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.channel', 'channel')
 
 			// genre
 			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
@@ -989,6 +1000,21 @@ export class ReleaseQueryService {
 				'releaseDspDeliveryDsp.codeCi',
 				'releaseDspDeliveryDsp.picture',
 				'releaseDspDeliveryDsp.type',
+			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.channelId',
+				'video.isrc',
+				'video.externalId',
+			])
+
+			// channel
+			.addSelect([
+				'channel.id',
+				'channel.name',
+				'channel.youtubeChannelId',
+				'channel.thumbUrl',
 			])
 
 			// virtual
