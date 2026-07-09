@@ -73,6 +73,7 @@ credential.json
 secrets
 
 .agent
+.agents
 
 debug-create-release-dto.json
 
