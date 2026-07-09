@@ -171,8 +171,8 @@ export class EntityAnalyticsService {
 	// DSP name resolution constants (dùng lại pattern từ global-timeline.service)
 	private readonly resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 	private readonly dspNameJoin = `
-    LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-    LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+    LEFT JOIN (SELECT id_dsps_report, pg_uuid, dsp_name FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
+    LEFT JOIN (SELECT pg_uuid, dsp_name FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
   `;
 
 	private async mapTerritoryCodesToCountryNames(
@@ -1808,6 +1808,7 @@ export class EntityAnalyticsService {
 		const dataSql = sortByRevenue ? `
 			SELECT
 				s.dsp_id AS dsp_id,
+				r.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
 				sum(s.total_revenue_usd) AS total_revenue_usd_raw,
 				toString(sum(s.total_revenue_usd)) AS total_revenue_usd,
@@ -1824,12 +1825,13 @@ export class EntityAnalyticsService {
 			) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
-			GROUP BY s.dsp_id, dsp_name
+			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
 			ORDER BY ${sortCol} DESC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		` : `
 			SELECT
 				s.dsp_id AS dsp_id,
+				r.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
 				sum(s.total_quantity) AS total_views,
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
@@ -1846,7 +1848,7 @@ export class EntityAnalyticsService {
 			) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
-			GROUP BY s.dsp_id, dsp_name
+			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
 			ORDER BY ${sortCol} DESC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
@@ -1855,6 +1857,7 @@ export class EntityAnalyticsService {
 			this.clickHouseService.query<{ total: string }>(countSql, params),
 			this.clickHouseService.query<{
 				dsp_id: string;
+				pg_dsp_id: string | null;
 				dsp_name: string;
 				total_views: string;
 				total_revenue_usd: string;
@@ -1902,7 +1905,8 @@ export class EntityAnalyticsService {
 
 			const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
 				rank: i + 1,
-				dspId: row.dsp_id,
+				pgDspId: row.pg_dsp_id || null,
+				dspReportId: row.dsp_id,
 				dspName: row.dsp_name || row.dsp_id,
 				totalViews: Number(row.total_views),
 				totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1910,7 +1914,8 @@ export class EntityAnalyticsService {
 			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
 				items.push({
 					rank: items.length + 1,
-					dspId: 'other',
+					pgDspId: null,
+					dspReportId: 'other',
 					dspName: 'Other',
 					totalViews: Math.max(0, otherViews),
 					totalRevenueUsd: otherRevExact,
@@ -1922,7 +1927,8 @@ export class EntityAnalyticsService {
 		const rankOffset = useTopN ? 0 : dto.skip;
 		const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
 			rank: rankOffset + i + 1,
-			dspId: row.dsp_id,
+			pgDspId: row.pg_dsp_id || null,
+			dspReportId: row.dsp_id,
 			dspName: row.dsp_name || row.dsp_id,
 			totalViews: Number(row.total_views),
 			totalRevenueUsd: row.total_revenue_usd || '0',
