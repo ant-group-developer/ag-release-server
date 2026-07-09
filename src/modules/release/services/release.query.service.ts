@@ -27,8 +27,8 @@ import {
 	VirtualColumnRelease,
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
-import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 interface IDataFromDb {
 	entities: Release[];
@@ -730,7 +730,7 @@ export class ReleaseQueryService {
 		}
 
 		if (channelId?.length) {
-			queryBuilder.andWhere('video.channelId IN (:...channelId)', {
+			qb.andWhere('video.channelId IN (:...channelId)', {
 				channelId,
 			});
 		}
