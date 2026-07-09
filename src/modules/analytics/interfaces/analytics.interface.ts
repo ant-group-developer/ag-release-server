@@ -416,7 +416,8 @@ export interface TerritoryBarChartItem {
 
 export interface EntityTopDspItem {
 	rank: number;
-	dspId: string;
+	pgDspId: string | null;
+	dspReportId: string;
 	dspName: string;
 	totalViews: number;
 	totalRevenueUsd: string;
