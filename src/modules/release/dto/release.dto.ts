@@ -640,7 +640,7 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 
 	@ApiPropertyOptional({
 		type: Boolean,
-		description: 'Filter releases that will skip CI import',
+		description: 'Filter releases by CI need import again flag',
 		example: true,
 	})
 	@IsOptional()
@@ -650,7 +650,7 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 		if (value === 'false' || value === false) return false;
 		return value;
 	})
-	isSkipImport?: boolean;
+	needImportAgain?: boolean;
 
 	@ApiPropertyOptional({
 		type: Boolean,
@@ -839,7 +839,7 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 		if (value === 'false' || value === false) return false;
 		return value;
 	})
-	isSkipImport?: boolean;
+	needImportAgain?: boolean;
 
 	@IsOptional()
 	@IsBoolean()
