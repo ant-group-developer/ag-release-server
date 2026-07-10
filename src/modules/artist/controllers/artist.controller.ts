@@ -68,8 +68,7 @@ export class ArtistController {
 		const data = await this.artistService.syncArtistProfileNameWithDsp();
 		return new ResponseSuccess({
 			data,
-			message:
-				'Background sync-artist-profile-name has been started.',
+			message: 'Background sync-artist-profile-name has been started.',
 		});
 	}
 

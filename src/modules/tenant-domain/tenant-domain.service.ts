@@ -1,14 +1,26 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'crypto';
-import { isPrimaryDomain, normalizeDomain, getPrimaryDomains } from 'src/common/config/domain.config';
+import {
+	getPrimaryDomains,
+	isPrimaryDomain,
+	normalizeDomain,
+} from 'src/common/config/domain.config';
 import { Repository } from 'typeorm';
 import { ResponseError } from '../../common/dtos/common.response.dto';
 import { Tenant } from '../tenant/tenant.entity';
-import { CfOAuthError, CloudflareDnsOAuthService } from './cloudflare-dns-oauth.service';
+import {
+	CfOAuthError,
+	CloudflareDnsOAuthService,
+} from './cloudflare-dns-oauth.service';
 import { CloudflareSaasService } from './cloudflare-saas.service';
+import {
+	DomainSetupMode,
+	DomainStatus,
+	SslStatus,
+	TenantDomain,
+} from './entities/tenant-domain.entity';
 import { TenantDomainMessages } from './tenant-domain.constants';
-import { DomainSetupMode, DomainStatus, SslStatus, TenantDomain } from './entities/tenant-domain.entity';
 
 export interface TenantBranding {
 	tenantId: string;
@@ -35,12 +47,23 @@ export class TenantDomainService {
 	private readonly logger = new Logger(TenantDomainService.name);
 
 	// in-memory cache: domain → { data, expiresAt }
-	private readonly resolveCache = new Map<string, { data: DomainResolveResult; expiresAt: number }>();
+	private readonly resolveCache = new Map<
+		string,
+		{ data: DomainResolveResult; expiresAt: number }
+	>();
 	private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
 	// CSRF state store: state → { tenantId, domain, returnUrl, expiresAt }
 	// returnUrl: full URL đã validate để redirect về sau khi xong (rỗng → fallback primary)
-	private readonly oauthStateStore = new Map<string, { tenantId: string; domain: string; returnUrl: string; expiresAt: number }>();
+	private readonly oauthStateStore = new Map<
+		string,
+		{
+			tenantId: string;
+			domain: string;
+			returnUrl: string;
+			expiresAt: number;
+		}
+	>();
 
 	constructor(
 		@InjectRepository(TenantDomain)
@@ -53,7 +76,11 @@ export class TenantDomainService {
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
-	async getDomain(tenantId: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions; canAutoSetup: boolean } | null> {
+	async getDomain(tenantId: string): Promise<{
+		domain: TenantDomain;
+		dnsInstructions: DnsInstructions;
+		canAutoSetup: boolean;
+	} | null> {
 		const domain = await this.repo.findOne({ where: { tenantId } });
 		if (!domain) return null;
 		return {
@@ -77,13 +104,19 @@ export class TenantDomainService {
 
 	async findActiveByDomain(domain: string): Promise<TenantDomain | null> {
 		return this.repo.findOne({
-			where: { domain: normalizeDomain(domain), status: DomainStatus.ACTIVE },
+			where: {
+				domain: normalizeDomain(domain),
+				status: DomainStatus.ACTIVE,
+			},
 		});
 	}
 
 	// ─── Add Domain ────────────────────────────────────────────────────────────
 
-	async addDomain(tenantId: string, domain: string): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions }> {
+	async addDomain(
+		tenantId: string,
+		domain: string,
+	): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions }> {
 		const normalizedDomain = normalizeDomain(domain);
 		this.validateDomainFormat(normalizedDomain);
 
@@ -92,12 +125,15 @@ export class TenantDomainService {
 			throw new ResponseError(TenantDomainMessages.ALREADY_HAS_DOMAIN);
 		}
 
-		const taken = await this.repo.findOne({ where: { domain: normalizedDomain } });
+		const taken = await this.repo.findOne({
+			where: { domain: normalizedDomain },
+		});
 		if (taken) {
 			throw new ResponseError(TenantDomainMessages.DOMAIN_TAKEN);
 		}
 
-		const cfResult = await this.cfSaasService.createCustomHostname(normalizedDomain);
+		const cfResult =
+			await this.cfSaasService.createCustomHostname(normalizedDomain);
 
 		const entity = this.repo.create({
 			domain: normalizedDomain,
@@ -105,7 +141,8 @@ export class TenantDomainService {
 			status: DomainStatus.PENDING,
 			setupMode: DomainSetupMode.MANUAL,
 			cfCustomHostnameId: cfResult.id,
-			verificationToken: cfResult.ownership_verification?.value ?? crypto.randomUUID(),
+			verificationToken:
+				cfResult.ownership_verification?.value ?? crypto.randomUUID(),
 			sslStatus: SslStatus.PENDING,
 		});
 
@@ -125,18 +162,23 @@ export class TenantDomainService {
 		}
 
 		if (!domain.cfCustomHostnameId) {
-			throw new BadRequestException('Domain has no Cloudflare hostname ID');
+			throw new BadRequestException(
+				'Domain has no Cloudflare hostname ID',
+			);
 		}
 
-		const cfStatus = await this.cfSaasService.getHostnameStatus(domain.cfCustomHostnameId);
+		const cfStatus = await this.cfSaasService.getHostnameStatus(
+			domain.cfCustomHostnameId,
+		);
 
 		domain.lastCheckedAt = new Date();
-		domain.lastCheckResult = cfStatus as unknown as Record<string, any>;
+		domain.lastCheckResult = cfStatus;
 
 		const dnsVerified = cfStatus.status === 'active';
 		const sslActive = cfStatus.ssl?.status === 'active';
 		// CF terminal failure states — anything else (pending, moved, etc.) is transient
-		const cfFailed = cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
+		const cfFailed =
+			cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
 
 		if (dnsVerified && sslActive) {
 			domain.status = DomainStatus.ACTIVE;
@@ -168,8 +210,13 @@ export class TenantDomainService {
 		if (!domain) return;
 
 		if (domain.cfCustomHostnameId) {
-			await this.cfSaasService.deleteCustomHostname(domain.cfCustomHostnameId)
-				.catch((err) => this.logger.warn(`CF delete failed for ${domain.domain}: ${err.message}`));
+			await this.cfSaasService
+				.deleteCustomHostname(domain.cfCustomHostnameId)
+				.catch((err) =>
+					this.logger.warn(
+						`CF delete failed for ${domain.domain}: ${err.message}`,
+					),
+				);
 		}
 
 		await this.repo.remove(domain);
@@ -206,7 +253,7 @@ export class TenantDomainService {
 					logo: record.tenant.logo,
 					icon: record.tenant.icon,
 					primaryColor: record.tenant.primaryColor,
-			  }
+				}
 			: null;
 
 		const data = {
@@ -214,13 +261,19 @@ export class TenantDomainService {
 			domain: normalizedDomain,
 			tenant,
 		};
-		this.resolveCache.set(normalizedDomain, { data, expiresAt: now + this.CACHE_TTL_MS });
+		this.resolveCache.set(normalizedDomain, {
+			data,
+			expiresAt: now + this.CACHE_TTL_MS,
+		});
 		return data;
 	}
 
 	// ─── Cloudflare OAuth ──────────────────────────────────────────────────────
 
-	async getCfOAuthUrl(tenantId: string, opts?: { returnUrl?: string; requestOrigin?: string }): Promise<string> {
+	async getCfOAuthUrl(
+		tenantId: string,
+		opts?: { returnUrl?: string; requestOrigin?: string },
+	): Promise<string> {
 		const domainRecord = await this.repo.findOne({ where: { tenantId } });
 		if (!domainRecord) {
 			throw new ResponseError(TenantDomainMessages.NOT_FOUND);
@@ -228,11 +281,16 @@ export class TenantDomainService {
 
 		// Chặn double-submit: domain đã active/verifying thì DNS đã đúng rồi
 		if (!this.canAutoSetup(domainRecord.status)) {
-			throw new ResponseError(TenantDomainMessages.CF_OAUTH_NOT_AVAILABLE);
+			throw new ResponseError(
+				TenantDomainMessages.CF_OAUTH_NOT_AVAILABLE,
+			);
 		}
 
 		// Ưu tiên returnUrl FE gửi (về đúng trang đang config); fallback origin header.
-		const returnUrl = await this.resolveSafeReturnUrl(opts?.returnUrl, opts?.requestOrigin);
+		const returnUrl = await this.resolveSafeReturnUrl(
+			opts?.returnUrl,
+			opts?.requestOrigin,
+		);
 
 		const state = crypto.randomUUID();
 		this.oauthStateStore.set(state, {
@@ -257,7 +315,9 @@ export class TenantDomainService {
 		const stateData = this.oauthStateStore.get(state);
 		if (!stateData || stateData.expiresAt < Date.now()) {
 			this.oauthStateStore.delete(state);
-			throw new ResponseError(TenantDomainMessages.CF_OAUTH_INVALID_STATE);
+			throw new ResponseError(
+				TenantDomainMessages.CF_OAUTH_INVALID_STATE,
+			);
 		}
 		this.oauthStateStore.delete(state);
 
@@ -268,8 +328,12 @@ export class TenantDomainService {
 			throw new ResponseError(TenantDomainMessages.NOT_FOUND);
 		}
 
-		const { access_token } = await this.cfDnsOAuthService.exchangeCode(code);
-		const zoneId = await this.cfDnsOAuthService.getZoneId(access_token, domain);
+		const { access_token } =
+			await this.cfDnsOAuthService.exchangeCode(code);
+		const zoneId = await this.cfDnsOAuthService.getZoneId(
+			access_token,
+			domain,
+		);
 
 		await this.cfDnsOAuthService.addDnsRecords(access_token, zoneId, {
 			domain,
@@ -284,7 +348,9 @@ export class TenantDomainService {
 		});
 
 		// Redirect về đúng URL admin bắt đầu flow (đã validate ở getCfOAuthUrl)
-		return this.appendSetupParams(stateData.returnUrl, { cf_setup: 'success' });
+		return this.appendSetupParams(stateData.returnUrl, {
+			cf_setup: 'success',
+		});
 	}
 
 	/**
@@ -297,8 +363,15 @@ export class TenantDomainService {
 		return stateData.returnUrl;
 	}
 
-	buildOAuthErrorRedirect(returnUrl: string, error: string, errorDescription?: string): string {
-		const params: Record<string, string> = { cf_setup: 'error', cf_error: error };
+	buildOAuthErrorRedirect(
+		returnUrl: string,
+		error: string,
+		errorDescription?: string,
+	): string {
+		const params: Record<string, string> = {
+			cf_setup: 'error',
+			cf_error: error,
+		};
 		if (errorDescription) params.cf_error_description = errorDescription;
 		return this.appendSetupParams(returnUrl, params);
 	}
@@ -309,7 +382,10 @@ export class TenantDomainService {
 	 * của FE để về đúng trang đang config. Nếu returnUrl không hợp lệ/không có thì
 	 * thử origin header; cuối cùng trả '' → fallback primary lúc redirect.
 	 */
-	private async resolveSafeReturnUrl(returnUrl?: string, requestOrigin?: string): Promise<string> {
+	private async resolveSafeReturnUrl(
+		returnUrl?: string,
+		requestOrigin?: string,
+	): Promise<string> {
 		// 1. Thử returnUrl FE gửi (giữ full path để về đúng trang)
 		if (returnUrl) {
 			try {
@@ -323,7 +399,9 @@ export class TenantDomainService {
 					parsed.searchParams.delete('cf_error_description');
 					return parsed.toString();
 				}
-				this.logger.warn(`CF OAuth: rejected unsafe returnUrl host "${parsed.host}"`);
+				this.logger.warn(
+					`CF OAuth: rejected unsafe returnUrl host "${parsed.host}"`,
+				);
 			} catch {
 				this.logger.warn(`CF OAuth: invalid returnUrl "${returnUrl}"`);
 			}
@@ -343,7 +421,9 @@ export class TenantDomainService {
 		const host = normalizeDomain(hostname);
 		if (!host) return false;
 		if (isPrimaryDomain(host)) return true;
-		const active = await this.repo.findOne({ where: { domain: host, status: DomainStatus.ACTIVE } });
+		const active = await this.repo.findOne({
+			where: { domain: host, status: DomainStatus.ACTIVE },
+		});
 		return !!active;
 	}
 
@@ -351,11 +431,15 @@ export class TenantDomainService {
 	 * Gắn các param cf_setup/cf_error vào returnUrl (giữ nguyên path + query sẵn có).
 	 * returnUrl rỗng → fallback PRIMARY_DOMAINS[0]/settings/domain.
 	 */
-	private appendSetupParams(returnUrl: string, params: Record<string, string>): string {
+	private appendSetupParams(
+		returnUrl: string,
+		params: Record<string, string>,
+	): string {
 		const base = returnUrl || this.defaultReturnUrl();
 		try {
 			const url = new URL(base);
-			for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+			for (const [k, v] of Object.entries(params))
+				url.searchParams.set(k, v);
 			return url.toString();
 		} catch {
 			// base không parse được (không nên xảy ra) → ghép thủ công
@@ -366,7 +450,10 @@ export class TenantDomainService {
 
 	private defaultReturnUrl(): string {
 		const primaryDomains = getPrimaryDomains();
-		const origin = primaryDomains.length > 0 ? `https://${primaryDomains[0]}` : 'https://localhost:3000';
+		const origin =
+			primaryDomains.length > 0
+				? `https://${primaryDomains[0]}`
+				: 'https://localhost:3000';
 		return `${origin}/settings/domain`;
 	}
 
@@ -381,16 +468,29 @@ export class TenantDomainService {
 		if (err instanceof ResponseError) {
 			// Hiện tại chỉ có CF_OAUTH_INVALID_STATE / NOT_FOUND đi qua đây
 			const messageCode = err.messageCode;
-			if (messageCode === TenantDomainMessages.CF_OAUTH_INVALID_STATE.messageCode) {
-				return { code: 'oauth_invalid_state', description: TenantDomainMessages.CF_OAUTH_INVALID_STATE.message };
+			if (
+				messageCode ===
+				TenantDomainMessages.CF_OAUTH_INVALID_STATE.messageCode
+			) {
+				return {
+					code: 'oauth_invalid_state',
+					description:
+						TenantDomainMessages.CF_OAUTH_INVALID_STATE.message,
+				};
 			}
 			if (messageCode === TenantDomainMessages.NOT_FOUND.messageCode) {
-				return { code: 'domain_not_found', description: TenantDomainMessages.NOT_FOUND.message };
+				return {
+					code: 'domain_not_found',
+					description: TenantDomainMessages.NOT_FOUND.message,
+				};
 			}
 			return { code: 'setup_failed', description: err.message };
 		}
 		this.logger.error('Unexpected CF OAuth callback error', err as any);
-		return { code: 'setup_failed', description: 'Unexpected error while completing Cloudflare setup' };
+		return {
+			code: 'setup_failed',
+			description: 'Unexpected error while completing Cloudflare setup',
+		};
 	}
 
 	// ─── Health Check (called by cron) ─────────────────────────────────────────
@@ -399,13 +499,16 @@ export class TenantDomainService {
 		if (!domain.cfCustomHostnameId) return;
 
 		try {
-			const cfStatus = await this.cfSaasService.getHostnameStatus(domain.cfCustomHostnameId);
+			const cfStatus = await this.cfSaasService.getHostnameStatus(
+				domain.cfCustomHostnameId,
+			);
 			domain.lastCheckedAt = new Date();
-			domain.lastCheckResult = cfStatus as unknown as Record<string, any>;
+			domain.lastCheckResult = cfStatus;
 
 			const dnsVerified = cfStatus.status === 'active';
 			const sslActive = cfStatus.ssl?.status === 'active';
-			const cfFailed = cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
+			const cfFailed =
+				cfStatus.status === 'blocked' || cfStatus.status === 'deleted';
 
 			if (dnsVerified && sslActive) {
 				if (domain.status !== DomainStatus.ACTIVE) {
@@ -413,12 +516,16 @@ export class TenantDomainService {
 					domain.sslStatus = SslStatus.ACTIVE;
 					domain.verifiedAt = domain.verifiedAt ?? new Date();
 					domain.sslActiveAt = new Date();
-					await this.tenantRepo.update(domain.tenantId, { domain: domain.domain });
+					await this.tenantRepo.update(domain.tenantId, {
+						domain: domain.domain,
+					});
 					this.invalidateDomainCache(domain.domain);
 				}
 			} else if (domain.status === DomainStatus.ACTIVE && !dnsVerified) {
 				domain.status = DomainStatus.EXPIRED;
-				await this.tenantRepo.update(domain.tenantId, { domain: undefined });
+				await this.tenantRepo.update(domain.tenantId, {
+					domain: undefined,
+				});
 				this.invalidateDomainCache(domain.domain);
 				// TODO: emit notification event to tenant admin
 			} else if (cfFailed) {
@@ -426,12 +533,16 @@ export class TenantDomainService {
 			} else {
 				// Still pending DNS/SSL propagation
 				domain.status = DomainStatus.VERIFYING;
-				domain.sslStatus = dnsVerified ? SslStatus.INITIALIZING : SslStatus.PENDING;
+				domain.sslStatus = dnsVerified
+					? SslStatus.INITIALIZING
+					: SslStatus.PENDING;
 			}
 
 			await this.repo.save(domain);
 		} catch (err: any) {
-			this.logger.warn(`Health check failed for domain ${domain.domain}: ${err.message}`);
+			this.logger.warn(
+				`Health check failed for domain ${domain.domain}: ${err.message}`,
+			);
 		}
 	}
 
@@ -440,16 +551,26 @@ export class TenantDomainService {
 	private validateDomainFormat(domain: string): void {
 		const reserved = /antmusic\.net$/i;
 		const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-		const validDomain = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+		const validDomain =
+			/^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
 		if (reserved.test(domain)) {
-			throw new ResponseError({ ...TenantDomainMessages.INVALID_DOMAIN_FORMAT, message: 'Cannot use antmusic.net subdomains' });
+			throw new ResponseError({
+				...TenantDomainMessages.INVALID_DOMAIN_FORMAT,
+				message: 'Cannot use antmusic.net subdomains',
+			});
 		}
 		if (ipPattern.test(domain)) {
-			throw new ResponseError({ ...TenantDomainMessages.INVALID_DOMAIN_FORMAT, message: 'IP addresses are not allowed' });
+			throw new ResponseError({
+				...TenantDomainMessages.INVALID_DOMAIN_FORMAT,
+				message: 'IP addresses are not allowed',
+			});
 		}
 		if (domain === 'localhost' || domain.endsWith('.localhost')) {
-			throw new ResponseError({ ...TenantDomainMessages.INVALID_DOMAIN_FORMAT, message: 'localhost is not allowed' });
+			throw new ResponseError({
+				...TenantDomainMessages.INVALID_DOMAIN_FORMAT,
+				message: 'localhost is not allowed',
+			});
 		}
 		if (!validDomain.test(domain)) {
 			throw new ResponseError(TenantDomainMessages.INVALID_DOMAIN_FORMAT);

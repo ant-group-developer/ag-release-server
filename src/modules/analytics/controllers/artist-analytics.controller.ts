@@ -1,14 +1,14 @@
 import { Body, Controller, Param, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { EntityAnalyticsService } from '../services/entity-analytics.service';
+import { Request } from 'express';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { Request } from 'express';
+import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
 @ApiTags('Analytics - Artist')
 @Controller('analytics/artist/:artistId')
@@ -209,26 +209,74 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks của artist (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top tracks của artist (sortBy: views | revenue)',
+	})
 	async topTracks(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
-			data: await this.entitySvc.getTopTracks('artist', artistId, dto, req.user!.tenantId),
+			data: await this.entitySvc.getTopTracks(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases của artist (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top releases của artist (sortBy: views | revenue)',
+	})
 	async topReleases(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
-			data: await this.entitySvc.getTopReleases('artist', artistId, dto, req.user!.tenantId),
+			data: await this.entitySvc.getTopReleases(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('dsp')
+	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | revenue)' })
+	async topDsps(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopDsps(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
+	@Post('ter')
+	@ApiOperation({ summary: 'Top territories của artist (sortBy: views | revenue)' })
+	async topTerritories(
+		@Param('artistId') artistId: string,
+		@Body() dto: EntityRankingQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getTopTerritories(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
 		});
 	}
 }

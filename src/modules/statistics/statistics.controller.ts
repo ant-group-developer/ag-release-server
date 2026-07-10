@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
-import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Request } from 'express';
+import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	QueryGetIssueCountDto,
@@ -19,8 +19,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data = await this.statisticsService.getIssueCounts(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getIssueCounts(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -30,8 +35,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data = await this.statisticsService.getOverviewCounts(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getOverviewCounts(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -42,9 +52,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data =
-			await this.statisticsService.getStreamCountsByCountry(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getStreamCountsByCountry(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -54,9 +68,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data =
-			await this.statisticsService.getStreamCountsByCountry(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getStreamCountsByCountry(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -66,9 +84,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data =
-			await this.statisticsService.getStreamCountsByCountry(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getStreamCountsByCountry(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 
@@ -78,8 +100,13 @@ export class StatisticsController {
 		@Req() req: Request,
 	) {
 		const tenantId = req.user!.tenantId;
-		const resolvedTenantId = checkIsNotSystemTenant(tenantId) ? tenantId : undefined;
-		const data = await this.statisticsService.getRevenueDspTimeline(query, resolvedTenantId);
+		const resolvedTenantId = checkIsNotSystemTenant(tenantId)
+			? tenantId
+			: undefined;
+		const data = await this.statisticsService.getRevenueDspTimeline(
+			query,
+			resolvedTenantId,
+		);
 		return new ResponseSuccess({ data });
 	}
 }

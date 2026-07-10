@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SpotifyEnrichmentService } from './spotify-enrichment.service';
 import { DeezerEnrichmentService } from './deezer-enrichment.service';
 import { LocalEnrichmentService } from './local-enrichment.service';
+import { SpotifyEnrichmentService } from './spotify-enrichment.service';
 
 /**
  * Enriched metadata returned from Spotify or Deezer APIs for a given ISRC.
@@ -95,9 +95,14 @@ export class MetadataEnrichmentService {
 
 		// ─── Local-first: check if ISRC already exists in DB ───
 		if (!options?.forceExternal) {
-			const localResult = await this.localEnrichmentService.findLocalByIsrc(normalizedIsrc);
+			const localResult =
+				await this.localEnrichmentService.findLocalByIsrc(
+					normalizedIsrc,
+				);
 			if (localResult) {
-				this.logger.log(`[Local Cache] Found enriched ISRC ${normalizedIsrc} in local DB, skipping external API call`);
+				this.logger.log(
+					`[Local Cache] Found enriched ISRC ${normalizedIsrc} in local DB, skipping external API call`,
+				);
 				return localResult;
 			}
 		}
@@ -108,7 +113,8 @@ export class MetadataEnrichmentService {
 		let deezerError: any = null;
 
 		await Promise.all([
-			this.spotifyEnrichmentService.enrichFromSpotify(normalizedIsrc)
+			this.spotifyEnrichmentService
+				.enrichFromSpotify(normalizedIsrc)
 				.then((res) => {
 					spotifyResult = res;
 				})
@@ -119,7 +125,8 @@ export class MetadataEnrichmentService {
 						spotifyError = err;
 					}
 				}),
-			this.deezerEnrichmentService.enrichFromDeezer(normalizedIsrc)
+			this.deezerEnrichmentService
+				.enrichFromDeezer(normalizedIsrc)
 				.then((res) => {
 					deezerResult = res;
 				})
@@ -138,15 +145,21 @@ export class MetadataEnrichmentService {
 
 		// If both APIs failed with fatal errors, throw a combined error to abort scanning
 		if (spotifyError && deezerError) {
-			throw new Error(`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`);
+			throw new Error(
+				`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`,
+			);
 		}
 
 		// Log individual warnings if one failed but the other succeeded or returned benign not-found
 		if (spotifyError) {
-			this.logger.warn(`Spotify lookup failed for ISRC ${normalizedIsrc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`);
+			this.logger.warn(
+				`Spotify lookup failed for ISRC ${normalizedIsrc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`,
+			);
 		}
 		if (deezerError) {
-			this.logger.warn(`Deezer lookup failed for ISRC ${normalizedIsrc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`);
+			this.logger.warn(
+				`Deezer lookup failed for ISRC ${normalizedIsrc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`,
+			);
 		}
 
 		if (spotifyResult) {
@@ -171,9 +184,12 @@ export class MetadataEnrichmentService {
 
 		// ─── Local-first: check if UPC already exists in DB ───
 		if (!options?.forceExternal) {
-			const localResult = await this.localEnrichmentService.findLocalByUpc(normalizedUpc);
+			const localResult =
+				await this.localEnrichmentService.findLocalByUpc(normalizedUpc);
 			if (localResult) {
-				this.logger.log(`[Local Cache] Found enriched UPC ${normalizedUpc} in local DB, skipping external API call`);
+				this.logger.log(
+					`[Local Cache] Found enriched UPC ${normalizedUpc} in local DB, skipping external API call`,
+				);
 				return localResult;
 			}
 		}
@@ -184,7 +200,8 @@ export class MetadataEnrichmentService {
 		let deezerError: any = null;
 
 		await Promise.all([
-			this.spotifyEnrichmentService.enrichFromSpotifyByUpc(normalizedUpc)
+			this.spotifyEnrichmentService
+				.enrichFromSpotifyByUpc(normalizedUpc)
 				.then((res) => {
 					spotifyResult = res;
 				})
@@ -195,7 +212,8 @@ export class MetadataEnrichmentService {
 						spotifyError = err;
 					}
 				}),
-			this.deezerEnrichmentService.enrichFromDeezerByUpc(normalizedUpc)
+			this.deezerEnrichmentService
+				.enrichFromDeezerByUpc(normalizedUpc)
 				.then((res) => {
 					deezerResult = res;
 				})
@@ -214,15 +232,21 @@ export class MetadataEnrichmentService {
 
 		// If both APIs failed with fatal errors, throw a combined error to abort scanning
 		if (spotifyError && deezerError) {
-			throw new Error(`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`);
+			throw new Error(
+				`Both Spotify and Deezer failed. Spotify: ${spotifyError.message} | Deezer: ${deezerError.message}`,
+			);
 		}
 
 		// Log individual warnings if one failed but the other succeeded or returned benign not-found
 		if (spotifyError) {
-			this.logger.warn(`Spotify UPC lookup failed for UPC ${normalizedUpc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`);
+			this.logger.warn(
+				`Spotify UPC lookup failed for UPC ${normalizedUpc}: ${spotifyError.message}. Continuing since Deezer succeeded or returned benign.`,
+			);
 		}
 		if (deezerError) {
-			this.logger.warn(`Deezer UPC lookup failed for UPC ${normalizedUpc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`);
+			this.logger.warn(
+				`Deezer UPC lookup failed for UPC ${normalizedUpc}: ${deezerError.message}. Continuing since Spotify succeeded or returned benign.`,
+			);
 		}
 
 		if (spotifyResult) {
@@ -241,15 +265,26 @@ export class MetadataEnrichmentService {
 	 */
 	async enrichBatch(
 		isrcs: string[],
-		options?: { concurrency?: number; delayMs?: number; forceExternal?: boolean; checkCancelled?: () => Promise<void> | void },
+		options?: {
+			concurrency?: number;
+			delayMs?: number;
+			forceExternal?: boolean;
+			checkCancelled?: () => Promise<void> | void;
+		},
 	): Promise<Map<string, EnrichedMetadata>> {
 		const concurrency = options?.concurrency ?? 3;
 		const delayMs = options?.delayMs ?? 200;
 		const results = new Map<string, EnrichedMetadata>();
-		const unique = [...new Set(isrcs.map((i) => i.trim().toUpperCase()).filter(Boolean))];
+		const unique = [
+			...new Set(
+				isrcs.map((i) => i.trim().toUpperCase()).filter(Boolean),
+			),
+		];
 		const batchCache = new Map<string, EnrichedMetadata>();
 
-		this.logger.log(`Enriching ${unique.length} unique ISRCs (concurrency=${concurrency})...`);
+		this.logger.log(
+			`Enriching ${unique.length} unique ISRCs (concurrency=${concurrency})...`,
+		);
 
 		// Process in sliding-window batches
 		for (let i = 0; i < unique.length; i += concurrency) {
@@ -264,7 +299,9 @@ export class MetadataEnrichmentService {
 				const cached = batchCache.get(isrc);
 				if (cached) {
 					results.set(isrc, cached);
-					this.logger.log(`[Batch Cache] Found ISRC ${isrc} in current enrichment batch, skipping external API call`);
+					this.logger.log(
+						`[Batch Cache] Found ISRC ${isrc} in current enrichment batch, skipping external API call`,
+					);
 					return;
 				}
 
@@ -275,10 +312,16 @@ export class MetadataEnrichmentService {
 					});
 					if (meta) {
 						this.cacheBatchMetadata(batchCache, isrc, meta);
-						results.set(isrc, batchCache.get(isrc) ?? this.buildMetadataForIsrc(meta, isrc));
+						results.set(
+							isrc,
+							batchCache.get(isrc) ??
+								this.buildMetadataForIsrc(meta, isrc),
+						);
 					}
 				} catch (err) {
-					this.logger.error(`Failed to enrich ISRC ${isrc}: ${err.message}`);
+					this.logger.error(
+						`Failed to enrich ISRC ${isrc}: ${err.message}`,
+					);
 					throw err; // Propagate fatal API error to halt scanning
 				}
 			});
@@ -296,8 +339,14 @@ export class MetadataEnrichmentService {
 
 			// Log progress periodically (every 50 batches / 150 ISRCs)
 			const processedCount = i + batch.length;
-			if (processedCount % 150 === 0 || processedCount === unique.length) {
-				const percentage = ((processedCount / unique.length) * 100).toFixed(1);
+			if (
+				processedCount % 150 === 0 ||
+				processedCount === unique.length
+			) {
+				const percentage = (
+					(processedCount / unique.length) *
+					100
+				).toFixed(1);
 				this.logger.log(
 					`[Progress] Enriched ${processedCount}/${unique.length} ISRCs (${percentage}% completed)...`,
 				);
@@ -309,7 +358,9 @@ export class MetadataEnrichmentService {
 			}
 		}
 
-		this.logger.log(`Enrichment complete: ${results.size}/${unique.length} ISRCs resolved.`);
+		this.logger.log(
+			`Enrichment complete: ${results.size}/${unique.length} ISRCs resolved.`,
+		);
 		return results;
 	}
 
@@ -319,7 +370,10 @@ export class MetadataEnrichmentService {
 	): EnrichedMetadata {
 		if (!secondary) return primary;
 
-		const tracksByIsrc = new Map<string, NonNullable<EnrichedMetadata['tracks']>[number]>();
+		const tracksByIsrc = new Map<
+			string,
+			NonNullable<EnrichedMetadata['tracks']>[number]
+		>();
 		for (const track of primary.tracks || []) {
 			const key = this.normalizeIsrc(track.isrc);
 			if (key) tracksByIsrc.set(key, { ...track });
@@ -328,7 +382,10 @@ export class MetadataEnrichmentService {
 		for (const track of secondary.tracks || []) {
 			const key = this.normalizeIsrc(track.isrc);
 			if (!key) continue;
-			const current = tracksByIsrc.get(key) || { isrc: track.isrc, title: track.title };
+			const current = tracksByIsrc.get(key) || {
+				isrc: track.isrc,
+				title: track.title,
+			};
 			tracksByIsrc.set(key, {
 				...current,
 				title: current.title || track.title,
@@ -345,7 +402,10 @@ export class MetadataEnrichmentService {
 			...(primary.albumCoverImages || []),
 			...(secondary.albumCoverImages || []),
 		].filter((image, index, all) => {
-			return image.url && all.findIndex((item) => item.url === image.url) === index;
+			return (
+				image.url &&
+				all.findIndex((item) => item.url === image.url) === index
+			);
 		});
 
 		return {
@@ -353,15 +413,20 @@ export class MetadataEnrichmentService {
 			trackDeezerId: primary.trackDeezerId || secondary.trackDeezerId,
 			trackDeezerUrl: primary.trackDeezerUrl || secondary.trackDeezerUrl,
 			trackSpotifyId: primary.trackSpotifyId || secondary.trackSpotifyId,
-			trackSpotifyUrl: primary.trackSpotifyUrl || secondary.trackSpotifyUrl,
+			trackSpotifyUrl:
+				primary.trackSpotifyUrl || secondary.trackSpotifyUrl,
 			artistDeezerId: primary.artistDeezerId || secondary.artistDeezerId,
-			artistDeezerUrl: primary.artistDeezerUrl || secondary.artistDeezerUrl,
-			artistSpotifyId: primary.artistSpotifyId || secondary.artistSpotifyId,
-			artistSpotifyUrl: primary.artistSpotifyUrl || secondary.artistSpotifyUrl,
+			artistDeezerUrl:
+				primary.artistDeezerUrl || secondary.artistDeezerUrl,
+			artistSpotifyId:
+				primary.artistSpotifyId || secondary.artistSpotifyId,
+			artistSpotifyUrl:
+				primary.artistSpotifyUrl || secondary.artistSpotifyUrl,
 			albumDeezerId: primary.albumDeezerId || secondary.albumDeezerId,
 			albumDeezerUrl: primary.albumDeezerUrl || secondary.albumDeezerUrl,
 			albumSpotifyId: primary.albumSpotifyId || secondary.albumSpotifyId,
-			albumSpotifyUrl: primary.albumSpotifyUrl || secondary.albumSpotifyUrl,
+			albumSpotifyUrl:
+				primary.albumSpotifyUrl || secondary.albumSpotifyUrl,
 			albumCoverImages: coverImages,
 			tracks: Array.from(tracksByIsrc.values()),
 		};
@@ -374,12 +439,18 @@ export class MetadataEnrichmentService {
 	): void {
 		const normalizedLookup = this.normalizeIsrc(lookupIsrc);
 		if (normalizedLookup) {
-			cache.set(normalizedLookup, this.buildMetadataForIsrc(meta, normalizedLookup));
+			cache.set(
+				normalizedLookup,
+				this.buildMetadataForIsrc(meta, normalizedLookup),
+			);
 		}
 
 		const primaryIsrc = this.normalizeIsrc(meta.isrc);
 		if (primaryIsrc) {
-			cache.set(primaryIsrc, this.buildMetadataForIsrc(meta, primaryIsrc));
+			cache.set(
+				primaryIsrc,
+				this.buildMetadataForIsrc(meta, primaryIsrc),
+			);
 		}
 
 		for (const track of meta.tracks ?? []) {
@@ -389,7 +460,10 @@ export class MetadataEnrichmentService {
 		}
 	}
 
-	private buildMetadataForIsrc(meta: EnrichedMetadata, isrc: string): EnrichedMetadata {
+	private buildMetadataForIsrc(
+		meta: EnrichedMetadata,
+		isrc: string,
+	): EnrichedMetadata {
 		const normalizedIsrc = this.normalizeIsrc(isrc);
 		const matchedTrack = (meta.tracks ?? []).find(
 			(track) => this.normalizeIsrc(track.isrc) === normalizedIsrc,

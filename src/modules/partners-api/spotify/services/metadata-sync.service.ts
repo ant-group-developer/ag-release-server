@@ -1,25 +1,24 @@
-
 import { Injectable, Logger } from '@nestjs/common';
-import { DataSource, EntityManager, In, ILike } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
-import { Release } from 'src/modules/release/entities/release.entity';
-import { Track } from 'src/modules/track/entities/track.entity';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
+import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
+import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
+import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
+import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { ReleaseArtist } from 'src/modules/release-artist/entities/release-artist.entity';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
-import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
-import { TrackScanHistory } from 'src/modules/copyright/entities/track-scan-history.entity';
-import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { TrackContributor } from 'src/modules/track-contributor/entities/track-contributor.entity';
+import { TrackLanguage } from 'src/modules/track-language/entities/track-language.entity';
 import { TrackLocalize } from 'src/modules/track-localize/entities/track-localize.entity';
-import { AudioFile } from 'src/modules/audio-file/entities/audio-file.entity';
 import { TrackPolicy } from 'src/modules/track-policy/entities/track-policy.entity';
-import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
-import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
-import { EnrichedMetadata } from './metadata-enrichment.service';
-import { stringToCode } from 'src/utils/util';
+import { TrackRevenue } from 'src/modules/track-revenue/entities/track-revenue.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { isValidStandardUpc } from 'src/utils/upc.util';
+import { stringToCode } from 'src/utils/util';
+import { DataSource, EntityManager, ILike, In } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
+import { EnrichedMetadata } from './metadata-enrichment.service';
 
 export interface ChangeLogEntry {
 	id: string;
@@ -84,8 +83,14 @@ export class MetadataSyncService {
 			change_type: data.changeType,
 			enrichment_source: data.enriched.source,
 			api_track_id: data.enriched.trackSpotifyId || '',
-			api_album_id: data.enriched.albumSpotifyId || data.enriched.albumDeezerId || '',
-			api_artist_id: data.enriched.artistSpotifyId || data.enriched.artistDeezerId || '',
+			api_album_id:
+				data.enriched.albumSpotifyId ||
+				data.enriched.albumDeezerId ||
+				'',
+			api_artist_id:
+				data.enriched.artistSpotifyId ||
+				data.enriched.artistDeezerId ||
+				'',
 			status: dryRun ? 'dry_run' : 'applied',
 			error_message: '',
 			is_dry_run: dryRun ? 1 : 0,
@@ -109,9 +114,19 @@ export class MetadataSyncService {
 
 		const releasePatch: Partial<Release> = {};
 		if (this.hasSpotifyMetadata(enriched)) {
-			const spotifyReleaseMetadata = this.buildReleaseSpotifyMetadata(release.metadataSpotify, enriched, lastSyncedAt);
-			if (this.hasJsonChanged(release.metadataSpotify, spotifyReleaseMetadata)) {
-				releasePatch.metadataSpotify = spotifyReleaseMetadata as Release['metadataSpotify'];
+			const spotifyReleaseMetadata = this.buildReleaseSpotifyMetadata(
+				release.metadataSpotify,
+				enriched,
+				lastSyncedAt,
+			);
+			if (
+				this.hasJsonChanged(
+					release.metadataSpotify,
+					spotifyReleaseMetadata,
+				)
+			) {
+				releasePatch.metadataSpotify =
+					spotifyReleaseMetadata as Release['metadataSpotify'];
 				changes.push('Release Spotify metadata updated');
 				chunkChangeLogs.push(
 					this.buildLogEntry(scanId, now, dryRun, {
@@ -121,7 +136,9 @@ export class MetadataSyncService {
 						isrc: enriched.isrc,
 						upc: release.upc || enriched.upc || '',
 						fieldName: 'metadata_spotify',
-						oldValue: JSON.stringify(release.metadataSpotify || null),
+						oldValue: JSON.stringify(
+							release.metadataSpotify || null,
+						),
 						newValue: JSON.stringify(spotifyReleaseMetadata),
 						changeType: 'link',
 						enriched,
@@ -131,8 +148,17 @@ export class MetadataSyncService {
 		}
 
 		if (this.hasDeezerMetadata(enriched)) {
-			const deezerReleaseMetadata = this.buildReleaseDeezerMetadata((release as any).metadataDeezer, enriched, lastSyncedAt);
-			if (this.hasJsonChanged((release as any).metadataDeezer, deezerReleaseMetadata)) {
+			const deezerReleaseMetadata = this.buildReleaseDeezerMetadata(
+				(release as any).metadataDeezer,
+				enriched,
+				lastSyncedAt,
+			);
+			if (
+				this.hasJsonChanged(
+					(release as any).metadataDeezer,
+					deezerReleaseMetadata,
+				)
+			) {
 				(releasePatch as any).metadataDeezer = deezerReleaseMetadata;
 				changes.push('Release Deezer metadata updated');
 				chunkChangeLogs.push(
@@ -143,7 +169,9 @@ export class MetadataSyncService {
 						isrc: enriched.isrc,
 						upc: release.upc || enriched.upc || '',
 						fieldName: 'metadata_deezer',
-						oldValue: JSON.stringify((release as any).metadataDeezer || null),
+						oldValue: JSON.stringify(
+							(release as any).metadataDeezer || null,
+						),
 						newValue: JSON.stringify(deezerReleaseMetadata),
 						changeType: 'link',
 						enriched,
@@ -161,7 +189,10 @@ export class MetadataSyncService {
 			? release.tracks
 			: await trackRepo.find({ where: { releaseId: release.id } });
 
-		const tracksByIsrc = new Map<string, NonNullable<EnrichedMetadata['tracks']>[number]>();
+		const tracksByIsrc = new Map<
+			string,
+			NonNullable<EnrichedMetadata['tracks']>[number]
+		>();
 		for (const apiTrack of enriched.tracks || []) {
 			const key = this.normalizeIsrc(apiTrack.isrc);
 			if (key) tracksByIsrc.set(key, apiTrack);
@@ -182,16 +213,30 @@ export class MetadataSyncService {
 		}
 
 		for (const track of tracks) {
-			const apiTrack = tracksByIsrc.get(this.normalizeIsrc(track.isrc || ''));
+			const apiTrack = tracksByIsrc.get(
+				this.normalizeIsrc(track.isrc || ''),
+			);
 			if (!apiTrack) continue;
 
 			const trackPatch: Partial<Track> = {};
 
 			if (this.hasSpotifyTrackMetadata(enriched, apiTrack)) {
-				const spotifyTrackMetadata = this.buildTrackSpotifyMetadata((track as any).metadataSpotify, enriched, apiTrack, lastSyncedAt);
-				if (this.hasJsonChanged((track as any).metadataSpotify, spotifyTrackMetadata)) {
+				const spotifyTrackMetadata = this.buildTrackSpotifyMetadata(
+					(track as any).metadataSpotify,
+					enriched,
+					apiTrack,
+					lastSyncedAt,
+				);
+				if (
+					this.hasJsonChanged(
+						(track as any).metadataSpotify,
+						spotifyTrackMetadata,
+					)
+				) {
 					(trackPatch as any).metadataSpotify = spotifyTrackMetadata;
-					changes.push(`Track[${track.isrc}] Spotify metadata updated`);
+					changes.push(
+						`Track[${track.isrc}] Spotify metadata updated`,
+					);
 					chunkChangeLogs.push(
 						this.buildLogEntry(scanId, now, dryRun, {
 							entityType: 'track',
@@ -200,7 +245,9 @@ export class MetadataSyncService {
 							isrc: track.isrc || apiTrack.isrc,
 							upc: release.upc || enriched.upc || '',
 							fieldName: 'metadata_spotify',
-							oldValue: JSON.stringify((track as any).metadataSpotify || null),
+							oldValue: JSON.stringify(
+								(track as any).metadataSpotify || null,
+							),
 							newValue: JSON.stringify(spotifyTrackMetadata),
 							changeType: 'link',
 							enriched,
@@ -210,10 +257,22 @@ export class MetadataSyncService {
 			}
 
 			if (this.hasDeezerTrackMetadata(enriched, apiTrack)) {
-				const deezerTrackMetadata = this.buildTrackDeezerMetadata((track as any).metadataDeezer, enriched, apiTrack, lastSyncedAt);
-				if (this.hasJsonChanged((track as any).metadataDeezer, deezerTrackMetadata)) {
+				const deezerTrackMetadata = this.buildTrackDeezerMetadata(
+					(track as any).metadataDeezer,
+					enriched,
+					apiTrack,
+					lastSyncedAt,
+				);
+				if (
+					this.hasJsonChanged(
+						(track as any).metadataDeezer,
+						deezerTrackMetadata,
+					)
+				) {
 					(trackPatch as any).metadataDeezer = deezerTrackMetadata;
-					changes.push(`Track[${track.isrc}] Deezer metadata updated`);
+					changes.push(
+						`Track[${track.isrc}] Deezer metadata updated`,
+					);
 					chunkChangeLogs.push(
 						this.buildLogEntry(scanId, now, dryRun, {
 							entityType: 'track',
@@ -222,7 +281,9 @@ export class MetadataSyncService {
 							isrc: track.isrc || apiTrack.isrc,
 							upc: release.upc || enriched.upc || '',
 							fieldName: 'metadata_deezer',
-							oldValue: JSON.stringify((track as any).metadataDeezer || null),
+							oldValue: JSON.stringify(
+								(track as any).metadataDeezer || null,
+							),
 							newValue: JSON.stringify(deezerTrackMetadata),
 							changeType: 'link',
 							enriched,
@@ -251,12 +312,17 @@ export class MetadataSyncService {
 		const labelName = enriched.labelName?.trim();
 		if (!labelName || labelName.toUpperCase() === 'N/A') return;
 
-		const label = await this.resolveOrCreateApiLabel(release.tenantId, labelName);
+		const label = await this.resolveOrCreateApiLabel(
+			release.tenantId,
+			labelName,
+		);
 		if (!label || release.labelId === label.id) return;
 
 		const oldLabelId = release.labelId || '';
 		const oldLabelName = release.label?.name?.trim();
-		const oldValue = oldLabelName ? `${oldLabelId} (${oldLabelName})` : oldLabelId;
+		const oldValue = oldLabelName
+			? `${oldLabelId} (${oldLabelName})`
+			: oldLabelId;
 		const newValue = `${label.id} (${label.name})`;
 
 		if (!dryRun) {
@@ -348,7 +414,6 @@ export class MetadataSyncService {
 		release.releaseArtists = [releaseArtist];
 	}
 
-
 	async mergeDuplicateTrackRowsWithManager(
 		manager: EntityManager,
 		canonicalTrackId: string,
@@ -356,11 +421,21 @@ export class MetadataSyncService {
 	): Promise<void> {
 		if (duplicateTrackIds.length === 0) return;
 
-		await manager.update(TrackRevenue, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
-		await manager.update(TrackScanHistory, { trackId: In(duplicateTrackIds) }, { trackId: canonicalTrackId });
+		await manager.update(
+			TrackRevenue,
+			{ trackId: In(duplicateTrackIds) },
+			{ trackId: canonicalTrackId },
+		);
+		await manager.update(
+			TrackScanHistory,
+			{ trackId: In(duplicateTrackIds) },
+			{ trackId: canonicalTrackId },
+		);
 		await manager.delete(TrackLanguage, { trackId: In(duplicateTrackIds) });
 		await manager.delete(TrackArtist, { trackId: In(duplicateTrackIds) });
-		await manager.delete(TrackContributor, { trackId: In(duplicateTrackIds) });
+		await manager.delete(TrackContributor, {
+			trackId: In(duplicateTrackIds),
+		});
 		await manager.delete(TrackLocalize, { trackId: In(duplicateTrackIds) });
 		await manager.delete(AudioFile, { trackId: In(duplicateTrackIds) });
 		await manager.delete(TrackPolicy, { trackId: In(duplicateTrackIds) });
@@ -385,7 +460,16 @@ export class MetadataSyncService {
 
 	async syncReleaseTracks(
 		release: Release,
-		apiTracks: Array<{ isrc: string; title: string; duration?: number; trackNumber?: number; spotifyId?: string; deezerId?: string; spotifyUrl?: string; deezerUrl?: string }>,
+		apiTracks: Array<{
+			isrc: string;
+			title: string;
+			duration?: number;
+			trackNumber?: number;
+			spotifyId?: string;
+			deezerId?: string;
+			spotifyUrl?: string;
+			deezerUrl?: string;
+		}>,
 		dryRun: boolean,
 		primaryEnriched: EnrichedMetadata,
 		now: string,
@@ -396,15 +480,19 @@ export class MetadataSyncService {
 		const trackRepo = this.dataSource.getRepository(Track);
 		const trackArtistRepo = this.dataSource.getRepository(TrackArtist);
 
-		this.logger.log(`Syncing ${apiTracks.length} track(s) for release ${release.id}`);
+		this.logger.log(
+			`Syncing ${apiTracks.length} track(s) for release ${release.id}`,
+		);
 
 		// 1. Fetch artists for link
 		let releaseArtists: ReleaseArtist[] = [];
 		try {
-			releaseArtists = await this.dataSource.getRepository(ReleaseArtist).find({
-				where: { releaseId: release.id },
-				relations: ['artist'],
-			});
+			releaseArtists = await this.dataSource
+				.getRepository(ReleaseArtist)
+				.find({
+					where: { releaseId: release.id },
+					relations: ['artist'],
+				});
 		} catch (err) {
 			this.logger.warn(`Failed to fetch release artists: ${err.message}`);
 		}
@@ -427,7 +515,10 @@ export class MetadataSyncService {
 		// 3. Move existing track orders to a temporary high range to avoid UQ_tracks_release_id_order conflicts
 		if (!dryRun) {
 			for (const track of dbTracks) {
-				await trackRepo.update({ id: track.id }, { order: track.order + 10000 });
+				await trackRepo.update(
+					{ id: track.id },
+					{ order: track.order + 10000 },
+				);
 			}
 		}
 
@@ -442,20 +533,25 @@ export class MetadataSyncService {
 
 			// Find if this ISRC already exists in our db tracks
 			const existingTrack = dbTracks.find(
-				(t) => t.isrc?.trim().toUpperCase() === apiTrack.isrc.trim().toUpperCase()
+				(t) =>
+					t.isrc?.trim().toUpperCase() ===
+					apiTrack.isrc.trim().toUpperCase(),
 			);
 
 			if (existingTrack) {
-				const duplicateTracks = await this.findImportedInvalidUpcDuplicateTracks(
-					apiTrack.isrc,
-					release.id,
-					release.tenantId,
-				);
+				const duplicateTracks =
+					await this.findImportedInvalidUpcDuplicateTracks(
+						apiTrack.isrc,
+						release.id,
+						release.tenantId,
+					);
 				const mergeableDuplicates = duplicateTracks.filter(
 					(duplicateTrack) => duplicateTrack.id !== existingTrack.id,
 				);
 				if (mergeableDuplicates.length > 0) {
-					const duplicateIds = mergeableDuplicates.map((track) => track.id);
+					const duplicateIds = mergeableDuplicates.map(
+						(track) => track.id,
+					);
 					if (!dryRun) {
 						await this.dataSource.transaction(async (manager) => {
 							await this.mergeDuplicateTrackRowsWithManager(
@@ -465,7 +561,9 @@ export class MetadataSyncService {
 							);
 							await this.cleanupEmptyImportedInvalidUpcReleases(
 								manager,
-								mergeableDuplicates.map((track) => track.releaseId),
+								mergeableDuplicates.map(
+									(track) => track.releaseId,
+								),
 							);
 						});
 					}
@@ -498,20 +596,22 @@ export class MetadataSyncService {
 				};
 				const lastSyncedAt = new Date().toISOString();
 				if (this.hasSpotifyTrackMetadata(primaryEnriched, apiTrack)) {
-					(trackPatch as any).metadataSpotify = this.buildTrackSpotifyMetadata(
-						(existingTrack as any).metadataSpotify,
-						primaryEnriched,
-						apiTrack,
-						lastSyncedAt,
-					);
+					(trackPatch as any).metadataSpotify =
+						this.buildTrackSpotifyMetadata(
+							(existingTrack as any).metadataSpotify,
+							primaryEnriched,
+							apiTrack,
+							lastSyncedAt,
+						);
 				}
 				if (this.hasDeezerTrackMetadata(primaryEnriched, apiTrack)) {
-					(trackPatch as any).metadataDeezer = this.buildTrackDeezerMetadata(
-						(existingTrack as any).metadataDeezer,
-						primaryEnriched,
-						apiTrack,
-						lastSyncedAt,
-					);
+					(trackPatch as any).metadataDeezer =
+						this.buildTrackDeezerMetadata(
+							(existingTrack as any).metadataDeezer,
+							primaryEnriched,
+							apiTrack,
+							lastSyncedAt,
+						);
 				}
 
 				if (!dryRun) {
@@ -520,10 +620,14 @@ export class MetadataSyncService {
 						trackPatch,
 					);
 				}
-				
-				const hasChanges = existingTrack.title !== apiTrack.title || existingTrack.order !== targetOrder;
+
+				const hasChanges =
+					existingTrack.title !== apiTrack.title ||
+					existingTrack.order !== targetOrder;
 				if (hasChanges) {
-					changes.push(`Track[${apiTrack.isrc}] updated: "${apiTrack.title}" (order: ${targetOrder})`);
+					changes.push(
+						`Track[${apiTrack.isrc}] updated: "${apiTrack.title}" (order: ${targetOrder})`,
+					);
 				}
 			} else {
 				const duplicateTrack = await trackRepo
@@ -532,7 +636,9 @@ export class MetadataSyncService {
 					.where('UPPER(track.isrc) = :isrc', {
 						isrc: apiTrack.isrc.trim().toUpperCase(),
 					})
-					.andWhere('track.releaseId != :releaseId', { releaseId: release.id })
+					.andWhere('track.releaseId != :releaseId', {
+						releaseId: release.id,
+					})
 					.getOne();
 
 				if (duplicateTrack?.release?.tenantId === release.tenantId) {
@@ -546,34 +652,50 @@ export class MetadataSyncService {
 							order: targetOrder,
 						};
 						const lastSyncedAt = new Date().toISOString();
-						if (this.hasSpotifyTrackMetadata(primaryEnriched, apiTrack)) {
-							(duplicateTrackPatch as any).metadataSpotify = this.buildTrackSpotifyMetadata(
-								(duplicateTrack as any).metadataSpotify,
+						if (
+							this.hasSpotifyTrackMetadata(
 								primaryEnriched,
 								apiTrack,
-								lastSyncedAt,
-							);
+							)
+						) {
+							(duplicateTrackPatch as any).metadataSpotify =
+								this.buildTrackSpotifyMetadata(
+									(duplicateTrack as any).metadataSpotify,
+									primaryEnriched,
+									apiTrack,
+									lastSyncedAt,
+								);
 						}
-						if (this.hasDeezerTrackMetadata(primaryEnriched, apiTrack)) {
-							(duplicateTrackPatch as any).metadataDeezer = this.buildTrackDeezerMetadata(
-								(duplicateTrack as any).metadataDeezer,
+						if (
+							this.hasDeezerTrackMetadata(
 								primaryEnriched,
 								apiTrack,
-								lastSyncedAt,
-							);
+							)
+						) {
+							(duplicateTrackPatch as any).metadataDeezer =
+								this.buildTrackDeezerMetadata(
+									(duplicateTrack as any).metadataDeezer,
+									primaryEnriched,
+									apiTrack,
+									lastSyncedAt,
+								);
 						}
 
 						if (!dryRun) {
-							await this.dataSource.transaction(async (manager) => {
-								await manager.getRepository(Track).update(
-									{ id: duplicateTrack.id },
-									duplicateTrackPatch,
-								);
-								await this.cleanupEmptyImportedInvalidUpcReleases(
-									manager,
-									[duplicateTrack.releaseId],
-								);
-							});
+							await this.dataSource.transaction(
+								async (manager) => {
+									await manager
+										.getRepository(Track)
+										.update(
+											{ id: duplicateTrack.id },
+											duplicateTrackPatch,
+										);
+									await this.cleanupEmptyImportedInvalidUpcReleases(
+										manager,
+										[duplicateTrack.releaseId],
+									);
+								},
+							);
 						}
 
 						changes.push(
@@ -595,22 +717,28 @@ export class MetadataSyncService {
 						);
 
 						try {
-							const artistIds = releaseArtists.map((ra) => ra.artistId).filter(Boolean);
+							const artistIds = releaseArtists
+								.map((ra) => ra.artistId)
+								.filter(Boolean);
 							await this.clickHouseService.insert(
 								CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
-								[{
-									isrc: apiTrack.isrc,
-									tenant_id: release.tenantId || '',
-									release_id: release.id,
-									release_upc: release.upc || '',
-									label_id: release.labelId || '',
-									artist_ids: artistIds,
-									is_deleted: 0,
-									updated_at: now.slice(0, 19),
-								}],
+								[
+									{
+										isrc: apiTrack.isrc,
+										tenant_id: release.tenantId || '',
+										release_id: release.id,
+										release_upc: release.upc || '',
+										label_id: release.labelId || '',
+										artist_ids: artistIds,
+										is_deleted: 0,
+										updated_at: now.slice(0, 19),
+									},
+								],
 							);
 						} catch (chErr) {
-							this.logger.error(`Failed to sync duplicate ISRC ${apiTrack.isrc} mapping: ${chErr.message}`);
+							this.logger.error(
+								`Failed to sync duplicate ISRC ${apiTrack.isrc} mapping: ${chErr.message}`,
+							);
 						}
 
 						continue;
@@ -628,7 +756,8 @@ export class MetadataSyncService {
 							releaseId: release.id,
 							isrc: apiTrack.isrc,
 							upc: release.upc || '',
-							fieldName: duplicateTrack.release.isImportedFromReport
+							fieldName: duplicateTrack.release
+								.isImportedFromReport
 								? 'duplicate_imported_valid_upc_skip'
 								: 'duplicate_isrc_skip',
 							oldValue: duplicateTrack.releaseId,
@@ -651,41 +780,49 @@ export class MetadataSyncService {
 						isImportedFromReport: true,
 					};
 					const lastSyncedAt = new Date().toISOString();
-					if (this.hasSpotifyTrackMetadata(primaryEnriched, apiTrack)) {
-						(createPayload as any).metadataSpotify = this.buildTrackSpotifyMetadata(
-							null,
-							primaryEnriched,
-							apiTrack,
-							lastSyncedAt,
-						);
+					if (
+						this.hasSpotifyTrackMetadata(primaryEnriched, apiTrack)
+					) {
+						(createPayload as any).metadataSpotify =
+							this.buildTrackSpotifyMetadata(
+								null,
+								primaryEnriched,
+								apiTrack,
+								lastSyncedAt,
+							);
 					}
-					if (this.hasDeezerTrackMetadata(primaryEnriched, apiTrack)) {
-						(createPayload as any).metadataDeezer = this.buildTrackDeezerMetadata(
-							null,
-							primaryEnriched,
-							apiTrack,
-							lastSyncedAt,
-						);
+					if (
+						this.hasDeezerTrackMetadata(primaryEnriched, apiTrack)
+					) {
+						(createPayload as any).metadataDeezer =
+							this.buildTrackDeezerMetadata(
+								null,
+								primaryEnriched,
+								apiTrack,
+								lastSyncedAt,
+							);
 					}
 					newTrack = await trackRepo.save(
-						trackRepo.create(createPayload)
+						trackRepo.create(createPayload),
 					);
 
 					// Link track to artists
 					for (const ra of releaseArtists) {
 						await trackArtistRepo.save(
 							trackArtistRepo.create({
-								trackId: newTrack!.id,
+								trackId: newTrack.id,
 								artistId: ra.artistId,
 								releaseArtistId: ra.id,
 								isFromReleaseAction: true,
 								isImportedFromReport: true,
-							})
+							}),
 						);
 					}
 				}
 
-				changes.push(`Track[${apiTrack.isrc}]: created "${apiTrack.title}"`);
+				changes.push(
+					`Track[${apiTrack.isrc}]: created "${apiTrack.title}"`,
+				);
 				chunkChangeLogs.push(
 					this.buildLogEntry(scanId, now, dryRun, {
 						entityType: 'track',
@@ -703,22 +840,28 @@ export class MetadataSyncService {
 
 				// Sync new track to ClickHouse pg_tracks_sync
 				try {
-					const artistIds = releaseArtists.map((ra) => ra.artistId).filter(Boolean);
+					const artistIds = releaseArtists
+						.map((ra) => ra.artistId)
+						.filter(Boolean);
 					await this.clickHouseService.insert(
 						CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
-						[{
-							isrc: apiTrack.isrc,
-							tenant_id: release.tenantId || '',
-							release_id: release.id,
-							release_upc: release.upc || '',
-							label_id: release.labelId || '',
-							artist_ids: artistIds,
-							is_deleted: 0,
-							updated_at: now.slice(0, 19),
-						}],
+						[
+							{
+								isrc: apiTrack.isrc,
+								tenant_id: release.tenantId || '',
+								release_id: release.id,
+								release_upc: release.upc || '',
+								label_id: release.labelId || '',
+								artist_ids: artistIds,
+								is_deleted: 0,
+								updated_at: now.slice(0, 19),
+							},
+						],
 					);
 				} catch (chErr) {
-					this.logger.error(`Failed to insert track ${apiTrack.isrc} into pg_tracks_sync: ${chErr.message}`);
+					this.logger.error(
+						`Failed to insert track ${apiTrack.isrc} into pg_tracks_sync: ${chErr.message}`,
+					);
 				}
 			}
 		}
@@ -734,7 +877,10 @@ export class MetadataSyncService {
 					while (usedOrders.has(restoreOrder)) {
 						restoreOrder++;
 					}
-					await trackRepo.update({ id: track.id }, { order: restoreOrder });
+					await trackRepo.update(
+						{ id: track.id },
+						{ order: restoreOrder },
+					);
 					usedOrders.add(restoreOrder);
 				}
 			}
@@ -749,25 +895,35 @@ export class MetadataSyncService {
 		const normalizedIsrc = this.normalizeIsrc(isrc);
 		if (!normalizedIsrc || !tenantId) return [];
 
-		const tracks = await this.dataSource.getRepository(Track)
+		const tracks = await this.dataSource
+			.getRepository(Track)
 			.createQueryBuilder('track')
 			.leftJoinAndSelect('track.release', 'duplicateRelease')
 			.where('UPPER(track.isrc) = :isrc', { isrc: normalizedIsrc })
-			.andWhere('track.releaseId != :releaseId', { releaseId: currentReleaseId })
-			.andWhere('duplicateRelease.tenantId = :tenantId', { tenantId })
-			.andWhere('duplicateRelease.isImportedFromReport = :isImportedFromReport', {
-				isImportedFromReport: true,
+			.andWhere('track.releaseId != :releaseId', {
+				releaseId: currentReleaseId,
 			})
+			.andWhere('duplicateRelease.tenantId = :tenantId', { tenantId })
+			.andWhere(
+				'duplicateRelease.isImportedFromReport = :isImportedFromReport',
+				{
+					isImportedFromReport: true,
+				},
+			)
 			.getMany();
 
-		return tracks.filter((track) => !isValidStandardUpc(track.release?.upc));
+		return tracks.filter(
+			(track) => !isValidStandardUpc(track.release?.upc),
+		);
 	}
 
 	private async cleanupEmptyImportedInvalidUpcReleases(
 		manager: EntityManager,
 		releaseIds: string[],
 	): Promise<string[]> {
-		const uniqueReleaseIds = Array.from(new Set(releaseIds.filter(Boolean)));
+		const uniqueReleaseIds = Array.from(
+			new Set(releaseIds.filter(Boolean)),
+		);
 		if (!uniqueReleaseIds.length) return [];
 
 		const releaseRepo = manager.getRepository(Release);
@@ -775,25 +931,85 @@ export class MetadataSyncService {
 		const deletedReleaseIds: string[] = [];
 
 		for (const releaseId of uniqueReleaseIds) {
-			const release = await releaseRepo.findOne({ where: { id: releaseId } });
-			if (!release?.isImportedFromReport || isValidStandardUpc(release.upc)) {
+			const release = await releaseRepo.findOne({
+				where: { id: releaseId },
+			});
+			if (
+				!release?.isImportedFromReport ||
+				isValidStandardUpc(release.upc)
+			) {
 				continue;
 			}
 
 			const trackCount = await trackRepo.count({ where: { releaseId } });
 			if (trackCount > 0) continue;
 
-			await manager.createQueryBuilder().delete().from('release_artist').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_contributors').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_localize').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_cover_art').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_dsp_delivery').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_territories').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('videos').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_captions').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_logs').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_language').where('release_id = :id', { id: releaseId }).execute();
-			await manager.createQueryBuilder().delete().from('release_enrichments').where('release_id = :id', { id: releaseId }).execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_artist')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_contributors')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_localize')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_cover_art')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_dsp_delivery')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_territories')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('videos')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_captions')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_logs')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_language')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
+			await manager
+				.createQueryBuilder()
+				.delete()
+				.from('release_enrichments')
+				.where('release_id = :id', { id: releaseId })
+				.execute();
 			await releaseRepo.delete(releaseId);
 			deletedReleaseIds.push(releaseId);
 		}
@@ -861,9 +1077,15 @@ export class MetadataSyncService {
 				(track) => this.normalizeIsrc(track.isrc) === isrc,
 			);
 			const canonical = this.pickCanonicalTrack(tracks, apiTrack);
-			const duplicateTracks = tracks.filter((track) => track.id !== canonical.id);
-			const deletableDuplicates = duplicateTracks.filter((track) => track.isImportedFromReport);
-			const skippedDuplicates = duplicateTracks.filter((track) => !track.isImportedFromReport);
+			const duplicateTracks = tracks.filter(
+				(track) => track.id !== canonical.id,
+			);
+			const deletableDuplicates = duplicateTracks.filter(
+				(track) => track.isImportedFromReport,
+			);
+			const skippedDuplicates = duplicateTracks.filter(
+				(track) => !track.isImportedFromReport,
+			);
 
 			for (const duplicate of skippedDuplicates) {
 				changes.push(
@@ -938,12 +1160,22 @@ export class MetadataSyncService {
 		const apiOrder = apiTrack?.trackNumber;
 
 		return [...tracks].sort((a, b) => {
-			const aTitleScore = normalizedApiTitle && a.title?.trim().toLowerCase() === normalizedApiTitle ? 0 : 1;
-			const bTitleScore = normalizedApiTitle && b.title?.trim().toLowerCase() === normalizedApiTitle ? 0 : 1;
+			const aTitleScore =
+				normalizedApiTitle &&
+				a.title?.trim().toLowerCase() === normalizedApiTitle
+					? 0
+					: 1;
+			const bTitleScore =
+				normalizedApiTitle &&
+				b.title?.trim().toLowerCase() === normalizedApiTitle
+					? 0
+					: 1;
 			if (aTitleScore !== bTitleScore) return aTitleScore - bTitleScore;
 
-			const aOrderScore = apiOrder !== undefined && a.order === apiOrder ? 0 : 1;
-			const bOrderScore = apiOrder !== undefined && b.order === apiOrder ? 0 : 1;
+			const aOrderScore =
+				apiOrder !== undefined && a.order === apiOrder ? 0 : 1;
+			const bOrderScore =
+				apiOrder !== undefined && b.order === apiOrder ? 0 : 1;
 			if (aOrderScore !== bOrderScore) return aOrderScore - bOrderScore;
 
 			return (a.order ?? 0) - (b.order ?? 0);
@@ -963,7 +1195,10 @@ export class MetadataSyncService {
 				.filter((image) => image.source === 'spotify')
 				.map(({ source, ...image }) => image),
 			trackLinks: (enriched.tracks || [])
-				.filter((track) => track.isrc && (track.spotifyId || track.spotifyUrl))
+				.filter(
+					(track) =>
+						track.isrc && (track.spotifyId || track.spotifyUrl),
+				)
 				.map((track) => ({
 					isrc: track.isrc,
 					spotifyId: track.spotifyId || null,
@@ -986,7 +1221,10 @@ export class MetadataSyncService {
 				.filter((image) => image.source === 'deezer')
 				.map(({ source, ...image }) => image),
 			trackLinks: (enriched.tracks || [])
-				.filter((track) => track.isrc && (track.deezerId || track.deezerUrl))
+				.filter(
+					(track) =>
+						track.isrc && (track.deezerId || track.deezerUrl),
+				)
 				.map((track) => ({
 					isrc: track.isrc,
 					deezerId: track.deezerId || null,
@@ -1035,18 +1273,26 @@ export class MetadataSyncService {
 	private hasSpotifyMetadata(enriched: EnrichedMetadata): boolean {
 		return Boolean(
 			enriched.albumSpotifyId ||
-				enriched.albumSpotifyUrl ||
-				(enriched.albumCoverImages || []).some((image) => image.source === 'spotify') ||
-				(enriched.tracks || []).some((track) => track.spotifyId || track.spotifyUrl),
+			enriched.albumSpotifyUrl ||
+			(enriched.albumCoverImages || []).some(
+				(image) => image.source === 'spotify',
+			) ||
+			(enriched.tracks || []).some(
+				(track) => track.spotifyId || track.spotifyUrl,
+			),
 		);
 	}
 
 	private hasDeezerMetadata(enriched: EnrichedMetadata): boolean {
 		return Boolean(
 			enriched.albumDeezerId ||
-				enriched.albumDeezerUrl ||
-				(enriched.albumCoverImages || []).some((image) => image.source === 'deezer') ||
-				(enriched.tracks || []).some((track) => track.deezerId || track.deezerUrl),
+			enriched.albumDeezerUrl ||
+			(enriched.albumCoverImages || []).some(
+				(image) => image.source === 'deezer',
+			) ||
+			(enriched.tracks || []).some(
+				(track) => track.deezerId || track.deezerUrl,
+			),
 		);
 	}
 
@@ -1054,14 +1300,24 @@ export class MetadataSyncService {
 		enriched: EnrichedMetadata,
 		apiTrack: NonNullable<EnrichedMetadata['tracks']>[number],
 	): boolean {
-		return Boolean(apiTrack.spotifyId || apiTrack.spotifyUrl || enriched.albumSpotifyId || enriched.albumSpotifyUrl);
+		return Boolean(
+			apiTrack.spotifyId ||
+			apiTrack.spotifyUrl ||
+			enriched.albumSpotifyId ||
+			enriched.albumSpotifyUrl,
+		);
 	}
 
 	private hasDeezerTrackMetadata(
 		enriched: EnrichedMetadata,
 		apiTrack: NonNullable<EnrichedMetadata['tracks']>[number],
 	): boolean {
-		return Boolean(apiTrack.deezerId || apiTrack.deezerUrl || enriched.albumDeezerId || enriched.albumDeezerUrl);
+		return Boolean(
+			apiTrack.deezerId ||
+			apiTrack.deezerUrl ||
+			enriched.albumDeezerId ||
+			enriched.albumDeezerUrl,
+		);
 	}
 
 	private normalizeIsrc(isrc?: string | null): string {

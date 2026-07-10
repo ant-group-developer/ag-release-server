@@ -1,5 +1,8 @@
-import { CacheModule as NestCacheModule, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Module, Inject, Logger } from '@nestjs/common';
+import {
+	CACHE_MANAGER,
+	CacheModule as NestCacheModule,
+} from '@nestjs/cache-manager';
+import { Inject, Logger, Module } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
 import { CacheController } from './cache.controller';
@@ -28,7 +31,9 @@ export class CacheModule {
 			const client = store.getClient();
 			if (client && typeof client.on === 'function') {
 				client.on('error', (err: any) => {
-					this.logger.error(`CacheManager Redis connection error: ${err.message}`);
+					this.logger.error(
+						`CacheManager Redis connection error: ${err.message}`,
+					);
 				});
 			}
 		}

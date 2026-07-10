@@ -10,6 +10,16 @@ import { TenantDomainService } from './modules/tenant-domain/tenant-domain.servi
 export let APP_GOLBAL: INestApplication<any>;
 
 async function bootstrap() {
+	const role = process.env.APP_ROLE || 'api';
+	const logger = new Logger('Bootstrap');
+
+	if (role === 'worker') {
+		const app = await NestFactory.createApplicationContext(AppModule);
+		app.enableShutdownHooks();
+		logger.log('⚙️  Worker instance started (no HTTP port)');
+		return;
+	}
+
 	const app = await NestFactory.create<NestExpressApplication>(AppModule);
 	APP_GOLBAL = app;
 
@@ -30,7 +40,6 @@ async function bootstrap() {
 	const port = process.env.APP_PORT || 3000;
 
 	await app.listen(port);
-	const logger = new Logger('Bootstrap');
 	logger.log(`🚀 Server running on http://localhost:${port}`);
 }
 

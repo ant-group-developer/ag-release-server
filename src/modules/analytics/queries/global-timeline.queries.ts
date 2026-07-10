@@ -1,13 +1,13 @@
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 
 export function getDspSalesTimelineTopDspsQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
-  topN: number,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.dsp_id AS dsp_id,
       ${resolvedDspName} AS dsp_name,
@@ -26,13 +26,13 @@ export function getDspSalesTimelineTopDspsQuery(
 }
 
 export function getDspSalesTimelineQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  dspExpr: string,
-  whereDsp: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	dspExpr: string,
+	whereDsp: string,
 ): string {
-  return `
+	return `
     SELECT
       toStartOfMonth(s.period) AS period_date,
       formatDateTime(s.period, '%Y-%m') AS period_str,
@@ -53,13 +53,13 @@ export function getDspSalesTimelineQuery(
 }
 
 export function getDspTrendsTimelineTopDspsQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
-  topN: number,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.dsp_id AS dsp_id,
       ${resolvedDspName} AS dsp_name,
@@ -78,13 +78,13 @@ export function getDspTrendsTimelineTopDspsQuery(
 }
 
 export function getDspTrendsTimelineQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  dspExpr: string,
-  whereDsp: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	dspExpr: string,
+	whereDsp: string,
 ): string {
-  return `
+	return `
     SELECT
       toStartOfMonth(s.period) AS period_date,
       formatDateTime(s.period, '%Y-%m') AS period_str,
@@ -104,13 +104,13 @@ export function getDspTrendsTimelineQuery(
 }
 
 export function getDspTrendsDailyTimelineTopDspsQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
-  topN: number,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.dsp_id AS dsp_id,
       ${resolvedDspName} AS dsp_name,
@@ -129,13 +129,13 @@ export function getDspTrendsDailyTimelineTopDspsQuery(
 }
 
 export function getDspTrendsDailyTimelineQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  dspExpr: string,
-  whereDsp: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	dspExpr: string,
+	whereDsp: string,
 ): string {
-  return `
+	return `
     SELECT
       s.reporting_date AS period_date,
       formatDateTime(s.reporting_date, '%Y-%m-%d') AS period_str,
@@ -155,11 +155,11 @@ export function getDspTrendsDailyTimelineQuery(
 }
 
 export function getTerSalesTimelineTopTersQuery(
-  joinSql: string,
-  filterSql: string,
-  topN: number,
+	joinSql: string,
+	filterSql: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.territory_code AS territory,
       sum(s.total_quantity) AS views
@@ -176,12 +176,12 @@ export function getTerSalesTimelineTopTersQuery(
 }
 
 export function getTerSalesTimelineQuery(
-  joinSql: string,
-  filterSql: string,
-  terExpr: string,
-  whereTer: string,
+	joinSql: string,
+	filterSql: string,
+	terExpr: string,
+	whereTer: string,
 ): string {
-  return `
+	return `
     SELECT
       toStartOfMonth(s.period) AS period_date,
       formatDateTime(s.period, '%Y-%m') AS period_str,
@@ -201,11 +201,11 @@ export function getTerSalesTimelineQuery(
 }
 
 export function getTerTrendsTimelineTopTersQuery(
-  joinSql: string,
-  filterSql: string,
-  topN: number,
+	joinSql: string,
+	filterSql: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.territory_code AS territory,
       sum(s.total_quantity) AS views
@@ -222,12 +222,12 @@ export function getTerTrendsTimelineTopTersQuery(
 }
 
 export function getTerTrendsTimelineQuery(
-  joinSql: string,
-  filterSql: string,
-  terExpr: string,
-  whereTer: string,
+	joinSql: string,
+	filterSql: string,
+	terExpr: string,
+	whereTer: string,
 ): string {
-  return `
+	return `
     SELECT
       toStartOfMonth(s.period) AS period_date,
       formatDateTime(s.period, '%Y-%m') AS period_str,
@@ -245,8 +245,11 @@ export function getTerTrendsTimelineQuery(
   `;
 }
 
-export function getRevenueOverviewQuery(joinSql: string, filterSql: string): string {
-  return `
+export function getRevenueOverviewQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
+	return `
     SELECT
       sum(s.total_quantity)     AS total_quantity,
       sum(s.total_revenue_usd) AS total_revenue_usd,
@@ -261,13 +264,13 @@ export function getRevenueOverviewQuery(joinSql: string, filterSql: string): str
 }
 
 export function getRevenueTimelineTopDspsQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
-  topN: number,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	topN: number,
 ): string {
-  return `
+	return `
     SELECT
       s.dsp_id AS dsp_id,
       ${resolvedDspName} AS dsp_name,
@@ -286,13 +289,13 @@ export function getRevenueTimelineTopDspsQuery(
 }
 
 export function getRevenueTimelineQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  dspExpr: string,
-  whereDsp: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	dspExpr: string,
+	whereDsp: string,
 ): string {
-  return `
+	return `
     SELECT
       toStartOfMonth(s.period) AS period_date,
       formatDateTime(s.period, '%Y-%m') AS period_str,
@@ -313,12 +316,12 @@ export function getRevenueTimelineQuery(
 }
 
 export function getRevenueTopDspCountQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
 ): string {
-  return `
+	return `
     SELECT uniq(${resolvedDspName}) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -331,14 +334,14 @@ export function getRevenueTopDspCountQuery(
 }
 
 export function getRevenueTopDspQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
-  limit: number,
-  offset: number,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       any(r.pg_uuid) AS pg_dsp_id,
       any(s.dsp_id) AS dsp_report_id,
@@ -359,11 +362,11 @@ export function getRevenueTopDspQuery(
 }
 
 export function getRevenueTopDspTotalQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -378,10 +381,10 @@ export function getRevenueTopDspTotalQuery(
 }
 
 export function getRevenueTopArtistCountQuery(
-  filterSql: string,
-  hasKeywordFilter: boolean,
+	filterSql: string,
+	hasKeywordFilter: boolean,
 ): string {
-  return `
+	return `
     SELECT uniq(artistId) AS total
     FROM (
       SELECT arrayJoin(t.artist_ids) AS artistId
@@ -397,12 +400,12 @@ export function getRevenueTopArtistCountQuery(
 }
 
 export function getRevenueTopArtistQuery(
-  filterSql: string,
-  hasKeywordFilter: boolean,
-  limit: number,
-  offset: number,
+	filterSql: string,
+	hasKeywordFilter: boolean,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       arrayJoin(t.artist_ids) AS artistId,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -422,10 +425,10 @@ export function getRevenueTopArtistQuery(
 }
 
 export function getRevenueTopArtistTotalQuery(
-  filterSql: string,
-  hasKeywordFilter: boolean,
+	filterSql: string,
+	hasKeywordFilter: boolean,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -440,11 +443,11 @@ export function getRevenueTopArtistTotalQuery(
 }
 
 export function getRevenueTopTrackCountQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
-  return `
+	// Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
+	return `
     SELECT uniq(s.isrc) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -457,13 +460,13 @@ export function getRevenueTopTrackCountQuery(
 }
 
 export function getRevenueTopTrackQuery(
-  joinSql: string,
-  filterSql: string,
-  limit: number,
-  offset: number,
+	joinSql: string,
+	filterSql: string,
+	limit: number,
+	offset: number,
 ): string {
-  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
-  return `
+	// Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
+	return `
     SELECT
       s.isrc AS isrc,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -482,7 +485,7 @@ export function getRevenueTopTrackQuery(
 }
 
 export function getRevenueTopTrackFallbackQuery(): string {
-  return `
+	return `
     SELECT
       isrc,
       any(track_title) AS track_title,
@@ -494,11 +497,11 @@ export function getRevenueTopTrackFallbackQuery(): string {
 }
 
 export function getRevenueTopTrackTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  // Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
-  return `
+	// Video bypass filter ISRC (video ISRC luon hop le, khong phai placeholder UPC-xxx).
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -513,10 +516,10 @@ export function getRevenueTopTrackTotalQuery(
 }
 
 export function getRevenueTopLabelCountQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT uniq(t.label_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -529,12 +532,12 @@ export function getRevenueTopLabelCountQuery(
 }
 
 export function getRevenueTopLabelQuery(
-  joinSql: string,
-  filterSql: string,
-  limit: number,
-  offset: number,
+	joinSql: string,
+	filterSql: string,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       t.label_id AS labelId,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -555,10 +558,10 @@ export function getRevenueTopLabelQuery(
 }
 
 export function getRevenueTopLabelTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -573,10 +576,10 @@ export function getRevenueTopLabelTotalQuery(
 }
 
 export function getRevenueTopChannelCountQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT uniq(t.channel_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -589,12 +592,12 @@ export function getRevenueTopChannelCountQuery(
 }
 
 export function getRevenueTopChannelQuery(
-  joinSql: string,
-  filterSql: string,
-  limit: number,
-  offset: number,
+	joinSql: string,
+	filterSql: string,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       t.channel_id AS channelId,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -615,10 +618,10 @@ export function getRevenueTopChannelQuery(
 }
 
 export function getRevenueTopChannelTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -633,10 +636,10 @@ export function getRevenueTopChannelTotalQuery(
 }
 
 export function getRevenueTopTenantCountQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT uniq(t.tenant_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -649,12 +652,12 @@ export function getRevenueTopTenantCountQuery(
 }
 
 export function getRevenueTopTenantQuery(
-  joinSql: string,
-  filterSql: string,
-  limit: number,
-  offset: number,
+	joinSql: string,
+	filterSql: string,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       t.tenant_id AS tenantId,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -673,10 +676,10 @@ export function getRevenueTopTenantQuery(
 }
 
 export function getRevenueTopTenantTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -690,10 +693,63 @@ export function getRevenueTopTenantTotalQuery(
   `;
 }
 
-export function getRevenueTopReleaseCountQuery(
-  filterSql: string,
+export function getRevenueTopSourceTypeCountQuery(
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
+    SELECT uniq(s.import_source) AS total
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopSourceTypeQuery(
+	joinSql: string,
+	filterSql: string,
+	limit: number,
+	offset: number,
+): string {
+	return `
+    SELECT
+      s.import_source AS sourceType,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY sourceType
+    ORDER BY revenue_usd DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+export function getRevenueTopSourceTypeTotalQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
+	return `
+    SELECT
+      sum(s.total_quantity) AS total_qty,
+      sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    ${joinSql}
+    WHERE t.is_deleted = 0
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopReleaseCountQuery(filterSql: string): string {
+	return `
     SELECT uniq(t.release_id) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
@@ -706,11 +762,11 @@ export function getRevenueTopReleaseCountQuery(
 }
 
 export function getRevenueTopReleaseQuery(
-  filterSql: string,
-  limit: number,
-  offset: number,
+	filterSql: string,
+	limit: number,
+	offset: number,
 ): string {
-  return `
+	return `
     SELECT
       t.release_id AS releaseId,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -728,10 +784,8 @@ export function getRevenueTopReleaseQuery(
   `;
 }
 
-export function getRevenueTopReleaseTotalQuery(
-  filterSql: string,
-): string {
-  return `
+export function getRevenueTopReleaseTotalQuery(filterSql: string): string {
+	return `
     SELECT
       sum(s.total_quantity) AS total_qty,
       sum(s.total_revenue_usd) AS total_rev
@@ -746,10 +800,10 @@ export function getRevenueTopReleaseTotalQuery(
 }
 
 export function getTrendsOverviewMainQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       sum(s.total_quantity) AS total_views,
       uniq(s.dsp_id) AS total_dsps,
@@ -765,10 +819,10 @@ export function getTrendsOverviewMainQuery(
 }
 
 export function getTrendsOverviewArtistQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT uniq(artist_id) AS total_artists
     FROM (
       SELECT arrayJoin(t.artist_ids) AS artist_id
@@ -784,10 +838,10 @@ export function getTrendsOverviewArtistQuery(
 }
 
 export function getTrendViewLineChartQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       formatDateTime(toStartOfMonth(s.reporting_date), '%Y-%m') AS period,
       sum(s.total_quantity) AS total_views
@@ -802,10 +856,8 @@ export function getTrendViewLineChartQuery(
   `;
 }
 
-export function getTrendViewDspBarChartTotalQuery(
-  filterSql: string,
-): string {
-  return `
+export function getTrendViewDspBarChartTotalQuery(filterSql: string): string {
+	return `
     SELECT sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
     INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
@@ -817,11 +869,11 @@ export function getTrendViewDspBarChartTotalQuery(
 }
 
 export function getTrendViewDspBarChartQuery(
-  filterSql: string,
-  resolvedDspName: string,
-  joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
+	joinExpr: string,
 ): string {
-  return `
+	return `
     SELECT
       ${resolvedDspName} AS dsp_name,
       sum(s.total_quantity) AS total_views
@@ -839,10 +891,10 @@ export function getTrendViewDspBarChartQuery(
 }
 
 export function getRevenueLineChartQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       formatDateTime(s.period, '%Y-%m') AS period,
       sum(s.total_revenue_usd) AS revenue_usd,
@@ -859,10 +911,10 @@ export function getRevenueLineChartQuery(
 }
 
 export function getTrendViewTerritoryBarChartTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
     ${joinSql}
@@ -874,10 +926,10 @@ export function getTrendViewTerritoryBarChartTotalQuery(
 }
 
 export function getTrendViewTerritoryBarChartQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       s.territory_code AS territory,
       sum(s.total_quantity) AS total_views
@@ -894,10 +946,10 @@ export function getTrendViewTerritoryBarChartQuery(
 }
 
 export function getRevenueDspBarChartTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
@@ -909,12 +961,12 @@ export function getRevenueDspBarChartTotalQuery(
 }
 
 export function getRevenueDspBarChartQuery(
-  joinSql: string,
-  joinExpr: string,
-  filterSql: string,
-  resolvedDspName: string,
+	joinSql: string,
+	joinExpr: string,
+	filterSql: string,
+	resolvedDspName: string,
 ): string {
-  return `
+	return `
     SELECT
       ${resolvedDspName} AS dsp_name,
       sum(s.total_revenue_usd) AS revenue_usd
@@ -932,10 +984,10 @@ export function getRevenueDspBarChartQuery(
 }
 
 export function getRevenueTerritoryBarChartTotalQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT sum(s.total_revenue_usd) AS total_rev
     FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
     ${joinSql}
@@ -947,10 +999,10 @@ export function getRevenueTerritoryBarChartTotalQuery(
 }
 
 export function getRevenueTerritoryBarChartQuery(
-  joinSql: string,
-  filterSql: string,
+	joinSql: string,
+	filterSql: string,
 ): string {
-  return `
+	return `
     SELECT
       s.territory_code AS territory,
       sum(s.total_revenue_usd) AS revenue_usd

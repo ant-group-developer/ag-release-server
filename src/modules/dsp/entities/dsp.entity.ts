@@ -101,7 +101,8 @@ export class Dsp extends WithUserRelations(BaseUserTrackedCustomIDEntity) {
 		type: 'varchar',
 		length: 20,
 		default: 'audio',
-		comment: 'DSP type: audio (releases & tracks) or video (releases & videos)',
+		comment:
+			'DSP type: audio (releases & tracks) or video (releases & videos)',
 	})
 	type: 'audio' | 'video';
 

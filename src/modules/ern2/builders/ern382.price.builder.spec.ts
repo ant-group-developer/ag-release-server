@@ -9,7 +9,7 @@ describe('Ern382Builder2 price information', () => {
 			deals: {
 				release: [
 					{
-						...ern382Example.deals!.release![0],
+						...ern382Example.deals!.release[0],
 						price: {
 							priceType: 'StandardRetailPrice',
 							value: 6.99,

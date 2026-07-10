@@ -12,11 +12,11 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 
 /** Một phần tử trong breakdown theo import_source (groupBySource=true) */
 export interface SourceBreakdownItem {
-  source: string;       // raw value: 'ftp', 'wmg_report', 'spotify_report', ...
-  sourceLabel: string;  // human-readable: 'Merlin', 'WMG', 'Spotify', ...
-  quantity: number;
-  revenueUsd?: number;
-  revenueUsdExact?: string;
+	source: string; // raw value: 'ftp', 'wmg_report', 'spotify_report', ...
+	sourceLabel: string; // human-readable: 'Merlin', 'WMG', 'Spotify', ...
+	quantity: number;
+	revenueUsd?: number;
+	revenueUsdExact?: string;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -24,39 +24,39 @@ export interface SourceBreakdownItem {
 // ═══════════════════════════════════════════════════════
 
 export interface DspTimelineSeriesItem {
-  dsp: string;
-  salesViews?: number;
-  trendViews?: number;
-  revenueUsd?: number;
-  revenueUsdExact?: string;
+	dsp: string;
+	salesViews?: number;
+	trendViews?: number;
+	revenueUsd?: number;
+	revenueUsdExact?: string;
 }
 
 export interface DspTimelinePeriod {
-  period: string; // 'YYYY-MM'
-  series: DspTimelineSeriesItem[];
+	period: string; // 'YYYY-MM'
+	series: DspTimelineSeriesItem[];
 }
 
 export interface DspTimelineResponse {
-  topDsps: string[];
-  items: DspTimelinePeriod[];
+	topDsps: string[];
+	items: DspTimelinePeriod[];
 }
 
 export interface TerTimelineSeriesItem {
-  territory: string;  // ISO country code (e.g. 'US', 'VN')
-  salesViews?: number;
-  trendViews?: number;
-  revenueUsd?: number;
-  revenueUsdExact?: string;
+	territory: string; // ISO country code (e.g. 'US', 'VN')
+	salesViews?: number;
+	trendViews?: number;
+	revenueUsd?: number;
+	revenueUsdExact?: string;
 }
 
 export interface TerTimelinePeriod {
-  period: string; // 'YYYY-MM'
-  series: TerTimelineSeriesItem[];
+	period: string; // 'YYYY-MM'
+	series: TerTimelineSeriesItem[];
 }
 
 export interface TerTimelineResponse {
-  topTerritories: string[];
-  items: TerTimelinePeriod[];
+	topTerritories: string[];
+	items: TerTimelinePeriod[];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -64,45 +64,45 @@ export interface TerTimelineResponse {
 // ═══════════════════════════════════════════════════════
 
 export interface RevenueOverviewResponse {
-  /** Tổng doanh thu quy đổi USD trong khoảng thời gian */
-  totalRevenueUsd: number;
-  totalRevenueUsdExact?: string;
-  /** Tổng lượt nghe */
-  totalQuantity: number;
-  /** Tổng số vùng lãnh thổ (quốc gia) phát sinh doanh thu */
-  totalTerritories: number;
+	/** Tổng doanh thu quy đổi USD trong khoảng thời gian */
+	totalRevenueUsd: number;
+	totalRevenueUsdExact?: string;
+	/** Tổng lượt nghe */
+	totalQuantity: number;
+	/** Tổng số vùng lãnh thổ (quốc gia) phát sinh doanh thu */
+	totalTerritories: number;
 }
 
 export interface RevenueDspItem {
-  pgDspId: string | null;
-  dspReportId: string;
-  dspName: string;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
+	pgDspId: string | null;
+	dspReportId: string;
+	dspName: string;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopDspResponse = RevenueDspItem[];
 
 export interface RevenueTimelineDspItem {
-  dsp: string;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
+	dsp: string;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
 }
 
 export interface RevenueTimelinePeriod {
-  period: string;  // 'YYYY-MM'
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  series: RevenueTimelineDspItem[];
+	period: string; // 'YYYY-MM'
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	series: RevenueTimelineDspItem[];
 }
 
 export interface RevenueTimelineResponse {
-  topDsps: string[];
-  items: RevenueTimelinePeriod[];
+	topDsps: string[];
+	items: RevenueTimelinePeriod[];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -111,65 +111,65 @@ export interface RevenueTimelineResponse {
 // ═══════════════════════════════════════════════════════
 
 export interface TrackRankingItem {
-  rank: number;
-  isrc: string;
-  title: string;
-  version: string | null;
-  artistName: string;
-  releaseId: string;
-  releaseTitle: string;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
-  release: {
-    coverArtThumbnails: ICoverArtThumbnails;
-  } | null;
+	rank: number;
+	isrc: string;
+	title: string;
+	version: string | null;
+	artistName: string;
+	releaseId: string;
+	releaseTitle: string;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
 }
 
 export interface ReleaseRankingItem {
-  rank: number;
-  releaseId: string;
-  title: string;
-  upc: string | null;
-  labelId: string | null;
-  labelName: string | null;
-  trackCount: number;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
-  release: {
-    coverArtThumbnails: ICoverArtThumbnails;
-  } | null;
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
 }
 
 export interface ArtistRankingItem {
-  rank: number;
-  artistId: string;
-  artistName: string;
-  picture: string | null;
-  image: string | null;
-  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
-  country: string | null;
-  genre: string | null;
-  trackCount: number;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	artistId: string;
+	artistName: string;
+	picture: string | null;
+	image: string | null;
+	profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+	country: string | null;
+	genre: string | null;
+	trackCount: number;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export interface LabelRankingItem {
-  rank: number;
-  labelId: string;
-  labelName: string;
-  picture: string | null;
-  image: string | null;
-  releaseCount: number;
-  trackCount: number;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
-  tenant?: {
-    id: string;
-    name: string;
-    title: string;
-    logo: string | null;
-  } | null;
+	rank: number;
+	labelId: string;
+	labelName: string;
+	picture: string | null;
+	image: string | null;
+	releaseCount: number;
+	trackCount: number;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
+	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -178,28 +178,28 @@ export interface LabelRankingItem {
 
 /** ClickHouse row: ISRC with aggregated views */
 export interface IsrcViewsRow {
-  isrc: string;
-  totalViews: string; // ClickHouse returns UInt64 as string
+	isrc: string;
+	totalViews: string; // ClickHouse returns UInt64 as string
 }
 
 /** PostgreSQL: Track metadata for enrichment */
 export interface TrackMetadata {
-  isrc: string;
-  trackTitle: string;
-  trackVersion: string | null;
-  releaseId: string;
-  releaseTitle: string;
-  releaseUpc: string | null;
-  labelId: string | null;
-  labelName: string | null;
+	isrc: string;
+	trackTitle: string;
+	trackVersion: string | null;
+	releaseId: string;
+	releaseTitle: string;
+	releaseUpc: string | null;
+	labelId: string | null;
+	labelName: string | null;
 }
 
 /** PostgreSQL: ISRC to Artist mapping */
 export interface IsrcArtistMapping {
-  isrc: string;
-  artistId: string;
-  artistName: string;
-  artistPicture: string | null;
+	isrc: string;
+	artistId: string;
+	artistName: string;
+	artistPicture: string | null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -207,168 +207,184 @@ export interface IsrcArtistMapping {
 // ═══════════════════════════════════════════════════════
 
 export interface RevenueArtistItem {
-  rank: number;
-  artistId: string;
-  artistName: string;
-  picture: string | null;
-  profiles: Array<{ dspCode: string; dspName: string; url: string }>;
-  country: string | null;
-  genre: string | null;
-  trackCount: number;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	artistId: string;
+	artistName: string;
+	picture: string | null;
+	profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+	country: string | null;
+	genre: string | null;
+	trackCount: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopArtistResponse = RevenueArtistItem[];
 
 export interface RevenueTrackItem {
-  rank: number;
-  isrc: string;
-  title: string;
-  version: string | null;
-  artistName: string;
-  releaseId: string | null;
-  releaseTitle: string | null;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	isrc: string;
+	title: string;
+	version: string | null;
+	artistName: string;
+	releaseId: string | null;
+	releaseTitle: string | null;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export type RevenueTopTrackResponse = RevenueTrackItem[];
 
 export interface EntityOverviewResponse {
-  totalTrendViews: number;   // tổng lượt stream trend trong kỳ
-  totalSalesViews: number;   // tổng lượt nghe sales trong kỳ
-  totalRevenueUsd: number;   // tổng doanh thu USD trong kỳ
-  totalRevenueUsdExact?: string;
-  artist?: {
-    id: string;
-    name: string;
-    picture: string | null;
-    profiles: Array<{ dspCode: string; dspName: string; url: string }>;
-    country: string | null;
-    genre: string | null;
-  } | null;
-  tenant?: {
-    id: string;
-    name: string;
-    title: string;
-    logo: string | null;
-  } | null;
+	totalTrendViews: number; // tổng lượt stream trend trong kỳ
+	totalSalesViews: number; // tổng lượt nghe sales trong kỳ
+	totalRevenueUsd: number; // tổng doanh thu USD trong kỳ
+	totalRevenueUsdExact?: string;
+	artist?: {
+		id: string;
+		name: string;
+		picture: string | null;
+		profiles: Array<{ dspCode: string; dspName: string; url: string }>;
+		country: string | null;
+		genre: string | null;
+	} | null;
+	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 export interface RevenueLabelItem {
-  rank: number;
-  labelId: string;
-  labelName: string;
-  picture: string | null;
-  releaseCount?: number;
-  trackCount?: number;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
-  tenant?: {
-    id: string;
-    name: string;
-    title: string;
-    logo: string | null;
-  } | null;
+	rank: number;
+	labelId: string;
+	labelName: string;
+	picture: string | null;
+	releaseCount?: number;
+	trackCount?: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
+	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 export interface RevenueTenantItem {
-  rank: number;
-  tenantId: string;
-  tenantName: string;
-  logo: string | null;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	tenantId: string;
+	tenantName: string;
+	logo: string | null;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export interface ChannelRankingItem {
-  rank: number;
-  channelId: string;
-  channelName: string;
-  thumbUrl: string | null;
-  youtubeChannelId: string | null;
-  releaseCount: number;
-  trackCount: number;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
-  tenant?: {
-    id: string;
-    name: string;
-    title: string;
-    logo: string | null;
-  } | null;
+	rank: number;
+	channelId: string;
+	channelName: string;
+	thumbUrl: string | null;
+	youtubeChannelId: string | null;
+	releaseCount: number;
+	trackCount: number;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
+	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 export interface RevenueChannelItem {
-  rank: number;
-  channelId: string;
-  channelName: string;
-  thumbUrl: string | null;
-  youtubeChannelId: string | null;
-  releaseCount?: number;
-  trackCount?: number;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
-  tenant?: {
-    id: string;
-    name: string;
-    title: string;
-    logo: string | null;
-  } | null;
+	rank: number;
+	channelId: string;
+	channelName: string;
+	thumbUrl: string | null;
+	youtubeChannelId: string | null;
+	releaseCount?: number;
+	trackCount?: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
+	tenant?: {
+		id: string;
+		name: string;
+		title: string;
+		logo: string | null;
+	} | null;
 }
 
 export interface OverviewTrendsResponse {
-  totalViews: number;
-  totalDsps: number;
-  totalTracks: number;
-  totalArtists: number;
-  totalLabels: number;
+	totalViews: number;
+	totalDsps: number;
+	totalTracks: number;
+	totalArtists: number;
+	totalLabels: number;
 }
 
 export interface TenantRankingItem {
-  rank: number;
-  tenantId: string;
-  tenantName: string;
-  logo: string | null;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	tenantId: string;
+	tenantName: string;
+	logo: string | null;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
 }
 
 export interface DspRankingItem {
-  rank: number;
-  pgDspId: string | null;
-  dspReportId: string;
-  dspName: string;
-  totalViews: number;
-  bySource?: SourceBreakdownItem[];
+	rank: number;
+	pgDspId: string | null;
+	dspReportId: string;
+	dspName: string;
+	totalViews: number;
+	bySource?: SourceBreakdownItem[];
+}
+
+export interface SourceTypeRankingItem {
+	rank: number;
+	sourceType: string;
+	sourceTypeLabel: string;
+	totalViews: number;
+}
+
+export interface RevenueSourceTypeItem {
+	rank: number;
+	sourceType: string;
+	sourceTypeLabel: string;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
 }
 
 export interface RevenueReleaseItem {
-  rank: number;
-  releaseId: string;
-  title: string;
-  upc: string | null;
-  labelId: string | null;
-  labelName: string | null;
-  trackCount: number;
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
-  bySource?: SourceBreakdownItem[];
-  release: {
-    coverArtThumbnails: ICoverArtThumbnails;
-  } | null;
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -377,77 +393,95 @@ export interface RevenueReleaseItem {
 
 /** Một điểm trên line-chart trend-view theo tháng */
 export interface TrendViewLineChartItem {
-  period: string; // 'YYYY-MM'
-  totalViews: number;
+	period: string; // 'YYYY-MM'
+	totalViews: number;
 }
 
 /** Một cột trong bar-chart DSP (top 5 + Other) */
 export interface DspBarChartItem {
-  dspName: string;
-  totalViews?: number;
-  revenueUsd?: number;
-  revenueUsdExact?: string;
+	dspName: string;
+	totalViews?: number;
+	revenueUsd?: number;
+	revenueUsdExact?: string;
 }
 
 /** Một điểm trên line-chart revenue theo tháng */
 export interface TerritoryBarChartItem {
-  territory: string;
-  totalViews?: number;
-  revenueUsd?: number;
-  revenueUsdExact?: string;
+	territory: string;
+	isoCode?: string;
+	totalViews?: number;
+	revenueUsd?: number;
+	revenueUsdExact?: string;
+}
+
+export interface EntityTopDspItem {
+	rank: number;
+	pgDspId: string | null;
+	dspReportId: string;
+	dspName: string;
+	totalViews: number;
+	totalRevenueUsd: string;
+}
+
+export interface EntityTopTerItem {
+	rank: number;
+	isoCode: string;
+	territory: string;
+	totalViews: number;
+	totalRevenueUsd: string;
 }
 
 export interface RevenueLineChartItem {
-  period: string; // 'YYYY-MM'
-  revenueUsd: number;
-  revenueUsdExact?: string;
-  quantity: number;
+	period: string; // 'YYYY-MM'
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
 }
 
 /** Metadata của DSP entity (lookup từ Postgres nếu có pgDspId) */
 export interface DspMeta {
-  pgDspId: string | null;
-  dspReportId: string | null;
-  name: string;
-  code: string | null;
-  picture: string | null;
-  isActive: boolean | null;
-  type: string | null;
+	pgDspId: string | null;
+	dspReportId: string | null;
+	name: string;
+	code: string | null;
+	picture: string | null;
+	isActive: boolean | null;
+	type: string | null;
 }
 
 /** Response cho POST /analytics/dsp/overview */
 export interface DspOverviewResponse {
-  totalTrendViews: number;
-  totalSalesViews: number;
-  totalRevenueUsd: number;
-  totalRevenueUsdExact?: string;
-  dsp: DspMeta | null;
+	totalTrendViews: number;
+	totalSalesViews: number;
+	totalRevenueUsd: number;
+	totalRevenueUsdExact?: string;
+	dsp: DspMeta | null;
 }
 
 /** Item trong top-tracks của DSP */
 export interface DspTopTrackItem {
-  rank: number;
-  isrc: string;
-  title: string;
-  version: string | null;
-  artistName: string;
-  releaseId: string;
-  releaseTitle: string;
-  totalViews: number;
-  totalRevenueUsd: string;
-  release: { coverArtThumbnails: ICoverArtThumbnails } | null;
+	rank: number;
+	isrc: string;
+	title: string;
+	version: string | null;
+	artistName: string;
+	releaseId: string;
+	releaseTitle: string;
+	totalViews: number;
+	totalRevenueUsd: string;
+	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }
 
 /** Item trong top-releases của DSP hoặc channel */
 export interface DspTopReleaseItem {
-  rank: number;
-  releaseId: string;
-  title: string;
-  upc: string | null;
-  labelId: string | null;
-  labelName: string | null;
-  trackCount: number;
-  totalViews: number;
-  totalRevenueUsd: string;
-  release: { coverArtThumbnails: ICoverArtThumbnails } | null;
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	totalViews: number;
+	totalRevenueUsd: string;
+	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }

@@ -2,8 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verify } from 'argon2';
 import { Request } from 'express';
+import {
+	isPrimaryDomain,
+	normalizeDomain,
+} from 'src/common/config/domain.config';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
-import { isPrimaryDomain, normalizeDomain } from 'src/common/config/domain.config';
 import { TenantDomainService } from '../tenant-domain/tenant-domain.service';
 import { SYSTEM_TENANT_ID } from '../tenant/tenant.constant';
 import { TenantService } from '../tenant/tenant.service';
@@ -38,7 +41,8 @@ export class AuthService {
 	private async resolveCustomDomain(customDomain: string) {
 		const normalized = normalizeDomain(customDomain);
 		if (isPrimaryDomain(normalized)) return null;
-		const record = await this.tenantDomainService.findActiveByDomain(normalized);
+		const record =
+			await this.tenantDomainService.findActiveByDomain(normalized);
 		if (!record) {
 			throw new ResponseError({
 				statusCode: 403,
@@ -119,7 +123,8 @@ export class AuthService {
 						.catch(() => {
 							throw new ResponseError({
 								statusCode: 403,
-								message: 'Your account does not have access to this workspace',
+								message:
+									'Your account does not have access to this workspace',
 								messageCode: 'auth.domain_restricted',
 							});
 						});
@@ -207,7 +212,11 @@ export class AuthService {
 		return { ok: true };
 	}
 
-	async switchTenant(tenantId: string, userId: string, customDomain?: string) {
+	async switchTenant(
+		tenantId: string,
+		userId: string,
+		customDomain?: string,
+	) {
 		const user = await this.userService.findOne(userId, {
 			select: {
 				id: true,
@@ -224,7 +233,8 @@ export class AuthService {
 			if (domainRecord && domainRecord.tenantId !== tenantId) {
 				throw new ResponseError({
 					statusCode: 403,
-					message: 'Your account does not have access to this workspace',
+					message:
+						'Your account does not have access to this workspace',
 					messageCode: 'auth.domain_restricted',
 				});
 			}

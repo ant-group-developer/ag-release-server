@@ -1,5 +1,5 @@
-import { BaseParser } from '../base.parser';
 import { FactDspRow } from '../../interfaces';
+import { BaseParser } from '../base.parser';
 
 /**
  * TikTok / Douyin Parser
@@ -13,51 +13,67 @@ import { FactDspRow } from '../../interfaces';
  *          video_views, comments, likes, shares, favorites, avg_watchtime
  */
 export class TiktokParser extends BaseParser {
-  constructor() {
-    super('tiktok');
-  }
+	constructor() {
+		super('tiktok');
+	}
 
-  protected parseRow(
-    record: Record<string, string>,
-    batchId: string,
-  ): FactDspRow | null {
-    let isrc = record['isrc']?.trim() || '';
-    const upc = record['product_code']?.trim() || '';
-    if (!isrc && !upc) return null;
+	protected parseRow(
+		record: Record<string, string>,
+		batchId: string,
+	): FactDspRow | null {
+		let isrc = record['isrc']?.trim() || '';
+		const upc = record['product_code']?.trim() || '';
+		if (!isrc && !upc) return null;
 
-    if (!isrc && upc) {
-      isrc = `UPC-${upc}`;
-    }
+		if (!isrc && upc) {
+			isrc = `UPC-${upc}`;
+		}
 
-    const row = this.createBaseRow(batchId);
-    row.reporting_period = this.normalizeDate(record['date']); // YYYYMMDD
-    row.isrc = isrc;
-    row.territory_code = this.normalizeCountryCode(record['territory']);
-    row.track_title = record['song_title'] || '';
-    row.artist_name = record['artist'] || '';
-    row.album_title = record['album'] || '';
-    row.label_name = record['label_name'] || '';
-    row.upc = record['product_code'] || '';
-    row.track_id_internal = record['platform_song_id'] || '';
-    row.track_classification = (record['content_type'] || '').toUpperCase(); // UGC / PGC
-    row.usage_type = 'social';
+		const row = this.createBaseRow(batchId);
+		row.reporting_period = this.normalizeDate(record['date']); // YYYYMMDD
+		row.isrc = isrc;
+		row.territory_code = this.normalizeCountryCode(record['territory']);
+		row.track_title = record['song_title'] || '';
+		row.artist_name = record['artist'] || '';
+		row.album_title = record['album'] || '';
+		row.label_name = record['label_name'] || '';
+		row.upc = record['product_code'] || '';
+		row.track_id_internal = record['platform_song_id'] || '';
+		row.track_classification = (record['content_type'] || '').toUpperCase(); // UGC / PGC
+		row.usage_type = 'social';
 
-    // Primary metric: video_views
-    row.quantity_total = this.safeInt(record['video_views']);
+		// Primary metric: video_views
+		row.quantity_total = this.safeInt(record['video_views']);
 
-    row.metadata = {
-      platform_name: record['platform_name'] || '', // TikTok or Douyin
-      ...(record['creations'] && record['creations'] !== '0' ? { creations: record['creations'] } : {}),
-      ...(record['comments'] && record['comments'] !== '0' ? { comments: record['comments'] } : {}),
-      ...(record['likes'] && record['likes'] !== '0' ? { likes: record['likes'] } : {}),
-      ...(record['shares'] && record['shares'] !== '0' ? { shares: record['shares'] } : {}),
-      ...(record['favorites'] && record['favorites'] !== '0' ? { favorites: record['favorites'] } : {}),
-      ...(record['avg_watchtime'] && record['avg_watchtime'] !== '0' ? { avg_watchtime: record['avg_watchtime'] } : {}),
-      ...(record['sublabel'] ? { sublabel: record['sublabel'] } : {}),
-      ...(record['label_provided_genre'] ? { label_genre: record['label_provided_genre'] } : {}),
-      ...(record['platform_classified_genre'] ? { platform_genre: record['platform_classified_genre'] } : {}),
-    };
+		row.metadata = {
+			platform_name: record['platform_name'] || '', // TikTok or Douyin
+			...(record['creations'] && record['creations'] !== '0'
+				? { creations: record['creations'] }
+				: {}),
+			...(record['comments'] && record['comments'] !== '0'
+				? { comments: record['comments'] }
+				: {}),
+			...(record['likes'] && record['likes'] !== '0'
+				? { likes: record['likes'] }
+				: {}),
+			...(record['shares'] && record['shares'] !== '0'
+				? { shares: record['shares'] }
+				: {}),
+			...(record['favorites'] && record['favorites'] !== '0'
+				? { favorites: record['favorites'] }
+				: {}),
+			...(record['avg_watchtime'] && record['avg_watchtime'] !== '0'
+				? { avg_watchtime: record['avg_watchtime'] }
+				: {}),
+			...(record['sublabel'] ? { sublabel: record['sublabel'] } : {}),
+			...(record['label_provided_genre']
+				? { label_genre: record['label_provided_genre'] }
+				: {}),
+			...(record['platform_classified_genre']
+				? { platform_genre: record['platform_classified_genre'] }
+				: {}),
+		};
 
-    return row;
-  }
+		return row;
+	}
 }

@@ -696,6 +696,6 @@ export class ExcelMapperService {
 	private str(value: unknown): string | null {
 		if (value === null || value === undefined) return null;
 		if (typeof value === 'object') return null;
-		return String(value as string | number | boolean).trim() || null;
+		return String(value).trim() || null;
 	}
 }

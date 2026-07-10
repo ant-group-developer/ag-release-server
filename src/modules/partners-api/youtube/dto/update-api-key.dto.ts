@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+	IsEnum,
+	IsInt,
+	IsOptional,
+	IsString,
+	MaxLength,
+	Min,
+	MinLength,
+} from 'class-validator';
 import { YoutubeApiKeyStatus } from '../enum/youtube.enum';
 
 export class UpdateYoutubeApiKeyDto {
@@ -13,7 +21,8 @@ export class UpdateYoutubeApiKeyDto {
 	alias?: string;
 
 	@ApiPropertyOptional({
-		description: 'Chi cho phep active hoac disabled (khac 2 gia tri kia bi ignore)',
+		description:
+			'Chi cho phep active hoac disabled (khac 2 gia tri kia bi ignore)',
 		enum: [YoutubeApiKeyStatus.ACTIVE, YoutubeApiKeyStatus.DISABLED],
 	})
 	@IsOptional()

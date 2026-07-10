@@ -117,7 +117,7 @@ export class ReleaseService {
 		return normalizeMetadataExternal({
 			...restOfRelease,
 			coverArtThumbnails,
-		}) as IReleaseDetail;
+		});
 	}
 
 	async findOneFull(id: string) {

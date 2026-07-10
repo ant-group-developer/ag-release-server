@@ -5,17 +5,17 @@ import {
 	NotFoundException,
 	OnModuleInit,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
-import { v4 as uuidv4 } from 'uuid';
-import { Repository } from 'typeorm';
 import { MetadataScanSchedule } from 'src/modules/release/entities/metadata-scan-schedule.entity';
 import {
 	MetadataScanSession,
 	MetadataScanTriggerType,
 	ScanSessionStatus,
 } from 'src/modules/release/entities/metadata-scan-session.entity';
+import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import {
 	CreateMetadataScanScheduleDto,
 	UpdateMetadataScanScheduleDto,
@@ -38,8 +38,14 @@ export class MetadataScanScheduleService implements OnModuleInit {
 		private readonly metadataScanService: MetadataScanService,
 	) {}
 
-	async onModuleInit(): Promise<void> {
-		await this.reloadSchedules();
+	onModuleInit(): void {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug('Skipping metadata scan schedules (not worker role)');
+			return;
+		}
+		this.reloadSchedules().catch((err) => {
+			this.logger.error(`Failed to load metadata scan schedules: ${err.message}`);
+		});
 	}
 
 	async list(): Promise<MetadataScanSchedule[]> {
@@ -88,7 +94,9 @@ export class MetadataScanScheduleService implements OnModuleInit {
 			...(dto.isImportedFromReport !== undefined
 				? { isImportedFromReport: dto.isImportedFromReport }
 				: {}),
-			...(dto.limitCount !== undefined ? { limitCount: dto.limitCount } : {}),
+			...(dto.limitCount !== undefined
+				? { limitCount: dto.limitCount }
+				: {}),
 			...(dto.force !== undefined ? { force: dto.force } : {}),
 		});
 
@@ -157,7 +165,10 @@ export class MetadataScanScheduleService implements OnModuleInit {
 				schedule.timezone || 'Asia/Ho_Chi_Minh',
 			);
 
-			this.schedulerRegistry.addCronJob(this.getJobName(schedule.id), job);
+			this.schedulerRegistry.addCronJob(
+				this.getJobName(schedule.id),
+				job,
+			);
 			job.start();
 			this.logger.log(
 				`Registered metadata scan schedule ${schedule.id}: ${schedule.cronExpression}`,
@@ -187,7 +198,9 @@ export class MetadataScanScheduleService implements OnModuleInit {
 				lastSkippedAt: new Date(),
 				lastSkipReason: reason,
 			});
-			this.logger.warn(`Skipped metadata scan schedule ${schedule.id}: ${reason}`);
+			this.logger.warn(
+				`Skipped metadata scan schedule ${schedule.id}: ${reason}`,
+			);
 			return { skipped: true, reason };
 		}
 
@@ -205,7 +218,7 @@ export class MetadataScanScheduleService implements OnModuleInit {
 				scanId,
 				force: schedule.force,
 				limit: schedule.limitCount ?? undefined,
-				isImportedFromReport: schedule.isImportedFromReport,
+				isImportedFromReport: schedule.isImportedFromReport ?? undefined,
 				triggerType: MetadataScanTriggerType.CRON,
 				scheduleId: schedule.id,
 			})
@@ -227,7 +240,9 @@ export class MetadataScanScheduleService implements OnModuleInit {
 			where: { id, isDeleted: false },
 		});
 		if (!schedule) {
-			throw new NotFoundException(`Metadata scan schedule not found: ${id}`);
+			throw new NotFoundException(
+				`Metadata scan schedule not found: ${id}`,
+			);
 		}
 		return schedule;
 	}
@@ -245,7 +260,9 @@ export class MetadataScanScheduleService implements OnModuleInit {
 		return `${this.jobNamePrefix}:${scheduleId}`;
 	}
 
-	private assertCron(schedule: Pick<MetadataScanSchedule, 'cronExpression' | 'timezone'>): void {
+	private assertCron(
+		schedule: Pick<MetadataScanSchedule, 'cronExpression' | 'timezone'>,
+	): void {
 		try {
 			new CronJob(
 				schedule.cronExpression,
@@ -263,7 +280,9 @@ export class MetadataScanScheduleService implements OnModuleInit {
 
 	private assertLimit(limitCount: number | null | undefined): void {
 		if (limitCount !== null && limitCount !== undefined && limitCount < 1) {
-			throw new BadRequestException('limitCount must be greater than 0 or null');
+			throw new BadRequestException(
+				'limitCount must be greater than 0 or null',
+			);
 		}
 	}
 }
