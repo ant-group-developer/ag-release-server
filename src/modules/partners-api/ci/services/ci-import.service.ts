@@ -4,7 +4,7 @@ import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { GetCiImportsDto } from '../dtos/ci-import.dto';
 
 export interface CiImportSimpleItem {
-	status?: string;
+	status?: any;
 	modify_time?: string;
 	errors: string[];
 }
@@ -62,7 +62,7 @@ export class CiImportService {
 			const endpoint = `/imports/v1/organisations/${this.organisationId}/batch`;
 			const response = await this.client.get(endpoint, {
 				params: this.buildParams({
-					order_by: 'modify_time_desc',
+					order_by: 'create_desc',
 					page: 0,
 					page_size: 999,
 					total_count: true,
@@ -89,10 +89,18 @@ export class CiImportService {
 					: [];
 
 		return items.map((item: any) => ({
-			status: item?.status,
+			status: this.getImportStatus(item),
 			modify_time: item?.modify_time,
 			errors: this.getImportWarnings(item),
 		}));
+	}
+
+	private getImportStatus(item: any): any {
+		const importFiles = Array.isArray(item?.import_file)
+			? item.import_file
+			: [];
+
+		return importFiles[0]?.import_status;
 	}
 
 	private getImportWarnings(item: any): string[] {
@@ -101,43 +109,64 @@ export class CiImportService {
 			: [];
 
 		return importFiles.flatMap((file: any) => {
-			const descriptions = Array.isArray(file?.description)
-				? file.description
-				: file?.description
-					? [file.description]
+			const importStatus = file?.import_status;
+			const descriptions = this.normalizeImportDescriptions(
+				importStatus?.description ?? file?.description,
+			);
+
+			const statusMessages =
+				importStatus && typeof importStatus === 'object'
+					? this.extractImportWarningMessages(importStatus)
 					: [];
 
-			return descriptions.flatMap((description: any) => {
-				if (typeof description === 'string') {
-					return description.trim() ? [description] : [];
-				}
-
-				const warnings = Array.isArray(description?.warnings)
-					? description.warnings
-					: [];
-
-				const errors = Array.isArray(description?.errors)
-					? description.errors
-					: [];
-
-				const messages = [
-					description?.message,
-					description?.error,
-					...warnings,
-					...errors,
-				].filter(Boolean);
-
-				if (messages.length) {
-					return messages.map((message: any) =>
-						typeof message === 'string'
-							? message
-							: JSON.stringify(message),
-					);
-				}
-
-				return [];
-			});
+			return [
+				...statusMessages,
+				...descriptions.flatMap((description: any) => {
+					return this.extractImportWarningMessages(description);
+				}),
+			];
 		});
+	}
+
+	private extractImportWarningMessages(description: any): string[] {
+		if (typeof description === 'string') {
+			return description.trim() ? [description] : [];
+		}
+
+		const warnings = Array.isArray(description?.warnings)
+			? description.warnings
+			: [];
+
+		const errors = Array.isArray(description?.errors)
+			? description.errors
+			: [];
+
+		const messages = [
+			description?.message,
+			description?.error,
+			...warnings,
+			...errors,
+		].filter(Boolean);
+
+		if (messages.length) {
+			return messages.map((message: any) =>
+				this.normalizeImportWarningMessage(message),
+			);
+		}
+
+		return [];
+	}
+
+	private normalizeImportDescriptions(description: any): any[] {
+		if (Array.isArray(description)) {
+			return description;
+		}
+
+		return description ? [description] : [];
+	}
+
+	private normalizeImportWarningMessage(message: any): string {
+		return typeof message === 'string' ? message : JSON.stringify(message);
 	}
 
 	async getImportDetail(batchId: string): Promise<any> {
