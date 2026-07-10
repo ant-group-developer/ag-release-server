@@ -13,6 +13,7 @@ import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
+import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { getFileExcelFromRaw } from 'src/utils/util.file';
 import { Repository, SelectQueryBuilder } from 'typeorm';
@@ -45,9 +46,16 @@ export class ReleaseCiDataService {
 
 		@Inject(forwardRef(() => ReleaseService))
 		private readonly releaseService: ReleaseService,
+
+		@Inject(forwardRef(() => ReleaseDspDeliveryService))
+		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
 	) {}
 
-	async upsertByReleaseId(releaseId: string, data: UpsertReleaseCiDataDto) {
+	async upsertByReleaseId(
+		releaseId: string,
+		data: UpsertReleaseCiDataDto,
+		options?: { skipSyncLiveVersionFromCiExportData?: boolean },
+	) {
 		if (data.importRawData !== undefined) {
 			data.importParsedData = this.getLatestImportRecord(
 				data.importRawData,
@@ -73,13 +81,25 @@ export class ReleaseCiDataService {
 				...data,
 			});
 
-			return this.repo.save(created);
+			const saved = await this.repo.save(created);
+			if (!options?.skipSyncLiveVersionFromCiExportData) {
+				await this.releaseDspDeliveryService.syncLiveVersionFromCiExportData(
+					[releaseId],
+				);
+			}
+
+			return saved;
 		}
 
 		Object.assign(entity, data);
 
 		entity.latestSyncedAt = new Date();
 		await this.repo.save(entity);
+		if (!options?.skipSyncLiveVersionFromCiExportData) {
+			await this.releaseDspDeliveryService.syncLiveVersionFromCiExportData(
+				[releaseId],
+			);
+		}
 
 		return this.findByReleaseId(releaseId);
 	}
@@ -234,7 +254,10 @@ export class ReleaseCiDataService {
 		};
 	}
 
-	async syncCiDataByReleaseId(releaseId: string) {
+	async syncCiDataByReleaseId(
+		releaseId: string,
+		options?: { skipSyncLiveVersionFromCiExportData?: boolean },
+	) {
 		const release = await this.releaseRepo.findOne({
 			where: { id: releaseId },
 			select: {
@@ -258,12 +281,16 @@ export class ReleaseCiDataService {
 				{ reloadFromCi: true },
 			);
 		} catch {
-			return this.upsertByReleaseId(release.id, {
-				status: ReleaseCiDataStatus.NOT_FOUND_ON_CI,
-				importRawData: null,
-				exportRawData: null,
-				qaFlagsCi: null,
-			});
+			return this.upsertByReleaseId(
+				release.id,
+				{
+					status: ReleaseCiDataStatus.NOT_FOUND_ON_CI,
+					importRawData: null,
+					exportRawData: null,
+					qaFlagsCi: null,
+				},
+				options,
+			);
 		}
 
 		const [importRawData, exportRawData, qaFlagsCi] = await Promise.all([
@@ -287,16 +314,23 @@ export class ReleaseCiDataService {
 			qaFlagsCi,
 		);
 
-		return this.upsertByReleaseId(release.id, {
-			status: ReleaseCiDataStatus.EXISTS_ON_CI,
-			importRawData,
-			exportRawData,
-			qaFlagsCi,
-			needImportAgain,
-		});
+		return this.upsertByReleaseId(
+			release.id,
+			{
+				status: ReleaseCiDataStatus.EXISTS_ON_CI,
+				importRawData,
+				exportRawData,
+				qaFlagsCi,
+				needImportAgain,
+			},
+			options,
+		);
 	}
 
-	async syncCiDataById(id: string) {
+	async syncCiDataById(
+		id: string,
+		options?: { skipSyncLiveVersionFromCiExportData?: boolean },
+	) {
 		const ciData = await this.repo.findOne({
 			where: { id },
 			select: {
@@ -309,7 +343,7 @@ export class ReleaseCiDataService {
 			throw new NotFoundException('Release CI data not found');
 		}
 
-		return this.syncCiDataByReleaseId(ciData.releaseId);
+		return this.syncCiDataByReleaseId(ciData.releaseId, options);
 	}
 
 	/**
@@ -385,7 +419,11 @@ export class ReleaseCiDataService {
 			// Goi sync song song trong tung batch; Promise.allSettled giup batch
 			// tiep tuc xu ly cac item con lai neu mot item bi loi.
 			const results = await Promise.allSettled(
-				batch.map((item) => this.syncCiDataById(item.id)),
+				batch.map((item) =>
+					this.syncCiDataById(item.id, {
+						skipSyncLiveVersionFromCiExportData: true,
+					}),
+				),
 			);
 			const syncedReleaseIds: string[] = [];
 
@@ -419,10 +457,8 @@ export class ReleaseCiDataService {
 				);
 			});
 
-			// Sau khi sync CI thanh cong, cap nhat flag has_live_version cho
-			// release_dsp_delivery dua tren exportParsedData moi nhat.
 			liveVersionSynced +=
-				await this.syncReleaseDspDeliveryLiveVersionFromCiData(
+				await this.releaseDspDeliveryService.syncLiveVersionFromCiExportData(
 					syncedReleaseIds,
 				);
 
@@ -443,40 +479,6 @@ export class ReleaseCiDataService {
 			failed: failed.length,
 			errors: failed,
 		};
-	}
-
-	private async syncReleaseDspDeliveryLiveVersionFromCiData(
-		releaseIds: string[],
-	): Promise<number> {
-		const uniqueReleaseIds = [...new Set(releaseIds)].filter(Boolean);
-		if (!uniqueReleaseIds.length) return 0;
-
-		const rows = await this.repo.query(
-			`
-				UPDATE "release_dsp_delivery" rdd
-				SET "has_live_version" = true
-				FROM "release_ci_data" rcd
-				INNER JOIN LATERAL jsonb_array_elements(rcd."export_parsed_data") AS export_item("value") ON true
-				INNER JOIN "dsps" dsp
-					ON upper(trim(dsp."code_ci")) = upper(trim(substring(
-						export_item."value" ->> 'deliveryPoint'
-						FROM '\\(([^()]*)\\)\\s*$'
-					)))
-				WHERE rdd."release_id" = rcd."release_id"
-				AND rdd."dsp_id" = dsp."id"
-				AND rcd."release_id" = ANY($1::uuid[])
-				AND lower(coalesce(export_item."value" ->> 'deliveryPointStatus', '')) = 'live'
-				AND substring(
-					export_item."value" ->> 'deliveryPoint'
-					FROM '\\(([^()]*)\\)\\s*$'
-				) IS NOT NULL
-				AND rdd."has_live_version" = false
-				RETURNING rdd."id"
-			`,
-			[uniqueReleaseIds],
-		);
-
-		return Array.isArray(rows) ? rows.length : 0;
 	}
 
 	private getLatestImportRecord(
@@ -636,6 +638,9 @@ export class ReleaseCiDataService {
 		const musicService = item.musicService ?? {};
 		const exportRequest = item.exportRequest ?? {};
 		const exportBatch = item.exportBatch ?? {};
+		const deliveryPointCode = musicService.dpc ?? null;
+		const deliveryPointDpid = musicService.DPID ?? null;
+		const deliveryPointId = musicService.id ?? null;
 		const dpc = musicService.dpc ? ` (${musicService.dpc})` : '';
 
 		return {
@@ -645,7 +650,14 @@ export class ReleaseCiDataService {
 			deliveryPoint: musicService.name
 				? `${musicService.name}${dpc}`
 				: null,
-			deliveryPointStatus: musicService.development_status ?? null,
+			deliveryPointCode,
+			deliveryPointDpid,
+			deliveryPointId,
+			deliveryPointStatus:
+				exportBatch.batch_transfer_status ??
+				item.status ??
+				musicService.development_status ??
+				null,
 			externalBatchId: exportBatch.external_batch_id ?? null,
 			transferEndDate: this.formatCiDateTime(
 				exportBatch.transfer_end_time ?? exportBatch.modify_time,

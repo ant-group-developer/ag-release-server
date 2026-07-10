@@ -227,6 +227,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3CronJobService,
 		ReleaseExecution3Service,
 		ReleaseExecution3ResultService,
+		ReleaseDspDeliveryService,
 	],
 })
 export class ReleaseModule {}

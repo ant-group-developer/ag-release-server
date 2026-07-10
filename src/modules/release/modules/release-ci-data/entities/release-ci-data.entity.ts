@@ -12,6 +12,9 @@ export interface ReleaseCiExportParsedData {
 	exportTask: string | null;
 	requestorOrganisation: string | null;
 	deliveryPoint: string | null;
+	deliveryPointCode?: string | null;
+	deliveryPointDpid?: string | null;
+	deliveryPointId?: string | number | null;
 	deliveryPointStatus: string | null;
 	externalBatchId: string | null;
 	transferEndDate: string | null;

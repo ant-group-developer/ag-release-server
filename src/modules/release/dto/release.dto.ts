@@ -21,7 +21,6 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
-import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
@@ -906,13 +905,15 @@ export class BulkSubmitReleaseDto {
 	})
 	skipDistributed?: boolean = true;
 
-	@ApiPropertyOptional({
-		enum: CiImportAction,
-		default: CiImportAction.KEEP_CURRENT_STATUS,
-	})
+	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
-	@IsEnum(CiImportAction)
-	ciImportAction?: CiImportAction = CiImportAction.SKIP_CI_IMPORT;
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	needImportAgain?: boolean;
 }
 
 // export class BulkSubmitPreviewTargetDto {
