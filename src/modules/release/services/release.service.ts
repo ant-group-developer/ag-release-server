@@ -33,14 +33,10 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { AutoSubmitHistory } from '../entities/auto-submit-history.entity';
 import { Release } from '../entities/release.entity';
-import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import {
-	ReleaseCiDataStatus,
-	ReleaseCiQaFlag,
-} from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ReleaseCiQaFlag } from '../modules/release-ci-data/entities/release-ci-data.entity';
 import { ReleaseCiDataService } from '../modules/release-ci-data/services/release-ci-data.service';
 import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
@@ -557,7 +553,7 @@ export class ReleaseService {
 			relations: ['release.releaseDspDeliveries'],
 		});
 
-		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+		this.applyCiImportActionToReleaseSnapshot(release, dto.needImportAgain);
 
 		const releaseDspDeliveries = (release.releaseDspDeliveries ?? []).map(
 			(delivery) => {
@@ -599,7 +595,7 @@ export class ReleaseService {
 				id: release.id,
 				code: submitCodes,
 				skipCodes,
-				ciImportAction: dto.ciImportAction,
+				needImportAgain: release.ciData?.needImportAgain,
 			},
 		};
 	}
@@ -765,47 +761,38 @@ export class ReleaseService {
 	}
 
 	/**
-	 * Điều chỉnh trạng thái CI trên release snapshot trước khi đưa vào execution.
+	 * Adjust CI snapshot before creating execution.
 	 *
-	 * Hàm này không ghi DB. Nó chỉ thu nhỏ `release.ciData` còn `{ status, needImportAgain }`
-	 * để builder/worker phía execution quyết định có cần chạy bước import CI hay không.
-	 *
-	 * Quy ước:
-	 * - KEEP_CURRENT_STATUS: giữ nguyên trạng thái CI hiện tại.
-	 * - FORCE_CI_IMPORT: ép snapshot về NOT_FOUND_ON_CI để execution import lại.
-	 * - SKIP_CI_IMPORT: chỉ import lại khi release_ci_data.need_import_again = true.
+	 * This does not write DB. Execution import/skip logic is driven by
+	 * `needImportAgain`, so keep the current CI status and only override that flag.
 	 */
 	private applyCiImportActionToReleaseSnapshot(
 		release: Release | null | undefined,
-		ciImportAction?: CiImportAction,
+		requestedNeedImportAgain?: boolean,
 	) {
 		if (!release?.ciData) return;
 
-		// Chỉ chỉnh snapshot truyền vào execution, không update release_ci_data gốc trong DB.
-		let ciDataStatus = release.ciData.status;
-		if (ciImportAction === CiImportAction.SKIP_CI_IMPORT) {
-			// Re-import only when CI sync marked the release as needing import again.
-			if (release.ciData.needImportAgain) {
-				ciDataStatus = ReleaseCiDataStatus.NOT_FOUND_ON_CI;
-			}
-		} else if (ciImportAction === CiImportAction.FORCE_CI_IMPORT) {
-			// FORCE luôn ép import lại bất kể trạng thái CI hiện tại.
-			ciDataStatus = ReleaseCiDataStatus.NOT_FOUND_ON_CI;
+		const currentNeedImportAgain = release.ciData.needImportAgain;
+		let needImportAgain = currentNeedImportAgain;
+
+		if (requestedNeedImportAgain === true) {
+			needImportAgain = true;
+		} else if (
+			requestedNeedImportAgain === false &&
+			currentNeedImportAgain === true
+		) {
+			needImportAgain = false;
 		}
 
-		// Snapshot đưa vào execution chỉ cần status CI để quyết định nhánh import/skip.
 		release.ciData = {
-			status: ciDataStatus,
-			needImportAgain:
-				ciImportAction === CiImportAction.FORCE_CI_IMPORT
-					? true
-					: release.ciData.needImportAgain,
+			needImportAgain,
 		} as typeof release.ciData;
 	}
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
 		try {
-			await this.releaseCiDataService.syncCiDataByReleaseId(id);
+			// await this.releaseCiDataService.syncCiDataByReleaseId(id);
+			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
 		} catch (error) {
 			console.log(error);
 		}
@@ -815,7 +802,7 @@ export class ReleaseService {
 		});
 
 		// truyền động từ fe để bỏ qua bước import ci, chứ ko lưu hay cập nhật release gốc
-		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+		this.applyCiImportActionToReleaseSnapshot(release, dto.needImportAgain);
 
 		await this.releaseRepo.update(id, {
 			status: ReleaseStatus.SUBMITTED,

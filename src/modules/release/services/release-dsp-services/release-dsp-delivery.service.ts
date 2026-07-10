@@ -1,5 +1,5 @@
 // services/release-dsp-delivery.service.ts
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { TenantDspAgreementService } from 'src/modules/dsp/services/dsp-tenant.service';
@@ -19,6 +19,8 @@ import { ReleaseDspDeliveryQueryService } from './release-dsp-delivery-query.ser
 
 @Injectable()
 export class ReleaseDspDeliveryService {
+	private readonly logger = new Logger(ReleaseDspDeliveryService.name);
+
 	constructor(
 		@InjectRepository(ReleaseDspDelivery)
 		private readonly repo: Repository<ReleaseDspDelivery>,
@@ -148,6 +150,104 @@ export class ReleaseDspDeliveryService {
 		info: { metadataPath?: string; batchId?: string },
 	): Promise<void> {
 		await this.repo.update({ releaseId, dspId }, info);
+	}
+
+	async syncLiveVersionFromCiExportData(
+		releaseIds: string[],
+	): Promise<number> {
+		const uniqueReleaseIds = [...new Set(releaseIds)].filter(Boolean);
+		if (!uniqueReleaseIds.length) return 0;
+
+		return this.repo.manager.transaction(async (manager) => {
+			// 1. Upsert has_live_version cho các dsp CÓ xuất hiện trong export mới
+			const upsertRows = await manager.query(
+				`
+			INSERT INTO "release_dsp_delivery" (
+				"release_id",
+				"dsp_id",
+				"has_live_version"
+			)
+			SELECT
+				ci_export."release_id",
+				dsp."id",
+				bool_or(
+					lower(coalesce(ci_export."delivery_point_status", '')) IN ('live', 'transferred')
+				)
+			FROM (
+				SELECT
+					rcd."release_id",
+					export_item."value" ->> 'deliveryPointStatus' AS "delivery_point_status",
+					coalesce(
+						nullif(trim(export_item."value" ->> 'deliveryPointCode'), ''),
+						nullif(trim(substring(
+							export_item."value" ->> 'deliveryPoint'
+							FROM '\\(([^()]*)\\)\\s*$'
+						)), '')
+					) AS "delivery_point_code"
+				FROM "release_ci_data" rcd
+				INNER JOIN LATERAL jsonb_array_elements(
+					coalesce(rcd."export_parsed_data", '[]'::jsonb)
+				) AS export_item("value") ON true
+				WHERE rcd."release_id" = ANY($1::uuid[])
+			) ci_export
+			INNER JOIN "dsps" dsp
+				ON upper(trim(dsp."code_ci")) =
+					upper(trim(ci_export."delivery_point_code"))
+			WHERE dsp."code_ci" IS NOT NULL
+			AND ci_export."delivery_point_code" IS NOT NULL
+			GROUP BY
+				ci_export."release_id",
+				dsp."id"
+			ON CONFLICT ("release_id", "dsp_id")
+			DO UPDATE SET
+				"has_live_version" = EXCLUDED."has_live_version"
+			RETURNING "id"
+			`,
+				[uniqueReleaseIds],
+			);
+
+			// 2. Set false cho dsp đang live cũ nhưng KHÔNG còn xuất hiện trong export mới
+			const downRows = await manager.query(
+				`
+			UPDATE "release_dsp_delivery" rdd
+			SET "has_live_version" = false
+			WHERE rdd."release_id" = ANY($1::uuid[])
+			AND rdd."has_live_version" = true
+			AND NOT EXISTS (
+				SELECT 1
+				FROM (
+					SELECT
+						rcd."release_id",
+						coalesce(
+							nullif(trim(export_item."value" ->> 'deliveryPointCode'), ''),
+							nullif(trim(substring(
+								export_item."value" ->> 'deliveryPoint'
+								FROM '\\(([^()]*)\\)\\s*$'
+							)), '')
+						) AS "delivery_point_code"
+					FROM "release_ci_data" rcd
+					INNER JOIN LATERAL jsonb_array_elements(
+						coalesce(rcd."export_parsed_data", '[]'::jsonb)
+					) AS export_item("value") ON true
+					WHERE rcd."release_id" = ANY($1::uuid[])
+				) ci_export
+				INNER JOIN "dsps" dsp2
+					ON upper(trim(dsp2."code_ci")) = upper(trim(ci_export."delivery_point_code"))
+				WHERE ci_export."release_id" = rdd."release_id"
+				AND dsp2."id" = rdd."dsp_id"
+			)
+			RETURNING rdd."id"
+			`,
+				[uniqueReleaseIds],
+			);
+
+			const syncedCount = upsertRows.length + downRows.length;
+			this.logger.log(
+				`syncLiveVersionFromCiExportData affected: ${syncedCount} (up: ${upsertRows.length}, down: ${downRows.length})`,
+			);
+
+			return syncedCount;
+		});
 	}
 
 	async updateSelected(releaseId: string, dspIds: string[]): Promise<void> {
