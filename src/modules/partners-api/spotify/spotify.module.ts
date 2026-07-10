@@ -11,6 +11,7 @@ import { ReleaseEnrichment } from 'src/modules/release/entities/release-enrichme
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { CiToolModule } from '../ci-tool/ci-tool.module';
 import { YoutubeModule } from '../youtube/youtube.module';
 import { SpotifyController } from './controllers/spotify.controller';
 import { DeezerEnrichmentService } from './services/deezer-enrichment.service';
@@ -28,6 +29,7 @@ import { SpotifyService2 } from './services/spotify2.service';
 	imports: [
 		AppConfigModule,
 		ClickHouseModule,
+		CiToolModule,
 		YoutubeModule,
 		TypeOrmModule.forFeature([
 			Release,
