@@ -28,7 +28,6 @@ import {
 	VirtualColumnReleaseArr,
 } from '../enum/release.enum';
 import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
-import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
 import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
 interface IDataFromDb {
 	entities: Release[];
@@ -519,7 +518,7 @@ export class ReleaseQueryService {
 			ciDataStatus,
 			neverExported,
 			lastImportIsFailed,
-			isSkipImport,
+			needImportAgain,
 			hasQaFlag,
 			dspDelivery,
 
@@ -536,7 +535,7 @@ export class ReleaseQueryService {
 			ciDataStatus ||
 			neverExported !== undefined ||
 			lastImportIsFailed !== undefined ||
-			isSkipImport !== undefined ||
+			needImportAgain !== undefined ||
 			hasQaFlag !== undefined
 		) {
 			itemsToJoin.push('release.ciData');
@@ -575,19 +574,10 @@ export class ReleaseQueryService {
 				);
 			}
 
-			if (isSkipImport !== undefined) {
+			if (needImportAgain !== undefined) {
 				qb.andWhere(
-					isSkipImport
-						? `(
-							"releaseCiData"."status" = :existsOnCiStatus
-							AND "releaseCiData"."need_import_again" = false
-						)`
-						: `(
-							"releaseCiData"."id" IS NULL
-							OR "releaseCiData"."status" != :existsOnCiStatus
-							OR "releaseCiData"."need_import_again" = true
-						)`,
-					{ existsOnCiStatus: ReleaseCiDataStatus.EXISTS_ON_CI },
+					`"releaseCiData"."need_import_again" = :needImportAgain`,
+					{ needImportAgain },
 				);
 			}
 
