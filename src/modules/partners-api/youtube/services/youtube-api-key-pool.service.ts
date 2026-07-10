@@ -43,13 +43,21 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 
 	constructor(private readonly keyService: YoutubeApiKeyService) {}
 
-	async onModuleInit(): Promise<void> {
-		await this.reload();
-		this.refreshTimer = setInterval(() => {
-			this.reload().catch((err) => {
-				this.logger.error(`Pool refresh failed: ${err.message}`);
+	onModuleInit(): void {
+		const scheduleRefresh = () => {
+			this.refreshTimer = setInterval(() => {
+				this.reload().catch((err) => {
+					this.logger.error(`Pool refresh failed: ${err.message}`);
+				});
+			}, YoutubeApiKeyPoolService.REFRESH_INTERVAL_MS);
+		};
+
+		this.reload()
+			.then(() => scheduleRefresh())
+			.catch((err) => {
+				this.logger.error(`YouTube key pool init failed: ${err.message}`);
+				scheduleRefresh();
 			});
-		}, YoutubeApiKeyPoolService.REFRESH_INTERVAL_MS);
 	}
 
 	onModuleDestroy(): void {

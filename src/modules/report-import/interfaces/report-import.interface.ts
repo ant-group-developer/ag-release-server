@@ -38,7 +38,9 @@ export interface ReportImportStatusResponse {
 	};
 	file: string;
 	error: string | null;
-	result: any;
+	result?: any;
+	detailR2Sync?: { zipsFound: number; zipsImported: number; zipsSkipped: number } | null;
+	detailExport?: { jobSpoId: string | null; foldersUploaded: number; r2ObjectKeys: string[] } | null;
 	startedAt: string | null;
 	finishedAt: string | null;
 	durationMs: number;

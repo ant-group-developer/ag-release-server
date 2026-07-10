@@ -13,7 +13,6 @@ import {
 } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 import { EntityManager, In, Repository } from 'typeorm';
-import { ReleaseCiDataStatus } from '../../release-ci-data/entities/release-ci-data.entity';
 import {
 	QueryGetListReleaseExecution3Dto,
 	ReleaseExecutionPageDto,
@@ -68,6 +67,7 @@ export class ReleaseExecution3Service {
 		type: ExecutionType;
 	}) {
 		return await this.queueService.queueExecution(body);
+		// await this.startProcessing();
 	}
 
 	async resumeWaitingSteps(): Promise<void> {
@@ -86,6 +86,7 @@ export class ReleaseExecution3Service {
 
 		for (const executionId of executionIds) {
 			await this.queueService.queueRunPipeline(executionId);
+			// await this.runPipeline('');
 		}
 	}
 
@@ -192,11 +193,7 @@ export class ReleaseExecution3Service {
 				ci: ciDealDsps,
 				state51: state51Dsps,
 				primaryDsp: null,
-				isSkipImport:
-					releaseSnapshot.ciData?.status ===
-					ReleaseCiDataStatus.EXISTS_ON_CI
-						? true
-						: false,
+				isSkipImport: releaseSnapshot.ciData?.needImportAgain === false,
 			},
 		};
 

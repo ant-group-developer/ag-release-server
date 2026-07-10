@@ -4,6 +4,7 @@ import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
+	IsInt,
 	IsObject,
 	IsOptional,
 	IsUUID,
@@ -14,6 +15,7 @@ import {
 	ReleaseCiDataStatus,
 	ReleaseCiExportParsedData,
 	ReleaseCiImportParsedData,
+	ReleaseCiQaFlag,
 } from '../entities/release-ci-data.entity';
 
 export enum FieldOrderReleaseCiData {
@@ -21,6 +23,7 @@ export enum FieldOrderReleaseCiData {
 	updatedAt = 'releaseCiData.updatedAt',
 	latestSyncedAt = 'releaseCiData.latestSyncedAt',
 	status = 'releaseCiData.status',
+	importCount = 'releaseCiData.importCount',
 	dspsLive = 'dsps_live',
 }
 
@@ -45,10 +48,30 @@ export class UpsertReleaseCiDataDto {
 	@IsObject()
 	importParsedData?: ReleaseCiImportParsedData | null;
 
+	@ApiPropertyOptional({
+		description: 'Number of import records from CI raw data',
+	})
+	@IsOptional()
+	@IsInt()
+	importCount?: number;
+
 	@ApiPropertyOptional({ description: 'Dữ liệu export đã parse' })
 	@IsOptional()
 	@IsArray()
 	exportParsedData?: ReleaseCiExportParsedData[] | null;
+
+	@ApiPropertyOptional({ description: 'Danh sách QA flags lấy từ CI' })
+	@IsOptional()
+	@IsArray()
+	qaFlagsCi?: ReleaseCiQaFlag[] | null;
+
+	@ApiPropertyOptional({
+		description:
+			'True when the latest import failed, QA flags exist, and no CI export exists',
+	})
+	@IsOptional()
+	@IsBoolean()
+	needImportAgain?: boolean;
 }
 
 export class BulkSyncDataCiDto {
@@ -120,6 +143,48 @@ export class GetListReleaseCiDataDto extends BaseQueryDto2 {
 		return value;
 	})
 	lastImportIsFailed?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Only get records that need import again',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	needImportAgain?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Filter records that will skip CI import',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isSkipImport?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Only get records that have QA flags',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasQaFlag?: boolean;
 
 	@ApiPropertyOptional({
 		enum: FieldOrderReleaseCiData,

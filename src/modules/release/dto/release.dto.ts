@@ -21,7 +21,6 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
-import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { FieldOrderRelease, ReleaseStatus } from '../enum/release.enum';
 import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
@@ -473,6 +472,22 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	artistId?: string[];
 
 	@ApiPropertyOptional({
+		type: [String],
+		description: 'Channel IDs',
+	})
+	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	channelId?: string[];
+
+	@ApiPropertyOptional({
 		type: String,
 		format: 'date-time',
 		description: 'Start release date',
@@ -623,6 +638,34 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	})
 	lastImportIsFailed?: boolean;
 
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Filter releases that will skip CI import',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isSkipImport?: boolean;
+
+	@ApiPropertyOptional({
+		type: Boolean,
+		description: 'Filter releases that have CI QA flags',
+		example: true,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasQaFlag?: boolean;
+
 	@ApiPropertyOptional({ type: QueryReleaseDspDeliveryDto })
 	@IsOptional()
 	@Transform(({ value }) => parseJsonObjectQueryValue(value))
@@ -725,6 +768,18 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 	artistId?: string[];
 
 	@IsOptional()
+	@Transform(({ value }) =>
+		value
+			? String(value)
+					.split(',')
+					.map((v) => v.trim())
+			: [],
+	)
+	@IsUUID('4', { each: true })
+	@IsArray()
+	channelId?: string[];
+
+	@IsOptional()
 	// @IsDate()
 	startDateRelease?: Date;
 
@@ -776,6 +831,24 @@ export class QueryGetListReleaseDto2 extends BaseQueryDto {
 		return value;
 	})
 	lastImportIsFailed?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	isSkipImport?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	hasQaFlag?: boolean;
 
 	@IsOptional()
 	@Transform(({ value }) => parseJsonObjectQueryValue(value))
@@ -832,13 +905,15 @@ export class BulkSubmitReleaseDto {
 	})
 	skipDistributed?: boolean = true;
 
-	@ApiPropertyOptional({
-		enum: CiImportAction,
-		default: CiImportAction.KEEP_CURRENT_STATUS,
-	})
+	@ApiPropertyOptional({ type: Boolean })
 	@IsOptional()
-	@IsEnum(CiImportAction)
-	ciImportAction?: CiImportAction = CiImportAction.SKIP_CI_IMPORT;
+	@IsBoolean()
+	@Transform(({ value }) => {
+		if (value === 'true' || value === true) return true;
+		if (value === 'false' || value === false) return false;
+		return value;
+	})
+	needImportAgain?: boolean;
 }
 
 // export class BulkSubmitPreviewTargetDto {

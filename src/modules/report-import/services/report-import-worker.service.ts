@@ -85,6 +85,10 @@ export class ReportImportWorkerService
 	) {}
 
 	onApplicationBootstrap() {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug('Skipping report import worker loop (not worker role)');
+			return;
+		}
 		this.initializeWorkerInBackground().catch((err) => {
 			this.logger.error(
 				`Failed to initialize Report Import Worker: ${err.message}`,

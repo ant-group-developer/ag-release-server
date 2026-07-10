@@ -634,7 +634,8 @@ export class TrackQueryService {
 						qbInner
 							.where(`track.title ILIKE :kw_${index}`)
 							.orWhere(`track.lyric ILIKE :kw_${index}`)
-							.orWhere(`track.version ILIKE :kw_${index}`);
+							.orWhere(`track.version ILIKE :kw_${index}`)
+							.orWhere(`track.isrc ILIKE :kw_${index}`);
 					}),
 					{ [`kw_${index}`]: `%${kw}%` },
 				);

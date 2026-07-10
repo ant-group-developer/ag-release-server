@@ -105,13 +105,18 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
 	};
 	file: string;
 	error: string | null;
-	result: any;
+	result?: any;
+	detailR2Sync?: { zipsFound: number; zipsImported: number; zipsSkipped: number } | null;
+	detailExport?: { jobSpoId: string | null; foldersUploaded: number; r2ObjectKeys: string[] } | null;
 	createdAt: string | null;
 	startedAt: string | null;
 	finishedAt: string | null;
 	durationMs: number;
 
 	constructor(job: ImportJob) {
+		const isR2Sync = job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
+		const isExportTrigger = job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
+
 		this.id = job.id;
 		this.status = job.status;
 		this.progress = {
@@ -131,7 +136,25 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
 		};
 		this.file = job.fileName;
 		this.error = job.errorMessage || null;
-		this.result = job.result;
+		if (isR2Sync) {
+			this.detailR2Sync = job.result
+				? {
+						zipsFound: (job.result.zipsFound as number) ?? 0,
+						zipsImported: (job.result.zipsImported as number) ?? 0,
+						zipsSkipped: (job.result.zipsSkipped as number) ?? 0,
+					}
+				: null;
+		} else if (isExportTrigger) {
+			this.detailExport = job.result
+				? {
+						jobSpoId: (job.result.jobSpoId as string) ?? null,
+						foldersUploaded: (job.result.foldersUploaded as number) ?? 0,
+						r2ObjectKeys: (job.result.r2ObjectKeys as string[]) ?? [],
+					}
+				: null;
+		} else {
+			this.result = job.result;
+		}
 		this.createdAt = toVN(job.createdAt);
 		this.startedAt = toVN(job.startedAt);
 		this.finishedAt = toVN(job.finishedAt);
