@@ -1,9 +1,44 @@
+import { listCountries } from 'src/modules/database/constants/database.init.constant';
 import { FactSalesRow } from '../../interfaces';
 import { BaseSalesParser } from './base-sales.parser';
+
+function normalizeCountryNameKey(value: string): string {
+	return value
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/&/g, ' and ')
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim()
+		.replace(/\s+/g, ' ');
+}
+
+const COUNTRY_NAME_TO_ISO2 = new Map<string, string>();
+for (const country of listCountries) {
+	const name = country[0];
+	const iso2 = country[2];
+	if (typeof name === 'string' && typeof iso2 === 'string') {
+		COUNTRY_NAME_TO_ISO2.set(
+			normalizeCountryNameKey(name),
+			iso2.toUpperCase(),
+		);
+	}
+}
+COUNTRY_NAME_TO_ISO2.set('usa', 'US');
+COUNTRY_NAME_TO_ISO2.set('united states of america', 'US');
+COUNTRY_NAME_TO_ISO2.set('uk', 'GB');
 
 export class RevelatorSalesParser extends BaseSalesParser {
 	constructor() {
 		super('revelator');
+	}
+
+	private normalizeRevelatorTerritory(value: string): string {
+		const normalized = this.normalizeCountryCode(value);
+		if (normalized !== 'N/A') return normalized;
+
+		const iso2 = COUNTRY_NAME_TO_ISO2.get(normalizeCountryNameKey(value));
+		return iso2 ?? 'N/A';
 	}
 
 	protected parseRow(
@@ -34,7 +69,9 @@ export class RevelatorSalesParser extends BaseSalesParser {
 		row.release_id = r['Release ID']?.trim() || 'N/A';
 		row.service_name = r['Service']?.trim() || 'N/A';
 		row.usage_type = r['Channel']?.trim() || 'N/A';
-		row.territory_code = this.normalizeCountryCode(r['Territory']?.trim() ?? '');
+		row.territory_code = this.normalizeRevelatorTerritory(
+			r['Territory']?.trim() ?? '',
+		);
 		row.quantity = this.safeInt(r['Quantity'] ?? '0');
 		row.revenue_usd = this.safeDecimal(r['Net Revenue in USD'] ?? '0');
 		row.revenue_currency = 'USD';

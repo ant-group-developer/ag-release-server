@@ -29,7 +29,7 @@ const BOMBSHELTER_RE =
 // e.g. 145958-2025-august-revelator-statement.csv.zip
 // e.g. 145958-2025-august-revelator-youtube-statement.csv.zip
 const REVELATOR_RE =
-	/^(\d+)-(\d{4})-([a-z]+)-revelator(-[a-z]+)?-statement\.csv\.zip$/i;
+	/^(\d+)-(\d{4})-([a-z]+)-revelator(-[a-z]+)?-statement\.csv(?:\.zip)?$/i;
 
 // Month name → MM
 const MONTH_MAP: Record<string, string> = {
