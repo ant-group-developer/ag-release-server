@@ -74,6 +74,8 @@ secrets
 
 .agent
 .agents
+.claude
+CLAUDE.md
 
 debug-create-release-dto.json
 
