@@ -375,6 +375,7 @@ export class ReleaseQueryService {
 				'video.id',
 				'video.releaseId',
 				'video.isrc',
+				'video.externalId',
 				'video.label',
 				'video.explicit',
 				'video.aiContent',
@@ -508,6 +509,7 @@ export class ReleaseQueryService {
 			subGenreId,
 			labelId,
 			artistId,
+			channelId,
 			isVariousArtist,
 			isImportedFromReport,
 			isEnrich,
@@ -518,6 +520,8 @@ export class ReleaseQueryService {
 			ciDataStatus,
 			neverExported,
 			lastImportIsFailed,
+			needImportAgain,
+			hasQaFlag,
 			dspDelivery,
 
 			fieldOrder,
@@ -532,7 +536,9 @@ export class ReleaseQueryService {
 		if (
 			ciDataStatus ||
 			neverExported !== undefined ||
-			lastImportIsFailed !== undefined
+			lastImportIsFailed !== undefined ||
+			needImportAgain !== undefined ||
+			hasQaFlag !== undefined
 		) {
 			itemsToJoin.push('release.ciData');
 
@@ -567,6 +573,28 @@ export class ReleaseQueryService {
 						? lastImportIsFailedCondition
 						: `NOT (${lastImportIsFailedCondition})`,
 					{ failedImportStatus: 'problem' },
+				);
+			}
+
+			if (needImportAgain !== undefined) {
+				qb.andWhere(
+					`"releaseCiData"."need_import_again" = :needImportAgain`,
+					{ needImportAgain },
+				);
+			}
+
+			if (hasQaFlag !== undefined) {
+				const hasQaFlagCondition = `
+					COALESCE(jsonb_array_length("releaseCiData"."qa_flags_ci"), 0) > 0
+				`;
+
+				qb.andWhere(
+					hasQaFlag
+						? hasQaFlagCondition
+						: `(
+							"releaseCiData"."id" IS NULL
+							OR NOT (${hasQaFlagCondition})
+						)`,
 				);
 			}
 		}
@@ -618,6 +646,7 @@ export class ReleaseQueryService {
 						.orWhere('artist.name ILIKE :keyword')
 						.orWhere('label.name ILIKE :keyword')
 						.orWhere('release.upc ILIKE :keyword')
+						.orWhere('video.isrc ILIKE :keyword')
 						.orWhere(
 							'CAST(release.status AS VARCHAR) ILIKE :keyword',
 						);
@@ -687,6 +716,12 @@ export class ReleaseQueryService {
 		if (artistId?.length) {
 			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
 				artistId,
+			});
+		}
+
+		if (channelId?.length) {
+			qb.andWhere('video.channelId IN (:...channelId)', {
+				channelId,
 			});
 		}
 
@@ -846,6 +881,8 @@ export class ReleaseQueryService {
 			.leftJoin('releaseContributor.artistRole', 'artistRoleContributor')
 
 			.leftJoin('release.label', 'label')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.channel', 'channel')
 
 			// genre
 			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
@@ -953,6 +990,21 @@ export class ReleaseQueryService {
 				'releaseDspDeliveryDsp.codeCi',
 				'releaseDspDeliveryDsp.picture',
 				'releaseDspDeliveryDsp.type',
+			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.channelId',
+				'video.isrc',
+				'video.externalId',
+			])
+
+			// channel
+			.addSelect([
+				'channel.id',
+				'channel.name',
+				'channel.youtubeChannelId',
+				'channel.thumbUrl',
 			])
 
 			// virtual

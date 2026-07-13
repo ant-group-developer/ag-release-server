@@ -10,6 +10,7 @@ services:
             - .env
         environment:
             - TZ=${TZ:-Asia/Ho_Chi_Minh}
+            - APP_ROLE=api
         command: yarn start:prod
         restart: unless-stopped
         volumes:
@@ -18,6 +19,25 @@ services:
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro
             - ./release_parsed:${RELEASE_PARSED_DIR}
+        mem_limit: 1500m
+        cpus: 1.5
+        depends_on:
+            - app-dev-worker
 
-        mem_limit: 2g # Set max memory to 2 GB
-        cpus: 2 # Set max CPU to 2 CPU core
+    app-dev-worker:
+        image: ag-music-server/dev:${TAG:-latest}
+        env_file:
+            - .env
+        environment:
+            - TZ=${TZ:-Asia/Ho_Chi_Minh}
+            - APP_ROLE=worker
+        command: yarn start:prod
+        restart: unless-stopped
+        volumes:
+            - ./proto:/app/proto:ro
+            - ./credential.json:/app/credential.json:ro
+            - ./secrets:/app/secrets:ro
+            - ./database.rclone.conf:/app/database.rclone.conf:ro
+            - ./release_parsed:${RELEASE_PARSED_DIR}
+        mem_limit: 1g
+        cpus: 0.5

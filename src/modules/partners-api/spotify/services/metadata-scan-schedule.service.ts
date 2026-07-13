@@ -38,8 +38,14 @@ export class MetadataScanScheduleService implements OnModuleInit {
 		private readonly metadataScanService: MetadataScanService,
 	) {}
 
-	async onModuleInit(): Promise<void> {
-		await this.reloadSchedules();
+	onModuleInit(): void {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug('Skipping metadata scan schedules (not worker role)');
+			return;
+		}
+		this.reloadSchedules().catch((err) => {
+			this.logger.error(`Failed to load metadata scan schedules: ${err.message}`);
+		});
 	}
 
 	async list(): Promise<MetadataScanSchedule[]> {

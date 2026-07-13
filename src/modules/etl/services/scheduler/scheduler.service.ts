@@ -18,6 +18,10 @@ export class SchedulerService implements OnModuleInit {
 	) {}
 
 	onModuleInit() {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug('Skipping ETL scheduler (not worker role)');
+			return;
+		}
 		this.initializeSchedulerInBackground().catch((err) => {
 			this.logger.error(
 				`Failed to initialize auto-sync cron: ${err.message}`,

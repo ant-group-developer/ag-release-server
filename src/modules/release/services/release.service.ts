@@ -33,11 +33,11 @@ import {
 import { SubmitReleaseDto } from '../dto/submit-release.dto';
 import { AutoSubmitHistory } from '../entities/auto-submit-history.entity';
 import { Release } from '../entities/release.entity';
-import { CiImportAction } from '../enum/ci-import-action.enum';
 import { ReleaseDspStatus } from '../enum/release-dsp.enum';
 import { ReleaseStatus } from '../enum/release.enum';
 import { IRelease, IReleaseDetail } from '../interfaces/release.interface';
-import { ReleaseCiDataStatus } from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ReleaseCiQaFlag } from '../modules/release-ci-data/entities/release-ci-data.entity';
+import { ReleaseCiDataService } from '../modules/release-ci-data/services/release-ci-data.service';
 import { ReleaseExecutionResultDto } from '../modules/release-executions3/dtos/release-execution3.dto';
 import { ExecutionType } from '../modules/release-executions3/enums/release-execution3.enum';
 import { ReleaseExecution3Service } from '../modules/release-executions3/services/release-execution3.service';
@@ -102,6 +102,9 @@ export class ReleaseService {
 
 		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+
+		@Inject(forwardRef(() => ReleaseCiDataService))
+		private readonly releaseCiDataService: ReleaseCiDataService,
 	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
@@ -550,7 +553,7 @@ export class ReleaseService {
 			relations: ['release.releaseDspDeliveries'],
 		});
 
-		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+		this.applyCiImportActionToReleaseSnapshot(release, dto.needImportAgain);
 
 		const releaseDspDeliveries = (release.releaseDspDeliveries ?? []).map(
 			(delivery) => {
@@ -592,7 +595,7 @@ export class ReleaseService {
 				id: release.id,
 				code: submitCodes,
 				skipCodes,
-				ciImportAction: dto.ciImportAction,
+				needImportAgain: release.ciData?.needImportAgain,
 			},
 		};
 	}
@@ -757,32 +760,49 @@ export class ReleaseService {
 		});
 	}
 
+	/**
+	 * Adjust CI snapshot before creating execution.
+	 *
+	 * This does not write DB. Execution import/skip logic is driven by
+	 * `needImportAgain`, so keep the current CI status and only override that flag.
+	 */
 	private applyCiImportActionToReleaseSnapshot(
 		release: Release | null | undefined,
-		ciImportAction?: CiImportAction,
+		requestedNeedImportAgain?: boolean,
 	) {
 		if (!release?.ciData) return;
 
-		let status = release.ciData.status;
+		const currentNeedImportAgain = release.ciData.needImportAgain;
+		let needImportAgain = currentNeedImportAgain;
 
-		if (ciImportAction === CiImportAction.SKIP_CI_IMPORT) {
-			if (status === ReleaseCiDataStatus.EXISTS_ON_CI) {
-				status = ReleaseCiDataStatus.EXISTS_ON_CI; // chỉ có thể skip khi đã tồn tại trên CI
-			}
-		} else if (ciImportAction === CiImportAction.FORCE_CI_IMPORT) {
-			status = ReleaseCiDataStatus.NOT_FOUND_ON_CI; // luôn import
+		if (requestedNeedImportAgain === true) {
+			needImportAgain = true;
+		} else if (
+			requestedNeedImportAgain === false &&
+			currentNeedImportAgain === true
+		) {
+			needImportAgain = false;
 		}
 
-		release.ciData = { status } as typeof release.ciData;
+		release.ciData = {
+			needImportAgain,
+		} as typeof release.ciData;
 	}
 
 	async submit3(id: string, dto: SubmitReleaseDto) {
+		try {
+			// await this.releaseCiDataService.syncCiDataByReleaseId(id);
+			await this.releaseCiDataService.bulkSyncDataCi({ ids: [id] });
+		} catch (error) {
+			console.log(error);
+		}
+
 		const release = await this.releaseQueryService.findOneReleaseFull({
 			releaseId: id,
 		});
 
 		// truyền động từ fe để bỏ qua bước import ci, chứ ko lưu hay cập nhật release gốc
-		this.applyCiImportActionToReleaseSnapshot(release, dto.ciImportAction);
+		this.applyCiImportActionToReleaseSnapshot(release, dto.needImportAgain);
 
 		await this.releaseRepo.update(id, {
 			status: ReleaseStatus.SUBMITTED,
@@ -805,13 +825,21 @@ export class ReleaseService {
 		await this.submit3(id, dto);
 	}
 
-	// get qa flag ci
+	/**
+	 * Lấy release format ID trên CI theo UPC của release và lưu vào `releaseFormatsIdCi`.
+	 *
+	 * `options.reloadFromCi` điều khiển việc dùng cache trong DB:
+	 * - false/undefined: nếu release đã có `releaseFormatsIdCi` thì trả luôn giá trị đang lưu,
+	 *   không gọi CI lại.
+	 * - true: bỏ qua giá trị đang lưu, gọi CI lại theo UPC và update lại `releaseFormatsIdCi`.
+	 */
 	async getReleaseFormatId(
 		id: string,
 		options?: { reloadFromCi?: boolean },
 	): Promise<string> {
 		const release = await this.releaseQueryService.findOne(id);
 
+		// Không reload thì ưu tiên dùng format ID đã sync trước đó để giảm request sang CI.
 		if (!options?.reloadFromCi && release.releaseFormatsIdCi) {
 			return release.releaseFormatsIdCi;
 		}
@@ -837,6 +865,13 @@ export class ReleaseService {
 		return releaseFormatsIdCi;
 	}
 
+	/**
+	 * Tự động đồng bộ `releaseFormatsIdCi` từ CI cho các release chưa import từ report.
+	 *
+	 * Mặc định chỉ lấy các release chưa có `releaseFormatsIdCi`.
+	 * Nếu `reloadFromCi = true`, hàm sẽ gọi lại CI cho cả release đã có format ID
+	 * để refresh giá trị đang lưu trong DB.
+	 */
 	async autoSyncReleaseFormatId(options?: { reloadFromCi?: boolean }) {
 		const batchSize = 5;
 		const query = this.releaseRepo
@@ -847,6 +882,7 @@ export class ReleaseService {
 			})
 			.orderBy('release.createdAt', 'ASC');
 
+		// Chế độ bình thường chỉ sync release còn thiếu format ID, tránh gọi CI lại không cần thiết.
 		if (!options?.reloadFromCi) {
 			query.andWhere('release.releaseFormatsIdCi IS NULL');
 		}
@@ -862,6 +898,7 @@ export class ReleaseService {
 		);
 
 		for (let index = 0; index < releases.length; index += batchSize) {
+			// Chạy theo batch nhỏ để giới hạn số request gọi CI đồng thời.
 			const batch = releases.slice(index, index + batchSize);
 			const batchNumber = Math.floor(index / batchSize) + 1;
 			const releaseIds = batch.map((release) => release.id);
@@ -870,6 +907,7 @@ export class ReleaseService {
 				`Processing release format ID batch ${batchNumber}/${totalBatches}. Release IDs: ${releaseIds.join(', ')}`,
 			);
 
+			// Dùng allSettled để một release lỗi không làm dừng toàn bộ job sync.
 			const results = await Promise.allSettled(
 				batch.map((release) =>
 					this.getReleaseFormatId(release.id, {
@@ -882,6 +920,7 @@ export class ReleaseService {
 				const releaseId = batch[resultIndex].id;
 
 				if (result.status === 'fulfilled') {
+					// getReleaseFormatId đã update DB, ở đây chỉ ghi nhận tiến độ.
 					synced += 1;
 					this.logger.log(
 						`Synced release format ID for release ${releaseId}: ${result.value}. Progress: ${
@@ -891,6 +930,7 @@ export class ReleaseService {
 					return;
 				}
 
+				// Ghi lại lỗi theo từng release để caller biết record nào cần xử lý lại.
 				const reason = result.reason;
 				const message =
 					reason instanceof Error ? reason.message : String(reason);
@@ -925,12 +965,18 @@ export class ReleaseService {
 		};
 	}
 
-	async getQaFlagCi(id: string) {
-		const releaseFormatsId = await this.getReleaseFormatId(id);
-		const res2 = await this.ciReleaseService.getQaFlagsV2({
-			releaseFormatsId,
-		});
-		return res2._embedded;
+	async getQaFlagsCi(
+		id: string,
+		options?: {
+			reloadFromCi?: boolean | undefined; // true thì sẽ luôn cập data mới nhất nhưng tốn tài nguyên
+		},
+	): Promise<ReleaseCiQaFlag[]> {
+		const releaseFormatsId = await this.getReleaseFormatId(id, options);
+		const res2: { _embedded?: ReleaseCiQaFlag[] } =
+			await this.ciReleaseService.getQaFlagsV2({
+				releaseFormatsId,
+			});
+		return res2._embedded ?? [];
 	}
 
 	async getStatusDspsCi(id: string): Promise<ReleaseExecutionResultDto[]> {
