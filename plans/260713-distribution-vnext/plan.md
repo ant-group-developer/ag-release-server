@@ -16,7 +16,7 @@
 | # | Phase | Trạng thái | Chi tiết | File |
 |---|-------|-----------|----------|------|
 | 0 | Đóng băng v3 + đặc tả (tài liệu này) | ✅ Done | — | (docs đã có) |
-| 1 | Domain layer thuần (aggregate + port) | 🔜 Next — sẽ deep-dive | Đầy đủ | [phase-01](phase-01-domain-layer.md) |
+| 1 | Domain layer thuần (aggregate + port) | ✅ Đặc tả xong — sẵn sàng EXECUTE | Đầy đủ + chốt hết open Q | [phase-01](phase-01-domain-layer.md) |
 | 2 | BullMQ thay cron-poll + DB-queue | ⬜ Chưa | Skeleton | [phase-02](phase-02-bullmq-engine.md) |
 | 3 | Outbox + distribution_event + timeline SSE | ⬜ Chưa | Skeleton | [phase-03](phase-03-outbox-timeline.md) |
 | 4 | ACL adapter cho SFTP/CI/gRPC/email + test double | ⬜ Chưa | Skeleton | [phase-04](phase-04-integration-acl.md) |
@@ -41,5 +41,12 @@ Phase 1 (domain) ──▶ Phase 2 (engine) ──▶ Phase 3 (outbox/timeline)
 
 ## Next action
 
-Deep-dive phase 1 (domain + ports) → fill chi tiết `phase-01-domain-layer.md`.
-Sau khi phase 1 xong, quay lại chi tiết hoá phase 2–6.
+Phase 1 đã đặc tả xong + chốt hết open question (xem cuối `phase-01-domain-layer.md`).
+Bước kế: **EXECUTE phase 1** — dịch đặc tả thành file `.ts` dưới `src/modules/distribution-orchestration/domain/` + unit test (theo Todo/Implementation Steps trong phase-01).
+Sau khi phase 1 code xong, quay lại chi tiết hoá phase 2–6.
+
+**Quyết định nền đã chốt (dùng cho mọi phase sau):**
+- Module `distribution-orchestration` (tách khỏi module `distribution` config + v3).
+- State 2 tầng: milestone state + event timeline. Lỗi → `ACTION_REQUIRED`/`ISSUES` + ticket, KHÔNG revert DRAFT.
+- Channel = **process-as-data** (`DeliveryProcess` per-DSP) + interpreter thuần; `ChannelState` chung nhỏ; topology chỉ metadata.
+- TAKEDOWN(b) = aggregate mới; RETRY = mutate aggregate cũ. Poison=3. Ticket riêng orchestration.
