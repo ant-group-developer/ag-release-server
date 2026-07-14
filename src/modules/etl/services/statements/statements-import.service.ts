@@ -148,6 +148,7 @@ export class StatementsImportService {
 						dspFolderName,
 						batchId,
 						'sales',
+						'bombshelter',
 					);
 
 					if (dspResult) {

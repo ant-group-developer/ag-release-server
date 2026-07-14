@@ -402,6 +402,7 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		sourceCategory: string = '',
+		importSource: string = 'ftp',
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Pre-load file exclude check once (avoids repeated async calls inside findDataFiles)
 		const fileExcluder = async (name: string) =>
@@ -414,6 +415,7 @@ export class ImportService {
 				folderName,
 				batchId,
 				fileExcluder,
+				importSource,
 			);
 		}
 		if (sourceCategory === 'illegitimate_activity') {
@@ -422,6 +424,7 @@ export class ImportService {
 				folderName,
 				batchId,
 				fileExcluder,
+				importSource,
 			);
 		}
 		// Default: trends / usage → existing parsers → fact_dsp
@@ -431,6 +434,7 @@ export class ImportService {
 			batchId,
 			sourceCategory,
 			fileExcluder,
+			importSource,
 		);
 	}
 
@@ -443,12 +447,13 @@ export class ImportService {
 		batchId: string,
 		sourceCategory: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
 			await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
-				'ftp_folder',
+				importSource === 'ftp' ? 'ftp_folder' : importSource,
 			);
 
 		const parser = getParserForFolder(folderName);
@@ -473,7 +478,7 @@ export class ImportService {
 						row.source_category = sourceCategory;
 					}
 					row.dsp_id = dspsReport.id_dsps_report;
-					row.import_source = 'ftp';
+					row.import_source = importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}
@@ -529,6 +534,7 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const isRevelator = this.isRevelatorSalesFolder(folderName);
 
@@ -537,7 +543,7 @@ export class ImportService {
 				? { id_dsps_report: '', pg_uuid: null }
 				: await this.dspMappingService.resolveOrCreateDspReport(
 						folderName,
-						'ftp_folder',
+						importSource === 'ftp' ? 'ftp_folder' : importSource,
 					);
 
 		const parser = getSalesParserForFolder(folderName);
@@ -567,7 +573,7 @@ export class ImportService {
 						: dspsReport.id_dsps_report;
 					row.import_source = isRevelator
 						? REVELATOR_IMPORT_SOURCE
-						: 'ftp';
+						: importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}
@@ -624,6 +630,7 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const prefix = folderName.split('-')[0];
 		let parser;
@@ -642,7 +649,7 @@ export class ImportService {
 		const dspsReport =
 			await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
-				'ftp_folder',
+				importSource === 'ftp' ? 'ftp_folder' : importSource,
 			);
 
 		const startTime = Date.now();
@@ -657,7 +664,7 @@ export class ImportService {
 				// Replace dsp_id with id_dsps_report
 				for (const row of rows) {
 					row.dsp_id = dspsReport.id_dsps_report;
-					row.import_source = 'ftp';
+					row.import_source = importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}

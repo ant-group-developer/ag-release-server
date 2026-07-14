@@ -190,6 +190,11 @@ export class TencentSalesParser extends BaseSalesParser {
 	constructor() {
 		super('tencent');
 	}
+
+	private normalizeReleaseId(value: string): string {
+		return value.trim().replace(/\.0+$/, '');
+	}
+
 	protected parseRow(
 		r: Record<string, string>,
 		batchId: string,
@@ -215,8 +220,9 @@ export class TencentSalesParser extends BaseSalesParser {
 		row.track_title = r['Track_Title'] || '';
 		row.artist_name = r['Artist_Name'] || '';
 		row.album_title = r['Release_Title'] || '';
-		row.release_id = r['Release_ID'] || '';
-		row.upc = r['Release_ID'] || '';
+		const releaseId = this.normalizeReleaseId(r['Release_ID'] || '');
+		row.release_id = releaseId;
+		row.upc = releaseId;
 		row.quantity = this.safeInt(r['Quantity'] || '0');
 		const rawUsd = r['Total_Payable_USD'] || r['USD_Amount'] || '0';
 		const rawLocal =
@@ -311,6 +317,7 @@ export class NeteaseSalesParser extends BaseSalesParser {
 		row.artist_name = r['Artist_Name'] || '';
 		row.album_title = r['Release_Title'] || '';
 		row.release_id = r['Release_ID'] || '';
+		row.upc = r['Release_ID'] || '';
 		// Note: header has a space: "Quantity_ Streams"
 		row.quantity = this.safeInt(
 			r['Quantity_ Streams'] || r['Quantity_Streams'] || '0',
