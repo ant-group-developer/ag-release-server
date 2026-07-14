@@ -613,8 +613,9 @@ export class RetryLimitExceededError extends DomainError {}   // poison detectio
 **Đọc tham chiếu (không sửa):**
 - `src/modules/release/modules/release-executions3/enums/release-execution3.enum.ts` — khớp giá trị `ExecutionType` để migration v3.
 - `src/modules/release/modules/release-executions3/services/release-execution3.engine.ts` — tham khảo tinh thần resolve status (KHÔNG copy code).
-- `src/modules/distribution/dsp-routing/enum/dsp-routing.enum.ts` — `RoutingModeEnum` (DIRECT/AGGREGATOR/SYSTEM) → map `ChannelTopology` (metadata).
-- `src/modules/distribution/aggregator/*` — `Aggregator` (danh tính CI/…, ddex config) + `hasDeal` → nguồn seed `DeliveryProcess` registry + `ChannelDeliverySpec`.
+- `src/modules/distribution/dsp-routing/enum/dsp-routing.enum.ts` — `RoutingModeEnum` (DIRECT/AGGREGATOR/SYSTEM) → map `ChannelTopology` (metadata). **Routing CI thật sự** = `dspRoutingConfig.mode === AGGREGATOR && aggregator.code === 'CI'` (đối chiếu `release-execution3.service.ts:172-176`).
+- `src/modules/dsp/entities/dsp.entity.ts` — **`hasDeal: boolean` NẰM Ở ĐÂY (per-DSP), KHÔNG phải trên Aggregator.** Tách CI deal (export admin panel) vs State51 (export email). Nguồn để `resolveProcessCode` chọn `ci.deal.*` vs `ci.state51.*` + set `ChannelDeliverySpec.exportMethod`.
+- `src/modules/distribution/aggregator/entities/aggregator.entity.ts` — `Aggregator`: `code` (vd 'CI'), `createsDoneFolder` (upload folder + .done = ĐÃ import → khớp §5 "upload=import"), `deliveryEmail`/`deliveryEmailSubject` (State51 email), `ddexId`/`ddexName`. Nguồn seed `DeliveryProcess` registry (chọn có stage `.done` / có bước email không) + `ChannelDeliverySpec`.
 
 **Không sửa gì trong `src/`** ở phase này (chỉ đặc tả). File `.ts` được tạo khi EXECUTE.
 
@@ -700,11 +701,15 @@ export class RetryLimitExceededError extends DomainError {}   // poison detectio
 ## Open Questions
 
 *(hết — mọi câu đã chốt; sẵn sàng EXECUTE phase 1)*
-5. **Ticket** — dùng lại module `issue` / `release-errors` hiện có làm `ticketRef`, hay khái niệm ticket riêng của orchestration? (nghiêng tái dùng `release-errors`/`issue` — cần xác nhận để định kiểu `ticketRef`).
 
+## Đối chiếu code thật (2026-07-13, kiểm tra lần 2)
 
-
-
+Đã verify các giả định với `src/`:
+- ✅ `ExecutionType` (INITIAL_RELEASE/UPDATE/TAKEDOWN/RETRY) khớp 100% `release-execution3.enum.ts:12` → migration giá trị chuỗi an toàn.
+- ✅ `RoutingModeEnum` (DIRECT/AGGREGATOR/SYSTEM) khớp `dsp-routing.enum.ts:4`.
+- ✅ ISRC/UPC regex đúng chuẩn hình thức.
+- ⚠️ **Sửa:** `hasDeal` nằm trên **`Dsp`** (`dsp.entity.ts:81`), KHÔNG phải Aggregator. Routing CI = `mode===AGGREGATOR && aggregator.code==='CI'`, rồi `dsp.hasDeal` tách deal/State51 (`release-execution3.service.ts:172-185`). Aggregator cung cấp `createsDoneFolder` (upload=import) + `deliveryEmail` (State51). Đã cập nhật §Related Code Files.
+- 📌 Registry seed process: đọc `Dsp.hasDeal` + `Aggregator.{code,createsDoneFolder,deliveryEmail}` để chọn `process.code` — KHÔNG hardcode danh sách DSP trong domain.
 
 
 
