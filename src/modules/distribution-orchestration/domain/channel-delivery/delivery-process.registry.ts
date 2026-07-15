@@ -1,4 +1,5 @@
 import { InvariantViolationError } from '../errors/domain-errors';
+import { ChannelState } from './channel-state.enum';
 import {
 	DeliveryProcess,
 	StageKind,
@@ -37,6 +38,7 @@ export const CI_DEAL_INITIAL: DeliveryProcess = {
 // CI takedown — take down the whole cluster; quite different from the two above
 export const CI_TAKEDOWN: DeliveryProcess = {
 	code: 'ci.takedown',
+	terminalState: ChannelState.TAKEN_DOWN,
 	stages: [
 		{ key: 'request', kind: StageKind.ACTION }, // send the cluster takedown command
 		{ key: 'confirm', kind: StageKind.WAIT, waitKind: 'TAKEDOWN' }, // wait for CI to confirm takedown

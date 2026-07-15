@@ -19,6 +19,7 @@ const LEVEL_BY_TYPE: Record<ChannelEventType, DomainEventLevel> = {
 	[ChannelEventType.CHANNEL_ISSUES]: 'milestone',
 	[ChannelEventType.CHANNEL_RESET]: 'milestone',
 	[ChannelEventType.ACTION_RETRIED]: 'progress', // self-loop within DELIVERING
+	[ChannelEventType.CHANNEL_TAKEN_DOWN]: 'milestone',
 };
 
 export interface ChannelEventContext {

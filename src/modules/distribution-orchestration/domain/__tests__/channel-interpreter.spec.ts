@@ -6,6 +6,7 @@ import {
 import { ChannelState } from '../channel-delivery/channel-state.enum';
 import {
 	CI_DEAL_INITIAL,
+	CI_TAKEDOWN,
 	SPOTIFY_INITIAL,
 } from '../channel-delivery/delivery-process.registry';
 import {
@@ -15,6 +16,38 @@ import {
 import { RetryPolicy } from '../value-objects/retry-policy.vo';
 
 const retry = RetryPolicy.sftpDefault();
+
+describe('deriveState — takedown terminal (process-as-data)', () => {
+	it('a finished takedown process derives TAKEN_DOWN, not LIVE', () => {
+		expect(deriveState(CI_TAKEDOWN, CI_TAKEDOWN.stages.length)).toBe(
+			ChannelState.TAKEN_DOWN,
+		);
+	});
+	it('finishing a takedown emits ChannelTakenDown (not ChannelLive)', () => {
+		const res = advance(
+			CI_TAKEDOWN,
+			{ pos: 1, state: ChannelState.WAITING, retryCount: 0 },
+			{ type: ChannelInputType.ARRIVED },
+			retry,
+		);
+		expect(res.state).toBe(ChannelState.TAKEN_DOWN);
+		expect(res.emitted).toContain(ChannelEventType.CHANNEL_TAKEN_DOWN);
+		expect(res.emitted).not.toContain(ChannelEventType.CHANNEL_LIVE);
+	});
+});
+
+describe('advance — RESET is only valid from ISSUES', () => {
+	it('rejects RESET on a LIVE channel (a done branch stays as-is on retry)', () => {
+		expect(() =>
+			advance(
+				SPOTIFY_INITIAL,
+				{ pos: 2, state: ChannelState.LIVE, retryCount: 0 },
+				{ type: ChannelInputType.RESET, resetToKey: 'deliver' },
+				retry,
+			),
+		).toThrow(InvalidTransitionError);
+	});
+});
 
 describe('deriveState (INV-C5)', () => {
 	it('derives state from the current stage kind', () => {

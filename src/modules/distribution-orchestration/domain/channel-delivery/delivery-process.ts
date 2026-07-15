@@ -1,4 +1,5 @@
 import { InvariantViolationError } from '../errors/domain-errors';
+import { ChannelState } from './channel-state.enum';
 
 /**
  * StageKind — the kind of one step in a DSP/aggregator flow.
@@ -35,6 +36,8 @@ export interface Stage {
 export interface DeliveryProcess {
 	readonly code: string; // e.g. 'spotify.initial'|'ci.deal.initial'|'ci.takedown'
 	readonly stages: readonly Stage[]; // linear order; interpreter walks pos 0 → end
+	/** Terminal state when the process runs to the end. Default LIVE (distribution); takedown → TAKEN_DOWN. */
+	readonly terminalState?: ChannelState.LIVE | ChannelState.TAKEN_DOWN;
 }
 
 /**

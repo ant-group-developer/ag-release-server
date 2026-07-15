@@ -47,6 +47,7 @@ export enum ChannelEventType {
 	CHANNEL_ISSUES = 'ChannelIssues', // terminal milestone: failed (payload carries ticketRef)
 	ACTION_RETRIED = 'ActionRetried', // progress: ACTION failed but can still retry
 	CHANNEL_RESET = 'ChannelReset', // milestone: RETRY reset back to an earlier stage
+	CHANNEL_TAKEN_DOWN = 'ChannelTakenDown', // terminal milestone: takedown process finished
 }
 
 /** The interpreter's result (immutable — freshly created, never mutating the input). */
