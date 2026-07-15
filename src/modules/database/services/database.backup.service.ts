@@ -238,15 +238,15 @@ export class DatabaseBackupService {
 		} catch (error) {
 			this.logger.error('Database backup error details:', error);
 			// Đảm bảo dọn dẹp file tạm trên server nếu phát sinh lỗi
-			if (fs.existsSync(backupPath)) {
-				try {
-					await fs.promises.unlink(backupPath);
-				} catch (unlinkError) {
-					this.logger.warn(
-						`Failed to delete temporary backup file: ${backupPath}`,
-					);
-				}
-			}
+			// if (fs.existsSync(backupPath)) {
+			// 	try {
+			// 		await fs.promises.unlink(backupPath);
+			// 	} catch (unlinkError) {
+			// 		this.logger.warn(
+			// 			`Failed to delete temporary backup file: ${backupPath}`,
+			// 		);
+			// 	}
+			// }
 			return {
 				status: StatusBackup.FAILED,
 				fileSize: 0,
