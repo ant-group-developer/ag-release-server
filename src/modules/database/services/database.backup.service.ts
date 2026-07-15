@@ -229,7 +229,7 @@ export class DatabaseBackupService {
 				isPublic: false,
 			});
 			// 4. Xóa file backup tạm thời trên server cục bộ
-			// await fs.promises.unlink(backupPath);
+			await fs.promises.unlink(backupPath);
 			return {
 				status: StatusBackup.SUCCESS,
 				fileSize,
@@ -240,7 +240,7 @@ export class DatabaseBackupService {
 			// Đảm bảo dọn dẹp file tạm trên server nếu phát sinh lỗi
 			if (fs.existsSync(backupPath)) {
 				try {
-					// await fs.promises.unlink(backupPath);
+					await fs.promises.unlink(backupPath);
 				} catch (unlinkError) {
 					this.logger.warn(
 						`Failed to delete temporary backup file: ${backupPath}`,
