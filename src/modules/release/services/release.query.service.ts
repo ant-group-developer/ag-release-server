@@ -219,51 +219,58 @@ export class ReleaseQueryService {
 		}
 	}
 
+	private countDspsLiveSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(release_dsp_delivery_live_sub.id)')
+			.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
+			.where('release_dsp_delivery_live_sub.release_id = release.id')
+			.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
+	}
+
+	private countTracksSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(track_sub1.id)')
+			.from('tracks', 'track_sub1')
+			.where('track_sub1.release_id = release.id');
+	}
+
+	private sumDurationSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('SUM(audio_files_sub2.duration)')
+			.from('tracks', 'track_sub2')
+			.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
+			.where('track_sub2.release_id = release.id');
+	}
+
+	private countDspsTotalSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(release_dsp_delivery_total_sub.id)')
+			.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
+			.where('release_dsp_delivery_total_sub.release_id = release.id');
+	}
+
 	private applyOrderFieldSelect(qbId: SelectQueryBuilder<Release>, fieldOrder?: string) {
 		qbId.select(`${this.mainAlias}.id`);
-		if (
-			fieldOrder &&
-			fieldOrder !== FieldOrderRelease.DSPS_LIVE &&
-			fieldOrder !== ('dsps_live_count' as any) &&
-			fieldOrder !== ('dsps_total_count' as any) &&
-			fieldOrder !== (FieldOrderRelease.TRACKS_COUNT as any) &&
-			fieldOrder !== (FieldOrderRelease.TOTAL_DURATION as any)
-		) {
-			qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
-		}
-		if (
-			fieldOrder === FieldOrderRelease.DSPS_LIVE ||
-			fieldOrder === ('dsps_live_count' as any)
-		) {
-			qbId.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(release_dsp_delivery_live_sub.id)')
-					.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
-					.where('release_dsp_delivery_live_sub.release_id = release.id')
-					.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
-			}, 'dsps_live_count');
-		} else if (fieldOrder === (FieldOrderRelease.TRACKS_COUNT as any)) {
-			qbId.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(track_sub1.id)')
-					.from('tracks', 'track_sub1')
-					.where('track_sub1.release_id = release.id');
-			}, FieldOrderRelease.TRACKS_COUNT);
-		} else if (fieldOrder === (FieldOrderRelease.TOTAL_DURATION as any)) {
-			qbId.addSelect((subQuery) => {
-				return subQuery
-					.select('SUM(audio_files_sub2.duration)')
-					.from('tracks', 'track_sub2')
-					.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
-					.where('track_sub2.release_id = release.id');
-			}, FieldOrderRelease.TOTAL_DURATION);
-		} else if (fieldOrder === ('dsps_total_count' as any)) {
-			qbId.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(release_dsp_delivery_total_sub.id)')
-					.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
-					.where('release_dsp_delivery_total_sub.release_id = release.id');
-			}, 'dsps_total_count');
+
+		if (!fieldOrder) return;
+
+		switch (fieldOrder) {
+			case FieldOrderRelease.DSPS_LIVE:
+			case 'dsps_live_count':
+				qbId.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count');
+				break;
+			case FieldOrderRelease.TRACKS_COUNT:
+				qbId.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT);
+				break;
+			case FieldOrderRelease.TOTAL_DURATION:
+				qbId.addSelect(this.sumDurationSubQuery, FieldOrderRelease.TOTAL_DURATION);
+				break;
+			case 'dsps_total_count':
+				qbId.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+				break;
+			default:
+				qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
+				break;
 		}
 	}
 
@@ -1254,32 +1261,10 @@ export class ReleaseQueryService {
 			.addSelect(['label.id', 'label.name', 'label.code', 'label.picture', 'label.description'])
 			.addSelect(['video.id', 'video.releaseId', 'video.channelId', 'video.isrc', 'video.externalId'])
 			.addSelect(['channel.id', 'channel.name', 'channel.youtubeChannelId', 'channel.thumbUrl'])
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(track_sub1.id)')
-					.from('tracks', 'track_sub1')
-					.where('track_sub1.release_id = release.id');
-			}, FieldOrderRelease.TRACKS_COUNT)
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('SUM(audio_files_sub2.duration)')
-					.from('tracks', 'track_sub2')
-					.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
-					.where('track_sub2.release_id = release.id');
-			}, FieldOrderRelease.TOTAL_DURATION)
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(release_dsp_delivery_live_sub.id)')
-					.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
-					.where('release_dsp_delivery_live_sub.release_id = release.id')
-					.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
-			}, 'dsps_live_count')
-			.addSelect((subQuery) => {
-				return subQuery
-					.select('COUNT(release_dsp_delivery_total_sub.id)')
-					.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
-					.where('release_dsp_delivery_total_sub.release_id = release.id');
-			}, 'dsps_total_count');
+			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
+			.addSelect(this.sumDurationSubQuery, FieldOrderRelease.TOTAL_DURATION)
+			.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count')
+			.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
 
 		return { itemsToJoin };
 	}
