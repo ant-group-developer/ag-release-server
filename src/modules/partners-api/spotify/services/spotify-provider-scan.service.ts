@@ -2,9 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { SpotifyDeliveryStatus } from '../entities/spotify-delivery-status.entity';
+import { SpotifySonarDelivery } from '../entities/spotify-sonar-delivery.entity';
 import { SpotifyCatalog } from '../entities/spotify-catalog.entity';
 import { SpotifyCatalogAvailability } from '../entities/spotify-catalog-availability.entity';
+import { SpotifyCatalogDelivery } from '../entities/spotify-catalog-delivery.entity';
 import { SpotifyProviderApiService } from './spotify-provider-api.service';
 
 export interface SonarScanOptions {
@@ -21,8 +22,8 @@ export class SpotifyProviderScanService {
 		@InjectRepository(Release)
 		private readonly releaseRepo: Repository<Release>,
 
-		@InjectRepository(SpotifyDeliveryStatus)
-		private readonly deliveryStatusRepo: Repository<SpotifyDeliveryStatus>,
+		@InjectRepository(SpotifySonarDelivery)
+		private readonly sonarDeliveryRepo: Repository<SpotifySonarDelivery>,
 
 		@InjectRepository(SpotifyCatalog)
 		private readonly catalogRepo: Repository<SpotifyCatalog>,
@@ -30,8 +31,18 @@ export class SpotifyProviderScanService {
 		@InjectRepository(SpotifyCatalogAvailability)
 		private readonly availabilityRepo: Repository<SpotifyCatalogAvailability>,
 
+		@InjectRepository(SpotifyCatalogDelivery)
+		private readonly catalogDeliveryRepo: Repository<SpotifyCatalogDelivery>,
+
 		private readonly apiService: SpotifyProviderApiService,
 	) {}
+
+	async getDeliveriesByRelease(releaseId: string): Promise<SpotifySonarDelivery[]> {
+		return this.sonarDeliveryRepo.find({
+			where: { releaseId },
+			order: { createdAtSpotify: 'DESC' },
+		});
+	}
 
 	async scanAll(options: SonarScanOptions = {}): Promise<{ processed: number; failed: number }> {
 		const { limit, isImportedFromReport, force = false } = options;
@@ -52,11 +63,11 @@ export class SpotifyProviderScanService {
 
 		if (!force) {
 			const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-			const recentlyScanned = await this.deliveryStatusRepo
-				.createQueryBuilder('ds')
-				.select('ds.release_id', 'releaseId')
-				.where('ds.updated_at > :oneDayAgo', { oneDayAgo })
-				.groupBy('ds.release_id')
+			const recentlyScanned = await this.sonarDeliveryRepo
+				.createQueryBuilder('sd')
+				.select('sd.release_id', 'releaseId')
+				.where('sd.updated_at > :oneDayAgo', { oneDayAgo })
+				.groupBy('sd.release_id')
 				.getRawMany<{ releaseId: string }>();
 
 			const scannedIds = new Set(recentlyScanned.map((r) => r.releaseId));
@@ -120,10 +131,10 @@ export class SpotifyProviderScanService {
 				? new Date(ps.albumMetadata.earliestStartDate.startDate)
 				: null;
 
-			await this.deliveryStatusRepo
+			await this.sonarDeliveryRepo
 				.createQueryBuilder()
 				.insert()
-				.into(SpotifyDeliveryStatus)
+				.into(SpotifySonarDelivery)
 				.values({
 					releaseId: release.id,
 					spotifyId: ps.id,
@@ -183,20 +194,54 @@ export class SpotifyProviderScanService {
 				albumUri: effectiveData.uri || albumUri,
 				albumUrl: effectiveData.url || null,
 				artists: effectiveData.artists?.length ? effectiveData.artists : null,
-				catalogDeliveries: (deliveries?.length ? deliveries : null) as SpotifyCatalog['catalogDeliveries'],
 				syncedAt: new Date(),
 			})
 			.orUpdate(
-				['album_uri', 'album_url', 'artists', 'catalog_deliveries', 'synced_at'],
+				['album_uri', 'album_url', 'artists', 'synced_at'],
 				['release_id'],
 			)
 			.returning(['id'])
 			.execute();
 
-		const catalogId = savedCatalog.generatedMaps?.[0]?.id
+		const catalogId: string | undefined =
+			savedCatalog.generatedMaps?.[0]?.id
 			?? (await this.catalogRepo.findOne({ where: { releaseId }, select: ['id'] }))?.id;
 
-		if (!catalogId || !availability) return;
+		if (!catalogId) return;
+
+		if (deliveries?.length) {
+			const deliveryRows = deliveries.map((d) => ({
+				catalogId,
+				deliveryId: d.deliveryId,
+				action: d.action || null,
+				deliveredAt: d.deliveredAt || null,
+				feedName: d.feedName || null,
+				productId: d.productId || null,
+				source: d.source || null,
+				feedGid: d.feedGid || null,
+				deliveryStatus: d.deliveryStatus || null,
+				deliveryErrors: (d.deliveryErrors?.length ? d.deliveryErrors : null) as string[] | null,
+				deliveryErrorsAndTypes: d.deliveryErrorsAndTypes?.length ? d.deliveryErrorsAndTypes : null,
+				assetTranscodingStatuses: d.assetTranscodingStatuses?.length ? d.assetTranscodingStatuses : null,
+			}));
+
+			await this.catalogDeliveryRepo
+				.createQueryBuilder()
+				.insert()
+				.into(SpotifyCatalogDelivery)
+				.values(deliveryRows)
+				.orUpdate(
+					[
+						'action', 'delivered_at', 'feed_name', 'product_id', 'source',
+						'feed_gid', 'delivery_status', 'delivery_errors',
+						'delivery_errors_and_types', 'asset_transcoding_statuses',
+					],
+					['catalog_id', 'delivery_id'],
+				)
+				.execute();
+		}
+
+		if (!availability) return;
 
 		const availabilityEntries = Object.entries(availability).map(([countryCode, avail]) => ({
 			catalogId,

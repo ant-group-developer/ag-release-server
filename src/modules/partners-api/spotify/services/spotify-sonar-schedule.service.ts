@@ -10,20 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { CreateSonarScheduleDto, UpdateSonarScheduleDto } from '../dtos/spotify-sonar-schedule.dto';
 import { SpotifySonarScanSchedule } from '../entities/spotify-sonar-scan-schedule.entity';
 import { SpotifyProviderScanService } from './spotify-provider-scan.service';
 
-export interface CreateSonarScheduleDto {
-	name: string;
-	enabled?: boolean;
-	cronExpression: string;
-	timezone?: string;
-	isImportedFromReport?: boolean | null;
-	limitCount?: number | null;
-	force?: boolean;
-}
-
-export interface UpdateSonarScheduleDto extends Partial<CreateSonarScheduleDto> {}
+export { CreateSonarScheduleDto, UpdateSonarScheduleDto };
 
 @Injectable()
 export class SpotifySonarScheduleService implements OnModuleInit {

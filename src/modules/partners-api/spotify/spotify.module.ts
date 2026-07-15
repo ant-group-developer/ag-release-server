@@ -18,7 +18,8 @@ import { SpotifyController } from './controllers/spotify.controller';
 import { SpotifySonarController } from './controllers/spotify-sonar.controller';
 import { SpotifyCatalogAvailability } from './entities/spotify-catalog-availability.entity';
 import { SpotifyCatalog } from './entities/spotify-catalog.entity';
-import { SpotifyDeliveryStatus } from './entities/spotify-delivery-status.entity';
+import { SpotifyCatalogDelivery } from './entities/spotify-catalog-delivery.entity';
+import { SpotifySonarDelivery } from './entities/spotify-sonar-delivery.entity';
 import { SpotifySonarScanSchedule } from './entities/spotify-sonar-scan-schedule.entity';
 import { DeezerEnrichmentService } from './services/deezer-enrichment.service';
 import { EnrichEventsGateway } from './services/enrich-events.gateway';
@@ -52,9 +53,10 @@ import { SpotifyService2 } from './services/spotify2.service';
 			ReleaseEnrichment,
 			MetadataScanSession,
 			MetadataScanSchedule,
-			SpotifyDeliveryStatus,
+			SpotifySonarDelivery,
 			SpotifyCatalog,
 			SpotifyCatalogAvailability,
+			SpotifyCatalogDelivery,
 			SpotifySonarScanSchedule,
 		]),
 	],

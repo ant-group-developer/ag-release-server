@@ -14,9 +14,9 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	CreateSonarScheduleDto,
-	SpotifySonarScheduleService,
 	UpdateSonarScheduleDto,
-} from '../services/spotify-sonar-schedule.service';
+} from '../dtos/spotify-sonar-schedule.dto';
+import { SpotifySonarScheduleService } from '../services/spotify-sonar-schedule.service';
 import { SpotifyProviderScanService } from '../services/spotify-provider-scan.service';
 
 @ApiTags('Partners API')
@@ -29,6 +29,17 @@ export class SpotifySonarController {
 		private readonly scanService: SpotifyProviderScanService,
 		private readonly scheduleService: SpotifySonarScheduleService,
 	) {}
+
+	@Get('releases/:releaseId/deliveries')
+	@SystemAdminOnly()
+	@ApiOperation({
+		summary: 'Lấy danh sách Sonar deliveries của 1 release',
+		description: 'Trả về tất cả delivery records từ Spotify Sonar (API 1+2), sort theo created_at_spotify DESC',
+	})
+	async getDeliveriesByRelease(@Param('releaseId') releaseId: string) {
+		const items = await this.scanService.getDeliveriesByRelease(releaseId);
+		return new ResponseSuccess({ data: { items, total: items.length } });
+	}
 
 	@Post('scan/trigger')
 	@SystemAdminOnly()

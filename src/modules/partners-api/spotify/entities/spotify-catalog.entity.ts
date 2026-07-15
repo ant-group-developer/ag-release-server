@@ -2,9 +2,10 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 import { SpotifyCatalogAvailability } from './spotify-catalog-availability.entity';
+import { SpotifyCatalogDelivery } from './spotify-catalog-delivery.entity';
 
 @Entity('spotify_catalog', {
-	comment: 'Dữ liệu catalog từ Spotify Atlas API (effectiveData)',
+	comment: 'Dữ liệu catalog từ Spotify Atlas API (effectiveData của API 3)',
 })
 export class SpotifyCatalog extends BaseUUIDEntity {
 	@Column({ name: 'release_id', type: 'uuid', unique: true })
@@ -31,25 +32,6 @@ export class SpotifyCatalog extends BaseUUIDEntity {
 		url: string;
 	}> | null;
 
-	@Column({
-		name: 'catalog_deliveries',
-		type: 'jsonb',
-		nullable: true,
-		comment: 'effectiveData.deliveries array (lịch sử delivery trong catalog)',
-	})
-	catalogDeliveries: Array<{
-		deliveryId: string;
-		action: string;
-		deliveredAt: string;
-		feedName: string;
-		productId: string;
-		feedGid: string;
-		deliveryStatus: string;
-		deliveryErrors: string[];
-		deliveryErrorsAndTypes: Array<{ type: string; message: string }>;
-		assetTranscodingStatuses: Array<{ assetType: string; status: string }>;
-	}> | null;
-
 	@Column({ name: 'synced_at', type: 'timestamptz', nullable: true })
 	syncedAt: Date | null;
 
@@ -59,4 +41,7 @@ export class SpotifyCatalog extends BaseUUIDEntity {
 
 	@OneToMany(() => SpotifyCatalogAvailability, (a) => a.catalog, { cascade: true })
 	availability: SpotifyCatalogAvailability[];
+
+	@OneToMany(() => SpotifyCatalogDelivery, (d) => d.catalog, { cascade: true })
+	catalogDeliveries: SpotifyCatalogDelivery[];
 }
