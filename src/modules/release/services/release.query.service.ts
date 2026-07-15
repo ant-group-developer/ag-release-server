@@ -29,6 +29,8 @@ import {
 } from '../enum/release.enum';
 import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
+import { parseJson } from '../utils/release.utils';
+
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -50,8 +52,6 @@ export class ReleaseQueryService {
 
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
-
-		private readonly ormService: OrmService,
 	) {
 		this.mainAlias = 'release';
 	}
@@ -110,6 +110,163 @@ export class ReleaseQueryService {
 		};
 	}
 
+	async getManyAndCountOptimized(query: QueryGetListReleaseDto) {
+		const qbId = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
+		const { itemsToJoin } = this.filterByQuery({ qb: qbId, query });
+		this.smartJoinForPhase1({ qb: qbId, query, itemsToJoin });
+
+		this.applyOrderFieldSelect(qbId, query.fieldOrder as string);
+
+		const [releasesBase, totalItems] = await qbId.getManyAndCount();
+
+		if (releasesBase.length === 0) {
+			return { totalItems, releases: [] };
+		}
+
+		const releaseIds = releasesBase.map((r) => r.id);
+
+		// Phase 2
+		const qbDetail = this.releaseRepo.createQueryBuilder(this.mainAlias);
+		qbDetail.where(`${this.mainAlias}.id IN (:...releaseIds)`, {
+			releaseIds,
+		});
+
+		qbDetail.leftJoin('release.tenant', 'tenant').addSelect([
+			'tenant.id',
+			'tenant.name',
+		]);
+
+		const { itemsToJoin: itemsDetail } = this.selectOptimized(qbDetail);
+
+		this.addSelectJsonCoverArts(qbDetail);
+		this.addSelectJsonArtists(qbDetail);
+		this.addSelectJsonContributors(qbDetail);
+		this.addSelectJsonDspDeliveries(qbDetail);
+
+		this.leftJoinOptimized({
+			qb: qbDetail,
+			relations: [...new Set([...itemsToJoin, ...itemsDetail])],
+		});
+
+		const [dataFromDb] = await Promise.all([qbDetail.getRawAndEntities()]);
+
+		const populatedReleases = this.assigneeVirtualColumn(dataFromDb);
+
+		// Parse JSON arrays and map them back to entities
+		for (const entity of populatedReleases) {
+			const raw = dataFromDb.raw.find((r) => r.release_id === entity.id);
+			if (raw) {
+				entity.releaseCoverArts = parseJson(raw.releaseCoverArts_json);
+				entity.releaseArtists = parseJson(raw.releaseArtists_json);
+				entity.releaseContributors = parseJson(raw.releaseContributors_json);
+				entity.releaseDspDeliveries = parseJson(raw.releaseDspDeliveries_json);
+			}
+		}
+
+		// Reorder
+		const releaseMap = new Map(
+			populatedReleases.map((r) => [r.id, r]),
+		);
+		const sortedReleases = releaseIds
+			.map((id) => releaseMap.get(id))
+			.filter(Boolean) as Release[];
+
+		return {
+			totalItems,
+			releases: sortedReleases,
+		};
+	}
+
+	private smartJoinForPhase1({
+		qb,
+		query,
+		itemsToJoin,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		query: QueryGetListReleaseDto;
+		itemsToJoin: string[];
+	}) {
+		const { keyword, artistId, channelId } = query;
+
+		const needsArtist = !!keyword || !!artistId?.length;
+		if (needsArtist) {
+			qb.leftJoin('release.releaseArtists', 'releaseArtist');
+			qb.leftJoin('releaseArtist.artist', 'artist');
+		}
+
+		const needsLabel = !!keyword;
+		if (needsLabel) {
+			qb.leftJoin('release.label', 'label');
+		}
+
+		const needsAlbumFormat = !!keyword;
+		if (needsAlbumFormat) {
+			qb.leftJoin('release.albumFormat', 'albumFormat');
+		}
+
+		const needsVideo = !!keyword || !!channelId?.length;
+		if (needsVideo) {
+			qb.leftJoin('release.video', 'video');
+		}
+
+		if (itemsToJoin.includes('release.ciData')) {
+			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
+		}
+		if (itemsToJoin.includes('release.releaseDspDeliveries')) {
+			qb.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
+			qb.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
+		}
+	}
+
+	private applyOrderFieldSelect(qbId: SelectQueryBuilder<Release>, fieldOrder?: string) {
+		qbId.select(`${this.mainAlias}.id`);
+		if (
+			fieldOrder &&
+			fieldOrder !== FieldOrderRelease.DSPS_LIVE &&
+			fieldOrder !== ('dsps_live_count' as any) &&
+			fieldOrder !== ('dsps_total_count' as any) &&
+			fieldOrder !== (FieldOrderRelease.TRACKS_COUNT as any) &&
+			fieldOrder !== (FieldOrderRelease.TOTAL_DURATION as any)
+		) {
+			qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
+		}
+		if (
+			fieldOrder === FieldOrderRelease.DSPS_LIVE ||
+			fieldOrder === ('dsps_live_count' as any)
+		) {
+			qbId.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(release_dsp_delivery_live_sub.id)')
+					.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
+					.where('release_dsp_delivery_live_sub.release_id = release.id')
+					.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
+			}, 'dsps_live_count');
+		} else if (fieldOrder === (FieldOrderRelease.TRACKS_COUNT as any)) {
+			qbId.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(track_sub1.id)')
+					.from('tracks', 'track_sub1')
+					.where('track_sub1.release_id = release.id');
+			}, FieldOrderRelease.TRACKS_COUNT);
+		} else if (fieldOrder === (FieldOrderRelease.TOTAL_DURATION as any)) {
+			qbId.addSelect((subQuery) => {
+				return subQuery
+					.select('SUM(audio_files_sub2.duration)')
+					.from('tracks', 'track_sub2')
+					.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
+					.where('track_sub2.release_id = release.id');
+			}, FieldOrderRelease.TOTAL_DURATION);
+		} else if (fieldOrder === ('dsps_total_count' as any)) {
+			qbId.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(release_dsp_delivery_total_sub.id)')
+					.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
+					.where('release_dsp_delivery_total_sub.release_id = release.id');
+			}, 'dsps_total_count');
+		}
+	}
+
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
 		const {
 			idInclude,
@@ -122,12 +279,12 @@ export class ReleaseQueryService {
 
 		const releaseInclude = idInclude?.length
 			? await this.releaseRepo.find({
-					select: {
-						id: true,
-						title: true,
-					},
-					where: { id: In(idInclude) },
-				})
+				select: {
+					id: true,
+					title: true,
+				},
+				where: { id: In(idInclude) },
+			})
 			: [];
 
 		const [items, totalItems] = await this.releaseRepo.findAndCount({
@@ -149,14 +306,6 @@ export class ReleaseQueryService {
 		});
 
 		return { items: [...releaseInclude, ...items], totalItems };
-	}
-
-	private newReleaseQb() {
-		return this.releaseRepo.createQueryBuilder('release');
-	}
-
-	private selectReleaseSimple(qb: SelectQueryBuilder<Release>) {
-		return qb.select(['release.id', 'release.title']);
 	}
 
 	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {
@@ -901,6 +1050,24 @@ export class ReleaseQueryService {
 		}
 	}
 
+	private leftJoinOptimized({
+		qb,
+		relations,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		relations?: string[];
+	}) {
+		qb.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.label', 'label')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.channel', 'channel')
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+
+		if (relations?.includes('release.ciData')) {
+			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
+		}
+	}
+
 	private select(
 		queryBuilder: SelectQueryBuilder<Release>,
 		query: QueryGetListReleaseDto,
@@ -1077,6 +1244,151 @@ export class ReleaseQueryService {
 		itemsToJoin.push('release.releaseDspDeliveries');
 
 		return { itemsToJoin };
+	}
+
+	private selectOptimized(queryBuilder: SelectQueryBuilder<Release>) {
+		const itemsToJoin: string[] = [];
+
+		queryBuilder
+			.addSelect(['albumFormat.id', 'albumFormat.name', 'albumFormat.code'])
+			.addSelect(['label.id', 'label.name', 'label.code', 'label.picture', 'label.description'])
+			.addSelect(['video.id', 'video.releaseId', 'video.channelId', 'video.isrc', 'video.externalId'])
+			.addSelect(['channel.id', 'channel.name', 'channel.youtubeChannelId', 'channel.thumbUrl'])
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(track_sub1.id)')
+					.from('tracks', 'track_sub1')
+					.where('track_sub1.release_id = release.id');
+			}, FieldOrderRelease.TRACKS_COUNT)
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('SUM(audio_files_sub2.duration)')
+					.from('tracks', 'track_sub2')
+					.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
+					.where('track_sub2.release_id = release.id');
+			}, FieldOrderRelease.TOTAL_DURATION)
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(release_dsp_delivery_live_sub.id)')
+					.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
+					.where('release_dsp_delivery_live_sub.release_id = release.id')
+					.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
+			}, 'dsps_live_count')
+			.addSelect((subQuery) => {
+				return subQuery
+					.select('COUNT(release_dsp_delivery_total_sub.id)')
+					.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
+					.where('release_dsp_delivery_total_sub.release_id = release.id');
+			}, 'dsps_total_count');
+
+		return { itemsToJoin };
+	}
+
+
+	private addSelectJsonCoverArts(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rca.id,
+						'fileId', rca.file_id,
+						'releaseId', rca.release_id,
+						'width', rca.width,
+						'height', rca.height,
+						'type', rca.type
+					)
+				) FILTER (WHERE rca.id IS NOT NULL), '[]')`)
+				.from('release_cover_art', 'rca')
+				.where('rca.release_id = release.id');
+		}, 'releaseCoverArts_json');
+	}
+
+	private addSelectJsonArtists(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', ra.id,
+						'artistId', ra.artist_id,
+						'releaseId', ra.release_id,
+						'addArtistToTracks', ra.add_artist_to_tracks,
+						'artist', JSON_BUILD_OBJECT(
+							'id', artist.id,
+							'name', artist.name,
+							'code', artist.code,
+							'picture', artist.picture,
+							'biography', artist.biography
+						)
+					)
+				) FILTER (WHERE ra.id IS NOT NULL), '[]')`)
+				.from('release_artist', 'ra')
+				.leftJoin('artists', 'artist', 'artist.id = ra.artist_id')
+				.where('ra.release_id = release.id');
+		}, 'releaseArtists_json');
+	}
+
+	private addSelectJsonContributors(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rc.id,
+						'artistRoleId', rc.artist_role_id,
+						'artistId', rc.artist_id,
+						'releaseId', rc.release_id,
+						'addContributorToTracks', rc.add_contributor_to_tracks,
+						'artist', JSON_BUILD_OBJECT(
+							'id', artist_c.id,
+							'name', artist_c.name,
+							'code', artist_c.code,
+							'picture', artist_c.picture,
+							'biography', artist_c.biography
+						),
+						'artistRole', JSON_BUILD_OBJECT(
+							'id', role.id,
+							'name', role.name,
+							'code', role.code
+						)
+					)
+				) FILTER (WHERE rc.id IS NOT NULL), '[]')`)
+				.from('release_contributors', 'rc')
+				.leftJoin('artists', 'artist_c', 'artist_c.id = rc.artist_id')
+				.leftJoin('artist_roles', 'role', 'role.id = rc.artist_role_id')
+				.where('rc.release_id = release.id');
+		}, 'releaseContributors_json');
+	}
+
+	private addSelectJsonDspDeliveries(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rdd.id,
+						'releaseId', rdd.release_id,
+						'dspId', rdd.dsp_id,
+						'status', rdd.status,
+						'isSelected', rdd.is_selected,
+						'hasLiveVersion', rdd.has_live_version,
+						'lastEnqueuedAt', rdd.last_enqueued_at,
+						'lastDeliveredAt', rdd.last_delivered_at,
+						'logs', rdd.logs,
+						'issues', rdd.issues,
+						'metadataPath', rdd.metadata_path,
+						'batchId', rdd.batch_id,
+						'dsp', JSON_BUILD_OBJECT(
+							'id', dsp.id,
+							'name', dsp.name,
+							'code', dsp.code,
+							'codeCi', dsp.code_ci,
+							'picture', dsp.picture,
+							'type', dsp.type
+						)
+					)
+				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`)
+				.from('release_dsp_delivery', 'rdd')
+				.leftJoin('dsps', 'dsp', 'dsp.id = rdd.dsp_id')
+				.where('rdd.release_id = release.id');
+		}, 'releaseDspDeliveries_json');
 	}
 
 	async findOneWithRelation(id: string) {
