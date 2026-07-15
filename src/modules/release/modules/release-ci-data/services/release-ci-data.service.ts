@@ -530,7 +530,7 @@ export class ReleaseCiDataService {
 			? this.getExportItems(exportRawData).length > 0
 			: false;
 
-		return lastImportIsFailed && hasQaFlag && !hasExportOnCi;
+		return (lastImportIsFailed || hasQaFlag) && !hasExportOnCi;
 	}
 
 	private getImportItems(

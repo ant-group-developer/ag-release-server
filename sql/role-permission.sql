@@ -201,6 +201,8 @@ WITH map(role_code, permission_code) AS (
     ('track.admin', 'track.scan'),
     -- User (granular)
     ('user.viewer', 'user.read'),
+    ('user.inviter', 'user.read'),
+    ('user.inviter', 'user.invite'),
     ('user.creator', 'user.read'),
     ('user.creator', 'user.create'),
     ('user.creator', 'user.invite'),
@@ -233,6 +235,29 @@ WITH map(role_code, permission_code) AS (
     ('workspace.admin', 'workspace.update.status'),
     ('workspace.admin', 'workspace.update.owner'),
     ('workspace.admin', 'workspace.update.config'),
+    -- Workspace Presets
+    ('workspace.member', 'dashboard.read'),
+    ('workspace.member', 'analytics.read'),
+    ('workspace.member', 'revenue.read'),
+    ('workspace.member', 'channel.read'),
+    ('workspace.member', 'workspace.read'),
+    ('workspace.member', 'user.read'),
+    ('workspace.member', 'artist.read'),
+    ('workspace.member', 'artist.create'),
+    ('workspace.member', 'artist.update'),
+    ('workspace.member', 'label.read'),
+    ('workspace.member', 'label.create'),
+    ('workspace.member', 'label.update'),
+    ('workspace.member', 'release_audio.read'),
+    ('workspace.member', 'release_audio.create'),
+    ('workspace.member', 'release_audio.update'),
+    ('workspace.member', 'release_video.read'),
+    ('workspace.member', 'release_video.create'),
+    ('workspace.member', 'release_video.update'),
+    ('workspace.member', 'release_review.create'),
+    ('workspace.member', 'release_review.can_fix'),
+    ('workspace.member', 'track.read'),
+    ('workspace.member', 'track.scan'),
     -- Role & Permission (management)
     ('user.editor', 'role.read'),
     ('user.editor', 'permission.read'),
@@ -245,3 +270,4 @@ FROM map m
 JOIN roles r ON r.code = m.role_code
 JOIN permissions p ON p.code = m.permission_code
 ON CONFLICT DO NOTHING;
+
