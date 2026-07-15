@@ -31,7 +31,7 @@ import { TrackService } from '../services/track.service';
 @ApiTags('Tracks')
 @Controller('tracks')
 export class TrackController {
-	constructor(private readonly trackService: TrackService) {}
+	constructor(private readonly trackService: TrackService) { }
 
 	@Get()
 	async getList(
@@ -43,7 +43,7 @@ export class TrackController {
 			query.tenantIds = [tenantId];
 		}
 
-		const result = await this.trackService.getList(query);
+		const result = await this.trackService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 

@@ -57,12 +57,69 @@ export class TrackQueryService {
 
 		@InjectRepository(TrackSensitive)
 		private readonly trackSensitiveRepo: Repository<TrackSensitive>,
-	) {}
+	) { }
 
 	// public
 	async getList(query: QueryGetListTrackDto) {
 		const qb = this.createQueryGetList(query);
 		return await qb.getManyAndCount();
+	}
+
+
+	async getList2(query: QueryGetListTrackDto): Promise<[Track[], number]> {
+		// BƯỚC 1: LỌC & PHÂN TRANG
+		const qbId = this.createBaseQb();
+
+		if (query.tenantIds?.length || query.labelId?.length) {
+			qbId.leftJoin('track.release', 'release');
+		}
+		if (query.artistId?.length) {
+			qbId.leftJoin('track.trackArtists', 'trackArtist');
+		}
+
+		this.applyFilter({ qb: qbId, filter: query });
+
+		const [rawTracks, totalItems] = await Promise.all([
+			qbId.getMany(),
+			qbId.getCount()
+		]);
+
+		const trackIds = rawTracks.map((t) => t.id);
+
+		if (trackIds.length === 0) return [[] as Track[], 0];
+
+		// BƯỚC 2: LOAD CHI TIẾT TỪ ID ĐÃ LỌC
+		const qbDetail = this.createBaseQb();
+		qbDetail.where('track.id IN (:...trackIds)', { trackIds });
+
+		this.leftJoinRelation(qbDetail);
+
+		this.addSelectReleaseSimple(qbDetail);
+		this.addSelectReleaseCoverArtSimple(qbDetail);
+		this.addSelectLabel(qbDetail);
+		this.addSelectAudioFile(qbDetail);
+		this.addSelectFileAndPeak(qbDetail);
+		this.addSelectTrackArtist(qbDetail);
+		this.addSelectTrackContributor(qbDetail);
+		this.addSelectTrackLanguage(qbDetail);
+		this.addSelectMetadataLanguage(qbDetail);
+		this.addSelectAudioLanguage(qbDetail);
+		this.addSelectMetadataLanguageCountry(qbDetail);
+		this.addSelectRecordingCountry(qbDetail);
+		this.addSelectPrimaryGenre(qbDetail);
+		this.addSelectSubGenre(qbDetail);
+		this.addSelectTrackType(qbDetail);
+		this.addSelectTrackOriginType(qbDetail);
+		this.addSelectTrackSensitive(qbDetail);
+
+		const itemsDb = await qbDetail.getMany();
+
+		const itemsMap = new Map(itemsDb.map((item) => [item.id, item]));
+		const items = trackIds
+			.map((id) => itemsMap.get(id))
+			.filter(Boolean) as Track[];
+
+		return [items, totalItems];
 	}
 
 	async getListSimple(query: QueryGetListTrackDto) {
@@ -71,9 +128,9 @@ export class TrackQueryService {
 
 		const trackInclude = idInclude?.length
 			? await this.trackRepo.find({
-					select: { id: true, title: true },
-					where: { id: In(idInclude) },
-				})
+				select: { id: true, title: true },
+				where: { id: In(idInclude) },
+			})
 			: [];
 
 		const [items, totalItems] = await this.trackRepo.findAndCount({
