@@ -15,6 +15,7 @@ import { ResponseSuccess } from '../../common/dtos/common.response.dto';
 import {
 	PublicRoute,
 	TenantOwnerOrAdminOnly,
+	TenantWhiteLabelOnly,
 } from '../auth/decorators/auth.decorator';
 import {
 	AddDomainDto,
@@ -38,6 +39,7 @@ export class TenantDomainController {
 		return new ResponseSuccess({ data });
 	}
 
+	@TenantWhiteLabelOnly()
 	@TenantOwnerOrAdminOnly()
 	@Post('tenants/:tenantId/domain')
 	@ApiOperation({ summary: 'Add custom domain to tenant' })
@@ -52,6 +54,7 @@ export class TenantDomainController {
 		return new ResponseSuccess({ data });
 	}
 
+	@TenantWhiteLabelOnly()
 	@TenantOwnerOrAdminOnly()
 	@Post('tenants/:tenantId/domain/verify')
 	@ApiOperation({ summary: 'Trigger domain verification check' })
@@ -60,6 +63,7 @@ export class TenantDomainController {
 		return new ResponseSuccess({ data });
 	}
 
+	@TenantWhiteLabelOnly()
 	@TenantOwnerOrAdminOnly()
 	@Delete('tenants/:tenantId/domain')
 	@ApiOperation({ summary: 'Remove custom domain from tenant' })
@@ -68,6 +72,7 @@ export class TenantDomainController {
 		return new ResponseSuccess({ data: null });
 	}
 
+	@TenantWhiteLabelOnly()
 	@TenantOwnerOrAdminOnly()
 	@Get('tenants/:tenantId/domain/cf-oauth-url')
 	@ApiOperation({
