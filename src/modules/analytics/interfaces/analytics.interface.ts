@@ -23,6 +23,43 @@ export interface SourceBreakdownItem {
 // Timelines (DSP and Territory)
 // ═══════════════════════════════════════════════════════
 
+export interface AnalyticsWorkspaceInfo {
+	id: string;
+	name: string;
+	title: string;
+	logo: string | null;
+}
+
+export interface AnalyticsChannelInfo {
+	id: string;
+	name: string;
+	thumbUrl: string | null;
+	youtubeChannelId: string | null;
+	tenant: AnalyticsWorkspaceInfo | null;
+}
+
+export interface AnalyticsVideoInfo {
+	id: string;
+	releaseId: string;
+	isrc: string | null;
+	externalId: string | null;
+	label: string | null;
+	explicit: boolean | null;
+	aiContent: string | null;
+	channelId: string | null;
+	description: string | null;
+	keywords: string[] | null;
+	madeForKids: string | null;
+	visibility: string | null;
+	contentProvider: string | null;
+	copyrightOwner: string | null;
+	partnerCustomId1: string | null;
+	partnerCustomId2: string | null;
+	fileId: string | null;
+	youtubeMatchStatus: string | null;
+	youtubeMatchScannedAt: Date | null;
+}
+
 export interface DspTimelineSeriesItem {
 	dsp: string;
 	salesViews?: number;
@@ -149,8 +186,9 @@ export interface ReleaseRankingVideoItem {
 	labelName: string | null;
 	trackCount: number;
 	totalViews: number;
-	channels: Array<{ id: string; name: string }>;
-	workspaces: Array<{ id: string; name: string }>;
+	channels: AnalyticsChannelInfo[];
+	workspaces: AnalyticsWorkspaceInfo[];
+	video: AnalyticsVideoInfo | null;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
@@ -415,8 +453,9 @@ export interface RevenueReleaseVideoItem {
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
-	channels: Array<{ id: string; name: string }>;
-	workspaces: Array<{ id: string; name: string }>;
+	channels: AnalyticsChannelInfo[];
+	workspaces: AnalyticsWorkspaceInfo[];
+	video: AnalyticsVideoInfo | null;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;

@@ -7,6 +7,8 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { getImportSourceLabel } from '../constants/import-source.constants';
 import { RankingQueryDto } from '../dto/analytics-query.dto';
 import {
+	AnalyticsChannelInfo,
+	AnalyticsWorkspaceInfo,
 	ArtistRankingItem,
 	ChannelRankingItem,
 	DspRankingItem,
@@ -596,10 +598,14 @@ export class RankingService {
 			coverOriginal: string;
 		}>(dataSql, params);
 
+		const releaseIds = paged.map((r) => r.releaseId);
 		const allChannelIds = [...new Set(paged.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
-		const channelsMeta = allChannelIds.length > 0
-			? await this.isrcResolverService.getChannelMetadata(allChannelIds)
-			: new Map();
+		const [channelsMeta, videosMeta] = await Promise.all([
+			allChannelIds.length > 0
+				? this.isrcResolverService.getChannelMetadata(allChannelIds)
+				: Promise.resolve(new Map()),
+			this.isrcResolverService.getVideoMetadataByReleaseIds(releaseIds),
+		]);
 
 		const items: ReleaseRankingVideoItem[] = paged.map((r, index) => {
 			const coverArtThumbnails: ICoverArtThumbnails = {
@@ -611,22 +617,19 @@ export class RankingService {
 			};
 			const rowChannelIds = (r.channelIds ?? []).filter(Boolean);
 
-			const channels = rowChannelIds
+			const channels: AnalyticsChannelInfo[] = rowChannelIds
 				.map((id) => {
 					const ch = channelsMeta.get(id);
-					return ch ? { id, name: ch.name } : null;
+					return ch ? { id, ...ch } : null;
 				})
-				.filter((c): c is { id: string; name: string } => c !== null);
+				.filter((c): c is AnalyticsChannelInfo => c !== null);
 
-			const workspacesMap = new Map<string, { id: string; name: string }>();
+			const workspacesMap = new Map<string, AnalyticsWorkspaceInfo>();
 			rowChannelIds.forEach((id) => {
 				const ch = channelsMeta.get(id);
 				const tenant = ch?.tenant;
 				if (tenant && !workspacesMap.has(tenant.id)) {
-					workspacesMap.set(tenant.id, {
-						id: tenant.id,
-						name: tenant.name || tenant.title,
-					});
+					workspacesMap.set(tenant.id, tenant);
 				}
 			});
 
@@ -641,6 +644,7 @@ export class RankingService {
 				totalViews: Number(r.totalViews),
 				channels,
 				workspaces: [...workspacesMap.values()],
+				video: videosMeta.get(r.releaseId) ?? null,
 				release: { coverArtThumbnails },
 			};
 		});

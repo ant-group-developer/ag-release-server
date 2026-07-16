@@ -9,6 +9,8 @@ import { EntityManager } from 'typeorm';
 import { getImportSourceLabel } from '../constants/import-source.constants';
 import { ChartQueryDto, TimelineQueryDto } from '../dto/analytics-query.dto';
 import {
+	AnalyticsChannelInfo,
+	AnalyticsWorkspaceInfo,
 	DspBarChartItem,
 	DspTimelinePeriod,
 	DspTimelineResponse,
@@ -2657,33 +2659,31 @@ export class TimelineAnalyticsService {
 			const releaseIds = rows.map((r) => r.releaseId);
 			const allChannelIds = [...new Set(rows.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
 
-			const [releasesMeta, channelsMeta] = await Promise.all([
+			const [releasesMeta, channelsMeta, videosMeta] = await Promise.all([
 				this.isrcResolverService.getReleaseMetadata(releaseIds),
 				allChannelIds.length > 0
 					? this.isrcResolverService.getChannelMetadata(allChannelIds)
 					: Promise.resolve(new Map()),
+				this.isrcResolverService.getVideoMetadataByReleaseIds(releaseIds),
 			]);
 
 			rows.forEach((r, index) => {
 				const meta = releasesMeta.get(r.releaseId);
 				const rowChannelIds = (r.channelIds ?? []).filter(Boolean);
 
-				const channels = rowChannelIds
+				const channels: AnalyticsChannelInfo[] = rowChannelIds
 					.map((id) => {
 						const ch = channelsMeta.get(id);
-						return ch ? { id, name: ch.name } : null;
+						return ch ? { id, ...ch } : null;
 					})
-					.filter((c): c is { id: string; name: string } => c !== null);
+					.filter((c): c is AnalyticsChannelInfo => c !== null);
 
-				const workspacesMap = new Map<string, { id: string; name: string }>();
+				const workspacesMap = new Map<string, AnalyticsWorkspaceInfo>();
 				rowChannelIds.forEach((id) => {
 					const ch = channelsMeta.get(id);
 					const tenant = ch?.tenant;
 					if (tenant && !workspacesMap.has(tenant.id)) {
-						workspacesMap.set(tenant.id, {
-							id: tenant.id,
-							name: tenant.name || tenant.title,
-						});
+						workspacesMap.set(tenant.id, tenant);
 					}
 				});
 
@@ -2700,6 +2700,7 @@ export class TimelineAnalyticsService {
 					quantity: Number(r.quantity),
 					channels,
 					workspaces: [...workspacesMap.values()],
+					video: videosMeta.get(r.releaseId) ?? null,
 					release: meta
 						? { coverArtThumbnails: meta.coverArtThumbnails }
 						: null,
@@ -2770,6 +2771,7 @@ export class TimelineAnalyticsService {
 						quantity: otherQty > 0 ? otherQty : 0,
 						channels: [],
 						workspaces: [],
+						video: null,
 						release: null,
 					};
 					if (query.groupBySource) {
