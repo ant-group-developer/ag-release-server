@@ -113,8 +113,15 @@ export class ReleaseQueryService {
 	async getManyAndCountOptimized(query: QueryGetListReleaseDto) {
 		const qbId = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
-		const { itemsToJoin } = this.filterByQuery({ qb: qbId, query });
-		this.smartJoinForPhase1({ qb: qbId, query, itemsToJoin });
+		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query });
+
+		if (itemsToJoin.includes('release.ciData')) {
+			qbId.leftJoinAndSelect('release.ciData', 'releaseCiData');
+		}
+		if (itemsToJoin.includes('release.releaseDspDeliveries')) {
+			qbId.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
+			qbId.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
+		}
 
 		this.applyOrderFieldSelect(qbId, query.fieldOrder as string);
 
@@ -176,47 +183,6 @@ export class ReleaseQueryService {
 			totalItems,
 			releases: sortedReleases,
 		};
-	}
-
-	private smartJoinForPhase1({
-		qb,
-		query,
-		itemsToJoin,
-	}: {
-		qb: SelectQueryBuilder<Release>;
-		query: QueryGetListReleaseDto;
-		itemsToJoin: string[];
-	}) {
-		const { keyword, artistId, channelId } = query;
-
-		const needsArtist = !!keyword || !!artistId?.length;
-		if (needsArtist) {
-			qb.leftJoin('release.releaseArtists', 'releaseArtist');
-			qb.leftJoin('releaseArtist.artist', 'artist');
-		}
-
-		const needsLabel = !!keyword;
-		if (needsLabel) {
-			qb.leftJoin('release.label', 'label');
-		}
-
-		const needsAlbumFormat = !!keyword;
-		if (needsAlbumFormat) {
-			qb.leftJoin('release.albumFormat', 'albumFormat');
-		}
-
-		const needsVideo = !!keyword || !!channelId?.length;
-		if (needsVideo) {
-			qb.leftJoin('release.video', 'video');
-		}
-
-		if (itemsToJoin.includes('release.ciData')) {
-			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
-		}
-		if (itemsToJoin.includes('release.releaseDspDeliveries')) {
-			qb.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
-			qb.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
-		}
 	}
 
 	private countDspsLiveSubQuery(subQuery: SelectQueryBuilder<any>) {
@@ -961,6 +927,342 @@ export class ReleaseQueryService {
 				'tenant.id',
 				'tenant.name',
 			]);
+		}
+
+		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
+			qb.orderBy('dsps_live_count', orderBy);
+		} else if (VirtualColumnReleaseArr.includes(fieldOrder)) {
+			qb.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			qb.orderBy(`release.${fieldOrder}`, orderBy);
+		}
+
+		qb.skip(skip).take(pageSize);
+
+		return { itemsToJoin };
+	}
+
+	private filterByQuery2({
+		qb,
+		query,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		query: QueryGetListReleaseDto;
+	}) {
+		const {
+			keyword,
+			ids,
+
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+
+			startDateRelease,
+			endDateRelease,
+
+			type,
+			albumFormatId,
+			status,
+			primaryGenreId,
+			subGenreId,
+			labelId,
+			artistId,
+			channelId,
+			isVariousArtist,
+			isImportedFromReport,
+			isEnrich,
+			hasError,
+			needsReview,
+			tenantIds,
+
+			ciDataStatus,
+			neverExported,
+			lastImportIsFailed,
+			needImportAgain,
+			hasQaFlag,
+			dspDelivery,
+
+			fieldOrder,
+			orderBy,
+
+			skip,
+			pageSize,
+		} = query;
+
+		const itemsToJoin: string[] = [];
+
+		if (
+			ciDataStatus ||
+			neverExported !== undefined ||
+			lastImportIsFailed !== undefined ||
+			needImportAgain !== undefined ||
+			hasQaFlag !== undefined
+		) {
+			itemsToJoin.push('release.ciData');
+
+			if (ciDataStatus) {
+				qb.andWhere('releaseCiData.status = :ciDataStatus', {
+					ciDataStatus,
+				});
+			}
+
+			if (neverExported !== undefined) {
+				const neverExportedCondition = `
+						(
+							"releaseCiData"."export_parsed_data" IS NULL
+							OR jsonb_array_length("releaseCiData"."export_parsed_data") = 0
+						)
+					`;
+
+				qb.andWhere(
+					neverExported
+						? neverExportedCondition
+						: `NOT ${neverExportedCondition}`,
+				);
+			}
+
+			if (lastImportIsFailed !== undefined) {
+				const lastImportIsFailedCondition = `
+					coalesce("releaseCiData"."import_parsed_data" ->> 'status', '') = :failedImportStatus
+				`;
+
+				qb.andWhere(
+					lastImportIsFailed
+						? lastImportIsFailedCondition
+						: `NOT (${lastImportIsFailedCondition})`,
+					{ failedImportStatus: 'problem' },
+				);
+			}
+
+			if (needImportAgain !== undefined) {
+				qb.andWhere(
+					`"releaseCiData"."need_import_again" = :needImportAgain`,
+					{ needImportAgain },
+				);
+			}
+
+			if (hasQaFlag !== undefined) {
+				const hasQaFlagCondition = `
+					COALESCE(jsonb_array_length("releaseCiData"."qa_flags_ci"), 0) > 0
+				`;
+
+				qb.andWhere(
+					hasQaFlag
+						? hasQaFlagCondition
+						: `(
+							"releaseCiData"."id" IS NULL
+							OR NOT (${hasQaFlagCondition})
+						)`,
+				);
+			}
+		}
+
+		const dspDeliveryInclude = (dspDelivery?.include ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+		const dspDeliveryExclude = (dspDelivery?.exclude ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+
+		if (dspDeliveryExclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryExclude,
+					prefix: 'excludeDspDelivery',
+					deliveryAlias: 'excludeDspDeliveryFilter',
+					dspAlias: 'excludeDspFilter',
+				});
+
+			qb.andWhere(`NOT ${condition}`, parameters);
+		}
+
+		if (dspDeliveryInclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryInclude,
+					prefix: 'includeDspDelivery',
+					deliveryAlias: 'includeDspDeliveryFilter',
+					dspAlias: 'includeDspFilter',
+				});
+
+			qb.andWhere(condition, parameters);
+		}
+
+		if (ids && ids.length > 0) {
+			qb.andWhere(`release.id IN (:...ids)`, { ids });
+		}
+
+		if (keyword) {
+			qb.andWhere(
+				new Brackets((qbInner) => {
+					qbInner.where('release.title ILIKE :keyword')
+						.orWhere('release.upc ILIKE :keyword')
+						.orWhere(`release.album_format_id IN (
+							SELECT albumFormatFilter.id FROM album_formats albumFormatFilter
+							WHERE albumFormatFilter.name ILIKE :keyword
+						)`)
+						.orWhere(`release.label_id IN (
+							SELECT labelFilter.id FROM labels labelFilter
+							WHERE labelFilter.name ILIKE :keyword
+						)`)
+						.orWhere(`release.id IN (
+							SELECT releaseArtistFilter.release_id FROM release_artist releaseArtistFilter
+							JOIN artists artistFilter ON artistFilter.id = releaseArtistFilter.artist_id
+							WHERE artistFilter.name ILIKE :keyword
+						)`)
+						.orWhere(`release.id IN (
+							SELECT videoFilter.release_id FROM videos videoFilter
+							WHERE videoFilter.isrc ILIKE :keyword
+						)`);
+				}),
+				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`release.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			qb.andWhere(
+				`release.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{
+					startUpdatedAt,
+					endUpdatedAt,
+				},
+			);
+		}
+
+		if (startDateRelease && endDateRelease) {
+			qb.andWhere(
+				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
+				{
+					startDateRelease,
+					endDateRelease,
+				},
+			);
+		}
+
+		if (albumFormatId?.length) {
+			qb.andWhere('release.albumFormatId IN (:...albumFormatId)', {
+				albumFormatId,
+			});
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
+		}
+
+		if (primaryGenreId?.length) {
+			qb.andWhere('release.primaryGenreId IN (:...primaryGenreId)', {
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId?.length) {
+			qb.andWhere('release.subGenreId IN (:...subGenreId)', {
+				subGenreId,
+			});
+		}
+
+		if (labelId?.length) {
+			qb.andWhere('release.labelId IN (:...labelId)', {
+				labelId,
+			});
+		}
+
+		if (artistId?.length) {
+			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
+				artistId,
+			});
+		}
+
+		if (channelId?.length) {
+			qb.andWhere('video.channelId IN (:...channelId)', {
+				channelId,
+			});
+		}
+
+		if (status?.length) {
+			qb.andWhere('release.status IN (:...status)', {
+				status,
+			});
+		}
+
+		if (isVariousArtist !== undefined) {
+			qb.andWhere('release.isVariousArtist = :isVariousArtist', {
+				isVariousArtist,
+			});
+		}
+
+		if (isImportedFromReport !== undefined) {
+			qb.andWhere(
+				'release.isImportedFromReport = :isImportedFromReport',
+				{ isImportedFromReport },
+			);
+		}
+
+		if (isEnrich !== undefined) {
+			const enrichExistsCondition = `EXISTS (
+				SELECT 1 FROM release_enrichments releaseEnrichmentFilter
+				WHERE releaseEnrichmentFilter.release_id = release.id
+				AND releaseEnrichmentFilter.status = :successfulEnrichmentStatus
+			)`;
+
+			qb.andWhere(
+				isEnrich ? enrichExistsCondition : `NOT ${enrichExistsCondition}`,
+				{ successfulEnrichmentStatus: ReleaseEnrichmentStatus.SUCCESS },
+			);
+		}
+
+		if (hasError !== undefined) {
+			const openErrorCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_errors releaseErrorFilter
+					WHERE releaseErrorFilter.release_id = release.id
+					AND releaseErrorFilter.submission_status = :openSubmissionStatus
+				)
+			`;
+
+			qb.andWhere(
+				hasError ? openErrorCondition : `NOT ${openErrorCondition}`,
+				{ openSubmissionStatus: ErrorSubmissionStatus.OPEN },
+			);
+		}
+
+		if (needsReview !== undefined) {
+			const reviewCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_reviews releaseReviewFilter
+					WHERE releaseReviewFilter.release_id = release.id
+					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+				)
+			`;
+
+			qb.andWhere(
+				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
+				{
+					pendingReviewStatuses: [
+						ReleaseReviewStatus.PENDING,
+						ReleaseReviewStatus.PROCESSING,
+					],
+				},
+			);
+		}
+
+		if (tenantIds?.length) {
+			qb.andWhere('release.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
 		}
 
 		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
