@@ -79,8 +79,8 @@ export class UpdateBackupDatabaseDto {
 	fileName: string;
 
 	@IsString()
-	@IsNotEmpty()
-	shell: string;
+	@IsOptional()
+	shell?: string;
 
 	@IsBoolean()
 	notifyOnFailed: boolean;
