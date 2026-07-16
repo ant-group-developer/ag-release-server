@@ -19,16 +19,17 @@ Theo section 9 — mỗi port 1 adapter:
 
 ## Entry / Exit
 
-- **Entry:** port interface ổn định (phase 1).
+- **Entry:** port interface ổn định (phase 1). Test double in-memory đã có sẵn từ Phase 2 (`infrastructure/test-doubles/`) — Phase 4 thay dần bằng adapter thật, giữ nguyên test double cho unit/integration test.
 - **Exit:** adapter thật chạy được với hệ ngoài (staging); test double phủ đủ cho test không cần hạ tầng.
 
 ## Todo (thô)
 
 - [ ] Reuse code SFTP/CI/gRPC hiện có, bọc lại sau port
 - [ ] Timeout + retry mỗi external call
-- [ ] Test double in-memory từng port
-- [ ] Idempotency check trong adapter (đã làm chưa?)
+- [ ] Idempotency check trong adapter ("đã làm chưa?" — lớp 2 idempotency, xem Phase 2 guide §3)
+- [ ] Wire adapter thật thay test double trong module (DI token theo port)
 
 ## Câu hỏi mở
 
 - Tái dùng bao nhiêu code integration v3 hiện tại? → khảo sát khi tới.
+- 9 port đã cố định chữ ký ở Phase 1; adapter chỉ implement, KHÔNG đổi interface. Nếu cần đổi interface → quay lại domain (hiếm).

@@ -15,9 +15,15 @@ Khi khối lượng/độ phức tạp vượt ngưỡng BullMQ thoải mái, sw
 
 ## Scope (thô)
 
-- `TemporalWorkflowAdapter` implement `WorkflowEnginePort`.
-- Map state machine hiện có sang Temporal workflow (giữ nguyên domain).
+- `TemporalWorkflowAdapter` implement `WorkflowEnginePort` (port đã có từ Phase 2).
+- Map "thực thi bước + chờ + retry" sang Temporal workflow (giữ nguyên domain + interpreter).
 - Migrate dần hoặc chạy song song theo loại execution.
+
+## Lưu ý trục port (từ quyết định Phase 2)
+
+`WorkflowEnginePort` chỉ bảo hiểm trục **thực-thi-bước** (BullMQ ↔ Temporal). Nó KHÔNG bảo hiểm trục **quyết-state** (domain interpreter ↔ XState). Hai trục khác nhau:
+- Đổi engine (Phase 6) = thay adapter sau `WorkflowEnginePort` → domain không đổi.
+- Nếu tương lai muốn XState làm state machine = cần một `StateMachinePort` RIÊNG, và đây vẫn là YAGNI cho tới khi có bằng chứng cần (xem `phase-02-bullmq-engine.md` §"đường lùi XState").
 
 ## Entry / Exit
 
