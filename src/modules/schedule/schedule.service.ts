@@ -1,5 +1,4 @@
-// schedule.service.ts
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
@@ -10,7 +9,7 @@ import { DspReportService } from '../dsp-report/services/dsp-report.service';
 import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
 
 @Injectable()
-export class ScheduleService implements OnModuleInit {
+export class ScheduleService implements OnApplicationBootstrap {
 	private readonly logger = new Logger(ScheduleService.name);
 
 	constructor(
@@ -22,7 +21,15 @@ export class ScheduleService implements OnModuleInit {
 		private readonly dspReportService: DspReportService,
 	) {}
 
-	onModuleInit() {
+	onApplicationBootstrap() {
+		if (process.env.APP_ROLE !== 'worker') {
+			const jobs = this.schedulerRegistry.getCronJobs();
+			for (const name of jobs.keys()) {
+				this.schedulerRegistry.deleteCronJob(name); // Dừng và xóa
+			}
+			return;
+		}
+
 		this.reloadConfig();
 
 		// Startup backfill: đảm bảo dsp_report_stats có data ngay sau khi migrate.
