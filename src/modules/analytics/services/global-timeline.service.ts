@@ -34,6 +34,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -1366,29 +1367,24 @@ export class TimelineAnalyticsService {
 			isrc: string;
 			revenue_usd: string;
 			quantity: string;
+			trackTitle: string;
+			trackVersion: string;
+			releaseId: string;
+			releaseTitle: string;
+			labelId: string;
+			labelName: string;
+			artistNames: string[];
+			trackMetadataSpotify: string;
+			trackMetadataDeezer: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(sql, params);
 
 		const items: RevenueTrackItem[] = [];
 
 		if (rows.length > 0) {
-			const topIsrcs = rows.map((r) => r.isrc);
-
-			const [metadataMap, artistMappings] = await Promise.all([
-				this.isrcResolverService.getTrackMetadataMap(topIsrcs),
-				this.isrcResolverService.getIsrcArtistMappings(topIsrcs),
-			]);
-
-			const artistNameMap = new Map<string, string>();
-			for (const m of artistMappings) {
-				const cur = artistNameMap.get(m.isrc);
-				artistNameMap.set(
-					m.isrc,
-					cur ? `${cur}, ${m.artistName}` : m.artistName,
-				);
-			}
-
 			const missingIsrcs = isSystem
-				? topIsrcs.filter((isrc) => !metadataMap.has(isrc))
+				? rows.filter((row) => !row.trackTitle).map((row) => row.isrc)
 				: [];
 
 			const fallbackMap = new Map<
@@ -1412,20 +1408,33 @@ export class TimelineAnalyticsService {
 			}
 
 			rows.forEach((r, index) => {
-				const meta = metadataMap.get(r.isrc);
 				const fallback = fallbackMap.get(r.isrc);
+				const artistNames = Array.isArray(r.artistNames) ? r.artistNames : [];
 				items.push({
 					rank: offset + index + 1,
 					isrc: r.isrc,
-					title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
-					version: meta?.trackVersion ?? null,
-					artistName:
-						artistNameMap.get(r.isrc) ?? fallback?.artistName ?? '',
-					releaseId: meta?.releaseId ?? null,
-					releaseTitle: meta?.releaseTitle ?? null,
+					title: r.trackTitle || fallback?.trackTitle || '',
+					version: r.trackVersion || null,
+					artistName: artistNames.join(', ') || fallback?.artistName || '',
+					releaseId: r.releaseId || null,
+					releaseTitle: r.releaseTitle || null,
+					labelId: r.labelId || null,
+					labelName: r.labelName || null,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
+					metadataExternal: normalizeSyncedMetadataExternal(
+						r.trackMetadataSpotify,
+						r.trackMetadataDeezer,
+					),
+					release: r.releaseId
+						? {
+								metadataExternal: normalizeSyncedMetadataExternal(
+									r.releaseMetadataSpotify,
+									r.releaseMetadataDeezer,
+								),
+							}
+						: null,
 				});
 			});
 
@@ -1495,9 +1504,13 @@ export class TimelineAnalyticsService {
 						artistName: '',
 						releaseId: null,
 						releaseTitle: null,
+						labelId: null,
+						labelName: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
+						metadataExternal: {},
+						release: null,
 					};
 					if (query.groupBySource) {
 						const topIsrcs = items
@@ -2445,32 +2458,49 @@ export class TimelineAnalyticsService {
 			releaseId: string;
 			revenue_usd: string;
 			quantity: string;
+			trackCount: string;
+			releaseTitle: string;
+			releaseUpc: string;
+			labelId: string;
+			labelName: string;
+			cover75: string;
+			cover100: string;
+			cover160: string;
+			cover300: string;
+			coverOriginal: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(sql, params);
 
 		const items: RevenueReleaseItem[] = [];
 		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		if (rows.length > 0) {
-			const releaseIds = rows.map((r) => r.releaseId);
-			const releasesMeta =
-				await this.isrcResolverService.getReleaseMetadata(releaseIds);
-
 			rows.forEach((r, index) => {
-				const meta = releasesMeta.get(r.releaseId);
 				items.push({
 					rank: offset + index + 1,
 					releaseId: r.releaseId,
-					title: meta?.title ?? 'Unknown Release',
-					upc: meta?.upc ?? null,
-					labelId: meta?.labelId ?? null,
-					labelName: meta?.labelName ?? null,
-					trackCount: meta?.trackCount ?? 0,
+					title: r.releaseTitle || 'Unknown Release',
+					upc: r.releaseUpc || null,
+					labelId: r.labelId || null,
+					labelName: r.labelName || null,
+					trackCount: Number(r.trackCount),
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
-					release: meta
-						? { coverArtThumbnails: meta.coverArtThumbnails }
-						: null,
+					metadataExternal: normalizeSyncedMetadataExternal(
+						r.releaseMetadataSpotify,
+						r.releaseMetadataDeezer,
+					),
+					release: {
+						coverArtThumbnails: {
+							'75x75': r.cover75 || null,
+							'100x100': r.cover100 || null,
+							'160x160': r.cover160 || null,
+							'300x300': r.cover300 || null,
+							original: r.coverOriginal || null,
+						},
+					},
 				});
 			});
 
@@ -2541,6 +2571,7 @@ export class TimelineAnalyticsService {
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
+						metadataExternal: {},
 						release: null,
 					};
 					if (query.groupBySource) {

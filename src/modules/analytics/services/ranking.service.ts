@@ -22,6 +22,7 @@ import {
 } from '../interfaces/analytics.interface';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 
 /**
  * Service xếp hạng hiệu năng (Rankings) cho Tracks, Releases, Artists, Labels.
@@ -210,12 +211,18 @@ export class RankingService {
         any(t.track_version) AS trackVersion,
         any(t.release_id) AS releaseId,
         any(t.release_title) AS releaseTitle,
+        any(t.label_id) AS labelId,
+        any(t.label_name) AS labelName,
         any(t.artist_names) AS artistNames,
         any(t.cover_75) AS cover75,
         any(t.cover_100) AS cover100,
         any(t.cover_160) AS cover160,
         any(t.cover_300) AS cover300,
-        any(t.cover_original) AS coverOriginal
+        any(t.cover_original) AS coverOriginal,
+        any(t.track_metadata_spotify) AS trackMetadataSpotify,
+        any(t.track_metadata_deezer) AS trackMetadataDeezer,
+        any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+        any(t.release_metadata_deezer) AS releaseMetadataDeezer
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
@@ -235,12 +242,18 @@ export class RankingService {
 			trackVersion: string;
 			releaseId: string;
 			releaseTitle: string;
+			labelId: string;
+			labelName: string;
 			artistNames: string[];
 			cover75: string;
 			cover100: string;
 			cover160: string;
 			cover300: string;
 			coverOriginal: string;
+			trackMetadataSpotify: string;
+			trackMetadataDeezer: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(dataSql, params);
 
 		// Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse fact table
@@ -303,8 +316,20 @@ export class RankingService {
 				artistName,
 				releaseId: row.releaseId || '',
 				releaseTitle: row.releaseTitle || fallback?.albumTitle || '',
+				labelId: row.labelId || null,
+				labelName: row.labelName || null,
 				totalViews: Number(row.totalViews),
-				release: { coverArtThumbnails },
+				metadataExternal: normalizeSyncedMetadataExternal(
+					row.trackMetadataSpotify,
+					row.trackMetadataDeezer,
+				),
+				release: {
+					coverArtThumbnails,
+					metadataExternal: normalizeSyncedMetadataExternal(
+						row.releaseMetadataSpotify,
+						row.releaseMetadataDeezer,
+					),
+				},
 			};
 		});
 
@@ -413,7 +438,9 @@ export class RankingService {
         any(t.cover_100) AS cover100,
         any(t.cover_160) AS cover160,
         any(t.cover_300) AS cover300,
-        any(t.cover_original) AS coverOriginal
+        any(t.cover_original) AS coverOriginal,
+        any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+        any(t.release_metadata_deezer) AS releaseMetadataDeezer
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
@@ -439,6 +466,8 @@ export class RankingService {
 			cover160: string;
 			cover300: string;
 			coverOriginal: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(dataSql, params);
 
 		const items: ReleaseRankingItem[] = paged.map((r, index) => {
@@ -458,6 +487,10 @@ export class RankingService {
 				labelName: r.labelName || null,
 				trackCount: Number(r.trackCount),
 				totalViews: Number(r.totalViews),
+				metadataExternal: normalizeSyncedMetadataExternal(
+					r.releaseMetadataSpotify,
+					r.releaseMetadataDeezer,
+				),
 				release: { coverArtThumbnails },
 			};
 		});

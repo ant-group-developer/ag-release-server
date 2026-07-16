@@ -155,10 +155,14 @@ export interface TrackRankingItem {
 	artistName: string;
 	releaseId: string;
 	releaseTitle: string;
+	labelId: string | null;
+	labelName: string | null;
 	totalViews: number;
+	metadataExternal: Record<string, unknown>;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
+		metadataExternal: Record<string, unknown>;
 	} | null;
 }
 
@@ -171,6 +175,7 @@ export interface ReleaseRankingItem {
 	labelName: string | null;
 	trackCount: number;
 	totalViews: number;
+	metadataExternal: Record<string, unknown>;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
@@ -286,10 +291,16 @@ export interface RevenueTrackItem {
 	artistName: string;
 	releaseId: string | null;
 	releaseTitle: string | null;
+	labelId: string | null;
+	labelName: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+	metadataExternal: Record<string, unknown>;
 	bySource?: SourceBreakdownItem[];
+	release: {
+		metadataExternal: Record<string, unknown>;
+	} | null;
 }
 
 export type RevenueTopTrackResponse = RevenueTrackItem[];
@@ -436,6 +447,7 @@ export interface RevenueReleaseItem {
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+	metadataExternal: Record<string, unknown>;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
