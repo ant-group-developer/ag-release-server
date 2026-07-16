@@ -140,6 +140,23 @@ export interface ReleaseRankingItem {
 	} | null;
 }
 
+export interface ReleaseRankingVideoItem {
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	totalViews: number;
+	channels: Array<{ id: string; name: string }>;
+	workspaces: Array<{ id: string; name: string }>;
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
+}
+
 export interface ArtistRankingItem {
 	rank: number;
 	artistId: string;
@@ -381,6 +398,25 @@ export interface RevenueReleaseItem {
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
+}
+
+export interface RevenueReleaseVideoItem {
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	channels: Array<{ id: string; name: string }>;
+	workspaces: Array<{ id: string; name: string }>;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;

@@ -35,4 +35,9 @@ export const TenantDomainMessages = {
 		message: 'Your account does not have access to this workspace',
 		messageCode: 'auth.domain_restricted',
 	},
+	WHITE_LABEL_ONLY: {
+		statusCode: 403,
+		message: 'Custom domains are only available for white-label tenants',
+		messageCode: 'tenant_domain.error.whiteLabelOnly',
+	},
 };
