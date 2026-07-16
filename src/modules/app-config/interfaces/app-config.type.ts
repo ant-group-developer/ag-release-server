@@ -26,7 +26,7 @@ export interface BackupDatabase {
 
 	// config
 	fileName: string;
-	shell: string;
+	shell?: string;
 
 	// Thông báo kết quả backup
 	notifyOnFailed: boolean;

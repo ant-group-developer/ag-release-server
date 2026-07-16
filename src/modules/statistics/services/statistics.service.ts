@@ -136,16 +136,18 @@ export class StatisticsService {
 
 	async getReleasesCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const releaseType = (filter as QueryGetOverviewCountDto).releaseType;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),
 		};
 		if (tenantId) {
 			where.tenantId = tenantId;
 		}
+		if (releaseType) {
+			where.type = releaseType;
+		}
 
-		return await this.releaseRepo.count({
-			where,
-		});
+		return await this.releaseRepo.count({ where });
 	}
 
 	async getReleasesImportCount(
@@ -153,6 +155,7 @@ export class StatisticsService {
 		tenantId?: string,
 	) {
 		const { startDate, endDate } = filter;
+		const releaseType = (filter as QueryGetOverviewCountDto).releaseType;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),
 			isImportedFromReport: true,
@@ -160,24 +163,27 @@ export class StatisticsService {
 		if (tenantId) {
 			where.tenantId = tenantId;
 		}
+		if (releaseType) {
+			where.type = releaseType;
+		}
 
-		return await this.releaseRepo.count({
-			where,
-		});
+		return await this.releaseRepo.count({ where });
 	}
 
 	async getTracksCount(filter: BaseQueryStatisticsDto, tenantId?: string) {
 		const { startDate, endDate } = filter;
+		const releaseType = (filter as QueryGetOverviewCountDto).releaseType;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),
 		};
-		if (tenantId) {
-			where.release = { tenantId };
+		const releaseWhere: any = {};
+		if (tenantId) releaseWhere.tenantId = tenantId;
+		if (releaseType) releaseWhere.type = releaseType;
+		if (Object.keys(releaseWhere).length > 0) {
+			where.release = releaseWhere;
 		}
 
-		return await this.trackRepo.count({
-			where,
-		});
+		return await this.trackRepo.count({ where });
 	}
 
 	async getTracksImportCount(
@@ -185,17 +191,19 @@ export class StatisticsService {
 		tenantId?: string,
 	) {
 		const { startDate, endDate } = filter;
+		const releaseType = (filter as QueryGetOverviewCountDto).releaseType;
 		const where: any = {
 			...this.buildDateFilter({ startDate, endDate }),
 			isImportedFromReport: true,
 		};
-		if (tenantId) {
-			where.release = { tenantId };
+		const releaseWhere: any = {};
+		if (tenantId) releaseWhere.tenantId = tenantId;
+		if (releaseType) releaseWhere.type = releaseType;
+		if (Object.keys(releaseWhere).length > 0) {
+			where.release = releaseWhere;
 		}
 
-		return await this.trackRepo.count({
-			where,
-		});
+		return await this.trackRepo.count({ where });
 	}
 
 	async getLabelsCount(filter: BaseQueryStatisticsDto, tenantId?: string) {

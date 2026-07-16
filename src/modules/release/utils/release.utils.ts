@@ -69,3 +69,7 @@ function omitTrackLinks(metadata: unknown): unknown {
 
 	return rest;
 }
+
+export function parseJson<T>(val: any): T {
+	return typeof val === 'string' ? JSON.parse(val) : val || [];
+}

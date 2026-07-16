@@ -65,6 +65,8 @@ VALUES
   ('Tenant Tier Creator','Create tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.creator', false),
   ('Tenant Tier Editor','Edit tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.editor', false),
   ('Tenant Tier Viewer','Read-only access to tenant tiers.','#D946EF', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'tenant_tier.viewer', false),
+  -- Workspace Presets
+  ('Workspace Member','Can read workspace, users, dashboard, analytics, revenue, channels; create/update artists, labels, audio/video releases; create/fix release reviews; scan tracks.','#64748B', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'workspace.member', true),
   -- Track
   ('Track Admin','Full control over tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.admin', false),
   ('Track Creator','Create tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.creator', false),
@@ -72,6 +74,7 @@ VALUES
   ('Track Viewer','Read-only access to tracks.','#10B981', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'track.viewer', true),
   -- User
   ('User Admin','Full control over users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.admin', false),
+  ('User Inviter','Invite users to tenants.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.inviter', false),
   ('User Creator','Create users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.creator', false),
   ('User Editor','Edit users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.editor', false),
   ('User Viewer','Read-only access to users.','#6366F1', '8554043d-a902-43fe-b4c4-40a22b93dfe2', '8554043d-a902-43fe-b4c4-40a22b93dfe2', 'user.viewer', true),
@@ -84,3 +87,4 @@ ON CONFLICT ("name") DO UPDATE SET
   note  = EXCLUDED.note,
   color = EXCLUDED.color,
   is_default = EXCLUDED.is_default;
+

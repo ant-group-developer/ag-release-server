@@ -57,7 +57,7 @@ import { ReleaseService } from '../services/release.service';
 @ApiTags('Releases')
 @Controller('releases')
 export class ReleaseController {
-	constructor(private readonly releaseService: ReleaseService) {}
+	constructor(private readonly releaseService: ReleaseService) { }
 
 	@ApiOperation({ summary: 'Get paginated release list' })
 	@ApiResponse({ status: 200, type: ResponseSuccess })
@@ -88,7 +88,7 @@ export class ReleaseController {
 			query.tenantIds = [tenantId];
 		}
 
-		const result = await this.releaseService.getList(query);
+		const result = await this.releaseService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 
@@ -186,7 +186,7 @@ export class ReleaseController {
 		// await
 		this.releaseService
 			.autoSubmitUndistributedMusicReleases(dto)
-			.catch((error) => {});
+			.catch((error) => { });
 
 		return new ResponseSuccess({});
 	}

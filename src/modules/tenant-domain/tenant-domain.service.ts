@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'crypto';
 import {
@@ -9,6 +9,7 @@ import {
 import { Repository } from 'typeorm';
 import { ResponseError } from '../../common/dtos/common.response.dto';
 import { Tenant } from '../tenant/tenant.entity';
+import { TenantType } from '../tenant/tenant.enum';
 import {
 	CfOAuthError,
 	CloudflareDnsOAuthService,
@@ -119,6 +120,14 @@ export class TenantDomainService {
 	): Promise<{ domain: TenantDomain; dnsInstructions: DnsInstructions }> {
 		const normalizedDomain = normalizeDomain(domain);
 		this.validateDomainFormat(normalizedDomain);
+
+		const tenant = await this.tenantRepo.findOne({
+			where: { id: tenantId },
+			select: ['id', 'type'],
+		});
+		if (tenant?.type !== TenantType.WHITE_LABEL) {
+			throw new ResponseError(TenantDomainMessages.WHITE_LABEL_ONLY);
+		}
 
 		const existing = await this.repo.findOne({ where: { tenantId } });
 		if (existing) {

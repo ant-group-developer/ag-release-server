@@ -2,10 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { execFile } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { DateFormat } from 'src/common/enums/common';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
+import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { generateFileNameWithTimestamp } from 'src/utils/util.date';
 import { Repository } from 'typeorm';
@@ -26,6 +28,7 @@ export class DatabaseBackupService {
 		private readonly appConfigService: AppConfigService,
 		private readonly configService: ConfigService,
 		private readonly notificationService: NotificationService,
+		private readonly bucketR2Service: BucketR2Service,
 	) {}
 
 	async eventBackup() {
@@ -68,7 +71,7 @@ export class DatabaseBackupService {
 		entityBackup: Backup;
 	}) {
 		const { fileSize, status, error } =
-			await this.runScriptBackup(backupPath);
+			await this.runScriptBackupV2(backupPath);
 
 		entityBackup.status = status;
 		entityBackup.fileSize = fileSize;
@@ -175,6 +178,82 @@ export class DatabaseBackupService {
 				status: StatusBackup.FAILED,
 				fileSize: 0,
 				error: JSON.stringify(error),
+			};
+		}
+	}
+
+	private async runScriptBackupV2(backupPath: string) {
+		const backupDir = path.dirname(backupPath);
+		if (!fs.existsSync(backupDir)) {
+			fs.mkdirSync(backupDir, { recursive: true });
+		}
+		// Đọc cấu hình kết nối database từ config service
+		const username = this.configService.get<string>('DB_USERNAME')!;
+		const host = this.configService.get<string>('DB_HOST')!;
+		const port = this.configService.get<number>('DB_PORT') || 5432;
+		const database = this.configService.get<string>('DB_DATABASE')!;
+		const password = this.configService.get<string>('DB_PASSWORD')!;
+		try {
+			// 1. Thực hiện dump dữ liệu bằng pg_dump trực tiếp thông qua execFile
+			await execFileAsync(
+				'pg_dump',
+				[
+					'-F',
+					'c',
+					'-U',
+					username,
+					'-h',
+					host,
+					'-p',
+					String(port),
+					'-f',
+					backupPath,
+					database,
+				],
+				{
+					env: {
+						...process.env,
+						PGPASSWORD: password,
+					},
+				},
+			);
+			// 2. Lấy kích thước file backup
+			const stats = await fs.promises.stat(backupPath);
+			const fileSize = stats.size;
+			// 3. Tải file lên Cloudflare R2 sử dụng BucketR2Service
+			const fileName = path.basename(backupPath);
+			await this.bucketR2Service.uploadFileFromPath({
+				key: `backups/${fileName}`,
+				filePath: backupPath,
+				contentType: 'application/octet-stream',
+				isPublic: false,
+			});
+			// 4. Xóa file backup tạm thời trên server cục bộ
+			await fs.promises.unlink(backupPath);
+			return {
+				status: StatusBackup.SUCCESS,
+				fileSize,
+				error: null,
+			};
+		} catch (error) {
+			this.logger.error('Database backup error details:', error);
+			// Đảm bảo dọn dẹp file tạm trên server nếu phát sinh lỗi
+			if (fs.existsSync(backupPath)) {
+				try {
+					await fs.promises.unlink(backupPath);
+				} catch (unlinkError) {
+					this.logger.warn(
+						`Failed to delete temporary backup file: ${backupPath}`,
+					);
+				}
+			}
+			return {
+				status: StatusBackup.FAILED,
+				fileSize: 0,
+				error:
+					error instanceof Error
+						? error.message
+						: JSON.stringify(error),
 			};
 		}
 	}
