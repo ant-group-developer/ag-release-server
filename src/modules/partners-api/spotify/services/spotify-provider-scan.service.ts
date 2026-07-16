@@ -315,14 +315,21 @@ export class SpotifyProviderScanService {
 
 		const { effectiveData, availability, deliveries } = catalog;
 
+		const resolvedAlbumUri = effectiveData.uri || albumUri;
+		const resolvedAlbumUrl = effectiveData.url || null;
+		// Extract bare albumId from "spotify:album:<id>"
+		const albumId = resolvedAlbumUri.startsWith('spotify:album:')
+			? resolvedAlbumUri.replace('spotify:album:', '')
+			: null;
+
 		const savedCatalog = await this.catalogRepo
 			.createQueryBuilder()
 			.insert()
 			.into(SpotifyCatalog)
 			.values({
 				releaseId,
-				albumUri: effectiveData.uri || albumUri,
-				albumUrl: effectiveData.url || null,
+				albumUri: resolvedAlbumUri,
+				albumUrl: resolvedAlbumUrl,
 				artists: effectiveData.artists?.length ? effectiveData.artists : null,
 				syncedAt: new Date(),
 			})
@@ -331,6 +338,21 @@ export class SpotifyProviderScanService {
 				['release_id'],
 			)
 			.returning(['id'])
+			.execute();
+
+		// Update releases.metadata_spotify with albumId + albumUrl
+		await this.releaseRepo
+			.createQueryBuilder()
+			.update()
+			.set({
+				metadataSpotify: () =>
+					`COALESCE(metadata_spotify, '{}')::jsonb || '${JSON.stringify({
+						albumId,
+						albumUrl: resolvedAlbumUrl,
+						lastSyncedAt: new Date().toISOString(),
+					})}'::jsonb`,
+			})
+			.where('id = :releaseId', { releaseId })
 			.execute();
 
 		const catalogId: string | undefined =
