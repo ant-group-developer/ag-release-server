@@ -21,6 +21,7 @@ import { SpotifyCatalog } from './entities/spotify-catalog.entity';
 import { SpotifyCatalogDelivery } from './entities/spotify-catalog-delivery.entity';
 import { SpotifySonarDelivery } from './entities/spotify-sonar-delivery.entity';
 import { SpotifySonarScanSchedule } from './entities/spotify-sonar-scan-schedule.entity';
+import { SpotifySonarScanSession } from './entities/spotify-sonar-scan-session.entity';
 import { DeezerEnrichmentService } from './services/deezer-enrichment.service';
 import { EnrichEventsGateway } from './services/enrich-events.gateway';
 import { LocalEnrichmentService } from './services/local-enrichment.service';
@@ -28,6 +29,7 @@ import { MetadataEnrichmentService } from './services/metadata-enrichment.servic
 import { MetadataScanScheduleService } from './services/metadata-scan-schedule.service';
 import { MetadataScanService } from './services/metadata-scan.service';
 import { MetadataSyncService } from './services/metadata-sync.service';
+import { SonarEventsGateway } from './services/sonar-events.gateway';
 import { SpotifyEnrichmentService } from './services/spotify-enrichment.service';
 import { SpotifyProviderApiService } from './services/spotify-provider-api.service';
 import { SpotifyProviderScanService } from './services/spotify-provider-scan.service';
@@ -58,6 +60,7 @@ import { SpotifyService2 } from './services/spotify2.service';
 			SpotifyCatalogAvailability,
 			SpotifyCatalogDelivery,
 			SpotifySonarScanSchedule,
+			SpotifySonarScanSession,
 		]),
 	],
 	controllers: [SpotifyController, SpotifySonarController],
@@ -72,6 +75,7 @@ import { SpotifyService2 } from './services/spotify2.service';
 		MetadataScanService,
 		MetadataScanScheduleService,
 		EnrichEventsGateway,
+		SonarEventsGateway,
 		SpotifyProviderTokenService,
 		SpotifyProviderApiService,
 		SpotifyProviderScanService,
@@ -88,6 +92,7 @@ import { SpotifyService2 } from './services/spotify2.service';
 		MetadataScanService,
 		MetadataScanScheduleService,
 		EnrichEventsGateway,
+		SonarEventsGateway,
 		SpotifyProviderTokenService,
 		SpotifyProviderApiService,
 		SpotifyProviderScanService,

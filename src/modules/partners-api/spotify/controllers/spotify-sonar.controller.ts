@@ -3,13 +3,19 @@ import {
 	Controller,
 	Delete,
 	Get,
+	Header,
 	Logger,
+	MessageEvent,
+	NotFoundException,
 	Param,
 	Post,
 	Put,
 	Query,
+	Sse,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Observable, concat, from, interval, merge, of } from 'rxjs';
+import { map, switchMap, takeWhile } from 'rxjs/operators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import {
@@ -18,6 +24,7 @@ import {
 } from '../dtos/spotify-sonar-schedule.dto';
 import { SpotifySonarScheduleService } from '../services/spotify-sonar-schedule.service';
 import { SpotifyProviderScanService } from '../services/spotify-provider-scan.service';
+import { SonarEventsGateway } from '../services/sonar-events.gateway';
 
 @ApiTags('Partners API')
 @ApiBearerAuth('token')
@@ -28,6 +35,7 @@ export class SpotifySonarController {
 	constructor(
 		private readonly scanService: SpotifyProviderScanService,
 		private readonly scheduleService: SpotifySonarScheduleService,
+		private readonly sonarEvents: SonarEventsGateway,
 	) {}
 
 	@Get('releases/:releaseId/deliveries')
@@ -56,24 +64,104 @@ export class SpotifySonarController {
 		const isForce = force === 'true';
 		const parsedIsImportedFromReport = this.parseOptionalBoolean(isImportedFromReport);
 
+		// Create session first so we can return scanId immediately
+		const { scanId } = await this.scanService.createSession({
+			force: isForce,
+			limitCount: parsedLimit ?? null,
+			isImportedFromReport: parsedIsImportedFromReport ?? null,
+		});
+
+		// Fire scan in background
 		this.scanService
-			.scanAll({
-				limit: parsedLimit,
-				force: isForce,
-				isImportedFromReport: parsedIsImportedFromReport,
-			})
+			.scanAll({ scanId, limit: parsedLimit, force: isForce, isImportedFromReport: parsedIsImportedFromReport })
 			.catch((err: Error) => {
 				this.logger.error(`Background Spotify Sonar scan failed: ${err.message}`, err.stack);
 			});
 
 		return new ResponseSuccess({
 			data: {
+				scanId,
 				message: 'Spotify Sonar scan started in background',
 				limit: parsedLimit,
 				force: isForce,
 				isImportedFromReport: parsedIsImportedFromReport,
 			},
 		});
+	}
+
+	@Sse('scan/:scanId/events')
+	@SystemAdminOnly()
+	@Header('Cache-Control', 'no-cache, no-transform')
+	@Header('Connection', 'keep-alive')
+	@Header('X-Accel-Buffering', 'no')
+	@ApiOperation({ summary: 'SSE stream tiến độ Sonar scan theo scanId' })
+	streamScanEvents(@Param('scanId') scanId: string): Observable<MessageEvent> {
+		const updates$ = this.sonarEvents.subscribe(scanId).pipe(
+			map((evt) => ({ type: evt.type, data: evt.data } as MessageEvent)),
+		);
+
+		const heartbeat$ = interval(20000).pipe(
+			map(() => ({ type: 'heartbeat', data: {} } as MessageEvent)),
+		);
+
+		const initial$ = from(this.scanService.findSessionById(scanId)).pipe(
+			switchMap((session) => {
+				if (!session) {
+					throw new NotFoundException(`Sonar scan session not found: ${scanId}`);
+				}
+
+				const snapshot: MessageEvent = {
+					type: 'snapshot',
+					data: {
+						scanId: session.id,
+						status: session.status,
+						totalReleases: session.totalReleases,
+						processedReleases: session.processedReleases,
+						successCount: session.successCount,
+						failedCount: session.failedCount,
+						force: session.force,
+						triggerType: session.triggerType,
+						limitCount: session.limitCount,
+						isImportedFromReport: session.isImportedFromReport,
+						startedAt: session.startedAt,
+						finishedAt: session.finishedAt,
+						errorMessage: session.errorMessage,
+					},
+				};
+
+				if (['COMPLETED', 'FAILED'].includes(session.status)) {
+					return of(snapshot);
+				}
+
+				return concat(of(snapshot), updates$);
+			}),
+		);
+
+		return merge(initial$, heartbeat$).pipe(
+			takeWhile(
+				(evt: MessageEvent) => evt.type !== 'completed' && evt.type !== 'failed',
+				true,
+			),
+		);
+	}
+
+	@Get('scan/sessions')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Lấy danh sách các Sonar scan session gần đây' })
+	@ApiQuery({ name: 'limit', required: false, type: Number })
+	async listSessions(@Query('limit') limit?: string) {
+		const parsedLimit = limit ? parseInt(limit, 10) : 20;
+		const sessions = await this.scanService.listSessions(parsedLimit);
+		return new ResponseSuccess({ data: { items: sessions, total: sessions.length } });
+	}
+
+	@Get('scan/sessions/:scanId')
+	@SystemAdminOnly()
+	@ApiOperation({ summary: 'Chi tiết 1 Sonar scan session' })
+	async getSession(@Param('scanId') scanId: string) {
+		const session = await this.scanService.findSessionById(scanId);
+		if (!session) throw new NotFoundException(`Scan session not found: ${scanId}`);
+		return new ResponseSuccess({ data: session });
 	}
 
 	@Get('schedules')

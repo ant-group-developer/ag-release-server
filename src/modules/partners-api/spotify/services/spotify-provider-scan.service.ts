@@ -6,12 +6,21 @@ import { SpotifySonarDelivery } from '../entities/spotify-sonar-delivery.entity'
 import { SpotifyCatalog } from '../entities/spotify-catalog.entity';
 import { SpotifyCatalogAvailability } from '../entities/spotify-catalog-availability.entity';
 import { SpotifyCatalogDelivery } from '../entities/spotify-catalog-delivery.entity';
+import {
+	SpotifySonarScanSession,
+	SonarScanSessionStatus,
+	SonarScanTriggerType,
+} from '../entities/spotify-sonar-scan-session.entity';
 import { SpotifyProviderApiService } from './spotify-provider-api.service';
+import { SonarEventsGateway } from './sonar-events.gateway';
 
 export interface SonarScanOptions {
+	scanId?: string;
 	limit?: number;
 	isImportedFromReport?: boolean;
 	force?: boolean;
+	triggerType?: SonarScanTriggerType;
+	scheduleId?: string;
 }
 
 @Injectable()
@@ -34,7 +43,11 @@ export class SpotifyProviderScanService {
 		@InjectRepository(SpotifyCatalogDelivery)
 		private readonly catalogDeliveryRepo: Repository<SpotifyCatalogDelivery>,
 
+		@InjectRepository(SpotifySonarScanSession)
+		private readonly sessionRepo: Repository<SpotifySonarScanSession>,
+
 		private readonly apiService: SpotifyProviderApiService,
+		private readonly sonarEvents: SonarEventsGateway,
 	) {}
 
 	async getDeliveriesByRelease(releaseId: string): Promise<SpotifySonarDelivery[]> {
@@ -44,58 +57,175 @@ export class SpotifyProviderScanService {
 		});
 	}
 
-	async scanAll(options: SonarScanOptions = {}): Promise<{ processed: number; failed: number }> {
-		const { limit, isImportedFromReport, force = false } = options;
-
-		const where: Record<string, unknown> = { upc: Not(IsNull()) };
-		if (isImportedFromReport !== undefined) {
-			where['isImportedFromReport'] = isImportedFromReport;
-		}
-
-		const releases = await this.releaseRepo.find({
-			where,
-			select: ['id', 'upc', 'isImportedFromReport'],
-			take: limit ?? 500,
-			order: { createdAt: 'DESC' },
+	async createSession(opts: {
+		force: boolean;
+		limitCount: number | null;
+		isImportedFromReport: boolean | null;
+		triggerType?: SonarScanTriggerType;
+		scheduleId?: string;
+	}): Promise<{ scanId: string }> {
+		const session = this.sessionRepo.create({
+			status: SonarScanSessionStatus.PROCESSING,
+			force: opts.force,
+			limitCount: opts.limitCount,
+			isImportedFromReport: opts.isImportedFromReport,
+			triggerType: opts.triggerType ?? SonarScanTriggerType.MANUAL,
+			scheduleId: opts.scheduleId ?? null,
+			startedAt: new Date(),
 		});
+		await this.sessionRepo.save(session);
+		return { scanId: session.id };
+	}
 
-		let releaseList = releases;
+	async findSessionById(scanId: string): Promise<SpotifySonarScanSession | null> {
+		return this.sessionRepo.findOne({ where: { id: scanId } });
+	}
 
-		if (!force) {
-			const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-			const recentlyScanned = await this.sonarDeliveryRepo
-				.createQueryBuilder('sd')
-				.select('sd.release_id', 'releaseId')
-				.where('sd.updated_at > :oneDayAgo', { oneDayAgo })
-				.groupBy('sd.release_id')
-				.getRawMany<{ releaseId: string }>();
+	async listSessions(limit: number): Promise<SpotifySonarScanSession[]> {
+		return this.sessionRepo.find({
+			order: { createdAt: 'DESC' },
+			take: limit,
+		});
+	}
 
-			const scannedIds = new Set(recentlyScanned.map((r) => r.releaseId));
-			releaseList = releases.filter((r) => !scannedIds.has(r.id));
+	async scanAll(options: SonarScanOptions = {}): Promise<{ scanId: string; processed: number; failed: number }> {
+		const {
+			scanId: existingScanId,
+			limit,
+			isImportedFromReport,
+			force = false,
+			triggerType = SonarScanTriggerType.MANUAL,
+			scheduleId,
+		} = options;
+
+		// Reuse existing session created by controller, or create a new one (e.g. cron)
+		let session: SpotifySonarScanSession;
+		if (existingScanId) {
+			session = await this.sessionRepo.findOneOrFail({ where: { id: existingScanId } });
+		} else {
+			session = this.sessionRepo.create({
+				status: SonarScanSessionStatus.PROCESSING,
+				force,
+				triggerType,
+				scheduleId: scheduleId ?? null,
+				isImportedFromReport: isImportedFromReport ?? null,
+				limitCount: limit ?? null,
+				startedAt: new Date(),
+			});
+			await this.sessionRepo.save(session);
 		}
+		const scanId = session.id;
 
-		this.logger.log(`Scanning ${releaseList.length} releases (force=${force})`);
+		const emitProgress = () => {
+			this.sonarEvents.emit({
+				scanId,
+				type: 'progress',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: session.processedReleases,
+					successCount: session.successCount,
+					failedCount: session.failedCount,
+				},
+			});
+		};
 
-		let processed = 0;
-		let failed = 0;
-
-		for (const release of releaseList) {
-			try {
-				await this.scanRelease(release);
-				processed++;
-			} catch (err) {
-				failed++;
-				this.logger.error(
-					`Failed to scan release ${release.id} (UPC: ${release.upc}): ${(err as Error).message}`,
-					(err as Error).stack,
-				);
+		try {
+			const where: Record<string, unknown> = { upc: Not(IsNull()) };
+			if (isImportedFromReport !== undefined) {
+				where['isImportedFromReport'] = isImportedFromReport;
 			}
 
-			await new Promise((resolve) => setTimeout(resolve, 200));
-		}
+			const releases = await this.releaseRepo.find({
+				where,
+				select: ['id', 'upc', 'isImportedFromReport'],
+				take: limit ?? 500,
+				order: { createdAt: 'DESC' },
+			});
 
-		this.logger.log(`Scan complete: ${processed} processed, ${failed} failed`);
-		return { processed, failed };
+			let releaseList = releases;
+
+			if (!force) {
+				const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+				const recentlyScanned = await this.sonarDeliveryRepo
+					.createQueryBuilder('sd')
+					.select('sd.release_id', 'releaseId')
+					.where('sd.updated_at > :oneDayAgo', { oneDayAgo })
+					.groupBy('sd.release_id')
+					.getRawMany<{ releaseId: string }>();
+
+				const scannedIds = new Set(recentlyScanned.map((r) => r.releaseId));
+				releaseList = releases.filter((r) => !scannedIds.has(r.id));
+			}
+
+			session.totalReleases = releaseList.length;
+			await this.sessionRepo.save(session);
+
+			this.logger.log(`[${scanId}] Scanning ${releaseList.length} releases (force=${force})`);
+			emitProgress();
+
+			for (const release of releaseList) {
+				try {
+					await this.scanRelease(release);
+					session.successCount++;
+				} catch (err) {
+					session.failedCount++;
+					this.logger.error(
+						`[${scanId}] Failed release ${release.id} (UPC: ${release.upc}): ${(err as Error).message}`,
+						(err as Error).stack,
+					);
+				}
+
+				session.processedReleases++;
+				await this.sessionRepo.save(session);
+				emitProgress();
+
+				await new Promise((resolve) => setTimeout(resolve, 200));
+			}
+
+			session.status = SonarScanSessionStatus.COMPLETED;
+			session.finishedAt = new Date();
+			await this.sessionRepo.save(session);
+
+			this.logger.log(`[${scanId}] Scan complete: ${session.successCount} ok, ${session.failedCount} failed`);
+
+			this.sonarEvents.emit({
+				scanId,
+				type: 'completed',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: session.processedReleases,
+					successCount: session.successCount,
+					failedCount: session.failedCount,
+				},
+			});
+
+			return { scanId, processed: session.successCount, failed: session.failedCount };
+		} catch (err) {
+			session.status = SonarScanSessionStatus.FAILED;
+			session.finishedAt = new Date();
+			session.errorMessage = (err as Error).message;
+			await this.sessionRepo.save(session);
+
+			this.sonarEvents.emit({
+				scanId,
+				type: 'failed',
+				timestamp: new Date().toISOString(),
+				data: {
+					status: session.status,
+					totalReleases: session.totalReleases,
+					processedReleases: session.processedReleases,
+					successCount: session.successCount,
+					failedCount: session.failedCount,
+					errorMessage: session.errorMessage,
+				},
+			});
+
+			throw err;
+		}
 	}
 
 	async scanRelease(release: Pick<Release, 'id' | 'upc'>): Promise<void> {
