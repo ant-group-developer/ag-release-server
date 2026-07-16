@@ -159,6 +159,7 @@ export interface TrackRankingItem {
 	labelName: string | null;
 	totalViews: number;
 	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
@@ -176,6 +177,7 @@ export interface ReleaseRankingItem {
 	trackCount: number;
 	totalViews: number;
 	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
@@ -297,6 +299,7 @@ export interface RevenueTrackItem {
 	revenueUsdExact?: string;
 	quantity: number;
 	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
 	release: {
 		metadataExternal: Record<string, unknown>;
@@ -448,6 +451,7 @@ export interface RevenueReleaseItem {
 	revenueUsdExact?: string;
 	quantity: number;
 	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;

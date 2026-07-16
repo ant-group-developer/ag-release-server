@@ -213,6 +213,7 @@ export class RankingService {
         any(t.release_title) AS releaseTitle,
         any(t.label_id) AS labelId,
         any(t.label_name) AS labelName,
+        any(t.tenant_id) AS tenantId,
         any(t.artist_names) AS artistNames,
         any(t.cover_75) AS cover75,
         any(t.cover_100) AS cover100,
@@ -244,6 +245,7 @@ export class RankingService {
 			releaseTitle: string;
 			labelId: string;
 			labelName: string;
+			tenantId: string;
 			artistNames: string[];
 			cover75: string;
 			cover100: string;
@@ -255,6 +257,9 @@ export class RankingService {
 			releaseMetadataSpotify: string;
 			releaseMetadataDeezer: string;
 		}>(dataSql, params);
+		const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+			[...new Set(paged.map((row) => row.tenantId).filter(Boolean))],
+		);
 
 		// Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse fact table
 		// Chỉ xảy ra với system-tenant (query tất cả ISRCs, không giới hạn pg_tracks_sync)
@@ -308,6 +313,9 @@ export class RankingService {
 				'300x300': row.cover300 || null,
 				original: row.coverOriginal || null,
 			};
+			const workspace = row.tenantId
+				? tenantMetadata.get(row.tenantId)
+				: undefined;
 			return {
 				rank: query.skip + index + 1,
 				isrc: row.isrc,
@@ -323,6 +331,9 @@ export class RankingService {
 					row.trackMetadataSpotify,
 					row.trackMetadataDeezer,
 				),
+				workspaces: workspace
+					? [{ id: row.tenantId, ...workspace }]
+					: [],
 				release: {
 					coverArtThumbnails,
 					metadataExternal: normalizeSyncedMetadataExternal(
@@ -434,6 +445,7 @@ export class RankingService {
         any(t.release_upc) AS releaseUpc,
         any(t.label_id) AS labelId,
         any(t.label_name) AS labelName,
+        any(t.tenant_id) AS tenantId,
         any(t.cover_75) AS cover75,
         any(t.cover_100) AS cover100,
         any(t.cover_160) AS cover160,
@@ -461,6 +473,7 @@ export class RankingService {
 			releaseUpc: string;
 			labelId: string;
 			labelName: string;
+			tenantId: string;
 			cover75: string;
 			cover100: string;
 			cover160: string;
@@ -469,6 +482,9 @@ export class RankingService {
 			releaseMetadataSpotify: string;
 			releaseMetadataDeezer: string;
 		}>(dataSql, params);
+		const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+			[...new Set(paged.map((row) => row.tenantId).filter(Boolean))],
+		);
 
 		const items: ReleaseRankingItem[] = paged.map((r, index) => {
 			const coverArtThumbnails: ICoverArtThumbnails = {
@@ -478,6 +494,9 @@ export class RankingService {
 				'300x300': r.cover300 || null,
 				original: r.coverOriginal || null,
 			};
+			const workspace = r.tenantId
+				? tenantMetadata.get(r.tenantId)
+				: undefined;
 			return {
 				rank: query.skip + index + 1,
 				releaseId: r.releaseId,
@@ -491,6 +510,9 @@ export class RankingService {
 					r.releaseMetadataSpotify,
 					r.releaseMetadataDeezer,
 				),
+				workspaces: workspace
+					? [{ id: r.tenantId, ...workspace }]
+					: [],
 				release: { coverArtThumbnails },
 			};
 		});

@@ -1373,6 +1373,7 @@ export class TimelineAnalyticsService {
 			releaseTitle: string;
 			labelId: string;
 			labelName: string;
+			tenantId: string;
 			artistNames: string[];
 			trackMetadataSpotify: string;
 			trackMetadataDeezer: string;
@@ -1383,6 +1384,9 @@ export class TimelineAnalyticsService {
 		const items: RevenueTrackItem[] = [];
 
 		if (rows.length > 0) {
+			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
+			);
 			const missingIsrcs = isSystem
 				? rows.filter((row) => !row.trackTitle).map((row) => row.isrc)
 				: [];
@@ -1410,6 +1414,9 @@ export class TimelineAnalyticsService {
 			rows.forEach((r, index) => {
 				const fallback = fallbackMap.get(r.isrc);
 				const artistNames = Array.isArray(r.artistNames) ? r.artistNames : [];
+				const workspace = r.tenantId
+					? tenantMetadata.get(r.tenantId)
+					: undefined;
 				items.push({
 					rank: offset + index + 1,
 					isrc: r.isrc,
@@ -1427,6 +1434,9 @@ export class TimelineAnalyticsService {
 						r.trackMetadataSpotify,
 						r.trackMetadataDeezer,
 					),
+					workspaces: workspace
+						? [{ id: r.tenantId, ...workspace }]
+						: [],
 					release: r.releaseId
 						? {
 								metadataExternal: normalizeSyncedMetadataExternal(
@@ -1510,6 +1520,7 @@ export class TimelineAnalyticsService {
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
 						metadataExternal: {},
+						workspaces: [],
 						release: null,
 					};
 					if (query.groupBySource) {
@@ -2463,6 +2474,7 @@ export class TimelineAnalyticsService {
 			releaseUpc: string;
 			labelId: string;
 			labelName: string;
+			tenantId: string;
 			cover75: string;
 			cover100: string;
 			cover160: string;
@@ -2476,7 +2488,13 @@ export class TimelineAnalyticsService {
 		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		if (rows.length > 0) {
+			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
+			);
 			rows.forEach((r, index) => {
+				const workspace = r.tenantId
+					? tenantMetadata.get(r.tenantId)
+					: undefined;
 				items.push({
 					rank: offset + index + 1,
 					releaseId: r.releaseId,
@@ -2492,6 +2510,9 @@ export class TimelineAnalyticsService {
 						r.releaseMetadataSpotify,
 						r.releaseMetadataDeezer,
 					),
+					workspaces: workspace
+						? [{ id: r.tenantId, ...workspace }]
+						: [],
 					release: {
 						coverArtThumbnails: {
 							'75x75': r.cover75 || null,
@@ -2572,6 +2593,7 @@ export class TimelineAnalyticsService {
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
 						metadataExternal: {},
+						workspaces: [],
 						release: null,
 					};
 					if (query.groupBySource) {
