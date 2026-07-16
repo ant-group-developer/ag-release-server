@@ -20,6 +20,7 @@ import {
 	RevenueLineChartItem,
 	RevenueOverviewResponse,
 	RevenueReleaseItem,
+	RevenueReleaseVideoItem,
 	RevenueSourceTypeItem,
 	RevenueTenantItem,
 	RevenueTimelineResponse,
@@ -2538,6 +2539,237 @@ export class TimelineAnalyticsService {
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
+						release: null,
+					};
+					if (query.groupBySource) {
+						const topReleaseIds = items
+							.filter((it) => it.releaseId !== 'other')
+							.map((it) => it.releaseId);
+						otherItem.bySource = await this.fetchSourceBreakdown(
+							CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+							's.period',
+							releaseJoinSql,
+							filterSql,
+							{ ...params },
+							topReleaseIds.length > 0
+								? 'AND t.release_id NOT IN ({_topReleaseIds:Array(String)})'
+								: '',
+							topReleaseIds.length > 0
+								? { _topReleaseIds: topReleaseIds }
+								: {},
+							true,
+						);
+					}
+					items.push(otherItem);
+				}
+			}
+		}
+
+		if (isPaginated) {
+			return new PageDto({
+				items,
+				metadata: { page, pageSize, totalItems },
+			});
+		} else {
+			return new PageDto({
+				items,
+				metadata: { page: 0, pageSize: 0, totalItems: 0 },
+			});
+		}
+	}
+
+	// ═══════════════════════════════════════════════════════
+	// REVENUE TOP RELEASE VIDEO (Top video releases by revenue)
+	// ═══════════════════════════════════════════════════════
+	async getRevenueTopReleaseVideo(
+		tenantId: string,
+		query: TimelineQueryDto,
+	): Promise<PageDto<RevenueReleaseVideoItem>> {
+		const key = this.cache.buildKey('tl:rev-top-release-video', tenantId, query);
+		return this.cache.wrap(key, () =>
+			this.computeRevenueTopReleaseVideo(tenantId, query),
+		);
+	}
+
+	private async computeRevenueTopReleaseVideo(
+		tenantId: string,
+		query: TimelineQueryDto,
+	): Promise<PageDto<RevenueReleaseVideoItem>> {
+		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
+		const toDate = normalizeDateToFirstOfMonth(query.toDate);
+		const { limit, offset, page, pageSize, isPaginated } =
+			this.getPaginationParams(query);
+		const isSystem = checkIsSystemTenant(tenantId);
+
+		const params: Record<string, any> = { from: fromDate, to: toDate };
+		let filterSql = `AND t.is_deleted = 0`;
+
+		if (!isSystem) {
+			filterSql += ' AND t.tenant_id = {tenantId:String}';
+			params.tenantId = tenantId;
+		}
+		if (query.labelId) {
+			filterSql += ' AND t.label_id = {labelId:String}';
+			params.labelId = query.labelId;
+		}
+		if (query.releaseId) {
+			filterSql += ' AND t.release_id = {releaseId:String}';
+			params.releaseId = query.releaseId;
+		}
+		if (query.importSource) {
+			filterSql += ' AND s.import_source = {importSource:String}';
+			params.importSource = query.importSource;
+		}
+
+		if (query.keyword) {
+			let matchedReleaseIds =
+				await this.isrcResolverService.getReleaseIdsByKeyword(
+					query.keyword,
+				);
+			if (matchedReleaseIds.length === 0) {
+				matchedReleaseIds = ['__none__'];
+			}
+			filterSql +=
+				' AND t.release_id IN ({matchedReleaseIds:Array(String)})';
+			params.matchedReleaseIds = matchedReleaseIds;
+		}
+
+		// Count query
+		const countSql = queries.getRevenueTopReleaseVideoCountQuery(filterSql);
+		const countResult = await this.clickHouseService.query<{
+			total: string;
+		}>(countSql, params);
+		const totalItems = Number(countResult[0]?.total ?? 0);
+
+		// Data query
+		const sql = queries.getRevenueTopReleaseVideoQuery(filterSql, limit, offset);
+		const rows = await this.clickHouseService.query<{
+			releaseId: string;
+			channelIds: string[];
+			revenue_usd: string;
+			quantity: string;
+		}>(sql, params);
+
+		const items: RevenueReleaseVideoItem[] = [];
+		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+
+		if (rows.length > 0) {
+			const releaseIds = rows.map((r) => r.releaseId);
+			const allChannelIds = [...new Set(rows.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
+
+			const [releasesMeta, channelsMeta] = await Promise.all([
+				this.isrcResolverService.getReleaseMetadata(releaseIds),
+				allChannelIds.length > 0
+					? this.isrcResolverService.getChannelMetadata(allChannelIds)
+					: Promise.resolve(new Map()),
+			]);
+
+			rows.forEach((r, index) => {
+				const meta = releasesMeta.get(r.releaseId);
+				const rowChannelIds = (r.channelIds ?? []).filter(Boolean);
+
+				const channels = rowChannelIds
+					.map((id) => {
+						const ch = channelsMeta.get(id);
+						return ch ? { id, name: ch.name } : null;
+					})
+					.filter((c): c is { id: string; name: string } => c !== null);
+
+				const workspacesMap = new Map<string, { id: string; name: string }>();
+				rowChannelIds.forEach((id) => {
+					const ch = channelsMeta.get(id);
+					const tenant = ch?.tenant;
+					if (tenant && !workspacesMap.has(tenant.id)) {
+						workspacesMap.set(tenant.id, {
+							id: tenant.id,
+							name: tenant.name || tenant.title,
+						});
+					}
+				});
+
+				items.push({
+					rank: offset + index + 1,
+					releaseId: r.releaseId,
+					title: meta?.title ?? 'Unknown Release',
+					upc: meta?.upc ?? null,
+					labelId: meta?.labelId ?? null,
+					labelName: meta?.labelName ?? null,
+					trackCount: meta?.trackCount ?? 0,
+					revenueUsd: this.revenueNumber(r.revenue_usd),
+					revenueUsdExact: this.revenueExact(r.revenue_usd),
+					quantity: Number(r.quantity),
+					channels,
+					workspaces: [...workspacesMap.values()],
+					release: meta
+						? { coverArtThumbnails: meta.coverArtThumbnails }
+						: null,
+				});
+			});
+
+			if (query.groupBySource) {
+				const breakdowns = await Promise.all(
+					items.map((item) =>
+						this.fetchSourceBreakdown(
+							CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+							's.period',
+							releaseJoinSql,
+							filterSql,
+							{ ...params },
+							'AND t.release_id = {_releaseId:String}',
+							{ _releaseId: item.releaseId },
+							true,
+						),
+					),
+				);
+				items.forEach((item, i) => {
+					item.bySource = breakdowns[i];
+				});
+			}
+
+			const shouldIncludeOther =
+				!isPaginated && query.includeOther === true;
+
+			if (shouldIncludeOther) {
+				const totalSql =
+					queries.getRevenueTopReleaseVideoTotalQuery(filterSql);
+				const totalResult = await this.clickHouseService.query<{
+					total_qty: string;
+					total_rev: string;
+				}>(totalSql, params);
+				const totalQty = Number(totalResult[0]?.total_qty ?? 0);
+				const totalRevExact = this.revenueExact(
+					totalResult[0]?.total_rev,
+				);
+
+				const itemsQtySum = items.reduce(
+					(acc, it) => acc + it.quantity,
+					0,
+				);
+				const itemsRevSumExact = this.addRevenueExact(
+					items.map((it) => it.revenueUsdExact),
+				);
+
+				const otherQty = totalQty - itemsQtySum;
+				const otherRevExact = this.subtractRevenueExact(
+					totalRevExact,
+					itemsRevSumExact,
+				);
+				const otherRev = this.revenueNumber(otherRevExact);
+
+				if (otherQty > 0 || otherRev > 0) {
+					const otherItem: RevenueReleaseVideoItem = {
+						rank: items.length + 1,
+						releaseId: 'other',
+						title: 'Other',
+						upc: null,
+						labelId: null,
+						labelName: null,
+						trackCount: 0,
+						revenueUsd: otherRev > 0 ? otherRev : 0,
+						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
+						quantity: otherQty > 0 ? otherQty : 0,
+						channels: [],
+						workspaces: [],
 						release: null,
 					};
 					if (query.groupBySource) {

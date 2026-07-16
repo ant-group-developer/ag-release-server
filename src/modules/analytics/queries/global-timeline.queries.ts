@@ -799,6 +799,61 @@ export function getRevenueTopReleaseTotalQuery(filterSql: string): string {
   `;
 }
 
+export function getRevenueTopReleaseVideoCountQuery(filterSql: string): string {
+	return `
+    SELECT uniq(t.release_id) AS total
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopReleaseVideoQuery(
+	filterSql: string,
+	limit: number,
+	offset: number,
+): string {
+	return `
+    SELECT
+      t.release_id AS releaseId,
+      groupUniqArray(20)(t.channel_id) AS channelIds,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY releaseId
+    ORDER BY revenue_usd DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+export function getRevenueTopReleaseVideoTotalQuery(filterSql: string): string {
+	return `
+    SELECT
+      sum(s.total_quantity) AS total_qty,
+      sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
 export function getTrendsOverviewMainQuery(
 	joinSql: string,
 	filterSql: string,

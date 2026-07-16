@@ -16,7 +16,11 @@ export class BaseQueryStatisticsDto {
 
 export class QueryGetIssueCountDto extends BaseQueryStatisticsDto {}
 
-export class QueryGetOverviewCountDto extends BaseQueryStatisticsDto {}
+export class QueryGetOverviewCountDto extends BaseQueryStatisticsDto {
+	@IsEnum(['audio', 'video'])
+	@IsOptional()
+	releaseType?: 'audio' | 'video';
+}
 
 export class QueryGetStreamCountByCountryDto extends BaseQueryStatisticsDto {
 	@Type(() => Date)
