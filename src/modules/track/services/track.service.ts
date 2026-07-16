@@ -27,7 +27,7 @@ export class TrackService {
 		private readonly appConfigService: AppConfigService,
 
 		private readonly releaseLogService: ReleaseLogService,
-	) {}
+	) { }
 
 	async submit(
 		id: string,
@@ -69,6 +69,24 @@ export class TrackService {
 
 		const [tracksDb, totalItems] =
 			await this.trackQueryService.getList(query);
+
+		const enhancedTracks = this.enhanceDetailsList(tracksDb);
+
+		return new PageDto({
+			items: enhancedTracks,
+			metadata: {
+				page,
+				pageSize,
+				totalItems,
+			},
+		});
+	}
+
+	async getList2(query: QueryGetListTrackDto): Promise<PageDto<Track>> {
+		const { page, pageSize } = query;
+
+		const [tracksDb, totalItems] =
+			await this.trackQueryService.getList2(query);
 
 		const enhancedTracks = this.enhanceDetailsList(tracksDb);
 

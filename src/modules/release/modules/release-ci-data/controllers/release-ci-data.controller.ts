@@ -29,7 +29,7 @@ import { ReleaseCiDataService } from '../services/release-ci-data.service';
 @ApiTags('Dữ liệu CI của bản phát hành')
 @Controller('release-ci-data')
 export class ReleaseCiDataController {
-	constructor(private readonly service: ReleaseCiDataService) {}
+	constructor(private readonly service: ReleaseCiDataService) { }
 
 	@Get()
 	@ApiOperation({
@@ -40,7 +40,7 @@ export class ReleaseCiDataController {
 		description: 'Bộ lọc danh sách dữ liệu CI của bản phát hành',
 	})
 	async getList(@Query() query: GetListReleaseCiDataDto) {
-		const result = await this.service.getList(query);
+		const result = await this.service.getList2(query);
 		return AppResponseSuccess.COMMON(result);
 	}
 

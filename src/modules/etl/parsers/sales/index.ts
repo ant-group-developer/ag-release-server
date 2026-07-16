@@ -26,6 +26,9 @@ export {
 	SoundcloudSalesParser,
 } from './group-b-parsers';
 
+// Revelator
+export { RevelatorSalesParser } from './revelator-sales.parser';
+
 // Group C-E: Complex format
 export {
 	BoomplaySalesParser,
@@ -59,6 +62,7 @@ import {
 	SaavnSalesParser,
 	SoundcloudSalesParser,
 } from './group-b-parsers';
+import { RevelatorSalesParser } from './revelator-sales.parser';
 import {
 	BoomplaySalesParser,
 	DeezerSalesParser,
@@ -87,6 +91,7 @@ export const SALES_PARSER_REGISTRY: Record<string, () => BaseSalesParser> = {
 	ncm: () => new NeteaseSalesParser(),
 	pnd: () => new PandoraSalesParser(),
 	res: () => new RessoSalesParser(),
+	rev: () => new RevelatorSalesParser(),
 	rhm: () => new RythmSalesParser(),
 	scu: () => new SoundcloudSalesParser(),
 	snp: () => new SnapSalesParser(),

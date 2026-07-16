@@ -49,7 +49,7 @@ export class ReleaseCiDataService {
 
 		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
-	) {}
+	) { }
 
 	async upsertByReleaseId(
 		releaseId: string,
@@ -142,6 +142,22 @@ export class ReleaseCiDataService {
 		});
 	}
 
+	async getList2(filter: GetListReleaseCiDataDto) {
+		const { page, pageSize } = filter;
+
+		const [items, totalItems] = await Promise.all([
+			this.createQbGetList2(filter).getMany(),
+			this.createQbGetList2(filter, true).getCount(),
+		]);
+
+		this.assignDspsLive(items);
+
+		return new PageDto({
+			items,
+			metadata: { page, pageSize, totalItems },
+		});
+	}
+
 	private assignDspsLive(items: ReleaseCiData[]): void {
 		for (const item of items) {
 			const count = item.exportParsedData?.length ?? 0;
@@ -162,9 +178,8 @@ export class ReleaseCiDataService {
 
 		const records = items.map((item, index) => {
 			const importLatest = item.importParsedData
-				? `${item.importParsedData.modify_time ?? ''} | ${
-						item.importParsedData.status ?? ''
-					}`
+				? `${item.importParsedData.modify_time ?? ''} | ${item.importParsedData.status ?? ''
+				}`
 				: '';
 
 			return {
@@ -434,8 +449,7 @@ export class ReleaseCiDataService {
 					synced += 1;
 					syncedReleaseIds.push(item.releaseId);
 					this.logger.log(
-						`Bulk synced data CI ${item.id} for release ${item.releaseId}. Progress: ${
-							synced + failed.length
+						`Bulk synced data CI ${item.id} for release ${item.releaseId}. Progress: ${synced + failed.length
 						}/${pendingItems.length}`,
 					);
 					return;
@@ -451,8 +465,7 @@ export class ReleaseCiDataService {
 					message,
 				});
 				this.logger.error(
-					`Failed to bulk sync data CI ${item.id} for release ${item.releaseId}. Progress: ${
-						synced + failed.length
+					`Failed to bulk sync data CI ${item.id} for release ${item.releaseId}. Progress: ${synced + failed.length
 					}/${pendingItems.length}. Error: ${message}`,
 				);
 			});
@@ -493,17 +506,31 @@ export class ReleaseCiDataService {
 			return null;
 		}
 
-		const importEntity = items.sort((a, b) => {
+		const importBatch = items.sort((a, b) => {
 			const aTime = new Date(a?.modify_time ?? 0).getTime();
 			const bTime = new Date(b?.modify_time ?? 0).getTime();
 			return bTime - aTime;
 		})[0];
 
+		const targetPackageId = importRawData.queryParams?.package_id;
+
+		let actualStatus = null;
+		if (Array.isArray(importBatch.import_file)) {
+			const targetFile = importBatch.import_file.find(
+				(file: any) =>
+					file.package_id === targetPackageId ||
+					file.GTIN === targetPackageId
+			);
+
+			actualStatus = targetFile?.import_status ?? null;
+		}
+
 		return {
-			status: importEntity.status ?? null,
-			modify_time: importEntity.modify_time ?? null,
+			status: actualStatus,
+			modify_time: importBatch.modify_time ?? null,
 		};
 	}
+
 
 	private getImportCount(importRawData?: Record<string, any> | null): number {
 		if (!importRawData) {
@@ -530,7 +557,7 @@ export class ReleaseCiDataService {
 			? this.getExportItems(exportRawData).length > 0
 			: false;
 
-		return lastImportIsFailed && hasQaFlag && !hasExportOnCi;
+		return lastImportIsFailed || hasQaFlag || !hasExportOnCi;
 	}
 
 	private getImportItems(
@@ -576,7 +603,7 @@ export class ReleaseCiDataService {
 			if (
 				!current ||
 				this.getExportRecordTime(item) >
-					this.getExportRecordTime(current)
+				this.getExportRecordTime(current)
 			) {
 				latestByDsp.set(dspKey, item);
 			}
@@ -613,10 +640,10 @@ export class ReleaseCiDataService {
 		const musicService = item.musicService ?? {};
 		return String(
 			musicService.dpc ??
-				musicService.DPID ??
-				musicService.id ??
-				musicService.name ??
-				item.id,
+			musicService.DPID ??
+			musicService.id ??
+			musicService.name ??
+			item.id,
 		);
 	}
 
@@ -768,6 +795,119 @@ export class ReleaseCiDataService {
 				{ keywords },
 			);
 		}
+
+		if (filter.fieldOrder === FieldOrderReleaseCiData.dspsLive) {
+			qb.orderBy('dsps_live_count', filter.orderBy)
+				.skip(filter.skip)
+				.take(filter.limit);
+			return;
+		}
+
+		orderAndPaging2({ qb, filter });
+	}
+
+	private createQbGetList2(filter: GetListReleaseCiDataDto, isCount = false) {
+		const qb = this.repo.createQueryBuilder('releaseCiData');
+
+		if (!isCount) {
+			qb.leftJoinAndSelect('releaseCiData.release', 'release');
+			qb.addSelect(
+				`COALESCE(jsonb_array_length("releaseCiData"."export_parsed_data"), 0)`,
+				'dsps_live_count',
+			);
+		} else if (filter.keyword?.length) {
+			qb.leftJoin('releaseCiData.release', 'release');
+		}
+
+		this.applyFilter2({ qb, filter, isCount });
+		return qb;
+	}
+
+	private applyFilter2({
+		qb,
+		filter,
+		isCount = false,
+	}: {
+		qb: SelectQueryBuilder<ReleaseCiData>;
+		filter: GetListReleaseCiDataDto;
+		isCount?: boolean;
+	}) {
+		const {
+			releaseId,
+			status,
+			keyword,
+			neverExported,
+			lastImportIsFailed,
+			needImportAgain,
+			isSkipImport,
+			hasQaFlag,
+		} = filter;
+
+		if (releaseId) {
+			qb.andWhere('releaseCiData.releaseId = :releaseId', { releaseId });
+		}
+
+		if (status) {
+			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (neverExported) {
+			qb.andWhere(
+				`(
+					"releaseCiData"."export_parsed_data" IS NULL
+					OR jsonb_array_length("releaseCiData"."export_parsed_data") = 0
+				)`,
+			);
+		}
+
+		if (lastImportIsFailed) {
+			qb.andWhere(
+				`"releaseCiData"."import_parsed_data" ->> 'status' = :importStatus`,
+				{ importStatus: 'problem' },
+			);
+		}
+
+		if (needImportAgain !== undefined) {
+			qb.andWhere(
+				`"releaseCiData"."need_import_again" = :needImportAgain`,
+				{ needImportAgain },
+			);
+		}
+
+		if (isSkipImport !== undefined) {
+			qb.andWhere(
+				`"releaseCiData"."need_import_again" = :isNeedImportAgain`,
+				{ isNeedImportAgain: !isSkipImport },
+			);
+		}
+
+		if (hasQaFlag !== undefined) {
+			const hasQaFlagCondition = `
+				COALESCE(jsonb_array_length("releaseCiData"."qa_flags_ci"), 0) > 0
+			`;
+
+			qb.andWhere(
+				hasQaFlag ? hasQaFlagCondition : `NOT (${hasQaFlagCondition})`,
+			);
+		}
+
+		if (keyword?.length) {
+			const isUpcSearch = keyword.every(k => /^\d{12,14}$/.test(k.trim()));
+
+			if (isUpcSearch) {
+				qb.andWhere('release.upc IN (:...keyword)', { keyword: keyword.map(k => k.trim()) });
+			} else {
+				const keywords = keyword.map((k) => `%${k}%`);
+				qb.andWhere(
+					`release.title ILIKE ANY(:keywords)`,
+					{ keywords },
+				);
+			}
+		}
+
+
+		if (isCount) return;
+
 
 		if (filter.fieldOrder === FieldOrderReleaseCiData.dspsLive) {
 			qb.orderBy('dsps_live_count', filter.orderBy)

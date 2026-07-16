@@ -21,7 +21,12 @@ import { getSalesParserForFolder } from '../../parsers/sales';
 
 import { DspReportService } from '../../../dsp-report/services/dsp-report.service';
 import { ReportEntityExtractorService } from '../../../release/services/report-entity-extractor.service';
-import { normalizeFactRows } from '../../utils/fact-row-normalizer.util';
+import {
+	hasMeaningfulText,
+	normalizeFactRows,
+} from '../../utils/fact-row-normalizer.util';
+
+const REVELATOR_IMPORT_SOURCE = 'bombshelter';
 
 export interface ImportResult {
 	batchId: string;
@@ -122,6 +127,17 @@ export class ImportService {
 		return { pgUuid: dspsReport.pg_uuid, dspType };
 	}
 
+	private async resolveDspContextById(
+		dspId: string,
+	): Promise<{ pgUuid: string | null; dspType: 'audio' | 'video' }> {
+		const dspsReport =
+			await this.dspMappingService.getDspsReportById(dspId);
+		if (!dspsReport) {
+			return { pgUuid: null, dspType: 'audio' };
+		}
+		return this.resolveDspContext(dspsReport);
+	}
+
 	/**
 	 * Gọi extractAndImport cho từng source_file trong batch — reuse cùng pattern
 	 * mà report-import-worker.service.ts đang dùng (line 603-627):
@@ -135,6 +151,7 @@ export class ImportService {
 			folderName: string;
 			batchId: string;
 			dspsReport: { id_dsps_report: string; pg_uuid: string | null };
+			resolveContextPerRowDsp?: boolean;
 		},
 	): Promise<{
 		totalReleases: number;
@@ -157,7 +174,11 @@ export class ImportService {
 			context.dspsReport,
 		);
 		const dryRun = !pgUuid;
-		if (dryRun) {
+		if (context.resolveContextPerRowDsp) {
+			this.logger.log(
+				`[${context.folderName}] Importing release metadata per row dsp_id.`,
+			);
+		} else if (dryRun) {
 			this.logger.log(
 				`[${context.folderName}] Skipping Postgres metadata import (pg_uuid rỗng — dsps_report chưa assign). Chỉ đếm pending.`,
 			);
@@ -170,39 +191,89 @@ export class ImportService {
 		for (const [sourceFileName, rows] of this.groupRowsBySourceFile(
 			allRows,
 		)) {
-			const res = await this.reportEntityExtractorService
-				.extractAndImport(rows, undefined, undefined, undefined, {
-					sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
-					parserCode: context.folderName,
-					fileName: sourceFileName,
-					jobId: context.batchId,
-					dspType,
-					dryRun,
-				})
-				.catch((err: any) => {
-					this.logger.error(
-						`[${context.folderName}] extractAndImport failed for ${sourceFileName}: ${err.message}`,
-						err.stack,
-					);
-					return {
-						totalReleases: 0,
-						created: 0,
-						skipped: 0,
-						errors: 1,
-						inDb: 0,
-						pending: 0,
-					};
-				});
+			const rowGroups = new Map<
+				string,
+				Array<FactDspRow | FactSalesRow>
+			>();
+			if (context.resolveContextPerRowDsp) {
+				for (const row of rows) {
+					const dspId =
+						row.dsp_id?.trim() || context.dspsReport.id_dsps_report;
+					const group = rowGroups.get(dspId) ?? [];
+					group.push(row);
+					rowGroups.set(dspId, group);
+				}
+			} else {
+				rowGroups.set(context.dspsReport.id_dsps_report, rows);
+			}
 
-			entityResult.totalReleases += res.totalReleases;
-			entityResult.created += res.created;
-			entityResult.skipped += res.skipped;
-			entityResult.errors += res.errors;
-			entityResult.inDb += res.inDb;
-			entityResult.pending += res.pending;
+			for (const [dspId, dspRows] of rowGroups) {
+				const currentContext = context.resolveContextPerRowDsp
+					? await this.resolveDspContextById(dspId)
+					: { pgUuid, dspType };
+				const currentDryRun = !currentContext.pgUuid;
+
+				const res = await this.reportEntityExtractorService
+					.extractAndImport(
+						dspRows,
+						undefined,
+						undefined,
+						undefined,
+						{
+							sourceType: ImportJobSourceType.FTP_SYNC_PERIOD,
+							parserCode: context.folderName,
+							fileName: sourceFileName,
+							jobId: context.batchId,
+							dspType: currentContext.dspType,
+							dryRun: currentDryRun,
+						},
+					)
+					.catch((err: any) => {
+						this.logger.error(
+							`[${context.folderName}] extractAndImport failed for ${sourceFileName}: ${err.message}`,
+							err.stack,
+						);
+						return {
+							totalReleases: 0,
+							created: 0,
+							skipped: 0,
+							errors: 1,
+							inDb: 0,
+							pending: 0,
+						};
+					});
+
+				entityResult.totalReleases += res.totalReleases;
+				entityResult.created += res.created;
+				entityResult.skipped += res.skipped;
+				entityResult.errors += res.errors;
+				entityResult.inDb += res.inDb;
+				entityResult.pending += res.pending;
+			}
 		}
 
 		return entityResult;
+	}
+
+	private isRevelatorSalesFolder(folderName: string): boolean {
+		return (
+			folderName === 'rev-revelator' || folderName.split('-')[0] === 'rev'
+		);
+	}
+
+	private async resolveRevelatorDspReportId(
+		row: FactSalesRow,
+		folderName: string,
+	): Promise<string> {
+		const serviceName = hasMeaningfulText(row.service_name)
+			? row.service_name.trim()
+			: folderName;
+		const dspsReport =
+			await this.dspMappingService.resolveOrCreateDspReport(
+				serviceName,
+				REVELATOR_IMPORT_SOURCE,
+			);
+		return dspsReport.id_dsps_report;
 	}
 
 	/**
@@ -331,6 +402,7 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		sourceCategory: string = '',
+		importSource: string = 'ftp',
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Pre-load file exclude check once (avoids repeated async calls inside findDataFiles)
 		const fileExcluder = async (name: string) =>
@@ -343,6 +415,7 @@ export class ImportService {
 				folderName,
 				batchId,
 				fileExcluder,
+				importSource,
 			);
 		}
 		if (sourceCategory === 'illegitimate_activity') {
@@ -351,6 +424,7 @@ export class ImportService {
 				folderName,
 				batchId,
 				fileExcluder,
+				importSource,
 			);
 		}
 		// Default: trends / usage → existing parsers → fact_dsp
@@ -360,6 +434,7 @@ export class ImportService {
 			batchId,
 			sourceCategory,
 			fileExcluder,
+			importSource,
 		);
 	}
 
@@ -372,12 +447,13 @@ export class ImportService {
 		batchId: string,
 		sourceCategory: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
 			await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
-				'ftp_folder',
+				importSource === 'ftp' ? 'ftp_folder' : importSource,
 			);
 
 		const parser = getParserForFolder(folderName);
@@ -402,7 +478,7 @@ export class ImportService {
 						row.source_category = sourceCategory;
 					}
 					row.dsp_id = dspsReport.id_dsps_report;
-					row.import_source = 'ftp';
+					row.import_source = importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}
@@ -458,13 +534,17 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
-		// Resolve or create dsps_report for this folder
-		const dspsReport =
-			await this.dspMappingService.resolveOrCreateDspReport(
-				folderName,
-				'ftp_folder',
-			);
+		const isRevelator = this.isRevelatorSalesFolder(folderName);
+
+		const dspsReport: { id_dsps_report: string; pg_uuid: string | null } =
+			isRevelator
+				? { id_dsps_report: '', pg_uuid: null }
+				: await this.dspMappingService.resolveOrCreateDspReport(
+						folderName,
+						importSource === 'ftp' ? 'ftp_folder' : importSource,
+					);
 
 		const parser = getSalesParserForFolder(folderName);
 		if (!parser) {
@@ -485,8 +565,15 @@ export class ImportService {
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report from dsps_report
 				for (const row of rows) {
-					row.dsp_id = dspsReport.id_dsps_report;
-					row.import_source = 'ftp';
+					row.dsp_id = isRevelator
+						? await this.resolveRevelatorDspReportId(
+								row,
+								folderName,
+							)
+						: dspsReport.id_dsps_report;
+					row.import_source = isRevelator
+						? REVELATOR_IMPORT_SOURCE
+						: importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}
@@ -519,6 +606,7 @@ export class ImportService {
 				folderName,
 				batchId,
 				dspsReport,
+				resolveContextPerRowDsp: isRevelator,
 			});
 
 			// Refresh materialized stats cho các dsp_id vừa nạp thêm data.
@@ -542,6 +630,7 @@ export class ImportService {
 		folderName: string,
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
+		importSource: string,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const prefix = folderName.split('-')[0];
 		let parser;
@@ -560,7 +649,7 @@ export class ImportService {
 		const dspsReport =
 			await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
-				'ftp_folder',
+				importSource === 'ftp' ? 'ftp_folder' : importSource,
 			);
 
 		const startTime = Date.now();
@@ -575,7 +664,7 @@ export class ImportService {
 				// Replace dsp_id with id_dsps_report
 				for (const row of rows) {
 					row.dsp_id = dspsReport.id_dsps_report;
-					row.import_source = 'ftp';
+					row.import_source = importSource;
 					row.source_file_name = sourceFileName;
 					normalizeFactRows([row]);
 				}

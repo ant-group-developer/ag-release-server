@@ -16,6 +16,7 @@ import {
 	DspRankingItem,
 	LabelRankingItem,
 	ReleaseRankingItem,
+	ReleaseRankingVideoItem,
 	SourceTypeRankingItem,
 	TenantRankingItem,
 	TrackRankingItem,
@@ -81,6 +82,31 @@ export class RankingController {
 		@Body() query: RankingQueryDto,
 	): Promise<ResponseSuccess<PageDto<ReleaseRankingItem>>> {
 		const data = await this.rankingService.getTopReleases(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	/**
+	 * Top Video Releases theo lượt xem.
+	 * POST /analytics/ranking/releases-video
+	 */
+	@Post('releases-video')
+	@ApiOperation({
+		summary: 'Get top video releases ranking',
+		description:
+			'Returns the most viewed video releases for the tenant, including channelName and workspaceName.',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Video releases ranking retrieved successfully.',
+	})
+	async getTopReleasesVideo(
+		@Req() req: Request,
+		@Body() query: RankingQueryDto,
+	): Promise<ResponseSuccess<PageDto<ReleaseRankingVideoItem>>> {
+		const data = await this.rankingService.getTopReleasesVideo(
 			req.user!.tenantId,
 			query,
 		);
