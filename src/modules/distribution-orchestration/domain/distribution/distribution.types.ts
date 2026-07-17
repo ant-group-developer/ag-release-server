@@ -26,6 +26,7 @@ export interface DistributionSnapshotRow {
 	readonly upc?: string;
 	readonly packageUri?: string;
 	readonly retryCount: number;
+	readonly version: number;
 }
 
 /** Which ISSUES channels to reset on retry (empty channelIds = all ISSUES channels). */

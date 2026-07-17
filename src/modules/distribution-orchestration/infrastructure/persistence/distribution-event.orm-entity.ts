@@ -34,7 +34,7 @@ export class DistributionEventOrmEntity {
 	level!: string;
 
 	@Column({ type: 'jsonb', default: () => "'{}'" })
-	payload!: Record<string, unknown>;
+	payload!: object;
 
 	/** Clock.now() từ domain, KHÔNG phải giờ INSERT. */
 	@Column({ type: 'timestamptz' })

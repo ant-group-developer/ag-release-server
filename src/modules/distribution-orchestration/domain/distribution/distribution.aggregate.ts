@@ -9,6 +9,7 @@ import * as E from '../events/distribution.events';
 import { DomainEvent } from '../events/domain-event.base';
 import { ExecutionPolicy } from '../policies/execution-policy.port';
 import { Clock } from '../ports/clock.port';
+import { ExecutionTypeEnum } from '../value-objects/execution-type.enum';
 import { DistributionState } from './distribution-state.enum';
 import {
 	CreateDistributionProps,
@@ -30,6 +31,7 @@ export class Distribution {
 	private _upc?: string;
 	private _packageUri?: string;
 	private _retryCount = 0;
+	private _version = 0; // optimistic lock — repo checks (WHERE version=?) then version+1
 	private readonly _pending: DomainEvent[] = [];
 
 	private constructor(
@@ -37,6 +39,7 @@ export class Distribution {
 		public readonly releaseId: string,
 		public readonly snapshotId: string,
 		public readonly tenantId: string,
+		public readonly type: ExecutionTypeEnum,
 		public readonly correlationId: string,
 		private readonly _channelSpecs: CreateDistributionProps['channelSpecs'],
 	) {}
@@ -50,6 +53,15 @@ export class Distribution {
 	get retryCount(): number {
 		return this._retryCount;
 	}
+	get version(): number {
+		return this._version;
+	}
+	get upc(): string | undefined {
+		return this._upc;
+	}
+	get packageUri(): string | undefined {
+		return this._packageUri;
+	}
 
 	/** Create a fresh aggregate in DRAFT (submit is a separate transition). */
 	static create(props: CreateDistributionProps): Distribution {
@@ -58,6 +70,7 @@ export class Distribution {
 			props.releaseId,
 			props.snapshotId,
 			props.tenantId,
+			props.type,
 			props.correlationId,
 			props.channelSpecs,
 		);
@@ -359,6 +372,7 @@ export class Distribution {
 			row.releaseId,
 			row.snapshotId,
 			row.tenantId,
+			row.type,
 			row.correlationId,
 			[],
 		);
@@ -367,6 +381,7 @@ export class Distribution {
 		d._upc = row.upc;
 		d._packageUri = row.packageUri;
 		d._retryCount = row.retryCount;
+		d._version = row.version;
 		return d;
 	}
 

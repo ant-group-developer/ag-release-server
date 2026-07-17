@@ -28,7 +28,7 @@ export class OutboxEventOrmEntity {
 	queue!: string;
 
 	@Column({ type: 'jsonb' })
-	payload!: Record<string, unknown>;
+	payload!: object;
 
 	/** Idempotency key = BullMQ jobId. UNIQUE constraint chặn trùng. */
 	@Column({ type: 'varchar', length: 120 })
