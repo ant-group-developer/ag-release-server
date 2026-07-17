@@ -353,6 +353,7 @@ export interface RevenueTenantItem {
 	tenantId: string;
 	tenantName: string;
 	logo: string | null;
+	type: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
@@ -410,6 +411,7 @@ export interface TenantRankingItem {
 	tenantId: string;
 	tenantName: string;
 	logo: string | null;
+	type: string | null;
 	totalViews: number;
 	bySource?: SourceBreakdownItem[];
 }

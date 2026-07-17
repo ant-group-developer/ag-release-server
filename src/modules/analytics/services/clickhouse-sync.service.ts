@@ -37,6 +37,7 @@ interface TrackSyncRow {
 	artist_ids: string[];
 	release_type: string;
 	channel_id: string;
+	external_id: string;
 	is_deleted: number;
 	updated_at: string;
 	track_title: string;
@@ -241,6 +242,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            artist_ids,
            release_type,
            channel_id,
+           external_id,
            track_title,
            track_version,
            release_title,
@@ -272,6 +274,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'audio' AS release_type,
              '' AS channel_id,
+             '' AS external_id,
              COALESCE(t.title, '') AS track_title,
              COALESCE(t.version, '') AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -317,6 +320,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'video' AS release_type,
              COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(v.external_id, '') AS external_id,
              COALESCE(r.title, '') AS track_title,
              '' AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -360,6 +364,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 				release_type: row.release_type ?? 'audio',
 				channel_id: row.channel_id ?? '',
+				external_id: row.external_id ?? '',
 				is_deleted: 0,
 				updated_at: new Date()
 					.toISOString()
@@ -589,6 +594,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'audio',
 					channel_id: '',
+					external_id: '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',
@@ -633,6 +639,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ''
            ) AS artist_ids,
            COALESCE(v.channel_id::text, '') AS channel_id,
+           COALESCE(v.external_id, '') AS external_id,
            COALESCE(r.title, '') AS track_title,
            '' AS track_version,
            COALESCE(r.title, '') AS release_title,
@@ -674,6 +681,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'video',
 					channel_id: row.channel_id ?? '',
+					external_id: row.external_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',
@@ -712,6 +720,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            artist_ids,
            release_type,
            channel_id,
+           external_id,
            track_title,
            track_version,
            release_title,
@@ -743,6 +752,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'audio' AS release_type,
              '' AS channel_id,
+             '' AS external_id,
              COALESCE(t.title, '') AS track_title,
              COALESCE(t.version, '') AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -789,6 +799,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'video' AS release_type,
              COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(v.external_id, '') AS external_id,
              COALESCE(r.title, '') AS track_title,
              '' AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -831,6 +842,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: row.release_type ?? 'audio',
 					channel_id: row.channel_id ?? '',
+					external_id: row.external_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',

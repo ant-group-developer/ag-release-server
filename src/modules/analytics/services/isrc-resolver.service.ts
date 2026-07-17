@@ -419,23 +419,27 @@ export class IsrcResolverService {
 	async getTenantMetadata(
 		tenantIds: string[],
 	): Promise<
-		Map<string, { name: string; title: string; logo: string | null }>
+		Map<
+			string,
+			{ name: string; title: string; logo: string | null; type: string | null }
+		>
 	> {
 		if (!tenantIds.length) return new Map();
 		const tenants = await this.tenantRepo.find({
 			where: { id: In(tenantIds) },
-			select: ['id', 'name', 'title', 'logo'],
+			select: ['id', 'name', 'title', 'logo', 'type'],
 		});
 
 		const map = new Map<
 			string,
-			{ name: string; title: string; logo: string | null }
+			{ name: string; title: string; logo: string | null; type: string | null }
 		>();
 		for (const t of tenants) {
 			map.set(t.id, {
 				name: t.name,
 				title: t.title || t.name,
 				logo: t.logo || null,
+				type: t.type ?? null,
 			});
 		}
 		return map;

@@ -1246,6 +1246,7 @@ export class RankingService {
 				tenantId: r.tenantId,
 				tenantName: meta?.title ?? 'Unknown Tenant',
 				logo: meta?.logo ?? null,
+				type: meta?.type ?? null,
 				totalViews: Number(r.totalViews),
 			};
 		});
