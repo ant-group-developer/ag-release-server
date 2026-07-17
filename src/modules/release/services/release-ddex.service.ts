@@ -31,6 +31,7 @@ import {
 	DEFAULT_PRICE_RANGE_TYPE,
 } from '../constants/release.constant';
 import { Release } from '../entities/release.entity';
+import { ReleaseTimeMode } from '../enum/release.enum';
 
 interface AudioFileInfo {
 	// buffer: Buffer;
@@ -789,6 +790,18 @@ export class ReleaseDdexService {
 				releaseDate: release.releaseDate
 					? this.formatDateTime(release.releaseDate)
 					: '',
+				releaseTime:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.releaseTime
+						: null,
+				releaseTimezoneOffset:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.timeZone?.utc === 'UTC'
+							? 'Z'
+							: release.timeZone?.utc
+						: null,
 
 				genre:
 					(release.primaryGenre?.name
@@ -1247,6 +1260,18 @@ export class ReleaseDdexService {
 				releaseDate: release.releaseDate
 					? this.formatDateTime(release.releaseDate)
 					: '',
+				releaseTime:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.releaseTime
+						: null,
+				releaseTimezoneOffset:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.timeZone?.utc === 'UTC'
+							? 'Z'
+							: release.timeZone?.utc
+						: null,
 				genre: release.primaryGenre?.name ?? 'Pop',
 				subGenre: release.subGenre?.name ?? undefined,
 				labelName: videoLabelName,

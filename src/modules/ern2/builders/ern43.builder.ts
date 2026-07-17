@@ -964,9 +964,22 @@ export class Ern43Builder2 {
 		}
 	}
 
+	private getStartDate(): string {
+		const release = this.input.release;
+		if (release.releaseTime) {
+			let timePart = release.releaseTime.trim();
+			if (timePart.length === 5) {
+				timePart = `${timePart}:00`;
+			}
+			const tzOffset = (release.releaseTimezoneOffset || '').trim();
+			return `${release.releaseDate}T${timePart}${tzOffset}`;
+		}
+		return `${release.releaseDate}T00:00:00`;
+	}
+
 	private buildDefaultDeals(dealList: ReturnType<typeof create>): void {
 		const territories = this.input.release.territories || ['Worldwide'];
-		const startDate = `${this.input.release.releaseDate}T00:00:00`;
+		const startDate = this.getStartDate();
 
 		// Audio tracks default deals
 		for (let i = 0; i < this.input.tracks.length; i++) {
@@ -1022,7 +1035,7 @@ export class Ern43Builder2 {
 
 	private buildVisibility(dealList: ReturnType<typeof create>): void {
 		const territories = this.input.release.territories || ['Worldwide'];
-		const startDate = `${this.input.release.releaseDate}T00:00:00`;
+		const startDate = this.getStartDate();
 
 		// Main release visibility (V0)
 		const v0 = dealList.ele('ReleaseVisibility');
