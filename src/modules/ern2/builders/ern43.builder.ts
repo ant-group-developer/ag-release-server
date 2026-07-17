@@ -845,6 +845,23 @@ export class Ern43Builder2 {
 		this.buildVisibility(dealList);
 	}
 
+	private formatDealDateTime(dateTimeStr: string): string {
+		if (!dateTimeStr) return '';
+		if (dateTimeStr.includes('T')) {
+			return dateTimeStr;
+		}
+		const release = this.input.release;
+		if (release.releaseTime) {
+			let timePart = release.releaseTime.trim();
+			if (timePart.length === 5) {
+				timePart = `${timePart}:00`;
+			}
+			const tzOffset = (release.releaseTimezoneOffset || '').trim();
+			return `${dateTimeStr}T${timePart}${tzOffset}`;
+		}
+		return `${dateTimeStr}T00:00:00`;
+	}
+
 	private buildExplicitDeals(dealList: ReturnType<typeof create>): void {
 		// Main release deal
 		if (this.input.deals?.release && this.input.deals.release.length > 0) {
@@ -860,9 +877,13 @@ export class Ern43Builder2 {
 				}
 
 				const validity = terms.ele('ValidityPeriod');
-				validity.ele('StartDateTime').txt(`${deal.startDate}T00:00:00`);
+				validity
+					.ele('StartDateTime')
+					.txt(this.formatDealDateTime(deal.startDate));
 				if (deal.endDate) {
-					validity.ele('EndDateTime').txt(`${deal.endDate}T00:00:00`);
+					validity
+						.ele('EndDateTime')
+						.txt(this.formatDealDateTime(deal.endDate));
 				}
 
 				for (const cm of deal.commercialModels) {
@@ -896,11 +917,11 @@ export class Ern43Builder2 {
 					const validity = terms.ele('ValidityPeriod');
 					validity
 						.ele('StartDateTime')
-						.txt(`${deal.startDate}T00:00:00`);
+						.txt(this.formatDealDateTime(deal.startDate));
 					if (deal.endDate) {
 						validity
 							.ele('EndDateTime')
-							.txt(`${deal.endDate}T00:00:00`);
+							.txt(this.formatDealDateTime(deal.endDate));
 					}
 
 					for (const cm of deal.commercialModels) {
@@ -940,11 +961,11 @@ export class Ern43Builder2 {
 					const validity = terms.ele('ValidityPeriod');
 					validity
 						.ele('StartDateTime')
-						.txt(`${deal.startDate}T00:00:00`);
+						.txt(this.formatDealDateTime(deal.startDate));
 					if (deal.endDate) {
 						validity
 							.ele('EndDateTime')
-							.txt(`${deal.endDate}T00:00:00`);
+							.txt(this.formatDealDateTime(deal.endDate));
 					}
 
 					for (const cm of deal.commercialModels) {

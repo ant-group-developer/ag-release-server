@@ -798,9 +798,7 @@ export class ReleaseDdexService {
 				releaseTimezoneOffset:
 					release.releaseTimeMode ===
 					ReleaseTimeMode.SPECIFIC_TIMEZONE
-						? release.timeZone?.utc === 'UTC'
-							? 'Z'
-							: release.timeZone?.utc
+						? this.cleanTimezoneOffset(release.timeZone?.utc)
 						: null,
 
 				genre:
@@ -1268,9 +1266,7 @@ export class ReleaseDdexService {
 				releaseTimezoneOffset:
 					release.releaseTimeMode ===
 					ReleaseTimeMode.SPECIFIC_TIMEZONE
-						? release.timeZone?.utc === 'UTC'
-							? 'Z'
-							: release.timeZone?.utc
+						? this.cleanTimezoneOffset(release.timeZone?.utc)
 						: null,
 				genre: release.primaryGenre?.name ?? 'Pop',
 				subGenre: release.subGenre?.name ?? undefined,
@@ -1385,6 +1381,15 @@ export class ReleaseDdexService {
 				],
 			},
 		};
+	}
+
+	private cleanTimezoneOffset(utcOffset?: string | null): string | null {
+		if (!utcOffset) return null;
+		const cleaned = utcOffset.replace(/UTC|GMT/gi, '').trim();
+		if (cleaned === '' || cleaned.toUpperCase() === 'Z') {
+			return 'Z';
+		}
+		return cleaned;
 	}
 
 	private getSha1Base64(filePath: string): string {

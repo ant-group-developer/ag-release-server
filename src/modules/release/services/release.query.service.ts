@@ -1877,6 +1877,7 @@ export class ReleaseQueryService {
 				'videoContributorRole',
 			)
 
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
 			.leftJoinAndSelect('release.ciData', 'releaseCiData')
 
 			.where('release.id = :releaseId', { releaseId })
@@ -2006,6 +2007,7 @@ export class ReleaseQueryService {
 		relations?: string[];
 	}) {
 		qb.leftJoinAndSelect('release.label', 'label')
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
 			.leftJoinAndSelect('release.ciData', 'releaseCiData')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
