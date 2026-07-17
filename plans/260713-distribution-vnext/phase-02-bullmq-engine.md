@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1+2+3 XONG (125 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** 🔵 Step 1+2+3+4 XONG (131 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [ ] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
 
 ## Context Links
 
@@ -194,7 +194,7 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - [x] Step 1: WorkflowEnginePort + UnitOfWorkPort + InMemoryWorkflowAdapter + module scaffold
 - [x] Step 2: 4 ORM entity + migration + repo + UoW + integration test (Nhịp 2.1–2.6)
 - [x] Step 3: 9 test-double in-memory
-- [ ] Step 4: orchestrate.handler + submit→validate chạy in-memory + test
+- [x] Step 4: orchestrate.handler + submit→validate chạy in-memory + test (6 spec xanh)
 - [ ] Step 5: step-runners (provision/build/upload/import/qa/export/status-sync)
 - [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
 - [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
@@ -208,7 +208,30 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - Integration (Step 7): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
 - Mỗi file < 200 LOC.
 
-**Status hiện tại (Step 1+2+3):** 125 test xanh (122 unit + 3 integration Postgres real via testcontainers, chưa thêm spec riêng cho test-double — sẽ exercise qua handler test Step 4). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+**Status hiện tại (Step 1+2+3+4):** 131 test xanh (128 unit + 3 integration Postgres real via testcontainers). Step 4 thêm 6 spec cho `OrchestrateHandler` (SUBMIT fresh · MARK_VALIDATED → PROVISIONING_IDS + outbox · idempotent guard · AggregateNotFoundError · optlock race · deterministic jobId). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+
+**Step 4 delivered files:**
+- `application/commands/distribution.command.ts` — discriminated union `SUBMIT | MARK_VALIDATED` (Step 5+ mở rộng 8 command còn lại)
+- `application/errors/aggregate-not-found.error.ts` — non-SUBMIT vào load null
+- `application/policy-resolver.ts` — ánh xạ `ExecutionType` → `ExecutionPolicy` + `POLICY_RESOLVER` token (RETRY tạm wrap INITIAL)
+- `application/ports/clock.port.token.ts` — Symbol `CLOCK` (giữ domain sạch framework)
+- `application/orchestrate.handler.ts` — vòng lặp 1 turn: load → apply → pullDomainEvents → buildOutbox → saveWithOutbox
+- `infrastructure/clock/system-clock.adapter.ts` — `SystemClock` cho prod
+- `infrastructure/test-doubles/in-memory-unit-of-work.ts` — no-tx uow cho handler test
+- `infrastructure/test-doubles/in-memory-distribution-repository.ts` — repo test-double mô phỏng optlock
+- `distribution-orchestration.module.ts` — wire `POLICY_RESOLVER` + `CLOCK` + `OrchestrateHandler`
+
+**Quyết định Step 4 (khi code):**
+
+| # | Chủ đề | Chốt | Ghi chú |
+|---|--------|------|---------|
+| 16 | Command shape | Discriminated union theo `type` (không class per command). Handler `switch` trên `command.type`. | KISS — 2 command giờ, 10 command Step 5+ vẫn scale được. |
+| 17 | Command "SUBMIT" tạo aggregate | `SubmitCommand` mang `create: CreateDistributionProps`. Handler: `load null → Distribution.create(cmd.create)`; `load có → dùng aggregate cũ (idempotent guard bên trong)`. | Không cần command riêng "CREATE". Aggregate `submit()` đã idempotent (state===VALIDATING → return). |
+| 18 | PolicyResolver riêng port | Aggregate KHÔNG lưu policy — handler resolve theo `dist.type` ngay trước khi apply. RETRY tạm wrap INITIAL (đọc `wrappedType` từ DB Step 5+). | Giữ process-as-data invariant + tránh serialize policy vào DB. |
+| 19 | CLOCK token ở application/ | `CLOCK = Symbol('Clock')` đặt `application/ports/clock.port.token.ts` — KHÔNG đặt trong `domain/ports/clock.port.ts`. | Guard `no-framework-import` chặn Symbol/NestJS ở domain. Token là hạ tầng DI, không phải business. |
+| 20 | Outbox derivation từ state MỚI | `buildOutbox(dist, command)` switch trên `dist.state` sau `apply()`. `PROVISIONING_IDS → dist.provision-id`; `BUILDING_PACKAGE → dist.build-package`. Terminal + VALIDATING = 0 outbox. | State là "sự thật kế tiếp cần làm gì". jobId = `${distId}:${state}:${key}` — deterministic. |
+| 21 | Handler KHÔNG gọi WorkflowEnginePort | Chỉ ghi outbox. Relay (Step 6) đọc outbox → enqueue thật. | At-least-once + không cần 2-phase commit DB+Redis. |
+| 22 | InMemoryDistributionRepository rehydrate on load | `load()` gọi `Distribution.rehydrate(snapshot, [...channels])` — 2 load ra 2 instance độc lập, giả contract repo thật. | Cần cho test optlock race (turn A + B mutate độc lập). |
 
 ## Risk Assessment
 

@@ -1,9 +1,16 @@
 import { Module } from '@nestjs/common';
 
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OrchestrateHandler } from './application/orchestrate.handler';
+import {
+	DefaultPolicyResolver,
+	POLICY_RESOLVER,
+} from './application/policy-resolver';
+import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
+import { SystemClock } from './infrastructure/clock/system-clock.adapter';
 import { ChannelDeliveryOrmEntity } from './infrastructure/persistence/channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from './infrastructure/persistence/distribution-event.orm-entity';
 import { DistributionOrmEntity } from './infrastructure/persistence/distribution.orm-entity';
@@ -18,10 +25,15 @@ import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-wor
  * Wire ports → adapters:
  *   · WORKFLOW_ENGINE          → InMemoryWorkflowAdapter (Step 8 swap sang BullMQ)
  *   · UNIT_OF_WORK             → TypeOrmUnitOfWork
- *   · DISTRIBUTION_REPOSITORY  → TypeOrmDistributionRepository (stateless — Nest OK với useClass)
+ *   · DISTRIBUTION_REPOSITORY  → TypeOrmDistributionRepository
+ *   · POLICY_RESOLVER          → DefaultPolicyResolver
+ *   · CLOCK                    → SystemClock (prod)
  *
- * Module CHƯA export gì — không có handler/service để module khác gọi vào.
- * Khi có API/controller ở phase sau, thêm exports tương ứng.
+ * Providers thường:
+ *   · OrchestrateHandler       — Step 4: entry point 1 vòng orchestrate
+ *
+ * Module CHƯA export gì — module khác chưa gọi handler qua DI (Step 7+ mới wire
+ * queue consumer). Test unit inject handler trực tiếp qua constructor.
  */
 @Module({
 	imports: [
@@ -39,6 +51,9 @@ import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-wor
 			provide: DISTRIBUTION_REPOSITORY,
 			useClass: TypeOrmDistributionRepository,
 		},
+		{ provide: POLICY_RESOLVER, useClass: DefaultPolicyResolver },
+		{ provide: CLOCK, useClass: SystemClock },
+		OrchestrateHandler,
 	],
 })
 export class DistributionOrchestrationModule {}
