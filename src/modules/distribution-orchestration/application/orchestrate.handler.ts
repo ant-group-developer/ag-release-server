@@ -4,8 +4,15 @@ import { DistributionState } from '../domain/distribution/distribution-state.enu
 import { Distribution } from '../domain/distribution/distribution.aggregate';
 import { Clock } from '../domain/ports/clock.port';
 import {
+	ApplyChannelInputCommand,
+	ApproveReviewCommand,
 	DistributionCommand,
+	FlagValidationErrorsCommand,
+	MarkIdsProvisionedCommand,
+	MarkPackageBuiltCommand,
 	MarkValidatedCommand,
+	RejectReviewCommand,
+	ResetForRetryCommand,
 	SubmitCommand,
 } from './commands/distribution.command';
 import { AggregateNotFoundError } from './errors/aggregate-not-found.error';
@@ -21,25 +28,24 @@ import { TxContext, UNIT_OF_WORK, UnitOfWork } from './ports/unit-of-work.port';
 /**
  * OrchestrateHandler — MỘT VÒNG orchestrate = MỘT command.
  *
- * Đây là "trạm trung chuyển" của queue `dist.orchestrate` (spec §Vòng lặp orchestrator):
- *
+ * "Trạm trung chuyển" của queue `dist.orchestrate` (spec §Vòng lặp orchestrator):
  *   1. LOAD    : repo.load(id)  → Distribution|null (rehydrate từ Postgres)
  *   2. APPLY   : gọi transition tương ứng command → domain quyết state kế + tích luỹ event
  *                (KHÔNG side-effect, KHÔNG gọi SFTP/gRPC)
- *   3. PULL    : dist.pullDomainEvents() → lấy danh sách event vừa tích luỹ
- *   4. PERSIST : (trong 1 transaction) UPDATE state (+ optlock) + UPSERT channels
- *                + INSERT events + INSERT outbox → tất cả atomic
- *   5. RELAY   : outbox-relay (tiến trình khác, Step 6) đọc outbox → enqueue queue chuyên biệt
+ *   3. PULL    : dist.pullDomainEvents()
+ *   4. BUILD   : buildOutbox(dist, command) từ state MỚI
+ *   5. PERSIST : (trong 1 transaction) UPDATE state (optlock) + UPSERT channels
+ *                + INSERT events + INSERT outbox → atomic
+ *   6. RELAY   : outbox-relay (Step 6) enqueue thật vào BullMQ
  *
- * Handler KHÔNG gọi WorkflowEnginePort trực tiếp — chỉ ghi outbox. Relay giữ tính at-least-once
- * (spec §Idempotency), giải quyết vấn đề 2-hệ-thống DB+Redis không chung transaction.
- *
- * Step 4: hỗ trợ 2 command (SUBMIT, MARK_VALIDATED). Step 5+ mở rộng thêm 8 command còn lại.
+ * Step 5 (mini): dispatch 10 command khớp aggregate + buildOutbox cover
+ * mọi state đi tới workflow queue. Runners thật (Step 5b) sẽ CONSUME
+ * các queue này và enqueue command STEP_DONE về `dist.orchestrate`.
  *
  * Error handling:
- *   · AggregateNotFoundError → command non-SUBMIT mà load null → không retry được.
- *   · OptimisticLockError → 2 worker đua → BullMQ retry job → load lại version mới.
- *   · Bất kỳ throw khác trong callback uow.run → TypeOrmUnitOfWork rollback + rethrow.
+ *   · AggregateNotFoundError → command non-SUBMIT mà load null.
+ *   · OptimisticLockError    → 2 worker đua → BullMQ retry job.
+ *   · Domain error (Invalid/Invariant/RetryLimit) → bubble, worker log + DLQ.
  */
 @Injectable()
 export class OrchestrateHandler {
@@ -54,9 +60,10 @@ export class OrchestrateHandler {
 	async handle(command: DistributionCommand): Promise<void> {
 		await this.uow.run(async (ctx) => {
 			const dist = await this.loadOrCreate(ctx, command);
+			const prevState = dist.state;
 			this.applyCommand(dist, command);
 			const events = dist.pullDomainEvents();
-			const outbox = this.buildOutbox(dist, command);
+			const outbox = this.buildOutbox(dist, command, prevState);
 			await this.repo.saveWithOutbox(ctx, dist, events, outbox);
 		});
 	}
@@ -84,11 +91,28 @@ export class OrchestrateHandler {
 	): void {
 		switch (command.type) {
 			case 'SUBMIT':
-				this.applySubmit(dist, command);
-				return;
+				return this.applySubmit(dist, command);
 			case 'MARK_VALIDATED':
-				this.applyMarkValidated(dist, command);
+				return this.applyMarkValidated(dist, command);
+			case 'FLAG_VALIDATION_ERRORS':
+				return this.applyFlagValidationErrors(dist, command);
+			case 'APPROVE_REVIEW':
+				return this.applyApproveReview(dist, command);
+			case 'REJECT_REVIEW':
+				return this.applyRejectReview(dist, command);
+			case 'RESUBMIT':
+				dist.resubmit(this.clock);
 				return;
+			case 'MARK_IDS_PROVISIONED':
+				return this.applyMarkIdsProvisioned(dist, command);
+			case 'MARK_PACKAGE_BUILT':
+				return this.applyMarkPackageBuilt(dist, command);
+			case 'APPLY_CHANNEL_INPUT':
+				return this.applyChannelInput(dist, command);
+			case 'RESET_FOR_RETRY':
+				return this.applyResetForRetry(dist, command);
+			case 'MARK_TAKEN_DOWN':
+				return this.applyMarkTakenDown(dist);
 		}
 	}
 
@@ -100,28 +124,105 @@ export class OrchestrateHandler {
 		dist: Distribution,
 		cmd: MarkValidatedCommand,
 	): void {
-		const policy = this.policies.resolve(dist.type);
-		dist.markValidated(policy, cmd.requiresReview, this.clock);
+		dist.markValidated(
+			this.policies.resolve(dist.type),
+			cmd.requiresReview,
+			this.clock,
+		);
+	}
+
+	private applyFlagValidationErrors(
+		dist: Distribution,
+		cmd: FlagValidationErrorsCommand,
+	): void {
+		dist.flagValidationErrors(cmd.ticketRef, cmd.errors, this.clock);
+	}
+
+	private applyApproveReview(
+		dist: Distribution,
+		cmd: ApproveReviewCommand,
+	): void {
+		dist.approveReview(
+			cmd.reviewerId,
+			this.policies.resolve(dist.type),
+			this.clock,
+		);
+	}
+
+	private applyRejectReview(
+		dist: Distribution,
+		cmd: RejectReviewCommand,
+	): void {
+		dist.rejectReview(cmd.reviewerId, cmd.ticketRef, cmd.note, this.clock);
+	}
+
+	private applyMarkIdsProvisioned(
+		dist: Distribution,
+		cmd: MarkIdsProvisionedCommand,
+	): void {
+		dist.markIdsProvisioned(cmd.upc, this.clock);
+	}
+
+	private applyMarkPackageBuilt(
+		dist: Distribution,
+		cmd: MarkPackageBuiltCommand,
+	): void {
+		dist.markPackageBuilt(
+			cmd.packageUri,
+			this.policies.resolve(dist.type),
+			this.clock,
+		);
+	}
+
+	private applyChannelInput(
+		dist: Distribution,
+		cmd: ApplyChannelInputCommand,
+	): void {
+		dist.applyChannelInput(cmd.channelId, cmd.input, this.clock);
+	}
+
+	private applyResetForRetry(
+		dist: Distribution,
+		cmd: ResetForRetryCommand,
+	): void {
+		dist.resetForRetry(
+			cmd.scope,
+			this.policies.resolve(dist.type),
+			this.clock,
+		);
+	}
+
+	private applyMarkTakenDown(dist: Distribution): void {
+		dist.markTakenDown(this.policies.resolve(dist.type), this.clock);
 	}
 
 	// ─── OUTBOX derivation ────────────────────────────────────────────────
 
 	/**
-	 * Từ state MỚI của aggregate, quyết job kế cần enqueue.
+	 * Sinh outbox từ state SAU apply(). "State là mệnh đề: 'bước kế cần làm gì'".
 	 *
-	 * Step 4 chỉ handle 2 nhánh:
-	 *   · VALIDATING          → không outbox (đợi external validator gọi MARK_VALIDATED)
-	 *   · PROVISIONING_IDS    → 1 job vào `dist.provision-id`
-	 *   · BUILDING_PACKAGE    → 1 job vào `dist.build-package`
-	 *   · DELIVERING          → không outbox ở đây (channels enqueue riêng — Step 5)
-	 *   · terminal states     → không outbox
+	 * Mapping state → queue:
+	 *   · PROVISIONING_IDS  → dist.provision-id       (runner Step 5b)
+	 *   · BUILDING_PACKAGE  → dist.build-package      (runner Step 5b)
+	 *   · DELIVERING        → 1 job/channel PENDING vào dist.orchestrate với
+	 *                          APPLY_CHANNEL_INPUT STEP_DONE... NO — DELIVERING
+	 *                          giao cho step-runner (upload/export/import-check)
+	 *                          per-channel. Step 5 mini KHÔNG derive per-channel
+	 *                          (tránh coupling handler với process shape) →
+	 *                          Step 5b làm khi có runner.
+	 *   · terminal/VALIDATING/IN_REVIEW/ACTION_REQUIRED → outbox rỗng (chờ
+	 *     external input: validator, reviewer, user resubmit).
 	 *
-	 * jobId = `${distId}:${state}:${key}` — deterministic, chống trùng ở tầng DB
-	 * (UNIQUE(jobId) trên outbox_event) và ở BullMQ layer 1 (jobId dedupe).
+	 * jobId deterministic: `${distId}:${newState}:${key}` — chống trùng ở tầng
+	 * DB (UNIQUE outbox_event.job_id) + BullMQ layer 1.
+	 *
+	 * NOTE: prevState để lại làm hook cho Step 5b (VD phát STEP_FAILED khi 1
+	 * transition failure sinh outbox reset). Hiện chưa dùng.
 	 */
 	private buildOutbox(
 		dist: Distribution,
 		command: DistributionCommand,
+		_prevState: DistributionState,
 	): OutboxEntry[] {
 		const jobId = `${dist.id}:${dist.state}:${command.key}`;
 		const payload = {

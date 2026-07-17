@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1+2+3+4 XONG (131 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** 🔵 Step 1-4 XONG · Step 5a (commands + handler dispatch) XONG · Step 5b (runners + rehydrate specs) chưa · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [~] Step 5 (5a done, 5b pending) [ ] Step 6 [ ] Step 7 [ ] Step 8
 
 ## Context Links
 
@@ -195,7 +195,8 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - [x] Step 2: 4 ORM entity + migration + repo + UoW + integration test (Nhịp 2.1–2.6)
 - [x] Step 3: 9 test-double in-memory
 - [x] Step 4: orchestrate.handler + submit→validate chạy in-memory + test (6 spec xanh)
-- [ ] Step 5: step-runners (provision/build/upload/import/qa/export/status-sync)
+- [~] Step 5a: 10 command discriminated union + handler dispatch + buildOutbox mở rộng (5 pipeline spec xanh — total 136 test)
+- [ ] Step 5b: rehydrate mang `channelSpecs` (cột jsonb mới) + 7 step-runners (provision/build/upload/import/qa/export/status-sync)
 - [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
 - [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
 - [ ] Cập nhật plan.md status Phase 2
@@ -258,4 +259,5 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - Rate-limit per host cho SFTP: cấu hình tĩnh hay đọc từ config DSP/aggregator? (quyết khi vào Step 5/7)
 - Migration test coverage: hiện integration dùng `synchronize`. Nếu cần verify migration file (partial index + FK CASCADE) → cần custom runner filter migration theo module, hoặc test riêng ở CI full-pipeline. Ghi tech debt, chưa scope.
 - Nested transaction (savepoint): UoW hiện KHÔNG hỗ trợ. Nếu Step 4/5 có handler compose 2 uow.run() lồng nhau → cần thêm savepoint logic.
+- **Rehydrate mất `_channelSpecs`** (phát hiện Step 5a): `Distribution.rehydrate(row, channels)` không nhận specs → sau save+load, `ensureChannelsSpawned` no-op cho aggregate CHƯA vào DELIVERING. Case: save ở PROVISIONING_IDS → load → MARK_PACKAGE_BUILT spawn channels → 0 channel spawned. Fix Step 5b: thêm cột `distribution.channel_specs jsonb` + tham số `specs: ChannelDeliverySpec[]` cho rehydrate + repo serialize/deserialize. Ảnh hưởng migration + orm-entity + repo.load + integration test.
 

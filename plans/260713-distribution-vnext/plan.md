@@ -17,7 +17,7 @@
 |---|-------|-----------|----------|------|
 | 0 | Đóng băng v3 + đặc tả (tài liệu này) | ✅ Done | — | (docs đã có) |
 | 1 | Domain layer thuần (aggregate + port) | ✅ Đặc tả xong — sẵn sàng EXECUTE | Đầy đủ + chốt hết open Q | [phase-01](phase-01-domain-layer.md) |
-| 2 | BullMQ thay cron-poll + DB-queue | 🔵 Step 1+2+3+4 XONG (persistence + test-doubles + orchestrate handler) — đang Step 5+ | 4/7 step done · 131 test xanh | [phase-02](phase-02-bullmq-engine.md) |
+| 2 | BullMQ thay cron-poll + DB-queue | 🔵 Step 1-4 + 5a XONG (handler dispatch 10 command) — đang Step 5b (runners + rehydrate specs) | 4.5/7 step done · 136 test xanh | [phase-02](phase-02-bullmq-engine.md) |
 | 3 | Timeline read-side + SSE (projection) | ⬜ Chưa | Skeleton (ranh giới P2/P3 chốt) | [phase-03](phase-03-outbox-timeline.md) |
 | 4 | ACL adapter cho SFTP/CI/gRPC/email + test double | ⬜ Chưa | Skeleton | [phase-04](phase-04-integration-acl.md) |
 | 5 | Bật lại REVIEW gate + resilience | ⬜ Chưa | Skeleton | [phase-05](phase-05-review-resilience.md) |
