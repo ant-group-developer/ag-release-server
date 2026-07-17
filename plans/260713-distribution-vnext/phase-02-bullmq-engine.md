@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1 + Step 2 XONG (125 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** 🔵 Step 1+2+3 XONG (125 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [ ] Step 3 [ ] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [ ] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
 
 ## Context Links
 
@@ -77,7 +77,7 @@ distribution-orchestration/
 │   │   ├── in-memory-workflow.adapter.ts     [Step 1 ✅] Map + clockMs ảo + advanceTime + FIFO dedupe
 │   │   └── bullmq-workflow.adapter.ts        [Step 8]
 │   ├── relay/outbox-relay.ts                  [Step 7] polling worker → enqueue
-│   └── test-doubles/*.ts                      [Step 4] 9 fake port in-memory
+│   └── test-doubles/*.ts                      [Step 3 ✅] 9 fake port in-memory (idempotent theo key/id)
 └── distribution-orchestration.module.ts       [Step 1+2 ✅] wire 3 provider
 ```
 
@@ -181,7 +181,7 @@ outbox_event (                 -- reliable publish (polling relay)
    - 2.4 `TypeOrmDistributionRepository` (load 2 query song song + saveWithOutbox: INSERT/UPDATE optlock + UPSERT channels + INSERT events + INSERT outbox trong tx do UoW mở).
    - 2.5 `TypeOrmUnitOfWork` (QueryRunner.connect → startTransaction → callback → commit/rollback → release trong finally; guard `isTransactionActive` tránh double-rollback). Wire `UNIT_OF_WORK` + `DISTRIBUTION_REPOSITORY`.
    - 2.6 Integration test với `testcontainers` + Postgres 16-alpine — 3 case: round-trip persist 4 bảng, load rehydrate, optimistic lock conflict.
-3. **9 test-double port in-memory** (Clock cố định, provisioner trả UPC giả, uploader ok, ...).
+3. **9 test-double port in-memory ✅** (`FixedClock`, `InMemoryIdentifierProvisioner`, `InMemoryPackageBuilder`, `InMemoryPackageUploader`, `InMemoryQaChecker`, `InMemoryExporter`, `InMemoryIngestResultReader`, `InMemoryDeliveryStatusReader`, `InMemoryTicketService`). Mỗi double tôn trọng idempotency contract ghi trong docblock port (gọi lại cùng key/releaseId/trackId → trả kết quả cũ, không tạo mới). `InMemoryPackageUploader` có `failNextUpload()` cho test retry.
 4. **Orchestrate handler + 1 command** (submit → markValidated) chạy end-to-end in-memory: assert state + event + outbox.
 5. **Step-runners** lần lượt: provision → build → upload → import-check → qa → export → status-sync. Mỗi runner gọi port → phát STEP_DONE/STEP_FAILED về `dist.orchestrate`.
 6. **Outbox relay** (polling worker) + retry/backoff + DLQ mỗi queue.
@@ -193,7 +193,7 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 
 - [x] Step 1: WorkflowEnginePort + UnitOfWorkPort + InMemoryWorkflowAdapter + module scaffold
 - [x] Step 2: 4 ORM entity + migration + repo + UoW + integration test (Nhịp 2.1–2.6)
-- [ ] Step 3: 9 test-double in-memory
+- [x] Step 3: 9 test-double in-memory
 - [ ] Step 4: orchestrate.handler + submit→validate chạy in-memory + test
 - [ ] Step 5: step-runners (provision/build/upload/import/qa/export/status-sync)
 - [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
@@ -208,7 +208,7 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - Integration (Step 7): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
 - Mỗi file < 200 LOC.
 
-**Status hiện tại (Step 1+2):** 125 test xanh (122 unit + 3 integration Postgres real via testcontainers). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+**Status hiện tại (Step 1+2+3):** 125 test xanh (122 unit + 3 integration Postgres real via testcontainers, chưa thêm spec riêng cho test-double — sẽ exercise qua handler test Step 4). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
 
 ## Risk Assessment
 
