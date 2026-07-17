@@ -8,6 +8,7 @@ export interface VideoCsvImportResult {
 	matchedExistingVideo: number;
 	createdVideoRelease: number;
 	channelLinked: number;
+	externalIdEnriched: number;
 	channelSkipped: number;
 	rowsSkipped: number;
 	errors: VideoCsvImportError[];

@@ -40,7 +40,8 @@ export class VideoCsvImportService {
 
 	/**
 	 * Import file CSV (buffer). Trung tam logic:
-	 *   1. Match video existing theo videos.isrc -> gan channelId (chi khi dang null).
+	 *   1. Match video existing theo videos.isrc -> enrich channelId (neu dang null)
+	 *      va externalId tu YouTube link.
 	 *   2. Video chua co -> reuse ReleaseReportImportService.importVideoRelease()
 	 *      de tao Release + Video + Artist + link, dung fallback tenant ANT MUSIC LLC + label AMG.
 	 *   3. Channel name khong match Postgres -> skip channel, log warn.
@@ -66,6 +67,7 @@ export class VideoCsvImportService {
 			matchedExistingVideo: 0,
 			createdVideoRelease: 0,
 			channelLinked: 0,
+			externalIdEnriched: 0,
 			channelSkipped: 0,
 			rowsSkipped: 0,
 			errors: [],
@@ -110,7 +112,8 @@ export class VideoCsvImportService {
 		this.logger.log(
 			`[CSV Import] Done. total=${result.totalRows}, ` +
 				`matched=${result.matchedExistingVideo}, created=${result.createdVideoRelease}, ` +
-				`channelLinked=${result.channelLinked}, channelSkipped=${result.channelSkipped}, ` +
+				`channelLinked=${result.channelLinked}, externalIdEnriched=${result.externalIdEnriched}, ` +
+				`channelSkipped=${result.channelSkipped}, ` +
 				`rowsSkipped=${result.rowsSkipped}, errors=${result.errors.length}`,
 		);
 
@@ -127,6 +130,7 @@ export class VideoCsvImportService {
 		const title = raw.Title?.trim();
 		const artistName = this.parseFirstArtist(raw['Main Artist(s)']);
 		const channelName = raw['Channel name']?.trim();
+		const externalId = this.extractYouTubeExternalId(raw['YouTube link']);
 
 		if (!isrc || !title) {
 			result.rowsSkipped++;
@@ -179,10 +183,37 @@ export class VideoCsvImportService {
 				}
 			}
 
+			const patch: Partial<Video> = {};
 			if (channel && !existingVideo.channelId) {
-				await this.videoRepo.update(existingVideo.id, { channelId: channel.id });
+				patch.channelId = channel.id;
 				result.channelLinked++;
-				changeLogs.push(this.buildLogEntry(existingVideo.id, existingVideo.releaseId, isrc, channel.id, nowStr));
+				changeLogs.push(
+					this.buildLogEntry(
+						existingVideo.id,
+						existingVideo.releaseId,
+						isrc,
+						channel.id,
+						nowStr,
+					),
+				);
+			}
+			if (externalId && existingVideo.externalId !== externalId) {
+				patch.externalId = externalId;
+				result.externalIdEnriched++;
+				changeLogs.push(
+					this.buildLogEntry(
+						existingVideo.id,
+						existingVideo.releaseId,
+						isrc,
+						externalId,
+						nowStr,
+						'external_id',
+						existingVideo.externalId ?? '',
+					),
+				);
+			}
+			if (Object.keys(patch).length > 0) {
+				await this.videoRepo.update(existingVideo.id, patch);
 			}
 			return;
 		}
@@ -199,13 +230,21 @@ export class VideoCsvImportService {
 			});
 
 			if (release) {
-				const video = await this.convertTrackToVideo(existingTrack, release, channel, changeLogs, nowStr);
+				const video = await this.convertTrackToVideo(
+					existingTrack,
+					release,
+					channel,
+					externalId,
+					changeLogs,
+					nowStr,
+				);
 				// Remove stale audio row from ClickHouse (track was deleted in transaction)
 				if (existingTrack.isrc) {
 					await this.deleteClickHouseTrackRow(existingTrack.isrc);
 				}
 				result.matchedExistingVideo++;
 				if (channel && video) result.channelLinked++;
+				if (externalId && video) result.externalIdEnriched++;
 			} else {
 				this.logger.warn(
 					`[CSV Import] Track ISRC=${isrc} found but release is not imported-from-report, skipping convert`,
@@ -227,17 +266,43 @@ export class VideoCsvImportService {
 		});
 		result.createdVideoRelease++;
 
-		if (!channel) return;
-
 		const newVideo = await this.videoRepo.findOne({ where: { releaseId: release.id } });
 		if (!newVideo) {
 			this.logger.warn(`[CSV Import] Video not found after create for release=${release.id}`);
 			return;
 		}
 
-		await this.videoRepo.update(newVideo.id, { channelId: channel.id });
-		result.channelLinked++;
-		changeLogs.push(this.buildLogEntry(newVideo.id, release.id, isrc, channel.id, nowStr));
+		const patch: Partial<Video> = {};
+		if (channel) {
+			patch.channelId = channel.id;
+			result.channelLinked++;
+			changeLogs.push(
+				this.buildLogEntry(
+					newVideo.id,
+					release.id,
+					isrc,
+					channel.id,
+					nowStr,
+				),
+			);
+		}
+		if (externalId) {
+			patch.externalId = externalId;
+			result.externalIdEnriched++;
+			changeLogs.push(
+				this.buildLogEntry(
+					newVideo.id,
+					release.id,
+					isrc,
+					externalId,
+					nowStr,
+					'external_id',
+				),
+			);
+		}
+		if (Object.keys(patch).length > 0) {
+			await this.videoRepo.update(newVideo.id, patch);
+		}
 	}
 
 	/**
@@ -250,6 +315,7 @@ export class VideoCsvImportService {
 		track: Track,
 		release: Release,
 		channel: Channel | null,
+		externalId: string | null,
 		changeLogs: ChangeLogEntry[],
 		nowStr: string,
 	): Promise<Video | null> {
@@ -275,6 +341,7 @@ export class VideoCsvImportService {
 					releaseId: release.id,
 					isrc: track.isrc,
 					...(channel ? { channelId: channel.id } : {}),
+					...(externalId ? { externalId } : {}),
 				}),
 			);
 
@@ -290,7 +357,15 @@ export class VideoCsvImportService {
 			}
 
 			if (channel) {
-				changeLogs.push(this.buildLogEntry(video.id, release.id, track.isrc ?? '', channel.id, nowStr));
+				changeLogs.push(
+					this.buildLogEntry(
+						video.id,
+						release.id,
+						track.isrc ?? '',
+						channel.id,
+						nowStr,
+					),
+				);
 			}
 
 			this.logger.log(
@@ -328,12 +403,54 @@ export class VideoCsvImportService {
 		return first || null;
 	}
 
+	/** Extract the canonical 11-character YouTube video ID from a CSV link. */
+	private extractYouTubeExternalId(
+		raw: string | undefined | null,
+	): string | null {
+		const value = raw?.trim();
+		if (!value) return null;
+
+		try {
+			const url = new URL(
+				/^https?:\/\//i.test(value) ? value : `https://${value}`,
+			);
+			const host = url.hostname.toLowerCase().replace(/^www\./, '');
+			let videoId: string | null = null;
+
+			if (host === 'youtu.be') {
+				videoId = url.pathname.split('/').filter(Boolean)[0] ?? null;
+			} else if (
+				host === 'youtube.com' ||
+				host.endsWith('.youtube.com')
+			) {
+				if (url.pathname === '/watch') {
+					videoId = url.searchParams.get('v');
+				} else {
+					const [pathType, id] = url.pathname
+						.split('/')
+						.filter(Boolean);
+					if (['shorts', 'embed', 'live'].includes(pathType)) {
+						videoId = id ?? null;
+					}
+				}
+			}
+
+			return videoId && /^[A-Za-z0-9_-]{11}$/.test(videoId)
+				? videoId
+				: null;
+		} catch {
+			return null;
+		}
+	}
+
 	private buildLogEntry(
 		videoId: string,
 		releaseId: string,
 		isrc: string,
 		channelId: string,
 		nowStr: string,
+		fieldName = 'channel_id',
+		oldValue = '',
 	): ChangeLogEntry {
 		return {
 			id: uuidv4(),
@@ -343,8 +460,8 @@ export class VideoCsvImportService {
 			release_id: releaseId,
 			isrc,
 			upc: '',
-			field_name: 'channel_id',
-			old_value: '',
+			field_name: fieldName,
+			old_value: oldValue,
 			new_value: channelId,
 			change_type: 'set',
 			enrichment_source: 'csv_import',

@@ -9,6 +9,8 @@ import { EntityManager } from 'typeorm';
 import { getImportSourceLabel } from '../constants/import-source.constants';
 import { ChartQueryDto, TimelineQueryDto } from '../dto/analytics-query.dto';
 import {
+	AnalyticsChannelInfo,
+	AnalyticsWorkspaceInfo,
 	DspBarChartItem,
 	DspTimelinePeriod,
 	DspTimelineResponse,
@@ -32,6 +34,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -1364,29 +1367,28 @@ export class TimelineAnalyticsService {
 			isrc: string;
 			revenue_usd: string;
 			quantity: string;
+			trackTitle: string;
+			trackVersion: string;
+			releaseId: string;
+			releaseTitle: string;
+			labelId: string;
+			labelName: string;
+			tenantId: string;
+			artistNames: string[];
+			trackMetadataSpotify: string;
+			trackMetadataDeezer: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(sql, params);
 
 		const items: RevenueTrackItem[] = [];
 
 		if (rows.length > 0) {
-			const topIsrcs = rows.map((r) => r.isrc);
-
-			const [metadataMap, artistMappings] = await Promise.all([
-				this.isrcResolverService.getTrackMetadataMap(topIsrcs),
-				this.isrcResolverService.getIsrcArtistMappings(topIsrcs),
-			]);
-
-			const artistNameMap = new Map<string, string>();
-			for (const m of artistMappings) {
-				const cur = artistNameMap.get(m.isrc);
-				artistNameMap.set(
-					m.isrc,
-					cur ? `${cur}, ${m.artistName}` : m.artistName,
-				);
-			}
-
+			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
+			);
 			const missingIsrcs = isSystem
-				? topIsrcs.filter((isrc) => !metadataMap.has(isrc))
+				? rows.filter((row) => !row.trackTitle).map((row) => row.isrc)
 				: [];
 
 			const fallbackMap = new Map<
@@ -1410,20 +1412,39 @@ export class TimelineAnalyticsService {
 			}
 
 			rows.forEach((r, index) => {
-				const meta = metadataMap.get(r.isrc);
 				const fallback = fallbackMap.get(r.isrc);
+				const artistNames = Array.isArray(r.artistNames) ? r.artistNames : [];
+				const workspace = r.tenantId
+					? tenantMetadata.get(r.tenantId)
+					: undefined;
 				items.push({
 					rank: offset + index + 1,
 					isrc: r.isrc,
-					title: meta?.trackTitle ?? fallback?.trackTitle ?? '',
-					version: meta?.trackVersion ?? null,
-					artistName:
-						artistNameMap.get(r.isrc) ?? fallback?.artistName ?? '',
-					releaseId: meta?.releaseId ?? null,
-					releaseTitle: meta?.releaseTitle ?? null,
+					title: r.trackTitle || fallback?.trackTitle || '',
+					version: r.trackVersion || null,
+					artistName: artistNames.join(', ') || fallback?.artistName || '',
+					releaseId: r.releaseId || null,
+					releaseTitle: r.releaseTitle || null,
+					labelId: r.labelId || null,
+					labelName: r.labelName || null,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
+					metadataExternal: normalizeSyncedMetadataExternal(
+						r.trackMetadataSpotify,
+						r.trackMetadataDeezer,
+					),
+					workspaces: workspace
+						? [{ id: r.tenantId, ...workspace }]
+						: [],
+					release: r.releaseId
+						? {
+								metadataExternal: normalizeSyncedMetadataExternal(
+									r.releaseMetadataSpotify,
+									r.releaseMetadataDeezer,
+								),
+							}
+						: null,
 				});
 			});
 
@@ -1493,9 +1514,14 @@ export class TimelineAnalyticsService {
 						artistName: '',
 						releaseId: null,
 						releaseTitle: null,
+						labelId: null,
+						labelName: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
+						metadataExternal: {},
+						workspaces: [],
+						release: null,
 					};
 					if (query.groupBySource) {
 						const topIsrcs = items
@@ -2039,6 +2065,7 @@ export class TimelineAnalyticsService {
 					tenantId: r.tenantId,
 					tenantName: meta?.title ?? 'Unknown Tenant',
 					logo: meta?.logo ?? null,
+					type: meta?.type ?? null,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
@@ -2108,6 +2135,7 @@ export class TimelineAnalyticsService {
 						tenantId: 'other',
 						tenantName: 'Other',
 						logo: null,
+						type: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
@@ -2443,32 +2471,59 @@ export class TimelineAnalyticsService {
 			releaseId: string;
 			revenue_usd: string;
 			quantity: string;
+			trackCount: string;
+			releaseTitle: string;
+			releaseUpc: string;
+			labelId: string;
+			labelName: string;
+			tenantId: string;
+			cover75: string;
+			cover100: string;
+			cover160: string;
+			cover300: string;
+			coverOriginal: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(sql, params);
 
 		const items: RevenueReleaseItem[] = [];
 		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		if (rows.length > 0) {
-			const releaseIds = rows.map((r) => r.releaseId);
-			const releasesMeta =
-				await this.isrcResolverService.getReleaseMetadata(releaseIds);
-
+			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
+			);
 			rows.forEach((r, index) => {
-				const meta = releasesMeta.get(r.releaseId);
+				const workspace = r.tenantId
+					? tenantMetadata.get(r.tenantId)
+					: undefined;
 				items.push({
 					rank: offset + index + 1,
 					releaseId: r.releaseId,
-					title: meta?.title ?? 'Unknown Release',
-					upc: meta?.upc ?? null,
-					labelId: meta?.labelId ?? null,
-					labelName: meta?.labelName ?? null,
-					trackCount: meta?.trackCount ?? 0,
+					title: r.releaseTitle || 'Unknown Release',
+					upc: r.releaseUpc || null,
+					labelId: r.labelId || null,
+					labelName: r.labelName || null,
+					trackCount: Number(r.trackCount),
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
-					release: meta
-						? { coverArtThumbnails: meta.coverArtThumbnails }
-						: null,
+					metadataExternal: normalizeSyncedMetadataExternal(
+						r.releaseMetadataSpotify,
+						r.releaseMetadataDeezer,
+					),
+					workspaces: workspace
+						? [{ id: r.tenantId, ...workspace }]
+						: [],
+					release: {
+						coverArtThumbnails: {
+							'75x75': r.cover75 || null,
+							'100x100': r.cover100 || null,
+							'160x160': r.cover160 || null,
+							'300x300': r.cover300 || null,
+							original: r.coverOriginal || null,
+						},
+					},
 				});
 			});
 
@@ -2539,6 +2594,8 @@ export class TimelineAnalyticsService {
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
+						metadataExternal: {},
+						workspaces: [],
 						release: null,
 					};
 					if (query.groupBySource) {
@@ -2657,33 +2714,31 @@ export class TimelineAnalyticsService {
 			const releaseIds = rows.map((r) => r.releaseId);
 			const allChannelIds = [...new Set(rows.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
 
-			const [releasesMeta, channelsMeta] = await Promise.all([
+			const [releasesMeta, channelsMeta, videosMeta] = await Promise.all([
 				this.isrcResolverService.getReleaseMetadata(releaseIds),
 				allChannelIds.length > 0
 					? this.isrcResolverService.getChannelMetadata(allChannelIds)
 					: Promise.resolve(new Map()),
+				this.isrcResolverService.getVideoMetadataByReleaseIds(releaseIds),
 			]);
 
 			rows.forEach((r, index) => {
 				const meta = releasesMeta.get(r.releaseId);
 				const rowChannelIds = (r.channelIds ?? []).filter(Boolean);
 
-				const channels = rowChannelIds
+				const channels: AnalyticsChannelInfo[] = rowChannelIds
 					.map((id) => {
 						const ch = channelsMeta.get(id);
-						return ch ? { id, name: ch.name } : null;
+						return ch ? { id, ...ch } : null;
 					})
-					.filter((c): c is { id: string; name: string } => c !== null);
+					.filter((c): c is AnalyticsChannelInfo => c !== null);
 
-				const workspacesMap = new Map<string, { id: string; name: string }>();
+				const workspacesMap = new Map<string, AnalyticsWorkspaceInfo>();
 				rowChannelIds.forEach((id) => {
 					const ch = channelsMeta.get(id);
 					const tenant = ch?.tenant;
 					if (tenant && !workspacesMap.has(tenant.id)) {
-						workspacesMap.set(tenant.id, {
-							id: tenant.id,
-							name: tenant.name || tenant.title,
-						});
+						workspacesMap.set(tenant.id, tenant);
 					}
 				});
 
@@ -2700,6 +2755,7 @@ export class TimelineAnalyticsService {
 					quantity: Number(r.quantity),
 					channels,
 					workspaces: [...workspacesMap.values()],
+					video: videosMeta.get(r.releaseId) ?? null,
 					release: meta
 						? { coverArtThumbnails: meta.coverArtThumbnails }
 						: null,
@@ -2770,6 +2826,7 @@ export class TimelineAnalyticsService {
 						quantity: otherQty > 0 ? otherQty : 0,
 						channels: [],
 						workspaces: [],
+						video: null,
 						release: null,
 					};
 					if (query.groupBySource) {
