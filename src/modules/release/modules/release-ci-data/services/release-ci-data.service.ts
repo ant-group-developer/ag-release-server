@@ -506,17 +506,31 @@ export class ReleaseCiDataService {
 			return null;
 		}
 
-		const importEntity = items.sort((a, b) => {
+		const importBatch = items.sort((a, b) => {
 			const aTime = new Date(a?.modify_time ?? 0).getTime();
 			const bTime = new Date(b?.modify_time ?? 0).getTime();
 			return bTime - aTime;
 		})[0];
 
+		const targetPackageId = importRawData.queryParams?.package_id;
+
+		let actualStatus = null;
+		if (Array.isArray(importBatch.import_file)) {
+			const targetFile = importBatch.import_file.find(
+				(file: any) =>
+					file.package_id === targetPackageId ||
+					file.GTIN === targetPackageId
+			);
+
+			actualStatus = targetFile?.import_status ?? null;
+		}
+
 		return {
-			status: importEntity.status ?? null,
-			modify_time: importEntity.modify_time ?? null,
+			status: actualStatus,
+			modify_time: importBatch.modify_time ?? null,
 		};
 	}
+
 
 	private getImportCount(importRawData?: Record<string, any> | null): number {
 		if (!importRawData) {
@@ -543,7 +557,7 @@ export class ReleaseCiDataService {
 			? this.getExportItems(exportRawData).length > 0
 			: false;
 
-		return (lastImportIsFailed || hasQaFlag) && !hasExportOnCi;
+		return lastImportIsFailed || hasQaFlag || !hasExportOnCi;
 	}
 
 	private getImportItems(

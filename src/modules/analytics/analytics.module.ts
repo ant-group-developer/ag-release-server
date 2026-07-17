@@ -13,6 +13,7 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TenantModule } from 'src/modules/tenant/tenant.module';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 
 // Controllers
 import { AnalyticsReportExportController } from './controllers/analytics-report-export.controller';
@@ -58,6 +59,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 			Dsp,
 			Tenant,
 			Channel,
+			Video,
 		]),
 	],
 	controllers: [

@@ -40,10 +40,11 @@ export class VideoCsvImportController {
 		summary: 'Import video CSV de enrich channel_id cho video releases',
 		description:
 			'Upload CSV format videoExports.csv (multipart/form-data key = file). ' +
-			'Voi moi row ISRC: match video existing de gan channelId (chi khi dang null), ' +
+			'Voi moi row ISRC: match video existing de gan channelId (chi khi dang null) ' +
+			'va externalId tu YouTube link, ' +
 			'hoac tao moi release+video (fallback tenant ANT MUSIC LLC + label AMG). ' +
 			'Channel name lookup case-insensitive theo channels.name. ' +
-			'Khong overwrite channelId da co san.',
+			'Khong overwrite channelId da co san; externalId chi cap nhat khi YouTube link hop le va khac gia tri hien tai.',
 	})
 	async import(
 		@UploadedFile()
