@@ -6,7 +6,7 @@ import { ChannelDeliverySpec } from './channel-delivery-spec';
 import { advance } from './channel-interpreter';
 import { ChannelInput, ChannelPosition } from './channel-interpreter.types';
 import { ChannelState, isChannelTerminal } from './channel-state.enum';
-import { DeliveryProcess } from './delivery-process';
+import { DeliveryProcess, Stage } from './delivery-process';
 import { getProcess } from './delivery-process.registry';
 
 /** Snapshot row to rehydrate a ChannelDelivery from persistence (phase 2 repo). */
@@ -96,6 +96,15 @@ export class ChannelDelivery {
 	/** Key of the first stage — the safe RESET target for a full retry (always pos 0 ≤ current). */
 	get firstStageKey(): string {
 		return this.process.stages[0].key;
+	}
+
+	/**
+	 * Stage the channel now sits on — undefined when pos runs past the last stage (terminal
+	 * LIVE/TAKEN_DOWN, no more work). Consumed by the outbox derivation in orchestrate.handler
+	 * to pick which queue the channel's next job should ride.
+	 */
+	get currentStage(): Stage | undefined {
+		return this.process.stages[this._pos];
 	}
 
 	/**

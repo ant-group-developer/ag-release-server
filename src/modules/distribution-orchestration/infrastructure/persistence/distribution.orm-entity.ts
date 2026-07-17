@@ -58,4 +58,12 @@ export class DistributionOrmEntity {
 	/** Optimistic lock: repo UPDATE ... WHERE version=? then version+1. Tự quản, không dùng @VersionColumn. */
 	@Column({ type: 'int', default: 0 })
 	version!: number;
+
+	/**
+	 * Immutable channel specs — set once at INSERT (fresh aggregate).
+	 * Cần vì rehydrate phải re-spawn channels khi state chuyển vào DELIVERING sau load.
+	 * jsonb (không Record<string, unknown>) tránh strict DeepPartial của TypeORM.
+	 */
+	@Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+	channelSpecs!: object;
 }

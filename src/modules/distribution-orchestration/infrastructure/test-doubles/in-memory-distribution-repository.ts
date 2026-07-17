@@ -103,10 +103,12 @@ function cloneViaRehydrate(src: Distribution, dbVersion: number): Distribution {
 			packageUri: src.packageUri,
 			retryCount: src.retryCount,
 			version: dbVersion,
+			channelSpecs: [...src.channelSpecs],
 		},
-		// Channels: rehydrate từ chính src.channels — giữ instance vì channel state là
-		// milestone của aggregate; test-double không cần deep-clone (test hiện tại của
-		// Step 4 chỉ chạy submit + markValidated, chưa spawn channel).
+		// Channels: giữ instance từ src.channels — channel entity không có mutation
+		// nào ngoài apply() (đã ghi state vào field private), test-double không cần
+		// deep-clone. Nếu case sau save+load channels bị mutate ở cả 2 aggregate cùng
+		// lúc → cần rehydrate channel; giờ chưa có case đó.
 		[...src.channels],
 	);
 }

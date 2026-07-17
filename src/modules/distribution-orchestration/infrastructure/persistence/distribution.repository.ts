@@ -79,19 +79,26 @@ export class TypeOrmDistributionRepository implements DistributionRepository {
 
 		// INSERT khi version=0 (aggregate mới create), UPDATE ngược lại
 		if (expectedVersion === 0) {
-			await ctx.manager.insert(DistributionOrmEntity, {
-				id: dist.id,
-				releaseId: dist.releaseId,
-				snapshotId: dist.snapshotId,
-				tenantId: dist.tenantId,
-				type: dist.type,
-				correlationId: dist.correlationId,
-				state: dist.state,
-				upc: dist.upc ?? null,
-				packageUri: dist.packageUri ?? null,
-				retryCount: dist.retryCount,
-				version: 1, // sau khi commit lần đầu, DB version=1
-			});
+			// createQueryBuilder tránh DeepPartial strict cho jsonb channel_specs
+			await ctx.manager
+				.createQueryBuilder()
+				.insert()
+				.into(DistributionOrmEntity)
+				.values({
+					id: dist.id,
+					releaseId: dist.releaseId,
+					snapshotId: dist.snapshotId,
+					tenantId: dist.tenantId,
+					type: dist.type,
+					correlationId: dist.correlationId,
+					state: dist.state,
+					upc: dist.upc ?? null,
+					packageUri: dist.packageUri ?? null,
+					retryCount: dist.retryCount,
+					version: 1, // sau khi commit lần đầu, DB version=1
+					channelSpecs: [...dist.channelSpecs] as unknown as object,
+				})
+				.execute();
 			return;
 		}
 
@@ -213,6 +220,7 @@ function toDistRow(r: DistributionOrmEntity): DistributionSnapshotRow {
 		packageUri: r.packageUri ?? undefined,
 		retryCount: r.retryCount,
 		version: r.version,
+		channelSpecs: (r.channelSpecs as ChannelDeliverySpec[]) ?? [],
 	};
 }
 

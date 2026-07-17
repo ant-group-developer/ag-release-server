@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1-4 XONG · Step 5a (commands + handler dispatch) XONG · Step 5b (runners + rehydrate specs) chưa · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** 🔵 Step 1-5 XONG (5b runners + E2E in-memory) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [~] Step 5 (5a done, 5b pending) [ ] Step 6 [ ] Step 7 [ ] Step 8
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [x] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
 
 ## Context Links
 
@@ -195,8 +195,8 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - [x] Step 2: 4 ORM entity + migration + repo + UoW + integration test (Nhịp 2.1–2.6)
 - [x] Step 3: 9 test-double in-memory
 - [x] Step 4: orchestrate.handler + submit→validate chạy in-memory + test (6 spec xanh)
-- [~] Step 5a: 10 command discriminated union + handler dispatch + buildOutbox mở rộng (5 pipeline spec xanh — total 136 test)
-- [ ] Step 5b: rehydrate mang `channelSpecs` (cột jsonb mới) + 7 step-runners (provision/build/upload/import/qa/export/status-sync)
+- [x] Step 5a: 10 command discriminated union + handler dispatch + buildOutbox mở rộng (5 pipeline spec xanh — total 136 test)
+- [x] Step 5b: migration channel_specs jsonb + rehydrate accept specs + per-channel outbox từ DELIVERING + 7 step-runners + E2E SUBMIT→LIVE spec (134 unit + 3 integration xanh)
 - [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
 - [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
 - [ ] Cập nhật plan.md status Phase 2

@@ -7,8 +7,10 @@ export type QueueName =
 	| 'dist.provision-id' // worker cấp UPC/ISRC
 	| 'dist.build-package' // worker build DDEX + upload GCS
 	| 'dist.sftp-upload' // worker upload SFTP tới DSP/aggregator
-	| 'dist.status-sync' // worker poll DSP xem đã live chưa
-	| 'dist.export'; // worker gọi API export (CI panel / State51 email)
+	| 'dist.ci-import-check' // worker poll CI import status (WAIT INGEST)
+	| 'dist.ci-qa-check' // worker poll CI QA flags (GATE qa)
+	| 'dist.export-batch' // worker gom batch export (WAIT EXPORT)
+	| 'dist.status-sync'; // worker poll DSP live/takedown status (WAIT PARTNER/GO_LIVE/TAKEDOWN)
 
 /**
  * Options khi enqueue. Tất cả optional — mặc định adapter tự xử lý.

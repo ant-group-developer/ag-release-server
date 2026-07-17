@@ -1,3 +1,4 @@
+import { ChannelDeliverySpec } from '../channel-delivery/channel-delivery-spec';
 import { ChannelDelivery } from '../channel-delivery/channel-delivery.entity';
 import { ChannelInputType } from '../channel-delivery/channel-interpreter.types';
 import {
@@ -41,7 +42,7 @@ export class Distribution {
 		public readonly tenantId: string,
 		public readonly type: ExecutionTypeEnum,
 		public readonly correlationId: string,
-		private readonly _channelSpecs: CreateDistributionProps['channelSpecs'],
+		private readonly _channelSpecs: readonly ChannelDeliverySpec[],
 	) {}
 
 	get state(): DistributionState {
@@ -61,6 +62,9 @@ export class Distribution {
 	}
 	get packageUri(): string | undefined {
 		return this._packageUri;
+	}
+	get channelSpecs(): readonly ChannelDeliverySpec[] {
+		return this._channelSpecs;
 	}
 
 	/** Create a fresh aggregate in DRAFT (submit is a separate transition). */
@@ -374,7 +378,7 @@ export class Distribution {
 			row.tenantId,
 			row.type,
 			row.correlationId,
-			[],
+			row.channelSpecs,
 		);
 		d._state = row.state;
 		d._channels = channels;

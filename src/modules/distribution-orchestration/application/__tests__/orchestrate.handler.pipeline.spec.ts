@@ -85,7 +85,9 @@ describe('OrchestrateHandler — Step 5 pipeline commands', () => {
 			key: 'k2',
 			requiresReview: false,
 		});
-		expect((await loaded())!.state).toBe(DistributionState.PROVISIONING_IDS);
+		expect((await loaded())!.state).toBe(
+			DistributionState.PROVISIONING_IDS,
+		);
 
 		await handler.handle({
 			type: 'MARK_IDS_PROVISIONED',
@@ -131,7 +133,9 @@ describe('OrchestrateHandler — Step 5 pipeline commands', () => {
 			key: 'k3',
 			reviewerId: 'rev-1',
 		});
-		expect((await loaded())!.state).toBe(DistributionState.PROVISIONING_IDS);
+		expect((await loaded())!.state).toBe(
+			DistributionState.PROVISIONING_IDS,
+		);
 		expect(repo.savedOutbox).toHaveLength(1);
 		expect(repo.savedOutbox[0].queue).toBe('dist.provision-id');
 	});

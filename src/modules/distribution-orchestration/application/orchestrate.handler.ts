@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DistributionState } from '../domain/distribution/distribution-state.enum';
 import { Distribution } from '../domain/distribution/distribution.aggregate';
 import { Clock } from '../domain/ports/clock.port';
+import { pickChannelQueue } from './channel-stage-to-queue';
 import {
 	ApplyChannelInputCommand,
 	ApproveReviewCommand,
@@ -236,8 +237,38 @@ export class OrchestrateHandler {
 				return [{ queue: 'dist.provision-id', payload, jobId }];
 			case DistributionState.BUILDING_PACKAGE:
 				return [{ queue: 'dist.build-package', payload, jobId }];
+			case DistributionState.DELIVERING:
+				return this.buildDeliveringOutbox(dist, command.key, payload);
 			default:
 				return [];
 		}
+	}
+
+	/**
+	 * DELIVERING: 1 job / channel non-terminal → queue derived from stage.
+	 * jobId = `${distId}:${channelId}:${stage.key}:${key}` — deterministic + per-channel.
+	 * Terminal channels emit nothing. Unknown stage kind = skipped (log ở runner Step 5b).
+	 */
+	private buildDeliveringOutbox(
+		dist: Distribution,
+		key: string,
+		basePayload: {
+			distributionId: string;
+			correlationId: string;
+			key: string;
+		},
+	): OutboxEntry[] {
+		const entries: OutboxEntry[] = [];
+		for (const channel of dist.channels) {
+			const queue = pickChannelQueue(channel);
+			if (!queue) continue;
+			const stageKey = channel.currentStage?.key ?? '?';
+			entries.push({
+				queue,
+				payload: { ...basePayload, channelId: channel.channelId },
+				jobId: `${dist.id}:${channel.channelId}:${stageKey}:${key}`,
+			});
+		}
+		return entries;
 	}
 }

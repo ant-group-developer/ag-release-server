@@ -184,14 +184,22 @@ describe('OrchestrateHandler', () => {
 		expect(aggB!.version).toBe(1);
 
 		// A markValidated + save trước → DB version 1→2
-		aggA!.markValidated(new DefaultPolicyResolver().resolve(aggA!.type), false, clock);
+		aggA!.markValidated(
+			new DefaultPolicyResolver().resolve(aggA!.type),
+			false,
+			clock,
+		);
 		await uow.run((ctx) =>
 			repo.saveWithOutbox(ctx, aggA!, aggA!.pullDomainEvents(), []),
 		);
 		expect(repo.getVersion(DIST_ID)).toBe(2);
 
 		// B markValidated + save với stale version=1 → throw OptimisticLockError
-		aggB!.markValidated(new DefaultPolicyResolver().resolve(aggB!.type), false, clock);
+		aggB!.markValidated(
+			new DefaultPolicyResolver().resolve(aggB!.type),
+			false,
+			clock,
+		);
 		await expect(
 			uow.run((ctx) =>
 				repo.saveWithOutbox(ctx, aggB!, aggB!.pullDomainEvents(), []),

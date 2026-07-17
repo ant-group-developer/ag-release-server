@@ -27,6 +27,8 @@ export interface DistributionSnapshotRow {
 	readonly packageUri?: string;
 	readonly retryCount: number;
 	readonly version: number;
+	/** Immutable at INSERT — serialised as jsonb; needed so post-load rehydrate can spawn channels. */
+	readonly channelSpecs: ChannelDeliverySpec[];
 }
 
 /** Which ISSUES channels to reset on retry (empty channelIds = all ISSUES channels). */

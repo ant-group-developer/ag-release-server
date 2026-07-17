@@ -34,6 +34,12 @@ import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-wor
  *
  * Module CHƯA export gì — module khác chưa gọi handler qua DI (Step 7+ mới wire
  * queue consumer). Test unit inject handler trực tiếp qua constructor.
+ *
+ * Step-runners (Step 5b) KHÔNG wire ở đây — 7 runner cần adapter cho 7 port
+ * (IdentifierProvisioner, PackageBuilder, PackageUploader, QaChecker, Exporter,
+ * IngestResultReader, DeliveryStatusReader) sẽ có ở Phase 4 (ACL layer). Runner
+ * đã Injectable + có DI token — Phase 4 chỉ cần thêm `{provide, useClass}` +
+ * đăng ký runner vào providers khi adapter sẵn sàng.
  */
 @Module({
 	imports: [
