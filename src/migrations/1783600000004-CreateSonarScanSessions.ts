@@ -6,7 +6,7 @@ export class CreateSonarScanSessions1783600000004 implements MigrationInterface 
 	async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(`
       CREATE TABLE "sonar_scan_sessions" (
-        "id"                      UUID NOT NULL DEFAULT uuid_generate_v4(),
+        "id"                      UUID NOT NULL DEFAULT gen_random_uuid(),
         "status"                  VARCHAR(20) NOT NULL DEFAULT 'PENDING',
         "total_releases"          INTEGER NOT NULL DEFAULT 0,
         "processed_releases"      INTEGER NOT NULL DEFAULT 0,
