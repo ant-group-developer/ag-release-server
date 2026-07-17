@@ -49,7 +49,7 @@ export class ReleaseCiDataService {
 
 		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
-	) { }
+	) {}
 
 	async upsertByReleaseId(
 		releaseId: string,
@@ -178,8 +178,9 @@ export class ReleaseCiDataService {
 
 		const records = items.map((item, index) => {
 			const importLatest = item.importParsedData
-				? `${item.importParsedData.modify_time ?? ''} | ${item.importParsedData.status ?? ''
-				}`
+				? `${item.importParsedData.modify_time ?? ''} | ${
+						item.importParsedData.status ?? ''
+					}`
 				: '';
 
 			return {
@@ -449,7 +450,8 @@ export class ReleaseCiDataService {
 					synced += 1;
 					syncedReleaseIds.push(item.releaseId);
 					this.logger.log(
-						`Bulk synced data CI ${item.id} for release ${item.releaseId}. Progress: ${synced + failed.length
+						`Bulk synced data CI ${item.id} for release ${item.releaseId}. Progress: ${
+							synced + failed.length
 						}/${pendingItems.length}`,
 					);
 					return;
@@ -465,7 +467,8 @@ export class ReleaseCiDataService {
 					message,
 				});
 				this.logger.error(
-					`Failed to bulk sync data CI ${item.id} for release ${item.releaseId}. Progress: ${synced + failed.length
+					`Failed to bulk sync data CI ${item.id} for release ${item.releaseId}. Progress: ${
+						synced + failed.length
 					}/${pendingItems.length}. Error: ${message}`,
 				);
 			});
@@ -519,7 +522,7 @@ export class ReleaseCiDataService {
 			const targetFile = importBatch.import_file.find(
 				(file: any) =>
 					file.package_id === targetPackageId ||
-					file.GTIN === targetPackageId
+					file.GTIN === targetPackageId,
 			);
 
 			actualStatus = targetFile?.import_status ?? null;
@@ -530,7 +533,6 @@ export class ReleaseCiDataService {
 			modify_time: importBatch.modify_time ?? null,
 		};
 	}
-
 
 	private getImportCount(importRawData?: Record<string, any> | null): number {
 		if (!importRawData) {
@@ -603,7 +605,7 @@ export class ReleaseCiDataService {
 			if (
 				!current ||
 				this.getExportRecordTime(item) >
-				this.getExportRecordTime(current)
+					this.getExportRecordTime(current)
 			) {
 				latestByDsp.set(dspKey, item);
 			}
@@ -640,10 +642,10 @@ export class ReleaseCiDataService {
 		const musicService = item.musicService ?? {};
 		return String(
 			musicService.dpc ??
-			musicService.DPID ??
-			musicService.id ??
-			musicService.name ??
-			item.id,
+				musicService.DPID ??
+				musicService.id ??
+				musicService.name ??
+				item.id,
 		);
 	}
 
@@ -892,22 +894,21 @@ export class ReleaseCiDataService {
 		}
 
 		if (keyword?.length) {
-			const isUpcSearch = keyword.every(k => /^\d{12,14}$/.test(k.trim()));
+			const isUpcSearch = keyword.every((k) =>
+				/^\d{12,14}$/.test(k.trim()),
+			);
 
 			if (isUpcSearch) {
-				qb.andWhere('release.upc IN (:...keyword)', { keyword: keyword.map(k => k.trim()) });
+				qb.andWhere('release.upc IN (:...keyword)', {
+					keyword: keyword.map((k) => k.trim()),
+				});
 			} else {
 				const keywords = keyword.map((k) => `%${k}%`);
-				qb.andWhere(
-					`release.title ILIKE ANY(:keywords)`,
-					{ keywords },
-				);
+				qb.andWhere(`release.title ILIKE ANY(:keywords)`, { keywords });
 			}
 		}
 
-
 		if (isCount) return;
-
 
 		if (filter.fieldOrder === FieldOrderReleaseCiData.dspsLive) {
 			qb.orderBy('dsps_live_count', filter.orderBy)

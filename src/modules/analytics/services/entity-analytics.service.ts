@@ -200,15 +200,20 @@ export class EntityAnalyticsService {
 			[iso2Codes],
 		);
 		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [country.iso2, country.name]),
+			countries.map((country: { iso2: string; name: string }) => [
+				country.iso2,
+				country.name,
+			]),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
-			const territory = (isOther
-				? item.territory
-				: (countryNameByIso2.get(iso2) ?? item.territory)) as string;
+			const territory = (
+				isOther
+					? item.territory
+					: (countryNameByIso2.get(iso2) ?? item.territory)
+			) as string;
 			return {
 				...item,
 				territory,
@@ -1424,7 +1429,10 @@ export class EntityAnalyticsService {
 
 		const totalItems = Number(countRows[0]?.total ?? 0);
 
-		const mapRow = (row: typeof dataRows[0], rank: number): DspTopReleaseItem => ({
+		const mapRow = (
+			row: (typeof dataRows)[0],
+			rank: number,
+		): DspTopReleaseItem => ({
 			rank,
 			releaseId: row.release_id,
 			title: row.release_title || '',
@@ -1467,15 +1475,32 @@ export class EntityAnalyticsService {
 					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 					AND t.release_id != ''
 			`;
-			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, baseParams))[0];
+			const totalsRow = (
+				await this.clickHouseService.query<{
+					total_views: string;
+					total_revenue_usd: string;
+				}>(totalsSql, baseParams)
+			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
-			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
-			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
-			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
-			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const grandTotalRevExact = this.revenueExact(
+				totalsRow?.total_revenue_usd,
+			);
+			const topRevExact = this.addRevenueExact(
+				dataRows.map((r) => r.total_revenue_usd),
+			);
+			const topViews = dataRows.reduce(
+				(s, r) => s + Number(r.total_views),
+				0,
+			);
+			const otherRevExact = this.subtractRevenueExact(
+				grandTotalRevExact,
+				topRevExact,
+			);
 			const otherViews = grandTotalViews - topViews;
 
-			const items: DspTopReleaseItem[] = dataRows.map((row, i) => mapRow(row, i + 1));
+			const items: DspTopReleaseItem[] = dataRows.map((row, i) =>
+				mapRow(row, i + 1),
+			);
 			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
 				items.push({
 					rank: items.length + 1,
@@ -1487,17 +1512,34 @@ export class EntityAnalyticsService {
 					trackCount: 0,
 					totalViews: Math.max(0, otherViews),
 					totalRevenueUsd: otherRevExact,
-					release: { coverArtThumbnails: { '75x75': null, '100x100': null, '160x160': null, '300x300': null, original: null } },
+					release: {
+						coverArtThumbnails: {
+							'75x75': null,
+							'100x100': null,
+							'160x160': null,
+							'300x300': null,
+							original: null,
+						},
+					},
 				});
 			}
-			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+			return new PageDto({
+				items,
+				metadata: { page, pageSize: topNLimit, totalItems },
+			});
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
-		const items: DspTopReleaseItem[] = dataRows.map((row, i) => mapRow(row, rankOffset + i + 1));
+		const items: DspTopReleaseItem[] = dataRows.map((row, i) =>
+			mapRow(row, rankOffset + i + 1),
+		);
 		return new PageDto({
 			items,
-			metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems },
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
 		});
 	}
 
@@ -1657,7 +1699,10 @@ export class EntityAnalyticsService {
 
 		const totalItems = Number(countRows[0]?.total ?? 0);
 
-		const mapTrackRow = (row: typeof dataRows[0], rank: number): DspTopTrackItem => ({
+		const mapTrackRow = (
+			row: (typeof dataRows)[0],
+			rank: number,
+		): DspTopTrackItem => ({
 			rank,
 			isrc: row.isrc,
 			title: row.track_title || '',
@@ -1699,15 +1744,32 @@ export class EntityAnalyticsService {
 				WHERE ${whereConditions}
 					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 			`;
-			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, baseParams))[0];
+			const totalsRow = (
+				await this.clickHouseService.query<{
+					total_views: string;
+					total_revenue_usd: string;
+				}>(totalsSql, baseParams)
+			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
-			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
-			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
-			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
-			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const grandTotalRevExact = this.revenueExact(
+				totalsRow?.total_revenue_usd,
+			);
+			const topRevExact = this.addRevenueExact(
+				dataRows.map((r) => r.total_revenue_usd),
+			);
+			const topViews = dataRows.reduce(
+				(s, r) => s + Number(r.total_views),
+				0,
+			);
+			const otherRevExact = this.subtractRevenueExact(
+				grandTotalRevExact,
+				topRevExact,
+			);
 			const otherViews = grandTotalViews - topViews;
 
-			const items: DspTopTrackItem[] = dataRows.map((row, i) => mapTrackRow(row, i + 1));
+			const items: DspTopTrackItem[] = dataRows.map((row, i) =>
+				mapTrackRow(row, i + 1),
+			);
 			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
 				items.push({
 					rank: items.length + 1,
@@ -1719,17 +1781,34 @@ export class EntityAnalyticsService {
 					releaseTitle: '',
 					totalViews: Math.max(0, otherViews),
 					totalRevenueUsd: otherRevExact,
-					release: { coverArtThumbnails: { '75x75': null, '100x100': null, '160x160': null, '300x300': null, original: null } },
+					release: {
+						coverArtThumbnails: {
+							'75x75': null,
+							'100x100': null,
+							'160x160': null,
+							'300x300': null,
+							original: null,
+						},
+					},
 				});
 			}
-			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+			return new PageDto({
+				items,
+				metadata: { page, pageSize: topNLimit, totalItems },
+			});
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
-		const items: DspTopTrackItem[] = dataRows.map((row, i) => mapTrackRow(row, rankOffset + i + 1));
+		const items: DspTopTrackItem[] = dataRows.map((row, i) =>
+			mapTrackRow(row, rankOffset + i + 1),
+		);
 		return new PageDto({
 			items,
-			metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems },
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
 		});
 	}
 
@@ -1768,22 +1847,33 @@ export class EntityAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = { entityId, fromMonth, toMonth };
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
-		const effectiveImportSource = entityType === 'sourceType' ? entityId : dto.importSource;
+		const effectiveImportSource =
+			entityType === 'sourceType' ? entityId : dto.importSource;
 		if (effectiveImportSource) params.importSource = effectiveImportSource;
 		if (dto.releaseType) params.releaseType = dto.releaseType;
 
-		const importFilter = effectiveImportSource ? 'AND s.import_source = {importSource:String}' : '';
-		const tenantFilter = isSystem || entityType === 'tenant' ? '' : 'AND t.tenant_id = {tenantId:String}';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
-		const entityFilter = ({
-			release: 'AND t.release_id = {entityId:String}',
-			track: 'AND t.isrc = {entityId:String}',
-			label: 'AND t.label_id = {entityId:String}',
-			artist: 'AND has(t.artist_ids, {entityId:String})',
-			tenant: 'AND t.tenant_id = {entityId:String}',
-			channel: 'AND t.channel_id = {entityId:String}',
-			sourceType: '',
-		} as Record<string, string>)[entityType] ?? '';
+		const importFilter = effectiveImportSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const tenantFilter =
+			isSystem || entityType === 'tenant'
+				? ''
+				: 'AND t.tenant_id = {tenantId:String}';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
+		const entityFilter =
+			(
+				{
+					release: 'AND t.release_id = {entityId:String}',
+					track: 'AND t.isrc = {entityId:String}',
+					label: 'AND t.label_id = {entityId:String}',
+					artist: 'AND has(t.artist_ids, {entityId:String})',
+					tenant: 'AND t.tenant_id = {entityId:String}',
+					channel: 'AND t.channel_id = {entityId:String}',
+					sourceType: '',
+				} as Record<string, string>
+			)[entityType] ?? '';
 
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
 		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
@@ -1791,7 +1881,9 @@ export class EntityAnalyticsService {
 		const primaryTable = sortByRevenue
 			? CLICKHOUSE_TABLES.SALES_DSP_MONTHLY
 			: CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY;
-		const importFilterSal = effectiveImportSource ? 'AND tr_sub.import_source = {importSource:String}' : '';
+		const importFilterSal = effectiveImportSource
+			? 'AND tr_sub.import_source = {importSource:String}'
+			: '';
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -1805,7 +1897,8 @@ export class EntityAnalyticsService {
 				${importFilter} ${whereTrack}
 		`;
 
-		const dataSql = sortByRevenue ? `
+		const dataSql = sortByRevenue
+			? `
 			SELECT
 				s.dsp_id AS dsp_id,
 				r.pg_uuid AS pg_dsp_id,
@@ -1828,7 +1921,8 @@ export class EntityAnalyticsService {
 			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
 			ORDER BY ${sortCol} DESC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
-		` : `
+		`
+			: `
 			SELECT
 				s.dsp_id AS dsp_id,
 				r.pg_uuid AS pg_dsp_id,
@@ -1868,7 +1962,8 @@ export class EntityAnalyticsService {
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
 			// Fetch grand totals to compute "Other"
-			const totalsSql = sortByRevenue ? `
+			const totalsSql = sortByRevenue
+				? `
 				SELECT toString(sum(s.total_revenue_usd)) AS total_revenue_usd, sum(tr.total_views) AS total_views
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 				${trackJoin}
@@ -1881,7 +1976,8 @@ export class EntityAnalyticsService {
 				) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${importFilter} ${whereTrack}
-			` : `
+			`
+				: `
 				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
 				${trackJoin}
@@ -1895,12 +1991,27 @@ export class EntityAnalyticsService {
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${importFilter} ${whereTrack}
 			`;
-			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, params))[0];
+			const totalsRow = (
+				await this.clickHouseService.query<{
+					total_views: string;
+					total_revenue_usd: string;
+				}>(totalsSql, params)
+			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
-			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
-			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
-			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
-			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const grandTotalRevExact = this.revenueExact(
+				totalsRow?.total_revenue_usd,
+			);
+			const topRevExact = this.addRevenueExact(
+				dataRows.map((r) => r.total_revenue_usd),
+			);
+			const topViews = dataRows.reduce(
+				(s, r) => s + Number(r.total_views),
+				0,
+			);
+			const otherRevExact = this.subtractRevenueExact(
+				grandTotalRevExact,
+				topRevExact,
+			);
 			const otherViews = grandTotalViews - topViews;
 
 			const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
@@ -1921,7 +2032,10 @@ export class EntityAnalyticsService {
 					totalRevenueUsd: otherRevExact,
 				});
 			}
-			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+			return new PageDto({
+				items,
+				metadata: { page, pageSize: topNLimit, totalItems },
+			});
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
@@ -1934,7 +2048,14 @@ export class EntityAnalyticsService {
 			totalRevenueUsd: row.total_revenue_usd || '0',
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
+		});
 	}
 
 	// ─────────────────────────────────────────────────────
@@ -1972,22 +2093,33 @@ export class EntityAnalyticsService {
 		const isSystem = checkIsSystemTenant(tenantId);
 		const params: Record<string, any> = { entityId, fromMonth, toMonth };
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
-		const effectiveImportSource = entityType === 'sourceType' ? entityId : dto.importSource;
+		const effectiveImportSource =
+			entityType === 'sourceType' ? entityId : dto.importSource;
 		if (effectiveImportSource) params.importSource = effectiveImportSource;
 		if (dto.releaseType) params.releaseType = dto.releaseType;
 
-		const importFilter = effectiveImportSource ? 'AND s.import_source = {importSource:String}' : '';
-		const tenantFilter = isSystem || entityType === 'tenant' ? '' : 'AND t.tenant_id = {tenantId:String}';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
-		const entityFilter = ({
-			release: 'AND t.release_id = {entityId:String}',
-			track: 'AND t.isrc = {entityId:String}',
-			label: 'AND t.label_id = {entityId:String}',
-			artist: 'AND has(t.artist_ids, {entityId:String})',
-			tenant: 'AND t.tenant_id = {entityId:String}',
-			channel: 'AND t.channel_id = {entityId:String}',
-			sourceType: '',
-		} as Record<string, string>)[entityType] ?? '';
+		const importFilter = effectiveImportSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const tenantFilter =
+			isSystem || entityType === 'tenant'
+				? ''
+				: 'AND t.tenant_id = {tenantId:String}';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
+		const entityFilter =
+			(
+				{
+					release: 'AND t.release_id = {entityId:String}',
+					track: 'AND t.isrc = {entityId:String}',
+					label: 'AND t.label_id = {entityId:String}',
+					artist: 'AND has(t.artist_ids, {entityId:String})',
+					tenant: 'AND t.tenant_id = {entityId:String}',
+					channel: 'AND t.channel_id = {entityId:String}',
+					sourceType: '',
+				} as Record<string, string>
+			)[entityType] ?? '';
 
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
 		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
@@ -1995,7 +2127,9 @@ export class EntityAnalyticsService {
 		const primaryTable = sortByRevenue
 			? CLICKHOUSE_TABLES.SALES_TER_MONTHLY
 			: CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY;
-		const importFilterSal = effectiveImportSource ? 'AND tr_sub.import_source = {importSource:String}' : '';
+		const importFilterSal = effectiveImportSource
+			? 'AND tr_sub.import_source = {importSource:String}'
+			: '';
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -2009,7 +2143,8 @@ export class EntityAnalyticsService {
 				${importFilter} ${whereTrack}
 		`;
 
-		const dataSql = sortByRevenue ? `
+		const dataSql = sortByRevenue
+			? `
 			SELECT
 				s.territory_code AS iso_code,
 				sum(s.total_revenue_usd) AS total_revenue_usd_raw,
@@ -2029,7 +2164,8 @@ export class EntityAnalyticsService {
 			GROUP BY s.territory_code
 			ORDER BY ${sortCol} DESC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
-		` : `
+		`
+			: `
 			SELECT
 				s.territory_code AS iso_code,
 				sum(s.total_quantity) AS total_views,
@@ -2061,18 +2197,26 @@ export class EntityAnalyticsService {
 		]);
 
 		const totalItems = Number(countRows[0]?.total ?? 0);
-		const iso2Codes = dataRows.map((r) => r.iso_code?.trim().toUpperCase()).filter(Boolean);
+		const iso2Codes = dataRows
+			.map((r) => r.iso_code?.trim().toUpperCase())
+			.filter(Boolean);
 		let nameMap = new Map<string, string>();
 		if (iso2Codes.length) {
 			const countries = await this.entityManager.query(
 				`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
 				[iso2Codes],
 			);
-			nameMap = new Map(countries.map((c: { iso2: string; name: string }) => [c.iso2, c.name]));
+			nameMap = new Map(
+				countries.map((c: { iso2: string; name: string }) => [
+					c.iso2,
+					c.name,
+				]),
+			);
 		}
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
-			const totalsSql = sortByRevenue ? `
+			const totalsSql = sortByRevenue
+				? `
 				SELECT toString(sum(s.total_revenue_usd)) AS total_revenue_usd, sum(tr.total_views) AS total_views
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 				${trackJoin}
@@ -2085,7 +2229,8 @@ export class EntityAnalyticsService {
 				) tr ON s.territory_code = tr.territory_code AND s.isrc = tr.isrc
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${importFilter} ${whereTrack}
-			` : `
+			`
+				: `
 				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
 				${trackJoin}
@@ -2099,12 +2244,27 @@ export class EntityAnalyticsService {
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${importFilter} ${whereTrack}
 			`;
-			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, params))[0];
+			const totalsRow = (
+				await this.clickHouseService.query<{
+					total_views: string;
+					total_revenue_usd: string;
+				}>(totalsSql, params)
+			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
-			const grandTotalRevExact = this.revenueExact(totalsRow?.total_revenue_usd);
-			const topRevExact = this.addRevenueExact(dataRows.map((r) => r.total_revenue_usd));
-			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
-			const otherRevExact = this.subtractRevenueExact(grandTotalRevExact, topRevExact);
+			const grandTotalRevExact = this.revenueExact(
+				totalsRow?.total_revenue_usd,
+			);
+			const topRevExact = this.addRevenueExact(
+				dataRows.map((r) => r.total_revenue_usd),
+			);
+			const topViews = dataRows.reduce(
+				(s, r) => s + Number(r.total_views),
+				0,
+			);
+			const otherRevExact = this.subtractRevenueExact(
+				grandTotalRevExact,
+				topRevExact,
+			);
 			const otherViews = grandTotalViews - topViews;
 
 			const items: EntityTopTerItem[] = dataRows.map((row, i) => {
@@ -2126,7 +2286,10 @@ export class EntityAnalyticsService {
 					totalRevenueUsd: otherRevExact,
 				});
 			}
-			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+			return new PageDto({
+				items,
+				metadata: { page, pageSize: topNLimit, totalItems },
+			});
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
@@ -2141,6 +2304,13 @@ export class EntityAnalyticsService {
 			};
 		});
 
-		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
+		});
 	}
 }

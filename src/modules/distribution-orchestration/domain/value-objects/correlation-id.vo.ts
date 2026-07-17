@@ -14,7 +14,10 @@ export class CorrelationId {
 	static create(raw: string): CorrelationId {
 		const v = raw.trim().toLowerCase();
 		if (!UUID_V4.test(v)) {
-			throw new InvariantViolationError('CorrelationId', `invalid uuid v4: ${raw}`);
+			throw new InvariantViolationError(
+				'CorrelationId',
+				`invalid uuid v4: ${raw}`,
+			);
 		}
 		return new CorrelationId(v);
 	}

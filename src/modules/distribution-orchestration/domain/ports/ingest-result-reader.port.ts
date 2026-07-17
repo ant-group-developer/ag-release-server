@@ -11,5 +11,8 @@ export type IngestStatus =
  * (it does NOT trigger an import; the import happened at upload). Adapter polls CI REST.
  */
 export interface IngestResultReader {
-	read(input: { batchId: string; key: IdempotencyKey }): Promise<IngestStatus>;
+	read(input: {
+		batchId: string;
+		key: IdempotencyKey;
+	}): Promise<IngestStatus>;
 }

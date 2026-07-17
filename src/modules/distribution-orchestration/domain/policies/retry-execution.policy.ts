@@ -29,7 +29,9 @@ export class RetryExecutionPolicy implements ExecutionPolicy {
 	resolveProcessCode(spec: ChannelDeliverySpec): string {
 		return this.inner.resolveProcessCode(spec);
 	}
-	selectChannelsForTakedown(all: ChannelDeliverySpec[]): ChannelDeliverySpec[] {
+	selectChannelsForTakedown(
+		all: ChannelDeliverySpec[],
+	): ChannelDeliverySpec[] {
 		return this.inner.selectChannelsForTakedown?.(all) ?? all;
 	}
 }

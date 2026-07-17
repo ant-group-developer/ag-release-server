@@ -89,7 +89,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 
 	onModuleInit() {
 		if (process.env.APP_ROLE !== 'worker') {
-			this.logger.debug('Skipping ClickHouse sync listener (not worker role)');
+			this.logger.debug(
+				'Skipping ClickHouse sync listener (not worker role)',
+			);
 			return;
 		}
 		this.initializeSyncInBackground().catch((err) => {
@@ -611,7 +613,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_original: row.cover_original ?? '',
 					track_metadata_spotify: row.track_metadata_spotify ?? '',
 					track_metadata_deezer: row.track_metadata_deezer ?? '',
-					release_metadata_spotify: row.release_metadata_spotify ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
 					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(
@@ -698,7 +701,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_original: row.cover_original ?? '',
 					track_metadata_spotify: row.track_metadata_spotify ?? '',
 					track_metadata_deezer: row.track_metadata_deezer ?? '',
-					release_metadata_spotify: row.release_metadata_spotify ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
 					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(
@@ -859,7 +863,8 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_original: row.cover_original ?? '',
 					track_metadata_spotify: row.track_metadata_spotify ?? '',
 					track_metadata_deezer: row.track_metadata_deezer ?? '',
-					release_metadata_spotify: row.release_metadata_spotify ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
 					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(

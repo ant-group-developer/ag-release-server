@@ -15,7 +15,10 @@ export class ScheduledAt {
 			throw new InvariantViolationError('ScheduledAt', 'invalid date');
 		}
 		if (when.getTime() < now.getTime()) {
-			throw new InvariantViolationError('ScheduledAt', 'must not be in the past');
+			throw new InvariantViolationError(
+				'ScheduledAt',
+				'must not be in the past',
+			);
 		}
 		// copy for immutability: the caller mutating `when` later must not affect the VO
 		return new ScheduledAt(new Date(when.getTime()));

@@ -11,10 +11,22 @@ export class SpotifyCatalog extends BaseUUIDEntity {
 	@Column({ name: 'release_id', type: 'uuid', unique: true })
 	releaseId: string;
 
-	@Column({ name: 'album_uri', type: 'varchar', length: 255, nullable: true, comment: 'effectiveData.uri' })
+	@Column({
+		name: 'album_uri',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'effectiveData.uri',
+	})
 	albumUri: string | null;
 
-	@Column({ name: 'album_url', type: 'varchar', length: 512, nullable: true, comment: 'effectiveData.url' })
+	@Column({
+		name: 'album_url',
+		type: 'varchar',
+		length: 512,
+		nullable: true,
+		comment: 'effectiveData.url',
+	})
 	albumUrl: string | null;
 
 	@Column({
@@ -39,9 +51,13 @@ export class SpotifyCatalog extends BaseUUIDEntity {
 	@JoinColumn({ name: 'release_id' })
 	release: Release;
 
-	@OneToMany(() => SpotifyCatalogAvailability, (a) => a.catalog, { cascade: true })
+	@OneToMany(() => SpotifyCatalogAvailability, (a) => a.catalog, {
+		cascade: true,
+	})
 	availability: SpotifyCatalogAvailability[];
 
-	@OneToMany(() => SpotifyCatalogDelivery, (d) => d.catalog, { cascade: true })
+	@OneToMany(() => SpotifyCatalogDelivery, (d) => d.catalog, {
+		cascade: true,
+	})
 	catalogDeliveries: SpotifyCatalogDelivery[];
 }

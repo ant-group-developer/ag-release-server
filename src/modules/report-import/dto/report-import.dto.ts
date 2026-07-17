@@ -106,8 +106,16 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
 	file: string;
 	error: string | null;
 	result?: any;
-	detailR2Sync?: { zipsFound: number; zipsImported: number; zipsSkipped: number } | null;
-	detailExport?: { jobSpoId: string | null; foldersUploaded: number; r2ObjectKeys: string[] } | null;
+	detailR2Sync?: {
+		zipsFound: number;
+		zipsImported: number;
+		zipsSkipped: number;
+	} | null;
+	detailExport?: {
+		jobSpoId: string | null;
+		foldersUploaded: number;
+		r2ObjectKeys: string[];
+	} | null;
 	createdAt: string | null;
 	startedAt: string | null;
 	finishedAt: string | null;
@@ -115,7 +123,8 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
 
 	constructor(job: ImportJob) {
 		const isR2Sync = job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
-		const isExportTrigger = job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
+		const isExportTrigger =
+			job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
 
 		this.id = job.id;
 		this.status = job.status;
@@ -148,8 +157,10 @@ export class ReportImportStatusResponseDto implements ReportImportStatusResponse
 			this.detailExport = job.result
 				? {
 						jobSpoId: (job.result.jobSpoId as string) ?? null,
-						foldersUploaded: (job.result.foldersUploaded as number) ?? 0,
-						r2ObjectKeys: (job.result.r2ObjectKeys as string[]) ?? [],
+						foldersUploaded:
+							(job.result.foldersUploaded as number) ?? 0,
+						r2ObjectKeys:
+							(job.result.r2ObjectKeys as string[]) ?? [],
 					}
 				: null;
 		} else {

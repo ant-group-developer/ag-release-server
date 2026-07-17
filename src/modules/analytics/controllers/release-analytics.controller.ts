@@ -224,7 +224,9 @@ export class ReleaseAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của release (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của release (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,
 		@Body() dto: EntityRankingQueryDto,

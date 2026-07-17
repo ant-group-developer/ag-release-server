@@ -217,27 +217,42 @@ describe('Distribution aggregate — invariants', () => {
 describe('resolveDistributionOutcome — bubble-up edge cases (INV-D4..D7)', () => {
 	it('all SKIPPED (0 LIVE) → FAILED', () => {
 		expect(
-			resolveDistributionOutcome([ChannelState.SKIPPED, ChannelState.SKIPPED]),
+			resolveDistributionOutcome([
+				ChannelState.SKIPPED,
+				ChannelState.SKIPPED,
+			]),
 		).toBe(DistributionState.FAILED);
 	});
 	it('all TAKEN_DOWN → TAKEN_DOWN', () => {
 		expect(
-			resolveDistributionOutcome([ChannelState.TAKEN_DOWN, ChannelState.TAKEN_DOWN]),
+			resolveDistributionOutcome([
+				ChannelState.TAKEN_DOWN,
+				ChannelState.TAKEN_DOWN,
+			]),
 		).toBe(DistributionState.TAKEN_DOWN);
 	});
 	it('TAKEN_DOWN + SKIPPED → TAKEN_DOWN', () => {
 		expect(
-			resolveDistributionOutcome([ChannelState.TAKEN_DOWN, ChannelState.SKIPPED]),
+			resolveDistributionOutcome([
+				ChannelState.TAKEN_DOWN,
+				ChannelState.SKIPPED,
+			]),
 		).toBe(DistributionState.TAKEN_DOWN);
 	});
 	it('LIVE + SKIPPED (no issues) → DISTRIBUTED (INV-D4)', () => {
 		expect(
-			resolveDistributionOutcome([ChannelState.LIVE, ChannelState.SKIPPED]),
+			resolveDistributionOutcome([
+				ChannelState.LIVE,
+				ChannelState.SKIPPED,
+			]),
 		).toBe(DistributionState.DISTRIBUTED);
 	});
 	it('still one non-terminal → null (stay DELIVERING)', () => {
 		expect(
-			resolveDistributionOutcome([ChannelState.LIVE, ChannelState.WAITING]),
+			resolveDistributionOutcome([
+				ChannelState.LIVE,
+				ChannelState.WAITING,
+			]),
 		).toBeNull();
 	});
 });

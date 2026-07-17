@@ -13,14 +13,14 @@ import {
 } from '../dto/analytics-query.dto';
 import {
 	DspTimelineResponse,
+	DspTopReleaseItem,
+	DspTopTrackItem,
 	EntityTopDspItem,
-	EntityOverviewResponse,
 	RevenueLineChartItem,
 	RevenueTimelineResponse,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { AnalyticsCacheService } from './analytics-cache.service';
-import { DspTopTrackItem, DspTopReleaseItem } from '../interfaces/analytics.interface';
 
 export interface TerOverviewResponse {
 	isoCode: string;
@@ -126,15 +126,25 @@ export class TerAnalyticsService {
 
 	// ── Overview ──────────────────────────────────────────
 
-	async getOverview(isoCode: string, dto: EntityOverviewQueryDto): Promise<TerOverviewResponse> {
-		const key = this.cache.buildKey('ter:overview', 'system', { isoCode, ...dto });
+	async getOverview(
+		isoCode: string,
+		dto: EntityOverviewQueryDto,
+	): Promise<TerOverviewResponse> {
+		const key = this.cache.buildKey('ter:overview', 'system', {
+			isoCode,
+			...dto,
+		});
 		return this.cache.wrap(key, () => this.computeOverview(isoCode, dto));
 	}
 
-	private async computeOverview(isoCode: string, dto: EntityOverviewQueryDto): Promise<TerOverviewResponse> {
+	private async computeOverview(
+		isoCode: string,
+		dto: EntityOverviewQueryDto,
+	): Promise<TerOverviewResponse> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const { terFilter, trackJoin, trackFilter, params } = this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+		const { terFilter, trackJoin, trackFilter, params } =
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -154,8 +164,14 @@ export class TerAnalyticsService {
 		`;
 
 		const [[trendRow], [salesRow], countryName] = await Promise.all([
-			this.clickHouseService.query<{ total_trend_views: string }>(trendSql, params),
-			this.clickHouseService.query<{ total_sales_views: string; total_revenue_usd: string }>(salesSql, params),
+			this.clickHouseService.query<{ total_trend_views: string }>(
+				trendSql,
+				params,
+			),
+			this.clickHouseService.query<{
+				total_sales_views: string;
+				total_revenue_usd: string;
+			}>(salesSql, params),
 			this.resolveCountryName(isoCode),
 		]);
 
@@ -165,21 +181,35 @@ export class TerAnalyticsService {
 			totalTrendViews: Number(trendRow?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRow?.total_sales_views ?? 0),
 			totalRevenueUsd: this.revenueNumber(salesRow?.total_revenue_usd),
-			totalRevenueUsdExact: this.revenueExact(salesRow?.total_revenue_usd),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRow?.total_revenue_usd,
+			),
 		};
 	}
 
 	// ── Trend view line chart ──────────────────────────────
 
-	async getTrendViewLineChart(isoCode: string, dto: ChartQueryDto): Promise<TrendViewLineChartItem[]> {
-		const key = this.cache.buildKey('ter:trend-line', 'system', { isoCode, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewLineChart(isoCode, dto));
+	async getTrendViewLineChart(
+		isoCode: string,
+		dto: ChartQueryDto,
+	): Promise<TrendViewLineChartItem[]> {
+		const key = this.cache.buildKey('ter:trend-line', 'system', {
+			isoCode,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewLineChart(isoCode, dto),
+		);
 	}
 
-	private async computeTrendViewLineChart(isoCode: string, dto: ChartQueryDto): Promise<TrendViewLineChartItem[]> {
+	private async computeTrendViewLineChart(
+		isoCode: string,
+		dto: ChartQueryDto,
+	): Promise<TrendViewLineChartItem[]> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const { terFilter, trackJoin, trackFilter, params } = this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+		const { terFilter, trackJoin, trackFilter, params } =
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -194,7 +224,10 @@ export class TerAnalyticsService {
 			GROUP BY period
 			ORDER BY period ASC
 		`;
-		const rows = await this.clickHouseService.query<{ period: string; total_views: string }>(sql, params);
+		const rows = await this.clickHouseService.query<{
+			period: string;
+			total_views: string;
+		}>(sql, params);
 		return rows.map((r) => ({
 			period: r.period.substring(0, 7),
 			totalViews: Number(r.total_views),
@@ -203,15 +236,27 @@ export class TerAnalyticsService {
 
 	// ── Revenue line chart ─────────────────────────────────
 
-	async getRevenueLineChart(isoCode: string, dto: ChartQueryDto): Promise<RevenueLineChartItem[]> {
-		const key = this.cache.buildKey('ter:rev-line', 'system', { isoCode, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueLineChart(isoCode, dto));
+	async getRevenueLineChart(
+		isoCode: string,
+		dto: ChartQueryDto,
+	): Promise<RevenueLineChartItem[]> {
+		const key = this.cache.buildKey('ter:rev-line', 'system', {
+			isoCode,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueLineChart(isoCode, dto),
+		);
 	}
 
-	private async computeRevenueLineChart(isoCode: string, dto: ChartQueryDto): Promise<RevenueLineChartItem[]> {
+	private async computeRevenueLineChart(
+		isoCode: string,
+		dto: ChartQueryDto,
+	): Promise<RevenueLineChartItem[]> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const { terFilter, trackJoin, trackFilter, params } = this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+		const { terFilter, trackJoin, trackFilter, params } =
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -227,7 +272,11 @@ export class TerAnalyticsService {
 			GROUP BY period
 			ORDER BY period ASC
 		`;
-		const rows = await this.clickHouseService.query<{ period: string; quantity: string; revenue_usd: string }>(sql, params);
+		const rows = await this.clickHouseService.query<{
+			period: string;
+			quantity: string;
+			revenue_usd: string;
+		}>(sql, params);
 		return rows.map((r) => ({
 			period: r.period.substring(0, 7),
 			revenueUsd: this.revenueNumber(r.revenue_usd),
@@ -238,16 +287,33 @@ export class TerAnalyticsService {
 
 	// ── Trend view DSP timeline ────────────────────────────
 
-	async getTrendViewDspTimeline(isoCode: string, dto: EntityTimelineQueryDto): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ter:trend-dsp-timeline', 'system', { isoCode, ...dto });
-		return this.cache.wrap(key, () => this.computeTrendViewDspTimeline(isoCode, dto));
+	async getTrendViewDspTimeline(
+		isoCode: string,
+		dto: EntityTimelineQueryDto,
+	): Promise<DspTimelineResponse> {
+		const key = this.cache.buildKey('ter:trend-dsp-timeline', 'system', {
+			isoCode,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTrendViewDspTimeline(isoCode, dto),
+		);
 	}
 
-	private async computeTrendViewDspTimeline(isoCode: string, dto: EntityTimelineQueryDto): Promise<DspTimelineResponse> {
+	private async computeTrendViewDspTimeline(
+		isoCode: string,
+		dto: EntityTimelineQueryDto,
+	): Promise<DspTimelineResponse> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const topN = dto.topN ?? 5;
-		const { fromClause, params } = this.buildTrendsSource(isoCode, fromMonth, toMonth, dto.importSource, dto.releaseType);
+		const { fromClause, params } = this.buildTrendsSource(
+			isoCode,
+			fromMonth,
+			toMonth,
+			dto.importSource,
+			dto.releaseType,
+		);
 
 		const topDspSql = `
 			SELECT ${this.resolvedDspName} AS dsp_name
@@ -257,7 +323,9 @@ export class TerAnalyticsService {
 			ORDER BY sum(s.total_quantity) DESC
 			LIMIT ${topN}
 		`;
-		const topDspRows = await this.clickHouseService.query<{ dsp_name: string }>(topDspSql, params);
+		const topDspRows = await this.clickHouseService.query<{
+			dsp_name: string;
+		}>(topDspSql, params);
 		const topDsps = topDspRows.map((r) => r.dsp_name);
 		params.topDsps = topDsps;
 
@@ -280,7 +348,11 @@ export class TerAnalyticsService {
 			GROUP BY period, dsp_name
 			ORDER BY period ASC
 		`;
-		const rows = await this.clickHouseService.query<{ period: string; dsp_name: string; total_views: string }>(timelineSql, params);
+		const rows = await this.clickHouseService.query<{
+			period: string;
+			dsp_name: string;
+			total_views: string;
+		}>(timelineSql, params);
 
 		const periodMap = new Map<string, Map<string, number>>();
 		for (const row of rows) {
@@ -288,29 +360,49 @@ export class TerAnalyticsService {
 			if (!periodMap.has(p)) periodMap.set(p, new Map());
 			periodMap.get(p)!.set(row.dsp_name, Number(row.total_views));
 		}
-		const allDsps = dto.includeOther !== false ? [...topDsps, 'Other'] : topDsps;
-		const items = Array.from(periodMap.entries()).map(([period, dspMap]) => ({
-			period,
-			series: allDsps
-				.filter((d) => dspMap.has(d))
-				.map((d) => ({ dsp: d, trendViews: dspMap.get(d) ?? 0 })),
-		}));
+		const allDsps =
+			dto.includeOther !== false ? [...topDsps, 'Other'] : topDsps;
+		const items = Array.from(periodMap.entries()).map(
+			([period, dspMap]) => ({
+				period,
+				series: allDsps
+					.filter((d) => dspMap.has(d))
+					.map((d) => ({ dsp: d, trendViews: dspMap.get(d) ?? 0 })),
+			}),
+		);
 
 		return { topDsps, items };
 	}
 
 	// ── Revenue timeline ───────────────────────────────────
 
-	async getRevenueTimeline(isoCode: string, dto: EntityTimelineQueryDto): Promise<RevenueTimelineResponse> {
-		const key = this.cache.buildKey('ter:rev-timeline', 'system', { isoCode, ...dto });
-		return this.cache.wrap(key, () => this.computeRevenueTimeline(isoCode, dto));
+	async getRevenueTimeline(
+		isoCode: string,
+		dto: EntityTimelineQueryDto,
+	): Promise<RevenueTimelineResponse> {
+		const key = this.cache.buildKey('ter:rev-timeline', 'system', {
+			isoCode,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeRevenueTimeline(isoCode, dto),
+		);
 	}
 
-	private async computeRevenueTimeline(isoCode: string, dto: EntityTimelineQueryDto): Promise<RevenueTimelineResponse> {
+	private async computeRevenueTimeline(
+		isoCode: string,
+		dto: EntityTimelineQueryDto,
+	): Promise<RevenueTimelineResponse> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const topN = dto.topN ?? 5;
-		const { fromClause, params } = this.buildTrendsSource(isoCode, fromMonth, toMonth, dto.importSource, dto.releaseType);
+		const { fromClause, params } = this.buildTrendsSource(
+			isoCode,
+			fromMonth,
+			toMonth,
+			dto.importSource,
+			dto.releaseType,
+		);
 
 		const topDspSql = `
 			SELECT ${this.resolvedDspName} AS dsp_name
@@ -326,7 +418,9 @@ export class TerAnalyticsService {
 			ORDER BY sum(coalesce(sa.total_revenue_usd, 0)) DESC
 			LIMIT ${topN}
 		`;
-		const topDspRows = await this.clickHouseService.query<{ dsp_name: string }>(topDspSql, params);
+		const topDspRows = await this.clickHouseService.query<{
+			dsp_name: string;
+		}>(topDspSql, params);
 		const topDsps = topDspRows.map((r) => r.dsp_name);
 		params.topDsps = topDsps;
 
@@ -364,21 +458,46 @@ export class TerAnalyticsService {
 			quantity: string;
 		}>(timelineSql, params);
 
-		const periodMap = new Map<string, { revenueUsd: number; revenueUsdExact: string; quantity: number; series: Map<string, { revenueUsd: number; revenueUsdExact: string; quantity: number }> }>();
+		const periodMap = new Map<
+			string,
+			{
+				revenueUsd: number;
+				revenueUsdExact: string;
+				quantity: number;
+				series: Map<
+					string,
+					{
+						revenueUsd: number;
+						revenueUsdExact: string;
+						quantity: number;
+					}
+				>;
+			}
+		>();
 		for (const row of rows) {
 			const p = row.period.substring(0, 7);
 			if (!periodMap.has(p)) {
-				periodMap.set(p, { revenueUsd: 0, revenueUsdExact: '0', quantity: 0, series: new Map() });
+				periodMap.set(p, {
+					revenueUsd: 0,
+					revenueUsdExact: '0',
+					quantity: 0,
+					series: new Map(),
+				});
 			}
 			const periodData = periodMap.get(p)!;
 			const rev = this.revenueNumber(row.revenue_usd);
 			const qty = Number(row.quantity);
 			periodData.revenueUsd += rev;
 			periodData.quantity += qty;
-			periodData.series.set(row.dsp_name, { revenueUsd: rev, revenueUsdExact: this.revenueExact(row.revenue_usd), quantity: qty });
+			periodData.series.set(row.dsp_name, {
+				revenueUsd: rev,
+				revenueUsdExact: this.revenueExact(row.revenue_usd),
+				quantity: qty,
+			});
 		}
 
-		const allDsps = dto.includeOther !== false ? [...topDsps, 'Other'] : topDsps;
+		const allDsps =
+			dto.includeOther !== false ? [...topDsps, 'Other'] : topDsps;
 		const items = Array.from(periodMap.entries()).map(([period, data]) => ({
 			period,
 			revenueUsd: data.revenueUsd,
@@ -388,7 +507,12 @@ export class TerAnalyticsService {
 				.filter((d) => data.series.has(d))
 				.map((d) => {
 					const s = data.series.get(d)!;
-					return { dsp: d, revenueUsd: s.revenueUsd, revenueUsdExact: s.revenueUsdExact, quantity: s.quantity };
+					return {
+						dsp: d,
+						revenueUsd: s.revenueUsd,
+						revenueUsdExact: s.revenueUsdExact,
+						quantity: s.quantity,
+					};
 				}),
 		}));
 
@@ -397,12 +521,21 @@ export class TerAnalyticsService {
 
 	// ── Top Tracks ─────────────────────────────────────────
 
-	async getTopTracks(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<DspTopTrackItem>> {
-		const key = this.cache.buildKey('ter:top-tracks', 'system', { isoCode, ...dto });
+	async getTopTracks(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<DspTopTrackItem>> {
+		const key = this.cache.buildKey('ter:top-tracks', 'system', {
+			isoCode,
+			...dto,
+		});
 		return this.cache.wrap(key, () => this.computeTopTracks(isoCode, dto));
 	}
 
-	private async computeTopTracks(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<DspTopTrackItem>> {
+	private async computeTopTracks(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<DspTopTrackItem>> {
 		const page = dto.page ?? 1;
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -411,8 +544,12 @@ export class TerAnalyticsService {
 		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const importFilter = dto.importSource ? 'AND s.import_source = {importSource:String}' : '';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
+		const importFilter = dto.importSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
 
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
@@ -476,11 +613,19 @@ export class TerAnalyticsService {
 		const [countRows, dataRows] = await Promise.all([
 			this.clickHouseService.query<{ total: string }>(countSql, params),
 			this.clickHouseService.query<{
-				isrc: string; track_title: string; track_version: string;
-				release_id: string; release_title: string; artist_name: string;
-				cover_75: string; cover_100: string; cover_160: string;
-				cover_300: string; cover_original: string;
-				total_views: string; total_revenue_usd: string;
+				isrc: string;
+				track_title: string;
+				track_version: string;
+				release_id: string;
+				release_title: string;
+				artist_name: string;
+				cover_75: string;
+				cover_100: string;
+				cover_160: string;
+				cover_300: string;
+				cover_original: string;
+				total_views: string;
+				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
 
@@ -507,17 +652,35 @@ export class TerAnalyticsService {
 			},
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
+		});
 	}
 
 	// ── Top Releases ───────────────────────────────────────
 
-	async getTopReleases(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<DspTopReleaseItem>> {
-		const key = this.cache.buildKey('ter:top-releases', 'system', { isoCode, ...dto });
-		return this.cache.wrap(key, () => this.computeTopReleases(isoCode, dto));
+	async getTopReleases(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<DspTopReleaseItem>> {
+		const key = this.cache.buildKey('ter:top-releases', 'system', {
+			isoCode,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeTopReleases(isoCode, dto),
+		);
 	}
 
-	private async computeTopReleases(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<DspTopReleaseItem>> {
+	private async computeTopReleases(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<DspTopReleaseItem>> {
 		const page = dto.page ?? 1;
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -526,8 +689,12 @@ export class TerAnalyticsService {
 		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const importFilter = dto.importSource ? 'AND s.import_source = {importSource:String}' : '';
-		const releaseTypeFilter = dto.releaseType ? 'AND t.release_type = {releaseType:String}' : '';
+		const importFilter = dto.importSource
+			? 'AND s.import_source = {importSource:String}'
+			: '';
+		const releaseTypeFilter = dto.releaseType
+			? 'AND t.release_type = {releaseType:String}'
+			: '';
 
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
@@ -596,11 +763,19 @@ export class TerAnalyticsService {
 		const [countRows, dataRows] = await Promise.all([
 			this.clickHouseService.query<{ total: string }>(countSql, params),
 			this.clickHouseService.query<{
-				release_id: string; release_title: string; release_upc: string;
-				label_id: string; label_name: string;
-				cover_75: string; cover_100: string; cover_160: string;
-				cover_300: string; cover_original: string;
-				track_count: string; total_views: string; total_revenue_usd: string;
+				release_id: string;
+				release_title: string;
+				release_upc: string;
+				label_id: string;
+				label_name: string;
+				cover_75: string;
+				cover_100: string;
+				cover_160: string;
+				cover_300: string;
+				cover_original: string;
+				track_count: string;
+				total_views: string;
+				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
 
@@ -627,23 +802,45 @@ export class TerAnalyticsService {
 			},
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
+		});
 	}
 
 	// ── Top DSPs ───────────────────────────────────────────
 
-	async getTopDsps(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<EntityTopDspItem>> {
-		const key = this.cache.buildKey('ter:top-dsps', 'system', { isoCode, ...dto });
+	async getTopDsps(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<EntityTopDspItem>> {
+		const key = this.cache.buildKey('ter:top-dsps', 'system', {
+			isoCode,
+			...dto,
+		});
 		return this.cache.wrap(key, () => this.computeTopDsps(isoCode, dto));
 	}
 
-	private async computeTopDsps(isoCode: string, dto: EntityRankingQueryDto): Promise<PageDto<EntityTopDspItem>> {
+	private async computeTopDsps(
+		isoCode: string,
+		dto: EntityRankingQueryDto,
+	): Promise<PageDto<EntityTopDspItem>> {
 		const page = dto.page ?? 1;
 		const sortByRevenue = dto.sortBy === 'revenue';
 		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
-		const { fromClause, params } = this.buildTrendsSource(isoCode, fromMonth, toMonth, dto.importSource, dto.releaseType);
+		const { fromClause, params } = this.buildTrendsSource(
+			isoCode,
+			fromMonth,
+			toMonth,
+			dto.importSource,
+			dto.releaseType,
+		);
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -654,7 +851,9 @@ export class TerAnalyticsService {
 			FROM ${fromClause}
 		`;
 
-		const importFilterSalWhere = dto.importSource ? `AND import_source = {importSource:String}` : '';
+		const importFilterSalWhere = dto.importSource
+			? `AND import_source = {importSource:String}`
+			: '';
 
 		const dataSql = `
 			SELECT
@@ -681,8 +880,11 @@ export class TerAnalyticsService {
 		const [countRows, dataRows] = await Promise.all([
 			this.clickHouseService.query<{ total: string }>(countSql, params),
 			this.clickHouseService.query<{
-				dsp_id: string; pg_dsp_id: string | null; dsp_name: string;
-				total_views: string; total_revenue_usd: string;
+				dsp_id: string;
+				pg_dsp_id: string | null;
+				dsp_name: string;
+				total_views: string;
+				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
 
@@ -700,12 +902,26 @@ export class TerAnalyticsService {
 					GROUP BY territory_code, dsp_id, isrc
 				) sa ON s.territory_code = sa.sal_ter AND s.dsp_id = sa.sal_dsp_id AND s.isrc = sa.sal_isrc
 			`;
-			const totalsRow = (await this.clickHouseService.query<{ total_views: string; total_revenue_usd: string }>(totalsSql, params))[0];
+			const totalsRow = (
+				await this.clickHouseService.query<{
+					total_views: string;
+					total_revenue_usd: string;
+				}>(totalsSql, params)
+			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
 			const grandTotalRevExact = totalsRow?.total_revenue_usd ?? '0';
-			const topRevSum = dataRows.reduce((s, r) => s + Number(r.total_revenue_usd), 0);
-			const topViews = dataRows.reduce((s, r) => s + Number(r.total_views), 0);
-			const otherRev = Math.max(0, Number(grandTotalRevExact) - topRevSum);
+			const topRevSum = dataRows.reduce(
+				(s, r) => s + Number(r.total_revenue_usd),
+				0,
+			);
+			const topViews = dataRows.reduce(
+				(s, r) => s + Number(r.total_views),
+				0,
+			);
+			const otherRev = Math.max(
+				0,
+				Number(grandTotalRevExact) - topRevSum,
+			);
 			const otherViews = Math.max(0, grandTotalViews - topViews);
 
 			const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
@@ -726,7 +942,10 @@ export class TerAnalyticsService {
 					totalRevenueUsd: otherRev.toString(),
 				});
 			}
-			return new PageDto({ items, metadata: { page, pageSize: topNLimit, totalItems } });
+			return new PageDto({
+				items,
+				metadata: { page, pageSize: topNLimit, totalItems },
+			});
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
@@ -739,6 +958,13 @@ export class TerAnalyticsService {
 			totalRevenueUsd: row.total_revenue_usd || '0',
 		}));
 
-		return new PageDto({ items, metadata: { page, pageSize: useTopN ? topNLimit : dto.limit, totalItems } });
+		return new PageDto({
+			items,
+			metadata: {
+				page,
+				pageSize: useTopN ? topNLimit : dto.limit,
+				totalItems,
+			},
+		});
 	}
 }

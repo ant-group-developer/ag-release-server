@@ -1,6 +1,6 @@
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Injectable, Logger } from '@nestjs/common';
 import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
 
 export interface CanonicalFile {
@@ -33,9 +33,18 @@ const REVELATOR_RE =
 
 // Month name → MM
 const MONTH_MAP: Record<string, string> = {
-	january: '01', february: '02', march: '03', april: '04',
-	may: '05', june: '06', july: '07', august: '08',
-	september: '09', october: '10', november: '11', december: '12',
+	january: '01',
+	february: '02',
+	march: '03',
+	april: '04',
+	may: '05',
+	june: '06',
+	july: '07',
+	august: '08',
+	september: '09',
+	october: '10',
+	november: '11',
+	december: '12',
 };
 
 // DSP name from filename → folder prefix used by parsers
@@ -107,7 +116,10 @@ export class StatementsResolverService {
 	async resolveOnly(dir: string): Promise<ResolveResult & { total: number }> {
 		const importedNames = await this.fetchImportedNames();
 		const result = this.resolveWithHistory(dir, importedNames);
-		return { ...result, total: result.toImport.length + result.skipped.length };
+		return {
+			...result,
+			total: result.toImport.length + result.skipped.length,
+		};
 	}
 
 	private async fetchImportedNames(): Promise<Set<string>> {
@@ -121,7 +133,10 @@ export class StatementsResolverService {
 		return new Set(rows.map((r) => r.filename));
 	}
 
-	private resolveWithHistory(dir: string, importedNames: Set<string>): ResolveResult {
+	private resolveWithHistory(
+		dir: string,
+		importedNames: Set<string>,
+	): ResolveResult {
 		const allFiles = fs.readdirSync(dir).filter((f) => {
 			const lower = f.toLowerCase();
 			// Drop HTML and hidden files
@@ -157,7 +172,16 @@ export class StatementsResolverService {
 				const isTerr = /_(TERR\d+(-auto)?)/i.test(midPart);
 				// Canonical base: strip [N] and -auto from filename
 				const baseNameNoSuffix = `bombshelter-digital-services-llc_${dspKey}_${period}_${midPart}.${ext}`;
-				entries.push({ fileName, localPath, dspKey, period, bracketN, isAuto, isTerr, baseNameNoSuffix });
+				entries.push({
+					fileName,
+					localPath,
+					dspKey,
+					period,
+					bracketN,
+					isAuto,
+					isTerr,
+					baseNameNoSuffix,
+				});
 				continue;
 			}
 
@@ -167,7 +191,9 @@ export class StatementsResolverService {
 				const monthName = rm[3].toLowerCase();
 				const mm = MONTH_MAP[monthName];
 				if (!mm) {
-					this.logger.warn(`Unknown month name in Revelator file: ${fileName}`);
+					this.logger.warn(
+						`Unknown month name in Revelator file: ${fileName}`,
+					);
 					continue;
 				}
 				const period = `${year}${mm}`;
@@ -185,7 +211,8 @@ export class StatementsResolverService {
 			}
 
 			// Older Deezer/MERLIN .txt pattern: BombshelterDigitalMERLIN_YYYYMMDD_YYYYMMDD[_TB].txt
-			const merlinRe = /^(?:Deezer_)?BombshelterDigital(?:MERLIN)?_(\d{6})\d{2}_\d{8}/i;
+			const merlinRe =
+				/^(?:Deezer_)?BombshelterDigital(?:MERLIN)?_(\d{6})\d{2}_\d{8}/i;
 			const mm2 = fileName.match(merlinRe);
 			if (mm2) {
 				entries.push({
@@ -218,7 +245,9 @@ export class StatementsResolverService {
 			const hasBase = group.some((e) => e.bracketN === null && !e.isAuto);
 			const autoFiles = group.filter((e) => e.isAuto);
 			const bracketFiles = group.filter((e) => e.bracketN !== null);
-			const baseFiles = group.filter((e) => e.bracketN === null && !e.isAuto);
+			const baseFiles = group.filter(
+				(e) => e.bracketN === null && !e.isAuto,
+			);
 
 			// -auto always wins, replaces base and brackets
 			if (autoFiles.length > 0) {
@@ -251,7 +280,9 @@ export class StatementsResolverService {
 		for (const e of resolved) {
 			const dspFolderName = DSP_FOLDER_MAP[e.dspKey];
 			if (!dspFolderName) {
-				this.logger.warn(`No DSP folder mapping for dsp key "${e.dspKey}" (file: ${e.fileName})`);
+				this.logger.warn(
+					`No DSP folder mapping for dsp key "${e.dspKey}" (file: ${e.fileName})`,
+				);
 				skipped.push({
 					localPath: e.localPath,
 					canonicalName: e.baseNameNoSuffix,
@@ -273,7 +304,10 @@ export class StatementsResolverService {
 
 			// -auto always re-imports (bỏ qua FTP history check)
 			if (!e.isAuto && importedNames.has(e.baseNameNoSuffix)) {
-				skipped.push({ ...entry, skipReason: 'already_imported_via_ftp' });
+				skipped.push({
+					...entry,
+					skipReason: 'already_imported_via_ftp',
+				});
 			} else {
 				toImport.push(entry);
 			}

@@ -16,49 +16,99 @@ export class TerAnalyticsController {
 
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a territory (ISO2 code)' })
-	async overview(@Param('isoCode') isoCode: string, @Body() dto: EntityOverviewQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getOverview(isoCode, dto) });
+	async overview(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityOverviewQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getOverview(isoCode, dto),
+		});
 	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Monthly trend view line chart for a territory' })
-	async trendViewLineChart(@Param('isoCode') isoCode: string, @Body() dto: ChartQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getTrendViewLineChart(isoCode, dto) });
+	async trendViewLineChart(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: ChartQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getTrendViewLineChart(isoCode, dto),
+		});
 	}
 
 	@Post('revenue/line-chart')
 	@ApiOperation({ summary: 'Monthly revenue line chart for a territory' })
-	async revenueLineChart(@Param('isoCode') isoCode: string, @Body() dto: ChartQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getRevenueLineChart(isoCode, dto) });
+	async revenueLineChart(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: ChartQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getRevenueLineChart(isoCode, dto),
+		});
 	}
 
 	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Monthly DSP trend view timeline for a territory' })
-	async trendViewDspTimeline(@Param('isoCode') isoCode: string, @Body() dto: EntityTimelineQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getTrendViewDspTimeline(isoCode, dto) });
+	@ApiOperation({
+		summary: 'Monthly DSP trend view timeline for a territory',
+	})
+	async trendViewDspTimeline(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityTimelineQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getTrendViewDspTimeline(isoCode, dto),
+		});
 	}
 
 	@Post('revenue/timeline')
-	@ApiOperation({ summary: 'Monthly revenue timeline (DSP breakdown) for a territory' })
-	async revenueTimeline(@Param('isoCode') isoCode: string, @Body() dto: EntityTimelineQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getRevenueTimeline(isoCode, dto) });
+	@ApiOperation({
+		summary: 'Monthly revenue timeline (DSP breakdown) for a territory',
+	})
+	async revenueTimeline(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityTimelineQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getRevenueTimeline(isoCode, dto),
+		});
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks in a territory (sortBy: views | revenue)' })
-	async topTracks(@Param('isoCode') isoCode: string, @Body() dto: EntityRankingQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getTopTracks(isoCode, dto) });
+	@ApiOperation({
+		summary: 'Top tracks in a territory (sortBy: views | revenue)',
+	})
+	async topTracks(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityRankingQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getTopTracks(isoCode, dto),
+		});
 	}
 
 	@Post('top-releases')
-	@ApiOperation({ summary: 'Top releases in a territory (sortBy: views | revenue)' })
-	async topReleases(@Param('isoCode') isoCode: string, @Body() dto: EntityRankingQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getTopReleases(isoCode, dto) });
+	@ApiOperation({
+		summary: 'Top releases in a territory (sortBy: views | revenue)',
+	})
+	async topReleases(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityRankingQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getTopReleases(isoCode, dto),
+		});
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs in a territory (sortBy: views | revenue)' })
-	async topDsps(@Param('isoCode') isoCode: string, @Body() dto: EntityRankingQueryDto) {
-		return new ResponseSuccess({ data: await this.terSvc.getTopDsps(isoCode, dto) });
+	@ApiOperation({
+		summary: 'Top DSPs in a territory (sortBy: views | revenue)',
+	})
+	async topDsps(
+		@Param('isoCode') isoCode: string,
+		@Body() dto: EntityRankingQueryDto,
+	) {
+		return new ResponseSuccess({
+			data: await this.terSvc.getTopDsps(isoCode, dto),
+		});
 	}
 }

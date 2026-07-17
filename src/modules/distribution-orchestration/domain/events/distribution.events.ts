@@ -12,7 +12,10 @@ export const makeDistributionSubmitted = (
 	at: Date,
 	data: { channelCount: number; snapshotId: string },
 ): DomainEvent =>
-	makeEvent('DistributionSubmitted', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('DistributionSubmitted', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
 export const makeValidated = (
 	distributionId: string,
@@ -26,23 +29,35 @@ export const makeValidationErrorsFlagged = (
 	at: Date,
 	data: { ticketRef: string; errors: string[] },
 ): DomainEvent =>
-	makeEvent('ValidationErrorsFlagged', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('ValidationErrorsFlagged', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
 export const makeReviewApproved = (
 	distributionId: string,
 	at: Date,
 	data: { reviewerId: string; next: string },
 ): DomainEvent =>
-	makeEvent('ReviewApproved', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('ReviewApproved', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
 export const makeReviewRejected = (
 	distributionId: string,
 	at: Date,
 	data: { reviewerId: string; ticketRef: string; note: string },
 ): DomainEvent =>
-	makeEvent('ReviewRejected', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('ReviewRejected', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
-export const makeResubmitted = (distributionId: string, at: Date): DomainEvent =>
+export const makeResubmitted = (
+	distributionId: string,
+	at: Date,
+): DomainEvent =>
 	makeEvent('Resubmitted', distributionId, at, { level: 'milestone' });
 
 export const makeIdsProvisioned = (
@@ -50,16 +65,25 @@ export const makeIdsProvisioned = (
 	at: Date,
 	data: { upc?: string },
 ): DomainEvent =>
-	makeEvent('IdsProvisioned', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('IdsProvisioned', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
 export const makePackageBuilt = (
 	distributionId: string,
 	at: Date,
 	data: { packageUri: string },
 ): DomainEvent =>
-	makeEvent('PackageBuilt', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('PackageBuilt', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
-export const makeDistributed = (distributionId: string, at: Date): DomainEvent =>
+export const makeDistributed = (
+	distributionId: string,
+	at: Date,
+): DomainEvent =>
 	makeEvent('Distributed', distributionId, at, { level: 'milestone' });
 
 export const makePartiallyDistributed = (
@@ -67,9 +91,15 @@ export const makePartiallyDistributed = (
 	at: Date,
 	data: { liveCount: number; issuesCount: number },
 ): DomainEvent =>
-	makeEvent('PartiallyDistributed', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('PartiallyDistributed', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
-export const makeDistributionFailed = (distributionId: string, at: Date): DomainEvent =>
+export const makeDistributionFailed = (
+	distributionId: string,
+	at: Date,
+): DomainEvent =>
 	makeEvent('DistributionFailed', distributionId, at, { level: 'milestone' });
 
 export const makeRetryReset = (
@@ -77,7 +107,10 @@ export const makeRetryReset = (
 	at: Date,
 	data: { scope: string },
 ): DomainEvent =>
-	makeEvent('RetryReset', distributionId, at, { level: 'milestone', ...data });
+	makeEvent('RetryReset', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});
 
 export const makeTakenDown = (distributionId: string, at: Date): DomainEvent =>
 	makeEvent('TakenDown', distributionId, at, { level: 'milestone' });

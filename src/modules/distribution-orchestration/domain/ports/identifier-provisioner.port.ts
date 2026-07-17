@@ -8,7 +8,10 @@ import { Upc } from '../value-objects/upc.vo';
  * The domain owns this contract; it never calls it (application/process-manager does).
  */
 export interface IdentifierProvisioner {
-	provisionUpc(input: { releaseId: string; key: IdempotencyKey }): Promise<Upc>;
+	provisionUpc(input: {
+		releaseId: string;
+		key: IdempotencyKey;
+	}): Promise<Upc>;
 	provisionIsrcs(input: {
 		trackIds: string[];
 		key: IdempotencyKey;

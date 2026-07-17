@@ -75,7 +75,9 @@ export class MetadataScanService implements OnModuleInit {
 
 	onModuleInit(): void {
 		this.failInterruptedProcessingScans().catch((err) => {
-			this.logger.error(`Failed to mark interrupted scans: ${err.message}`);
+			this.logger.error(
+				`Failed to mark interrupted scans: ${err.message}`,
+			);
 		});
 	}
 
@@ -1880,7 +1882,9 @@ export class MetadataScanService implements OnModuleInit {
 		if (scanId) {
 			const sessionRepo =
 				this.dataSource.getRepository(MetadataScanSession);
-			const session = await sessionRepo.findOne({ where: { id: scanId } });
+			const session = await sessionRepo.findOne({
+				where: { id: scanId },
+			});
 
 			if (!session) {
 				return null;
@@ -1892,7 +1896,10 @@ export class MetadataScanService implements OnModuleInit {
 			const totalReleases = session.totalReleases ?? 0;
 			const processedReleases = session.processedReleases ?? 0;
 			const totalDone = successCount + failedCount + notFoundCount;
-			const totalRemaining = Math.max(0, totalReleases - processedReleases);
+			const totalRemaining = Math.max(
+				0,
+				totalReleases - processedReleases,
+			);
 
 			return {
 				totalReleases,
@@ -1911,7 +1918,10 @@ export class MetadataScanService implements OnModuleInit {
 				successReleasesCount: successCount,
 				failedReleasesCount: failedCount,
 				notFoundReleasesCount: notFoundCount,
-				pendingReleasesCount: Math.max(0, totalReleases - processedReleases),
+				pendingReleasesCount: Math.max(
+					0,
+					totalReleases - processedReleases,
+				),
 				processingReleasesCount:
 					session.status === ScanSessionStatus.PROCESSING ? 1 : 0,
 			};

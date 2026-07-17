@@ -4,11 +4,11 @@ import {
 	validateProcess,
 } from '../channel-delivery/delivery-process';
 import {
+	CI_DEAL_INITIAL,
+	CI_TAKEDOWN,
 	getProcess,
 	hasProcess,
 	SPOTIFY_INITIAL,
-	CI_DEAL_INITIAL,
-	CI_TAKEDOWN,
 } from '../channel-delivery/delivery-process.registry';
 import { InvariantViolationError } from '../errors/domain-errors';
 

@@ -14,11 +14,11 @@ import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.enti
 import { Track } from 'src/modules/track/entities/track.entity';
 import { CiToolModule } from '../ci-tool/ci-tool.module';
 import { YoutubeModule } from '../youtube/youtube.module';
-import { SpotifyController } from './controllers/spotify.controller';
 import { SpotifySonarController } from './controllers/spotify-sonar.controller';
+import { SpotifyController } from './controllers/spotify.controller';
 import { SpotifyCatalogAvailability } from './entities/spotify-catalog-availability.entity';
-import { SpotifyCatalog } from './entities/spotify-catalog.entity';
 import { SpotifyCatalogDelivery } from './entities/spotify-catalog-delivery.entity';
+import { SpotifyCatalog } from './entities/spotify-catalog.entity';
 import { SpotifySonarDelivery } from './entities/spotify-sonar-delivery.entity';
 import { SpotifySonarScanSchedule } from './entities/spotify-sonar-scan-schedule.entity';
 import { SpotifySonarScanSession } from './entities/spotify-sonar-scan-session.entity';

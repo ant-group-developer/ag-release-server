@@ -25,7 +25,9 @@ export class TakedownPolicy implements ExecutionPolicy {
 	resolveProcessCode(spec: ChannelDeliverySpec): string {
 		return buildProcessCode(spec, 'takedown');
 	}
-	selectChannelsForTakedown(all: ChannelDeliverySpec[]): ChannelDeliverySpec[] {
+	selectChannelsForTakedown(
+		all: ChannelDeliverySpec[],
+	): ChannelDeliverySpec[] {
 		// aggregator takes down the whole cluster; direct are already per-DSP picks upstream.
 		// here we simply pass through — the application decides which direct DSPs were selected.
 		return all.filter(

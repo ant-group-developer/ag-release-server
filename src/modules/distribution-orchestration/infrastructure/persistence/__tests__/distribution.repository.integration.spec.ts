@@ -18,8 +18,8 @@ import { Clock } from '../../../domain/ports/clock.port';
 import { ExecutionTypeEnum } from '../../../domain/value-objects/execution-type.enum';
 import { ChannelDeliveryOrmEntity } from '../channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from '../distribution-event.orm-entity';
-import { TypeOrmDistributionRepository } from '../distribution.repository';
 import { DistributionOrmEntity } from '../distribution.orm-entity';
+import { TypeOrmDistributionRepository } from '../distribution.repository';
 import { OutboxEventOrmEntity } from '../outbox-event.orm-entity';
 import { TypeOrmUnitOfWork } from '../typeorm-unit-of-work.adapter';
 

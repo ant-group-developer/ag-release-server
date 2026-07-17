@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OrmService } from 'src/modules/orm/orm.service';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
@@ -139,10 +138,9 @@ export class ReleaseQueryService {
 			releaseIds,
 		});
 
-		qbDetail.leftJoin('release.tenant', 'tenant').addSelect([
-			'tenant.id',
-			'tenant.name',
-		]);
+		qbDetail
+			.leftJoin('release.tenant', 'tenant')
+			.addSelect(['tenant.id', 'tenant.name']);
 
 		const { itemsToJoin: itemsDetail } = this.selectOptimized(qbDetail);
 
@@ -166,15 +164,17 @@ export class ReleaseQueryService {
 			if (raw) {
 				entity.releaseCoverArts = parseJson(raw.releaseCoverArts_json);
 				entity.releaseArtists = parseJson(raw.releaseArtists_json);
-				entity.releaseContributors = parseJson(raw.releaseContributors_json);
-				entity.releaseDspDeliveries = parseJson(raw.releaseDspDeliveries_json);
+				entity.releaseContributors = parseJson(
+					raw.releaseContributors_json,
+				);
+				entity.releaseDspDeliveries = parseJson(
+					raw.releaseDspDeliveries_json,
+				);
 			}
 		}
 
 		// Reorder
-		const releaseMap = new Map(
-			populatedReleases.map((r) => [r.id, r]),
-		);
+		const releaseMap = new Map(populatedReleases.map((r) => [r.id, r]));
 		const sortedReleases = releaseIds
 			.map((id) => releaseMap.get(id))
 			.filter(Boolean) as Release[];
@@ -204,7 +204,11 @@ export class ReleaseQueryService {
 		return subQuery
 			.select('SUM(audio_files_sub2.duration)')
 			.from('tracks', 'track_sub2')
-			.leftJoin('audio_files', 'audio_files_sub2', 'audio_files_sub2.track_id = track_sub2.id')
+			.leftJoin(
+				'audio_files',
+				'audio_files_sub2',
+				'audio_files_sub2.track_id = track_sub2.id',
+			)
 			.where('track_sub2.release_id = release.id');
 	}
 
@@ -215,7 +219,10 @@ export class ReleaseQueryService {
 			.where('release_dsp_delivery_total_sub.release_id = release.id');
 	}
 
-	private applyOrderFieldSelect(qbId: SelectQueryBuilder<Release>, fieldOrder?: string) {
+	private applyOrderFieldSelect(
+		qbId: SelectQueryBuilder<Release>,
+		fieldOrder?: string,
+	) {
 		qbId.select(`${this.mainAlias}.id`);
 
 		if (!fieldOrder) return;
@@ -226,10 +233,16 @@ export class ReleaseQueryService {
 				qbId.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count');
 				break;
 			case FieldOrderRelease.TRACKS_COUNT:
-				qbId.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT);
+				qbId.addSelect(
+					this.countTracksSubQuery,
+					FieldOrderRelease.TRACKS_COUNT,
+				);
 				break;
 			case FieldOrderRelease.TOTAL_DURATION:
-				qbId.addSelect(this.sumDurationSubQuery, FieldOrderRelease.TOTAL_DURATION);
+				qbId.addSelect(
+					this.sumDurationSubQuery,
+					FieldOrderRelease.TOTAL_DURATION,
+				);
 				break;
 			case 'dsps_total_count':
 				qbId.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
@@ -252,12 +265,12 @@ export class ReleaseQueryService {
 
 		const releaseInclude = idInclude?.length
 			? await this.releaseRepo.find({
-				select: {
-					id: true,
-					title: true,
-				},
-				where: { id: In(idInclude) },
-			})
+					select: {
+						id: true,
+						title: true,
+					},
+					where: { id: In(idInclude) },
+				})
 			: [];
 
 		const [items, totalItems] = await this.releaseRepo.findAndCount({
@@ -1096,22 +1109,20 @@ export class ReleaseQueryService {
 		if (keyword) {
 			qb.andWhere(
 				new Brackets((qbInner) => {
-					qbInner.where('release.title ILIKE :keyword')
+					qbInner
+						.where('release.title ILIKE :keyword')
 						.orWhere('release.upc ILIKE :keyword')
 						.orWhere(`release.album_format_id IN (
 							SELECT albumFormatFilter.id FROM album_formats albumFormatFilter
 							WHERE albumFormatFilter.name ILIKE :keyword
-						)`)
-						.orWhere(`release.label_id IN (
+						)`).orWhere(`release.label_id IN (
 							SELECT labelFilter.id FROM labels labelFilter
 							WHERE labelFilter.name ILIKE :keyword
-						)`)
-						.orWhere(`release.id IN (
+						)`).orWhere(`release.id IN (
 							SELECT releaseArtistFilter.release_id FROM release_artist releaseArtistFilter
 							JOIN artists artistFilter ON artistFilter.id = releaseArtistFilter.artist_id
 							WHERE artistFilter.name ILIKE :keyword
-						)`)
-						.orWhere(`release.id IN (
+						)`).orWhere(`release.id IN (
 							SELECT videoFilter.release_id FROM videos videoFilter
 							WHERE videoFilter.isrc ILIKE :keyword
 						)`);
@@ -1217,7 +1228,9 @@ export class ReleaseQueryService {
 			)`;
 
 			qb.andWhere(
-				isEnrich ? enrichExistsCondition : `NOT ${enrichExistsCondition}`,
+				isEnrich
+					? enrichExistsCondition
+					: `NOT ${enrichExistsCondition}`,
 				{ successfulEnrichmentStatus: ReleaseEnrichmentStatus.SUCCESS },
 			);
 		}
@@ -1559,23 +1572,47 @@ export class ReleaseQueryService {
 		const itemsToJoin: string[] = [];
 
 		queryBuilder
-			.addSelect(['albumFormat.id', 'albumFormat.name', 'albumFormat.code'])
-			.addSelect(['label.id', 'label.name', 'label.code', 'label.picture', 'label.description'])
-			.addSelect(['video.id', 'video.releaseId', 'video.channelId', 'video.isrc', 'video.externalId'])
-			.addSelect(['channel.id', 'channel.name', 'channel.youtubeChannelId', 'channel.thumbUrl'])
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+			])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.code',
+				'label.picture',
+				'label.description',
+			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.channelId',
+				'video.isrc',
+				'video.externalId',
+			])
+			.addSelect([
+				'channel.id',
+				'channel.name',
+				'channel.youtubeChannelId',
+				'channel.thumbUrl',
+			])
 			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
-			.addSelect(this.sumDurationSubQuery, FieldOrderRelease.TOTAL_DURATION)
+			.addSelect(
+				this.sumDurationSubQuery,
+				FieldOrderRelease.TOTAL_DURATION,
+			)
 			.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count')
 			.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
 
 		return { itemsToJoin };
 	}
 
-
 	private addSelectJsonCoverArts(queryBuilder: SelectQueryBuilder<Release>) {
 		queryBuilder.addSelect((subQuery) => {
 			return subQuery
-				.select(`COALESCE(JSON_AGG(
+				.select(
+					`COALESCE(JSON_AGG(
 					JSON_BUILD_OBJECT(
 						'id', rca.id,
 						'fileId', rca.file_id,
@@ -1584,7 +1621,8 @@ export class ReleaseQueryService {
 						'height', rca.height,
 						'type', rca.type
 					)
-				) FILTER (WHERE rca.id IS NOT NULL), '[]')`)
+				) FILTER (WHERE rca.id IS NOT NULL), '[]')`,
+				)
 				.from('release_cover_art', 'rca')
 				.where('rca.release_id = release.id');
 		}, 'releaseCoverArts_json');
@@ -1593,7 +1631,8 @@ export class ReleaseQueryService {
 	private addSelectJsonArtists(queryBuilder: SelectQueryBuilder<Release>) {
 		queryBuilder.addSelect((subQuery) => {
 			return subQuery
-				.select(`COALESCE(JSON_AGG(
+				.select(
+					`COALESCE(JSON_AGG(
 					JSON_BUILD_OBJECT(
 						'id', ra.id,
 						'artistId', ra.artist_id,
@@ -1607,17 +1646,21 @@ export class ReleaseQueryService {
 							'biography', artist.biography
 						)
 					)
-				) FILTER (WHERE ra.id IS NOT NULL), '[]')`)
+				) FILTER (WHERE ra.id IS NOT NULL), '[]')`,
+				)
 				.from('release_artist', 'ra')
 				.leftJoin('artists', 'artist', 'artist.id = ra.artist_id')
 				.where('ra.release_id = release.id');
 		}, 'releaseArtists_json');
 	}
 
-	private addSelectJsonContributors(queryBuilder: SelectQueryBuilder<Release>) {
+	private addSelectJsonContributors(
+		queryBuilder: SelectQueryBuilder<Release>,
+	) {
 		queryBuilder.addSelect((subQuery) => {
 			return subQuery
-				.select(`COALESCE(JSON_AGG(
+				.select(
+					`COALESCE(JSON_AGG(
 					JSON_BUILD_OBJECT(
 						'id', rc.id,
 						'artistRoleId', rc.artist_role_id,
@@ -1637,7 +1680,8 @@ export class ReleaseQueryService {
 							'code', role.code
 						)
 					)
-				) FILTER (WHERE rc.id IS NOT NULL), '[]')`)
+				) FILTER (WHERE rc.id IS NOT NULL), '[]')`,
+				)
 				.from('release_contributors', 'rc')
 				.leftJoin('artists', 'artist_c', 'artist_c.id = rc.artist_id')
 				.leftJoin('artist_roles', 'role', 'role.id = rc.artist_role_id')
@@ -1645,10 +1689,13 @@ export class ReleaseQueryService {
 		}, 'releaseContributors_json');
 	}
 
-	private addSelectJsonDspDeliveries(queryBuilder: SelectQueryBuilder<Release>) {
+	private addSelectJsonDspDeliveries(
+		queryBuilder: SelectQueryBuilder<Release>,
+	) {
 		queryBuilder.addSelect((subQuery) => {
 			return subQuery
-				.select(`COALESCE(JSON_AGG(
+				.select(
+					`COALESCE(JSON_AGG(
 					JSON_BUILD_OBJECT(
 						'id', rdd.id,
 						'releaseId', rdd.release_id,
@@ -1671,7 +1718,8 @@ export class ReleaseQueryService {
 							'type', dsp.type
 						)
 					)
-				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`)
+				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`,
+				)
 				.from('release_dsp_delivery', 'rdd')
 				.leftJoin('dsps', 'dsp', 'dsp.id = rdd.dsp_id')
 				.where('rdd.release_id = release.id');

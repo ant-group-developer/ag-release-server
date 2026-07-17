@@ -70,7 +70,11 @@ export class CiToolService {
 		return typeof status === 'string' ? status : null;
 	}
 
-	async triggerSpotifyProviderRefreshToken(): Promise<{ success: boolean; jobId: string; message: string }> {
+	async triggerSpotifyProviderRefreshToken(): Promise<{
+		success: boolean;
+		jobId: string;
+		message: string;
+	}> {
 		const { data } = await firstValueFrom(
 			this.httpService.post(
 				`${process.env.CI_TOOL_URL}/api/spotify/provider/refresh-token`,

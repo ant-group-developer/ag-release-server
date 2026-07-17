@@ -243,7 +243,9 @@ export class ChannelAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của channel (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của channel (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
 		@Body() dto: EntityRankingQueryDto,

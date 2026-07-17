@@ -18,5 +18,8 @@ export interface PackageUploader {
 		dspCode: DspCode;
 		key: IdempotencyKey;
 	}): Promise<UploadResult>;
-	markBatchDone(input: { path: PackagePath; key: IdempotencyKey }): Promise<void>;
+	markBatchDone(input: {
+		path: PackagePath;
+		key: IdempotencyKey;
+	}): Promise<void>;
 }

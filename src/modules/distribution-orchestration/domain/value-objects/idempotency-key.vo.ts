@@ -13,7 +13,10 @@ export class IdempotencyKey {
 			throw new InvariantViolationError('IdempotencyKey', 'empty');
 		}
 		if (v.length > 128) {
-			throw new InvariantViolationError('IdempotencyKey', `too long: ${v.length} > 128`);
+			throw new InvariantViolationError(
+				'IdempotencyKey',
+				`too long: ${v.length} > 128`,
+			);
 		}
 		return new IdempotencyKey(v);
 	}

@@ -105,7 +105,7 @@ export class ReleaseService {
 
 		@Inject(forwardRef(() => ReleaseCiDataService))
 		private readonly releaseCiDataService: ReleaseCiDataService,
-	) { }
+	) {}
 
 	async getOne(id: string): Promise<IReleaseDetail> {
 		const release = await this.releaseQueryService.getOneDetail(id);
@@ -406,7 +406,7 @@ export class ReleaseService {
 			}
 		}
 
-		archive.finalize().catch((_e) => { });
+		archive.finalize().catch((_e) => {});
 
 		return {
 			contentType: 'application/zip',
@@ -923,7 +923,8 @@ export class ReleaseService {
 					// getReleaseFormatId đã update DB, ở đây chỉ ghi nhận tiến độ.
 					synced += 1;
 					this.logger.log(
-						`Synced release format ID for release ${releaseId}: ${result.value}. Progress: ${synced + failed.length
+						`Synced release format ID for release ${releaseId}: ${result.value}. Progress: ${
+							synced + failed.length
 						}/${releases.length}`,
 					);
 					return;
@@ -939,7 +940,8 @@ export class ReleaseService {
 					message,
 				});
 				this.logger.error(
-					`Failed to sync release format ID for release ${releaseId}. Progress: ${synced + failed.length
+					`Failed to sync release format ID for release ${releaseId}. Progress: ${
+						synced + failed.length
 					}/${releases.length}. Error: ${message}`,
 				);
 			});
@@ -1082,13 +1084,13 @@ export class ReleaseService {
 	): ReleaseStatus {
 		const statuses = dataDsp
 			? (release.releaseDspDeliveries
-				?.filter((delivery) =>
-					dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
-				)
-				.map((delivery) => delivery.status) ?? [])
+					?.filter((delivery) =>
+						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
+					)
+					.map((delivery) => delivery.status) ?? [])
 			: (release.releaseDspDeliveries?.map(
-				(delivery) => delivery.status,
-			) ?? []);
+					(delivery) => delivery.status,
+				) ?? []);
 
 		if (!statuses.length) {
 			return release.status;

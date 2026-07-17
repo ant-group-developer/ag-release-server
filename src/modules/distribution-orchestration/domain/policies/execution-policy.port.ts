@@ -25,5 +25,7 @@ export interface ExecutionPolicy {
 	resolveProcessCode(spec: ChannelDeliverySpec): string;
 
 	/** TAKEDOWN only: choose which channels to take down (direct per-DSP; aggregator whole cluster). */
-	selectChannelsForTakedown?(all: ChannelDeliverySpec[]): ChannelDeliverySpec[];
+	selectChannelsForTakedown?(
+		all: ChannelDeliverySpec[],
+	): ChannelDeliverySpec[];
 }

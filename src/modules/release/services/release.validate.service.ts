@@ -841,8 +841,10 @@ export class ReleaseValidateService {
 	}
 
 	private isExplicitContent(code?: string | null): boolean {
-		return ['Explicit', 'ExplicitContentEdited', 'NoAdviceAvailable'].includes(
-			code?.trim() ?? '',
-		);
+		return [
+			'Explicit',
+			'ExplicitContentEdited',
+			'NoAdviceAvailable',
+		].includes(code?.trim() ?? '');
 	}
 }
