@@ -1561,7 +1561,7 @@ export class ReleaseQueryService {
 		queryBuilder
 			.addSelect(['albumFormat.id', 'albumFormat.name', 'albumFormat.code'])
 			.addSelect(['label.id', 'label.name', 'label.code', 'label.picture', 'label.description'])
-			.addSelect(['video.id', 'video.releaseId', 'video.channelId', 'video.isrc', 'video.externalId'])
+			.addSelect(['video.id', 'video.releaseId', 'video.channelId', 'video.isrc', 'video.externalId', 'video.visibility'])
 			.addSelect(['channel.id', 'channel.name', 'channel.youtubeChannelId', 'channel.thumbUrl'])
 			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
 			.addSelect(this.sumDurationSubQuery, FieldOrderRelease.TOTAL_DURATION)
