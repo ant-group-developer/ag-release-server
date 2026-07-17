@@ -3,6 +3,8 @@
 > Mục tiêu: đọc xong file này là bạn HIỂU đủ để tự gõ, không chỉ chép. Spec kỹ thuật ở
 > `phase-02-bullmq-engine.md`. File này giải thích *vì sao* + *nghĩ thế nào*.
 
+**Trạng thái (2026-07-17):** Step 1 + Step 2 đã CODE XONG, 125 test xanh (122 unit + 3 integration Postgres real via testcontainers). Section 7 dưới đây tóm tắt "bài học khi code" — những thứ chỉ ngộ ra khi chạm code thật.
+
 ---
 
 ## 0. Mô hình tư duy: Domain là BỘ NÃO, Phase 2 là CƠ THỂ
@@ -200,28 +202,118 @@ Implement `WorkflowEnginePort` bằng `new Queue()` của bullmq. `delayMs` → 
 
 ---
 
-## 5. Bắt tay: Step 1 làm gì, tự kiểm thế nào
+## 5. Step 1 + Step 2 — checklist & tự kiểm
 
-**Mục tiêu Step 1:** dựng 2 port + 1 adapter giả + module rỗng. Chưa đụng DB, chưa đụng BullMQ. Có 1 test nhỏ chứng minh adapter giả hoạt động.
+### Step 1 ✅ (2026-07-16)
+Mục tiêu: dựng 2 port + 1 adapter giả + module rỗng. Chưa đụng DB, chưa đụng BullMQ.
 
-Checklist:
-1. Tạo `application/ports/workflow-engine.port.ts` (dùng skeleton mục 4).
-2. Tạo `application/ports/unit-of-work.port.ts`.
-3. Tạo `infrastructure/workflow/in-memory-workflow.adapter.ts` (chú ý `advanceTime` để tua thời gian).
-4. Tạo `distribution-orchestration.module.ts` (khai báo tối thiểu, chưa cần nhiều provider).
-5. Viết 1 spec nhỏ: enqueue 1 job `delayMs=1000` → `due()` rỗng; `advanceTime(1000)` → `due()` có 1 job. Chứng minh cơ chế "chờ không block".
+- [x] `application/ports/workflow-engine.port.ts` (QueueName union 6 queue, EnqueueOptions, JobPayload, WORKFLOW_ENGINE Symbol)
+- [x] `application/ports/unit-of-work.port.ts` (TxContext expose EntityManager, UNIT_OF_WORK Symbol)
+- [x] `infrastructure/workflow/in-memory-workflow.adapter.ts` (Map + clockMs ảo + advanceTime + setTime + jobId dedupe + FIFO seq)
+- [x] `distribution-orchestration.module.ts` — wire `WORKFLOW_ENGINE` → InMemoryWorkflowAdapter + `TypeOrmModule.forFeature([4 entity])`
+- [x] 5 spec test: delay=0 due ngay · delayMs+advanceTime 1 ngày · dedupe jobId · schedule+setTime · FIFO seq
 
-**Tự kiểm:** `npx tsc --noEmit` sạch + test nhỏ xanh + guard `no-framework-import.spec.ts` vẫn xanh (vì bạn không đụng `domain/`).
+### Step 2 ✅ (2026-07-17, 6 nhịp)
+Mục tiêu: chạm DB thật — 4 bảng + migration + repository + UoW + integration test round-trip.
+
+- [x] Nhịp 2.1 — Schema 4 bảng (`version` cột optlock, `distribution_event` 3 cột chiếu + jsonb payload, hoãn `orchestration_ticket` giữ cột string)
+- [x] Nhịp 2.2 — Migration hand-written (4 CREATE + 3 FK CASCADE + 8 INDEX + 1 partial index outbox WHERE dispatched_at IS NULL)
+- [x] Nhịp 2.3 — 4 ORM entity với suffix `.orm-entity.ts` + glob autoload update
+- [x] Nhịp 2.4 — `TypeOrmDistributionRepository` (load 2 query song song + saveWithOutbox: INSERT/UPDATE optlock + UPSERT channels + INSERT events + INSERT outbox, tất cả trong tx do UoW mở)
+- [x] Nhịp 2.5 — `TypeOrmUnitOfWork` (QueryRunner + startTransaction/commit/rollback + release trong finally + guard `isTransactionActive`) + wire `UNIT_OF_WORK` + `DISTRIBUTION_REPOSITORY`
+- [x] Nhịp 2.6 — Integration test với `testcontainers` + Postgres 16-alpine, 3 case: round-trip persist 4 bảng · load rehydrate state+channels order+optional spec · optimistic lock conflict
+
+**Kết quả tổng**: 125/125 test xanh (122 unit + 3 integration real DB). tsc sạch. Guard `no-framework-import` xanh.
 
 ---
 
 ## 6. Hai câu tự trả lời TRƯỚC khi gõ (để hiểu, không chép)
 
 1. **`WorkflowEnginePort` đặt ở `application/` hay `domain/`?**
-   Gợi ý: aggregate `Distribution` có bao giờ gọi `enqueue()` không? Port domain là thứ *domain cần để hoàn thành nghiệp vụ* (Clock, provisioner). "Enqueue job" là việc *điều phối*, domain không quan tâm. → đặt đâu?
+   Đáp: `application/`. Aggregate không gọi enqueue — nó chỉ pull events. Enqueue là việc điều phối, không thuộc luật nghiệp vụ.
 
 2. **`InMemoryWorkflowAdapter` test "chờ 5 ngày" mà không chờ thật, bằng cách nào?**
-   Gợi ý: đừng dùng `setTimeout`. Lưu `runAt` (mốc thời gian ảo), cho test một cách "tua thời gian". Đây cũng là lý do Clock là port — thời gian phải điều khiển được trong test.
+   Đáp: lưu `runAt` (mốc ảo), test gọi `advanceTime(ms)` tua thời gian. Không setTimeout. Đây cũng là lý do Clock là port.
 
-Trả lời được 2 câu này là bạn sẵn sàng. Code xong Step 1, tôi review.
+---
+
+## 7. Bài học khi code Step 1+2 (những thứ chỉ ngộ ra khi chạm code)
+
+### 7.1 Optimistic lock KHÔNG dùng `@VersionColumn`
+
+TypeORM có sẵn `@VersionColumn` — tự tăng version, throw `OptimisticLockVersionMismatchError` nếu lệch. Nhưng nó chạy qua `repository.save()` với entity đầy đủ. Chúng ta không dùng vì:
+
+- Repo dùng `createQueryBuilder().update()` để có `WHERE version = ?` tường minh và đọc `result.affected` để tự throw `OptimisticLockError` của domain.
+- Cách này match với style của repo (2 query rõ ràng, không phụ thuộc ORM guessing).
+
+**Pattern**: `INSERT khi version=0 (fresh aggregate) → sau commit lần đầu DB=1`; `UPDATE với WHERE version=X SET version=X+1`; `affected===0 → throw`.
+
+### 7.2 `payload: object` (KHÔNG `Record<string, unknown>`) cho jsonb
+
+Định nghĩa entity với `payload: Record<string, unknown>` gây fail compile khi `save()` vì TypeORM `DeepPartial<T>` khắt khe với `Record`. Giải pháp:
+
+- Entity khai `payload: object` (loose type — dữ liệu vào DB vẫn là JSON hợp lệ).
+- Insert qua `createQueryBuilder().insert().values(rows)` — bypass DeepPartial gate hoàn toàn.
+
+Không phải Best Practice™ hoàn hảo nhưng thực dụng và cô lập được trong 1 file repo.
+
+### 7.3 Aggregate immutable field: public readonly, không private+getter
+
+Ban đầu tôi định thêm `_type` + `get type()`. Nhưng nhìn lại: `id`, `releaseId`, `snapshotId`, `tenantId`, `correlationId` đều là `public readonly` trong constructor. `type` cùng tính chất (immutable từ create) → nhất quán: **cũng public readonly**.
+
+Bài học: private+getter chỉ cần khi có logic đọc (transform, lazy compute) hoặc dự tính thêm setter/transition đổi giá trị. Nếu không, thêm boilerplate cho vui.
+
+### 7.4 TxContext expose `EntityManager` — clean architecture "cargo cult"
+
+Cách kiểu clean architecture "thuần" sẽ là port `TxContext.query()` / `TxContext.repository()` trừu tượng, không nhắc TypeORM. Nhưng:
+
+- Team đã bake TypeORM khắp codebase, không có kịch bản đổi ORM.
+- Application đã biết ngữ cảnh persistence (khác domain thuần) → coupling ở đây không phá invariant nào.
+- Trừu tượng thêm 1 layer = 1 file port + 1 file adapter + mọi thao tác DB phải đi qua wrapper → phức tạp không đáng.
+
+**Nguyên tắc**: guard `no-framework-import` chỉ áp `domain/`. Application/infrastructure được import framework thoải mái.
+
+### 7.5 UoW `finally { release() }` LUÔN cần
+
+`QueryRunner.release()` trả connection về pool. Nếu quên → mỗi transaction leak 1 connection → pool exhaustion sau ~10 lần chạy. Pattern:
+
+```ts
+const qr = ds.createQueryRunner();
+await qr.connect(); await qr.startTransaction();
+try {
+  const result = await work({ manager: qr.manager });
+  await qr.commitTransaction();
+  return result;
+} catch (err) {
+  if (qr.isTransactionActive) await qr.rollbackTransaction();
+  throw err;
+} finally {
+  await qr.release();
+}
+```
+
+Guard `isTransactionActive` tránh double-rollback khi commit throw (edge case hiếm nhưng nếu xảy ra, rollback thứ 2 sẽ throw đè lỗi gốc).
+
+### 7.6 Integration test — testcontainers vs migration:run
+
+Đặc tả nói "chạy migration:run trên DB test". Thực tế chạm code lộ ra: TypeORM `runMigrations()` chạy TOÀN BỘ migration trong repo, không filter được — có migration cũ (`AddClickHouseSyncOutbox`) phụ thuộc bảng `tracks` module khác, fail ngay.
+
+Giải pháp: `synchronize: true` với 4 entity module này. Trade-off:
+- ✅ Test scope = repo behavior, không phải migration correctness.
+- ❌ Partial index outbox + FK CASCADE trong migration file không có trong test này.
+- 📝 Tech debt: nếu muốn cover migration thật, cần custom runner filter theo module.
+
+### 7.7 Tại sao 2 query song song thay vì JOIN?
+
+Load Distribution = SELECT distribution + SELECT channels (Promise.all). Không dùng LEFT JOIN vì:
+
+- Nếu channels 0 rows, LEFT JOIN vẫn phải NULL-check trong mapper.
+- Nếu N channels, JOIN duplicate row distribution N lần (mỗi row lặp cột parent) — wire cost tương đương 2 query riêng với N < ~10.
+- 2 query rõ ràng: dev đọc SQL log biết ngay repo làm gì; mapper mỗi bảng độc lập.
+
+Trade-off thay đổi khi N lớn — nếu 1 distribution có 50 channels và load nhiều, có thể cân JOIN. Chưa cần lo (YAGNI).
+
+---
+
+Bài học lớn: **spec đúng ~85% khi chạm code**. 15% còn lại cần chỉnh — không phải spec sai, mà là quyết định chi tiết chỉ lộ khi gõ TypeScript thật. Bảng "Quyết định phát sinh khi code" trong `phase-02-bullmq-engine.md` liệt kê đủ 11 điểm.
 

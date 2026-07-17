@@ -1,7 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🟡 Đặc tả xong — sẵn sàng EXECUTE
-**Depends on:** Phase 1 (domain thuần) ✅ · **Blocks:** Phase 3 (outbox projection + SSE)
+**Priority:** Cao · **Status:** 🔵 Step 1 + Step 2 XONG (125 test xanh, có integration testcontainers) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+
+**Progress:** [x] Step 1 [x] Step 2 [ ] Step 3 [ ] Step 4 [ ] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
 
 ## Context Links
 
@@ -17,7 +18,9 @@ Thay cơ chế điều phối của v3 (DB-queue tự viết `release_execution*
 
 Bài toán là **wait-bound** (chờ SFTP/CI/DSP 1–5 ngày), không throughput-bound. Hệ quả bất di: không giữ tài nguyên khi chờ (delayed job), state ở Postgres, worker stateless, mọi bước idempotent.
 
-## Quyết định đã chốt (2026-07-16)
+## Quyết định đã chốt
+
+Quyết định gốc (đặc tả):
 
 | # | Chủ đề | Chốt | Lý do |
 |---|--------|------|-------|
@@ -25,6 +28,22 @@ Bài toán là **wait-bound** (chờ SFTP/CI/DSP 1–5 ngày), không throughput
 | 2 | **BullMQ dep** | **Port + in-memory adapter TRƯỚC**, cài `bullmq` + `BullMqWorkflowAdapter` thật ở step cuối + integration test riêng. | Unit test không cần Redis; giữ vòng lặp học từng bước; vẫn đạt exit "end-to-end qua BullMQ". |
 | 3 | **Outbox relay** | **Polling worker**: `SELECT ... WHERE dispatched_at IS NULL FOR UPDATE SKIP LOCKED` → enqueue → mark dispatched. | Đơn giản, dễ test, at-least-once, quen thuộc. Không cần pg_notify/CDC giai đoạn này (YAGNI). |
 | 4 | **Ranh giới P2/P3** | **P2 = write-side** (4 bảng + ghi `distribution_event` trong transaction + relay enqueue). **P3 = read-side** (projection `release_dsp_delivery` + SSE timeline). | CQRS-lite: tách ghi khỏi đọc. P2 *ghi* event nhưng chưa *chiếu* ra UI. |
+
+Quyết định phát sinh khi code (Step 1–2):
+
+| # | Chủ đề | Chốt | Ghi chú |
+|---|--------|------|---------|
+| 5 | **DI token** | Cách A — Symbol token, không abstract class. Port là interface thuần TS. | Nhất quán 3 Symbol: `WORKFLOW_ENGINE` / `UNIT_OF_WORK` / `DISTRIBUTION_REPOSITORY`. |
+| 6 | **TxContext shape** | Expose `EntityManager` (Lựa chọn 1). | Chấp nhận coupling TypeORM ở application layer — team đã bake TypeORM, không có kịch bản đổi ORM; port `TxContext.query()` thêm phức tạp không đáng. |
+| 7 | **Optimistic lock** | KHÔNG dùng `@VersionColumn` — repo tự UPDATE ... WHERE version=? SET version=version+1, đọc `rowsAffected`. | `version=0` → INSERT (fresh aggregate), sau commit lần đầu DB=1. |
+| 8 | **ORM entity naming** | Suffix `.orm-entity.ts` thay `.entity.ts` — tránh nhiễu domain `.entity.ts`. | Cập nhật glob autoload `database.config.ts` thêm `*.orm-entity{.ts,.js}`. |
+| 9 | **Relations mapping** | KHÔNG map `@ManyToOne`/`@OneToMany` — giữ FK cột string, repo dùng 2 query song song rõ ràng. | Cost tương đương JOIN với N nhỏ, kiểm soát query rõ hơn. |
+| 10 | **jsonb payload type** | `payload: object` (không `Record<string, unknown>`). | TypeORM DeepPartial khắt khe với `Record<string, unknown>` khi dùng `repo.save()`. Repo dùng `createQueryBuilder().insert()` để tránh vấn đề này. |
+| 11 | **Bigserial id** | Trả `string` (không `number`). | `bigint > MAX_SAFE_INTEGER` — không ép về number. |
+| 12 | **UoW nested tx** | KHÔNG hỗ trợ (nested `run()` mở 2 QueryRunner độc lập). | KISS ở P2; thêm savepoint khi có use case thật. |
+| 13 | **Aggregate `type` field** | Public readonly field trong constructor (nhất quán id/releaseId/…), không private+getter. | Fix tech debt Nhịp 2.5: trước đó `props.type` bị quăng đi, repo phải cast `as unknown`. |
+| 14 | **Migration in integration test** | `synchronize: true` thay `runMigrations()`. | TypeORM chạy TOÀN BỘ migration repo, không filter được — có migration cũ phụ thuộc bảng `tracks` module khác. Scope test = repo behavior, không phải migration correctness. Trade-off: partial index outbox + FK CASCADE không có trong test này. |
+| 15 | **Integration DB source** | `testcontainers` + `@testcontainers/postgresql` (Postgres 16-alpine, 1 container/suite). | Zero user setup, CI-ready. `beforeEach` TRUNCATE CASCADE giữa test. |
 
 **Đường lùi XState (nếu Phase 5+ chứng minh cần):** giữ 3 bề mặt domain `apply()` / `pullDomainEvents()` / `rehydrate()` bất biến + persist state ở dạng trung tính (`state` string + `pos` số + `retryCount`). Khi cần, thêm `StateMachinePort` riêng (KHÁC `WorkflowEnginePort` — hai trục: quyết-state vs thực-thi-bước); XState vào application như view/simulator đọc cùng `DeliveryProcess`, không thành nguồn sự thật thứ 2.
 
@@ -36,22 +55,33 @@ Bài toán là **wait-bound** (chờ SFTP/CI/DSP 1–5 ngày), không throughput
 distribution-orchestration/
 ├── domain/                                  # Phase 1 — BẤT KHẢ XÂM PHẠM
 ├── application/
-│   ├── ports/workflow-engine.port.ts        # interface enqueue/schedule (thuần)
-│   ├── ports/unit-of-work.port.ts           # interface transaction boundary
-│   ├── commands/*.ts                         # SubmitCmd, MarkValidatedCmd, ChannelInputCmd...
-│   ├── orchestrate.handler.ts               # "một vòng": load→apply→pull→persist+outbox
-│   └── step-runners/*.ts                     # provision/build/upload/... gọi port → phát STEP_DONE
+│   ├── errors/optimistic-lock.error.ts       [Step 2 ✅]
+│   ├── ports/
+│   │   ├── workflow-engine.port.ts           [Step 1 ✅] QueueName union, EnqueueOptions, JobPayload, WORKFLOW_ENGINE
+│   │   ├── unit-of-work.port.ts              [Step 1 ✅] TxContext{manager: EntityManager}, UNIT_OF_WORK
+│   │   ├── outbox-entry.ts                   [Step 2 ✅] {queue, payload, jobId, delayMs?, runAt?}
+│   │   └── distribution-repository.port.ts   [Step 2 ✅] load + saveWithOutbox, DISTRIBUTION_REPOSITORY
+│   ├── commands/*.ts                          [Step 5] SubmitCmd, MarkValidatedCmd, ChannelInputCmd...
+│   ├── orchestrate.handler.ts                [Step 5] "một vòng": load→apply→pull→persist+outbox
+│   └── step-runners/*.ts                      [Step 6] provision/build/upload/... → phát STEP_DONE
 ├── infrastructure/
 │   ├── persistence/
-│   │   ├── *.orm-entity.ts                    # 4 TypeORM entity (distribution/channel/event/outbox)
-│   │   ├── distribution.repository.ts        # rehydrate + save-with-outbox (1 transaction)
-│   │   └── outbox.repository.ts
-│   ├── workflow/in-memory-workflow.adapter.ts   # cho unit test (step 1)
-│   ├── workflow/bullmq-workflow.adapter.ts      # thật (step cuối)
-│   ├── relay/outbox-relay.ts                  # polling worker → enqueue
-│   └── test-doubles/*.ts                      # 9 fake port in-memory
-└── distribution-orchestration.module.ts
+│   │   ├── distribution.orm-entity.ts        [Step 2 ✅] + 3 index
+│   │   ├── channel-delivery.orm-entity.ts    [Step 2 ✅] PK varchar(80) + 2 index
+│   │   ├── distribution-event.orm-entity.ts  [Step 2 ✅] bigserial id, 3 cột chiếu, jsonb payload
+│   │   ├── outbox-event.orm-entity.ts        [Step 2 ✅] UNIQUE(jobId), jsonb payload
+│   │   ├── distribution.repository.ts        [Step 2 ✅] TypeOrmDistributionRepository (load + saveWithOutbox)
+│   │   ├── typeorm-unit-of-work.adapter.ts   [Step 2 ✅] QueryRunner + transaction
+│   │   └── __tests__/*.integration.spec.ts   [Step 2 ✅] testcontainers Postgres, 3 case
+│   ├── workflow/
+│   │   ├── in-memory-workflow.adapter.ts     [Step 1 ✅] Map + clockMs ảo + advanceTime + FIFO dedupe
+│   │   └── bullmq-workflow.adapter.ts        [Step 8]
+│   ├── relay/outbox-relay.ts                  [Step 7] polling worker → enqueue
+│   └── test-doubles/*.ts                      [Step 4] 9 fake port in-memory
+└── distribution-orchestration.module.ts       [Step 1+2 ✅] wire 3 provider
 ```
+
+Migration: `src/migrations/1784200000000-CreateDistributionOrchestrationTables.ts` [Step 2 ✅] — 4 CREATE TABLE + 3 FK CASCADE + 8 INDEX + 1 partial index outbox (WHERE dispatched_at IS NULL). CHƯA chạy `migration:run` production; integration test dùng `synchronize` (xem quyết định #14).
 
 **Nguyên tắc:** `application/` + `infrastructure/` được import framework (bullmq/typeorm/@nestjs). `domain/` giữ nguyên. Guard `no-framework-import.spec.ts` chỉ quét `domain/` → vẫn xanh.
 
@@ -143,25 +173,31 @@ outbox_event (                 -- reliable publish (polling relay)
 
 ## Implementation Steps
 
-1. **Nền + port.** `WorkflowEnginePort` + `UnitOfWorkPort` + `InMemoryWorkflowAdapter`. Module scaffold. (chưa cài bullmq)
-2. **TypeORM entity + migration** 4 bảng (+ snapshot nếu thiếu). Compile + migration:run dry.
-3. **Repository** `rehydrate` (row → `Distribution.rehydrate`/`ChannelDelivery.rehydrate`) + `saveWithOutbox` (1 transaction: state + channels + events + outbox).
-4. **9 test-double port in-memory** (Clock cố định, provisioner trả UPC giả, uploader ok, ...).
-5. **Orchestrate handler + 1 command** (submit → markValidated) chạy end-to-end in-memory: assert state + event + outbox.
-6. **Step-runners** lần lượt: provision → build → upload → import-check → qa → export → status-sync. Mỗi runner gọi port → phát STEP_DONE/STEP_FAILED về `dist.orchestrate`.
-7. **Outbox relay** (polling worker) + retry/backoff + DLQ mỗi queue.
-8. **BullMqWorkflowAdapter thật** + wire Redis (`@nestjs-modules/ioredis` đã có) + integration test 1 release INITIAL end-to-end.
+1. **Nền + port ✅** `WorkflowEnginePort` + `UnitOfWorkPort` + `InMemoryWorkflowAdapter` (Map + clockMs ảo + advanceTime + setTime + jobId dedupe + FIFO seq). Module scaffold wire `WORKFLOW_ENGINE`. 5 spec test in-memory.
+2. **Persistence ✅** — chia làm 6 nhịp:
+   - 2.1 Schema 4 bảng (chốt: `version` cột optlock; `distribution_event` 3 cột chiếu + jsonb payload; hoãn `orchestration_ticket` giữ cột string).
+   - 2.2 Migration hand-written `1784200000000-CreateDistributionOrchestrationTables.ts` (4 CREATE + 3 FK + 8 INDEX + 1 partial index outbox).
+   - 2.3 4 ORM entity (suffix `.orm-entity.ts`; glob autoload update).
+   - 2.4 `TypeOrmDistributionRepository` (load 2 query song song + saveWithOutbox: INSERT/UPDATE optlock + UPSERT channels + INSERT events + INSERT outbox trong tx do UoW mở).
+   - 2.5 `TypeOrmUnitOfWork` (QueryRunner.connect → startTransaction → callback → commit/rollback → release trong finally; guard `isTransactionActive` tránh double-rollback). Wire `UNIT_OF_WORK` + `DISTRIBUTION_REPOSITORY`.
+   - 2.6 Integration test với `testcontainers` + Postgres 16-alpine — 3 case: round-trip persist 4 bảng, load rehydrate, optimistic lock conflict.
+3. **9 test-double port in-memory** (Clock cố định, provisioner trả UPC giả, uploader ok, ...).
+4. **Orchestrate handler + 1 command** (submit → markValidated) chạy end-to-end in-memory: assert state + event + outbox.
+5. **Step-runners** lần lượt: provision → build → upload → import-check → qa → export → status-sync. Mỗi runner gọi port → phát STEP_DONE/STEP_FAILED về `dist.orchestrate`.
+6. **Outbox relay** (polling worker) + retry/backoff + DLQ mỗi queue.
+7. **BullMqWorkflowAdapter thật** + wire Redis (`@nestjs-modules/ioredis` đã có) + integration test 1 release INITIAL end-to-end.
+
+_(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh lại số Step 3→7 cho khớp.)_
 
 ## Todo
 
-- [ ] Step 1: WorkflowEnginePort + UnitOfWorkPort + InMemoryWorkflowAdapter + module scaffold
-- [ ] Step 2: 4 TypeORM entity + migration (+ snapshot check)
-- [ ] Step 3: distribution.repository (rehydrate + saveWithOutbox transaction)
-- [ ] Step 4: 9 test-double in-memory
-- [ ] Step 5: orchestrate.handler + submit→validate chạy in-memory + test
-- [ ] Step 6: step-runners (provision/build/upload/import/qa/export/status-sync)
-- [ ] Step 7: outbox-relay polling + retry/backoff + DLQ
-- [ ] Step 8: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
+- [x] Step 1: WorkflowEnginePort + UnitOfWorkPort + InMemoryWorkflowAdapter + module scaffold
+- [x] Step 2: 4 ORM entity + migration + repo + UoW + integration test (Nhịp 2.1–2.6)
+- [ ] Step 3: 9 test-double in-memory
+- [ ] Step 4: orchestrate.handler + submit→validate chạy in-memory + test
+- [ ] Step 5: step-runners (provision/build/upload/import/qa/export/status-sync)
+- [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
+- [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
 - [ ] Cập nhật plan.md status Phase 2
 
 ## Success Criteria
@@ -169,8 +205,10 @@ outbox_event (                 -- reliable publish (polling relay)
 - Unit test: submit→validate→provision→build→deliver (1 channel) chạy qua handler + in-memory adapter, state chảy đúng, events + outbox ghi đúng, KHÔNG cần Redis/DB thật.
 - Idempotency: chạy lại cùng command/job (cùng key) KHÔNG tạo side-effect/event kép.
 - Guard `no-framework-import.spec.ts` vẫn xanh (domain sạch).
-- Integration (step 8): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
+- Integration (Step 7): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
 - Mỗi file < 200 LOC.
+
+**Status hiện tại (Step 1+2):** 125 test xanh (122 unit + 3 integration Postgres real via testcontainers). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
 
 ## Risk Assessment
 
@@ -192,7 +230,9 @@ outbox_event (                 -- reliable publish (polling relay)
 
 ## Unresolved Questions
 
-- Bảng `release_snapshot` đã tồn tại từ v3 chưa, hay Phase 2 tạo mới? (kiểm tra khi vào Step 2)
-- `WorkflowEnginePort` + command types đặt ở `application/` hay một phần (types thuần) xuống `domain/`? (nghiêng application — engine là chi tiết ngoài domain)
-- Rate-limit per host cho SFTP: cấu hình tĩnh hay đọc từ config DSP/aggregator? (quyết khi vào Step 6/8)
+- Bảng `release_snapshot` đã tồn tại từ v3 chưa, hay Phase 2 tạo mới? (chưa chạm — schema Step 2 chỉ lưu `snapshotId` uuid; kiểm tra khi cần load snapshot ở step-runner)
+- ~~`WorkflowEnginePort` + command types đặt ở `application/` hay `domain/`~~ → **Chốt: `application/`** (Step 1).
+- Rate-limit per host cho SFTP: cấu hình tĩnh hay đọc từ config DSP/aggregator? (quyết khi vào Step 5/7)
+- Migration test coverage: hiện integration dùng `synchronize`. Nếu cần verify migration file (partial index + FK CASCADE) → cần custom runner filter migration theo module, hoặc test riêng ở CI full-pipeline. Ghi tech debt, chưa scope.
+- Nested transaction (savepoint): UoW hiện KHÔNG hỗ trợ. Nếu Step 4/5 có handler compose 2 uow.run() lồng nhau → cần thêm savepoint logic.
 
