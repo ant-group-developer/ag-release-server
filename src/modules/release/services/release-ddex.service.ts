@@ -31,6 +31,7 @@ import {
 	DEFAULT_PRICE_RANGE_TYPE,
 } from '../constants/release.constant';
 import { Release } from '../entities/release.entity';
+import { ReleaseTimeMode } from '../enum/release.enum';
 
 interface AudioFileInfo {
 	// buffer: Buffer;
@@ -789,6 +790,16 @@ export class ReleaseDdexService {
 				releaseDate: release.releaseDate
 					? this.formatDateTime(release.releaseDate)
 					: '',
+				releaseTime:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.releaseTime
+						: null,
+				releaseTimezoneOffset:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? this.cleanTimezoneOffset(release.timeZone?.utc)
+						: null,
 
 				genre:
 					(release.primaryGenre?.name
@@ -1247,6 +1258,16 @@ export class ReleaseDdexService {
 				releaseDate: release.releaseDate
 					? this.formatDateTime(release.releaseDate)
 					: '',
+				releaseTime:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? release.releaseTime
+						: null,
+				releaseTimezoneOffset:
+					release.releaseTimeMode ===
+					ReleaseTimeMode.SPECIFIC_TIMEZONE
+						? this.cleanTimezoneOffset(release.timeZone?.utc)
+						: null,
 				genre: release.primaryGenre?.name ?? 'Pop',
 				subGenre: release.subGenre?.name ?? undefined,
 				labelName: videoLabelName,
@@ -1360,6 +1381,15 @@ export class ReleaseDdexService {
 				],
 			},
 		};
+	}
+
+	private cleanTimezoneOffset(utcOffset?: string | null): string | null {
+		if (!utcOffset) return null;
+		const cleaned = utcOffset.replace(/UTC|GMT/gi, '').trim();
+		if (cleaned === '' || cleaned.toUpperCase() === 'Z') {
+			return 'Z';
+		}
+		return cleaned;
 	}
 
 	private getSha1Base64(filePath: string): string {
