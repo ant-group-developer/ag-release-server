@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { NotificationService } from 'src/modules/notification/services/notification.service';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Brackets, Repository } from 'typeorm';
 import { QueryGetListLogDto } from '../dto/log.dto';
@@ -38,8 +37,6 @@ export class LogsService {
 	constructor(
 		@InjectRepository(Logs)
 		private readonly repo: Repository<Logs>,
-
-		private readonly notificationService: NotificationService,
 	) {}
 
 	success(dto: Omit<WriteLogDto, 'level'>) {
