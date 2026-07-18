@@ -756,6 +756,7 @@ export class SftpConnectService {
 				);
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
+				const stats = fs.statSync(localPath);
 				const abortController = new AbortController();
 				const fileStream = fs.createReadStream(localPath);
 				const timeout = setTimeout(() => {
@@ -766,14 +767,17 @@ export class SftpConnectService {
 					fileStream.destroy();
 				}, this.s3UploadTimeoutMs);
 
+				this.logger.log(`file size ${stats.size}`);
 				this.logger.log(`Starting S3 upload: ${key}`);
 
+				continue;
 				try {
 					await s3.send(
 						new PutObjectCommand({
 							Bucket: config.bucket!,
 							Key: key,
 							Body: fileStream,
+							ContentLength: stats.size, // <--- Báo kích thước file để không nạp đệm toàn bộ vào RAM
 						}),
 						{ abortSignal: abortController.signal },
 					);
