@@ -6,6 +6,7 @@ import {
 	PutObjectCommand,
 	S3Client,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { Injectable, Logger } from '@nestjs/common';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { spawn } from 'child_process';
@@ -321,15 +322,24 @@ export class SftpConnectService {
 				remoteDir,
 				path.basename(localFile),
 			);
+			const fileStream = fs.createReadStream(localFile);
 
-			await s3.send(
-				new PutObjectCommand({
-					Bucket: sftp.bucket!,
-					Key: key,
-					Body: fs.createReadStream(localFile),
-				}),
-			);
-
+			try {
+				const upload = new Upload({
+					client: s3,
+					params: {
+						Bucket: sftp.bucket!,
+						Key: key,
+						Body: fileStream,
+					},
+					leavePartsOnError: false,
+					queueSize: 4,
+					partSize: 10 * 1024 * 1024,
+				});
+				await upload.done();
+			} finally {
+				fileStream.destroy();
+			}
 			return;
 		}
 
@@ -757,13 +767,15 @@ export class SftpConnectService {
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
 				const stats = fs.statSync(localPath);
-				const abortController = new AbortController();
 				const fileStream = fs.createReadStream(localPath);
+				let parallelUploads3: Upload | null = null;
 				const timeout = setTimeout(() => {
 					this.logger.error(
 						`S3 upload timed out after 1 hour: ${key}`,
 					);
-					abortController.abort();
+					if (parallelUploads3) {
+						parallelUploads3.abort();
+					}
 					fileStream.destroy();
 				}, this.s3UploadTimeoutMs);
 
@@ -771,15 +783,19 @@ export class SftpConnectService {
 				this.logger.log(`Starting S3 upload: ${key}`);
 
 				try {
-					await s3.send(
-						new PutObjectCommand({
+					parallelUploads3 = new Upload({
+						client: s3,
+						params: {
 							Bucket: config.bucket!,
 							Key: key,
 							Body: fileStream,
-							ContentLength: stats.size, // <--- Báo kích thước file để không nạp đệm toàn bộ vào RAM
-						}),
-						{ abortSignal: abortController.signal },
-					);
+						},
+						leavePartsOnError: false,
+						queueSize: 4, // Upload song song tối đa 4 part cùng lúc
+						partSize: 10 * 1024 * 1024, // Chia nhỏ 10MB mỗi part
+					});
+
+					await parallelUploads3.done();
 					this.logger.log(`Completed S3 upload: ${key}`);
 				} catch (error) {
 					this.logger.error(
