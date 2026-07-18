@@ -1,5 +1,5 @@
 # --------- Stage 1: build ứng dụng ---------
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # 1. Copy manifest và cài toàn bộ (bao gồm devDeps)
@@ -13,7 +13,7 @@ COPY . .
 RUN yarn build
 
 # --------- Stage 2: chỉ chứa runtime ---------
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 # Cài tool cần khi runtime (backup, rclone…)
