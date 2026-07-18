@@ -21,6 +21,7 @@ import {
 @Injectable()
 export class SftpConnectService {
 	private readonly logger = new Logger(SftpConnectService.name);
+	private readonly s3UploadTimeoutMs = 60 * 60 * 1000;
 
 	private createClient(): SftpClient {
 		return new SftpClient();
@@ -746,13 +747,37 @@ export class SftpConnectService {
 				);
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
-				await s3.send(
-					new PutObjectCommand({
-						Bucket: config.bucket!,
-						Key: key,
-						Body: fs.createReadStream(localPath),
-					}),
-				);
+				const abortController = new AbortController();
+				const fileStream = fs.createReadStream(localPath);
+				const timeout = setTimeout(() => {
+					this.logger.error(
+						`S3 upload timed out after 1 hour: ${key}`,
+					);
+					abortController.abort();
+				}, this.s3UploadTimeoutMs);
+
+				this.logger.log(`Starting S3 upload: ${key}`);
+
+				try {
+					await s3.send(
+						new PutObjectCommand({
+							Bucket: config.bucket!,
+							Key: key,
+							Body: fileStream,
+						}),
+						{ abortSignal: abortController.signal },
+					);
+					this.logger.log(`Completed S3 upload: ${key}`);
+				} catch (error) {
+					this.logger.error(
+						`S3 upload failed: ${key}`,
+						error instanceof Error ? error.stack : String(error),
+					);
+					throw error;
+				} finally {
+					clearTimeout(timeout);
+					fileStream.destroy();
+				}
 			}
 		}
 	}
