@@ -20,9 +20,9 @@ import {
 	TenantRankingItem,
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
-import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 
 /**
  * Service xếp hạng hiệu năng (Rankings) cho Tracks, Releases, Artists, Labels.
@@ -510,9 +510,7 @@ export class RankingService {
 					r.releaseMetadataSpotify,
 					r.releaseMetadataDeezer,
 				),
-				workspaces: workspace
-					? [{ id: r.tenantId, ...workspace }]
-					: [],
+				workspaces: workspace ? [{ id: r.tenantId, ...workspace }] : [],
 				release: { coverArtThumbnails },
 			};
 		});
@@ -654,7 +652,11 @@ export class RankingService {
 		}>(dataSql, params);
 
 		const releaseIds = paged.map((r) => r.releaseId);
-		const allChannelIds = [...new Set(paged.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
+		const allChannelIds = [
+			...new Set(
+				paged.flatMap((r) => r.channelIds ?? []).filter(Boolean),
+			),
+		];
 		const [channelsMeta, videosMeta] = await Promise.all([
 			allChannelIds.length > 0
 				? this.isrcResolverService.getChannelMetadata(allChannelIds)

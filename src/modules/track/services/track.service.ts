@@ -27,7 +27,7 @@ export class TrackService {
 		private readonly appConfigService: AppConfigService,
 
 		private readonly releaseLogService: ReleaseLogService,
-	) { }
+	) {}
 
 	async submit(
 		id: string,

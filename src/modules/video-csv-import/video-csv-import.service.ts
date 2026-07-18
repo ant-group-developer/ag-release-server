@@ -7,10 +7,10 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { ChangeLogEntry } from 'src/modules/partners-api/spotify/services/metadata-sync.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseReportImportService } from 'src/modules/release/services/release-report-import.service';
-import { Track } from 'src/modules/track/entities/track.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
-import { Video } from 'src/modules/video/entities/video.entity';
+import { Track } from 'src/modules/track/entities/track.entity';
 import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
+import { Video } from 'src/modules/video/entities/video.entity';
 import { DataSource, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { VideoCsvImportResult } from './dto/video-csv-import-result.dto';
@@ -163,7 +163,9 @@ export class VideoCsvImportService {
 			if (existingRelease?.isImportedFromReport) {
 				// Update release type to video if still audio
 				if (existingRelease.type === 'audio') {
-					await this.releaseRepo.update(existingRelease.id, { type: 'video' });
+					await this.releaseRepo.update(existingRelease.id, {
+						type: 'video',
+					});
 					this.logger.log(
 						`[CSV Import] Fixed release ${existingRelease.id} type=audio→video for ISRC=${isrc}`,
 					);
@@ -226,7 +228,10 @@ export class VideoCsvImportService {
 
 		if (existingTrack) {
 			const release = await this.releaseRepo.findOne({
-				where: { id: existingTrack.releaseId, isImportedFromReport: true },
+				where: {
+					id: existingTrack.releaseId,
+					isImportedFromReport: true,
+				},
 			});
 
 			if (release) {
@@ -255,20 +260,25 @@ export class VideoCsvImportService {
 		}
 
 		// 3. No existing track/video → create new Release + Video
-		const release = await this.releaseReportImportService.importVideoRelease({
-			upc: `ISRC-${isrc}`,
-			title,
-			artistName: artistName || undefined,
-			tracks: [{ title, isrc }],
-			importSourceType: 'CSV',
-			importParserCode: 'video-csv-import',
-			importFileName: 'videoExports.csv',
-		});
+		const release =
+			await this.releaseReportImportService.importVideoRelease({
+				upc: `ISRC-${isrc}`,
+				title,
+				artistName: artistName || undefined,
+				tracks: [{ title, isrc }],
+				importSourceType: 'CSV',
+				importParserCode: 'video-csv-import',
+				importFileName: 'videoExports.csv',
+			});
 		result.createdVideoRelease++;
 
-		const newVideo = await this.videoRepo.findOne({ where: { releaseId: release.id } });
+		const newVideo = await this.videoRepo.findOne({
+			where: { releaseId: release.id },
+		});
 		if (!newVideo) {
-			this.logger.warn(`[CSV Import] Video not found after create for release=${release.id}`);
+			this.logger.warn(
+				`[CSV Import] Video not found after create for release=${release.id}`,
+			);
 			return;
 		}
 
@@ -324,7 +334,9 @@ export class VideoCsvImportService {
 			await manager.update(Release, release.id, { type: 'video' });
 
 			// Fetch track artists before deleting track
-			const trackArtists = await manager.find(TrackArtist, { where: { trackId: track.id } });
+			const trackArtists = await manager.find(TrackArtist, {
+				where: { trackId: track.id },
+			});
 
 			// Delete track_artists manually (no CASCADE on DB)
 			if (trackArtists.length > 0) {

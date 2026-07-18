@@ -40,11 +40,15 @@ export class MetadataScanScheduleService implements OnModuleInit {
 
 	onModuleInit(): void {
 		if (process.env.APP_ROLE !== 'worker') {
-			this.logger.debug('Skipping metadata scan schedules (not worker role)');
+			this.logger.debug(
+				'Skipping metadata scan schedules (not worker role)',
+			);
 			return;
 		}
 		this.reloadSchedules().catch((err) => {
-			this.logger.error(`Failed to load metadata scan schedules: ${err.message}`);
+			this.logger.error(
+				`Failed to load metadata scan schedules: ${err.message}`,
+			);
 		});
 	}
 
@@ -218,7 +222,8 @@ export class MetadataScanScheduleService implements OnModuleInit {
 				scanId,
 				force: schedule.force,
 				limit: schedule.limitCount ?? undefined,
-				isImportedFromReport: schedule.isImportedFromReport ?? undefined,
+				isImportedFromReport:
+					schedule.isImportedFromReport ?? undefined,
 				triggerType: MetadataScanTriggerType.CRON,
 				scheduleId: schedule.id,
 			})

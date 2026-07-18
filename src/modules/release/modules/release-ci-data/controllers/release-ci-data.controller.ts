@@ -29,7 +29,7 @@ import { ReleaseCiDataService } from '../services/release-ci-data.service';
 @ApiTags('Dữ liệu CI của bản phát hành')
 @Controller('release-ci-data')
 export class ReleaseCiDataController {
-	constructor(private readonly service: ReleaseCiDataService) { }
+	constructor(private readonly service: ReleaseCiDataService) {}
 
 	@Get()
 	@ApiOperation({

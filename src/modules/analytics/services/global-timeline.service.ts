@@ -1384,9 +1384,10 @@ export class TimelineAnalyticsService {
 		const items: RevenueTrackItem[] = [];
 
 		if (rows.length > 0) {
-			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
-				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
-			);
+			const tenantMetadata =
+				await this.isrcResolverService.getTenantMetadata([
+					...new Set(rows.map((row) => row.tenantId).filter(Boolean)),
+				]);
 			const missingIsrcs = isSystem
 				? rows.filter((row) => !row.trackTitle).map((row) => row.isrc)
 				: [];
@@ -1413,7 +1414,9 @@ export class TimelineAnalyticsService {
 
 			rows.forEach((r, index) => {
 				const fallback = fallbackMap.get(r.isrc);
-				const artistNames = Array.isArray(r.artistNames) ? r.artistNames : [];
+				const artistNames = Array.isArray(r.artistNames)
+					? r.artistNames
+					: [];
 				const workspace = r.tenantId
 					? tenantMetadata.get(r.tenantId)
 					: undefined;
@@ -1422,7 +1425,8 @@ export class TimelineAnalyticsService {
 					isrc: r.isrc,
 					title: r.trackTitle || fallback?.trackTitle || '',
 					version: r.trackVersion || null,
-					artistName: artistNames.join(', ') || fallback?.artistName || '',
+					artistName:
+						artistNames.join(', ') || fallback?.artistName || '',
 					releaseId: r.releaseId || null,
 					releaseTitle: r.releaseTitle || null,
 					labelId: r.labelId || null,
@@ -1439,10 +1443,11 @@ export class TimelineAnalyticsService {
 						: [],
 					release: r.releaseId
 						? {
-								metadataExternal: normalizeSyncedMetadataExternal(
-									r.releaseMetadataSpotify,
-									r.releaseMetadataDeezer,
-								),
+								metadataExternal:
+									normalizeSyncedMetadataExternal(
+										r.releaseMetadataSpotify,
+										r.releaseMetadataDeezer,
+									),
 							}
 						: null,
 				});
@@ -2490,9 +2495,10 @@ export class TimelineAnalyticsService {
 		const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
 		if (rows.length > 0) {
-			const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
-				[...new Set(rows.map((row) => row.tenantId).filter(Boolean))],
-			);
+			const tenantMetadata =
+				await this.isrcResolverService.getTenantMetadata([
+					...new Set(rows.map((row) => row.tenantId).filter(Boolean)),
+				]);
 			rows.forEach((r, index) => {
 				const workspace = r.tenantId
 					? tenantMetadata.get(r.tenantId)
@@ -2642,7 +2648,11 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: TimelineQueryDto,
 	): Promise<PageDto<RevenueReleaseVideoItem>> {
-		const key = this.cache.buildKey('tl:rev-top-release-video', tenantId, query);
+		const key = this.cache.buildKey(
+			'tl:rev-top-release-video',
+			tenantId,
+			query,
+		);
 		return this.cache.wrap(key, () =>
 			this.computeRevenueTopReleaseVideo(tenantId, query),
 		);
@@ -2699,7 +2709,11 @@ export class TimelineAnalyticsService {
 		const totalItems = Number(countResult[0]?.total ?? 0);
 
 		// Data query
-		const sql = queries.getRevenueTopReleaseVideoQuery(filterSql, limit, offset);
+		const sql = queries.getRevenueTopReleaseVideoQuery(
+			filterSql,
+			limit,
+			offset,
+		);
 		const rows = await this.clickHouseService.query<{
 			releaseId: string;
 			channelIds: string[];
@@ -2712,14 +2726,20 @@ export class TimelineAnalyticsService {
 
 		if (rows.length > 0) {
 			const releaseIds = rows.map((r) => r.releaseId);
-			const allChannelIds = [...new Set(rows.flatMap((r) => r.channelIds ?? []).filter(Boolean))];
+			const allChannelIds = [
+				...new Set(
+					rows.flatMap((r) => r.channelIds ?? []).filter(Boolean),
+				),
+			];
 
 			const [releasesMeta, channelsMeta, videosMeta] = await Promise.all([
 				this.isrcResolverService.getReleaseMetadata(releaseIds),
 				allChannelIds.length > 0
 					? this.isrcResolverService.getChannelMetadata(allChannelIds)
 					: Promise.resolve(new Map()),
-				this.isrcResolverService.getVideoMetadataByReleaseIds(releaseIds),
+				this.isrcResolverService.getVideoMetadataByReleaseIds(
+					releaseIds,
+				),
 			]);
 
 			rows.forEach((r, index) => {
@@ -3358,15 +3378,19 @@ export class TimelineAnalyticsService {
 			[iso2Codes],
 		);
 		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [country.iso2, country.name]),
+			countries.map((country: { iso2: string; name: string }) => [
+				country.iso2,
+				country.name,
+			]),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
-			const territory =
-				(iso2 && iso2 !== 'OTHER'
+			const territory = (
+				iso2 && iso2 !== 'OTHER'
 					? (countryNameByIso2.get(iso2) ?? item.territory)
-					: item.territory) as string;
+					: item.territory
+			) as string;
 			return {
 				...item,
 				territory,

@@ -10,7 +10,10 @@ import {
 } from 'class-validator';
 
 export class CreateSonarScheduleDto {
-	@ApiProperty({ example: 'Spotify Sonar nightly', description: 'Tên schedule' })
+	@ApiProperty({
+		example: 'Spotify Sonar nightly',
+		description: 'Tên schedule',
+	})
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(120)
@@ -27,7 +30,10 @@ export class CreateSonarScheduleDto {
 	@MaxLength(100)
 	cronExpression: string;
 
-	@ApiPropertyOptional({ example: 'Asia/Ho_Chi_Minh', default: 'Asia/Ho_Chi_Minh' })
+	@ApiPropertyOptional({
+		example: 'Asia/Ho_Chi_Minh',
+		default: 'Asia/Ho_Chi_Minh',
+	})
 	@IsOptional()
 	@IsString()
 	@MaxLength(80)
@@ -36,22 +42,34 @@ export class CreateSonarScheduleDto {
 	@ApiPropertyOptional({
 		example: true,
 		nullable: true,
-		description: 'true: chỉ release từ report, false: chỉ release không từ report, null: tất cả',
+		description:
+			'true: chỉ release từ report, false: chỉ release không từ report, null: tất cả',
 	})
 	@IsOptional()
 	@IsBoolean()
 	isImportedFromReport?: boolean | null;
 
-	@ApiPropertyOptional({ example: 500, nullable: true, default: 500, description: 'Số release tối đa mỗi lần chạy' })
+	@ApiPropertyOptional({
+		example: 500,
+		nullable: true,
+		default: 500,
+		description: 'Số release tối đa mỗi lần chạy',
+	})
 	@IsOptional()
 	@IsInt()
 	@Min(1)
 	limitCount?: number | null;
 
-	@ApiPropertyOptional({ example: false, default: false, description: 'Re-fetch release đã có data trong 24h' })
+	@ApiPropertyOptional({
+		example: false,
+		default: false,
+		description: 'Re-fetch release đã có data trong 24h',
+	})
 	@IsOptional()
 	@IsBoolean()
 	force?: boolean;
 }
 
-export class UpdateSonarScheduleDto extends PartialType(CreateSonarScheduleDto) {}
+export class UpdateSonarScheduleDto extends PartialType(
+	CreateSonarScheduleDto,
+) {}

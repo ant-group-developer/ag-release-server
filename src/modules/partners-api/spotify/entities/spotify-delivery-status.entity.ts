@@ -1,6 +1,6 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { Column, Entity, Index, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 @Entity('spotify_delivery_status', {
 	comment: 'Lịch sử delivery của release lên Spotify Sonar (API 1 + API 2)',
@@ -46,28 +46,63 @@ export class SpotifyDeliveryStatus extends BaseUUIDEntity {
 	})
 	updatedAtSpotify: Date | null;
 
-	@Column({ name: 'licensor_uuid', type: 'varchar', length: 50, nullable: true })
+	@Column({
+		name: 'licensor_uuid',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+	})
 	licensorUuid: string | null;
 
-	@Column({ name: 'licensor_name', type: 'varchar', length: 255, nullable: true })
+	@Column({
+		name: 'licensor_name',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+	})
 	licensorName: string | null;
 
 	@Column({ name: 'feed_name', type: 'varchar', length: 100, nullable: true })
 	feedName: string | null;
 
-	@Column({ name: 'album_uri', type: 'varchar', length: 255, nullable: true, comment: 'spotify:album:xxx' })
+	@Column({
+		name: 'album_uri',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'spotify:album:xxx',
+	})
 	albumUri: string | null;
 
-	@Column({ name: 'artist_names', type: 'jsonb', nullable: true, comment: 'Mảng tên nghệ sĩ từ albumMetadata' })
+	@Column({
+		name: 'artist_names',
+		type: 'jsonb',
+		nullable: true,
+		comment: 'Mảng tên nghệ sĩ từ albumMetadata',
+	})
 	artistNames: string[] | null;
 
-	@Column({ name: 'album_name', type: 'varchar', length: 255, nullable: true })
+	@Column({
+		name: 'album_name',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+	})
 	albumName: string | null;
 
-	@Column({ name: 'cover_art_sha1', type: 'jsonb', nullable: true, comment: '{ small, medium, large } sha1digest' })
+	@Column({
+		name: 'cover_art_sha1',
+		type: 'jsonb',
+		nullable: true,
+		comment: '{ small, medium, large } sha1digest',
+	})
 	coverArtSha1: Record<string, string> | null;
 
-	@Column({ name: 'earliest_start_date', type: 'timestamptz', nullable: true })
+	@Column({
+		name: 'earliest_start_date',
+		type: 'timestamptz',
+		nullable: true,
+	})
 	earliestStartDate: Date | null;
 
 	@Column({
@@ -81,7 +116,12 @@ export class SpotifyDeliveryStatus extends BaseUUIDEntity {
 	@Column({ name: 'is_provider_test', type: 'boolean', default: false })
 	isProviderTest: boolean;
 
-	@Column({ name: 'warning_status', type: 'varchar', length: 50, nullable: true })
+	@Column({
+		name: 'warning_status',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+	})
 	warningStatus: string | null;
 
 	@Column({ name: 'warning_count', type: 'integer', default: 0 })

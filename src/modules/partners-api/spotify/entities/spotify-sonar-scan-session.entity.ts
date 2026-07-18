@@ -123,7 +123,10 @@ export class SpotifySonarScanSession extends BaseUUIDEntity {
 	})
 	finishedAt: Date | null;
 
-	@ManyToOne(() => SpotifySonarScanSchedule, { nullable: true, onDelete: 'SET NULL' })
+	@ManyToOne(() => SpotifySonarScanSchedule, {
+		nullable: true,
+		onDelete: 'SET NULL',
+	})
 	@JoinColumn({ name: 'schedule_id' })
 	schedule: SpotifySonarScanSchedule | null;
 }

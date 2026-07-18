@@ -3,7 +3,8 @@ import { Release } from 'src/modules/release/entities/release.entity';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 @Entity('spotify_sonar_delivery', {
-	comment: 'Delivery của release lên Spotify Sonar — dữ liệu từ API 1 (list) + API 2 (validation errors)',
+	comment:
+		'Delivery của release lên Spotify Sonar — dữ liệu từ API 1 (list) + API 2 (validation errors)',
 })
 @Unique('UQ_spotify_sonar_delivery_release_delivery_feed', [
 	'releaseId',
@@ -15,19 +16,40 @@ export class SpotifySonarDelivery extends BaseUUIDEntity {
 	@Column({ name: 'release_id', type: 'uuid' })
 	releaseId: string;
 
-	@Column({ name: 'spotify_id', type: 'varchar', length: 50, nullable: true, comment: 'productStatuses[].id' })
+	@Column({
+		name: 'spotify_id',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+		comment: 'productStatuses[].id',
+	})
 	spotifyId: string | null;
 
 	@Column({ name: 'feed_gid', type: 'varchar', length: 100 })
 	feedGid: string;
 
-	@Column({ name: 'delivery_name', type: 'varchar', length: 100, comment: 'key.deliveryName' })
+	@Column({
+		name: 'delivery_name',
+		type: 'varchar',
+		length: 100,
+		comment: 'key.deliveryName',
+	})
 	deliveryName: string;
 
-	@Column({ name: 'product_id', type: 'varchar', length: 50, comment: 'key.productId (UPC)' })
+	@Column({
+		name: 'product_id',
+		type: 'varchar',
+		length: 50,
+		comment: 'key.productId (UPC)',
+	})
 	productId: string;
 
-	@Column({ name: 'status', type: 'varchar', length: 50, comment: 'FAILURE / SUCCESS / ...' })
+	@Column({
+		name: 'status',
+		type: 'varchar',
+		length: 50,
+		comment: 'FAILURE / SUCCESS / ...',
+	})
 	status: string;
 
 	@Column({ name: 'created_at_spotify', type: 'timestamptz', nullable: true })
@@ -36,28 +58,63 @@ export class SpotifySonarDelivery extends BaseUUIDEntity {
 	@Column({ name: 'updated_at_spotify', type: 'timestamptz', nullable: true })
 	updatedAtSpotify: Date | null;
 
-	@Column({ name: 'licensor_uuid', type: 'varchar', length: 50, nullable: true })
+	@Column({
+		name: 'licensor_uuid',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+	})
 	licensorUuid: string | null;
 
-	@Column({ name: 'licensor_name', type: 'varchar', length: 255, nullable: true })
+	@Column({
+		name: 'licensor_name',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+	})
 	licensorName: string | null;
 
 	@Column({ name: 'feed_name', type: 'varchar', length: 100, nullable: true })
 	feedName: string | null;
 
-	@Column({ name: 'album_uri', type: 'varchar', length: 255, nullable: true, comment: 'spotify:album:xxx' })
+	@Column({
+		name: 'album_uri',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'spotify:album:xxx',
+	})
 	albumUri: string | null;
 
-	@Column({ name: 'artist_names', type: 'jsonb', nullable: true, comment: 'albumMetadata.artistName[]' })
+	@Column({
+		name: 'artist_names',
+		type: 'jsonb',
+		nullable: true,
+		comment: 'albumMetadata.artistName[]',
+	})
 	artistNames: string[] | null;
 
-	@Column({ name: 'album_name', type: 'varchar', length: 255, nullable: true })
+	@Column({
+		name: 'album_name',
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+	})
 	albumName: string | null;
 
-	@Column({ name: 'cover_art_sha1', type: 'jsonb', nullable: true, comment: '{ small, medium, large }' })
+	@Column({
+		name: 'cover_art_sha1',
+		type: 'jsonb',
+		nullable: true,
+		comment: '{ small, medium, large }',
+	})
 	coverArtSha1: Record<string, string> | null;
 
-	@Column({ name: 'earliest_start_date', type: 'timestamptz', nullable: true })
+	@Column({
+		name: 'earliest_start_date',
+		type: 'timestamptz',
+		nullable: true,
+	})
 	earliestStartDate: Date | null;
 
 	@Column({
@@ -71,7 +128,12 @@ export class SpotifySonarDelivery extends BaseUUIDEntity {
 	@Column({ name: 'is_provider_test', type: 'boolean', default: false })
 	isProviderTest: boolean;
 
-	@Column({ name: 'warning_status', type: 'varchar', length: 50, nullable: true })
+	@Column({
+		name: 'warning_status',
+		type: 'varchar',
+		length: 50,
+		nullable: true,
+	})
 	warningStatus: string | null;
 
 	@Column({ name: 'warning_count', type: 'integer', default: 0 })

@@ -2,7 +2,8 @@ import { BaseUUIDEntity } from 'src/common/entities/base.entity';
 import { Column, Entity, Index } from 'typeorm';
 
 @Entity('spotify_sonar_scan_schedules', {
-	comment: 'Cấu hình lịch tự động lấy dữ liệu Spotify Sonar delivery + catalog',
+	comment:
+		'Cấu hình lịch tự động lấy dữ liệu Spotify Sonar delivery + catalog',
 })
 export class SpotifySonarScanSchedule extends BaseUUIDEntity {
 	@Column({ type: 'varchar', length: 120, comment: 'Tên lịch quét' })
@@ -22,14 +23,25 @@ export class SpotifySonarScanSchedule extends BaseUUIDEntity {
 		type: 'boolean',
 		nullable: true,
 		default: null,
-		comment: 'true: chỉ release từ report, false: chỉ release không từ report, null: tất cả',
+		comment:
+			'true: chỉ release từ report, false: chỉ release không từ report, null: tất cả',
 	})
 	isImportedFromReport: boolean | null;
 
-	@Column({ name: 'limit_count', type: 'integer', nullable: true, default: 500, comment: 'Số release tối đa mỗi lần chạy' })
+	@Column({
+		name: 'limit_count',
+		type: 'integer',
+		nullable: true,
+		default: 500,
+		comment: 'Số release tối đa mỗi lần chạy',
+	})
 	limitCount: number | null;
 
-	@Column({ type: 'boolean', default: false, comment: 'Re-fetch release đã có data' })
+	@Column({
+		type: 'boolean',
+		default: false,
+		comment: 'Re-fetch release đã có data',
+	})
 	force: boolean;
 
 	@Index()

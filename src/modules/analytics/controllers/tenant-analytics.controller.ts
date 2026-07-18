@@ -303,7 +303,9 @@ export class TenantAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của tenant (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của tenant (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('tenantId') tenantId: string,
 		@Body() dto: EntityRankingQueryDto,
