@@ -783,7 +783,6 @@ export class SftpConnectService {
 				this.logger.log(`file size ${stats.size}`);
 				this.logger.log(`Starting S3 upload: ${key}`);
 
-				continue;
 				try {
 					parallelUploads3 = new Upload({
 						client: s3,
