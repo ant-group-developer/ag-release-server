@@ -122,7 +122,7 @@ export class ReleaseQueryService {
 			qbId.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 		}
 
-		this.applyOrderFieldSelect(qbId, query.fieldOrder as string);
+		this.applyOrderFieldSelect(qbId, query.fieldOrder);
 
 		const [releasesBase, totalItems] = await qbId.getManyAndCount();
 
@@ -1590,6 +1590,7 @@ export class ReleaseQueryService {
 				'video.channelId',
 				'video.isrc',
 				'video.externalId',
+				'video.visibility',
 			])
 			.addSelect([
 				'channel.id',
@@ -1925,6 +1926,7 @@ export class ReleaseQueryService {
 				'videoContributorRole',
 			)
 
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
 			.leftJoinAndSelect('release.ciData', 'releaseCiData')
 
 			.where('release.id = :releaseId', { releaseId })
@@ -2054,6 +2056,7 @@ export class ReleaseQueryService {
 		relations?: string[];
 	}) {
 		qb.leftJoinAndSelect('release.label', 'label')
+			.leftJoinAndSelect('release.timeZone', 'timeZone')
 			.leftJoinAndSelect('release.ciData', 'releaseCiData')
 			.leftJoinAndSelect('release.primaryGenre', 'releasePrimaryGenre')
 			.leftJoinAndSelect('release.subGenre', 'releaseSubGenre')
