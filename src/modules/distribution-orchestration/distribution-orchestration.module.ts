@@ -17,17 +17,21 @@ import { DistributionOrmEntity } from './infrastructure/persistence/distribution
 import { TypeOrmDistributionRepository } from './infrastructure/persistence/distribution.repository';
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
+import { OutboxRelay } from './infrastructure/relay/outbox-relay';
 import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-workflow.adapter';
 
 /**
  * DistributionOrchestrationModule — scaffold cho Phase 2.
  *
  * Wire ports → adapters:
- *   · WORKFLOW_ENGINE          → InMemoryWorkflowAdapter (Step 8 swap sang BullMQ)
+ *   · WORKFLOW_ENGINE          → InMemoryWorkflowAdapter (Step 7 swap sang BullMQ)
  *   · UNIT_OF_WORK             → TypeOrmUnitOfWork
  *   · DISTRIBUTION_REPOSITORY  → TypeOrmDistributionRepository
  *   · POLICY_RESOLVER          → DefaultPolicyResolver
  *   · CLOCK                    → SystemClock (prod)
+ *
+ * Infrastructure services:
+ *   · OutboxRelay              — Step 6: polling outbox_event → enqueue via WorkflowEnginePort
  *
  * Providers thường:
  *   · OrchestrateHandler       — Step 4: entry point 1 vòng orchestrate
@@ -60,6 +64,7 @@ import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-wor
 		{ provide: POLICY_RESOLVER, useClass: DefaultPolicyResolver },
 		{ provide: CLOCK, useClass: SystemClock },
 		OrchestrateHandler,
+		OutboxRelay,
 	],
 })
 export class DistributionOrchestrationModule {}

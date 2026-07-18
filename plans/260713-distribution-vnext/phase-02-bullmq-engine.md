@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1-5 XONG (5b runners + E2E in-memory) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** 🔵 Step 1-6 XONG (outbox relay + 6 integration test) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [x] Step 5 [ ] Step 6 [ ] Step 7 [ ] Step 8
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [x] Step 5 [x] Step 6 [ ] Step 7
 
 ## Context Links
 
@@ -77,6 +77,9 @@ distribution-orchestration/
 │   │   ├── in-memory-workflow.adapter.ts     [Step 1 ✅] Map + clockMs ảo + advanceTime + FIFO dedupe
 │   │   └── bullmq-workflow.adapter.ts        [Step 8]
 │   ├── relay/outbox-relay.ts                  [Step 7] polling worker → enqueue
+│   ├── relay/
+│   │   ├── outbox-relay.ts                   [Step 6 ✅] polling + dispatch + retry + soft-DLQ
+│   │   └── __tests__/*.integration.spec.ts   [Step 6 ✅] testcontainers, 6 case
 │   └── test-doubles/*.ts                      [Step 3 ✅] 9 fake port in-memory (idempotent theo key/id)
 └── distribution-orchestration.module.ts       [Step 1+2 ✅] wire 3 provider
 ```
@@ -197,7 +200,7 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - [x] Step 4: orchestrate.handler + submit→validate chạy in-memory + test (6 spec xanh)
 - [x] Step 5a: 10 command discriminated union + handler dispatch + buildOutbox mở rộng (5 pipeline spec xanh — total 136 test)
 - [x] Step 5b: migration channel_specs jsonb + rehydrate accept specs + per-channel outbox từ DELIVERING + 7 step-runners + E2E SUBMIT→LIVE spec (134 unit + 3 integration xanh)
-- [ ] Step 6: outbox-relay polling + retry/backoff + DLQ
+- [x] Step 6: outbox-relay polling + retry/backoff + soft-DLQ (6 integration test xanh, total 143 test)
 - [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
 - [ ] Cập nhật plan.md status Phase 2
 
@@ -209,7 +212,23 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - Integration (Step 7): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
 - Mỗi file < 200 LOC.
 
-**Status hiện tại (Step 1+2+3+4):** 131 test xanh (128 unit + 3 integration Postgres real via testcontainers). Step 4 thêm 6 spec cho `OrchestrateHandler` (SUBMIT fresh · MARK_VALIDATED → PROVISIONING_IDS + outbox · idempotent guard · AggregateNotFoundError · optlock race · deterministic jobId). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+**Status hiện tại (Step 1–6):** 143 test xanh (134 unit + 9 integration Postgres real via testcontainers). Step 6 thêm 6 integration test cho OutboxRelay. `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+
+**Step 6 delivered files:**
+- `infrastructure/relay/outbox-relay.ts` — `@Cron('*/5 * * * * *')` polling worker: SELECT FOR UPDATE SKIP LOCKED → dispatch via WorkflowEnginePort → mark dispatched. Retry with `attempts` counter + `last_error`. Soft-DLQ at MAX_ATTEMPTS=10. Concurrency guard (`_polling` flag).
+- `infrastructure/relay/__tests__/outbox-relay.integration.spec.ts` — 6 case: happy path 3 entries, schedule(runAt) mode, engine failure retry, max attempts skip, SKIP LOCKED concurrent polls, idempotent re-poll.
+- `distribution-orchestration.module.ts` — wire `OutboxRelay` as provider.
+
+**Quyết định Step 6 (khi code):**
+
+| # | Chủ đề | Chốt | Ghi chú |
+|---|--------|------|---------|
+| 23 | Port cho relay | KHÔNG tạo port riêng. Relay là pure infra — application layer không bao giờ gọi relay trực tiếp. | KISS — port sẽ thừa, relay chỉ có 1 implementation (polling DB). |
+| 24 | maxAttempts | Hardcode `const MAX_ATTEMPTS = 10` trong file relay. | Chưa có use case đổi runtime. Refactor khi cần. |
+| 25 | Test strategy | Integration test only (testcontainers Postgres). Bỏ unit test mocked. | Relay phụ thuộc nặng raw SQL (`FOR UPDATE SKIP LOCKED`) — mock QueryRunner test ít hành vi thật. |
+| 26 | Tx scope relay | 1 QueryRunner tx bao toàn batch: SELECT FOR UPDATE → dispatch 1-by-1 → UPDATE status. | SKIP LOCKED lock batch, dispatch nhanh (chỉ ghi queue). Fail 1 entry không chặn cả batch. |
+| 27 | Relay tách khỏi UoW | Relay tự tạo QueryRunner riêng, KHÔNG dùng UoW port. | UoW là cho handler (business tx). Relay là infra polling — concerns khác nhau. |
+| 28 | Concurrency guard | `private _polling = false` — Cron tick skip nếu poll trước chưa xong. | Tránh 2 poll chồng nhau khi 1 batch chậm > 5s. |
 
 **Step 4 delivered files:**
 - `application/commands/distribution.command.ts` — discriminated union `SUBMIT | MARK_VALIDATED` (Step 5+ mở rộng 8 command còn lại)
