@@ -767,6 +767,10 @@ export class SftpConnectService {
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
 				const stats = fs.statSync(localPath);
+<<<<<<< HEAD
+=======
+				const abortController = new AbortController();
+>>>>>>> a6ba3166 (update (uploadFolderS3): fix out of memory)
 				const fileStream = fs.createReadStream(localPath);
 				let parallelUploads3: Upload | null = null;
 				const timeout = setTimeout(() => {
@@ -779,6 +783,7 @@ export class SftpConnectService {
 				this.logger.log(`file size ${stats.size}`);
 				this.logger.log(`Starting S3 upload: ${key}`);
 
+				continue;
 				try {
 					parallelUploads3 = new Upload({
 						client: s3,
@@ -786,6 +791,7 @@ export class SftpConnectService {
 							Bucket: config.bucket!,
 							Key: key,
 							Body: fileStream,
+<<<<<<< HEAD
 						},
 						leavePartsOnError: false,
 						queueSize: 4, // Upload song song tối đa 4 part cùng lúc
@@ -793,6 +799,12 @@ export class SftpConnectService {
 					});
 
 					await parallelUploads3.done();
+=======
+							ContentLength: stats.size, // <--- Báo kích thước file để không nạp đệm toàn bộ vào RAM
+						}),
+						{ abortSignal: abortController.signal },
+					);
+>>>>>>> a6ba3166 (update (uploadFolderS3): fix out of memory)
 					this.logger.log(`Completed S3 upload: ${key}`);
 				} catch (error) {
 					this.logger.error(
