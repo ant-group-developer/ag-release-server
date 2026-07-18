@@ -7,6 +7,7 @@ import {
 	S3Client,
 } from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -137,6 +138,10 @@ export class SftpConnectService {
 					},
 					endpoint: config.endpoint,
 					forcePathStyle: !!config.endpoint,
+					requestHandler: new NodeHttpHandler({
+						connectionTimeout: 10000,
+						socketTimeout: 10000,
+					}),
 				});
 
 				const testKey =
@@ -677,6 +682,10 @@ export class SftpConnectService {
 			},
 			endpoint: config.endpoint,
 			forcePathStyle: !!config.endpoint,
+			requestHandler: new NodeHttpHandler({
+				connectionTimeout: 60000, // 1 phút để thiết lập kết nối mạng ban đầu
+				socketTimeout: 300000, // 5 phút không có gói tin nào truyền nhận qua socket thì ngắt và báo lỗi
+			}),
 		});
 	}
 
@@ -754,6 +763,7 @@ export class SftpConnectService {
 						`S3 upload timed out after 1 hour: ${key}`,
 					);
 					abortController.abort();
+					fileStream.destroy();
 				}, this.s3UploadTimeoutMs);
 
 				this.logger.log(`Starting S3 upload: ${key}`);
