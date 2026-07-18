@@ -4,6 +4,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../../clickhouse';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { ResolvedFtpParserConfig } from '../../../dsp-report/services/ftp-parser-config.service';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import {
 	FactDspRow,
@@ -403,6 +404,7 @@ export class ImportService {
 		batchId: string,
 		sourceCategory: string = '',
 		importSource: string = 'ftp',
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Pre-load file exclude check once (avoids repeated async calls inside findDataFiles)
 		const fileExcluder = async (name: string) =>
@@ -416,6 +418,7 @@ export class ImportService {
 				batchId,
 				fileExcluder,
 				importSource,
+				parserConfig,
 			);
 		}
 		if (sourceCategory === 'illegitimate_activity') {
@@ -425,6 +428,7 @@ export class ImportService {
 				batchId,
 				fileExcluder,
 				importSource,
+				parserConfig,
 			);
 		}
 		// Default: trends / usage → existing parsers → fact_dsp
@@ -435,6 +439,7 @@ export class ImportService {
 			sourceCategory,
 			fileExcluder,
 			importSource,
+			parserConfig,
 		);
 	}
 
@@ -448,15 +453,18 @@ export class ImportService {
 		sourceCategory: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
-			await this.dspMappingService.resolveOrCreateDspReport(
+			parserConfig?.dspReport ??
+			(await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
 				importSource === 'ftp' ? 'ftp_folder' : importSource,
-			);
+			));
 
-		const parser = getParserForFolder(folderName);
+		const parser: any =
+			parserConfig?.parser ?? getParserForFolder(folderName);
 		if (!parser) {
 			this.logger.warn(`No trends parser for folder: ${folderName}`);
 			return null;
@@ -535,18 +543,21 @@ export class ImportService {
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const isRevelator = this.isRevelatorSalesFolder(folderName);
 
 		const dspsReport: { id_dsps_report: string; pg_uuid: string | null } =
-			isRevelator
+			parserConfig?.dspReport ??
+			(isRevelator
 				? { id_dsps_report: '', pg_uuid: null }
 				: await this.dspMappingService.resolveOrCreateDspReport(
 						folderName,
 						importSource === 'ftp' ? 'ftp_folder' : importSource,
-					);
+					));
 
-		const parser = getSalesParserForFolder(folderName);
+		const parser: any =
+			parserConfig?.parser ?? getSalesParserForFolder(folderName);
 		if (!parser) {
 			this.logger.warn(
 				`⚠️ [UNKNOWN DSP] No sales parser found for folder: "${folderName}" — data skipped. Please add a parser for this DSP.`,
@@ -631,14 +642,19 @@ export class ImportService {
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const prefix = folderName.split('-')[0];
-		let parser;
-		if (prefix === 'dzr') parser = new DeezerIllegitimateParser();
-		else if (prefix === 'scu') parser = new SoundCloudIllegitimateParser();
-		else if (prefix === 'spo') parser = new SpotifyIllegitimateParser();
-		else if (prefix === 'tiktok') parser = new TiktokIllegitimateParser();
-		else {
+		let parser: any = parserConfig?.parser;
+		if (!parser) {
+			if (prefix === 'dzr') parser = new DeezerIllegitimateParser();
+			else if (prefix === 'scu')
+				parser = new SoundCloudIllegitimateParser();
+			else if (prefix === 'spo') parser = new SpotifyIllegitimateParser();
+			else if (prefix === 'tiktok')
+				parser = new TiktokIllegitimateParser();
+		}
+		if (!parser) {
 			this.logger.warn(
 				`No illegitimate parser for folder: ${folderName}`,
 			);
@@ -647,10 +663,11 @@ export class ImportService {
 
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
-			await this.dspMappingService.resolveOrCreateDspReport(
+			parserConfig?.dspReport ??
+			(await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
 				importSource === 'ftp' ? 'ftp_folder' : importSource,
-			);
+			));
 
 		const startTime = Date.now();
 		this.logger.log(`Parsing ILLEGITIMATE folder: ${folderName}`);

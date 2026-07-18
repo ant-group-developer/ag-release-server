@@ -5,7 +5,12 @@ import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../../clickhouse';
+import { FtpSourceCategory } from '../../../dsp-report/dto/ftp-parser-config.dto';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import {
+	FtpParserConfigService,
+	ResolvedFtpParserConfig,
+} from '../../../dsp-report/services/ftp-parser-config.service';
 import { UpdateSyncConfigDto } from '../../dto/sync-config.dto';
 import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
@@ -67,6 +72,8 @@ export interface ImportHistoryRow {
 	rows_imported: string;
 	files_processed: string;
 	files_list: string[];
+	file_manifest?: string[];
+	parser_config_version?: string;
 	duration_ms: string;
 	error_message: string;
 	batch_id: string;
@@ -89,6 +96,7 @@ export class SyncService {
 		private readonly exchangeRateService: ExchangeRateService,
 		private readonly excludePatternService: ExcludePatternService,
 		private readonly cubeRebuildService: CubeRebuildService,
+		private readonly ftpParserConfigService: FtpParserConfigService,
 	) {}
 
 	// ── Tracking helpers ──────────────────────────────────
@@ -102,6 +110,8 @@ export class SyncService {
 		rows_imported?: number;
 		files_processed?: number;
 		files_list?: string[];
+		file_manifest?: string[];
+		parser_config_version?: number;
 		duration_ms?: number;
 		error_message?: string;
 		batch_id?: string;
@@ -117,6 +127,8 @@ export class SyncService {
 				rows_imported: data.rows_imported || 0,
 				files_processed: data.files_processed || 0,
 				files_list: data.files_list || [],
+				file_manifest: data.file_manifest || [],
+				parser_config_version: data.parser_config_version || 0,
 				duration_ms: data.duration_ms || 0,
 				error_message: data.error_message || '',
 				batch_id: data.batch_id || '',
@@ -170,10 +182,18 @@ export class SyncService {
 	 * Returns a Map of "period|category|dsp_folder" → { status, files_list }
 	 */
 	private async getImportedDetails(): Promise<
-		Map<string, { status: string; files_list: string[] }>
+		Map<
+			string,
+			{
+				status: string;
+				files_list: string[];
+				file_manifest: string[];
+				parser_config_version: number;
+			}
+		>
 	> {
 		const sql = `
-      SELECT period, category, dsp_folder, status, files_list
+		SELECT period, category, dsp_folder, status, files_list, file_manifest, parser_config_version
       FROM etl_import_history FINAL
       WHERE status = 'done'
     `;
@@ -183,13 +203,25 @@ export class SyncService {
 			dsp_folder: string;
 			status: string;
 			files_list: string[];
+			file_manifest?: string[];
+			parser_config_version?: string | number;
 		}>(sql);
 
-		const map = new Map<string, { status: string; files_list: string[] }>();
+		const map = new Map<
+			string,
+			{
+				status: string;
+				files_list: string[];
+				file_manifest: string[];
+				parser_config_version: number;
+			}
+		>();
 		for (const r of rows) {
 			map.set(`${r.period}|${r.category}|${r.dsp_folder}`, {
 				status: r.status,
 				files_list: r.files_list || [],
+				file_manifest: r.file_manifest || r.files_list || [],
+				parser_config_version: Number(r.parser_config_version || 0),
 			});
 		}
 		return map;
@@ -378,6 +410,46 @@ export class SyncService {
 			for (const dspFolder of dspFolders) {
 				const key = `${period}|${category}|${dspFolder}`;
 				const existing = importedDetails.get(key);
+				let parserConfig: ResolvedFtpParserConfig;
+				try {
+					parserConfig = await this.ftpParserConfigService.resolve(
+						dspFolder,
+						category as FtpSourceCategory,
+					);
+				} catch (err) {
+					this.logger.error(
+						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'error',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						error: err.message,
+					});
+					continue;
+				}
+				const remoteFiles = await this.ftpService.listRemoteFiles(
+					category,
+					period,
+					dspFolder,
+					parserConfig.selectFile,
+				);
+				if (remoteFiles.length === 0) {
+					this.logger.warn(
+						`No files matched parser config for ${category}/${dspFolder}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'skipped',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						reason: 'no files matched parser config',
+					});
+					continue;
+				}
 
 				// ── Change detection: compare file lists ──
 				if (existing && existing.status === 'done') {
@@ -389,15 +461,10 @@ export class SyncService {
 							dspFolder,
 						);
 					} else {
-						// List files on FTP without downloading
-						const remoteFiles =
-							await this.ftpService.listRemoteFiles(
-								category,
-								period,
-								dspFolder,
-							);
 						const previousFiles = (
-							existing.files_list || []
+							existing.file_manifest ||
+							existing.files_list ||
+							[]
 						).sort();
 
 						// Compare: if identical → skip
@@ -405,7 +472,11 @@ export class SyncService {
 							remoteFiles.length === previousFiles.length &&
 							remoteFiles.every((f, i) => f === previousFiles[i]);
 
-						if (filesMatch) {
+						const configMatches =
+							existing.parser_config_version ===
+							parserConfig.configVersion;
+
+						if (filesMatch && configMatches) {
 							this.logger.log(
 								`  ✅ ${category}/${dspFolder} — ${remoteFiles.length} files unchanged, skip`,
 							);
@@ -426,7 +497,7 @@ export class SyncService {
 						);
 						this.logger.log(
 							`  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
-								`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}). Re-syncing...`,
+								`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}, config v${parserConfig.configVersion}). Re-syncing...`,
 						);
 
 						// Delete old data for this specific folder before re-import
@@ -459,6 +530,7 @@ export class SyncService {
 							category,
 							dspFolder,
 							this.tempBaseDir,
+							parserConfig.selectFile,
 						);
 
 					// Track: parsing
@@ -477,6 +549,8 @@ export class SyncService {
 						dspFolder,
 						batchId,
 						category,
+						'ftp',
+						parserConfig,
 					);
 
 					// If no parser found, log and skip
@@ -498,7 +572,7 @@ export class SyncService {
 
 					const rows = dspResult.rows || 0;
 					const files = dspResult.files || 0;
-					const fileNames = dspResult.fileNames || [];
+					const fileNames = remoteFiles;
 					const durationMs = Date.now() - folderStart;
 
 					// Track: done (with updated files_list for future change detection)
@@ -511,6 +585,8 @@ export class SyncService {
 						rows_imported: rows,
 						files_processed: files,
 						files_list: fileNames,
+						file_manifest: remoteFiles,
+						parser_config_version: parserConfig.configVersion,
 						duration_ms: durationMs,
 						batch_id: batchId,
 					});

@@ -140,13 +140,19 @@ export class FtpService {
 		category: string,
 		period: string,
 		dspFolder: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<string[]> {
 		const config = this.getConfig();
 		const client = await this.connect();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
-			const files = await this.listFilesRecursive(client, remotePath, '');
+			const files = await this.listFilesRecursive(
+				client,
+				remotePath,
+				'',
+				fileSelector,
+			);
 			return files.sort();
 		} catch (err) {
 			this.logger.warn(
@@ -167,6 +173,7 @@ export class FtpService {
 		client: ftp.Client,
 		remotePath: string,
 		prefix: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<string[]> {
 		const list = await client.list(remotePath);
 		const files: string[] = [];
@@ -178,9 +185,11 @@ export class FtpService {
 					client,
 					`${remotePath}/${item.name}`,
 					relativeName,
+					fileSelector,
 				);
 				files.push(...subFiles);
 			} else if (item.isFile) {
+				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
 					await this.excludePatternService.shouldExclude(
 						item.name,
@@ -206,6 +215,8 @@ export class FtpService {
 		client: ftp.Client,
 		remotePath: string,
 		localPath: string,
+		prefix: string = '',
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<number> {
 		// Ensure local directory exists
 		fs.mkdirSync(localPath, { recursive: true });
@@ -216,14 +227,18 @@ export class FtpService {
 		for (const item of list) {
 			const remoteItemPath = `${remotePath}/${item.name}`;
 			const localItemPath = path.join(localPath, item.name);
+			const relativeName = prefix ? `${prefix}/${item.name}` : item.name;
 
 			if (item.isDirectory) {
 				fileCount += await this.downloadFolder(
 					client,
 					remoteItemPath,
 					localItemPath,
+					relativeName,
+					fileSelector,
 				);
 			} else if (item.isFile) {
+				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
 					await this.excludePatternService.shouldExclude(
 						item.name,
@@ -325,6 +340,7 @@ export class FtpService {
 		category: string,
 		dspFolder: string,
 		tempDir: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<{ localPath: string; fileCount: number }> {
 		const config = this.getConfig();
 		const client = await this.connect();
@@ -336,6 +352,8 @@ export class FtpService {
 				client,
 				remotePath,
 				localPath,
+				'',
+				fileSelector,
 			);
 			return { localPath, fileCount };
 		} finally {
