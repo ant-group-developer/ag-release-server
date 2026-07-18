@@ -1,12 +1,12 @@
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { Injectable, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { CanonicalFile, ResolveResult } from './statements-resolver.service';
+import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
 import { ImportService } from '../import/import.service';
 import { SyncService } from '../sync/sync.service';
-import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
+import { CanonicalFile, ResolveResult } from './statements-resolver.service';
 
 export interface DspImportDetail {
 	dspFolderName: string;
@@ -25,7 +25,12 @@ export interface StatementsSummary {
 
 	// Skip breakdown
 	skippedByReason: Record<string, number>;
-	skippedFiles: Array<{ name: string; dsp: string; period: string; reason: string }>;
+	skippedFiles: Array<{
+		name: string;
+		dsp: string;
+		period: string;
+		reason: string;
+	}>;
 
 	// Import results
 	totalRowsImported: number;
@@ -101,10 +106,19 @@ export class StatementsImportService {
 			if (deletedKeys.has(key)) continue;
 			deletedKeys.add(key);
 			autoStep++;
-			onProgress?.(`Deleting existing data: ${f.dspFolderName}/${f.period}`, autoStep, autoRevisions.length);
-			this.logger.log(`Deleting existing data for auto-revision: ${f.dspFolderName} / ${f.period}`);
+			onProgress?.(
+				`Deleting existing data: ${f.dspFolderName}/${f.period}`,
+				autoStep,
+				autoRevisions.length,
+			);
+			this.logger.log(
+				`Deleting existing data for auto-revision: ${f.dspFolderName} / ${f.period}`,
+			);
 			try {
-				await this.syncService.deleteDataForManualImport(f.period, f.dspFolderName);
+				await this.syncService.deleteDataForManualImport(
+					f.period,
+					f.dspFolderName,
+				);
 			} catch (err) {
 				const msg = `Failed to delete data for ${f.dspFolderName}/${f.period}: ${(err as Error).message}`;
 				this.logger.error(msg);
@@ -127,21 +141,31 @@ export class StatementsImportService {
 			let dspStep = 0;
 			for (const [dspFolderName, dspFiles] of dspList) {
 				dspStep++;
-				onProgress?.(`Importing ${dspFolderName} (${dspFiles.length} files)`, dspStep, dspList.length);
+				onProgress?.(
+					`Importing ${dspFolderName} (${dspFiles.length} files)`,
+					dspStep,
+					dspList.length,
+				);
 
 				const dspTempDir = path.join(tempBase, dspFolderName);
 				fs.mkdirSync(dspTempDir, { recursive: true });
 
 				for (const f of dspFiles) {
-					const dest = path.join(dspTempDir, path.basename(f.localPath));
+					const dest = path.join(
+						dspTempDir,
+						path.basename(f.localPath),
+					);
 					try {
-						if (!fs.existsSync(dest)) fs.symlinkSync(f.localPath, dest);
+						if (!fs.existsSync(dest))
+							fs.symlinkSync(f.localPath, dest);
 					} catch {
 						fs.copyFileSync(f.localPath, dest);
 					}
 				}
 
-				this.logger.log(`Importing ${dspFiles.length} files for ${dspFolderName}`);
+				this.logger.log(
+					`Importing ${dspFiles.length} files for ${dspFolderName}`,
+				);
 				try {
 					const dspResult = await this.importService.importDspFolder(
 						dspTempDir,
@@ -162,7 +186,9 @@ export class StatementsImportService {
 						});
 
 						// Write etl_import_history per period
-						const periods = [...new Set(dspFiles.map((f) => f.period))];
+						const periods = [
+							...new Set(dspFiles.map((f) => f.period)),
+						];
 						for (const period of periods) {
 							const periodFiles = dspFiles
 								.filter((f) => f.period === period)
@@ -215,8 +241,14 @@ export class StatementsImportService {
 				duration_ms: data.durationMs,
 				error_message: '',
 				batch_id: data.batchId,
-				started_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-				completed_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+				started_at: new Date()
+					.toISOString()
+					.replace('T', ' ')
+					.substring(0, 19),
+				completed_at: new Date()
+					.toISOString()
+					.replace('T', ' ')
+					.substring(0, 19),
 			},
 		]);
 	}

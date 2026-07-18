@@ -14,7 +14,9 @@ export class ConfigSyncService implements OnModuleInit {
 
 	onModuleInit() {
 		if (process.env.APP_ROLE !== 'worker') {
-			this.logger.debug('Skipping report source configs sync (not worker role)');
+			this.logger.debug(
+				'Skipping report source configs sync (not worker role)',
+			);
 			return;
 		}
 		this.syncConfigsInBackground().catch((err) => {

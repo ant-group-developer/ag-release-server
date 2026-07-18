@@ -421,7 +421,12 @@ export class IsrcResolverService {
 	): Promise<
 		Map<
 			string,
-			{ name: string; title: string; logo: string | null; type: string | null }
+			{
+				name: string;
+				title: string;
+				logo: string | null;
+				type: string | null;
+			}
 		>
 	> {
 		if (!tenantIds.length) return new Map();
@@ -432,7 +437,12 @@ export class IsrcResolverService {
 
 		const map = new Map<
 			string,
-			{ name: string; title: string; logo: string | null; type: string | null }
+			{
+				name: string;
+				title: string;
+				logo: string | null;
+				type: string | null;
+			}
 		>();
 		for (const t of tenants) {
 			map.set(t.id, {

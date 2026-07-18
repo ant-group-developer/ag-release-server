@@ -27,8 +27,8 @@ import { LabelAnalyticsController } from './controllers/label-analytics.controll
 import { ReleaseAnalyticsController } from './controllers/release-analytics.controller';
 import { SourceTypeAnalyticsController } from './controllers/source-type-analytics.controller';
 import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
-import { TrackAnalyticsController } from './controllers/track-analytics.controller';
 import { TerAnalyticsController } from './controllers/ter-analytics.controller';
+import { TrackAnalyticsController } from './controllers/track-analytics.controller';
 
 // Services
 import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
@@ -37,12 +37,12 @@ import { AnalyticsReportExportService } from './services/analytics-report-export
 import { ClickHouseSyncService } from './services/clickhouse-sync.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { DspAnalyticsService } from './services/dsp-analytics.service';
-import { TerAnalyticsService } from './services/ter-analytics.service';
 import { EntityAnalyticsService } from './services/entity-analytics.service';
 import { ExportQueueService } from './services/export-queue.service';
 import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { IsrcResolverService } from './services/isrc-resolver.service';
 import { RankingService } from './services/ranking.service';
+import { TerAnalyticsService } from './services/ter-analytics.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({

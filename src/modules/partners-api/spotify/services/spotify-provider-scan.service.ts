@@ -1,18 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
 import { Release } from 'src/modules/release/entities/release.entity';
-import { SpotifySonarDelivery } from '../entities/spotify-sonar-delivery.entity';
-import { SpotifyCatalog } from '../entities/spotify-catalog.entity';
+import { IsNull, Not, Repository } from 'typeorm';
 import { SpotifyCatalogAvailability } from '../entities/spotify-catalog-availability.entity';
 import { SpotifyCatalogDelivery } from '../entities/spotify-catalog-delivery.entity';
+import { SpotifyCatalog } from '../entities/spotify-catalog.entity';
+import { SpotifySonarDelivery } from '../entities/spotify-sonar-delivery.entity';
 import {
-	SpotifySonarScanSession,
 	SonarScanSessionStatus,
 	SonarScanTriggerType,
+	SpotifySonarScanSession,
 } from '../entities/spotify-sonar-scan-session.entity';
-import { SpotifyProviderApiService } from './spotify-provider-api.service';
 import { SonarEventsGateway } from './sonar-events.gateway';
+import { SpotifyProviderApiService } from './spotify-provider-api.service';
 
 export interface SonarScanOptions {
 	scanId?: string;
@@ -50,7 +50,9 @@ export class SpotifyProviderScanService {
 		private readonly sonarEvents: SonarEventsGateway,
 	) {}
 
-	async getDeliveriesByRelease(releaseId: string): Promise<SpotifySonarDelivery[]> {
+	async getDeliveriesByRelease(
+		releaseId: string,
+	): Promise<SpotifySonarDelivery[]> {
 		return this.sonarDeliveryRepo.find({
 			where: { releaseId },
 			order: { createdAtSpotify: 'DESC' },
@@ -77,7 +79,9 @@ export class SpotifyProviderScanService {
 		return { scanId: session.id };
 	}
 
-	async findSessionById(scanId: string): Promise<SpotifySonarScanSession | null> {
+	async findSessionById(
+		scanId: string,
+	): Promise<SpotifySonarScanSession | null> {
 		return this.sessionRepo.findOne({ where: { id: scanId } });
 	}
 
@@ -88,7 +92,9 @@ export class SpotifyProviderScanService {
 		});
 	}
 
-	async scanAll(options: SonarScanOptions = {}): Promise<{ scanId: string; processed: number; failed: number }> {
+	async scanAll(
+		options: SonarScanOptions = {},
+	): Promise<{ scanId: string; processed: number; failed: number }> {
 		const {
 			scanId: existingScanId,
 			limit,
@@ -101,7 +107,9 @@ export class SpotifyProviderScanService {
 		// Reuse existing session created by controller, or create a new one (e.g. cron)
 		let session: SpotifySonarScanSession;
 		if (existingScanId) {
-			session = await this.sessionRepo.findOneOrFail({ where: { id: existingScanId } });
+			session = await this.sessionRepo.findOneOrFail({
+				where: { id: existingScanId },
+			});
 		} else {
 			session = this.sessionRepo.create({
 				status: SonarScanSessionStatus.PROCESSING,
@@ -155,14 +163,18 @@ export class SpotifyProviderScanService {
 					.groupBy('sd.release_id')
 					.getRawMany<{ releaseId: string }>();
 
-				const scannedIds = new Set(recentlyScanned.map((r) => r.releaseId));
+				const scannedIds = new Set(
+					recentlyScanned.map((r) => r.releaseId),
+				);
 				releaseList = releases.filter((r) => !scannedIds.has(r.id));
 			}
 
 			session.totalReleases = releaseList.length;
 			await this.sessionRepo.save(session);
 
-			this.logger.log(`[${scanId}] Scanning ${releaseList.length} releases (force=${force})`);
+			this.logger.log(
+				`[${scanId}] Scanning ${releaseList.length} releases (force=${force})`,
+			);
 			emitProgress();
 
 			for (const release of releaseList) {
@@ -188,7 +200,9 @@ export class SpotifyProviderScanService {
 			session.finishedAt = new Date();
 			await this.sessionRepo.save(session);
 
-			this.logger.log(`[${scanId}] Scan complete: ${session.successCount} ok, ${session.failedCount} failed`);
+			this.logger.log(
+				`[${scanId}] Scan complete: ${session.successCount} ok, ${session.failedCount} failed`,
+			);
 
 			this.sonarEvents.emit({
 				scanId,
@@ -203,7 +217,11 @@ export class SpotifyProviderScanService {
 				},
 			});
 
-			return { scanId, processed: session.successCount, failed: session.failedCount };
+			return {
+				scanId,
+				processed: session.successCount,
+				failed: session.failedCount,
+			};
 		} catch (err) {
 			session.status = SonarScanSessionStatus.FAILED;
 			session.finishedAt = new Date();
@@ -231,10 +249,14 @@ export class SpotifyProviderScanService {
 	async scanRelease(release: Pick<Release, 'id' | 'upc'>): Promise<void> {
 		if (!release.upc) return;
 
-		const productStatuses = await this.apiService.getDeliveries(release.upc);
+		const productStatuses = await this.apiService.getDeliveries(
+			release.upc,
+		);
 
 		if (!productStatuses.length) {
-			this.logger.debug(`No deliveries found for release ${release.id} (UPC: ${release.upc})`);
+			this.logger.debug(
+				`No deliveries found for release ${release.id} (UPC: ${release.upc})`,
+			);
 			return;
 		}
 
@@ -247,17 +269,25 @@ export class SpotifyProviderScanService {
 				ps.key.feedGid,
 			);
 
-			const validationErrors = detail?.productDetail?.validationStatus?.errors ?? null;
+			const validationErrors =
+				detail?.productDetail?.validationStatus?.errors ?? null;
 
 			const coverArtSha1 = ps.albumMetadata?.coverArt
 				? {
-					small: ps.albumMetadata.coverArt.smallCoverArt?.sha1digest ?? null,
-					medium: ps.albumMetadata.coverArt.mediumCoverArt?.sha1digest ?? null,
-					large: ps.albumMetadata.coverArt.largeCoverArt?.sha1digest ?? null,
-				  }
+						small:
+							ps.albumMetadata.coverArt.smallCoverArt
+								?.sha1digest ?? null,
+						medium:
+							ps.albumMetadata.coverArt.mediumCoverArt
+								?.sha1digest ?? null,
+						large:
+							ps.albumMetadata.coverArt.largeCoverArt
+								?.sha1digest ?? null,
+					}
 				: null;
 
-			const earliestStartDate = ps.albumMetadata?.earliestStartDate?.startDate
+			const earliestStartDate = ps.albumMetadata?.earliestStartDate
+				?.startDate
 				? new Date(ps.albumMetadata.earliestStartDate.startDate)
 				: null;
 
@@ -272,28 +302,46 @@ export class SpotifyProviderScanService {
 					deliveryName: ps.key.deliveryName,
 					productId: ps.key.productId,
 					status: ps.status,
-					createdAtSpotify: ps.createdAt ? new Date(ps.createdAt) : null,
-					updatedAtSpotify: ps.updatedAt ? new Date(ps.updatedAt) : null,
+					createdAtSpotify: ps.createdAt
+						? new Date(ps.createdAt)
+						: null,
+					updatedAtSpotify: ps.updatedAt
+						? new Date(ps.updatedAt)
+						: null,
 					licensorUuid: ps.licensorUuid ?? null,
 					licensorName: ps.licensorName ?? null,
 					feedName: ps.feedName ?? null,
 					albumUri: ps.uri ?? null,
-					artistNames: (ps.albumMetadata?.artistName ?? null) as string[] | null,
+					artistNames: (ps.albumMetadata?.artistName ?? null) as
+						| string[]
+						| null,
 					albumName: ps.albumMetadata?.albumName ?? null,
 					coverArtSha1: coverArtSha1 as Record<string, string> | null,
 					earliestStartDate,
-					validationErrors: validationErrors?.length ? validationErrors : null,
+					validationErrors: validationErrors?.length
+						? validationErrors
+						: null,
 					isProviderTest: ps.isProviderTest ?? false,
 					warningStatus: ps.warningStatus ?? null,
 					warningCount: ps.warningCount ?? 0,
 				})
 				.orUpdate(
 					[
-						'status', 'updated_at_spotify', 'validation_errors',
-						'warning_status', 'warning_count', 'album_uri',
-						'artist_names', 'album_name', 'cover_art_sha1',
-						'earliest_start_date', 'licensor_uuid', 'licensor_name',
-						'feed_name', 'is_provider_test', 'spotify_id',
+						'status',
+						'updated_at_spotify',
+						'validation_errors',
+						'warning_status',
+						'warning_count',
+						'album_uri',
+						'artist_names',
+						'album_name',
+						'cover_art_sha1',
+						'earliest_start_date',
+						'licensor_uuid',
+						'licensor_name',
+						'feed_name',
+						'is_provider_test',
+						'spotify_id',
 					],
 					['release_id', 'delivery_name', 'feed_gid'],
 				)
@@ -309,7 +357,10 @@ export class SpotifyProviderScanService {
 		}
 	}
 
-	private async syncCatalog(releaseId: string, albumUri: string): Promise<void> {
+	private async syncCatalog(
+		releaseId: string,
+		albumUri: string,
+	): Promise<void> {
 		const catalog = await this.apiService.getCatalog(albumUri);
 		if (!catalog?.effectiveData) return;
 
@@ -330,7 +381,9 @@ export class SpotifyProviderScanService {
 				releaseId,
 				albumUri: resolvedAlbumUri,
 				albumUrl: resolvedAlbumUrl,
-				artists: effectiveData.artists?.length ? effectiveData.artists : null,
+				artists: effectiveData.artists?.length
+					? effectiveData.artists
+					: null,
 				syncedAt: new Date(),
 			})
 			.orUpdate(
@@ -346,18 +399,25 @@ export class SpotifyProviderScanService {
 			.update()
 			.set({
 				metadataSpotify: () =>
-					`COALESCE(metadata_spotify, '{}')::jsonb || '${JSON.stringify({
-						albumId,
-						albumUrl: resolvedAlbumUrl,
-						lastSyncedAt: new Date().toISOString(),
-					})}'::jsonb`,
+					`COALESCE(metadata_spotify, '{}')::jsonb || '${JSON.stringify(
+						{
+							albumId,
+							albumUrl: resolvedAlbumUrl,
+							lastSyncedAt: new Date().toISOString(),
+						},
+					)}'::jsonb`,
 			})
 			.where('id = :releaseId', { releaseId })
 			.execute();
 
 		const catalogId: string | undefined =
-			savedCatalog.generatedMaps?.[0]?.id
-			?? (await this.catalogRepo.findOne({ where: { releaseId }, select: ['id'] }))?.id;
+			savedCatalog.generatedMaps?.[0]?.id ??
+			(
+				await this.catalogRepo.findOne({
+					where: { releaseId },
+					select: ['id'],
+				})
+			)?.id;
 
 		if (!catalogId) return;
 
@@ -372,9 +432,15 @@ export class SpotifyProviderScanService {
 				source: d.source || null,
 				feedGid: d.feedGid || null,
 				deliveryStatus: d.deliveryStatus || null,
-				deliveryErrors: (d.deliveryErrors?.length ? d.deliveryErrors : null) as string[] | null,
-				deliveryErrorsAndTypes: d.deliveryErrorsAndTypes?.length ? d.deliveryErrorsAndTypes : null,
-				assetTranscodingStatuses: d.assetTranscodingStatuses?.length ? d.assetTranscodingStatuses : null,
+				deliveryErrors: (d.deliveryErrors?.length
+					? d.deliveryErrors
+					: null) as string[] | null,
+				deliveryErrorsAndTypes: d.deliveryErrorsAndTypes?.length
+					? d.deliveryErrorsAndTypes
+					: null,
+				assetTranscodingStatuses: d.assetTranscodingStatuses?.length
+					? d.assetTranscodingStatuses
+					: null,
 			}));
 
 			await this.catalogDeliveryRepo
@@ -384,9 +450,16 @@ export class SpotifyProviderScanService {
 				.values(deliveryRows)
 				.orUpdate(
 					[
-						'action', 'delivered_at', 'feed_name', 'product_id', 'source',
-						'feed_gid', 'delivery_status', 'delivery_errors',
-						'delivery_errors_and_types', 'asset_transcoding_statuses',
+						'action',
+						'delivered_at',
+						'feed_name',
+						'product_id',
+						'source',
+						'feed_gid',
+						'delivery_status',
+						'delivery_errors',
+						'delivery_errors_and_types',
+						'asset_transcoding_statuses',
 					],
 					['catalog_id', 'delivery_id'],
 				)
@@ -395,15 +468,17 @@ export class SpotifyProviderScanService {
 
 		if (!availability) return;
 
-		const availabilityEntries = Object.entries(availability).map(([countryCode, avail]) => ({
-			catalogId,
-			countryCode,
-			deliveredStart: avail.deliveredStart || null,
-			deliveredEnd: avail.deliveredEnd || null,
-			effectiveStart: avail.effectiveStart || null,
-			effectiveEnd: avail.effectiveEnd || null,
-			status: avail.status || null,
-		}));
+		const availabilityEntries = Object.entries(availability).map(
+			([countryCode, avail]) => ({
+				catalogId,
+				countryCode,
+				deliveredStart: avail.deliveredStart || null,
+				deliveredEnd: avail.deliveredEnd || null,
+				effectiveStart: avail.effectiveStart || null,
+				effectiveEnd: avail.effectiveEnd || null,
+				status: avail.status || null,
+			}),
+		);
 
 		if (!availabilityEntries.length) return;
 
@@ -416,7 +491,13 @@ export class SpotifyProviderScanService {
 				.into(SpotifyCatalogAvailability)
 				.values(chunk)
 				.orUpdate(
-					['delivered_start', 'delivered_end', 'effective_start', 'effective_end', 'status'],
+					[
+						'delivered_start',
+						'delivered_end',
+						'effective_start',
+						'effective_end',
+						'status',
+					],
 					['catalog_id', 'country_code'],
 				)
 				.execute();

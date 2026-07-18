@@ -1,39 +1,39 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { pipeline } from 'stream/promises';
-import { createWriteStream } from 'fs';
-import { randomUUID } from 'crypto';
 import {
 	BadRequestException,
+	Body,
 	Controller,
 	Get,
 	MessageEvent,
 	NotFoundException,
 	Param,
 	Post,
-	Body,
 	Sse,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import { createWriteStream } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { concat, from, interval, merge, Observable, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const AdmZip = require('adm-zip');
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
+import { pipeline } from 'stream/promises';
 import {
 	ImportJobSourceType,
 	ImportJobStatus,
 } from '../interfaces/import-job.interface';
 import {
-	ImportJobsService,
 	computeProgressDetail,
+	ImportJobsService,
 } from '../services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
 import { StatementsImportService } from '../services/statements/statements-import.service';
 import { StatementsResolverService } from '../services/statements/statements-resolver.service';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const AdmZip = require('adm-zip');
 
 const STATEMENTS_R2_PREFIX = 'statements-uploads';
 
@@ -73,7 +73,8 @@ export class StatementsUploadController {
 		},
 	})
 	async preUpload(@Body() body: { filename: string }) {
-		if (!body?.filename) throw new BadRequestException('filename is required');
+		if (!body?.filename)
+			throw new BadRequestException('filename is required');
 		if (!body.filename.toLowerCase().endsWith('.zip'))
 			throw new BadRequestException('filename must end with .zip');
 
@@ -106,7 +107,10 @@ export class StatementsUploadController {
 			'Verifies zip exists in R2, then downloads, extracts, resolves, and imports. ' +
 			'Poll status via GET /etl/statements/jobs/:jobId or stream via GET /etl/statements/jobs/:jobId/events.',
 	})
-	@ApiParam({ name: 'jobId', description: 'jobId returned by POST /pre-upload' })
+	@ApiParam({
+		name: 'jobId',
+		description: 'jobId returned by POST /pre-upload',
+	})
 	async startJob(@Param('jobId') jobId: string) {
 		const job = await this.importJobsService.findById(jobId);
 		if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
@@ -130,7 +134,9 @@ export class StatementsUploadController {
 		await this.importJobsService.markProcessing(jobId);
 
 		// Fire-and-forget async job
-		this.runImportJob(jobId, r2Key).catch(() => {/* markFailed handles it */});
+		this.runImportJob(jobId, r2Key).catch(() => {
+			/* markFailed handles it */
+		});
 
 		return new ResponseSuccess({ data: { jobId, status: 'PROCESSING' } });
 	}
@@ -140,11 +146,16 @@ export class StatementsUploadController {
 	@Get('jobs/:jobId')
 	@SystemAdminOnly()
 	@ApiOperation({ summary: 'Get statements import job status' })
-	@ApiParam({ name: 'jobId', description: 'jobId returned by POST /pre-upload' })
+	@ApiParam({
+		name: 'jobId',
+		description: 'jobId returned by POST /pre-upload',
+	})
 	async getJobStatus(@Param('jobId') jobId: string) {
 		const job = await this.importJobsService.findById(jobId);
 		if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
-		return new ResponseSuccess({ data: formatStatementsJob(job, computeProgressDetail) });
+		return new ResponseSuccess({
+			data: formatStatementsJob(job, computeProgressDetail),
+		});
 	}
 
 	// ─── Step 3 alt: SSE stream ──────────────────────────────────────────────
@@ -159,9 +170,9 @@ export class StatementsUploadController {
 	})
 	@ApiParam({ name: 'jobId' })
 	streamJobEvents(@Param('jobId') jobId: string): Observable<MessageEvent> {
-		const updates$ = this.jobEvents.subscribe(jobId).pipe(
-			map((evt) => ({ type: evt.type, data: evt.data })),
-		);
+		const updates$ = this.jobEvents
+			.subscribe(jobId)
+			.pipe(map((evt) => ({ type: evt.type, data: evt.data })));
 
 		const heartbeat$ = interval(20000).pipe(
 			map(() => ({ type: 'heartbeat', data: {} })),
@@ -169,7 +180,8 @@ export class StatementsUploadController {
 
 		const initial$ = from(this.importJobsService.findById(jobId)).pipe(
 			switchMap((job) => {
-				if (!job) throw new NotFoundException(`Job not found: ${jobId}`);
+				if (!job)
+					throw new NotFoundException(`Job not found: ${jobId}`);
 
 				const snapshotEvt: MessageEvent = {
 					type: 'snapshot',
@@ -202,14 +214,21 @@ export class StatementsUploadController {
 	// ─── Internal: async import runner ───────────────────────────────────────
 
 	private async runImportJob(jobId: string, r2Key: string): Promise<void> {
-		const tempDir = path.join(os.tmpdir(), `statements-${jobId}-${randomUUID()}`);
+		const tempDir = path.join(
+			os.tmpdir(),
+			`statements-${jobId}-${randomUUID()}`,
+		);
 		fs.mkdirSync(tempDir, { recursive: true });
 
 		try {
 			// 1. Download zip from R2
 			await this.importJobsService.updateProgress(
 				jobId,
-				{ progressLabel: 'Downloading from R2', progressCurrent: 1, progressTotal: 4 },
+				{
+					progressLabel: 'Downloading from R2',
+					progressCurrent: 1,
+					progressTotal: 4,
+				},
 				true,
 			);
 			const stream = await this.r2Service.getObjectStream({
@@ -222,7 +241,11 @@ export class StatementsUploadController {
 			// 2. Extract zip
 			await this.importJobsService.updateProgress(
 				jobId,
-				{ progressLabel: 'Extracting zip', progressCurrent: 2, progressTotal: 4 },
+				{
+					progressLabel: 'Extracting zip',
+					progressCurrent: 2,
+					progressTotal: 4,
+				},
 				true,
 			);
 			const extractDir = path.join(tempDir, 'extracted');
@@ -235,10 +258,15 @@ export class StatementsUploadController {
 			// 3. Resolve canonical files + dedup
 			await this.importJobsService.updateProgress(
 				jobId,
-				{ progressLabel: 'Resolving canonical files', progressCurrent: 3, progressTotal: 4 },
+				{
+					progressLabel: 'Resolving canonical files',
+					progressCurrent: 3,
+					progressTotal: 4,
+				},
 				true,
 			);
-			const resolveResult = await this.resolverService.resolve(extractDir);
+			const resolveResult =
+				await this.resolverService.resolve(extractDir);
 
 			// 4. Import
 			await this.importJobsService.updateProgress(
@@ -304,9 +332,15 @@ function formatStatementsJob(job: any, computeDetail: (j: any) => any) {
 		id: job.id,
 		status: job.status,
 		progress: {
-			current: job.status === ImportJobStatus.COMPLETED ? job.progressTotal : job.progressCurrent,
+			current:
+				job.status === ImportJobStatus.COMPLETED
+					? job.progressTotal
+					: job.progressCurrent,
 			total: job.progressTotal,
-			label: job.status === ImportJobStatus.COMPLETED ? 'Done' : job.progressLabel,
+			label:
+				job.status === ImportJobStatus.COMPLETED
+					? 'Done'
+					: job.progressLabel,
 			detail: computeDetail(job),
 		},
 		rows: {

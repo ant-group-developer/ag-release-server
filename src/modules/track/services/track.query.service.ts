@@ -57,14 +57,13 @@ export class TrackQueryService {
 
 		@InjectRepository(TrackSensitive)
 		private readonly trackSensitiveRepo: Repository<TrackSensitive>,
-	) { }
+	) {}
 
 	// public
 	async getList(query: QueryGetListTrackDto) {
 		const qb = this.createQueryGetList(query);
 		return await qb.getManyAndCount();
 	}
-
 
 	async getList2(query: QueryGetListTrackDto): Promise<[Track[], number]> {
 		// BƯỚC 1: LỌC & PHÂN TRANG
@@ -81,7 +80,7 @@ export class TrackQueryService {
 
 		const [rawTracks, totalItems] = await Promise.all([
 			qbId.getMany(),
-			qbId.getCount()
+			qbId.getCount(),
 		]);
 
 		const trackIds = rawTracks.map((t) => t.id);
@@ -128,9 +127,9 @@ export class TrackQueryService {
 
 		const trackInclude = idInclude?.length
 			? await this.trackRepo.find({
-				select: { id: true, title: true },
-				where: { id: In(idInclude) },
-			})
+					select: { id: true, title: true },
+					where: { id: In(idInclude) },
+				})
 			: [];
 
 		const [items, totalItems] = await this.trackRepo.findAndCount({

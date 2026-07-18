@@ -86,7 +86,9 @@ export class ReportImportWorkerService
 
 	onApplicationBootstrap() {
 		if (process.env.APP_ROLE !== 'worker') {
-			this.logger.debug('Skipping report import worker loop (not worker role)');
+			this.logger.debug(
+				'Skipping report import worker loop (not worker role)',
+			);
 			return;
 		}
 		this.initializeWorkerInBackground().catch((err) => {

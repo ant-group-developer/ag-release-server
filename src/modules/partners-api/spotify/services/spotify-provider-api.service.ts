@@ -21,9 +21,21 @@ export interface SonarProductStatus {
 		artistName: string[];
 		albumName: string;
 		coverArt: {
-			smallCoverArt?: { height: number; width: number; sha1digest: string };
-			mediumCoverArt?: { height: number; width: number; sha1digest: string };
-			largeCoverArt?: { height: number; width: number; sha1digest: string };
+			smallCoverArt?: {
+				height: number;
+				width: number;
+				sha1digest: string;
+			};
+			mediumCoverArt?: {
+				height: number;
+				width: number;
+				sha1digest: string;
+			};
+			largeCoverArt?: {
+				height: number;
+				width: number;
+				sha1digest: string;
+			};
 		};
 		earliestStartDate?: { startDate: string; releaseType: string };
 	};
@@ -84,14 +96,17 @@ export interface AtlasCatalog {
 		feedGid: string;
 		licensorId: string;
 	};
-	availability: Record<string, {
-		deliveredStart: string;
-		deliveredEnd: string;
-		effectiveStart: string;
-		effectiveEnd: string;
-		status: string;
-		patches: unknown[];
-	}>;
+	availability: Record<
+		string,
+		{
+			deliveredStart: string;
+			deliveredEnd: string;
+			effectiveStart: string;
+			effectiveEnd: string;
+			status: string;
+			patches: unknown[];
+		}
+	>;
 	deliveries: Array<{
 		deliveryId: string;
 		action: string;
@@ -112,11 +127,17 @@ export class SpotifyProviderApiService {
 	private readonly logger = new Logger(SpotifyProviderApiService.name);
 
 	private get sonarBaseUrl(): string {
-		return process.env.SPOTIFY_SONAR_BASE_URL ?? 'https://sonar-view.spotify.com';
+		return (
+			process.env.SPOTIFY_SONAR_BASE_URL ??
+			'https://sonar-view.spotify.com'
+		);
 	}
 
 	private get atlasBaseUrl(): string {
-		return process.env.SPOTIFY_ATLAS_BASE_URL ?? 'https://atlas-view.spotify.com';
+		return (
+			process.env.SPOTIFY_ATLAS_BASE_URL ??
+			'https://atlas-view.spotify.com'
+		);
 	}
 
 	constructor(
@@ -138,9 +159,12 @@ export class SpotifyProviderApiService {
 		});
 
 		const { data } = await firstValueFrom(
-			this.httpService.get(`${this.sonarBaseUrl}/v2/products?${params.toString()}`, {
-				headers: { Authorization: `Bearer ${token}` },
-			}),
+			this.httpService.get(
+				`${this.sonarBaseUrl}/v2/products?${params.toString()}`,
+				{
+					headers: { Authorization: `Bearer ${token}` },
+				},
+			),
 		);
 
 		return (data?.productStatuses ?? []) as SonarProductStatus[];
@@ -152,19 +176,28 @@ export class SpotifyProviderApiService {
 		feedGid: string,
 	): Promise<SonarDeliveryDetail | null> {
 		const token = await this.tokenService.getToken();
-		const params = new URLSearchParams({ productId, deliveryName, feedGid });
+		const params = new URLSearchParams({
+			productId,
+			deliveryName,
+			feedGid,
+		});
 
 		try {
 			const { data } = await firstValueFrom(
-				this.httpService.get(`${this.sonarBaseUrl}/v2/product?${params.toString()}`, {
-					headers: { Authorization: `Bearer ${token}` },
-				}),
+				this.httpService.get(
+					`${this.sonarBaseUrl}/v2/product?${params.toString()}`,
+					{
+						headers: { Authorization: `Bearer ${token}` },
+					},
+				),
 			);
 
 			const product = data?.products?.[0];
 			return product ?? null;
 		} catch (err) {
-			this.logger.warn(`Failed to get delivery detail for ${productId}/${deliveryName}: ${(err as Error).message}`);
+			this.logger.warn(
+				`Failed to get delivery detail for ${productId}/${deliveryName}: ${(err as Error).message}`,
+			);
 			return null;
 		}
 	}
@@ -185,7 +218,9 @@ export class SpotifyProviderApiService {
 			);
 			return data as AtlasCatalog;
 		} catch (err) {
-			this.logger.warn(`Failed to get catalog for ${albumUri}: ${(err as Error).message}`);
+			this.logger.warn(
+				`Failed to get catalog for ${albumUri}: ${(err as Error).message}`,
+			);
 			return null;
 		}
 	}

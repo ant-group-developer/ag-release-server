@@ -24,6 +24,7 @@ import { map, switchMap, takeWhile } from 'rxjs/operators';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import { v4 as uuidv4 } from 'uuid';
+import { CiToolService } from '../../ci-tool/ci-tool.service';
 import {
 	CreateMetadataScanScheduleDto,
 	QueryMetadataScanSessionsDto,
@@ -35,7 +36,6 @@ import { MetadataScanScheduleService } from '../services/metadata-scan-schedule.
 import { MetadataScanService } from '../services/metadata-scan.service';
 import { SpotifyService } from '../services/spotify.service';
 import { SpotifyService2 } from '../services/spotify2.service';
-import { CiToolService } from '../../ci-tool/ci-tool.service';
 
 @ApiTags('Partners API')
 @ApiBearerAuth('token')
@@ -66,10 +66,12 @@ export class SpotifyController {
 	@SystemAdminOnly()
 	@ApiOperation({
 		summary: 'Trigger Spotify provider refresh-token job via CI tool',
-		description: 'Kicks off the headless browser flow on the CI tool to fetch a fresh Spotify provider access_token.',
+		description:
+			'Kicks off the headless browser flow on the CI tool to fetch a fresh Spotify provider access_token.',
 	})
 	async triggerSpotifyProviderRefreshToken() {
-		const data = await this.ciToolService.triggerSpotifyProviderRefreshToken();
+		const data =
+			await this.ciToolService.triggerSpotifyProviderRefreshToken();
 		return new ResponseSuccess({ data });
 	}
 
@@ -77,10 +79,12 @@ export class SpotifyController {
 	@SystemAdminOnly()
 	@ApiOperation({
 		summary: 'Poll Spotify provider refresh-token job status',
-		description: 'Returns current status (running/success/failed). On success, the token field contains the full Spotify provider credentials.',
+		description:
+			'Returns current status (running/success/failed). On success, the token field contains the full Spotify provider credentials.',
 	})
 	async getSpotifyProviderRefreshStatus(@Param('jobId') jobId: string) {
-		const data = await this.ciToolService.getSpotifyProviderRefreshStatus(jobId);
+		const data =
+			await this.ciToolService.getSpotifyProviderRefreshStatus(jobId);
 		return new ResponseSuccess({ data });
 	}
 

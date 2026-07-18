@@ -62,7 +62,6 @@ import {
 	SaavnSalesParser,
 	SoundcloudSalesParser,
 } from './group-b-parsers';
-import { RevelatorSalesParser } from './revelator-sales.parser';
 import {
 	BoomplaySalesParser,
 	DeezerSalesParser,
@@ -73,6 +72,7 @@ import {
 	TiktokSalesParser,
 	VevoSalesParser,
 } from './group-ce-parsers';
+import { RevelatorSalesParser } from './revelator-sales.parser';
 
 /**
  * Registry mapping DSP folder name prefixes to their SALES parser classes.

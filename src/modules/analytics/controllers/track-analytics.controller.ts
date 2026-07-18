@@ -222,7 +222,9 @@ export class TrackAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của track (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của track (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('isrc') isrc: string,
 		@Body() dto: EntityRankingQueryDto,

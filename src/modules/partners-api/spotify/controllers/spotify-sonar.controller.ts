@@ -13,7 +13,12 @@ import {
 	Query,
 	Sse,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBearerAuth,
+	ApiOperation,
+	ApiQuery,
+	ApiTags,
+} from '@nestjs/swagger';
 import { Observable, concat, from, interval, merge, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
@@ -22,9 +27,9 @@ import {
 	CreateSonarScheduleDto,
 	UpdateSonarScheduleDto,
 } from '../dtos/spotify-sonar-schedule.dto';
-import { SpotifySonarScheduleService } from '../services/spotify-sonar-schedule.service';
-import { SpotifyProviderScanService } from '../services/spotify-provider-scan.service';
 import { SonarEventsGateway } from '../services/sonar-events.gateway';
+import { SpotifyProviderScanService } from '../services/spotify-provider-scan.service';
+import { SpotifySonarScheduleService } from '../services/spotify-sonar-schedule.service';
 
 @ApiTags('Partners API')
 @ApiBearerAuth('token')
@@ -42,7 +47,8 @@ export class SpotifySonarController {
 	@SystemAdminOnly()
 	@ApiOperation({
 		summary: 'Lấy danh sách Sonar deliveries của 1 release',
-		description: 'Trả về tất cả delivery records từ Spotify Sonar (API 1+2), sort theo created_at_spotify DESC',
+		description:
+			'Trả về tất cả delivery records từ Spotify Sonar (API 1+2), sort theo created_at_spotify DESC',
 	})
 	async getDeliveriesByRelease(@Param('releaseId') releaseId: string) {
 		const items = await this.scanService.getDeliveriesByRelease(releaseId);
@@ -51,7 +57,9 @@ export class SpotifySonarController {
 
 	@Post('scan/trigger')
 	@SystemAdminOnly()
-	@ApiOperation({ summary: 'Trigger Spotify Sonar delivery + catalog scan manually' })
+	@ApiOperation({
+		summary: 'Trigger Spotify Sonar delivery + catalog scan manually',
+	})
 	@ApiQuery({ name: 'limit', required: false, type: Number })
 	@ApiQuery({ name: 'force', required: false, type: Boolean })
 	@ApiQuery({ name: 'isImportedFromReport', required: false, type: Boolean })
@@ -62,7 +70,8 @@ export class SpotifySonarController {
 	) {
 		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
 		const isForce = force === 'true';
-		const parsedIsImportedFromReport = this.parseOptionalBoolean(isImportedFromReport);
+		const parsedIsImportedFromReport =
+			this.parseOptionalBoolean(isImportedFromReport);
 
 		// Create session first so we can return scanId immediately
 		const { scanId } = await this.scanService.createSession({
@@ -73,9 +82,17 @@ export class SpotifySonarController {
 
 		// Fire scan in background
 		this.scanService
-			.scanAll({ scanId, limit: parsedLimit, force: isForce, isImportedFromReport: parsedIsImportedFromReport })
+			.scanAll({
+				scanId,
+				limit: parsedLimit,
+				force: isForce,
+				isImportedFromReport: parsedIsImportedFromReport,
+			})
 			.catch((err: Error) => {
-				this.logger.error(`Background Spotify Sonar scan failed: ${err.message}`, err.stack);
+				this.logger.error(
+					`Background Spotify Sonar scan failed: ${err.message}`,
+					err.stack,
+				);
 			});
 
 		return new ResponseSuccess({
@@ -95,19 +112,28 @@ export class SpotifySonarController {
 	@Header('Connection', 'keep-alive')
 	@Header('X-Accel-Buffering', 'no')
 	@ApiOperation({ summary: 'SSE stream tiến độ Sonar scan theo scanId' })
-	streamScanEvents(@Param('scanId') scanId: string): Observable<MessageEvent> {
-		const updates$ = this.sonarEvents.subscribe(scanId).pipe(
-			map((evt) => ({ type: evt.type, data: evt.data } as MessageEvent)),
-		);
+	streamScanEvents(
+		@Param('scanId') scanId: string,
+	): Observable<MessageEvent> {
+		const updates$ = this.sonarEvents
+			.subscribe(scanId)
+			.pipe(
+				map(
+					(evt) =>
+						({ type: evt.type, data: evt.data }) as MessageEvent,
+				),
+			);
 
 		const heartbeat$ = interval(20000).pipe(
-			map(() => ({ type: 'heartbeat', data: {} } as MessageEvent)),
+			map(() => ({ type: 'heartbeat', data: {} }) as MessageEvent),
 		);
 
 		const initial$ = from(this.scanService.findSessionById(scanId)).pipe(
 			switchMap((session) => {
 				if (!session) {
-					throw new NotFoundException(`Sonar scan session not found: ${scanId}`);
+					throw new NotFoundException(
+						`Sonar scan session not found: ${scanId}`,
+					);
 				}
 
 				const snapshot: MessageEvent = {
@@ -139,7 +165,8 @@ export class SpotifySonarController {
 
 		return merge(initial$, heartbeat$).pipe(
 			takeWhile(
-				(evt: MessageEvent) => evt.type !== 'completed' && evt.type !== 'failed',
+				(evt: MessageEvent) =>
+					evt.type !== 'completed' && evt.type !== 'failed',
 				true,
 			),
 		);
@@ -152,7 +179,9 @@ export class SpotifySonarController {
 	async listSessions(@Query('limit') limit?: string) {
 		const parsedLimit = limit ? parseInt(limit, 10) : 20;
 		const sessions = await this.scanService.listSessions(parsedLimit);
-		return new ResponseSuccess({ data: { items: sessions, total: sessions.length } });
+		return new ResponseSuccess({
+			data: { items: sessions, total: sessions.length },
+		});
 	}
 
 	@Get('scan/sessions/:scanId')
@@ -160,7 +189,8 @@ export class SpotifySonarController {
 	@ApiOperation({ summary: 'Chi tiết 1 Sonar scan session' })
 	async getSession(@Param('scanId') scanId: string) {
 		const session = await this.scanService.findSessionById(scanId);
-		if (!session) throw new NotFoundException(`Scan session not found: ${scanId}`);
+		if (!session)
+			throw new NotFoundException(`Scan session not found: ${scanId}`);
 		return new ResponseSuccess({ data: session });
 	}
 
@@ -183,7 +213,10 @@ export class SpotifySonarController {
 	@Put('schedules/:id')
 	@SystemAdminOnly()
 	@ApiOperation({ summary: 'Update Spotify Sonar scan schedule' })
-	async updateSchedule(@Param('id') id: string, @Body() body: UpdateSonarScheduleDto) {
+	async updateSchedule(
+		@Param('id') id: string,
+		@Body() body: UpdateSonarScheduleDto,
+	) {
 		const schedule = await this.scheduleService.update(id, body);
 		return new ResponseSuccess({ data: schedule });
 	}
