@@ -93,6 +93,10 @@ export interface ErnReleaseInput2 {
 	type: 'Album' | 'Single' | 'EP' | (string & {});
 	/** Release date (YYYY-MM-DD) */
 	releaseDate: string;
+	/** Release time (HH:mm:ss) */
+	releaseTime?: string | null;
+	/** Timezone offset (e.g. +07:00, -05:00, Z) */
+	releaseTimezoneOffset?: string | null;
 	/** Primary genre */
 	genre: string;
 	/** Sub-genre */
