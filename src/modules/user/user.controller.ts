@@ -15,14 +15,9 @@ import {
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UserId } from 'src/common/decorators/req.decorators';
-import {
-	PageDto,
-	ResponseError,
-	ResponseSuccess,
-} from 'src/common/dtos/common.response.dto';
+import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { DeleteResult } from 'typeorm';
 import { AccessControlService } from '../access-control/access-control.service';
-import { AuthMessages } from '../auth/constants/messages';
 import {
 	RequirePermissions,
 	SystemAdminOnly,
@@ -66,19 +61,20 @@ export class UserController {
 		const tenantId = checkIsSystemTenant(req.user!.tenantId)
 			? payload.tenantId
 			: req.user!.tenantId;
-		if (!tenantId) {
-			throw new ResponseError(AuthMessages.TENANT_ID_REQUIRED);
-		}
 
 		const userReqId = req.user!.sub;
 
 		const result = await this.userService.create(payload, userReqId);
-		await this.tenantUserService.addUserToTenant(
-			tenantId,
-			result.id,
-			payload.tenantUserType ?? TenantUserType.MEMBER,
-			userReqId,
-		);
+
+		if (tenantId) {
+			await this.tenantUserService.addUserToTenant(
+				tenantId,
+				result.id,
+				payload.tenantUserType ?? TenantUserType.MEMBER,
+				userReqId,
+			);
+		}
+
 		return new ResponseSuccess({ data: result });
 	}
 
