@@ -773,10 +773,7 @@ export class SftpConnectService {
 					this.logger.error(
 						`S3 upload timed out after 1 hour: ${key}`,
 					);
-					if (parallelUploads3) {
-						parallelUploads3.abort();
-					}
-					fileStream.destroy();
+					abortController.abort();
 				}, this.s3UploadTimeoutMs);
 
 				this.logger.log(`file size ${stats.size}`);
