@@ -18,13 +18,13 @@ import { TypeOrmDistributionRepository } from './infrastructure/persistence/dist
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
-import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-workflow.adapter';
+import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow.adapter';
 
 /**
  * DistributionOrchestrationModule — scaffold cho Phase 2.
  *
  * Wire ports → adapters:
- *   · WORKFLOW_ENGINE          → InMemoryWorkflowAdapter (Step 7 swap sang BullMQ)
+ *   · WORKFLOW_ENGINE          → BullMqWorkflowAdapter (Step 7 — prod BullMQ)
  *   · UNIT_OF_WORK             → TypeOrmUnitOfWork
  *   · DISTRIBUTION_REPOSITORY  → TypeOrmDistributionRepository
  *   · POLICY_RESOLVER          → DefaultPolicyResolver
@@ -55,7 +55,7 @@ import { InMemoryWorkflowAdapter } from './infrastructure/workflow/in-memory-wor
 		]),
 	],
 	providers: [
-		{ provide: WORKFLOW_ENGINE, useClass: InMemoryWorkflowAdapter },
+		{ provide: WORKFLOW_ENGINE, useClass: BullMqWorkflowAdapter },
 		{ provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
 		{
 			provide: DISTRIBUTION_REPOSITORY,

@@ -1,8 +1,8 @@
 # Phase 2 — BullMQ engine thay cron-poll + DB-queue tự viết
 
-**Priority:** Cao · **Status:** 🔵 Step 1-6 XONG (outbox relay + 6 integration test) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
+**Priority:** Cao · **Status:** ✅ HOÀN THÀNH (Step 1–7 XONG) · **Depends on:** Phase 1 ✅ · **Blocks:** Phase 3
 
-**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [x] Step 5 [x] Step 6 [ ] Step 7
+**Progress:** [x] Step 1 [x] Step 2 [x] Step 3 [x] Step 4 [x] Step 5 [x] Step 6 [x] Step 7
 
 ## Context Links
 
@@ -75,13 +75,13 @@ distribution-orchestration/
 │   │   └── __tests__/*.integration.spec.ts   [Step 2 ✅] testcontainers Postgres, 3 case
 │   ├── workflow/
 │   │   ├── in-memory-workflow.adapter.ts     [Step 1 ✅] Map + clockMs ảo + advanceTime + FIFO dedupe
-│   │   └── bullmq-workflow.adapter.ts        [Step 8]
-│   ├── relay/outbox-relay.ts                  [Step 7] polling worker → enqueue
+│   │   ├── bullmq-workflow.adapter.ts        [Step 7 ✅] prod adapter: lazy Queue per QueueName + sanitizeJobId
+│   │   └── __tests__/bullmq-e2e.integration.spec.ts [Step 7 ✅] testcontainers Redis+Postgres, 5 case
 │   ├── relay/
 │   │   ├── outbox-relay.ts                   [Step 6 ✅] polling + dispatch + retry + soft-DLQ
 │   │   └── __tests__/*.integration.spec.ts   [Step 6 ✅] testcontainers, 6 case
 │   └── test-doubles/*.ts                      [Step 3 ✅] 9 fake port in-memory (idempotent theo key/id)
-└── distribution-orchestration.module.ts       [Step 1+2 ✅] wire 3 provider
+└── distribution-orchestration.module.ts       [Step 1+2+7 ✅] wire BullMqWorkflowAdapter (prod)
 ```
 
 Migration: `src/migrations/1784200000000-CreateDistributionOrchestrationTables.ts` [Step 2 ✅] — 4 CREATE TABLE + 3 FK CASCADE + 8 INDEX + 1 partial index outbox (WHERE dispatched_at IS NULL). CHƯA chạy `migration:run` production; integration test dùng `synchronize` (xem quyết định #14).
@@ -201,8 +201,8 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - [x] Step 5a: 10 command discriminated union + handler dispatch + buildOutbox mở rộng (5 pipeline spec xanh — total 136 test)
 - [x] Step 5b: migration channel_specs jsonb + rehydrate accept specs + per-channel outbox từ DELIVERING + 7 step-runners + E2E SUBMIT→LIVE spec (134 unit + 3 integration xanh)
 - [x] Step 6: outbox-relay polling + retry/backoff + soft-DLQ (6 integration test xanh, total 143 test)
-- [ ] Step 7: cài bullmq + BullMqWorkflowAdapter + integration test end-to-end
-- [ ] Cập nhật plan.md status Phase 2
+- [x] Step 7: cài bullmq + BullMqWorkflowAdapter + E2E integration test (5 test xanh, total 148 test)
+- [x] Cập nhật plan.md status Phase 2
 
 ## Success Criteria
 
@@ -212,7 +212,24 @@ _(Step Repository của đặc tả gốc gộp vào Step 2 Nhịp 2.4; đánh l
 - Integration (Step 7): 1 release INITIAL chạy end-to-end qua BullMQ thật với port giả cho external.
 - Mỗi file < 200 LOC.
 
-**Status hiện tại (Step 1–6):** 143 test xanh (134 unit + 9 integration Postgres real via testcontainers). Step 6 thêm 6 integration test cho OutboxRelay. `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+**Status cuối cùng (Phase 2 HOÀN THÀNH):** 148 test xanh (134 unit + 14 integration via testcontainers Postgres+Redis). `no-framework-import.spec.ts` xanh. tsc sạch cho module.
+
+**Step 7 delivered files:**
+- `infrastructure/workflow/bullmq-workflow.adapter.ts` — `BullMqWorkflowAdapter implements WorkflowEnginePort`: lazy Queue per QueueName, `sanitizeJobId()` (`:` → `-`), `extractConnectionOpts()` (tránh ioredis type mismatch), `OnModuleDestroy` close tất cả Queue.
+- `infrastructure/workflow/__tests__/bullmq-e2e.integration.spec.ts` — 5 case E2E: happy path relay→Redis, delayMs, dedupe jobId, colon sanitization, schedule(runAt).
+- `distribution-orchestration.module.ts` — swap `InMemoryWorkflowAdapter` → `BullMqWorkflowAdapter` cho prod.
+- `package.json` — `yarn add bullmq@5.80.8`.
+
+**Quyết định Step 7 (khi code):**
+
+| # | Chủ đề | Chốt | Ghi chú |
+|---|--------|------|---------|
+| 29 | JobId sanitization | `sanitizeJobId()`: replace `:` → `-` trong adapter. Handler/outbox giữ nguyên `:`. | BullMQ cấm `:` trong jobId (Redis key separator). Mapping 1-1 deterministic → dedupe vẫn hoạt động. |
+| 30 | Redis connection | Extract `host/port/password/db` từ injected Redis → pass `ConnectionOptions` cho BullMQ Queue. | Tránh ioredis type mismatch (project vs bullmq bundled version). BullMQ tự tạo connection nội bộ. |
+| 31 | Queue lazy init | `Map<QueueName, Queue>` — tạo Queue lần đầu gọi `getOrCreateQueue()`. | Test thường chỉ dùng 2–3 queue. Không tạo 8 Queue upfront. |
+| 32 | OnModuleDestroy | Close tất cả Queue → nhả Redis connection. | Graceful shutdown. Tránh connection leak. |
+| 33 | Phase 2 scope = producer only | Adapter chỉ enqueue (Queue.add). KHÔNG tạo Worker/consumer. | Consumer (xử lý job) ở Phase 4+ khi có adapter thật cho 9 external port. |
+| 34 | Test strategy | E2E integration: testcontainers Redis 7 + Postgres 16 song song. Relay → BullMQ adapter → verify job trong Redis. | Adapter rất thin — unit test mock Queue giá trị thấp. E2E chứng minh pipeline thật. |
 
 **Step 6 delivered files:**
 - `infrastructure/relay/outbox-relay.ts` — `@Cron('*/5 * * * * *')` polling worker: SELECT FOR UPDATE SKIP LOCKED → dispatch via WorkflowEnginePort → mark dispatched. Retry with `attempts` counter + `last_error`. Soft-DLQ at MAX_ATTEMPTS=10. Concurrency guard (`_polling` flag).
