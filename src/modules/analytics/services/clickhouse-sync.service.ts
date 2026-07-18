@@ -37,6 +37,7 @@ interface TrackSyncRow {
 	artist_ids: string[];
 	release_type: string;
 	channel_id: string;
+	external_id: string;
 	is_deleted: number;
 	updated_at: string;
 	track_title: string;
@@ -49,6 +50,10 @@ interface TrackSyncRow {
 	cover_160: string;
 	cover_300: string;
 	cover_original: string;
+	track_metadata_spotify: string;
+	track_metadata_deezer: string;
+	release_metadata_spotify: string;
+	release_metadata_deezer: string;
 }
 
 interface DspSyncRow {
@@ -84,7 +89,9 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 
 	onModuleInit() {
 		if (process.env.APP_ROLE !== 'worker') {
-			this.logger.debug('Skipping ClickHouse sync listener (not worker role)');
+			this.logger.debug(
+				'Skipping ClickHouse sync listener (not worker role)',
+			);
 			return;
 		}
 		this.initializeSyncInBackground().catch((err) => {
@@ -138,11 +145,16 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				c: string;
 				with_release_upc: string;
 				empty_title: string;
+				metadata_rows: string;
 			}>(
 				`SELECT
 					count() AS c,
 					countIf(release_upc != '') AS with_release_upc,
-					countIf(track_title = '' AND is_deleted = 0) AS empty_title
+					countIf(track_title = '' AND is_deleted = 0) AS empty_title,
+					countIf(
+						track_metadata_spotify != '' OR track_metadata_deezer != ''
+						OR release_metadata_spotify != '' OR release_metadata_deezer != ''
+					) AS metadata_rows
 				 FROM ${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} WHERE is_deleted = 0`,
 			);
 			const chCount = Number(countResult[0]?.c ?? 0);
@@ -150,24 +162,45 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				countResult[0]?.with_release_upc ?? 0,
 			);
 			const chEmptyTitle = Number(countResult[0]?.empty_title ?? 0);
+			const chMetadataRows = Number(countResult[0]?.metadata_rows ?? 0);
 
 			// Dem so ISRC hop le tren Postgres (tracks + videos)
 			const pgCountResult = await this.entityManager.query(
-				`SELECT COUNT(DISTINCT isrc) AS c
+				`SELECT
+					COUNT(DISTINCT isrc) AS c,
+					COUNT(DISTINCT isrc) FILTER (
+						WHERE track_metadata_spotify IS NOT NULL
+							OR track_metadata_deezer IS NOT NULL
+							OR release_metadata_spotify IS NOT NULL
+							OR release_metadata_deezer IS NOT NULL
+					) AS metadata_rows
          FROM (
-           SELECT t.isrc FROM tracks t
+           SELECT
+             t.isrc,
+             t.metadata_spotify AS track_metadata_spotify,
+             t.metadata_deezer AS track_metadata_deezer,
+             r.metadata_spotify AS release_metadata_spotify,
+             r.metadata_deezer AS release_metadata_deezer
+           FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            WHERE t.isrc IS NOT NULL AND t.isrc != ''
            UNION
-           SELECT v.isrc FROM videos v
+           SELECT
+             v.isrc,
+             NULL::jsonb AS track_metadata_spotify,
+             NULL::jsonb AS track_metadata_deezer,
+             r.metadata_spotify AS release_metadata_spotify,
+             r.metadata_deezer AS release_metadata_deezer
+           FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            WHERE v.isrc IS NOT NULL AND v.isrc != ''
          ) AS combined`,
 			);
 			const pgCount = Number(pgCountResult[0]?.c ?? 0);
+			const pgMetadataRows = Number(pgCountResult[0]?.metadata_rows ?? 0);
 
 			this.logger.log(
-				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse empty_title=${chEmptyTitle} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, Postgres=${pgCount} ISRCs, forceSync=${forceSync}`,
+				`Initial sync check: ClickHouse=${chCount} rows, ClickHouse empty_title=${chEmptyTitle} rows, ClickHouse release_upc=${chWithReleaseUpc} rows, ClickHouse metadata=${chMetadataRows} rows, Postgres=${pgCount} ISRCs, Postgres metadata=${pgMetadataRows} rows, forceSync=${forceSync}`,
 			);
 
 			// Neu ClickHouse trong, thieu du lieu (so voi Postgres) hoac bi rong track_title, hoac forceSync = true
@@ -176,6 +209,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				chCount === 0 ||
 				chCount < pgCount ||
 				chWithReleaseUpc < pgCount ||
+				chMetadataRows < pgMetadataRows ||
 				(chEmptyTitle > 0 && pgCount > 0)
 			) {
 				this.logger.log(
@@ -210,6 +244,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            artist_ids,
            release_type,
            channel_id,
+           external_id,
            track_title,
            track_version,
            release_title,
@@ -219,7 +254,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            cover_100,
            cover_160,
            cover_300,
-           cover_original
+           cover_original,
+           track_metadata_spotify,
+           track_metadata_deezer,
+           release_metadata_spotify,
+           release_metadata_deezer
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -237,6 +276,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'audio' AS release_type,
              '' AS channel_id,
+             '' AS external_id,
              COALESCE(t.title, '') AS track_title,
              COALESCE(t.version, '') AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -254,7 +294,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+             COALESCE(t.metadata_spotify::text, '') AS track_metadata_spotify,
+             COALESCE(t.metadata_deezer::text, '') AS track_metadata_deezer,
+             COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+             COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -278,6 +322,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'video' AS release_type,
              COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(v.external_id, '') AS external_id,
              COALESCE(r.title, '') AS track_title,
              '' AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -295,7 +340,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+             '' AS track_metadata_spotify,
+             '' AS track_metadata_deezer,
+             COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+             COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -317,6 +366,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 				release_type: row.release_type ?? 'audio',
 				channel_id: row.channel_id ?? '',
+				external_id: row.external_id ?? '',
 				is_deleted: 0,
 				updated_at: new Date()
 					.toISOString()
@@ -334,6 +384,10 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 				cover_160: row.cover_160 ?? '',
 				cover_300: row.cover_300 ?? '',
 				cover_original: row.cover_original ?? '',
+				track_metadata_spotify: row.track_metadata_spotify ?? '',
+				track_metadata_deezer: row.track_metadata_deezer ?? '',
+				release_metadata_spotify: row.release_metadata_spotify ?? '',
+				release_metadata_deezer: row.release_metadata_deezer ?? '',
 			}));
 
 			await this.clickHouseService.insert(
@@ -518,7 +572,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+           COALESCE(t.metadata_spotify::text, '') AS track_metadata_spotify,
+           COALESCE(t.metadata_deezer::text, '') AS track_metadata_deezer,
+           COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+           COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
          FROM tracks t
          INNER JOIN releases r ON r.id = t.release_id
          LEFT JOIN labels l ON l.id = r.label_id
@@ -538,6 +596,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'audio',
 					channel_id: '',
+					external_id: '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',
@@ -552,6 +611,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_160: row.cover_160 ?? '',
 					cover_300: row.cover_300 ?? '',
 					cover_original: row.cover_original ?? '',
+					track_metadata_spotify: row.track_metadata_spotify ?? '',
+					track_metadata_deezer: row.track_metadata_deezer ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
+					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
@@ -578,6 +642,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ''
            ) AS artist_ids,
            COALESCE(v.channel_id::text, '') AS channel_id,
+           COALESCE(v.external_id, '') AS external_id,
            COALESCE(r.title, '') AS track_title,
            '' AS track_version,
            COALESCE(r.title, '') AS release_title,
@@ -595,7 +660,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
            COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+           COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+           '' AS track_metadata_spotify,
+           '' AS track_metadata_deezer,
+           COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+           COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
          FROM videos v
          INNER JOIN releases r ON r.id = v.release_id
          LEFT JOIN labels l ON l.id = r.label_id
@@ -615,6 +684,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: 'video',
 					channel_id: row.channel_id ?? '',
+					external_id: row.external_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',
@@ -629,6 +699,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_160: row.cover_160 ?? '',
 					cover_300: row.cover_300 ?? '',
 					cover_original: row.cover_original ?? '',
+					track_metadata_spotify: row.track_metadata_spotify ?? '',
+					track_metadata_deezer: row.track_metadata_deezer ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
+					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,
@@ -649,6 +724,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            artist_ids,
            release_type,
            channel_id,
+           external_id,
            track_title,
            track_version,
            release_title,
@@ -658,7 +734,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
            cover_100,
            cover_160,
            cover_300,
-           cover_original
+           cover_original,
+           track_metadata_spotify,
+           track_metadata_deezer,
+           release_metadata_spotify,
+           release_metadata_deezer
          FROM (
            SELECT
              t.isrc AS isrc,
@@ -676,6 +756,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'audio' AS release_type,
              '' AS channel_id,
+             '' AS external_id,
              COALESCE(t.title, '') AS track_title,
              COALESCE(t.version, '') AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -693,7 +774,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+             COALESCE(t.metadata_spotify::text, '') AS track_metadata_spotify,
+             COALESCE(t.metadata_deezer::text, '') AS track_metadata_deezer,
+             COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+             COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
            FROM tracks t
            INNER JOIN releases r ON r.id = t.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -718,6 +803,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              ) AS artist_ids,
              'video' AS release_type,
              COALESCE(v.channel_id::text, '') AS channel_id,
+             COALESCE(v.external_id, '') AS external_id,
              COALESCE(r.title, '') AS track_title,
              '' AS track_version,
              COALESCE(r.title, '') AS release_title,
@@ -735,7 +821,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '100x100' LIMIT 1), '') AS cover_100,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '160x160' LIMIT 1), '') AS cover_160,
              COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = '300x300' LIMIT 1), '') AS cover_300,
-             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original
+             COALESCE((SELECT rca.file_id::text FROM release_cover_art rca WHERE rca.release_id = r.id AND rca.type = 'original' LIMIT 1), '') AS cover_original,
+             '' AS track_metadata_spotify,
+             '' AS track_metadata_deezer,
+             COALESCE(r.metadata_spotify::text, '') AS release_metadata_spotify,
+             COALESCE(r.metadata_deezer::text, '') AS release_metadata_deezer
            FROM videos v
            INNER JOIN releases r ON r.id = v.release_id
            LEFT JOIN labels l ON l.id = r.label_id
@@ -756,6 +846,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					artist_ids: row.artist_ids ? row.artist_ids.split(',') : [],
 					release_type: row.release_type ?? 'audio',
 					channel_id: row.channel_id ?? '',
+					external_id: row.external_id ?? '',
 					is_deleted: 0,
 					updated_at: now,
 					track_title: row.track_title ?? '',
@@ -770,6 +861,11 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 					cover_160: row.cover_160 ?? '',
 					cover_300: row.cover_300 ?? '',
 					cover_original: row.cover_original ?? '',
+					track_metadata_spotify: row.track_metadata_spotify ?? '',
+					track_metadata_deezer: row.track_metadata_deezer ?? '',
+					release_metadata_spotify:
+						row.release_metadata_spotify ?? '',
+					release_metadata_deezer: row.release_metadata_deezer ?? '',
 				}));
 				await this.clickHouseService.insert(
 					CLICKHOUSE_TABLES.PG_TRACKS_SYNC,

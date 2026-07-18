@@ -264,7 +264,9 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của artist (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của artist (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,

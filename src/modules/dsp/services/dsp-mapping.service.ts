@@ -51,7 +51,10 @@ export class DspMappingService implements OnModuleInit {
 		const normalizedInput = input.toLowerCase().trim();
 
 		// Try to find existing by dsp_name AND source
-		const existing = await this.findByDspNameAndSource(normalizedInput, source);
+		const existing = await this.findByDspNameAndSource(
+			normalizedInput,
+			source,
+		);
 		if (existing) {
 			return existing;
 		}
@@ -116,7 +119,10 @@ export class DspMappingService implements OnModuleInit {
 		]);
 
 		// Update cache with (dspName:source) key
-		this.dspsReportCache.set(`${dspName.toLowerCase()}:${source}`, newRecord);
+		this.dspsReportCache.set(
+			`${dspName.toLowerCase()}:${source}`,
+			newRecord,
+		);
 
 		this.logger.log(
 			`Created new dsps_report for '${dspName}' from source '${source}': ${idDspsReport}`,

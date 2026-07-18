@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OrmService } from 'src/modules/orm/orm.service';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
@@ -29,6 +28,8 @@ import {
 } from '../enum/release.enum';
 import { ErrorSubmissionStatus } from '../modules/release-errors/entities/release-error.entity';
 import { ReleaseReviewStatus } from '../modules/release-reviews/entities/release-review.entity';
+import { parseJson } from '../utils/release.utils';
+
 interface IDataFromDb {
 	entities: Release[];
 	raw: {
@@ -50,8 +51,6 @@ export class ReleaseQueryService {
 
 		@InjectRepository(Track)
 		private readonly trackRepo: Repository<Track>,
-
-		private readonly ormService: OrmService,
 	) {
 		this.mainAlias = 'release';
 	}
@@ -110,6 +109,150 @@ export class ReleaseQueryService {
 		};
 	}
 
+	async getManyAndCountOptimized(query: QueryGetListReleaseDto) {
+		const qbId = this.releaseRepo.createQueryBuilder(this.mainAlias);
+
+		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query });
+
+		if (itemsToJoin.includes('release.ciData')) {
+			qbId.leftJoinAndSelect('release.ciData', 'releaseCiData');
+		}
+		if (itemsToJoin.includes('release.releaseDspDeliveries')) {
+			qbId.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
+			qbId.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
+		}
+
+		this.applyOrderFieldSelect(qbId, query.fieldOrder as string);
+
+		const [releasesBase, totalItems] = await qbId.getManyAndCount();
+
+		if (releasesBase.length === 0) {
+			return { totalItems, releases: [] };
+		}
+
+		const releaseIds = releasesBase.map((r) => r.id);
+
+		// Phase 2
+		const qbDetail = this.releaseRepo.createQueryBuilder(this.mainAlias);
+		qbDetail.where(`${this.mainAlias}.id IN (:...releaseIds)`, {
+			releaseIds,
+		});
+
+		qbDetail
+			.leftJoin('release.tenant', 'tenant')
+			.addSelect(['tenant.id', 'tenant.name']);
+
+		const { itemsToJoin: itemsDetail } = this.selectOptimized(qbDetail);
+
+		this.addSelectJsonCoverArts(qbDetail);
+		this.addSelectJsonArtists(qbDetail);
+		this.addSelectJsonContributors(qbDetail);
+		this.addSelectJsonDspDeliveries(qbDetail);
+
+		this.leftJoinOptimized({
+			qb: qbDetail,
+			relations: [...new Set([...itemsToJoin, ...itemsDetail])],
+		});
+
+		const [dataFromDb] = await Promise.all([qbDetail.getRawAndEntities()]);
+
+		const populatedReleases = this.assigneeVirtualColumn(dataFromDb);
+
+		// Parse JSON arrays and map them back to entities
+		for (const entity of populatedReleases) {
+			const raw = dataFromDb.raw.find((r) => r.release_id === entity.id);
+			if (raw) {
+				entity.releaseCoverArts = parseJson(raw.releaseCoverArts_json);
+				entity.releaseArtists = parseJson(raw.releaseArtists_json);
+				entity.releaseContributors = parseJson(
+					raw.releaseContributors_json,
+				);
+				entity.releaseDspDeliveries = parseJson(
+					raw.releaseDspDeliveries_json,
+				);
+			}
+		}
+
+		// Reorder
+		const releaseMap = new Map(populatedReleases.map((r) => [r.id, r]));
+		const sortedReleases = releaseIds
+			.map((id) => releaseMap.get(id))
+			.filter(Boolean) as Release[];
+
+		return {
+			totalItems,
+			releases: sortedReleases,
+		};
+	}
+
+	private countDspsLiveSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(release_dsp_delivery_live_sub.id)')
+			.from('release_dsp_delivery', 'release_dsp_delivery_live_sub')
+			.where('release_dsp_delivery_live_sub.release_id = release.id')
+			.andWhere("release_dsp_delivery_live_sub.status = 'distributed'");
+	}
+
+	private countTracksSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(track_sub1.id)')
+			.from('tracks', 'track_sub1')
+			.where('track_sub1.release_id = release.id');
+	}
+
+	private sumDurationSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('SUM(audio_files_sub2.duration)')
+			.from('tracks', 'track_sub2')
+			.leftJoin(
+				'audio_files',
+				'audio_files_sub2',
+				'audio_files_sub2.track_id = track_sub2.id',
+			)
+			.where('track_sub2.release_id = release.id');
+	}
+
+	private countDspsTotalSubQuery(subQuery: SelectQueryBuilder<any>) {
+		return subQuery
+			.select('COUNT(release_dsp_delivery_total_sub.id)')
+			.from('release_dsp_delivery', 'release_dsp_delivery_total_sub')
+			.where('release_dsp_delivery_total_sub.release_id = release.id');
+	}
+
+	private applyOrderFieldSelect(
+		qbId: SelectQueryBuilder<Release>,
+		fieldOrder?: string,
+	) {
+		qbId.select(`${this.mainAlias}.id`);
+
+		if (!fieldOrder) return;
+
+		switch (fieldOrder) {
+			case FieldOrderRelease.DSPS_LIVE:
+			case 'dsps_live_count':
+				qbId.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count');
+				break;
+			case FieldOrderRelease.TRACKS_COUNT:
+				qbId.addSelect(
+					this.countTracksSubQuery,
+					FieldOrderRelease.TRACKS_COUNT,
+				);
+				break;
+			case FieldOrderRelease.TOTAL_DURATION:
+				qbId.addSelect(
+					this.sumDurationSubQuery,
+					FieldOrderRelease.TOTAL_DURATION,
+				);
+				break;
+			case 'dsps_total_count':
+				qbId.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+				break;
+			default:
+				qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
+				break;
+		}
+	}
+
 	async getListSimple(query: QueryGetListReleaseDto): Promise<any> {
 		const {
 			idInclude,
@@ -149,14 +292,6 @@ export class ReleaseQueryService {
 		});
 
 		return { items: [...releaseInclude, ...items], totalItems };
-	}
-
-	private newReleaseQb() {
-		return this.releaseRepo.createQueryBuilder('release');
-	}
-
-	private selectReleaseSimple(qb: SelectQueryBuilder<Release>) {
-		return qb.select(['release.id', 'release.title']);
 	}
 
 	private assigneeVirtualColumn(dataFromDb: IDataFromDb) {
@@ -820,6 +955,342 @@ export class ReleaseQueryService {
 		return { itemsToJoin };
 	}
 
+	private filterByQuery2({
+		qb,
+		query,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		query: QueryGetListReleaseDto;
+	}) {
+		const {
+			keyword,
+			ids,
+
+			startCreatedAt,
+			endCreatedAt,
+			startUpdatedAt,
+			endUpdatedAt,
+
+			startDateRelease,
+			endDateRelease,
+
+			type,
+			albumFormatId,
+			status,
+			primaryGenreId,
+			subGenreId,
+			labelId,
+			artistId,
+			channelId,
+			isVariousArtist,
+			isImportedFromReport,
+			isEnrich,
+			hasError,
+			needsReview,
+			tenantIds,
+
+			ciDataStatus,
+			neverExported,
+			lastImportIsFailed,
+			needImportAgain,
+			hasQaFlag,
+			dspDelivery,
+
+			fieldOrder,
+			orderBy,
+
+			skip,
+			pageSize,
+		} = query;
+
+		const itemsToJoin: string[] = [];
+
+		if (
+			ciDataStatus ||
+			neverExported !== undefined ||
+			lastImportIsFailed !== undefined ||
+			needImportAgain !== undefined ||
+			hasQaFlag !== undefined
+		) {
+			itemsToJoin.push('release.ciData');
+
+			if (ciDataStatus) {
+				qb.andWhere('releaseCiData.status = :ciDataStatus', {
+					ciDataStatus,
+				});
+			}
+
+			if (neverExported !== undefined) {
+				const neverExportedCondition = `
+						(
+							"releaseCiData"."export_parsed_data" IS NULL
+							OR jsonb_array_length("releaseCiData"."export_parsed_data") = 0
+						)
+					`;
+
+				qb.andWhere(
+					neverExported
+						? neverExportedCondition
+						: `NOT ${neverExportedCondition}`,
+				);
+			}
+
+			if (lastImportIsFailed !== undefined) {
+				const lastImportIsFailedCondition = `
+					coalesce("releaseCiData"."import_parsed_data" ->> 'status', '') = :failedImportStatus
+				`;
+
+				qb.andWhere(
+					lastImportIsFailed
+						? lastImportIsFailedCondition
+						: `NOT (${lastImportIsFailedCondition})`,
+					{ failedImportStatus: 'problem' },
+				);
+			}
+
+			if (needImportAgain !== undefined) {
+				qb.andWhere(
+					`"releaseCiData"."need_import_again" = :needImportAgain`,
+					{ needImportAgain },
+				);
+			}
+
+			if (hasQaFlag !== undefined) {
+				const hasQaFlagCondition = `
+					COALESCE(jsonb_array_length("releaseCiData"."qa_flags_ci"), 0) > 0
+				`;
+
+				qb.andWhere(
+					hasQaFlag
+						? hasQaFlagCondition
+						: `(
+							"releaseCiData"."id" IS NULL
+							OR NOT (${hasQaFlagCondition})
+						)`,
+				);
+			}
+		}
+
+		const dspDeliveryInclude = (dspDelivery?.include ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+		const dspDeliveryExclude = (dspDelivery?.exclude ?? []).filter(
+			(item) => item?.code && item?.status?.length,
+		);
+
+		if (dspDeliveryExclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryExclude,
+					prefix: 'excludeDspDelivery',
+					deliveryAlias: 'excludeDspDeliveryFilter',
+					dspAlias: 'excludeDspFilter',
+				});
+
+			qb.andWhere(`NOT ${condition}`, parameters);
+		}
+
+		if (dspDeliveryInclude.length) {
+			const { condition, parameters } =
+				this.buildDspDeliveryExistsCondition({
+					items: dspDeliveryInclude,
+					prefix: 'includeDspDelivery',
+					deliveryAlias: 'includeDspDeliveryFilter',
+					dspAlias: 'includeDspFilter',
+				});
+
+			qb.andWhere(condition, parameters);
+		}
+
+		if (ids && ids.length > 0) {
+			qb.andWhere(`release.id IN (:...ids)`, { ids });
+		}
+
+		if (keyword) {
+			qb.andWhere(
+				new Brackets((qbInner) => {
+					qbInner
+						.where('release.title ILIKE :keyword')
+						.orWhere('release.upc ILIKE :keyword')
+						.orWhere(`release.album_format_id IN (
+							SELECT albumFormatFilter.id FROM album_formats albumFormatFilter
+							WHERE albumFormatFilter.name ILIKE :keyword
+						)`).orWhere(`release.label_id IN (
+							SELECT labelFilter.id FROM labels labelFilter
+							WHERE labelFilter.name ILIKE :keyword
+						)`).orWhere(`release.id IN (
+							SELECT releaseArtistFilter.release_id FROM release_artist releaseArtistFilter
+							JOIN artists artistFilter ON artistFilter.id = releaseArtistFilter.artist_id
+							WHERE artistFilter.name ILIKE :keyword
+						)`).orWhere(`release.id IN (
+							SELECT videoFilter.release_id FROM videos videoFilter
+							WHERE videoFilter.isrc ILIKE :keyword
+						)`);
+				}),
+				{ keyword: `%${keyword}%` },
+			);
+		}
+
+		if (startCreatedAt && endCreatedAt) {
+			qb.andWhere(
+				`release.createdAt BETWEEN :startCreatedAt AND :endCreatedAt`,
+				{
+					startCreatedAt,
+					endCreatedAt,
+				},
+			);
+		}
+
+		if (startUpdatedAt && endUpdatedAt) {
+			qb.andWhere(
+				`release.updatedAt BETWEEN :startUpdatedAt AND :endUpdatedAt`,
+				{
+					startUpdatedAt,
+					endUpdatedAt,
+				},
+			);
+		}
+
+		if (startDateRelease && endDateRelease) {
+			qb.andWhere(
+				`release.releaseDate BETWEEN :startDateRelease AND :endDateRelease`,
+				{
+					startDateRelease,
+					endDateRelease,
+				},
+			);
+		}
+
+		if (albumFormatId?.length) {
+			qb.andWhere('release.albumFormatId IN (:...albumFormatId)', {
+				albumFormatId,
+			});
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
+		}
+
+		if (primaryGenreId?.length) {
+			qb.andWhere('release.primaryGenreId IN (:...primaryGenreId)', {
+				primaryGenreId,
+			});
+		}
+
+		if (subGenreId?.length) {
+			qb.andWhere('release.subGenreId IN (:...subGenreId)', {
+				subGenreId,
+			});
+		}
+
+		if (labelId?.length) {
+			qb.andWhere('release.labelId IN (:...labelId)', {
+				labelId,
+			});
+		}
+
+		if (artistId?.length) {
+			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
+				artistId,
+			});
+		}
+
+		if (channelId?.length) {
+			qb.andWhere('video.channelId IN (:...channelId)', {
+				channelId,
+			});
+		}
+
+		if (status?.length) {
+			qb.andWhere('release.status IN (:...status)', {
+				status,
+			});
+		}
+
+		if (isVariousArtist !== undefined) {
+			qb.andWhere('release.isVariousArtist = :isVariousArtist', {
+				isVariousArtist,
+			});
+		}
+
+		if (isImportedFromReport !== undefined) {
+			qb.andWhere(
+				'release.isImportedFromReport = :isImportedFromReport',
+				{ isImportedFromReport },
+			);
+		}
+
+		if (isEnrich !== undefined) {
+			const enrichExistsCondition = `EXISTS (
+				SELECT 1 FROM release_enrichments releaseEnrichmentFilter
+				WHERE releaseEnrichmentFilter.release_id = release.id
+				AND releaseEnrichmentFilter.status = :successfulEnrichmentStatus
+			)`;
+
+			qb.andWhere(
+				isEnrich
+					? enrichExistsCondition
+					: `NOT ${enrichExistsCondition}`,
+				{ successfulEnrichmentStatus: ReleaseEnrichmentStatus.SUCCESS },
+			);
+		}
+
+		if (hasError !== undefined) {
+			const openErrorCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_errors releaseErrorFilter
+					WHERE releaseErrorFilter.release_id = release.id
+					AND releaseErrorFilter.submission_status = :openSubmissionStatus
+				)
+			`;
+
+			qb.andWhere(
+				hasError ? openErrorCondition : `NOT ${openErrorCondition}`,
+				{ openSubmissionStatus: ErrorSubmissionStatus.OPEN },
+			);
+		}
+
+		if (needsReview !== undefined) {
+			const reviewCondition = `
+				EXISTS (
+					SELECT 1
+					FROM release_reviews releaseReviewFilter
+					WHERE releaseReviewFilter.release_id = release.id
+					AND releaseReviewFilter.status IN (:...pendingReviewStatuses)
+				)
+			`;
+
+			qb.andWhere(
+				needsReview ? reviewCondition : `NOT ${reviewCondition}`,
+				{
+					pendingReviewStatuses: [
+						ReleaseReviewStatus.PENDING,
+						ReleaseReviewStatus.PROCESSING,
+					],
+				},
+			);
+		}
+
+		if (tenantIds?.length) {
+			qb.andWhere('release.tenantId IN (:...tenantIds)', {
+				tenantIds,
+			});
+		}
+
+		if (fieldOrder === FieldOrderRelease.DSPS_LIVE) {
+			qb.orderBy('dsps_live_count', orderBy);
+		} else if (VirtualColumnReleaseArr.includes(fieldOrder)) {
+			qb.orderBy(`${fieldOrder}`, orderBy);
+		} else {
+			qb.orderBy(`release.${fieldOrder}`, orderBy);
+		}
+
+		qb.skip(skip).take(pageSize);
+
+		return { itemsToJoin };
+	}
+
 	private buildDspDeliveryExistsCondition({
 		items,
 		prefix,
@@ -898,6 +1369,24 @@ export class ReleaseQueryService {
 				'release.releaseDspDeliveries',
 				'releaseDspDelivery',
 			).leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
+		}
+	}
+
+	private leftJoinOptimized({
+		qb,
+		relations,
+	}: {
+		qb: SelectQueryBuilder<Release>;
+		relations?: string[];
+	}) {
+		qb.leftJoin('release.albumFormat', 'albumFormat')
+			.leftJoin('release.label', 'label')
+			.leftJoin('release.video', 'video')
+			.leftJoin('video.channel', 'channel')
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+
+		if (relations?.includes('release.ciData')) {
+			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
 		}
 	}
 
@@ -1077,6 +1566,164 @@ export class ReleaseQueryService {
 		itemsToJoin.push('release.releaseDspDeliveries');
 
 		return { itemsToJoin };
+	}
+
+	private selectOptimized(queryBuilder: SelectQueryBuilder<Release>) {
+		const itemsToJoin: string[] = [];
+
+		queryBuilder
+			.addSelect([
+				'albumFormat.id',
+				'albumFormat.name',
+				'albumFormat.code',
+			])
+			.addSelect([
+				'label.id',
+				'label.name',
+				'label.code',
+				'label.picture',
+				'label.description',
+			])
+			.addSelect([
+				'video.id',
+				'video.releaseId',
+				'video.channelId',
+				'video.isrc',
+				'video.externalId',
+			])
+			.addSelect([
+				'channel.id',
+				'channel.name',
+				'channel.youtubeChannelId',
+				'channel.thumbUrl',
+			])
+			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
+			.addSelect(
+				this.sumDurationSubQuery,
+				FieldOrderRelease.TOTAL_DURATION,
+			)
+			.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count')
+			.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+
+		return { itemsToJoin };
+	}
+
+	private addSelectJsonCoverArts(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(
+					`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rca.id,
+						'fileId', rca.file_id,
+						'releaseId', rca.release_id,
+						'width', rca.width,
+						'height', rca.height,
+						'type', rca.type
+					)
+				) FILTER (WHERE rca.id IS NOT NULL), '[]')`,
+				)
+				.from('release_cover_art', 'rca')
+				.where('rca.release_id = release.id');
+		}, 'releaseCoverArts_json');
+	}
+
+	private addSelectJsonArtists(queryBuilder: SelectQueryBuilder<Release>) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(
+					`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', ra.id,
+						'artistId', ra.artist_id,
+						'releaseId', ra.release_id,
+						'addArtistToTracks', ra.add_artist_to_tracks,
+						'artist', JSON_BUILD_OBJECT(
+							'id', artist.id,
+							'name', artist.name,
+							'code', artist.code,
+							'picture', artist.picture,
+							'biography', artist.biography
+						)
+					)
+				) FILTER (WHERE ra.id IS NOT NULL), '[]')`,
+				)
+				.from('release_artist', 'ra')
+				.leftJoin('artists', 'artist', 'artist.id = ra.artist_id')
+				.where('ra.release_id = release.id');
+		}, 'releaseArtists_json');
+	}
+
+	private addSelectJsonContributors(
+		queryBuilder: SelectQueryBuilder<Release>,
+	) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(
+					`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rc.id,
+						'artistRoleId', rc.artist_role_id,
+						'artistId', rc.artist_id,
+						'releaseId', rc.release_id,
+						'addContributorToTracks', rc.add_contributor_to_tracks,
+						'artist', JSON_BUILD_OBJECT(
+							'id', artist_c.id,
+							'name', artist_c.name,
+							'code', artist_c.code,
+							'picture', artist_c.picture,
+							'biography', artist_c.biography
+						),
+						'artistRole', JSON_BUILD_OBJECT(
+							'id', role.id,
+							'name', role.name,
+							'code', role.code
+						)
+					)
+				) FILTER (WHERE rc.id IS NOT NULL), '[]')`,
+				)
+				.from('release_contributors', 'rc')
+				.leftJoin('artists', 'artist_c', 'artist_c.id = rc.artist_id')
+				.leftJoin('artist_roles', 'role', 'role.id = rc.artist_role_id')
+				.where('rc.release_id = release.id');
+		}, 'releaseContributors_json');
+	}
+
+	private addSelectJsonDspDeliveries(
+		queryBuilder: SelectQueryBuilder<Release>,
+	) {
+		queryBuilder.addSelect((subQuery) => {
+			return subQuery
+				.select(
+					`COALESCE(JSON_AGG(
+					JSON_BUILD_OBJECT(
+						'id', rdd.id,
+						'releaseId', rdd.release_id,
+						'dspId', rdd.dsp_id,
+						'status', rdd.status,
+						'isSelected', rdd.is_selected,
+						'hasLiveVersion', rdd.has_live_version,
+						'lastEnqueuedAt', rdd.last_enqueued_at,
+						'lastDeliveredAt', rdd.last_delivered_at,
+						'logs', rdd.logs,
+						'issues', rdd.issues,
+						'metadataPath', rdd.metadata_path,
+						'batchId', rdd.batch_id,
+						'dsp', JSON_BUILD_OBJECT(
+							'id', dsp.id,
+							'name', dsp.name,
+							'code', dsp.code,
+							'codeCi', dsp.code_ci,
+							'picture', dsp.picture,
+							'type', dsp.type
+						)
+					)
+				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`,
+				)
+				.from('release_dsp_delivery', 'rdd')
+				.leftJoin('dsps', 'dsp', 'dsp.id = rdd.dsp_id')
+				.where('rdd.release_id = release.id');
+		}, 'releaseDspDeliveries_json');
 	}
 
 	async findOneWithRelation(id: string) {

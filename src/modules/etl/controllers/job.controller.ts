@@ -160,15 +160,16 @@ export class JobController {
 }
 
 function formatJob(job: ImportJob) {
-  const isImportOrSync =
-    job.sourceType === ImportJobSourceType.REPORT_UPLOAD ||
-    job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
-    job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
-    job.sourceType === ImportJobSourceType.FTP_RETRY ||
-    job.sourceType === ImportJobSourceType.FTP_AUTO_CRON;
+	const isImportOrSync =
+		job.sourceType === ImportJobSourceType.REPORT_UPLOAD ||
+		job.sourceType === ImportJobSourceType.FTP_SYNC_PERIOD ||
+		job.sourceType === ImportJobSourceType.FTP_SYNC_ALL ||
+		job.sourceType === ImportJobSourceType.FTP_RETRY ||
+		job.sourceType === ImportJobSourceType.FTP_AUTO_CRON;
 
-  const isR2Sync = job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
-  const isExportTrigger = job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
+	const isR2Sync = job.sourceType === ImportJobSourceType.SPOTIFY_R2_SYNC;
+	const isExportTrigger =
+		job.sourceType === ImportJobSourceType.SPOTIFY_EXPORT_TRIGGER;
 
 	return {
 		id: job.id,
@@ -216,7 +217,8 @@ function formatJob(job: ImportJob) {
 						detailExport: job.result
 							? {
 									jobSpoId: job.result.jobSpoId ?? null,
-									foldersUploaded: job.result.foldersUploaded ?? 0,
+									foldersUploaded:
+										job.result.foldersUploaded ?? 0,
 									r2ObjectKeys: job.result.r2ObjectKeys ?? [],
 								}
 							: null,

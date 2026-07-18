@@ -55,7 +55,9 @@ export class YoutubeApiKeyPoolService implements OnModuleInit {
 		this.reload()
 			.then(() => scheduleRefresh())
 			.catch((err) => {
-				this.logger.error(`YouTube key pool init failed: ${err.message}`);
+				this.logger.error(
+					`YouTube key pool init failed: ${err.message}`,
+				);
 				scheduleRefresh();
 			});
 	}

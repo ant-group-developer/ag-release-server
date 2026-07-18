@@ -155,6 +155,17 @@ export class SyncService {
 	}
 
 	/**
+	 * Public wrapper for manual import flows (e.g. statements upload).
+	 * Deletes sales fact data for a given (period YYYYMM, dsp folder) before re-import.
+	 */
+	async deleteDataForManualImport(
+		period: string,
+		dspFolder: string,
+	): Promise<void> {
+		await this.deleteFolderData(period, 'sales', dspFolder);
+	}
+
+	/**
 	 * Get detailed import info for change detection.
 	 * Returns a Map of "period|category|dsp_folder" → { status, files_list }
 	 */

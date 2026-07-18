@@ -14,6 +14,7 @@ import {
 	RevenueLineChartItem,
 	RevenueOverviewResponse,
 	RevenueReleaseItem,
+	RevenueReleaseVideoItem,
 	RevenueSourceTypeItem,
 	RevenueTenantItem,
 	RevenueTimelineResponse,
@@ -341,6 +342,27 @@ export class TimelineAnalyticsController {
 		@Body() query: TimelineQueryDto,
 	): Promise<ResponseSuccess<PageDto<RevenueReleaseItem>>> {
 		const data = await this.timelineService.getRevenueTopRelease(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
+
+	@Post('revenue/top-release-video')
+	@ApiOperation({
+		summary: 'Get top video releases by revenue for tenant',
+		description:
+			'Returns top video releases sorted by USD revenue, including channelName and workspaceName.',
+	})
+	@ApiResponse({
+		status: 201,
+		description: 'Top video releases by revenue retrieved successfully.',
+	})
+	async getRevenueTopReleaseVideo(
+		@Req() req: Request,
+		@Body() query: TimelineQueryDto,
+	): Promise<ResponseSuccess<PageDto<RevenueReleaseVideoItem>>> {
+		const data = await this.timelineService.getRevenueTopReleaseVideo(
 			req.user!.tenantId,
 			query,
 		);

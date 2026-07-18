@@ -69,4 +69,52 @@ export class CiToolService {
 
 		return typeof status === 'string' ? status : null;
 	}
+
+	async triggerSpotifyProviderRefreshToken(): Promise<{
+		success: boolean;
+		jobId: string;
+		message: string;
+	}> {
+		const { data } = await firstValueFrom(
+			this.httpService.post(
+				`${process.env.CI_TOOL_URL}/api/spotify/provider/refresh-token`,
+				{},
+				{
+					headers: {
+						'x-api-key': process.env.CI_TOOL_API_KEY,
+						'Content-Type': 'application/json',
+					},
+				},
+			),
+		);
+		return data;
+	}
+
+	async getSpotifyProviderRefreshStatus(jobId: string): Promise<{
+		success: boolean;
+		data: {
+			status: 'running' | 'success' | 'failed';
+			step: string;
+			error: string | null;
+			token?: {
+				access_token: string;
+				refresh_token: string;
+				token_type: string;
+				expires_in: number;
+			};
+			lastRun?: string;
+		};
+	}> {
+		const { data } = await firstValueFrom(
+			this.httpService.get(
+				`${process.env.CI_TOOL_URL}/api/spotify/provider/refresh-status/${jobId}`,
+				{
+					headers: {
+						'x-api-key': process.env.CI_TOOL_API_KEY,
+					},
+				},
+			),
+		);
+		return data;
+	}
 }

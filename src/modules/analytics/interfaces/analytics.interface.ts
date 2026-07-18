@@ -23,6 +23,43 @@ export interface SourceBreakdownItem {
 // Timelines (DSP and Territory)
 // ═══════════════════════════════════════════════════════
 
+export interface AnalyticsWorkspaceInfo {
+	id: string;
+	name: string;
+	title: string;
+	logo: string | null;
+}
+
+export interface AnalyticsChannelInfo {
+	id: string;
+	name: string;
+	thumbUrl: string | null;
+	youtubeChannelId: string | null;
+	tenant: AnalyticsWorkspaceInfo | null;
+}
+
+export interface AnalyticsVideoInfo {
+	id: string;
+	releaseId: string;
+	isrc: string | null;
+	externalId: string | null;
+	label: string | null;
+	explicit: boolean | null;
+	aiContent: string | null;
+	channelId: string | null;
+	description: string | null;
+	keywords: string[] | null;
+	madeForKids: string | null;
+	visibility: string | null;
+	contentProvider: string | null;
+	copyrightOwner: string | null;
+	partnerCustomId1: string | null;
+	partnerCustomId2: string | null;
+	fileId: string | null;
+	youtubeMatchStatus: string | null;
+	youtubeMatchScannedAt: Date | null;
+}
+
 export interface DspTimelineSeriesItem {
 	dsp: string;
 	salesViews?: number;
@@ -118,10 +155,15 @@ export interface TrackRankingItem {
 	artistName: string;
 	releaseId: string;
 	releaseTitle: string;
+	labelId: string | null;
+	labelName: string | null;
 	totalViews: number;
+	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
+		metadataExternal: Record<string, unknown>;
 	} | null;
 }
 
@@ -134,6 +176,26 @@ export interface ReleaseRankingItem {
 	labelName: string | null;
 	trackCount: number;
 	totalViews: number;
+	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
+}
+
+export interface ReleaseRankingVideoItem {
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	totalViews: number;
+	channels: AnalyticsChannelInfo[];
+	workspaces: AnalyticsWorkspaceInfo[];
+	video: AnalyticsVideoInfo | null;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;
@@ -231,10 +293,17 @@ export interface RevenueTrackItem {
 	artistName: string;
 	releaseId: string | null;
 	releaseTitle: string | null;
+	labelId: string | null;
+	labelName: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
 	bySource?: SourceBreakdownItem[];
+	release: {
+		metadataExternal: Record<string, unknown>;
+	} | null;
 }
 
 export type RevenueTopTrackResponse = RevenueTrackItem[];
@@ -284,6 +353,7 @@ export interface RevenueTenantItem {
 	tenantId: string;
 	tenantName: string;
 	logo: string | null;
+	type: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
@@ -341,6 +411,7 @@ export interface TenantRankingItem {
 	tenantId: string;
 	tenantName: string;
 	logo: string | null;
+	type: string | null;
 	totalViews: number;
 	bySource?: SourceBreakdownItem[];
 }
@@ -381,6 +452,28 @@ export interface RevenueReleaseItem {
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
+	metadataExternal: Record<string, unknown>;
+	workspaces: AnalyticsWorkspaceInfo[];
+	bySource?: SourceBreakdownItem[];
+	release: {
+		coverArtThumbnails: ICoverArtThumbnails;
+	} | null;
+}
+
+export interface RevenueReleaseVideoItem {
+	rank: number;
+	releaseId: string;
+	title: string;
+	upc: string | null;
+	labelId: string | null;
+	labelName: string | null;
+	trackCount: number;
+	revenueUsd: number;
+	revenueUsdExact?: string;
+	quantity: number;
+	channels: AnalyticsChannelInfo[];
+	workspaces: AnalyticsWorkspaceInfo[];
+	video: AnalyticsVideoInfo | null;
 	bySource?: SourceBreakdownItem[];
 	release: {
 		coverArtThumbnails: ICoverArtThumbnails;

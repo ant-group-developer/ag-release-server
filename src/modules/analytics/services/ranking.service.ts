@@ -7,16 +7,20 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { getImportSourceLabel } from '../constants/import-source.constants';
 import { RankingQueryDto } from '../dto/analytics-query.dto';
 import {
+	AnalyticsChannelInfo,
+	AnalyticsWorkspaceInfo,
 	ArtistRankingItem,
 	ChannelRankingItem,
 	DspRankingItem,
 	LabelRankingItem,
 	ReleaseRankingItem,
+	ReleaseRankingVideoItem,
 	SourceBreakdownItem,
 	SourceTypeRankingItem,
 	TenantRankingItem,
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -207,12 +211,19 @@ export class RankingService {
         any(t.track_version) AS trackVersion,
         any(t.release_id) AS releaseId,
         any(t.release_title) AS releaseTitle,
+        any(t.label_id) AS labelId,
+        any(t.label_name) AS labelName,
+        any(t.tenant_id) AS tenantId,
         any(t.artist_names) AS artistNames,
         any(t.cover_75) AS cover75,
         any(t.cover_100) AS cover100,
         any(t.cover_160) AS cover160,
         any(t.cover_300) AS cover300,
-        any(t.cover_original) AS coverOriginal
+        any(t.cover_original) AS coverOriginal,
+        any(t.track_metadata_spotify) AS trackMetadataSpotify,
+        any(t.track_metadata_deezer) AS trackMetadataDeezer,
+        any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+        any(t.release_metadata_deezer) AS releaseMetadataDeezer
       FROM ${table} s
       ${joinSql}
       WHERE 1=1
@@ -232,13 +243,23 @@ export class RankingService {
 			trackVersion: string;
 			releaseId: string;
 			releaseTitle: string;
+			labelId: string;
+			labelName: string;
+			tenantId: string;
 			artistNames: string[];
 			cover75: string;
 			cover100: string;
 			cover160: string;
 			cover300: string;
 			coverOriginal: string;
+			trackMetadataSpotify: string;
+			trackMetadataDeezer: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(dataSql, params);
+		const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+			[...new Set(paged.map((row) => row.tenantId).filter(Boolean))],
+		);
 
 		// Fallback: ISRCs không có trong pg_tracks_sync → lấy metadata từ ClickHouse fact table
 		// Chỉ xảy ra với system-tenant (query tất cả ISRCs, không giới hạn pg_tracks_sync)
@@ -292,6 +313,9 @@ export class RankingService {
 				'300x300': row.cover300 || null,
 				original: row.coverOriginal || null,
 			};
+			const workspace = row.tenantId
+				? tenantMetadata.get(row.tenantId)
+				: undefined;
 			return {
 				rank: query.skip + index + 1,
 				isrc: row.isrc,
@@ -300,8 +324,23 @@ export class RankingService {
 				artistName,
 				releaseId: row.releaseId || '',
 				releaseTitle: row.releaseTitle || fallback?.albumTitle || '',
+				labelId: row.labelId || null,
+				labelName: row.labelName || null,
 				totalViews: Number(row.totalViews),
-				release: { coverArtThumbnails },
+				metadataExternal: normalizeSyncedMetadataExternal(
+					row.trackMetadataSpotify,
+					row.trackMetadataDeezer,
+				),
+				workspaces: workspace
+					? [{ id: row.tenantId, ...workspace }]
+					: [],
+				release: {
+					coverArtThumbnails,
+					metadataExternal: normalizeSyncedMetadataExternal(
+						row.releaseMetadataSpotify,
+						row.releaseMetadataDeezer,
+					),
+				},
 			};
 		});
 
@@ -406,11 +445,14 @@ export class RankingService {
         any(t.release_upc) AS releaseUpc,
         any(t.label_id) AS labelId,
         any(t.label_name) AS labelName,
+        any(t.tenant_id) AS tenantId,
         any(t.cover_75) AS cover75,
         any(t.cover_100) AS cover100,
         any(t.cover_160) AS cover160,
         any(t.cover_300) AS cover300,
-        any(t.cover_original) AS coverOriginal
+        any(t.cover_original) AS coverOriginal,
+        any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+        any(t.release_metadata_deezer) AS releaseMetadataDeezer
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
       WHERE t.is_deleted = 0
@@ -431,12 +473,18 @@ export class RankingService {
 			releaseUpc: string;
 			labelId: string;
 			labelName: string;
+			tenantId: string;
 			cover75: string;
 			cover100: string;
 			cover160: string;
 			cover300: string;
 			coverOriginal: string;
+			releaseMetadataSpotify: string;
+			releaseMetadataDeezer: string;
 		}>(dataSql, params);
+		const tenantMetadata = await this.isrcResolverService.getTenantMetadata(
+			[...new Set(paged.map((row) => row.tenantId).filter(Boolean))],
+		);
 
 		const items: ReleaseRankingItem[] = paged.map((r, index) => {
 			const coverArtThumbnails: ICoverArtThumbnails = {
@@ -446,6 +494,9 @@ export class RankingService {
 				'300x300': r.cover300 || null,
 				original: r.coverOriginal || null,
 			};
+			const workspace = r.tenantId
+				? tenantMetadata.get(r.tenantId)
+				: undefined;
 			return {
 				rank: query.skip + index + 1,
 				releaseId: r.releaseId,
@@ -455,11 +506,206 @@ export class RankingService {
 				labelName: r.labelName || null,
 				trackCount: Number(r.trackCount),
 				totalViews: Number(r.totalViews),
+				metadataExternal: normalizeSyncedMetadataExternal(
+					r.releaseMetadataSpotify,
+					r.releaseMetadataDeezer,
+				),
+				workspaces: workspace ? [{ id: r.tenantId, ...workspace }] : [],
 				release: { coverArtThumbnails },
 			};
 		});
 
 		// groupBySource: fetch breakdown per release
+		if (query.groupBySource && items.length > 0) {
+			const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
+			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
+			const breakdowns = await Promise.all(
+				items.map((item) =>
+					this.fetchTrendSourceBreakdown(
+						table,
+						releaseJoinSql,
+						dateFilterSql,
+						`${dspFilter} ${filterSql}`,
+						params,
+						'AND t.release_id = {_releaseId:String}',
+						{ _releaseId: item.releaseId },
+					),
+				),
+			);
+			items.forEach((item, i) => {
+				item.bySource = breakdowns[i];
+			});
+		}
+
+		return new PageDto({ items, metadata: { page, pageSize, totalItems } });
+	}
+
+	// ═══════════════════════════════════════════════════════
+	// 2b. TOP VIDEO RELEASES RANKING
+	// ═══════════════════════════════════════════════════════
+	async getTopReleasesVideo(
+		tenantId: string,
+		query: RankingQueryDto,
+	): Promise<PageDto<ReleaseRankingVideoItem>> {
+		const key = this.cache.buildKey('rank:releases-video', tenantId, query);
+		return this.cache.wrap(key, () =>
+			this.computeTopReleasesVideo(tenantId, query),
+		);
+	}
+
+	private async computeTopReleasesVideo(
+		tenantId: string,
+		query: RankingQueryDto,
+	): Promise<PageDto<ReleaseRankingVideoItem>> {
+		const { fromDate, toDate, page, pageSize } = query;
+		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		params.from = fromDate;
+		params.to = toDate;
+
+		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
+		if (query.dspId) params.dspId = query.dspId;
+
+		if (query.keyword) {
+			let matchedReleaseIds =
+				await this.isrcResolverService.getReleaseIdsByKeyword(
+					query.keyword,
+				);
+			if (matchedReleaseIds.length === 0) {
+				matchedReleaseIds = ['__none__'];
+			}
+			filterSql +=
+				' AND t.release_id IN ({matchedReleaseIds:Array(String)})';
+			params.matchedReleaseIds = matchedReleaseIds;
+		}
+
+		const table = query.dspId
+			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
+			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
+		const dateCol = 'reporting_date';
+
+		const countSql = `
+      SELECT uniq(t.release_id) AS total
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.release_id != ''
+        AND t.release_type = 'video'
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+    `;
+		const countResult = await this.clickHouseService.query<{
+			total: string;
+		}>(countSql, params);
+		const totalItems = Number(countResult[0]?.total ?? 0);
+
+		if (totalItems === 0) {
+			return new PageDto({
+				items: [],
+				metadata: { page, pageSize, totalItems: 0 },
+			});
+		}
+
+		const dataSql = `
+      SELECT
+        t.release_id AS releaseId,
+        groupUniqArray(20)(t.channel_id) AS channelIds,
+        uniq(s.isrc) AS trackCount,
+        sum(s.total_quantity) AS totalViews,
+        any(t.release_title) AS releaseTitle,
+        any(t.release_upc) AS releaseUpc,
+        any(t.label_id) AS labelId,
+        any(t.label_name) AS labelName,
+        any(t.cover_75) AS cover75,
+        any(t.cover_100) AS cover100,
+        any(t.cover_160) AS cover160,
+        any(t.cover_300) AS cover300,
+        any(t.cover_original) AS coverOriginal
+      FROM ${table} s
+      INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+      WHERE t.is_deleted = 0
+        AND t.release_id != ''
+        AND t.release_type = 'video'
+        AND s.${dateCol} >= toDate({from:String})
+        AND s.${dateCol} <= toDate({to:String})
+        ${dspFilter}
+        ${filterSql}
+      GROUP BY releaseId
+      ORDER BY totalViews DESC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `;
+		const paged = await this.clickHouseService.query<{
+			releaseId: string;
+			channelIds: string[];
+			trackCount: string;
+			totalViews: string;
+			releaseTitle: string;
+			releaseUpc: string;
+			labelId: string;
+			labelName: string;
+			cover75: string;
+			cover100: string;
+			cover160: string;
+			cover300: string;
+			coverOriginal: string;
+		}>(dataSql, params);
+
+		const releaseIds = paged.map((r) => r.releaseId);
+		const allChannelIds = [
+			...new Set(
+				paged.flatMap((r) => r.channelIds ?? []).filter(Boolean),
+			),
+		];
+		const [channelsMeta, videosMeta] = await Promise.all([
+			allChannelIds.length > 0
+				? this.isrcResolverService.getChannelMetadata(allChannelIds)
+				: Promise.resolve(new Map()),
+			this.isrcResolverService.getVideoMetadataByReleaseIds(releaseIds),
+		]);
+
+		const items: ReleaseRankingVideoItem[] = paged.map((r, index) => {
+			const coverArtThumbnails: ICoverArtThumbnails = {
+				'75x75': r.cover75 || null,
+				'100x100': r.cover100 || null,
+				'160x160': r.cover160 || null,
+				'300x300': r.cover300 || null,
+				original: r.coverOriginal || null,
+			};
+			const rowChannelIds = (r.channelIds ?? []).filter(Boolean);
+
+			const channels: AnalyticsChannelInfo[] = rowChannelIds
+				.map((id) => {
+					const ch = channelsMeta.get(id);
+					return ch ? { id, ...ch } : null;
+				})
+				.filter((c): c is AnalyticsChannelInfo => c !== null);
+
+			const workspacesMap = new Map<string, AnalyticsWorkspaceInfo>();
+			rowChannelIds.forEach((id) => {
+				const ch = channelsMeta.get(id);
+				const tenant = ch?.tenant;
+				if (tenant && !workspacesMap.has(tenant.id)) {
+					workspacesMap.set(tenant.id, tenant);
+				}
+			});
+
+			return {
+				rank: query.skip + index + 1,
+				releaseId: r.releaseId,
+				title: r.releaseTitle || 'Unknown Release',
+				upc: r.releaseUpc || null,
+				labelId: r.labelId || null,
+				labelName: r.labelName || null,
+				trackCount: Number(r.trackCount),
+				totalViews: Number(r.totalViews),
+				channels,
+				workspaces: [...workspacesMap.values()],
+				video: videosMeta.get(r.releaseId) ?? null,
+				release: { coverArtThumbnails },
+			};
+		});
+
 		if (query.groupBySource && items.length > 0) {
 			const releaseJoinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 			const dateFilterSql = `AND s.${dateCol} >= toDate({from:String}) AND s.${dateCol} <= toDate({to:String})`;
@@ -1002,6 +1248,7 @@ export class RankingService {
 				tenantId: r.tenantId,
 				tenantName: meta?.title ?? 'Unknown Tenant',
 				logo: meta?.logo ?? null,
+				type: meta?.type ?? null,
 				totalViews: Number(r.totalViews),
 			};
 		});

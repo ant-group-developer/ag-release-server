@@ -1,3 +1,4 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from 'src/modules/app-config/app-config.module';
@@ -11,8 +12,16 @@ import { ReleaseEnrichment } from 'src/modules/release/entities/release-enrichme
 import { Release } from 'src/modules/release/entities/release.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { CiToolModule } from '../ci-tool/ci-tool.module';
 import { YoutubeModule } from '../youtube/youtube.module';
+import { SpotifySonarController } from './controllers/spotify-sonar.controller';
 import { SpotifyController } from './controllers/spotify.controller';
+import { SpotifyCatalogAvailability } from './entities/spotify-catalog-availability.entity';
+import { SpotifyCatalogDelivery } from './entities/spotify-catalog-delivery.entity';
+import { SpotifyCatalog } from './entities/spotify-catalog.entity';
+import { SpotifySonarDelivery } from './entities/spotify-sonar-delivery.entity';
+import { SpotifySonarScanSchedule } from './entities/spotify-sonar-scan-schedule.entity';
+import { SpotifySonarScanSession } from './entities/spotify-sonar-scan-session.entity';
 import { DeezerEnrichmentService } from './services/deezer-enrichment.service';
 import { EnrichEventsGateway } from './services/enrich-events.gateway';
 import { LocalEnrichmentService } from './services/local-enrichment.service';
@@ -20,7 +29,12 @@ import { MetadataEnrichmentService } from './services/metadata-enrichment.servic
 import { MetadataScanScheduleService } from './services/metadata-scan-schedule.service';
 import { MetadataScanService } from './services/metadata-scan.service';
 import { MetadataSyncService } from './services/metadata-sync.service';
+import { SonarEventsGateway } from './services/sonar-events.gateway';
 import { SpotifyEnrichmentService } from './services/spotify-enrichment.service';
+import { SpotifyProviderApiService } from './services/spotify-provider-api.service';
+import { SpotifyProviderScanService } from './services/spotify-provider-scan.service';
+import { SpotifyProviderTokenService } from './services/spotify-provider-token.service';
+import { SpotifySonarScheduleService } from './services/spotify-sonar-schedule.service';
 import { SpotifyService } from './services/spotify.service';
 import { SpotifyService2 } from './services/spotify2.service';
 
@@ -28,7 +42,9 @@ import { SpotifyService2 } from './services/spotify2.service';
 	imports: [
 		AppConfigModule,
 		ClickHouseModule,
+		CiToolModule,
 		YoutubeModule,
+		HttpModule,
 		TypeOrmModule.forFeature([
 			Release,
 			Track,
@@ -39,9 +55,15 @@ import { SpotifyService2 } from './services/spotify2.service';
 			ReleaseEnrichment,
 			MetadataScanSession,
 			MetadataScanSchedule,
+			SpotifySonarDelivery,
+			SpotifyCatalog,
+			SpotifyCatalogAvailability,
+			SpotifyCatalogDelivery,
+			SpotifySonarScanSchedule,
+			SpotifySonarScanSession,
 		]),
 	],
-	controllers: [SpotifyController],
+	controllers: [SpotifyController, SpotifySonarController],
 	providers: [
 		SpotifyService,
 		SpotifyService2,
@@ -53,6 +75,11 @@ import { SpotifyService2 } from './services/spotify2.service';
 		MetadataScanService,
 		MetadataScanScheduleService,
 		EnrichEventsGateway,
+		SonarEventsGateway,
+		SpotifyProviderTokenService,
+		SpotifyProviderApiService,
+		SpotifyProviderScanService,
+		SpotifySonarScheduleService,
 	],
 	exports: [
 		SpotifyService,
@@ -65,6 +92,11 @@ import { SpotifyService2 } from './services/spotify2.service';
 		MetadataScanService,
 		MetadataScanScheduleService,
 		EnrichEventsGateway,
+		SonarEventsGateway,
+		SpotifyProviderTokenService,
+		SpotifyProviderApiService,
+		SpotifyProviderScanService,
+		SpotifySonarScheduleService,
 	],
 })
 export class SpotifyModule {}

@@ -48,6 +48,7 @@ export default new DataSource({
 	entities: [
 		__dirname + '/../../**/*.entity{.ts,.js}',
 		__dirname + '/../../**/*.entities{.ts,.js}',
+		__dirname + '/../../**/*.orm-entity{.ts,.js}',
 	],
 	migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
 	migrationsTableName: 'migrations',

@@ -43,7 +43,7 @@ export class TrackController {
 			query.tenantIds = [tenantId];
 		}
 
-		const result = await this.trackService.getList(query);
+		const result = await this.trackService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 

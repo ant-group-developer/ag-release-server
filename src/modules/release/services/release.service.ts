@@ -186,7 +186,7 @@ export class ReleaseService {
 		const { page, pageSize } = query;
 
 		const { releases, totalItems } =
-			await this.releaseQueryService.getManyAndCount(query);
+			await this.releaseQueryService.getManyAndCountOptimized(query);
 
 		const enhancedRelease = enhanceReleasesDetails(releases);
 

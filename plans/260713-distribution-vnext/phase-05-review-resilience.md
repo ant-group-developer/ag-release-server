@@ -11,7 +11,7 @@ Bật gate kiểm duyệt thủ công (theo cờ tenant) + các resilience patte
 - REVIEW gate: bước `AWAITING_REVIEW` chèn giữa VALIDATING và PROVISIONING_IDS **chỉ khi** tenant bật `requiresManualReview`. Approve/reject → resume (human signal).
 - Bảng `review` + endpoint approve/reject (RBAC).
 - Resilience: bulkhead SFTP per host, circuit breaker CI/SFTP, poison detection (giới hạn retry), timeout/deadline mỗi bước.
-- RETRY endpoint: chỉ admin (RBAC), reset subtree ISSUES/FAILED → resume, giới hạn số lần.
+- RETRY endpoint: chỉ admin (RBAC), gọi `Distribution.resetForRetry(scope, policy, clock)` (domain đã có, guard `POISON_LIMIT=3`), reset subtree ISSUES → resume, giữ nguyên nhánh LIVE.
 
 ## Entry / Exit
 
@@ -29,4 +29,5 @@ Bật gate kiểm duyệt thủ công (theo cờ tenant) + các resilience patte
 
 ## Câu hỏi mở
 
-- Ngưỡng retry/poison cụ thể là bao nhiêu? → chốt với nghiệp vụ.
+- Ngưỡng retry/poison: domain đang hardcode `POISON_LIMIT=3` (khớp spec). Có cần cấu hình theo tenant không? → chốt với nghiệp vụ.
+- REVIEW gate: domain đã có state `IN_REVIEW` + `approveReview`/`rejectReview`. Phase 5 chỉ cắm cờ tenant `requiresManualReview` vào `markValidated` + bảng `review` + endpoint. Không đụng state machine.

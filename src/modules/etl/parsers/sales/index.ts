@@ -26,6 +26,9 @@ export {
 	SoundcloudSalesParser,
 } from './group-b-parsers';
 
+// Revelator
+export { RevelatorSalesParser } from './revelator-sales.parser';
+
 // Group C-E: Complex format
 export {
 	BoomplaySalesParser,
@@ -69,6 +72,7 @@ import {
 	TiktokSalesParser,
 	VevoSalesParser,
 } from './group-ce-parsers';
+import { RevelatorSalesParser } from './revelator-sales.parser';
 
 /**
  * Registry mapping DSP folder name prefixes to their SALES parser classes.
@@ -87,6 +91,7 @@ export const SALES_PARSER_REGISTRY: Record<string, () => BaseSalesParser> = {
 	ncm: () => new NeteaseSalesParser(),
 	pnd: () => new PandoraSalesParser(),
 	res: () => new RessoSalesParser(),
+	rev: () => new RevelatorSalesParser(),
 	rhm: () => new RythmSalesParser(),
 	scu: () => new SoundcloudSalesParser(),
 	snp: () => new SnapSalesParser(),

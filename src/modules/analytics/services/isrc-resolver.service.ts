@@ -9,9 +9,11 @@ import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { TrackArtist } from 'src/modules/track-artist/entities/track-artist.entity';
 import { Track } from 'src/modules/track/entities/track.entity';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { Video } from 'src/modules/video/entities/video.entity';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import { ILike, In, Repository } from 'typeorm';
 import {
+	AnalyticsVideoInfo,
 	IsrcArtistMapping,
 	TrackMetadata,
 } from '../interfaces/analytics.interface';
@@ -35,6 +37,8 @@ export class IsrcResolverService {
 		private readonly tenantRepo: Repository<Tenant>,
 		@InjectRepository(Channel)
 		private readonly channelRepo: Repository<Channel>,
+		@InjectRepository(Video)
+		private readonly videoRepo: Repository<Video>,
 	) {}
 
 	/**
@@ -415,23 +419,37 @@ export class IsrcResolverService {
 	async getTenantMetadata(
 		tenantIds: string[],
 	): Promise<
-		Map<string, { name: string; title: string; logo: string | null }>
+		Map<
+			string,
+			{
+				name: string;
+				title: string;
+				logo: string | null;
+				type: string | null;
+			}
+		>
 	> {
 		if (!tenantIds.length) return new Map();
 		const tenants = await this.tenantRepo.find({
 			where: { id: In(tenantIds) },
-			select: ['id', 'name', 'title', 'logo'],
+			select: ['id', 'name', 'title', 'logo', 'type'],
 		});
 
 		const map = new Map<
 			string,
-			{ name: string; title: string; logo: string | null }
+			{
+				name: string;
+				title: string;
+				logo: string | null;
+				type: string | null;
+			}
 		>();
 		for (const t of tenants) {
 			map.set(t.id, {
 				name: t.name,
 				title: t.title || t.name,
 				logo: t.logo || null,
+				type: t.type ?? null,
 			});
 		}
 		return map;
@@ -480,6 +498,63 @@ export class IsrcResolverService {
 	// `IN(...)` khổng lồ cho ClickHouse → double RAM hit. Đây là defense-in-depth
 	// ngăn OOM khi client gõ keyword ngắn.
 	// ─────────────────────────────────────────────────────
+	async getVideoMetadataByReleaseIds(
+		releaseIds: string[],
+	): Promise<Map<string, AnalyticsVideoInfo>> {
+		const map = new Map<string, AnalyticsVideoInfo>();
+		if (!releaseIds.length) return map;
+
+		const videos = await this.videoRepo.find({
+			where: { releaseId: In(releaseIds) },
+			select: {
+				id: true,
+				releaseId: true,
+				isrc: true,
+				externalId: true,
+				label: true,
+				explicit: true,
+				aiContent: true,
+				channelId: true,
+				description: true,
+				keywords: true,
+				madeForKids: true,
+				visibility: true,
+				contentProvider: true,
+				copyrightOwner: true,
+				partnerCustomId1: true,
+				partnerCustomId2: true,
+				fileId: true,
+				youtubeMatchStatus: true,
+				youtubeMatchScannedAt: true,
+			},
+		});
+
+		for (const video of videos) {
+			map.set(video.releaseId, {
+				id: video.id,
+				releaseId: video.releaseId,
+				isrc: video.isrc,
+				externalId: video.externalId,
+				label: video.label,
+				explicit: video.explicit,
+				aiContent: video.aiContent,
+				channelId: video.channelId,
+				description: video.description,
+				keywords: video.keywords,
+				madeForKids: video.madeForKids,
+				visibility: video.visibility,
+				contentProvider: video.contentProvider,
+				copyrightOwner: video.copyrightOwner,
+				partnerCustomId1: video.partnerCustomId1,
+				partnerCustomId2: video.partnerCustomId2,
+				fileId: video.fileId,
+				youtubeMatchStatus: video.youtubeMatchStatus,
+				youtubeMatchScannedAt: video.youtubeMatchScannedAt,
+			});
+		}
+		return map;
+	}
+
 	private static readonly KEYWORD_SEARCH_LIMIT = 1000;
 
 	private warnIfHitCeiling(

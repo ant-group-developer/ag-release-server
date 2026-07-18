@@ -40,7 +40,7 @@ export class ReleaseCiDataController {
 		description: 'Bộ lọc danh sách dữ liệu CI của bản phát hành',
 	})
 	async getList(@Query() query: GetListReleaseCiDataDto) {
-		const result = await this.service.getList(query);
+		const result = await this.service.getList2(query);
 		return AppResponseSuccess.COMMON(result);
 	}
 

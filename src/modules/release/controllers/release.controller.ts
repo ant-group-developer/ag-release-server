@@ -88,7 +88,7 @@ export class ReleaseController {
 			query.tenantIds = [tenantId];
 		}
 
-		const result = await this.releaseService.getList(query);
+		const result = await this.releaseService.getList2(query);
 		return new ResponseSuccess({ data: result });
 	}
 

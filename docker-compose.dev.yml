@@ -19,6 +19,7 @@ services:
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro
             - ./release_parsed:${RELEASE_PARSED_DIR}
+            - ./backups:/app/backups
         mem_limit: 1500m
         cpus: 1.5
         depends_on:

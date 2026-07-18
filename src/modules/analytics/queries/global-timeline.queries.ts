@@ -470,7 +470,19 @@ export function getRevenueTopTrackQuery(
     SELECT
       s.isrc AS isrc,
       sum(s.total_revenue_usd) AS revenue_usd,
-      sum(s.total_quantity) AS quantity
+      sum(s.total_quantity) AS quantity,
+      any(t.track_title) AS trackTitle,
+      any(t.track_version) AS trackVersion,
+      any(t.release_id) AS releaseId,
+      any(t.release_title) AS releaseTitle,
+      any(t.label_id) AS labelId,
+      any(t.label_name) AS labelName,
+      any(t.tenant_id) AS tenantId,
+      any(t.artist_names) AS artistNames,
+      any(t.track_metadata_spotify) AS trackMetadataSpotify,
+      any(t.track_metadata_deezer) AS trackMetadataDeezer,
+      any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+      any(t.release_metadata_deezer) AS releaseMetadataDeezer
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
@@ -770,7 +782,20 @@ export function getRevenueTopReleaseQuery(
     SELECT
       t.release_id AS releaseId,
       sum(s.total_revenue_usd) AS revenue_usd,
-      sum(s.total_quantity) AS quantity
+      sum(s.total_quantity) AS quantity,
+      uniq(s.isrc) AS trackCount,
+      any(t.release_title) AS releaseTitle,
+      any(t.release_upc) AS releaseUpc,
+      any(t.label_id) AS labelId,
+      any(t.label_name) AS labelName,
+      any(t.tenant_id) AS tenantId,
+      any(t.cover_75) AS cover75,
+      any(t.cover_100) AS cover100,
+      any(t.cover_160) AS cover160,
+      any(t.cover_300) AS cover300,
+      any(t.cover_original) AS coverOriginal,
+      any(t.release_metadata_spotify) AS releaseMetadataSpotify,
+      any(t.release_metadata_deezer) AS releaseMetadataDeezer
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
     WHERE t.is_deleted = 0
@@ -793,6 +818,61 @@ export function getRevenueTopReleaseTotalQuery(filterSql: string): string {
     INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
     WHERE t.is_deleted = 0
       AND t.release_id != ''
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopReleaseVideoCountQuery(filterSql: string): string {
+	return `
+    SELECT uniq(t.release_id) AS total
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
+export function getRevenueTopReleaseVideoQuery(
+	filterSql: string,
+	limit: number,
+	offset: number,
+): string {
+	return `
+    SELECT
+      t.release_id AS releaseId,
+      groupUniqArray(20)(t.channel_id) AS channelIds,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
+      AND s.period >= toDate({from:String})
+      AND s.period <= toDate({to:String})
+      ${filterSql}
+    GROUP BY releaseId
+    ORDER BY revenue_usd DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+}
+
+export function getRevenueTopReleaseVideoTotalQuery(filterSql: string): string {
+	return `
+    SELECT
+      sum(s.total_quantity) AS total_qty,
+      sum(s.total_revenue_usd) AS total_rev
+    FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    WHERE t.is_deleted = 0
+      AND t.release_id != ''
+      AND t.release_type = 'video'
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}

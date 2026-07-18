@@ -347,7 +347,9 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('ter')
-	@ApiOperation({ summary: 'Top territories của label (sortBy: views | revenue)' })
+	@ApiOperation({
+		summary: 'Top territories của label (sortBy: views | revenue)',
+	})
 	async topTerritories(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,

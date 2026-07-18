@@ -17,8 +17,8 @@
 |---|-------|-----------|----------|------|
 | 0 | Đóng băng v3 + đặc tả (tài liệu này) | ✅ Done | — | (docs đã có) |
 | 1 | Domain layer thuần (aggregate + port) | ✅ Đặc tả xong — sẵn sàng EXECUTE | Đầy đủ + chốt hết open Q | [phase-01](phase-01-domain-layer.md) |
-| 2 | BullMQ thay cron-poll + DB-queue | ⬜ Chưa | Skeleton | [phase-02](phase-02-bullmq-engine.md) |
-| 3 | Outbox + distribution_event + timeline SSE | ⬜ Chưa | Skeleton | [phase-03](phase-03-outbox-timeline.md) |
+| 2 | BullMQ thay cron-poll + DB-queue | 🔵 Step 1-4 + 5a XONG (handler dispatch 10 command) — đang Step 5b (runners + rehydrate specs) | 4.5/7 step done · 136 test xanh | [phase-02](phase-02-bullmq-engine.md) |
+| 3 | Timeline read-side + SSE (projection) | ⬜ Chưa | Skeleton (ranh giới P2/P3 chốt) | [phase-03](phase-03-outbox-timeline.md) |
 | 4 | ACL adapter cho SFTP/CI/gRPC/email + test double | ⬜ Chưa | Skeleton | [phase-04](phase-04-integration-acl.md) |
 | 5 | Bật lại REVIEW gate + resilience | ⬜ Chưa | Skeleton | [phase-05](phase-05-review-resilience.md) |
 | 6 | (tùy chọn) WorkflowEnginePort → Temporal | ⬜ Optional | Skeleton | [phase-06](phase-06-temporal-optional.md) |
@@ -26,7 +26,7 @@
 ## Dependencies
 
 ```text
-Phase 1 (domain) ──▶ Phase 2 (engine) ──▶ Phase 3 (outbox/timeline)
+Phase 1 (domain) ──▶ Phase 2 (engine + write-side) ──▶ Phase 3 (timeline read-side/SSE)
                           │                      │
                           ▼                      ▼
                      Phase 4 (ACL) ──────▶ Phase 5 (review/resilience)
@@ -41,12 +41,23 @@ Phase 1 (domain) ──▶ Phase 2 (engine) ──▶ Phase 3 (outbox/timeline)
 
 ## Next action
 
-Phase 1 đã đặc tả xong + chốt hết open question (xem cuối `phase-01-domain-layer.md`).
-Bước kế: **EXECUTE phase 1** — dịch đặc tả thành file `.ts` dưới `src/modules/distribution-orchestration/domain/` + unit test (theo Todo/Implementation Steps trong phase-01).
-Sau khi phase 1 code xong, quay lại chi tiết hoá phase 2–6.
+Phase 1 (domain) **ĐÃ EXECUTE XONG**: 48 file, 117 test xanh dưới `src/modules/distribution-orchestration/domain/`.
+
+Phase 2 **Step 1 + Step 2 + Step 3 + Step 4 XONG** (2026-07-17):
+- Step 1: WorkflowEnginePort + UnitOfWorkPort + InMemoryWorkflowAdapter + module scaffold.
+- Step 2 (6 nhịp): 4 ORM entity + migration + `TypeOrmDistributionRepository` (load + saveWithOutbox với optimistic lock) + `TypeOrmUnitOfWork` + integration test với `testcontainers` Postgres.
+- Step 3: 9 test-double in-memory cho 9 domain port (`infrastructure/test-doubles/`) — mỗi double giữ idempotency contract của port (key/releaseId/trackId → không tạo mới khi gọi lại).
+- Step 4: `OrchestrateHandler` (load→apply→pullEvents→buildOutbox→saveWithOutbox) + 2 command (`SUBMIT`, `MARK_VALIDATED`) + `PolicyResolver` + `CLOCK` token + `SystemClock` adapter + in-memory `UoW`/`Repository` test-doubles. 6 spec handler xanh.
+- Test: **131/131 xanh** (128 unit + 3 integration real DB). Guard `no-framework-import` vẫn xanh. tsc sạch cho module.
+
+**Bước kế: Phase 2 — Step 5+** (step-runners provision/build/upload/import/qa/export/status-sync → outbox relay → BullMQ thật).
 
 **Quyết định nền đã chốt (dùng cho mọi phase sau):**
 - Module `distribution-orchestration` (tách khỏi module `distribution` config + v3).
 - State 2 tầng: milestone state + event timeline. Lỗi → `ACTION_REQUIRED`/`ISSUES` + ticket, KHÔNG revert DRAFT.
 - Channel = **process-as-data** (`DeliveryProcess` per-DSP) + interpreter thuần; `ChannelState` chung nhỏ; topology chỉ metadata.
 - TAKEDOWN(b) = aggregate mới; RETRY = mutate aggregate cũ. Poison=3. Ticket riêng orchestration.
+- **DI**: Symbol token (interface thuần, không abstract class).
+- **Transaction**: `TxContext` expose `EntityManager` (chấp nhận coupling TypeORM ở application — team không có kịch bản đổi ORM).
+- **Optlock**: raw UPDATE ... WHERE version=? + SET version+1 (không `@VersionColumn` — cần đọc `rowsAffected`).
+- **ORM naming**: suffix `.orm-entity.ts` để tránh nhiễu với domain `.entity.ts`.
