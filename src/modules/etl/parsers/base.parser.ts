@@ -6,6 +6,12 @@ import * as readline from 'readline';
 import * as zlib from 'zlib';
 import { FactDspRow } from '../interfaces';
 import { normalizeTextValue } from '../utils/fact-row-normalizer.util';
+import {
+	applyInputAliases,
+	ConfiguredFieldMapping,
+	readSourceValue,
+	transformMappedValue,
+} from './field-mapping-overlay';
 
 const AdmZip = require('adm-zip');
 
@@ -16,10 +22,21 @@ const AdmZip = require('adm-zip');
 export abstract class BaseParser {
 	protected readonly logger: Logger;
 	protected readonly dspId: string;
+	private fieldMappingOverrides: ConfiguredFieldMapping[] = [];
 
 	constructor(dspId: string) {
 		this.dspId = dspId;
 		this.logger = new Logger(`${this.constructor.name}`);
+	}
+
+	/**
+	 * Keep the legacy parser as the base implementation and apply database
+	 * configuration as aliases/overrides around it. This avoids losing parser
+	 * rules that have not been made configurable yet.
+	 */
+	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
+		this.fieldMappingOverrides = mappings;
+		return this;
 	}
 
 	/**
@@ -146,13 +163,20 @@ export abstract class BaseParser {
 				headers.forEach((h, i) => {
 					record[h.trim()] = (values[i] || '').trim();
 				});
+				applyInputAliases(record, this.fieldMappingOverrides);
 
 				const parsed = this.parseRow(record, batchId, filePath);
 				if (parsed) {
 					if (Array.isArray(parsed)) {
-						rows.push(...parsed);
+						rows.push(
+							...parsed.map((row) =>
+								this.applyFieldMappingOverrides(row, record),
+							),
+						);
 					} else {
-						rows.push(parsed);
+						rows.push(
+							this.applyFieldMappingOverrides(parsed, record),
+						);
 					}
 				}
 			} catch (err) {
@@ -176,6 +200,43 @@ export abstract class BaseParser {
 		batchId: string,
 		filePath: string,
 	): FactDspRow | FactDspRow[] | null;
+
+	private applyFieldMappingOverrides(
+		row: FactDspRow,
+		record: Record<string, string>,
+	): FactDspRow {
+		for (const mapping of this.fieldMappingOverrides) {
+			const value = transformMappedValue(
+				readSourceValue(record, mapping.reportColumn),
+				mapping.transform,
+			);
+			if (mapping.targetColumn.startsWith('metadata.')) {
+				row.metadata[mapping.targetColumn.slice('metadata.'.length)] =
+					value;
+				continue;
+			}
+			const target = mapping.targetColumn as keyof FactDspRow;
+			if (
+				[
+					'quantity_total',
+					'quantity_unique_users',
+					'quantity_invalid',
+				].includes(mapping.targetColumn)
+			) {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.safeInt(value);
+			} else if (mapping.targetColumn === 'reporting_period') {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeDate(value);
+			} else if (mapping.targetColumn === 'territory_code') {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeCountryCode(value);
+			} else {
+				(row as unknown as Record<string, unknown>)[target] = value;
+			}
+		}
+		return row;
+	}
 
 	/**
 	 * Determine file delimiter from extension/content.

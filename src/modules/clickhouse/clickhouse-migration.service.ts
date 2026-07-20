@@ -197,15 +197,7 @@ export class ClickHouseMigrationService implements OnModuleInit {
 
 		const sql = fs.readFileSync(migration.filePath, 'utf-8');
 
-		// Split by semicolons, filtering empty statements and comments-only blocks
-		const statements = sql
-			.split(';')
-			.map((s) => s.trim())
-			.filter((s) => {
-				// Remove empty and comment-only statements
-				const withoutComments = s.replace(/--.*$/gm, '').trim();
-				return withoutComments.length > 0;
-			});
+		const statements = this.splitStatements(sql);
 
 		for (let i = 0; i < statements.length; i++) {
 			const stmt = statements[i];
@@ -231,5 +223,72 @@ export class ClickHouseMigrationService implements OnModuleInit {
 		this.logger.log(
 			`✅ Migration ${migration.version} applied (${duration}ms, ${statements.length} statements)`,
 		);
+	}
+
+	/** Split SQL without treating semicolons inside literals or comments as delimiters. */
+	private splitStatements(sql: string): string[] {
+		const statements: string[] = [];
+		let start = 0;
+		let quote: string | null = null;
+		let lineComment = false;
+		let blockComment = false;
+
+		for (let index = 0; index < sql.length; index++) {
+			const char = sql[index];
+			const next = sql[index + 1];
+
+			if (lineComment) {
+				if (char === '\n') lineComment = false;
+				continue;
+			}
+			if (blockComment) {
+				if (char === '*' && next === '/') {
+					blockComment = false;
+					index++;
+				}
+				continue;
+			}
+			if (quote) {
+				if (char === '\\') {
+					index++;
+					continue;
+				}
+				if (char === quote) {
+					if (quote === "'" && next === "'") {
+						index++;
+						continue;
+					}
+					quote = null;
+				}
+				continue;
+			}
+			if (char === '-' && next === '-') {
+				lineComment = true;
+				index++;
+				continue;
+			}
+			if (char === '/' && next === '*') {
+				blockComment = true;
+				index++;
+				continue;
+			}
+			if (char === "'" || char === '"' || char === '`') {
+				quote = char;
+				continue;
+			}
+			if (char === ';') {
+				const statement = sql.slice(start, index).trim();
+				if (statement.replace(/--.*$/gm, '').trim()) {
+					statements.push(statement);
+				}
+				start = index + 1;
+			}
+		}
+
+		const finalStatement = sql.slice(start).trim();
+		if (finalStatement.replace(/--.*$/gm, '').trim()) {
+			statements.push(finalStatement);
+		}
+		return statements;
 	}
 }

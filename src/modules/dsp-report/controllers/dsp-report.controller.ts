@@ -6,6 +6,7 @@ import {
 	Get,
 	NotFoundException,
 	Param,
+	Patch,
 	Post,
 	Put,
 	Query,
@@ -20,6 +21,7 @@ import {
 import {
 	FtpSourceCategory,
 	PreviewFtpParserConfigDto,
+	UpdateFtpParserFieldMappingsDto,
 	UpsertFtpParserConfigDto,
 } from '../dto/ftp-parser-config.dto';
 import {
@@ -43,7 +45,7 @@ export class DspReportController {
 		});
 	}
 
-	/** Scans all ETL parser source files and stores their source + column mappings in ClickHouse. */
+	/** Parser catalog sync also runs automatically at startup; this endpoint is safe to call because unchanged source hashes are skipped. */
 	@Post('parser-catalog/sync')
 	async syncParserCatalog(): Promise<
 		ResponseSuccess<{ filesScanned: number; parsersSynced: number }>
@@ -58,7 +60,9 @@ export class DspReportController {
 		@Param('parserCode') parserCode: string,
 	): Promise<ResponseSuccess<unknown>> {
 		const parser =
-			await this.ftpParserConfigService.getCatalogByParserCode(parserCode);
+			await this.ftpParserConfigService.getCatalogByParserCode(
+				parserCode,
+			);
 		if (!parser) {
 			throw new NotFoundException(
 				`Parser catalog not found: ${parserCode}. Run POST /dsp-report/parser-catalog/sync first.`,
@@ -67,7 +71,7 @@ export class DspReportController {
 		return new ResponseSuccess({ data: parser });
 	}
 
-	/** Load legacy folder-to-parser mappings into the database without overwriting existing configs. */
+	/** Legacy folder mappings are seeded automatically at startup; this endpoint is idempotent. */
 	@Post('ftp-parser-configs/seed-legacy')
 	async seedLegacyFtpParserConfigs(): Promise<
 		ResponseSuccess<{ reportsScanned: number; configsCreated: number }>
@@ -82,7 +86,9 @@ export class DspReportController {
 		@Param('id') id: string,
 	): Promise<ResponseSuccess<unknown>> {
 		return new ResponseSuccess({
-			data: await this.ftpParserConfigService.findAllDetailsByDspReport(id),
+			data: await this.ftpParserConfigService.findAllDetailsByDspReport(
+				id,
+			),
 		});
 	}
 
@@ -119,11 +125,24 @@ export class DspReportController {
 		return new ResponseSuccess({ data: { success: true } });
 	}
 
+	@Patch('parser-catalog/:parserCode/field-mappings')
+	async updateParserFieldMappings(
+		@Param('parserCode') parserCode: string,
+		@Body() dto: UpdateFtpParserFieldMappingsDto,
+	): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.updateParserFieldMappings(
+				parserCode,
+				dto.fieldMappings,
+			),
+		});
+	}
+
 	@Post(':id/ftp-parser-configs/:category/preview')
-	async previewFtpParserConfig(
+	previewFtpParserConfig(
 		@Param('category') category: FtpSourceCategory,
 		@Body() dto: PreviewFtpParserConfigDto,
-	): Promise<ResponseSuccess<unknown>> {
+	): ResponseSuccess<unknown> {
 		if (!dto.config)
 			throw new BadRequestException('config is required for preview');
 		return new ResponseSuccess({

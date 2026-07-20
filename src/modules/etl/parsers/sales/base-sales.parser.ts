@@ -9,6 +9,12 @@ import {
 	normalizeFactRows,
 	normalizeTextValue,
 } from '../../utils/fact-row-normalizer.util';
+import {
+	applyInputAliases,
+	ConfiguredFieldMapping,
+	readSourceValue,
+	transformMappedValue,
+} from '../field-mapping-overlay';
 
 const AdmZip = require('adm-zip');
 
@@ -19,6 +25,7 @@ const AdmZip = require('adm-zip');
 export abstract class BaseSalesParser {
 	protected readonly logger: Logger;
 	protected readonly dspId: string;
+	private fieldMappingOverrides: ConfiguredFieldMapping[] = [];
 
 	/** Number of header rows to skip before the actual column header (default 0). */
 	protected skipHeaderRows = 0;
@@ -26,6 +33,12 @@ export abstract class BaseSalesParser {
 	constructor(dspId: string) {
 		this.dspId = dspId;
 		this.logger = new Logger(`${this.constructor.name}`);
+	}
+
+	/** Apply database mappings without replacing DSP-specific parser behaviour. */
+	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
+		this.fieldMappingOverrides = mappings;
+		return this;
 	}
 
 	/**
@@ -164,13 +177,27 @@ export abstract class BaseSalesParser {
 				headers.forEach((h, i) => {
 					record[h.trim()] = (values[i] || '').trim();
 				});
+				applyInputAliases(record, this.fieldMappingOverrides);
 
 				const parsed = this.parseRow(record, batchId, filePath);
 				if (parsed) {
 					if (Array.isArray(parsed)) {
-						rows.push(...this.normalizeParsedRows(parsed));
+						rows.push(
+							...this.normalizeParsedRows(
+								parsed.map((row) =>
+									this.applyFieldMappingOverrides(
+										row,
+										record,
+									),
+								),
+							),
+						);
 					} else {
-						rows.push(...this.normalizeParsedRows([parsed]));
+						rows.push(
+							...this.normalizeParsedRows([
+								this.applyFieldMappingOverrides(parsed, record),
+							]),
+						);
 					}
 				}
 			} catch (err) {
@@ -205,6 +232,52 @@ export abstract class BaseSalesParser {
 		batchId: string,
 		filePath: string,
 	): FactSalesRow | FactSalesRow[] | null;
+
+	private applyFieldMappingOverrides(
+		row: FactSalesRow,
+		record: Record<string, string>,
+	): FactSalesRow {
+		for (const mapping of this.fieldMappingOverrides) {
+			const value = transformMappedValue(
+				readSourceValue(record, mapping.reportColumn),
+				mapping.transform,
+			);
+			if (mapping.targetColumn.startsWith('metadata.')) {
+				row.metadata[mapping.targetColumn.slice('metadata.'.length)] =
+					value;
+				continue;
+			}
+			const target = mapping.targetColumn as keyof FactSalesRow;
+			if (
+				['quantity', 'quantity_creations', 'quantity_views'].includes(
+					mapping.targetColumn,
+				)
+			) {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.safeInt(value);
+			} else if (
+				['revenue_usd', 'revenue_local'].includes(mapping.targetColumn)
+			) {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.safeDecimal(value);
+			} else if (
+				mapping.targetColumn === 'reporting_period_start' ||
+				mapping.targetColumn === 'reporting_period_end'
+			) {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeDate(
+						value,
+						mapping.targetColumn === 'reporting_period_start',
+					);
+			} else if (mapping.targetColumn === 'territory_code') {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeCountryCode(value);
+			} else {
+				(row as unknown as Record<string, unknown>)[target] = value;
+			}
+		}
+		return row;
+	}
 
 	protected normalizeParsedRows(rows: FactSalesRow[]): FactSalesRow[] {
 		return normalizeFactRows(rows);

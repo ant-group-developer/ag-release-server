@@ -2,7 +2,7 @@ import {
 	BadRequestException,
 	Injectable,
 	Logger,
-	OnModuleInit,
+	OnApplicationBootstrap,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -15,6 +15,10 @@ import {
 	DspsReport,
 } from '../../dsp/services/dsp-mapping.service';
 import { BaseParser, PARSER_REGISTRY } from '../../etl/parsers';
+import {
+	ConfiguredDspFieldMappingParser,
+	ConfiguredSalesFieldMappingParser,
+} from '../../etl/parsers/configured-field-mapping.parser';
 import {
 	DeezerIllegitimateParser,
 	SoundCloudIllegitimateParser,
@@ -49,7 +53,6 @@ export interface FtpParserConfigRecord {
 	parserCode: string;
 	includePatterns: string[];
 	excludePatterns: string[];
-	fieldMappings: FtpParserFieldMapping[];
 	isActive: boolean;
 	description: string;
 	configVersion: number;
@@ -63,6 +66,8 @@ export interface FtpParserConfigDetails extends FtpParserConfigRecord {
 
 export interface FtpParserFieldMapping {
 	reportColumn: string;
+	/** Internal legacy-header alias; it is resolved by the service, never required from UI. */
+	parserColumn?: string;
 	targetColumn: string;
 	transform?: string;
 }
@@ -81,12 +86,13 @@ export interface ParserCatalogRecord {
 }
 
 export interface ResolvedFtpParserConfig {
-dspReport: DspsReport;
+	dspReport: DspsReport;
 	category: FtpSourceCategory;
 	parserCode: string;
 	parser: FtpParser | null;
 	configVersion: number;
 	usesDatabaseConfig: boolean;
+	usesDatabaseFieldMappings: boolean;
 	selectFile(relativePath: string): boolean;
 }
 
@@ -99,7 +105,6 @@ function toRecord(row: any): FtpParserConfigRecord {
 		parserCode: row.parser_code,
 		includePatterns: row.include_patterns || [],
 		excludePatterns: row.exclude_patterns || [],
-		fieldMappings: parseFieldMappings(row.field_mappings),
 		isActive: Number(row.is_active) === 1,
 		description: row.description || '',
 		configVersion: Number(row.config_version || 0),
@@ -108,27 +113,17 @@ function toRecord(row: any): FtpParserConfigRecord {
 	};
 }
 
-function parseFieldMappings(value: unknown): FtpParserFieldMapping[] {
-	if (Array.isArray(value)) return value as FtpParserFieldMapping[];
-	if (typeof value !== 'string' || !value) return [];
-	try {
-		const mappings: unknown = JSON.parse(value);
-		return Array.isArray(mappings)
-			? (mappings as FtpParserFieldMapping[])
-			: [];
-	} catch {
-		return [];
-	}
-}
-
-function toParserCatalogRecord(row: any): ParserCatalogRecord {
+function toParserCatalogRecord(
+	row: any,
+	fieldMappings: FtpParserFieldMapping[] = [],
+): ParserCatalogRecord {
 	return {
 		parserCode: row.parser_code,
 		sourceCategory: row.source_category,
 		parserName: row.parser_name,
 		sourceFile: row.source_file,
 		targetTable: row.target_table,
-		fieldMappings: parseFieldMappings(row.field_mappings),
+		fieldMappings,
 		parserSource: row.parser_source,
 		sourceHash: row.source_hash,
 		isSelectable: Number(row.is_selectable) === 1,
@@ -137,7 +132,7 @@ function toParserCatalogRecord(row: any): ParserCatalogRecord {
 }
 
 @Injectable()
-export class FtpParserConfigService implements OnModuleInit {
+export class FtpParserConfigService implements OnApplicationBootstrap {
 	private readonly logger = new Logger(FtpParserConfigService.name);
 	private readonly catalog = this.buildCatalog();
 
@@ -147,13 +142,18 @@ export class FtpParserConfigService implements OnModuleInit {
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
 	) {}
 
-	onModuleInit(): void {
-		void this.seedLegacyConfigs().catch((err: Error) =>
+	async onApplicationBootstrap(): Promise<void> {
+		try {
+			await this.clickHouseMigrationService.waitForMigrations();
+			await this.seedLegacyConfigs();
+			await this.syncParserCatalog();
+		} catch (err) {
+			const error = err as Error;
 			this.logger.error(
-				`Failed to seed legacy FTP parser configs: ${err.message}`,
-				err.stack,
-			),
-		);
+				`Automatic FTP parser configuration sync failed: ${error.message}`,
+				error.stack,
+			);
+		}
 	}
 
 	/**
@@ -195,7 +195,6 @@ export class FtpParserConfigService implements OnModuleInit {
 					parser_code: legacy.code,
 					include_patterns: [],
 					exclude_patterns: [],
-					field_mappings: '[]',
 					is_active: 1,
 					description: 'Seeded from legacy folder parser mapping',
 					config_version: 0,
@@ -218,7 +217,7 @@ export class FtpParserConfigService implements OnModuleInit {
 
 	getRuntimeCatalog(): ParserCatalogItem[] {
 		return Array.from(this.catalog.values())
-			.map(({ factory, ...item }) => item)
+			.map(({ factory: _factory, ...item }) => item)
 			.sort((a, b) => a.code.localeCompare(b.code));
 	}
 
@@ -231,7 +230,13 @@ export class FtpParserConfigService implements OnModuleInit {
 		const rows = await this.clickHouseService.query<any>(
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_PARSER_CATALOG} FINAL WHERE is_active = 1 ORDER BY source_category, parser_code`,
 		);
-		return rows.map(toParserCatalogRecord);
+		const mappings = await this.findEffectiveCatalogFieldMappings();
+		return rows.map((row) =>
+			toParserCatalogRecord(
+				row,
+				mappings.get(`${row.parser_code}|${row.source_category}`) || [],
+			),
+		);
 	}
 
 	async getCatalogByParserCode(
@@ -242,7 +247,16 @@ export class FtpParserConfigService implements OnModuleInit {
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_PARSER_CATALOG} FINAL WHERE parser_code = {parserCode:String} AND is_active = 1 ORDER BY synced_at DESC LIMIT 1`,
 			{ parserCode },
 		);
-		return rows.length > 0 ? toParserCatalogRecord(rows[0]) : null;
+		if (rows.length === 0) return null;
+		const row = rows[0];
+		const mappings = await this.findEffectiveCatalogFieldMappings(
+			parserCode,
+			row.source_category,
+		);
+		return toParserCatalogRecord(
+			row,
+			mappings.get(`${parserCode}|${row.source_category}`) || [],
+		);
 	}
 
 	/**
@@ -271,12 +285,59 @@ export class FtpParserConfigService implements OnModuleInit {
 			knownCodes.set(parserName, entries);
 		}
 
+		const existing = await this.clickHouseService.query<{
+			parser_code: string;
+			source_category: string;
+			parser_name: string;
+			source_file: string;
+			target_table: string;
+			parser_source: string;
+			source_hash: string;
+			is_selectable: number;
+		}>(
+			`SELECT parser_code, source_category, parser_name, source_file, target_table, parser_source, source_hash, is_selectable
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_CATALOG} FINAL
+			 WHERE is_active = 1`,
+		);
+		const existingHashes = new Map(
+			existing.map((row) => [
+				`${row.parser_code}|${row.source_category}`,
+				row.source_hash,
+			]),
+		);
+		const existingCatalogMappings = await this.findCatalogFieldMappings();
+		const existingCatalogMappingRows = await this.clickHouseService.query<{
+			parser_code: string;
+			source_category: string;
+			mapping_key: string;
+			report_column: string;
+			parser_column: string;
+			target_column: string;
+			transform: string;
+		}>(
+			`SELECT parser_code, source_category, mapping_key, report_column, parser_column, target_column, transform
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE mapping_scope = 'catalog' AND is_active = 1`,
+		);
+		const existingCatalogMappingsByKey = new Map<
+			string,
+			typeof existingCatalogMappingRows
+		>();
+		for (const row of existingCatalogMappingRows) {
+			const key = `${row.parser_code}|${row.source_category}`;
+			const items = existingCatalogMappingsByKey.get(key) || [];
+			items.push(row);
+			existingCatalogMappingsByKey.set(key, items);
+		}
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const rows: Record<string, unknown>[] = [];
+		const mappingRows: Record<string, unknown>[] = [];
 		for (const filePath of files) {
 			const source = fs.readFileSync(filePath, 'utf8');
 			const parserDefinitions = this.extractParserDefinitions(source);
-			const sourceFile = path.relative(root, filePath).replace(/\\/g, '/');
+			const sourceFile = path
+				.relative(root, filePath)
+				.replace(/\\/g, '/');
 			const sourceHash = crypto
 				.createHash('sha256')
 				.update(source)
@@ -287,23 +348,115 @@ export class FtpParserConfigService implements OnModuleInit {
 				const entries = knownCodes.get(parserName) || [];
 				const catalogEntries = entries.length
 					? entries
-					: [this.createSourceOnlyCatalogEntry(parserName, sourceFile)];
+					: [
+							this.createSourceOnlyCatalogEntry(
+								parserName,
+								sourceFile,
+							),
+						];
 				for (const entry of catalogEntries) {
+					const catalogKey = `${entry.code}|${entry.category}`;
+					const fieldMappings =
+						this.extractFieldMappings(parserSource);
+					const staleCategoryRows = entries.length
+						? []
+						: existing.filter(
+								(row) =>
+									row.parser_code === entry.code &&
+									row.source_file === sourceFile &&
+									row.source_category !== entry.category,
+							);
+					for (const stale of staleCategoryRows) {
+						rows.push({
+							parser_code: stale.parser_code,
+							source_category: stale.source_category,
+							parser_name: stale.parser_name,
+							source_file: stale.source_file,
+							target_table: stale.target_table,
+							parser_source: stale.parser_source,
+							source_hash: stale.source_hash,
+							is_selectable: stale.is_selectable,
+							is_active: 0,
+							synced_at: now,
+						});
+						mappingRows.push(
+							...(existingCatalogMappingsByKey.get(
+								`${stale.parser_code}|${stale.source_category}`,
+							) || []).map((mapping) => ({
+								mapping_scope: 'catalog',
+								dsp_report_id: '',
+								parser_code: mapping.parser_code,
+								source_category: mapping.source_category,
+								config_version: 0,
+								mapping_key: mapping.mapping_key,
+								report_column: mapping.report_column,
+								parser_column: mapping.parser_column,
+								target_column: mapping.target_column,
+								transform: mapping.transform,
+								is_active: 0,
+								updated_at: now,
+							})),
+						);
+					}
+					if (
+						existingHashes.get(catalogKey) === sourceHash &&
+						(fieldMappings.length === 0 ||
+							existingCatalogMappings.has(catalogKey))
+					)
+						continue;
 					rows.push({
 						parser_code: entry.code,
 						source_category: entry.category,
 						parser_name: parserName,
 						source_file: sourceFile,
 						target_table: this.getTargetTable(entry.category),
-						field_mappings: JSON.stringify(
-							this.extractFieldMappings(parserSource),
-						),
 						parser_source: source,
 						source_hash: sourceHash,
 						is_selectable: entries.length ? 1 : 0,
 						is_active: 1,
 						synced_at: now,
 					});
+					mappingRows.push(
+						...fieldMappings.map((mapping) => ({
+							mapping_scope: 'catalog',
+							dsp_report_id: '',
+							parser_code: entry.code,
+							source_category: entry.category,
+							config_version: 0,
+							mapping_key: this.makeMappingKey(mapping),
+							report_column: mapping.reportColumn,
+							parser_column: mapping.reportColumn,
+							target_column: mapping.targetColumn,
+							transform: mapping.transform || 'trim',
+							is_active: 1,
+							updated_at: now,
+						})),
+					);
+					const nextKeys = new Set(
+						fieldMappings.map((mapping) =>
+							this.makeMappingKey(mapping),
+						),
+					);
+					mappingRows.push(
+						...(existingCatalogMappingsByKey.get(catalogKey) || [])
+							.filter(
+								(mapping) => !nextKeys.has(mapping.mapping_key),
+							)
+							.map((mapping) => ({
+								mapping_scope: 'catalog',
+								dsp_report_id: '',
+								parser_code: mapping.parser_code,
+								source_category: mapping.source_category,
+								config_version: 0,
+								mapping_key: mapping.mapping_key,
+								report_column: mapping.report_column,
+								parser_column: mapping.parser_column,
+								target_column: mapping.target_column,
+								transform: mapping.transform,
+								is_active: 0,
+								updated_at: now,
+							})),
+					);
 				}
 			}
 		}
@@ -312,6 +465,12 @@ export class FtpParserConfigService implements OnModuleInit {
 			await this.clickHouseService.insert(
 				CLICKHOUSE_TABLES.FTP_PARSER_CATALOG,
 				rows,
+			);
+		}
+		if (mappingRows.length > 0) {
+			await this.clickHouseService.insert(
+				CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS,
+				mappingRows,
 			);
 		}
 
@@ -329,7 +488,9 @@ export class FtpParserConfigService implements OnModuleInit {
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_DSP_PARSER_CONFIGS} FINAL WHERE dsp_report_id = {id:String} AND source_category = {category:String} LIMIT 1`,
 			{ id, category },
 		);
-		return rows.length ? toRecord(rows[0]) : null;
+		if (!rows.length) return null;
+		const row = rows[0];
+		return toRecord(row);
 	}
 
 	async findAllByDspReport(id: string): Promise<FtpParserConfigRecord[]> {
@@ -337,7 +498,7 @@ export class FtpParserConfigService implements OnModuleInit {
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_DSP_PARSER_CONFIGS} FINAL WHERE dsp_report_id = {id:String} ORDER BY source_category`,
 			{ id },
 		);
-		return rows.map(toRecord);
+		return rows.map((row) => toRecord(row));
 	}
 
 	/** Config for a folder enriched with the parser source/mapping stored in the catalog. */
@@ -371,8 +532,6 @@ export class FtpParserConfigService implements OnModuleInit {
 		this.validatePatterns(dto.includePatterns || []);
 		this.validatePatterns(dto.excludePatterns || []);
 		const existing = await this.findByDspReportAndCategory(id, category);
-		const fieldMappings = dto.fieldMappings ?? existing?.fieldMappings ?? [];
-		this.validateFieldMappings(fieldMappings);
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const record = {
 			dsp_report_id: id,
@@ -380,7 +539,6 @@ export class FtpParserConfigService implements OnModuleInit {
 			parser_code: dto.parserCode,
 			include_patterns: dto.includePatterns || [],
 			exclude_patterns: dto.excludePatterns || [],
-			field_mappings: JSON.stringify(fieldMappings),
 			is_active: dto.isActive === false ? 0 : 1,
 			description: dto.description || '',
 			config_version: (existing?.configVersion ?? 0) + 1,
@@ -407,7 +565,6 @@ export class FtpParserConfigService implements OnModuleInit {
 					parser_code: existing.parserCode,
 					include_patterns: existing.includePatterns,
 					exclude_patterns: existing.excludePatterns,
-					field_mappings: JSON.stringify(existing.fieldMappings),
 					is_active: 0,
 					description: existing.description,
 					config_version: existing.configVersion + 1,
@@ -435,13 +592,33 @@ export class FtpParserConfigService implements OnModuleInit {
 		);
 		if (config?.isActive) {
 			const entry = this.assertCatalogCode(config.parserCode, category);
+			const fieldMappings = await this.findParserOverrideFieldMappings(
+				config.parserCode,
+				category,
+			);
+			const usesDatabaseFieldMappings = fieldMappings.length > 0;
+			const legacyParser = entry.factory();
+			const resolvedMappings = usesDatabaseFieldMappings
+				? await this.resolveParserColumns(
+						config.parserCode,
+						category,
+						fieldMappings,
+					)
+				: [];
 			return this.resolved(
 				dspReport,
 				category,
 				config.parserCode,
-				entry.factory(),
+				usesDatabaseFieldMappings
+					? this.applyDatabaseFieldMappings(
+							legacyParser,
+							category,
+							resolvedMappings,
+						)
+					: legacyParser,
 				config.configVersion,
 				true,
+				usesDatabaseFieldMappings,
 				config.includePatterns,
 				config.excludePatterns,
 			);
@@ -453,6 +630,7 @@ export class FtpParserConfigService implements OnModuleInit {
 			legacy?.code || '',
 			legacy?.factory() || null,
 			0,
+			false,
 			false,
 			[],
 			[],
@@ -484,6 +662,7 @@ export class FtpParserConfigService implements OnModuleInit {
 		parser: FtpParser | null,
 		configVersion: number,
 		usesDatabaseConfig: boolean,
+		usesDatabaseFieldMappings: boolean,
 		includes: string[],
 		excludes: string[],
 	): ResolvedFtpParserConfig {
@@ -494,6 +673,7 @@ export class FtpParserConfigService implements OnModuleInit {
 			parser,
 			configVersion,
 			usesDatabaseConfig,
+			usesDatabaseFieldMappings,
 			selectFile: this.makeSelector(includes, excludes),
 		};
 	}
@@ -510,6 +690,263 @@ export class FtpParserConfigService implements OnModuleInit {
 			!exclude.some((r) => r.test(relativePath));
 	}
 
+	private async findCatalogFieldMappings(
+		parserCode?: string,
+		category?: FtpSourceCategory,
+	): Promise<Map<string, FtpParserFieldMapping[]>> {
+		const filters = ["mapping_scope = 'catalog'", 'is_active = 1'];
+		const params: Record<string, unknown> = {};
+		if (parserCode) {
+			filters.push('parser_code = {parserCode:String}');
+			params.parserCode = parserCode;
+		}
+		if (category) {
+			filters.push('source_category = {category:String}');
+			params.category = category;
+		}
+		const rows = await this.clickHouseService.query<any>(
+			`SELECT parser_code, source_category, report_column, parser_column, target_column, transform
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE ${filters.join(' AND ')}
+			 ORDER BY parser_code, source_category, mapping_key`,
+			params,
+		);
+		const result = new Map<string, FtpParserFieldMapping[]>();
+		for (const row of rows) {
+			const key = `${row.parser_code}|${row.source_category}`;
+			const mappings = result.get(key) || [];
+			mappings.push({
+				reportColumn: row.report_column,
+				parserColumn: row.parser_column || undefined,
+				targetColumn: row.target_column,
+				transform: row.transform || undefined,
+			});
+			result.set(key, mappings);
+		}
+		return result;
+	}
+
+	private async findParserOverrideFieldMappings(
+		parserCode: string,
+		category: FtpSourceCategory,
+	): Promise<FtpParserFieldMapping[]> {
+		const versions = await this.clickHouseService.query<{
+			config_version: string | number;
+		}>(
+			`SELECT max(config_version) AS config_version
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE mapping_scope = 'parser_override'
+			   AND parser_code = {parserCode:String}
+			   AND source_category = {category:String}`,
+			{ parserCode, category },
+		);
+		const configVersion = Number(versions[0]?.config_version || 0);
+		if (!configVersion) return [];
+		const rows = await this.clickHouseService.query<any>(
+			`SELECT report_column, parser_column, target_column, transform
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE mapping_scope = 'parser_override'
+			   AND parser_code = {parserCode:String}
+			   AND source_category = {category:String}
+			   AND config_version = {configVersion:UInt64}
+			   AND is_active = 1
+			 ORDER BY mapping_key`,
+			{ parserCode, category, configVersion },
+		);
+		return rows.map((row) => ({
+			reportColumn: row.report_column,
+			parserColumn: row.parser_column || undefined,
+			targetColumn: row.target_column,
+			transform: row.transform || undefined,
+		}));
+	}
+
+	private async findEffectiveCatalogFieldMappings(
+		parserCode?: string,
+		category?: FtpSourceCategory,
+	): Promise<Map<string, FtpParserFieldMapping[]>> {
+		const base = await this.findCatalogFieldMappings(parserCode, category);
+		const filters = ["mapping_scope = 'parser_override'"];
+		const params: Record<string, unknown> = {};
+		if (parserCode) {
+			filters.push('parser_code = {parserCode:String}');
+			params.parserCode = parserCode;
+		}
+		if (category) {
+			filters.push('source_category = {category:String}');
+			params.category = category;
+		}
+		const rows = await this.clickHouseService.query<any>(
+			`SELECT parser_code, source_category, config_version, report_column, parser_column, target_column, transform, is_active
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE ${filters.join(' AND ')}
+			 ORDER BY parser_code, source_category, config_version, mapping_key`,
+			params,
+		);
+		const latestVersion = new Map<string, number>();
+		for (const row of rows) {
+			const key = `${row.parser_code}|${row.source_category}`;
+			latestVersion.set(
+				key,
+				Math.max(
+					latestVersion.get(key) || 0,
+					Number(row.config_version),
+				),
+			);
+		}
+		const effective = new Map(base);
+		for (const [key, version] of latestVersion) {
+			const overrides = rows
+				.filter(
+					(row) =>
+						`${row.parser_code}|${row.source_category}` === key &&
+						Number(row.config_version) === version &&
+						Number(row.is_active) === 1,
+				)
+				.map((row) => ({
+					reportColumn: row.report_column,
+					parserColumn: row.parser_column || undefined,
+					targetColumn: row.target_column,
+					transform: row.transform || undefined,
+				}));
+			const byTarget = new Map(
+				(effective.get(key) || []).map((mapping) => [
+					mapping.targetColumn,
+					mapping,
+				]),
+			);
+			for (const mapping of overrides) {
+				byTarget.set(mapping.targetColumn, mapping);
+			}
+			effective.set(key, Array.from(byTarget.values()));
+		}
+		return effective;
+	}
+
+	async updateParserFieldMappings(
+		parserCode: string,
+		fieldMappings: FtpParserFieldMapping[],
+	): Promise<ParserCatalogRecord> {
+		const entry = this.catalog.get(parserCode);
+		if (!entry)
+			throw new BadRequestException(
+				`Unsupported parser code "${parserCode}"`,
+			);
+		this.validateFieldMappings(entry.category, fieldMappings);
+		const latest = await this.clickHouseService.query<{
+			config_version: string | number;
+		}>(
+			`SELECT max(config_version) AS config_version
+			 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+			 WHERE mapping_scope = 'parser_override'
+			   AND parser_code = {parserCode:String}
+			   AND source_category = {category:String}`,
+			{ parserCode, category: entry.category },
+		);
+		const configVersion = Number(latest[0]?.config_version || 0) + 1;
+		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+		const resolvedMappings = await this.resolveParserColumns(
+			parserCode,
+			entry.category,
+			fieldMappings,
+		);
+		const previousVersion = configVersion - 1;
+		const previousRows = previousVersion
+			? await this.clickHouseService.query<any>(
+					`SELECT mapping_key, report_column, parser_column, target_column, transform
+					 FROM ${CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS} FINAL
+					 WHERE mapping_scope = 'parser_override'
+					   AND parser_code = {parserCode:String}
+					   AND source_category = {category:String}
+					   AND config_version = {configVersion:UInt64}
+					   AND is_active = 1`,
+					{
+						parserCode,
+						category: entry.category,
+						configVersion: previousVersion,
+					},
+				)
+			: [];
+		const nextKeys = new Set(
+			resolvedMappings.map((mapping) => this.makeMappingKey(mapping)),
+		);
+		const rows = [
+			...resolvedMappings.map((mapping) => ({
+				mapping_scope: 'parser_override',
+				dsp_report_id: '',
+				parser_code: parserCode,
+				source_category: entry.category,
+				config_version: configVersion,
+				mapping_key: this.makeMappingKey(mapping),
+				report_column: mapping.reportColumn.trim(),
+				parser_column:
+					mapping.parserColumn || mapping.reportColumn.trim(),
+				target_column: mapping.targetColumn.trim(),
+				transform: mapping.transform || 'trim',
+				is_active: 1,
+				updated_at: now,
+			})),
+			...previousRows
+				.filter((mapping) => !nextKeys.has(mapping.mapping_key))
+				.map((mapping) => ({
+					mapping_scope: 'parser_override',
+					dsp_report_id: '',
+					parser_code: parserCode,
+					source_category: entry.category,
+					config_version: configVersion,
+					mapping_key: mapping.mapping_key,
+					report_column: mapping.report_column,
+					parser_column: mapping.parser_column,
+					target_column: mapping.target_column,
+					transform: mapping.transform,
+					is_active: 0,
+					updated_at: now,
+				})),
+		];
+		if (rows.length > 0) {
+			await this.clickHouseService.insert(
+				CLICKHOUSE_TABLES.FTP_PARSER_FIELD_MAPPINGS,
+				rows,
+			);
+		}
+		const catalog = await this.getCatalogByParserCode(parserCode);
+		if (!catalog) throw new BadRequestException('Parser catalog not found');
+		return catalog;
+	}
+
+	private async resolveParserColumns(
+		parserCode: string,
+		category: FtpSourceCategory,
+		mappings: FtpParserFieldMapping[],
+	): Promise<FtpParserFieldMapping[]> {
+		const catalogMappings = await this.findCatalogFieldMappings(
+			parserCode,
+			category,
+		);
+		const parserColumnsByTarget = new Map<string, string>();
+		for (const mapping of catalogMappings.get(
+			`${parserCode}|${category}`,
+		) || []) {
+			if (!parserColumnsByTarget.has(mapping.targetColumn)) {
+				parserColumnsByTarget.set(
+					mapping.targetColumn,
+					mapping.parserColumn || mapping.reportColumn,
+				);
+			}
+		}
+		return mappings.map((mapping) => ({
+			...mapping,
+			parserColumn:
+				mapping.parserColumn ||
+				parserColumnsByTarget.get(mapping.targetColumn) ||
+				mapping.reportColumn,
+		}));
+	}
+
+	private makeMappingKey(mapping: FtpParserFieldMapping): string {
+		return `target:${mapping.targetColumn.trim()}:source:${mapping.reportColumn.trim()}`;
+	}
+
 	private validatePatterns(patterns: string[]) {
 		for (const pattern of patterns) {
 			try {
@@ -522,14 +959,116 @@ export class FtpParserConfigService implements OnModuleInit {
 		}
 	}
 
-	private validateFieldMappings(mappings: FtpParserFieldMapping[]) {
+	private validateFieldMappings(
+		category: FtpSourceCategory,
+		mappings: FtpParserFieldMapping[],
+	) {
+		const seenTargets = new Set<string>();
 		for (const mapping of mappings) {
-			if (!mapping.reportColumn?.trim() || !mapping.targetColumn?.trim()) {
+			if (
+				!mapping.reportColumn?.trim() ||
+				!mapping.targetColumn?.trim()
+			) {
 				throw new BadRequestException(
 					'Each field mapping needs reportColumn and targetColumn',
 				);
 			}
+			const target = mapping.targetColumn.trim();
+			if (!this.isWritableTargetColumn(category, target)) {
+				throw new BadRequestException(
+					`Unsupported targetColumn: "${mapping.targetColumn}"`,
+				);
+			}
+			if (seenTargets.has(target)) {
+				throw new BadRequestException(
+					`Each targetColumn can be mapped only once: "${target}"`,
+				);
+			}
+			seenTargets.add(target);
+			if (
+				mapping.transform &&
+				!['trim', 'raw', 'uppercase', 'lowercase', 'isrc'].includes(
+					mapping.transform,
+				)
+			) {
+				throw new BadRequestException(
+					`Unsupported field transform: "${mapping.transform}"`,
+				);
+			}
 		}
+	}
+
+	private createDatabaseFieldMappingParser(
+		category: FtpSourceCategory,
+		mappings: FtpParserFieldMapping[],
+	): FtpParser {
+		return category === FtpSourceCategory.SALES
+			? new ConfiguredSalesFieldMappingParser(mappings)
+			: new ConfiguredDspFieldMappingParser(mappings, category);
+	}
+
+	private applyDatabaseFieldMappings(
+		legacyParser: FtpParser,
+		category: FtpSourceCategory,
+		mappings: FtpParserFieldMapping[],
+	): FtpParser {
+		if (
+			legacyParser instanceof BaseParser ||
+			legacyParser instanceof BaseSalesParser
+		) {
+			return legacyParser.setFieldMappingOverrides(mappings);
+		}
+		return this.createDatabaseFieldMappingParser(category, mappings);
+	}
+
+	private isWritableTargetColumn(
+		category: FtpSourceCategory,
+		target: string,
+	): boolean {
+		if (/^metadata\.[A-Za-z_][A-Za-z0-9_]*$/.test(target)) return true;
+		const dspColumns = [
+			'reporting_period',
+			'partner_id',
+			'account_identifier',
+			'licensor',
+			'label_name',
+			'territory_code',
+			'isrc',
+			'upc',
+			'track_title',
+			'artist_name',
+			'album_title',
+			'composer_name',
+			'track_id_internal',
+			'quantity_total',
+			'quantity_unique_users',
+			'quantity_invalid',
+			'usage_type',
+			'monetisation_type',
+			'track_classification',
+		];
+		const salesColumns = [
+			'reporting_period_start',
+			'reporting_period_end',
+			'service_name',
+			'dpid',
+			'member_name',
+			'grid',
+			'release_id',
+			'genre',
+			'quantity',
+			'quantity_creations',
+			'quantity_views',
+			'revenue_usd',
+			'revenue_local',
+			'revenue_currency',
+			'service_tier',
+			'plan_name',
+			'commercial_model',
+		];
+		return (
+			category === FtpSourceCategory.SALES ? salesColumns : dspColumns
+		).includes(target);
 	}
 	private assertCatalogCode(
 		code: string,
@@ -568,7 +1107,21 @@ export class FtpParserConfigService implements OnModuleInit {
 			for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 				const fullPath = path.join(dir, entry.name);
 				if (entry.isDirectory()) visit(fullPath);
-				else if (/\.parser\.(ts|js)$/.test(entry.name)) files.push(fullPath);
+				// Most parsers use `*.parser.ts`, while the sales parser groups
+				// use `group-*-parsers.ts`. Illegitimate parsers are co-located in
+				// `illegitimate/index.ts`. Include all three source layouts so the
+				// generated catalog and field mappings match the runtime registry.
+				else {
+					const relativePath = path
+						.relative(root, fullPath)
+						.replace(/\\/g, '/');
+					const isParserSource =
+						/\.parser\.(ts|js)$/.test(entry.name) ||
+						/-parsers\.(ts|js)$/.test(entry.name) ||
+						relativePath === 'illegitimate/index.ts' ||
+						relativePath === 'illegitimate/index.js';
+					if (isParserSource) files.push(fullPath);
+				}
 			}
 		};
 		visit(root);
@@ -579,7 +1132,8 @@ export class FtpParserConfigService implements OnModuleInit {
 		parserName: string;
 		parserSource: string;
 	}> {
-		const definitions: Array<{ parserName: string; parserSource: string }> = [];
+		const definitions: Array<{ parserName: string; parserSource: string }> =
+			[];
 		const classPattern = /export\s+(?:abstract\s+)?class\s+(\w+Parser)\b/g;
 		for (const match of source.matchAll(classPattern)) {
 			const parserName = match[1];
@@ -633,7 +1187,7 @@ export class FtpParserConfigService implements OnModuleInit {
 				index++;
 				continue;
 			}
-			if (char === '\'' || char === '"' || char === '`') {
+			if (char === "'" || char === '"' || char === '`') {
 				quote = char;
 				continue;
 			}
@@ -650,9 +1204,10 @@ export class FtpParserConfigService implements OnModuleInit {
 		parserName: string,
 		sourceFile: string,
 	): CatalogEntry {
-		const category = sourceFile.includes('/sales/')
+		const pathSegments = sourceFile.split('/');
+		const category = pathSegments.includes('sales')
 			? FtpSourceCategory.SALES
-			: sourceFile.includes('/illegitimate/')
+			: pathSegments.includes('illegitimate')
 				? FtpSourceCategory.ILLEGITIMATE_ACTIVITY
 				: FtpSourceCategory.TRENDS;
 		const slug = parserName
@@ -664,7 +1219,9 @@ export class FtpParserConfigService implements OnModuleInit {
 			category,
 			label: `${category}: ${parserName}`,
 			factory: () => {
-				throw new Error('Source-only parser is not selectable for FTP sync');
+				throw new Error(
+					'Source-only parser is not selectable for FTP sync',
+				);
 			},
 		};
 	}
@@ -686,7 +1243,9 @@ export class FtpParserConfigService implements OnModuleInit {
 
 		const mappings: FtpParserFieldMapping[] = [];
 		const addMappings = (targetColumn: string, expression: string) => {
-			const reportColumns = new Set(this.extractReportColumns(expression));
+			const reportColumns = new Set(
+				this.extractReportColumns(expression),
+			);
 			for (const variable of expression.matchAll(/\b([A-Za-z_]\w*)\b/g)) {
 				for (const column of variables.get(variable[1]) || []) {
 					reportColumns.add(column);
@@ -698,9 +1257,7 @@ export class FtpParserConfigService implements OnModuleInit {
 			}
 		};
 
-		for (const match of source.matchAll(
-			/row\.(\w+)\s*=\s*([\s\S]*?);/g,
-		)) {
+		for (const match of source.matchAll(/row\.(\w+)\s*=\s*([\s\S]*?);/g)) {
 			addMappings(match[1], match[2]);
 		}
 		for (const match of source.matchAll(
@@ -720,7 +1277,7 @@ export class FtpParserConfigService implements OnModuleInit {
 
 	private extractReportColumns(expression: string): string[] {
 		return Array.from(
-			expression.matchAll(/record\[['\"]([^'\"]+)['\"]\]/g),
+			expression.matchAll(/\b(?:record|r)\[['"]([^'"]+)['"]\]/g),
 			(match) => match[1],
 		);
 	}

@@ -1,7 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
-import { ValidateNested } from 'class-validator';
+import {
+	IsArray,
+	IsBoolean,
+	IsOptional,
+	IsString,
+	ValidateNested,
+} from 'class-validator';
 
 export enum FtpSourceCategory {
 	TRENDS = 'trends',
@@ -26,8 +31,9 @@ export class FtpParserFieldMappingDto {
 	targetColumn: string;
 
 	@ApiPropertyOptional({
-		description: 'Optional transformation applied by the parser',
-		example: 'normalize ISRC and remove hyphens',
+		description:
+			'Optional safe transform: trim (default), raw, uppercase, lowercase, or isrc.',
+		example: 'isrc',
 	})
 	@IsOptional()
 	@IsString()
@@ -53,18 +59,6 @@ export class UpsertFtpParserConfigDto {
 	@IsString({ each: true })
 	excludePatterns?: string[];
 
-	@ApiPropertyOptional({
-		description:
-			'Human-readable mapping from report columns to columns in the target fact table. This documents the parser; it does not replace parser code.',
-		type: [FtpParserFieldMappingDto],
-		default: [],
-	})
-	@IsOptional()
-	@IsArray()
-	@ValidateNested({ each: true })
-	@Type(() => FtpParserFieldMappingDto)
-	fieldMappings?: FtpParserFieldMappingDto[];
-
 	@ApiPropertyOptional({ default: true })
 	@IsOptional()
 	@IsBoolean()
@@ -74,6 +68,18 @@ export class UpsertFtpParserConfigDto {
 	@IsOptional()
 	@IsString()
 	description?: string;
+}
+
+export class UpdateFtpParserFieldMappingsDto {
+	@ApiProperty({
+		description:
+			'Replaces mappings for one parser code. Unmapped parser logic remains hard-coded.',
+		type: [FtpParserFieldMappingDto],
+	})
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => FtpParserFieldMappingDto)
+	fieldMappings: FtpParserFieldMappingDto[];
 }
 
 export class PreviewFtpParserConfigDto {
