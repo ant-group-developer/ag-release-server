@@ -40,7 +40,7 @@ async getDeliverDesire(params?: GetCiDeliverDesireDto): Promise<any> {
 
 **Recommendation for Phase 4:**
 - Phase 4 ACL adapter should implement **polling-based DeliveryStatusReader** adapter
-- Use `CiExportService.getStatusDsps()` method (already exists in v3)
+- ✅ DONE: Uses new `CiDeliverDesireApiService.getDeliverDesire()` (in `infrastructure/ci-api/`, NOT v3 `CiExportService`)
 - CI "export" happens outside SmartHub — we only READ status via API
 - NO need to implement "trigger export" — CI does it automatically when batch uploaded
 
@@ -292,10 +292,9 @@ None — all 6 questions answered with definitive evidence.
 
 ## Next Steps for Phase 4 Implementation
 
-1. **DeliveryStatusReader adapter:**
-   - Wire `CiExportService.getStatusDsps()` method
-   - Add 30s timeout to axios config
-   - Implement polling logic (interval TBD)
+1. **DeliveryStatusReader adapter:** ✅ DONE
+   - Uses new `CiDeliverDesireApiService` (in `infrastructure/ci-api/`, NOT v3 `CiExportService`)
+   - 30s timeout configured in `CiApiService` base client
 
 2. **IdentifierProvisioner adapter:**
    - Wire `UpcService.getUpc()` (10s timeout)

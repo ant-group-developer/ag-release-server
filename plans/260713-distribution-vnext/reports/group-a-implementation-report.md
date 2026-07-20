@@ -9,7 +9,9 @@
 
 ## Summary
 
-Implemented 3 read-only CI adapters for Phase 4 ACL layer. All adapters wrap existing v3 CI services (CiImportService, CiReleaseService, CiExportService) and translate CI API responses to domain types. Module wired with DI tokens from step-runners. TypeScript compilation clean.
+Implemented 3 read-only CI adapters for Phase 4 ACL layer. All adapters use **new dedicated CI API services** created in `infrastructure/ci-api/` (CiImportApiService, CiQaApiService, CiDeliverDesireApiService) — NOT v3 services directly. Adapters translate CI API responses to domain types. Module wired with DI tokens from step-runners + `CiApiModule` import. TypeScript compilation clean.
+
+> **Note:** Initial implementation wrapped v3 services. A subsequent refactor (see `group-a-refactor-report.md`) created dedicated CI API services with correct endpoint implementations and critical bug fixes (QA closed_date filter, import warnings extraction).
 
 ---
 
@@ -21,7 +23,7 @@ Implemented 3 read-only CI adapters for Phase 4 ACL layer. All adapters wrap exi
 
 **Port:** `IngestResultReader.read({batchId, key}) → IngestStatus`
 
-**V3 Service:** `CiImportService.getImportsSimple()`
+**Service:** `CiImportApiService.getImportBatch()` (new, in `infrastructure/ci-api/`)
 
 **ACL Translation:**
 ```typescript
@@ -54,7 +56,7 @@ CI API Response                          → Domain Type
 
 **Port:** `QaChecker.check({releaseId, key}) → QaResult`
 
-**V3 Service:** `CiReleaseService.getReleaseFormatOneV2()` + `getQaFlagsV2()`
+**Service:** `CiQaApiService.getReleaseIdByUpc()` + `getQaFlags()` (new, in `infrastructure/ci-api/`)
 
 **ACL Translation:**
 ```typescript
@@ -88,7 +90,7 @@ Release format not found                 → {kind: 'clean'}
 
 **Port:** `DeliveryStatusReader.read({batchId, dspCodes[]}) → Map<dspCode, DspLiveStatus>`
 
-**V3 Service:** `CiExportService.getStatusDsps()` (wraps `getDeliverDesire()`)
+**Service:** `CiDeliverDesireApiService.getDeliverDesire()` (new, in `infrastructure/ci-api/`)
 
 **ACL Translation:**
 ```typescript
@@ -104,7 +106,7 @@ DSP not in response                      → Map {dspCode → 'pending'}
 ```
 
 **Key Implementation Details:**
-- Reuses v3 `getStatusDsps()` method (already aggregates deliver_desire data)
+- Uses dedicated `CiDeliverDesireApiService.getDeliverDesire()` (new service, NOT v3 reuse)
 - Case-insensitive DSP code matching (normalizes to lowercase)
 - Returns `Map<string, DspLiveStatus>` for requested DSP codes only
 - Handles missing DSPs gracefully (default to `pending`)
@@ -125,26 +127,31 @@ DSP not in response                      → Map {dspCode → 'pending'}
 **File:** `distribution-orchestration.module.ts`
 
 **Changes:**
-1. Added `CiModule` import (provides v3 CI services)
-2. Imported DI tokens from step-runners:
+1. Added `CiApiModule` import (new dedicated CI API services in `infrastructure/ci-api/`)
+2. Added `AppConfigModule` import (for CI API config values)
+3. Added `CI_API_CONFIG` provider (factory reads baseUrl, organisationId, token from AppConfigService)
+4. Imported DI tokens from step-runners:
    - `INGEST_RESULT_READER` from `ci-import-check.runner.ts:26`
    - `QA_CHECKER` from `qa.runner.ts:21`
    - `DELIVERY_STATUS_READER` from `status-sync.runner.ts:23`
-3. Registered 3 adapter providers:
+5. Registered 3 adapter providers:
    ```typescript
    { provide: INGEST_RESULT_READER, useClass: CiImportAdapter }
    { provide: QA_CHECKER, useClass: CiQaAdapter }
    { provide: DELIVERY_STATUS_READER, useClass: CiDeliverDesireAdapter }
    ```
-4. Updated module doc comments to reflect Phase 4 progress
+6. Kept `CiModule` import for backward compatibility (v3 services still used elsewhere)
 
 **DI Graph:**
 ```
-Step Runners                 Adapters                    V3 Services
-─────────────────────────────────────────────────────────────────────
-CiImportCheckRunner    →    CiImportAdapter       →    CiImportService
-QaRunner               →    CiQaAdapter           →    CiReleaseService  
-StatusSyncRunner       →    CiDeliverDesireAdapter →   CiExportService
+Step Runners                 Adapters                    New CI API Services
+──────────────────────────────────────────────────────────────────────────────
+CiImportCheckRunner    →    CiImportAdapter       →    CiImportApiService
+QaRunner               →    CiQaAdapter           →    CiQaApiService  
+StatusSyncRunner       →    CiDeliverDesireAdapter →   CiDeliverDesireApiService
+                                                        ↑
+                                                   All in infrastructure/ci-api/
+                                                   (NOT v3 partners-api services)
 ```
 
 ---
@@ -172,7 +179,7 @@ This is a v3-wide issue, not specific to Phase 4 adapters. Flagged for separate 
 
 All 3 adapters follow consistent ACL pattern:
 
-1. **Wrap v3 service** — inject existing service, no direct axios calls
+1. **Wrap dedicated CI API service** — inject new service from `infrastructure/ci-api/`, NOT v3 services
 2. **Translate response** — CI API structure → domain discriminated union
 3. **Handle 404 gracefully** — treat as "not ready yet" (pending/clean)
 4. **Normalize edge cases** — empty arrays, missing fields, malformed data
@@ -181,7 +188,8 @@ All 3 adapters follow consistent ACL pattern:
 
 **Benefits:**
 - Domain layer stays clean (no CI API details)
-- V3 services handle auth, retry, error formatting
+- New CI API services handle auth, timeout (30s), error formatting
+- Dedicated services fix v3 bugs (infinite timeout, missing closed_date filter)
 - Adapters < 100 LOC each (easy to test)
 - Test doubles unchanged (unit tests still fast)
 
@@ -269,7 +277,7 @@ infrastructure/
 - [x] TypeScript compilation clean
 - [x] ACL translation documented
 - [x] Read-only, idempotent by design
-- [x] Reuses v3 services (no duplicate auth/retry logic)
+- [x] Uses new dedicated CI API services in `infrastructure/ci-api/` (separate from v3)
 - [x] Adapters < 200 LOC each
 
 **Status:** ✅ All criteria met. Group A complete.

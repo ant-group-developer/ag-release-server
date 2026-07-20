@@ -35,11 +35,11 @@
 
 ## GROUP A — Read-only CI adapters (rủi ro thấp, làm trước)
 
-> Chỉ GET request, tự idempotent. Tái dùng axios client v3. Không side-effect.
+> Chỉ GET request, tự idempotent. **Đã tạo CI API services riêng** trong `infrastructure/ci-api/` (KHÔNG dùng v3 service trực tiếp). Không side-effect.
 
 ### A1 — CiImportAdapter (IngestResultReader)
 - **Port:** `read({batchId, key}) → IngestStatus{ok|pending|problem}`
-- **V3 reuse:** `partners-api/ci/services/ci-import.service.ts` → `getImports()`
+- **V3 reuse:** ~~`partners-api/ci/services/ci-import.service.ts`~~ → Tạo mới `infrastructure/ci-api/ci-import-api.service.ts`
 - **ACL:** CI `{status, errors[]}` → discriminated union; CI 404 → `pending`
 - **Timeout:** thêm 30s (v3 axios CHƯA có timeout — fix luôn)
 - **File:** `infrastructure/adapters/ci-import.adapter.ts`
@@ -48,7 +48,7 @@
 
 ### A2 — CiQaAdapter (QaChecker)
 - **Port:** `check({releaseId, key}) → QaResult{clean|flagged}`
-- **V3 reuse:** `ci-release.service.ts` (thêm method gọi `/releases/v2/.../qaflags`)
+- **V3 reuse:** ~~`ci-release.service.ts`~~ → Tạo mới `infrastructure/ci-api/ci-qa-api.service.ts` (2-step: UPC → releaseId → flags)
 - **ACL:** CI `{qaflags:[{flag,status}]}` → QaResult; CI 404 → `clean`
 - **Timeout:** 30s
 - **File:** `infrastructure/adapters/ci-qa.adapter.ts`
@@ -57,14 +57,14 @@
 
 ### A3 — CiDeliverDesireAdapter (DeliveryStatusReader)
 - **Port:** `read({batchId, dspCodes[]}) → Map<dspCode, DspLiveStatus>`
-- **V3 reuse:** `ci-export.service.ts` → `getStatusDsps()` / `getDeliverDesire()` (đã có sẵn)
+- **V3 reuse:** ~~`ci-export.service.ts`~~ → Tạo mới `infrastructure/ci-api/ci-deliver-desire-api.service.ts`
 - **ACL:** CI `{deliver_desire:[{dsp,status}]}` → Map
 - **Timeout:** 30s
 - **File:** `infrastructure/adapters/ci-deliver-desire.adapter.ts`
 - **DI:** wire `DELIVERY_STATUS_READER`
 - **Est:** 2h
 
-**Exit Group A:** 3 CI adapter wire xong, tsc sạch, runner ci-import/qa/status-sync chạy được với adapter thật.
+**Exit Group A:** ✅ DONE — 3 CI adapter + 6 file `infrastructure/ci-api/` + module wire xong, tsc sạch.
 
 ---
 

@@ -8,11 +8,11 @@
 
 ## Executive Summary
 
-Phase 4 implements real adapters wrapping external systems (SFTP, CI REST, gRPC, email) behind the 9 port interfaces defined in Phase 1. All ports already have in-memory test doubles. Existing v3 integration code provides reusable foundation for SFTP, CI API, and gRPC adapters.
+Phase 4 implements real adapters wrapping external systems (SFTP, CI REST, gRPC, email) behind the 9 port interfaces defined in Phase 1. All ports already have in-memory test doubles. SFTP and gRPC adapters reuse existing v3 integration code. **CI adapters use NEW dedicated services** created in `infrastructure/ci-api/` (separate from v3 partners-api).
 
 **Key findings:**
 - 9 ports → 7-8 adapter classes (Exporter handles 2 methods internally)
-- Strong v3 code reuse: SFTP (ssh2-sftp-client), CI REST (axios clients), gRPC (UPC/ISRC services)
+- Strong v3 code reuse: SFTP (ssh2-sftp-client), gRPC (UPC/ISRC services). **CI adapters use NEW dedicated services** in `infrastructure/ci-api/` (not v3 partners-api)
 - Idempotency layer 2 (adapter-level) via external system checks, NOT local cache
 - Test double vs real adapter controlled by DI tokens at module wire
 
@@ -25,10 +25,10 @@ Phase 4 implements real adapters wrapping external systems (SFTP, CI REST, gRPC,
 | 1 | `IdentifierProvisioner` | `GrpcIdentifierAdapter` | gRPC UPC/ISRC server | `src/modules/external/upc/upc.service.ts`<br>`src/modules/external/isrc/isrc.service.ts` |
 | 2 | `PackageBuilder` | `DdexXmlPackageBuilder` | xmlbuilder2 + GCS/S3 | `src/modules/release/services/release-ddex.service.ts` (partial DDEX logic)<br>Need new: xmlbuilder2 wrapper + folder structure |
 | 3 | `PackageUploader` | `SftpUploaderAdapter` | ssh2-sftp-client | `src/modules/distribution/sftp-connect/sftp-connect.service.ts` (full reuse) |
-| 4 | `IngestResultReader` | `CiImportAdapter` | CI REST `/imports/v1/.../batch` | `src/modules/partners-api/ci/services/ci-import.service.ts` |
-| 5 | `QaChecker` | `CiQaAdapter` | CI REST `/releases/v2/.../qaflags` | `src/modules/partners-api/ci/services/ci-release.service.ts` |
+| 4 | `IngestResultReader` | `CiImportAdapter` | CI REST `/imports/v1/.../batch` | **New:** `infrastructure/ci-api/ci-import-api.service.ts` (dedicated, NOT v3 reuse) |
+| 5 | `QaChecker` | `CiQaAdapter` | CI REST `/releases/v2/.../qaflags` | **New:** `infrastructure/ci-api/ci-qa-api.service.ts` (dedicated, NOT v3 reuse) |
 | 6 | `Exporter` | `CiExportAdapter`<br>`State51EmailAdapter` | CI export panel<br>SMTP batch email | New: export panel integration<br>New: email batch service |
-| 7 | `DeliveryStatusReader` | `CiDeliverDesireAdapter` | CI REST `/exports/v1/.../deliver_desire` | `src/modules/partners-api/ci/services/ci-export.service.ts` |
+| 7 | `DeliveryStatusReader` | `CiDeliverDesireAdapter` | CI REST `/exports/v1/.../deliver_desire` | **New:** `infrastructure/ci-api/ci-deliver-desire-api.service.ts` (dedicated, NOT v3 reuse) |
 | 8 | `TicketService` | `PostgresTicketAdapter` | Postgres (own schema) | New: simple CRUD, not reusing v3 `issue`/`release_errors` |
 | 9 | `Clock` | `SystemClock` | Node.js `Date.now()` | Trivial wrapper |
 
@@ -385,9 +385,9 @@ export const IDENTIFIER_PROVISIONER = Symbol('IdentifierProvisioner');
 
 **Incremental adapter replacement strategy:**
 
-1. **Start with read-only adapters (lowest risk):**
+1. **Start with read-only adapters (lowest risk):** ✅ DONE
    - SystemClock (trivial)
-   - CiImportAdapter, CiQaAdapter, CiDeliverDesireAdapter (read-only APIs)
+   - CiImportAdapter, CiQaAdapter, CiDeliverDesireAdapter (new dedicated CI API services in `infrastructure/ci-api/`)
 
 2. **Then write-only adapters with rollback:**
    - PostgresTicketAdapter (own DB, easy rollback)
