@@ -29,6 +29,8 @@ import {
 
 const REVELATOR_IMPORT_SOURCE = 'bombshelter';
 
+import { ParseFileStats } from '../../parsers/base.parser';
+
 export interface ImportResult {
 	batchId: string;
 	totalRows: number;
@@ -41,6 +43,7 @@ export interface ImportResult {
 		rows: number;
 		durationMs: number;
 		fileNames: string[];
+		fileStats?: ParseFileStats[];
 		releases?: {
 			totalReleases: number;
 			created: number;
@@ -476,10 +479,12 @@ export class ImportService {
 		);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactDspRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				for (const row of rows) {
 					if (sourceCategory) {
@@ -531,6 +536,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -569,10 +575,12 @@ export class ImportService {
 		this.logger.log(`Parsing SALES folder: ${folderName}`);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactSalesRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report from dsps_report
 				for (const row of rows) {
@@ -630,6 +638,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -673,10 +682,12 @@ export class ImportService {
 		this.logger.log(`Parsing ILLEGITIMATE folder: ${folderName}`);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactDspRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report
 				for (const row of rows) {
@@ -726,6 +737,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -742,6 +754,7 @@ export class ImportService {
 			inDb: number;
 			pending: number;
 		},
+		fileStats?: ParseFileStats[],
 	): ImportResult['dspResults'][0] {
 		const duration = Date.now() - startTime;
 		this.logger.log(
@@ -757,6 +770,7 @@ export class ImportService {
 			rows: totalRows,
 			durationMs: duration,
 			fileNames: files.map((f) => path.basename(f)),
+			fileStats,
 			releases: entityResult
 				? {
 						totalReleases: entityResult.totalReleases,

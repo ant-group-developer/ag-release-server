@@ -15,6 +15,16 @@ import {
 
 const AdmZip = require('adm-zip');
 
+export interface ParseFileStats {
+	filePath: string;
+	fileName: string;
+	fileDirectory: string;
+	totalLines: number;
+	processedRows: number;
+	skippedRows: number;
+	errorRows: number;
+}
+
 /**
  * Abstract base parser for all DSP data files.
  * Each DSP parser extends this and implements parseRow().
@@ -51,6 +61,31 @@ export abstract class BaseParser {
 		}
 
 		return this.parseSingleFile(filePath, batchId);
+	}
+
+	/**
+	 * Parse a file and return both rows and per-file stats (totalLines, processedRows, etc.).
+	 * Used by importers that write to etl_import_history.
+	 */
+	async parseFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
+		const lowerPath = filePath.toLowerCase();
+		if (lowerPath.endsWith('.zip')) {
+			const rows = await this.parseZipFile(filePath, batchId);
+			const stats: ParseFileStats = {
+				filePath,
+				fileName: path.basename(filePath),
+				fileDirectory: path.dirname(filePath),
+				totalLines: rows.length,
+				processedRows: rows.length,
+				skippedRows: 0,
+				errorRows: 0,
+			};
+			return { rows, stats };
+		}
+		return this.parseSingleFileWithStats(filePath, batchId);
 	}
 
 	/**
@@ -123,6 +158,17 @@ export abstract class BaseParser {
 		filePath: string,
 		batchId: string,
 	): Promise<FactDspRow[]> {
+		const { rows } = await this.parseSingleFileWithStats(filePath, batchId);
+		return rows;
+	}
+
+	/**
+	 * Core single-file parser that tracks per-file stats.
+	 */
+	private async parseSingleFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
 		const rows: FactDspRow[] = [];
 		const delimiter = this.getDelimiter(filePath);
 		const isGzipped = filePath.toLowerCase().endsWith('.gz');
@@ -144,6 +190,8 @@ export abstract class BaseParser {
 
 		let headers: string[] = [];
 		let lineNum = 0;
+		let skippedRows = 0;
+		let errorRows = 0;
 
 		for await (const rawLine of rl) {
 			lineNum++;
@@ -157,7 +205,10 @@ export abstract class BaseParser {
 
 			try {
 				const values = this.parseLine(line, delimiter);
-				if (values.length < headers.length * 0.5) continue;
+				if (values.length < headers.length * 0.5) {
+					skippedRows++;
+					continue;
+				}
 
 				const record: Record<string, string> = {};
 				headers.forEach((h, i) => {
@@ -178,8 +229,11 @@ export abstract class BaseParser {
 							this.applyFieldMappingOverrides(parsed, record),
 						);
 					}
+				} else {
+					skippedRows++;
 				}
 			} catch (err) {
+				errorRows++;
 				if (lineNum <= 5) {
 					this.logger.warn(
 						`Line ${lineNum} error in ${path.basename(filePath)}: ${err.message}`,
@@ -188,7 +242,17 @@ export abstract class BaseParser {
 			}
 		}
 
-		return rows;
+		const stats: ParseFileStats = {
+			filePath,
+			fileName: path.basename(filePath),
+			fileDirectory: path.dirname(filePath),
+			totalLines: lineNum,
+			processedRows: rows.length,
+			skippedRows,
+			errorRows,
+		};
+
+		return { rows, stats };
 	}
 
 	/**

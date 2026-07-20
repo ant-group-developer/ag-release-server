@@ -98,6 +98,22 @@ export interface ResolvedFtpParserConfig {
 
 type CatalogEntry = ParserCatalogItem & { factory: () => FtpParser };
 
+const SUPPORTED_FIELD_TRANSFORMS = [
+	'trim',
+	'raw',
+	'uppercase',
+	'lowercase',
+	'isrc',
+] as const;
+
+function isSupportedFieldTransform(value: string): boolean {
+	return (SUPPORTED_FIELD_TRANSFORMS as readonly string[]).includes(value);
+}
+
+function normalizeFieldTransform(value?: string): string {
+	return value && isSupportedFieldTransform(value) ? value : 'trim';
+}
+
 function toRecord(row: any): FtpParserConfigRecord {
 	return {
 		dspReportId: row.dsp_report_id,
@@ -398,10 +414,18 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							})),
 						);
 					}
+					const existingMappings =
+						existingCatalogMappingsByKey.get(catalogKey) || [];
+					const mappingsAreSafe =
+						existingMappings.length > 0 &&
+						existingMappings.every((mapping) =>
+							isSupportedFieldTransform(mapping.transform),
+						);
 					if (
 						existingHashes.get(catalogKey) === sourceHash &&
 						(fieldMappings.length === 0 ||
-							existingCatalogMappings.has(catalogKey))
+							(existingCatalogMappings.has(catalogKey) &&
+								mappingsAreSafe))
 					)
 						continue;
 					rows.push({
@@ -719,7 +743,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				reportColumn: row.report_column,
 				parserColumn: row.parser_column || undefined,
 				targetColumn: row.target_column,
-				transform: row.transform || undefined,
+				transform: normalizeFieldTransform(row.transform),
 			});
 			result.set(key, mappings);
 		}
@@ -987,9 +1011,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			seenTargets.add(target);
 			if (
 				mapping.transform &&
-				!['trim', 'raw', 'uppercase', 'lowercase', 'isrc'].includes(
-					mapping.transform,
-				)
+				!isSupportedFieldTransform(mapping.transform)
 			) {
 				throw new BadRequestException(
 					`Unsupported field transform: "${mapping.transform}"`,
@@ -1053,8 +1075,16 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			'service_name',
 			'dpid',
 			'member_name',
+			'label_name',
+			'territory_code',
+			'isrc',
+			'upc',
 			'grid',
 			'release_id',
+			'track_title',
+			'artist_name',
+			'album_title',
+			'composer_name',
 			'genre',
 			'quantity',
 			'quantity_creations',
@@ -1062,6 +1092,8 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			'revenue_usd',
 			'revenue_local',
 			'revenue_currency',
+			'usage_type',
+			'monetisation_type',
 			'service_tier',
 			'plan_name',
 			'commercial_model',
@@ -1253,7 +1285,11 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			}
 			const transform = expression.replace(/\s+/g, ' ').trim();
 			for (const reportColumn of reportColumns) {
-				mappings.push({ reportColumn, targetColumn, transform });
+				mappings.push({
+					reportColumn,
+					targetColumn,
+					transform: 'trim',
+				});
 			}
 		};
 
