@@ -1,4 +1,5 @@
 import { IdempotencyKey } from '../value-objects/idempotency-key.vo';
+import { TicketMetadata } from '../value-objects/ticket-metadata.vo';
 import { TicketReason, TicketRef } from '../value-objects/ticket-ref.vo';
 
 /**
@@ -12,6 +13,7 @@ export interface TicketService {
 		channelId?: string;
 		reason: TicketReason;
 		detail: string;
+		metadata?: TicketMetadata;
 		key: IdempotencyKey;
 	}): Promise<TicketRef>;
 	resolve(input: { ticket: TicketRef }): Promise<void>;

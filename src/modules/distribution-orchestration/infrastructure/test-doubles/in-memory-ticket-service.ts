@@ -1,5 +1,6 @@
 import { TicketService } from '../../domain/ports/ticket-service.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
+import { TicketMetadata } from '../../domain/value-objects/ticket-metadata.vo';
 import {
 	TicketReason,
 	TicketRef,
@@ -11,6 +12,7 @@ export interface RecordedTicket {
 	readonly channelId?: string;
 	readonly reason: TicketReason;
 	readonly detail: string;
+	readonly metadata?: TicketMetadata;
 	resolved: boolean;
 }
 
@@ -28,6 +30,7 @@ export class InMemoryTicketService implements TicketService {
 		channelId?: string;
 		reason: TicketReason;
 		detail: string;
+		metadata?: TicketMetadata;
 		key: IdempotencyKey;
 	}): Promise<TicketRef> {
 		const existing = this.refByKey.get(input.key.value);
@@ -41,6 +44,7 @@ export class InMemoryTicketService implements TicketService {
 			channelId: input.channelId,
 			reason: input.reason,
 			detail: input.detail,
+			metadata: input.metadata,
 			resolved: false,
 		});
 		return ref;

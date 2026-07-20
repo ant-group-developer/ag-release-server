@@ -21,6 +21,10 @@ import { DELIVERY_STATUS_READER } from './application/step-runners/status-sync.r
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
+import {
+	PostgresTicketAdapter,
+	TICKET_SERVICE,
+} from './infrastructure/adapters/postgres-ticket.adapter';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
@@ -29,6 +33,7 @@ import { ChannelDeliveryOrmEntity } from './infrastructure/persistence/channel-d
 import { DistributionEventOrmEntity } from './infrastructure/persistence/distribution-event.orm-entity';
 import { DistributionOrmEntity } from './infrastructure/persistence/distribution.orm-entity';
 import { TypeOrmDistributionRepository } from './infrastructure/persistence/distribution.repository';
+import { OrchestrationTicketOrmEntity } from './infrastructure/persistence/orchestration-ticket.orm-entity';
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
@@ -65,7 +70,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  * queue consumer). Test unit inject handler trực tiếp qua constructor.
  *
  * Remaining Phase 4 adapters (Group B-E):
- *   · TICKET_SERVICE           → PostgresTicketAdapter (Group B)
+ *   · TICKET_SERVICE           → PostgresTicketAdapter (Group B) ✅ WIRED
  *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C)
  *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D)
  *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D)
@@ -78,6 +83,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			ChannelDeliveryOrmEntity,
 			DistributionEventOrmEntity,
 			OutboxEventOrmEntity,
+			OrchestrationTicketOrmEntity,
 		]),
 		AppConfigModule, // For CI API config
 		CiModule, // Keep v3 services for backward compatibility
@@ -113,6 +119,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: INGEST_RESULT_READER, useClass: CiImportAdapter },
 		{ provide: QA_CHECKER, useClass: CiQaAdapter },
 		{ provide: DELIVERY_STATUS_READER, useClass: CiDeliverDesireAdapter },
+		{ provide: TICKET_SERVICE, useClass: PostgresTicketAdapter },
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
