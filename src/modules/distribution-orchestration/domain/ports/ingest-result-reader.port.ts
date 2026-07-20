@@ -9,10 +9,14 @@ export type IngestStatus =
 /**
  * IngestResultReader — READS how the aggregator processed the batch we already imported
  * (it does NOT trigger an import; the import happened at upload). Adapter polls CI REST.
+ *
+ * A batch (`batchId`) may contain MANY packages (one per UPC). `upc` selects which
+ * package's ingest status to read — one package's problem must NOT fail a sibling package.
  */
 export interface IngestResultReader {
 	read(input: {
 		batchId: string;
+		upc: string;
 		key: IdempotencyKey;
 	}): Promise<IngestStatus>;
 }

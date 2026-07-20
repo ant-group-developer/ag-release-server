@@ -1,5 +1,13 @@
 {
-	"cSpell.words": ["DDEX", "GTIN", "Isrc", "PADPIDA"],
+	"cSpell.words": [
+		"DDEX",
+		"GTIN",
+		"Isrc",
+		"organisations",
+		"PADPIDA",
+		"qaflags",
+		"releaseformats"
+	],
 	"editor.formatOnSave": true,
 	"editor.defaultFormatter": "esbenp.prettier-vscode",
 	"[typescript]": {
@@ -15,4 +23,3 @@
 		"source.fixAll.eslint": "explicit"
 	}
 }
-

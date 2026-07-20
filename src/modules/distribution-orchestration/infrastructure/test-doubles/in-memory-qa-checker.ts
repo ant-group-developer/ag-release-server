@@ -5,17 +5,17 @@ import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
  * InMemoryQaChecker — test double cho QaChecker. Mặc định 'clean'; `setResult()` mô phỏng flag.
  */
 export class InMemoryQaChecker implements QaChecker {
-	private readonly resultByRelease = new Map<string, QaResult>();
+	private readonly resultByUpc = new Map<string, QaResult>();
 	private readonly defaultResult: QaResult = { kind: 'clean' };
 
-	setResult(releaseId: string, result: QaResult): void {
-		this.resultByRelease.set(releaseId, result);
+	setResult(upc: string, result: QaResult): void {
+		this.resultByUpc.set(upc, result);
 	}
 
 	async check(input: {
-		releaseId: string;
+		upc: string;
 		key: IdempotencyKey;
 	}): Promise<QaResult> {
-		return this.resultByRelease.get(input.releaseId) ?? this.defaultResult;
+		return this.resultByUpc.get(input.upc) ?? this.defaultResult;
 	}
 }

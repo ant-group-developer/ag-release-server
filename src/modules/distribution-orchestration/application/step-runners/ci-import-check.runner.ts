@@ -43,9 +43,19 @@ export class CiImportCheckRunner {
 		);
 		if (!dist) throw new AggregateNotFoundError(payload.distributionId);
 
+		// CI import batch is keyed by the upload's external_identifier (timestamp folder).
+		// Within a batch there may be many packages; reader filters to THIS release's UPC.
+		const upc = dist.upc;
+		if (!upc) {
+			throw new Error(
+				`CiImportCheckRunner: UPC not set on distribution ${dist.id} — cannot check import batch`,
+			);
+		}
+
 		const batchId = `${dist.id}:${payload.channelId}`;
 		const status = await this.reader.read({
 			batchId,
+			upc,
 			key: IdempotencyKey.create(payload.key),
 		});
 

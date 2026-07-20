@@ -170,7 +170,9 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 		expect(loaded.channels[0].state).toBe(ChannelState.WAITING);
 
 		// ── STEP 5: Simulate DSP live → status-sync ARRIVED → channel LIVE → DISTRIBUTED ──
-		statusReader.setStatus(`${DIST_ID}:${DIST_ID}:ch:0`, 'SPOTIFY', 'live');
+		// StatusSyncRunner queries the reader by UPC (CI API B10 uses ?gtin={{upc}}),
+		// so key the simulated live status by the aggregate's provisioned UPC.
+		statusReader.setStatus(loaded.upc!, 'SPOTIFY', 'live');
 		await drainOutboxToWorkflow();
 		expect(await drainOneJob()).toBe(true);
 		loaded = (await uow.run((ctx) => repo.load(ctx, DIST_ID)))!;

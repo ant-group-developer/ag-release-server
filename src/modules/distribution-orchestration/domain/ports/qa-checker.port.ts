@@ -6,7 +6,10 @@ export type QaResult =
 
 /**
  * QaChecker — checks QA flags for a release. A GATE stage uses this: clean → pass, flagged → ISSUES.
+ *
+ * `upc` = the release's UPC/GTIN barcode (e.g., "701798205454").
+ * CI API requires UPC (?gtin=) to look up QA flags — NOT our internal releaseId.
  */
 export interface QaChecker {
-	check(input: { releaseId: string; key: IdempotencyKey }): Promise<QaResult>;
+	check(input: { upc: string; key: IdempotencyKey }): Promise<QaResult>;
 }

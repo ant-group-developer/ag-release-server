@@ -19,6 +19,7 @@ export class InMemoryIngestResultReader implements IngestResultReader {
 
 	async read(input: {
 		batchId: string;
+		upc: string;
 		key: IdempotencyKey;
 	}): Promise<IngestStatus> {
 		const queue = this.queueByBatch.get(input.batchId);

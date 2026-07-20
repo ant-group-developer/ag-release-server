@@ -49,9 +49,18 @@ export class StatusSyncRunner {
 		}
 
 		const dspCode = DspCode.create(channel.spec.dspCode);
-		const batchId = `${dist.id}:${payload.channelId}`;
+
+		// CI API B10 requires UPC (?gtin={{upc}}) to check delivery status.
+		// dist.upc is available after identifier provisioning step.
+		const upc = dist.upc;
+		if (!upc) {
+			throw new Error(
+				`StatusSyncRunner: UPC not set on distribution ${dist.id} — cannot check delivery status`,
+			);
+		}
+
 		const statuses = await this.reader.read({
-			batchId,
+			upc,
 			dspCodes: [dspCode],
 		});
 		const status = statuses.get(dspCode.value) ?? 'pending';

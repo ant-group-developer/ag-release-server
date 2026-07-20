@@ -35,8 +35,16 @@ export class QaRunner {
 		);
 		if (!dist) throw new AggregateNotFoundError(payload.distributionId);
 
+		// dist.upc is set after identifier provisioning (B8.1 requires UPC/GTIN).
+		const upc = dist.upc;
+		if (!upc) {
+			throw new Error(
+				`QaRunner: UPC not set on distribution ${dist.id} — cannot check QA flags`,
+			);
+		}
+
 		const result = await this.checker.check({
-			releaseId: dist.releaseId,
+			upc,
 			key: IdempotencyKey.create(payload.key),
 		});
 		if (result.kind === 'flagged') {

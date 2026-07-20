@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppConfigModule } from '../app-config/app-config.module';
+import { AppConfigService } from '../app-config/app-config.service';
+import { CiModule } from '../partners-api/ci/ci.module';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
 	DefaultPolicyResolver,
@@ -12,6 +15,14 @@ import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
 import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
+import { INGEST_RESULT_READER } from './application/step-runners/ci-import-check.runner';
+import { QA_CHECKER } from './application/step-runners/qa.runner';
+import { DELIVERY_STATUS_READER } from './application/step-runners/status-sync.runner';
+import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
+import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
+import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
+import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
+import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
 import { DistributionController } from './infrastructure/http/distribution.controller';
 import { ChannelDeliveryOrmEntity } from './infrastructure/persistence/channel-delivery.orm-entity';
@@ -25,7 +36,7 @@ import { DistributionSseService } from './infrastructure/sse/distribution-sse.se
 import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow.adapter';
 
 /**
- * DistributionOrchestrationModule — scaffold cho Phase 2.
+ * DistributionOrchestrationModule — scaffold cho Phase 2 + Phase 4 ACL adapters.
  *
  * Wire ports → adapters:
  *   · WORKFLOW_ENGINE          → BullMqWorkflowAdapter (Step 7 — prod BullMQ)
@@ -33,6 +44,15 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  *   · DISTRIBUTION_REPOSITORY  → TypeOrmDistributionRepository
  *   · POLICY_RESOLVER          → DefaultPolicyResolver
  *   · CLOCK                    → SystemClock (prod)
+ *
+ * Phase 4 ACL adapters (Group A — read-only CI) — REFACTORED:
+ *   · INGEST_RESULT_READER     → CiImportAdapter (wraps CiImportApiService)
+ *   · QA_CHECKER               → CiQaAdapter (wraps CiQaApiService)
+ *   · DELIVERY_STATUS_READER   → CiDeliverDesireAdapter (wraps CiDeliverDesireApiService)
+ *
+ * CI API Infrastructure:
+ *   · CiApiModule              — New dedicated CI API client (separate from v3 partners-api)
+ *   · CI_API_CONFIG            — Config provider (baseUrl, organisationId, token, timeout)
  *
  * Infrastructure services:
  *   · OutboxRelay              — Step 6: polling outbox_event → enqueue via WorkflowEnginePort
@@ -44,11 +64,12 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  * Module CHƯA export gì — module khác chưa gọi handler qua DI (Step 7+ mới wire
  * queue consumer). Test unit inject handler trực tiếp qua constructor.
  *
- * Step-runners (Step 5b) KHÔNG wire ở đây — 7 runner cần adapter cho 7 port
- * (IdentifierProvisioner, PackageBuilder, PackageUploader, QaChecker, Exporter,
- * IngestResultReader, DeliveryStatusReader) sẽ có ở Phase 4 (ACL layer). Runner
- * đã Injectable + có DI token — Phase 4 chỉ cần thêm `{provide, useClass}` +
- * đăng ký runner vào providers khi adapter sẵn sàng.
+ * Remaining Phase 4 adapters (Group B-E):
+ *   · TICKET_SERVICE           → PostgresTicketAdapter (Group B)
+ *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C)
+ *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D)
+ *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D)
+ *   · EXPORTER                 → ExporterAdapter (Group E)
  */
 @Module({
 	imports: [
@@ -58,9 +79,29 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			DistributionEventOrmEntity,
 			OutboxEventOrmEntity,
 		]),
+		AppConfigModule, // For CI API config
+		CiModule, // Keep v3 services for backward compatibility
+		CiApiModule, // New CI API services for orchestration
 	],
 	controllers: [DistributionController],
 	providers: [
+		// CI API Config provider
+		{
+			provide: CI_API_CONFIG,
+			useFactory: (appConfigService: AppConfigService) => ({
+				baseUrl: appConfigService.getValue<string>(
+					'config.partners.ci.baseUrl',
+				),
+				organisationId: appConfigService.getValue<string>(
+					'config.partners.ci.organisationId',
+				),
+				token: appConfigService.getValue<string>(
+					'config.partners.ci.token',
+				),
+				timeout: 30000, // 30s timeout per docs
+			}),
+			inject: [AppConfigService],
+		},
 		{ provide: WORKFLOW_ENGINE, useClass: BullMqWorkflowAdapter },
 		{ provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
 		{
@@ -69,6 +110,9 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		},
 		{ provide: POLICY_RESOLVER, useClass: DefaultPolicyResolver },
 		{ provide: CLOCK, useClass: SystemClock },
+		{ provide: INGEST_RESULT_READER, useClass: CiImportAdapter },
+		{ provide: QA_CHECKER, useClass: CiQaAdapter },
+		{ provide: DELIVERY_STATUS_READER, useClass: CiDeliverDesireAdapter },
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
