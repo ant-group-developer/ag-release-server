@@ -104,7 +104,7 @@ beforeAll(async () => {
 
 	// Wire: adapter + relay
 	adapter = new BullMqWorkflowAdapter(redis);
-	relay = new OutboxRelay(dataSource, adapter);
+	relay = new OutboxRelay(dataSource, adapter, { emit: () => true } as any);
 });
 
 afterAll(async () => {

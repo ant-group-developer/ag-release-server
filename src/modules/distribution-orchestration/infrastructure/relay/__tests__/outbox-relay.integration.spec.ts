@@ -81,7 +81,7 @@ beforeEach(async () => {
 		`TRUNCATE TABLE "outbox_event" RESTART IDENTITY CASCADE`,
 	);
 	workflow = new InMemoryWorkflowAdapter();
-	relay = new OutboxRelay(dataSource, workflow);
+	relay = new OutboxRelay(dataSource, workflow, { emit: () => true } as any);
 });
 
 // ── Helpers ──
@@ -232,7 +232,9 @@ describe('OutboxRelay (integration)', () => {
 		}
 
 		// Two separate relay instances sharing same DataSource + workflow
-		const relay2 = new OutboxRelay(dataSource, workflow);
+		const relay2 = new OutboxRelay(dataSource, workflow, {
+			emit: () => true,
+		} as any);
 
 		// Run 2 polls concurrently — each SELECT FOR UPDATE SKIP LOCKED
 		// so they won't lock the same rows

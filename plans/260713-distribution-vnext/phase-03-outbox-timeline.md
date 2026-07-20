@@ -1,6 +1,6 @@
 # Phase 3 — Timeline read-side + SSE (projection từ distribution_event)
 
-**Priority:** Trung bình-cao · **Status:** ⬜ Chưa (skeleton) · **Chi tiết hoá sau khi Phase 2 xong**
+**Priority:** Trung bình-cao · **Status:** 🔵 Đang thực hiện — Step 2 XONG · **Chi tiết: `phase-03-outbox-timeline-detailed.md`**
 **Depends on:** Phase 2 (đã có `distribution_event` + `outbox_event` + relay ở write-side)
 
 ## Ranh giới với Phase 2 (đã chốt 2026-07-16)

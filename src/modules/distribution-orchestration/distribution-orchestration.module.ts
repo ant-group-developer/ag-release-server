@@ -10,7 +10,10 @@ import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
+import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
+import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
+import { DistributionController } from './infrastructure/http/distribution.controller';
 import { ChannelDeliveryOrmEntity } from './infrastructure/persistence/channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from './infrastructure/persistence/distribution-event.orm-entity';
 import { DistributionOrmEntity } from './infrastructure/persistence/distribution.orm-entity';
@@ -18,6 +21,7 @@ import { TypeOrmDistributionRepository } from './infrastructure/persistence/dist
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
+import { DistributionSseService } from './infrastructure/sse/distribution-sse.service';
 import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow.adapter';
 
 /**
@@ -32,6 +36,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  *
  * Infrastructure services:
  *   · OutboxRelay              — Step 6: polling outbox_event → enqueue via WorkflowEnginePort
+ *   · ReleaseDspDeliveryProjection — Phase 3 Step 3: CQRS projection event → read model
  *
  * Providers thường:
  *   · OrchestrateHandler       — Step 4: entry point 1 vòng orchestrate
@@ -54,6 +59,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			OutboxEventOrmEntity,
 		]),
 	],
+	controllers: [DistributionController],
 	providers: [
 		{ provide: WORKFLOW_ENGINE, useClass: BullMqWorkflowAdapter },
 		{ provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
@@ -65,6 +71,9 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: CLOCK, useClass: SystemClock },
 		OrchestrateHandler,
 		OutboxRelay,
+		DistributionTimelineQueryService,
+		DistributionSseService,
+		ReleaseDspDeliveryProjection,
 	],
 })
 export class DistributionOrchestrationModule {}
