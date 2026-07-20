@@ -90,6 +90,26 @@ export class ReleaseCiDataController {
 		return AppResponseSuccess.JOB_PROCESSING();
 	}
 
+	@Post('bulk-sync-track-order')
+	@ApiOperation({
+		summary: 'Bulk sync thứ tự track từ CI',
+	})
+	@ApiBody({
+		type: BulkSyncDataCiDto,
+		required: false,
+		description:
+			'Không truyền body: đồng bộ tất cả. Truyền releaseIds để đồng bộ cụ thể.',
+	})
+	bulkSyncTrackOrder(@Body() body: BulkSyncDataCiDto) {
+		this.service.bulkSyncTrackOrder(body).catch((error) => {
+			console.log(
+				`Error in bulkSyncTrackOrder: ${error.message}`,
+				error.stack,
+			);
+		});
+		return AppResponseSuccess.JOB_PROCESSING();
+	}
+
 	@Get(':id')
 	@ApiOperation({
 		summary: 'Lấy chi tiết dữ liệu CI',

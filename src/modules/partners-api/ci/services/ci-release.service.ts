@@ -8,7 +8,11 @@ import {
 import axios, { AxiosInstance } from 'axios';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
-import { GetCiQaFlagsDto, GetCiReleaseFormatsDto } from '../dtos/ci.dto';
+import {
+	GetCiQaFlagsDto,
+	GetCiReleaseFormatsDto,
+	GetCiReleasesDto,
+} from '../dtos/ci.dto';
 
 @Injectable()
 export class CiReleaseService {
@@ -71,6 +75,33 @@ export class CiReleaseService {
 		} catch (error) {
 			this.logger.error(
 				`Error getReleaseFormats`,
+				error?.message || error,
+			);
+			throw error;
+		}
+	}
+
+	async getReleasesV1(params?: GetCiReleasesDto): Promise<any> {
+		try {
+			const endpoint = `/releases/v1/organisations/${this.organisationId}/releases`;
+			const response = await this.client.get(endpoint, {
+				params: this.buildParams(params as any),
+			});
+			return response.data;
+		} catch (error) {
+			this.logger.error(`Error getReleasesV1`, error?.message || error);
+			throw error;
+		}
+	}
+
+	async getReleaseMetadataV1(releaseId: string): Promise<any> {
+		try {
+			const endpoint = `/releases/v1/organisations/${this.organisationId}/releases/${releaseId}/metadata`;
+			const response = await this.client.get(endpoint);
+			return response.data;
+		} catch (error) {
+			this.logger.error(
+				`Error getReleaseMetadataV1`,
 				error?.message || error,
 			);
 			throw error;
