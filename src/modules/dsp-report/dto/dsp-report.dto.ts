@@ -3,6 +3,12 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { OrderDirection } from 'src/common/enums/common';
 
+export enum DspReportSource {
+	FTP_FOLDER = 'ftp_folder',
+	WMG_REPORT = 'wmg_report',
+	SPOTIFY_REPORT = 'spotify_report',
+}
+
 export class QueryGetListDspReportDto extends BaseQueryDto {
 	@ApiProperty({
 		description: 'Filter by assignment status',
@@ -12,6 +18,16 @@ export class QueryGetListDspReportDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
 	status?: string;
+
+	@ApiProperty({
+		description: 'Filter by DSP report source',
+		required: false,
+		enum: DspReportSource,
+		example: DspReportSource.WMG_REPORT,
+	})
+	@IsOptional()
+	@IsEnum(DspReportSource)
+	source?: DspReportSource;
 
 	@ApiProperty({
 		description: 'Field to sort by',
