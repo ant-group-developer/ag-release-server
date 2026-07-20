@@ -7,6 +7,7 @@ import {
 	S3Client,
 } from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -21,9 +22,103 @@ import {
 @Injectable()
 export class SftpConnectService {
 	private readonly logger = new Logger(SftpConnectService.name);
+	private readonly s3UploadTimeoutMs = 60 * 60 * 1000;
 
 	private createClient(): SftpClient {
 		return new SftpClient();
+	}
+
+	private getConnectConfig(config: SftpMetadata) {
+		return {
+			host: config.host,
+			port: config.port ?? 22,
+			username: config.username,
+			password: config.password,
+			privateKey: config.privateKey,
+			readyTimeout: 60_000,
+			keepaliveInterval: 20_000, // 20 seconds keepalive
+			keepaliveCountMax: 3, // 3 missed keepalives before disconnect
+		};
+	}
+
+	private uploadFileWithTimeout(
+		client: SftpClient,
+		localPath: string,
+		remotePath: string,
+		onFileUploaded?: (file: string) => void,
+	): Promise<void> {
+		return new Promise<void>((resolve, reject) => {
+			let timer: NodeJS.Timeout;
+			const fileName = path.basename(localPath);
+			const stats = fs.statSync(localPath);
+			const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+
+			this.logger.log(
+				`Bắt đầu tải lên SFTP: ${fileName} (${fileSizeMB} MB)`,
+			);
+
+			const resetTimeout = () => {
+				if (timer) clearTimeout(timer);
+				timer = setTimeout(
+					() => {
+						reject(
+							new Error(
+								`SFTP upload timeout: Quá 5 phút không có dữ liệu mới được tải lên cho file ${fileName}`,
+							),
+						);
+					},
+					5 * 60 * 1000,
+				); // 5 minutes inactivity timeout
+			};
+
+			resetTimeout();
+
+			let lastTransferred = 0;
+			client
+				.put(localPath, remotePath, {
+					step: (
+						total_transferred: number,
+						chunk: number,
+						total_size: number,
+					) => {
+						resetTimeout();
+						const percent =
+							total_size > 0
+								? (
+										(total_transferred / total_size) *
+										100
+									).toFixed(1)
+								: '0';
+						if (
+							total_transferred - lastTransferred >
+								5 * 1024 * 1024 ||
+							total_transferred === total_size
+						) {
+							this.logger.log(
+								`Tiến trình tải lên [${fileName}]: ${percent}% (${(
+									total_transferred /
+									(1024 * 1024)
+								).toFixed(2)} MB / ${fileSizeMB} MB)`,
+							);
+							lastTransferred = total_transferred;
+						}
+					},
+				})
+				.then(() => {
+					if (timer) clearTimeout(timer);
+					this.logger.log(`Tải lên SFTP thành công: ${fileName}`);
+					onFileUploaded?.(localPath);
+					resolve();
+				})
+				.catch((err) => {
+					if (timer) clearTimeout(timer);
+					this.logger.error(
+						`Lỗi khi tải file ${fileName} lên SFTP: ${err.message}`,
+						err.stack,
+					);
+					reject(err instanceof Error ? err : new Error(String(err)));
+				});
+		});
 	}
 
 	async testConnect(config: SftpMetadata): Promise<{
@@ -43,6 +138,10 @@ export class SftpConnectService {
 					},
 					endpoint: config.endpoint,
 					forcePathStyle: !!config.endpoint,
+					requestHandler: new NodeHttpHandler({
+						connectionTimeout: 10000,
+						socketTimeout: 10000,
+					}),
 				});
 
 				const testKey =
@@ -67,7 +166,9 @@ export class SftpConnectService {
 							Key: testKey,
 						}),
 					);
-				} catch {}
+				} catch {
+					// Ignore deletion errors for test file
+				}
 
 				return {
 					status: true,
@@ -85,16 +186,15 @@ export class SftpConnectService {
 		}
 
 		const client = this.createClient();
+		(client as any).on('error', (err: any) => {
+			this.logger.error(
+				`SFTP Client Error (testConnect): ${err.message}`,
+				err.stack,
+			);
+		});
 
 		try {
-			await client.connect({
-				host: config.host,
-				port: config.port ?? 22,
-				username: config.username,
-				password: config.password,
-				privateKey: config.privateKey,
-				readyTimeout: 60_000,
-			});
+			await client.connect(this.getConnectConfig(config));
 
 			return {
 				status: true,
@@ -117,15 +217,14 @@ export class SftpConnectService {
 	 */
 	async connect(config: SftpMetadata): Promise<SftpClient> {
 		const client = this.createClient();
-
-		await client.connect({
-			host: config.host,
-			port: config.port ?? 22,
-			username: config.username,
-			password: config.password,
-			privateKey: config.privateKey,
-			readyTimeout: 60_000, // Increased from 10s to 60s
+		(client as any).on('error', (err: any) => {
+			this.logger.error(
+				`SFTP Client Error (connect): ${err.message}`,
+				err.stack,
+			);
 		});
+
+		await client.connect(this.getConnectConfig(config));
 
 		return client;
 	}
@@ -138,16 +237,15 @@ export class SftpConnectService {
 		remotePath: string,
 	): Promise<FileInfo[]> {
 		const client = this.createClient();
+		(client as any).on('error', (err: any) => {
+			this.logger.error(
+				`SFTP Client Error (listDirect): ${err.message}`,
+				err.stack,
+			);
+		});
 
 		try {
-			await client.connect({
-				host: config.host,
-				port: config.port ?? 22,
-				username: config.username,
-				password: config.password,
-				privateKey: config.privateKey,
-				readyTimeout: 60_000, // Increased from 10s to 60s
-			});
+			await client.connect(this.getConnectConfig(config));
 
 			return await client.list(remotePath);
 		} finally {
@@ -236,15 +334,14 @@ export class SftpConnectService {
 		}
 
 		const client = new SftpClient();
+		(client as any).on('error', (err: any) => {
+			this.logger.error(
+				`SFTP Client Error (uploadFile): ${err.message}`,
+				err.stack,
+			);
+		});
 		try {
-			await client.connect({
-				host: sftp.host,
-				port: sftp.port ?? 22,
-				username: sftp.username,
-				password: sftp.password,
-				privateKey: sftp.privateKey,
-				readyTimeout: 60_000,
-			});
+			await client.connect(this.getConnectConfig(sftp));
 
 			try {
 				await client.mkdir(remoteDir, true);
@@ -256,7 +353,7 @@ export class SftpConnectService {
 				remoteDir,
 				path.basename(localFile),
 			);
-			await client.put(localFile, remotePath);
+			await this.uploadFileWithTimeout(client, localFile, remotePath);
 		} finally {
 			await client.end();
 		}
@@ -322,7 +419,7 @@ export class SftpConnectService {
 			const s3 = this.createS3Client(sftp);
 
 			const current = path.basename(localDir); // 20260603164430404
-			const parent = path.basename(path.dirname(localDir)); // release_parsed (bỏ qua)
+			const _parent = path.basename(path.dirname(localDir)); // release_parsed (bỏ qua)
 
 			// Lấy UPC folders bên trong localDir
 			const upcFolders = fs.readdirSync(localDir);
@@ -342,15 +439,14 @@ export class SftpConnectService {
 		}
 
 		const client = new SftpClient();
+		(client as any).on('error', (err: any) => {
+			this.logger.error(
+				`SFTP Client Error (uploadFolder): ${err.message}`,
+				err.stack,
+			);
+		});
 		try {
-			await client.connect({
-				host: sftp.host,
-				port: sftp.port ?? 22,
-				username: sftp.username,
-				password: sftp.password,
-				privateKey: sftp.privateKey,
-				readyTimeout: 60_000,
-			});
+			await client.connect(this.getConnectConfig(sftp));
 
 			const targetRemoteDir = path.posix.join(
 				remoteDir,
@@ -415,7 +511,9 @@ export class SftpConnectService {
 
 		try {
 			content = JSON.parse(contentText);
-		} catch {}
+		} catch {
+			// Ignore JSON parsing errors and use raw content text
+		}
 
 		return {
 			status: this.getVevoResponseStatus(responseObject.Key),
@@ -565,8 +663,12 @@ export class SftpConnectService {
 			if (entry.isDirectory()) {
 				await this.uploadRecursive(client, lp, rp, onFileUploaded);
 			} else if (entry.isFile()) {
-				await client.put(lp, rp);
-				onFileUploaded?.(lp);
+				await this.uploadFileWithTimeout(
+					client,
+					lp,
+					rp,
+					onFileUploaded,
+				);
 			}
 		}
 	}
@@ -580,6 +682,10 @@ export class SftpConnectService {
 			},
 			endpoint: config.endpoint,
 			forcePathStyle: !!config.endpoint,
+			requestHandler: new NodeHttpHandler({
+				connectionTimeout: 60000, // 1 phút để thiết lập kết nối mạng ban đầu
+				socketTimeout: 300000, // 5 phút không có gói tin nào truyền nhận qua socket thì ngắt và báo lỗi
+			}),
 		});
 	}
 
@@ -650,13 +756,41 @@ export class SftpConnectService {
 				);
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
-				await s3.send(
-					new PutObjectCommand({
-						Bucket: config.bucket!,
-						Key: key,
-						Body: fs.createReadStream(localPath),
-					}),
-				);
+				const stats = fs.statSync(localPath);
+				const abortController = new AbortController();
+				const fileStream = fs.createReadStream(localPath);
+				const timeout = setTimeout(() => {
+					this.logger.error(
+						`S3 upload timed out after 1 hour: ${key}`,
+					);
+					abortController.abort();
+					fileStream.destroy();
+				}, this.s3UploadTimeoutMs);
+
+				this.logger.log(`file size ${stats.size}`);
+				this.logger.log(`Starting S3 upload: ${key}`);
+
+				try {
+					await s3.send(
+						new PutObjectCommand({
+							Bucket: config.bucket!,
+							Key: key,
+							Body: fileStream,
+							ContentLength: stats.size, // <--- Báo kích thước file để không nạp đệm toàn bộ vào RAM
+						}),
+						{ abortSignal: abortController.signal },
+					);
+					this.logger.log(`Completed S3 upload: ${key}`);
+				} catch (error) {
+					this.logger.error(
+						`S3 upload failed: ${key}`,
+						error instanceof Error ? error.stack : String(error),
+					);
+					throw error;
+				} finally {
+					clearTimeout(timeout);
+					fileStream.destroy();
+				}
 			}
 		}
 	}
