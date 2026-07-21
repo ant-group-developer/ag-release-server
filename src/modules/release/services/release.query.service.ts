@@ -1724,7 +1724,8 @@ export class ReleaseQueryService {
 							'code', dsp.code,
 							'codeCi', dsp.code_ci,
 							'picture', dsp.picture,
-							'type', dsp.type
+							'type', dsp.type,
+							'isActive', dsp.is_active
 						)
 					)
 				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`,
