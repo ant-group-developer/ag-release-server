@@ -4,7 +4,7 @@ import { ReleaseExecution3 } from 'src/modules/release/modules/release-execution
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 export enum LogLevel {
-	INFO = 'INFO',
+	LOG = 'LOG',
 	SUCCESS = 'SUCCESS',
 	WARNING = 'WARNING',
 	ERROR = 'ERROR',
@@ -32,7 +32,7 @@ export enum LogModule {
 export class Logs extends BaseUUIDEntity {
 	@Column({
 		type: 'varchar',
-		default: LogLevel.INFO,
+		default: LogLevel.LOG,
 	})
 	level: LogLevel;
 

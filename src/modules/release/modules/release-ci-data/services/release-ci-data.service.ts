@@ -1257,7 +1257,7 @@ export class ReleaseCiDataService {
 					this.logsService.warning({
 						module: LogModule.RELEASE,
 						type: LogCategory.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | Sai ISRC nhưng khớp Title. Tự động lấp vào vị trí số ${newOrder}.`,
+						message: `[WARNING] | ${trackInfo} | ISRC mismatched but Title matched. Automatically placed at position ${newOrder}.`,
 						data: baseData,
 					});
 					break;
@@ -1266,7 +1266,7 @@ export class ReleaseCiDataService {
 					this.logsService.warning({
 						module: LogModule.RELEASE,
 						type: LogCategory.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | Sai ISRC và Title. Tự động đưa vào vị trí trống số ${newOrder} theo phương pháp loại trừ.`,
+						message: `[WARNING] | ${trackInfo} | ISRC and Title mismatched. Automatically placed in empty position ${newOrder} using elimination method.`,
 						data: baseData,
 					});
 					break;
@@ -1275,7 +1275,7 @@ export class ReleaseCiDataService {
 					this.logsService.warning({
 						module: LogModule.RELEASE,
 						type: LogCategory.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | Dư thừa track so với CI. Tự động xếp xuống cuối danh sách (Thứ tự mới: ${newOrder}).`,
+						message: `[WARNING] | ${trackInfo} | Extra track compared to CI. Automatically appended to the end of the list (New position: ${newOrder}).`,
 						data: baseData,
 					});
 					break;
@@ -1284,7 +1284,7 @@ export class ReleaseCiDataService {
 					this.logsService.log({
 						module: LogModule.RELEASE,
 						type: LogCategory.BUSINESS,
-						message: `[UPDATE] | ${trackInfo} | Đổi thứ tự từ ${oldOrder} sang ${newOrder}`,
+						message: `[UPDATE] | ${trackInfo} | Changed order from ${oldOrder} to ${newOrder}`,
 						data: baseData,
 					});
 					break;
