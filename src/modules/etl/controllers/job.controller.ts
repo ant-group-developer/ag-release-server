@@ -20,6 +20,7 @@ import {
 	computeProgressDetail,
 } from '../services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
+import { EtlImportHistoryRepository } from '../services/etl-import-history/etl-import-history.repository';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -27,7 +28,49 @@ export class JobController {
 	constructor(
 		private readonly importJobsService: ImportJobsService,
 		private readonly jobEvents: JobEventsGateway,
+		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
+
+	@Get('jobs/:id/status-detail')
+	@ApiOperation({
+		summary: 'Get per-file import detail for a job',
+		description:
+			'Returns etl_import_history records grouped by period → category → dsp_folder → files[]',
+	})
+	@ApiParam({ name: 'id', description: 'Job ID' })
+	async getJobStatusDetail(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<any>> {
+		const rows = await this.etlImportHistoryRepository.findByJobId(id);
+		const grouped: Record<string, Record<string, Record<string, any[]>>> = {};
+
+		for (const row of rows) {
+			const period = row.period || '_';
+			const category = row.category || '_';
+			const dspFolder = row.dsp_folder || '_';
+
+			if (!grouped[period]) grouped[period] = {};
+			if (!grouped[period][category]) grouped[period][category] = {};
+			if (!grouped[period][category][dspFolder])
+				grouped[period][category][dspFolder] = [];
+
+			grouped[period][category][dspFolder].push({
+				file_name: row.file_name,
+				file_path: row.file_path,
+				status: row.status,
+				total_lines: row.total_lines,
+				processed_rows: row.processed_rows,
+				skipped_rows: row.skipped_rows,
+				error_rows: row.error_rows,
+				duration_ms: row.duration_ms,
+				error_message: row.error_message || null,
+				started_at: row.started_at,
+				completed_at: row.completed_at,
+			});
+		}
+
+		return new ResponseSuccess({ data: grouped });
+	}
 
 	@Get('jobs/:id')
 	@ApiOperation({
