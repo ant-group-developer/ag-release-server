@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { VevoChannelCallbackDto } from '../channel/dto/vevo.dto';
 import { ChannelService } from '../channel/services/channel.service';
 import { VevoService } from '../channel/services/vevo.service';
+import { LogModule } from '../log/entites/logs.entity';
 import { LogsService } from '../log/services/logs.services';
 import { VideoService } from '../video/video.service';
 import {
@@ -24,16 +25,16 @@ export class WebhookService {
 
 	async handleVevoChannelCallback(payload: VevoChannelCallbackDto) {
 		this.logsService.log({
-			module: 'webhook.vevo.channel',
-			message: 'Received Vevo channel callback',
+			module: LogModule.VEVO_WEBHOOK,
+			message: `[CHANNEL_RECEIVE] Vevo channel callback: ${payload.channel_name || 'Unknown'}`,
 			data: { payload },
 		});
 
 		const result = await this.channelService.handleVevoCallback(payload);
 
 		this.logsService.log({
-			module: 'webhook.vevo.channel',
-			message: 'Handled Vevo channel callback',
+			module: LogModule.VEVO_WEBHOOK,
+			message: `[CHANNEL_HANDLED] Vevo channel callback: ${payload.channel_name || 'Unknown'}`,
 			data: { payload, result },
 		});
 
@@ -44,8 +45,8 @@ export class WebhookService {
 		payload: VevoVideoNotificationDto,
 	) {
 		this.logsService.log({
-			module: 'webhook.vevo.video',
-			message: 'Received Vevo video notification callback',
+			module: LogModule.VEVO_WEBHOOK,
+			message: `[VIDEO_RECEIVE] Vevo video callback - ISRC: ${payload.isrc} | Stage: ${payload.stage}`,
 			data: { payload },
 		});
 
@@ -57,8 +58,8 @@ export class WebhookService {
 			};
 
 			this.logsService.log({
-				module: 'webhook.vevo.video',
-				message: 'Handled Vevo video notification callback',
+				module: LogModule.VEVO_WEBHOOK,
+				message: `[VIDEO_HANDLED] Vevo video callback (PRE-STAGE) - ISRC: ${payload.isrc}`,
 				data: { payload, result },
 			});
 
@@ -72,8 +73,8 @@ export class WebhookService {
 		});
 
 		this.logsService.log({
-			module: 'webhook.vevo.video',
-			message: 'Handled Vevo video notification callback',
+			module: LogModule.VEVO_WEBHOOK,
+			message: `[VIDEO_HANDLED] Vevo video callback - ISRC: ${payload.isrc} | Operation: ${payload.operation}`,
 			data: { payload, result },
 		});
 

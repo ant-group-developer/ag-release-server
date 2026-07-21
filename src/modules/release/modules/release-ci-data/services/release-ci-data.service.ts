@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { from, lastValueFrom } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { ErrorType, LogLevel } from 'src/modules/log/entites/logs.entity';
+import { LogCategory, LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.service';
@@ -975,7 +975,10 @@ export class ReleaseCiDataService {
 			.andWhere("release.upc != ''")
 			.andWhere('ciData.status = :ciStatus', {
 				ciStatus: ReleaseCiDataStatus.EXISTS_ON_CI,
-			});
+			})
+			.andWhere(
+				`("ciData"."import_parsed_data" ->> 'status' != 'complete' OR "ciData"."import_parsed_data" ->> 'status' IS NULL)`,
+			);
 
 		if (targetReleaseIds.size > 0) {
 			qb.andWhere('release.id IN (:...ids)', {
@@ -1252,36 +1255,36 @@ export class ReleaseCiDataService {
 			switch (item.matchType) {
 				case 'TITLE':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | ISRC mismatch but Title matches. Auto-filling at position ${newOrder}.`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Sai ISRC nhưng khớp Title. Tự động lấp vào vị trí số ${newOrder}.`,
 						data: baseData,
 					});
 					break;
 
 				case 'INDEX':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | ISRC and Title mismatch. Auto-filling empty position ${newOrder} by elimination.`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Sai ISRC và Title. Tự động đưa vào vị trí trống số ${newOrder} theo phương pháp loại trừ.`,
 						data: baseData,
 					});
 					break;
 
 				case 'APPEND':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | Extra track compared to CI. Automatically placed at the end of the list (New order: ${newOrder}).`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Dư thừa track so với CI. Tự động xếp xuống cuối danh sách (Thứ tự mới: ${newOrder}).`,
 						data: baseData,
 					});
 					break;
 
 				default:
 					this.logsService.log({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[UPDATE] | ${trackInfo} | Changed order from ${oldOrder} to ${newOrder}`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[UPDATE] | ${trackInfo} | Đổi thứ tự từ ${oldOrder} sang ${newOrder}`,
 						data: baseData,
 					});
 					break;

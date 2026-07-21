@@ -4,12 +4,12 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { Brackets, Repository } from 'typeorm';
 import { QueryGetListLogDto } from '../dto/log.dto';
-import { ErrorType, LogLevel, Logs } from '../entites/logs.entity';
+import { LogCategory, LogLevel, LogModule, Logs } from '../entites/logs.entity';
 
 type WriteLogDto = {
 	level?: LogLevel;
-	type?: ErrorType;
-	module?: string;
+	type?: LogCategory;
+	module?: LogModule;
 	message?: string;
 	data?: Record<string, any>;
 
@@ -29,7 +29,7 @@ export class LogsService {
 	 */
 	private readonly saveDbLevels: LogLevel[] = [
 		LogLevel.SUCCESS,
-		LogLevel.LOG,
+		LogLevel.INFO,
 		LogLevel.ERROR,
 		LogLevel.WARNING,
 	];
@@ -49,7 +49,7 @@ export class LogsService {
 	log(dto: Omit<WriteLogDto, 'level'>) {
 		this.saveDbAndSendNotificationToDev_Safe({
 			...dto,
-			level: LogLevel.LOG,
+			level: LogLevel.INFO,
 		});
 	}
 
@@ -82,7 +82,7 @@ export class LogsService {
 				break;
 		}
 
-		// if (data.type === ErrorType.SYSTEM) {
+		// if (data.type === LogCategory .SYSTEM) {
 		// 	this.notificationService
 		// 		.sendToDev({
 		// 			subject: `[${data.level}] SYSTEM ERROR`,

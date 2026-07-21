@@ -4,7 +4,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
-import { ErrorType, LogLevel } from '../entites/logs.entity';
+import { LogCategory, LogLevel } from '../entites/logs.entity';
 
 export enum FieldOrderLog {
 	log_createdAt = 'log.createdAt',
@@ -32,7 +32,7 @@ export class QueryGetListLogDto extends BaseQueryDto2 {
 	level?: LogLevel[];
 
 	@ApiPropertyOptional({
-		enum: ErrorType,
+		enum: LogCategory,
 		isArray: true,
 		description: 'Filter by error types. Accepts comma-separated values.',
 	})
@@ -45,8 +45,8 @@ export class QueryGetListLogDto extends BaseQueryDto2 {
 			: [],
 	)
 	@IsArray()
-	@IsEnum(ErrorType, { each: true })
-	type?: ErrorType[];
+	@IsEnum(LogCategory, { each: true })
+	type?: LogCategory[];
 
 	@ApiPropertyOptional({
 		isArray: true,
