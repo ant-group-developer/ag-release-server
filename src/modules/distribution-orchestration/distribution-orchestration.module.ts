@@ -5,7 +5,10 @@ import { AppConfigModule } from '../app-config/app-config.module';
 import { AppConfigService } from '../app-config/app-config.service';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
+import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { ErnModule2 } from '../ern2/ern.module';
+import { IsrcModule } from '../external/isrc/isrc.module';
+import { UpcModule } from '../external/upc/upc.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
@@ -20,16 +23,20 @@ import { ReleaseDspDeliveryProjection } from './application/projection/release-d
 import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
 import { PACKAGE_BUILDER } from './application/step-runners/build-package.runner';
 import { INGEST_RESULT_READER } from './application/step-runners/ci-import-check.runner';
+import { IDENTIFIER_PROVISIONER } from './application/step-runners/provision-id.runner';
 import { QA_CHECKER } from './application/step-runners/qa.runner';
+import { PACKAGE_UPLOADER } from './application/step-runners/sftp-upload.runner';
 import { DELIVERY_STATUS_READER } from './application/step-runners/status-sync.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
 import { DdexXmlPackageBuilder } from './infrastructure/adapters/ddex-xml-package-builder.adapter';
+import { GrpcIdentifierAdapter } from './infrastructure/adapters/grpc-identifier.adapter';
 import {
 	PostgresTicketAdapter,
 	TICKET_SERVICE,
 } from './infrastructure/adapters/postgres-ticket.adapter';
+import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
@@ -77,8 +84,8 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  *
  *   · TICKET_SERVICE           → PostgresTicketAdapter (Group B) ✅ WIRED
  *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C) ✅ WIRED
- *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D)
- *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D)
+ *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D) ✅ WIRED
+ *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D) ✅ WIRED
  *   · EXPORTER                 → ExporterAdapter (Group E)
  */
 @Module({
@@ -91,13 +98,17 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			OrchestrationTicketOrmEntity,
 			ReleaseSnapshotOrmEntity,
 		]),
-		AppConfigModule, // For CI API config
+		AppConfigModule, // For CI API config + generator config (UPC/ISRC prefix IDs)
 		CiModule, // Keep v3 services for backward compatibility
 		CiApiModule, // New CI API services for orchestration
 		// Group C: DdexXmlPackageBuilder dependencies
 		ErnModule2, // ErnService2 — DDEX XML generation
 		BucketModule2, // BucketService2 — download audio/cover from cloud
-		DspRoutingConfigsModule, // DspRoutingConfigsService — resolve ERN config
+		DspRoutingConfigsModule, // DspRoutingConfigsService — resolve ERN + SFTP config
+		// Group D: GrpcIdentifierAdapter + SftpUploaderAdapter dependencies
+		UpcModule, // UpcService — gRPC UPC provisioning
+		IsrcModule, // IsrcService — gRPC ISRC provisioning
+		SftpConnectModule, // SftpConnectService — SFTP/S3 upload
 	],
 	controllers: [DistributionController],
 	providers: [
@@ -131,6 +142,8 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: DELIVERY_STATUS_READER, useClass: CiDeliverDesireAdapter },
 		{ provide: TICKET_SERVICE, useClass: PostgresTicketAdapter },
 		{ provide: PACKAGE_BUILDER, useClass: DdexXmlPackageBuilder },
+		{ provide: IDENTIFIER_PROVISIONER, useClass: GrpcIdentifierAdapter },
+		{ provide: PACKAGE_UPLOADER, useClass: SftpUploaderAdapter },
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,

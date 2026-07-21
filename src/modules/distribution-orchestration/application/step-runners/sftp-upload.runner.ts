@@ -78,7 +78,7 @@ export class SftpUploadRunner {
 
 		// VIA_AGGREGATOR: đánh dấu .done để CI nhận batch = imported
 		if (channel.spec.aggregatorCode) {
-			await this.uploader.markBatchDone({ path, key });
+			await this.uploader.markBatchDone({ path, dspCode, key });
 		}
 
 		return {

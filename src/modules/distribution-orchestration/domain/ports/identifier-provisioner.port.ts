@@ -14,6 +14,7 @@ export interface IdentifierProvisioner {
 	}): Promise<Upc>;
 	provisionIsrcs(input: {
 		trackIds: string[];
+		releaseId: string;
 		key: IdempotencyKey;
 	}): Promise<Map<string, Isrc>>;
 }
