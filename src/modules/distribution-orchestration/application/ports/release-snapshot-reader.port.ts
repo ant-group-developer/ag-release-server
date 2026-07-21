@@ -35,7 +35,11 @@ export interface ReleaseSnapshot {
 	readonly tracks?: Array<{ id: string; title?: string; isrc?: string }>;
 	readonly releaseArtists?: Array<{ id: string; name?: string }>;
 	readonly releaseCoverArts?: Array<{ id: string; url?: string }>;
-	readonly territories?: Array<{ id: string; code?: string }>;
+	// Territory: OneToOne (không phải mảng) — khớp Release entity thật
+	readonly releaseTerritory?: {
+		distributeWorldwide?: boolean | null;
+		selectedCountries?: string[] | null;
+	} | null;
 	// Full jsonb payload for future extensibility
 	readonly payload: Record<string, unknown>;
 }

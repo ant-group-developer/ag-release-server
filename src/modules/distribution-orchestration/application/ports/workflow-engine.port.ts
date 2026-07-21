@@ -43,6 +43,8 @@ export interface JobPayload {
 	readonly command?: unknown; // generic unknown để tránh circular dep; worker cast về DistributionCommand
 	/** Optional: for channel-specific jobs (DELIVERING state), mang channelId */
 	readonly channelId?: string;
+	/** Optional: đếm số lần re-poll của bước WAIT (runner trả null) — dùng cho jobId re-poll unique */
+	readonly pollAttempt?: number;
 }
 
 /**

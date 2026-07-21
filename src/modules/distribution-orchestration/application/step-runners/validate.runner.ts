@@ -14,6 +14,7 @@ import {
 } from '../ports/distribution-repository.port';
 import {
 	RELEASE_SNAPSHOT_READER,
+	ReleaseSnapshot,
 	ReleaseSnapshotReader,
 } from '../ports/release-snapshot-reader.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
@@ -110,7 +111,7 @@ export class ValidateRunner {
 	 * Validate snapshot required fields.
 	 * @returns array of error messages (empty = clean)
 	 */
-	private validateSnapshot(snapshot: any): string[] {
+	private validateSnapshot(snapshot: ReleaseSnapshot): string[] {
 		const errors: string[] = [];
 
 		// Release-level required fields
@@ -129,17 +130,25 @@ export class ValidateRunner {
 		const tracks = snapshot.tracks || [];
 		const artists = snapshot.releaseArtists || [];
 		const coverArts = snapshot.releaseCoverArts || [];
-		const territories = snapshot.territories || [];
 
 		if (tracks.length === 0) errors.push('At least 1 track is required');
 		if (artists.length === 0) errors.push('At least 1 artist is required');
 		if (coverArts.length === 0)
 			errors.push('At least 1 cover art is required');
-		if (territories.length === 0)
-			errors.push('At least 1 territory is required');
+
+		// Territory (OneToOne): worldwide HOẶC ≥1 selectedCountries
+		const territory = snapshot.releaseTerritory;
+		const hasTerritory =
+			!!territory &&
+			(territory.distributeWorldwide === true ||
+				(territory.selectedCountries?.length ?? 0) > 0);
+		if (!hasTerritory)
+			errors.push(
+				'Territory is required (worldwide or at least 1 country)',
+			);
 
 		// Track-level validation (each track needs title + ISRC)
-		tracks.forEach((track: any, idx: number) => {
+		tracks.forEach((track, idx: number) => {
 			if (!track.title)
 				errors.push(`Track ${idx + 1}: title is required`);
 			if (!track.isrc) errors.push(`Track ${idx + 1}: ISRC is required`);

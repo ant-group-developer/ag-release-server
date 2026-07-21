@@ -93,10 +93,21 @@ Mỗi queue một Worker. Worker xử lý theo 2 nhóm:
 - [✅] Wire module đầy đủ
 - [✅] Integration test: submit → validate → provision → build → deliver → LIVE qua Worker thật (testcontainers Redis+PG)
 
-**Status:** ✅ DONE (2026-07-21)
-**Files:** 7 new, 3 modified, 646 LOC
-**Tests:** 229 pass (E2E + unit)
-**Code Review:** 4 enhancement notes (2 high, 2 medium) — see review output
+**Status:** ✅ DONE (2026-07-21) + review fixes applied
+**Tests:** 239 pass (runInBand — song song bị flaky testcontainer "starting up")
+
+**Review fixes (2026-07-21) — 5 lỗi sau review Khối A:**
+1. **Re-poll (nghiêm trọng):** `processJob` cũ `return` khi runner trả null → mọi bước WAIT (ci-import, status-sync) kẹt vĩnh viễn. Fix: null → re-enqueue CÙNG queue với `delayMs` (`repoll-delay.config.ts`: import 5m, status-sync 1h) + `pollAttempt` counter → jobId unique mỗi lần (tránh BullMQ dedupe chặn). `JobPayload.pollAttempt?` mới.
+2. **Snapshot (nghiêm trọng):** submit cũ nhận `snapshotId` từ body, KHÔNG tạo snapshot → validate luôn "snapshot not found". Fix: `ReleaseSnapshotWriter` port + `ReleaseSnapshotWriterAdapter` (bọc `ReleaseQueryService.findOneReleaseFull` → JSON round-trip → INSERT release_snapshot). Service submit tạo snapshot trước khi enqueue. Import `ReleaseModule`.
+3. **Auth:** submit endpoint dùng `@User()` lấy `tenantId` từ JWT (global JwtAuthGuard+PolicyGuard đã có), KHÔNG nhận tenantId từ body. `SubmitDistributionDto` với `@IsUUID/@IsEnum/@ArrayNotEmpty`.
+4. **DTO enum:** `type` validate `@IsEnum(ExecutionTypeEnum)` thay `as any` + comment sai (`INITIAL` → `INITIAL_RELEASE`).
+5. **Idempotency:** key ổn định `submit:{releaseId}:{type}` (hoặc client cấp) thay `Date.now()` → double-submit dedupe.
+
+**Fix phụ (field mismatch):** validate territory dùng `releaseTerritory` (OneToOne: worldwide HOẶC ≥1 selectedCountries), KHÔNG phải `territories[]` — đối chiếu Release entity thật. Reader + port + runner đồng bộ.
+
+**Test mới:** `validate.runner.spec.ts` (6 case: clean/missing-field/territory×2/track-isrc/snapshot-missing), `distribution-worker.repoll.spec.ts` (4 case: orchestrate no-enqueue/command→orchestrate/null→re-poll/pollAttempt tăng).
+
+**CÒN LẠI (chưa trong scope fix này):** #6 (runner command bypass outbox — an toàn nhờ job retry + idempotent, chỉ cần comment rõ) chưa xử lý; E2E vẫn bypass validation (drain dist.validate). Khối B sẽ nối tenant.requiresManualReview thật (hiện hardcode false ở validate.runner).
 
 ---
 

@@ -12,6 +12,7 @@ import { IsrcModule } from '../external/isrc/isrc.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { NotificationModule } from '../notification/notification.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { ReleaseModule } from '../release/release.module';
 import { Tenant } from '../tenant/tenant.entity';
 import { DistributionCommandService } from './application/distribution-command.service';
 import { OrchestrateHandler } from './application/orchestrate.handler';
@@ -22,6 +23,7 @@ import {
 import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
 import { RELEASE_SNAPSHOT_READER } from './application/ports/release-snapshot-reader.port';
+import { RELEASE_SNAPSHOT_WRITER } from './application/ports/release-snapshot-writer.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
@@ -63,6 +65,7 @@ import {
 	TICKET_SERVICE,
 } from './infrastructure/adapters/postgres-ticket.adapter';
 import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
+import { ReleaseSnapshotWriterAdapter } from './infrastructure/adapters/release-snapshot-writer.adapter';
 import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
@@ -143,6 +146,8 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 		SftpConnectModule, // SftpConnectService — SFTP/S3 upload
 		// Group E: ExporterAdapter dependencies
 		NotificationModule, // NotificationResendService — Resend API email
+		// Khối A fix: snapshot writer bọc ReleaseQueryService
+		ReleaseModule, // ReleaseQueryService — findOneReleaseFull cho snapshot
 	],
 	controllers: [DistributionController, DistributionCommandController],
 	providers: [
@@ -182,6 +187,10 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 		{
 			provide: RELEASE_SNAPSHOT_READER,
 			useClass: ReleaseSnapshotReaderAdapter,
+		},
+		{
+			provide: RELEASE_SNAPSHOT_WRITER,
+			useClass: ReleaseSnapshotWriterAdapter,
 		},
 		// Step runners (consumers for BullMQ jobs)
 		BuildPackageRunner,

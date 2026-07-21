@@ -11,11 +11,13 @@ import Redis from 'ioredis';
 import { Inject } from '@nestjs/common';
 import {
 	EnqueueOptions,
+	JobPayload,
 	QUEUES,
 	QueueName,
 	WORKFLOW_ENGINE,
 	WorkflowEnginePort,
 } from '../../application/ports/workflow-engine.port';
+import { REPOLL_DELAY_MS } from './repoll-delay.config';
 import { RunnerDispatchMap } from './runner-dispatch-map';
 
 /**
@@ -109,20 +111,33 @@ export class DistributionWorkerService
 	}
 
 	/**
-	 * Process job: dispatch → runner/handler → enqueue command nếu có.
+	 * Process job: dispatch → runner/handler → enqueue command HOẶC re-poll.
+	 *
+	 * Trả về từ dispatch:
+	 *   · `dist.orchestrate` → LUÔN null (handler đã persist state) → không làm gì thêm.
+	 *   · runner queue trả command → enqueue lại vào `dist.orchestrate`.
+	 *   · runner queue trả null → bước WAIT còn 'pending' → RE-POLL: enqueue lại chính
+	 *     queue đó với delayMs (nhả worker ngay, BullMQ đánh thức sau). KHÔNG block.
 	 */
-	private async processJob(queue: QueueName, payload: any): Promise<void> {
+	private async processJob(
+		queue: QueueName,
+		payload: JobPayload,
+	): Promise<void> {
 		const command = await this.dispatchMap.dispatch(queue, payload);
 
+		// dist.orchestrate: handler tự persist, không trả command → xong.
+		if (queue === QUEUES.ORCHESTRATE) return;
+
+		// Runner trả null = chưa có kết quả (WAIT pending) → re-poll cùng queue.
 		if (!command) {
-			// dist.orchestrate hoặc runner poll chưa có kết quả
+			await this.repoll(queue, payload);
 			return;
 		}
 
-		// Runner trả command → enqueue lại vào dist.orchestrate
+		// Runner trả command → enqueue lại vào dist.orchestrate.
 		const opts: EnqueueOptions = {
-			jobId: `${payload.distributionId}:${command.type}:${command.key}`,
-			attempts: 3, // Default retry; Khối D sẽ map theo RetryPolicy
+			jobId: `${command.distributionId}:${command.type}:${command.key}`,
+			attempts: 3, // Default retry; Khối D map theo RetryPolicy
 		};
 
 		await this.workflowEngine.enqueue(
@@ -134,6 +149,26 @@ export class DistributionWorkerService
 				command, // Mang toàn bộ command vào payload
 			},
 			opts,
+		);
+	}
+
+	/**
+	 * Re-poll: enqueue lại queue hiện tại sau delayMs.
+	 *
+	 * jobId phải KHÁC nhau mỗi lần poll — nếu giữ nguyên jobId, BullMQ dedupe sẽ
+	 * chặn lần re-enqueue kế → job kẹt. Dùng attempt counter trong key.
+	 */
+	private async repoll(queue: QueueName, payload: JobPayload): Promise<void> {
+		const attempt = (payload.pollAttempt ?? 0) + 1;
+		const delayMs = REPOLL_DELAY_MS(queue);
+
+		await this.workflowEngine.enqueue(
+			queue,
+			{ ...payload, pollAttempt: attempt },
+			{
+				jobId: `${payload.distributionId}:${queue}:poll-${attempt}:${payload.key}`,
+				delayMs,
+			},
 		);
 	}
 }

@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 
+import { ExecutionTypeEnum } from '../domain/value-objects/execution-type.enum';
 import { SubmitCommand } from './commands/distribution.command';
+import {
+	RELEASE_SNAPSHOT_WRITER,
+	ReleaseSnapshotWriter,
+} from './ports/release-snapshot-writer.port';
 import {
 	EnqueueOptions,
 	QUEUES,
@@ -12,33 +17,44 @@ import {
 /**
  * DistributionCommandService — entry point cho HTTP → queue.
  *
- * Khối A chỉ implement `submit`. Khối B/E sẽ thêm `approveReview`/`rejectReview`/`retry`.
- * Service này enqueue command vào `dist.orchestrate` qua WorkflowEnginePort.
+ * Khối A implement `submit`: tạo snapshot bất biến từ release → enqueue SUBMIT.
+ * Khối B/E thêm approveReview/rejectReview/retry.
  */
 @Injectable()
 export class DistributionCommandService {
 	constructor(
 		@Inject(WORKFLOW_ENGINE)
 		private readonly workflowEngine: WorkflowEnginePort,
+		@Inject(RELEASE_SNAPSHOT_WRITER)
+		private readonly snapshotWriter: ReleaseSnapshotWriter,
 	) {}
 
 	/**
-	 * Submit distribution — tạo snapshot + enqueue SUBMIT command.
+	 * Submit distribution — tạo snapshot bất biến + enqueue SUBMIT command.
 	 *
-	 * @param input - release metadata để tạo distribution
 	 * @returns distributionId
 	 */
 	async submit(input: {
 		releaseId: string;
-		snapshotId: string;
 		tenantId: string;
-		type: string; // ExecutionTypeEnum: 'INITIAL' | 'UPDATE' | 'TAKEDOWN'
-		correlationId: string;
-		channelSpecs: any[]; // ChannelDeliverySpec[]
+		type: ExecutionTypeEnum;
+		channelSpecs: unknown[];
+		idempotencyKey?: string;
 	}): Promise<string> {
 		const distributionId = uuidv4();
-		const key = `submit:${Date.now()}`;
+		const correlationId = uuidv4();
 
+		// Idempotency ổn định: client cấp, hoặc derive từ releaseId+type
+		// → double-submit cùng release+type dùng chung key (jobId dedupe chặn trùng).
+		const key =
+			input.idempotencyKey ?? `submit:${input.releaseId}:${input.type}`;
+
+		// 1. Tạo snapshot bất biến (chụp release tại thời điểm submit)
+		const snapshotId = await this.snapshotWriter.createFromRelease(
+			input.releaseId,
+		);
+
+		// 2. Enqueue SUBMIT với snapshotId vừa tạo
 		const command: SubmitCommand = {
 			type: 'SUBMIT',
 			distributionId,
@@ -46,11 +62,11 @@ export class DistributionCommandService {
 			create: {
 				id: distributionId,
 				releaseId: input.releaseId,
-				snapshotId: input.snapshotId,
+				snapshotId,
 				tenantId: input.tenantId,
-				type: input.type as any,
-				correlationId: input.correlationId,
-				channelSpecs: input.channelSpecs,
+				type: input.type,
+				correlationId,
+				channelSpecs: input.channelSpecs as never,
 			},
 		};
 
@@ -61,12 +77,7 @@ export class DistributionCommandService {
 
 		await this.workflowEngine.enqueue(
 			QUEUES.ORCHESTRATE,
-			{
-				distributionId,
-				correlationId: input.correlationId,
-				key,
-				command,
-			},
+			{ distributionId, correlationId, key, command },
 			opts,
 		);
 

@@ -45,9 +45,19 @@ export class ReleaseSnapshotReaderAdapter implements ReleaseSnapshotReader {
 			tracks: this.getArray(payload, 'tracks') as any,
 			releaseArtists: this.getArray(payload, 'releaseArtists') as any,
 			releaseCoverArts: this.getArray(payload, 'releaseCoverArts') as any,
-			territories: this.getArray(payload, 'territories') as any,
+			releaseTerritory: this.getObject(payload, 'releaseTerritory'),
 			payload,
 		};
+	}
+
+	private getObject(
+		obj: Record<string, unknown>,
+		key: string,
+	): Record<string, unknown> | null {
+		const val = obj[key];
+		return val && typeof val === 'object' && !Array.isArray(val)
+			? (val as Record<string, unknown>)
+			: null;
 	}
 
 	private getString(
