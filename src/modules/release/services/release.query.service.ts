@@ -121,6 +121,12 @@ export class ReleaseQueryService {
 			qbId.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
 			qbId.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 		}
+		if (itemsToJoin.includes('release.video')) {
+			qbId.leftJoinAndSelect('release.video', 'video');
+		}
+		if (itemsToJoin.includes('release.releaseArtists')) {
+			qbId.leftJoinAndSelect('release.releaseArtists', 'releaseArtist');
+		}
 
 		this.applyOrderFieldSelect(qbId, query.fieldOrder);
 
@@ -1190,12 +1196,14 @@ export class ReleaseQueryService {
 		}
 
 		if (artistId?.length) {
+			itemsToJoin.push('release.releaseArtists');
 			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
 				artistId,
 			});
 		}
 
 		if (channelId?.length) {
+			itemsToJoin.push('release.video');
 			qb.andWhere('video.channelId IN (:...channelId)', {
 				channelId,
 			});
