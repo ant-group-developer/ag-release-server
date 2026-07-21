@@ -1106,6 +1106,9 @@ export class TrackQueryService {
 		return {
 			...track,
 
+			isInstrumental:
+				track.isInstrumental ?? release?.isInstrumental ?? false,
+
 			pLineYear: release?.pLineYear,
 			pLineOwner: release?.pLineOwner,
 
