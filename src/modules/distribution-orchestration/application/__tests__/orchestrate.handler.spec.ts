@@ -10,6 +10,7 @@ import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
 import { OptimisticLockError } from '../errors/optimistic-lock.error';
 import { OrchestrateHandler } from '../orchestrate.handler';
 import { DefaultPolicyResolver } from '../policy-resolver';
+import { QUEUES } from '../ports/workflow-engine.port';
 
 /**
  * Test spec cho OrchestrateHandler — vòng lặp 1 turn end-to-end in-memory.
@@ -77,8 +78,9 @@ describe('OrchestrateHandler', () => {
 		expect(repo.getVersion(DIST_ID)).toBe(1);
 		expect(repo.savedEvents).toHaveLength(1);
 		expect(repo.savedEvents[0].type).toBe('DistributionSubmitted');
-		// state VALIDATING → không outbox (đợi external validator)
-		expect(repo.savedOutbox).toHaveLength(0);
+		// state VALIDATING → outbox có 1 job dist.validate (Khối A trigger validation)
+		expect(repo.savedOutbox).toHaveLength(1);
+		expect(repo.savedOutbox[0].queue).toBe(QUEUES.VALIDATE);
 
 		// Load lại → state VALIDATING đúng
 		const loaded = await uow.run((ctx) => repo.load(ctx, DIST_ID));
@@ -107,13 +109,14 @@ describe('OrchestrateHandler', () => {
 			'Validated',
 		]);
 
-		// outbox: 1 job vào dist.provision-id
-		expect(repo.savedOutbox).toHaveLength(1);
-		expect(repo.savedOutbox[0].queue).toBe('dist.provision-id');
-		expect(repo.savedOutbox[0].jobId).toBe(
+		// outbox: 2 jobs (dist.validate từ SUBMIT + dist.provision-id từ MARK_VALIDATED)
+		expect(repo.savedOutbox).toHaveLength(2);
+		expect(repo.savedOutbox[0].queue).toBe(QUEUES.VALIDATE);
+		expect(repo.savedOutbox[1].queue).toBe(QUEUES.PROVISION_ID);
+		expect(repo.savedOutbox[1].jobId).toBe(
 			`${DIST_ID}:${DistributionState.PROVISIONING_IDS}:val-k1`,
 		);
-		expect(repo.savedOutbox[0].payload).toMatchObject({
+		expect(repo.savedOutbox[1].payload).toMatchObject({
 			distributionId: DIST_ID,
 			correlationId: 'corr-1',
 			key: 'val-k1',
@@ -143,8 +146,10 @@ describe('OrchestrateHandler', () => {
 		// events: chỉ 1 lần DistributionSubmitted (turn 2 aggregate guard bỏ qua)
 		expect(repo.savedEvents).toHaveLength(1);
 		expect(repo.savedEvents[0].type).toBe('DistributionSubmitted');
-		// outbox: 0 (state vẫn VALIDATING)
-		expect(repo.savedOutbox).toHaveLength(0);
+		// outbox: 2 jobs dist.validate (cả 2 lần SUBMIT đều emit, vì outbox derive từ state SAU apply)
+		expect(repo.savedOutbox).toHaveLength(2);
+		expect(repo.savedOutbox[0].queue).toBe(QUEUES.VALIDATE);
+		expect(repo.savedOutbox[1].queue).toBe(QUEUES.VALIDATE);
 	});
 
 	// ── 4. MARK_VALIDATED không có aggregate → AggregateNotFoundError ──────
@@ -227,7 +232,9 @@ describe('OrchestrateHandler', () => {
 
 		const jobIds = repo.savedOutbox.map((o) => o.jobId);
 		// jobId cấu tạo: `${distId}:${state}:${key}` → cùng inputs → cùng jobId
+		// SUBMIT key=sub-k1 → dist.validate job; MARK_VALIDATED key=val-fixed-key → dist.provision-id job
 		expect(jobIds).toEqual([
+			`${DIST_ID}:${DistributionState.VALIDATING}:sub-k1`,
 			`${DIST_ID}:${DistributionState.PROVISIONING_IDS}:val-fixed-key`,
 		]);
 	});

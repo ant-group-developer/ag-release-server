@@ -8,6 +8,7 @@ import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { DataSource } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
+import { QUEUES } from '../../../application/ports/workflow-engine.port';
 import { ChannelDeliveryOrmEntity } from '../../persistence/channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from '../../persistence/distribution-event.orm-entity';
 import { DistributionOrmEntity } from '../../persistence/distribution.orm-entity';
@@ -138,7 +139,7 @@ async function insertOutboxEntry(overrides: {
 		 VALUES ($1, $2, $3, $4, $5, $6, 0, NULL)`,
 		[
 			DIST_ID,
-			overrides.queue ?? 'dist.orchestrate',
+			overrides.queue ?? QUEUES.ORCHESTRATE,
 			JSON.stringify({
 				distributionId: DIST_ID,
 				correlationId: '55555555-5555-5555-5555-555555555555',
@@ -180,25 +181,25 @@ describe('BullMQ E2E — OutboxRelay → BullMqWorkflowAdapter → Redis', () =>
 	it('Test 1 — 2 outbox entries → relay dispatch → 2 jobs in Redis queues', async () => {
 		await insertOutboxEntry({
 			jobId: 'e2e-job-1',
-			queue: 'dist.orchestrate',
+			queue: QUEUES.ORCHESTRATE,
 		});
 		await insertOutboxEntry({
 			jobId: 'e2e-job-2',
-			queue: 'dist.provision-id',
+			queue: QUEUES.PROVISION_ID,
 		});
 
 		const dispatched = await relay.pollAndDispatch();
 		expect(dispatched).toBe(2);
 
 		// Verify jobs in Redis
-		const orchestrateJobs = await getJobsFromQueue('dist.orchestrate');
+		const orchestrateJobs = await getJobsFromQueue(QUEUES.ORCHESTRATE);
 		expect(orchestrateJobs).toHaveLength(1);
 		expect(orchestrateJobs[0].id).toBe('e2e-job-1'); // sanitized: no colon in this case
 		expect(orchestrateJobs[0].data).toMatchObject({
 			distributionId: DIST_ID,
 		});
 
-		const provisionJobs = await getJobsFromQueue('dist.provision-id');
+		const provisionJobs = await getJobsFromQueue(QUEUES.PROVISION_ID);
 		expect(provisionJobs).toHaveLength(1);
 		expect(provisionJobs[0].id).toBe('e2e-job-2');
 	});
@@ -206,13 +207,13 @@ describe('BullMQ E2E — OutboxRelay → BullMqWorkflowAdapter → Redis', () =>
 	it('Test 2 — entry with delayMs → job has delay set', async () => {
 		await insertOutboxEntry({
 			jobId: 'delay-job',
-			queue: 'dist.build-package',
+			queue: QUEUES.BUILD_PACKAGE,
 			delayMs: 30_000,
 		});
 
 		await relay.pollAndDispatch();
 
-		const jobs = await getJobsFromQueue('dist.build-package');
+		const jobs = await getJobsFromQueue(QUEUES.BUILD_PACKAGE);
 		expect(jobs).toHaveLength(1);
 		expect(jobs[0].delay).toBe(30_000);
 	});
@@ -224,14 +225,14 @@ describe('BullMQ E2E — OutboxRelay → BullMqWorkflowAdapter → Redis', () =>
 			correlationId: '55555555-5555-5555-5555-555555555555',
 			key: 'dedup-key',
 		};
-		await adapter.enqueue('dist.orchestrate', payload, {
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload, {
 			jobId: 'dedup-test',
 		});
-		await adapter.enqueue('dist.orchestrate', payload, {
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload, {
 			jobId: 'dedup-test',
 		});
 
-		const jobs = await getJobsFromQueue('dist.orchestrate');
+		const jobs = await getJobsFromQueue(QUEUES.ORCHESTRATE);
 		expect(jobs).toHaveLength(1);
 	});
 
@@ -239,12 +240,12 @@ describe('BullMQ E2E — OutboxRelay → BullMqWorkflowAdapter → Redis', () =>
 		// This simulates the real handler jobId format: ${distId}:${state}:${key}
 		await insertOutboxEntry({
 			jobId: `${DIST_ID}:PROVISIONING_IDS:key-1`,
-			queue: 'dist.provision-id',
+			queue: QUEUES.PROVISION_ID,
 		});
 
 		await relay.pollAndDispatch();
 
-		const jobs = await getJobsFromQueue('dist.provision-id');
+		const jobs = await getJobsFromQueue(QUEUES.PROVISION_ID);
 		expect(jobs).toHaveLength(1);
 		// Colons replaced with dashes by sanitizeJobId
 		expect(jobs[0].id).toBe(
@@ -256,13 +257,13 @@ describe('BullMQ E2E — OutboxRelay → BullMqWorkflowAdapter → Redis', () =>
 		const runAt = new Date(Date.now() + 60_000); // 1 minute from now
 		await insertOutboxEntry({
 			jobId: 'sched-job',
-			queue: 'dist.ci-import-check',
+			queue: QUEUES.CI_IMPORT_CHECK,
 			runAt,
 		});
 
 		await relay.pollAndDispatch();
 
-		const jobs = await getJobsFromQueue('dist.ci-import-check');
+		const jobs = await getJobsFromQueue(QUEUES.CI_IMPORT_CHECK);
 		expect(jobs).toHaveLength(1);
 		// Delay should be approximately 60s (± a few seconds for test execution time)
 		expect(jobs[0].delay).toBeGreaterThan(50_000);

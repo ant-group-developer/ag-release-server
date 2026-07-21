@@ -12,6 +12,8 @@ import { IsrcModule } from '../external/isrc/isrc.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { NotificationModule } from '../notification/notification.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { Tenant } from '../tenant/tenant.entity';
+import { DistributionCommandService } from './application/distribution-command.service';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
 	DefaultPolicyResolver,
@@ -19,6 +21,7 @@ import {
 } from './application/policy-resolver';
 import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
+import { RELEASE_SNAPSHOT_READER } from './application/ports/release-snapshot-reader.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
@@ -48,6 +51,7 @@ import {
 	DELIVERY_STATUS_READER,
 	StatusSyncRunner,
 } from './application/step-runners/status-sync.runner';
+import { ValidateRunner } from './application/step-runners/validate.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
@@ -58,10 +62,12 @@ import {
 	PostgresTicketAdapter,
 	TICKET_SERVICE,
 } from './infrastructure/adapters/postgres-ticket.adapter';
+import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
 import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
+import { DistributionCommandController } from './infrastructure/http/distribution-command.controller';
 import { DistributionController } from './infrastructure/http/distribution.controller';
 import { ChannelDeliveryOrmEntity } from './infrastructure/persistence/channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from './infrastructure/persistence/distribution-event.orm-entity';
@@ -74,6 +80,8 @@ import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
 import { DistributionSseService } from './infrastructure/sse/distribution-sse.service';
 import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow.adapter';
+import { DistributionWorkerService } from './infrastructure/workflow/distribution-worker.service';
+import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map';
 
 /**
  * DistributionOrchestrationModule — scaffold cho Phase 2 + Phase 4 ACL adapters.
@@ -120,6 +128,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			OrchestrationTicketOrmEntity,
 			ReleaseSnapshotOrmEntity,
 			Aggregator, // Group E: ExporterAdapter queries State51 aggregator
+			Tenant, // ValidateRunner reads tenant (Khối B will add requiresManualReview)
 		]),
 		AppConfigModule, // For CI API config + generator config (UPC/ISRC prefix IDs)
 		CiModule, // Keep v3 services for backward compatibility
@@ -135,7 +144,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		// Group E: ExporterAdapter dependencies
 		NotificationModule, // NotificationResendService — Resend API email
 	],
-	controllers: [DistributionController],
+	controllers: [DistributionController, DistributionCommandController],
 	providers: [
 		// CI API Config provider
 		{
@@ -170,6 +179,10 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: IDENTIFIER_PROVISIONER, useClass: GrpcIdentifierAdapter },
 		{ provide: PACKAGE_UPLOADER, useClass: SftpUploaderAdapter },
 		{ provide: EXPORTER, useClass: ExporterAdapter },
+		{
+			provide: RELEASE_SNAPSHOT_READER,
+			useClass: ReleaseSnapshotReaderAdapter,
+		},
 		// Step runners (consumers for BullMQ jobs)
 		BuildPackageRunner,
 		ProvisionIdRunner,
@@ -178,12 +191,17 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		QaRunner,
 		StatusSyncRunner,
 		ExportBatchRunner,
+		ValidateRunner,
 		// Application services
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
 		DistributionSseService,
 		ReleaseDspDeliveryProjection,
+		DistributionCommandService,
+		// Khối A: Worker + dispatch
+		DistributionWorkerService,
+		RunnerDispatchMap,
 	],
 })
 export class DistributionOrchestrationModule {}

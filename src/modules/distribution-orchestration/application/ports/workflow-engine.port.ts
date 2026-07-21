@@ -1,16 +1,21 @@
 /**
- * Tên queue — union hẹp thay vì string tự do (compile-time check).
- * Thêm queue mới = thêm vào union này.
+ * Tên queue — single source of truth. Đổi giá trị string chỉ sửa ở đây,
+ * mọi call site dùng QUEUES.XXX nên compiler tự báo lỗi nếu tham chiếu sai.
  */
-export type QueueName =
-	| 'dist.orchestrate' // turn engine: nhận command, chạy 6 bước
-	| 'dist.provision-id' // worker cấp UPC/ISRC
-	| 'dist.build-package' // worker build DDEX + upload GCS
-	| 'dist.sftp-upload' // worker upload SFTP tới DSP/aggregator
-	| 'dist.ci-import-check' // worker poll CI import status (WAIT INGEST)
-	| 'dist.ci-qa-check' // worker poll CI QA flags (GATE qa)
-	| 'dist.export-batch' // worker gom batch export (WAIT EXPORT)
-	| 'dist.status-sync'; // worker poll DSP live/takedown status (WAIT PARTNER/GO_LIVE/TAKEDOWN)
+export const QUEUES = {
+	ORCHESTRATE: 'dist.orchestrate', // turn engine: nhận command, chạy 6 bước
+	VALIDATE: 'dist.validate', // worker validate release metadata
+	PROVISION_ID: 'dist.provision-id', // worker cấp UPC/ISRC
+	BUILD_PACKAGE: 'dist.build-package', // worker build DDEX + upload GCS
+	SFTP_UPLOAD: 'dist.sftp-upload', // worker upload SFTP tới DSP/aggregator
+	CI_IMPORT_CHECK: 'dist.ci-import-check', // worker poll CI import status (WAIT INGEST)
+	CI_QA_CHECK: 'dist.ci-qa-check', // worker poll CI QA flags (GATE qa)
+	EXPORT_BATCH: 'dist.export-batch', // worker gom batch export (WAIT EXPORT)
+	STATUS_SYNC: 'dist.status-sync', // worker poll DSP live/takedown status (WAIT PARTNER/GO_LIVE/TAKEDOWN)
+} as const;
+
+/** Union hẹp derive từ QUEUES — thêm queue mới = thêm vào object trên. */
+export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 /**
  * Options khi enqueue. Tất cả optional — mặc định adapter tự xử lý.
@@ -34,6 +39,10 @@ export interface JobPayload {
 	readonly correlationId: string;
 	/** Cùng giá trị với EnqueueOptions.jobId — worker log key này để soi trùng. */
 	readonly key: string;
+	/** Optional: for dist.orchestrate queue, mang toàn bộ DistributionCommand để worker gọi handler trực tiếp */
+	readonly command?: unknown; // generic unknown để tránh circular dep; worker cast về DistributionCommand
+	/** Optional: for channel-specific jobs (DELIVERING state), mang channelId */
+	readonly channelId?: string;
 }
 
 /**

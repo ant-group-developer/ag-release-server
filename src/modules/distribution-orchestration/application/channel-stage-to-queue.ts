@@ -1,6 +1,6 @@
 import { ChannelDelivery } from '../domain/channel-delivery/channel-delivery.entity';
 import { StageKind } from '../domain/channel-delivery/delivery-process';
-import { QueueName } from './ports/workflow-engine.port';
+import { QUEUES, QueueName } from './ports/workflow-engine.port';
 
 /**
  * Pick which queue the channel's next job rides based on its current stage.
@@ -27,23 +27,23 @@ export function pickChannelQueue(channel: ChannelDelivery): QueueName | null {
 
 	switch (stage.kind) {
 		case StageKind.ACTION:
-			if (stage.key === 'deliver') return 'dist.sftp-upload';
-			if (stage.key === 'request') return 'dist.status-sync';
+			if (stage.key === 'deliver') return QUEUES.SFTP_UPLOAD;
+			if (stage.key === 'request') return QUEUES.STATUS_SYNC;
 			return null;
 		case StageKind.GATE:
-			return 'dist.ci-qa-check';
+			return QUEUES.CI_QA_CHECK;
 		case StageKind.WAIT: {
 			switch (stage.waitKind) {
 				case 'INGEST':
-					return 'dist.ci-import-check';
+					return QUEUES.CI_IMPORT_CHECK;
 				case 'EXPORT':
-					return 'dist.export-batch';
+					return QUEUES.EXPORT_BATCH;
 				case 'PARTNER':
 				case 'GO_LIVE':
 				case 'TAKEDOWN':
-					return 'dist.status-sync';
+					return QUEUES.STATUS_SYNC;
 				default:
-					return 'dist.status-sync';
+					return QUEUES.STATUS_SYNC;
 			}
 		}
 		default:

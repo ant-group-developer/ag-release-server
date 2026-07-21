@@ -25,6 +25,7 @@ import {
 } from './ports/distribution-repository.port';
 import { OutboxEntry } from './ports/outbox-entry';
 import { TxContext, UNIT_OF_WORK, UnitOfWork } from './ports/unit-of-work.port';
+import { QUEUES } from './ports/workflow-engine.port';
 
 /**
  * OrchestrateHandler — MỘT VÒNG orchestrate = MỘT command.
@@ -233,10 +234,12 @@ export class OrchestrateHandler {
 		};
 
 		switch (dist.state) {
+			case DistributionState.VALIDATING:
+				return [{ queue: QUEUES.VALIDATE, payload, jobId }];
 			case DistributionState.PROVISIONING_IDS:
-				return [{ queue: 'dist.provision-id', payload, jobId }];
+				return [{ queue: QUEUES.PROVISION_ID, payload, jobId }];
 			case DistributionState.BUILDING_PACKAGE:
-				return [{ queue: 'dist.build-package', payload, jobId }];
+				return [{ queue: QUEUES.BUILD_PACKAGE, payload, jobId }];
 			case DistributionState.DELIVERING:
 				return this.buildDeliveringOutbox(dist, command.key, payload);
 			default:

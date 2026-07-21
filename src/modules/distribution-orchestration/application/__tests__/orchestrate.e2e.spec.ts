@@ -15,7 +15,7 @@ import { InMemoryWorkflowAdapter } from '../../infrastructure/workflow/in-memory
 import { DistributionCommand } from '../commands/distribution.command';
 import { OrchestrateHandler } from '../orchestrate.handler';
 import { DefaultPolicyResolver } from '../policy-resolver';
-import { QueueName } from '../ports/workflow-engine.port';
+import { QUEUES, QueueName } from '../ports/workflow-engine.port';
 import { BuildPackageRunner } from '../step-runners/build-package.runner';
 import { ProvisionIdRunner } from '../step-runners/provision-id.runner';
 import { SftpUploadRunner } from '../step-runners/sftp-upload.runner';
@@ -87,14 +87,19 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 			QueueName,
 			undefined | { run: (p: any) => Promise<any> }
 		> = {
-			'dist.orchestrate': undefined, // orchestrate consumed by handler, not runner
-			'dist.provision-id': new ProvisionIdRunner(uow, repo, provisioner),
-			'dist.build-package': new BuildPackageRunner(uow, repo, builder),
-			'dist.sftp-upload': new SftpUploadRunner(uow, repo, uploader),
-			'dist.ci-import-check': undefined,
-			'dist.ci-qa-check': undefined,
-			'dist.export-batch': undefined,
-			'dist.status-sync': new StatusSyncRunner(uow, repo, statusReader),
+			[QUEUES.ORCHESTRATE]: undefined, // orchestrate consumed by handler, not runner
+			[QUEUES.VALIDATE]: undefined, // Khối A added; E2E test uses MARK_VALIDATED directly (skip validation)
+			[QUEUES.PROVISION_ID]: new ProvisionIdRunner(
+				uow,
+				repo,
+				provisioner,
+			),
+			[QUEUES.BUILD_PACKAGE]: new BuildPackageRunner(uow, repo, builder),
+			[QUEUES.SFTP_UPLOAD]: new SftpUploadRunner(uow, repo, uploader),
+			[QUEUES.CI_IMPORT_CHECK]: undefined,
+			[QUEUES.CI_QA_CHECK]: undefined,
+			[QUEUES.EXPORT_BATCH]: undefined,
+			[QUEUES.STATUS_SYNC]: new StatusSyncRunner(uow, repo, statusReader),
 		};
 
 		// ── Helper: sync outbox → workflow adapter (giả outbox-relay Step 6) ──
@@ -115,7 +120,8 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 			if (!job) return false;
 			const runner = runners[job.queue];
 			if (!runner) {
-				throw new Error(`No runner for queue ${job.queue}`);
+				// Skip queues not in test scope (e.g., dist.validate khi test bypass validation)
+				return true;
 			}
 			const cmd = (await runner.run(
 				job.payload,
@@ -136,6 +142,11 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 		);
 
 		// ── STEP 2: External validator OK → MARK_VALIDATED ──
+		// Note: buildOutbox VALIDATING → dist.validate job, nhưng test này bypass validation
+		// bằng cách gọi MARK_VALIDATED trực tiếp. Drain để clear dist.validate job.
+		await drainOutboxToWorkflow();
+		await drainOneJob(); // Skip dist.validate job
+
 		await handler.handle({
 			type: 'MARK_VALIDATED',
 			distributionId: DIST_ID,

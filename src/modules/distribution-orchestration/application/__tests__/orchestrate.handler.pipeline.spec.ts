@@ -8,6 +8,7 @@ import { InMemoryDistributionRepository } from '../../infrastructure/test-double
 import { InMemoryUnitOfWork } from '../../infrastructure/test-doubles/in-memory-unit-of-work';
 import { OrchestrateHandler } from '../orchestrate.handler';
 import { DefaultPolicyResolver } from '../policy-resolver';
+import { QUEUES } from '../ports/workflow-engine.port';
 
 /**
  * Pipeline spec — Step 5 mở rộng 8 command → chạy INITIAL_RELEASE end-to-end
@@ -99,9 +100,13 @@ describe('OrchestrateHandler — Step 5 pipeline commands', () => {
 		expect(d.state).toBe(DistributionState.BUILDING_PACKAGE);
 		expect(d.upc).toBe('123456789012');
 
-		// Outbox: 2 job — provision-id (từ turn 2) + build-package (từ turn 3)
+		// Outbox: 3 jobs — dist.validate (từ turn 1 SUBMIT) + provision-id (từ turn 2) + build-package (từ turn 3)
 		const queues = repo.savedOutbox.map((o) => o.queue);
-		expect(queues).toEqual(['dist.provision-id', 'dist.build-package']);
+		expect(queues).toEqual([
+			QUEUES.VALIDATE,
+			QUEUES.PROVISION_ID,
+			QUEUES.BUILD_PACKAGE,
+		]);
 		const eventTypes = repo.savedEvents.map((e) => e.type);
 		expect(eventTypes).toEqual([
 			'DistributionSubmitted',
@@ -125,7 +130,8 @@ describe('OrchestrateHandler — Step 5 pipeline commands', () => {
 			requiresReview: true,
 		});
 		expect((await loaded())!.state).toBe(DistributionState.IN_REVIEW);
-		expect(repo.savedOutbox).toHaveLength(0); // IN_REVIEW → chờ reviewer
+		expect(repo.savedOutbox).toHaveLength(1); // VALIDATING → dist.validate (Khối A)
+		expect(repo.savedOutbox[0].queue).toBe(QUEUES.VALIDATE);
 
 		await handler.handle({
 			type: 'APPROVE_REVIEW',
@@ -136,8 +142,10 @@ describe('OrchestrateHandler — Step 5 pipeline commands', () => {
 		expect((await loaded())!.state).toBe(
 			DistributionState.PROVISIONING_IDS,
 		);
-		expect(repo.savedOutbox).toHaveLength(1);
-		expect(repo.savedOutbox[0].queue).toBe('dist.provision-id');
+		// outbox: 2 jobs (dist.validate từ SUBMIT + dist.provision-id từ APPROVE_REVIEW)
+		expect(repo.savedOutbox).toHaveLength(2);
+		expect(repo.savedOutbox[0].queue).toBe(QUEUES.VALIDATE);
+		expect(repo.savedOutbox[1].queue).toBe(QUEUES.PROVISION_ID);
 	});
 
 	// ── review reject + resubmit ──────────────────────────────────────────

@@ -7,6 +7,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 import { OptimisticLockError } from '../../../application/errors/optimistic-lock.error';
 import { OutboxEntry } from '../../../application/ports/outbox-entry';
+import { QUEUES } from '../../../application/ports/workflow-engine.port';
 import { ChannelDeliverySpec } from '../../../domain/channel-delivery/channel-delivery-spec';
 import { ChannelState } from '../../../domain/channel-delivery/channel-state.enum';
 import { ChannelTopology } from '../../../domain/channel-delivery/channel-topology.enum';
@@ -132,7 +133,7 @@ describe('TypeOrmDistributionRepository (integration)', () => {
 
 		const outbox: OutboxEntry[] = [
 			{
-				queue: 'dist.orchestrate',
+				queue: QUEUES.ORCHESTRATE,
 				payload: { command: 'RUN_TURN', distId: dist.id },
 				jobId: `${dist.id}:submit`,
 			},
@@ -180,7 +181,7 @@ describe('TypeOrmDistributionRepository (integration)', () => {
 			[dist.id],
 		);
 		expect(outboxRows).toHaveLength(1);
-		expect(outboxRows[0].queue).toBe('dist.orchestrate');
+		expect(outboxRows[0].queue).toBe(QUEUES.ORCHESTRATE);
 		expect(outboxRows[0].job_id).toBe(`${dist.id}:submit`);
 		expect(outboxRows[0].dispatched_at).toBeNull();
 	});

@@ -5,6 +5,7 @@ import {
 import { DataSource } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
+import { QUEUES } from '../../../application/ports/workflow-engine.port';
 import { ChannelDeliveryOrmEntity } from '../../persistence/channel-delivery.orm-entity';
 import { DistributionEventOrmEntity } from '../../persistence/distribution-event.orm-entity';
 import { DistributionOrmEntity } from '../../persistence/distribution.orm-entity';
@@ -102,7 +103,7 @@ async function insertOutboxEntry(overrides: {
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		[
 			DIST_ID,
-			overrides.queue ?? 'dist.orchestrate',
+			overrides.queue ?? QUEUES.ORCHESTRATE,
 			JSON.stringify({
 				distributionId: DIST_ID,
 				correlationId: '55555555-5555-5555-5555-555555555555',
@@ -133,10 +134,10 @@ async function getOutboxRow(
 describe('OutboxRelay (integration)', () => {
 	it('Test 1 — happy path: 3 pending entries → poll → 3 dispatched', async () => {
 		await insertOutboxEntry({ jobId: 'job-1' });
-		await insertOutboxEntry({ jobId: 'job-2', queue: 'dist.provision-id' });
+		await insertOutboxEntry({ jobId: 'job-2', queue: QUEUES.PROVISION_ID });
 		await insertOutboxEntry({
 			jobId: 'job-3',
-			queue: 'dist.build-package',
+			queue: QUEUES.BUILD_PACKAGE,
 		});
 
 		const dispatched = await relay.pollAndDispatch();
@@ -165,7 +166,7 @@ describe('OutboxRelay (integration)', () => {
 		expect(dispatched).toBe(1);
 		expect(scheduleSpy).toHaveBeenCalledTimes(1);
 		expect(scheduleSpy).toHaveBeenCalledWith(
-			'dist.orchestrate',
+			QUEUES.ORCHESTRATE,
 			expect.objectContaining({ distributionId: DIST_ID }),
 			runAt,
 			expect.objectContaining({ jobId: 'sched-1' }),
@@ -179,9 +180,9 @@ describe('OutboxRelay (integration)', () => {
 		await insertOutboxEntry({ jobId: 'ok-1' });
 		await insertOutboxEntry({
 			jobId: 'fail-1',
-			queue: 'dist.provision-id',
+			queue: QUEUES.PROVISION_ID,
 		});
-		await insertOutboxEntry({ jobId: 'ok-2', queue: 'dist.build-package' });
+		await insertOutboxEntry({ jobId: 'ok-2', queue: QUEUES.BUILD_PACKAGE });
 
 		// Make engine throw only for 'fail-1'
 		const originalEnqueue = workflow.enqueue.bind(workflow);

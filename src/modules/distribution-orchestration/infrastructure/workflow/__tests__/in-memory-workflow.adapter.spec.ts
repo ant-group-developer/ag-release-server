@@ -1,4 +1,7 @@
-import { JobPayload } from '../../../application/ports/workflow-engine.port';
+import {
+	JobPayload,
+	QUEUES,
+} from '../../../application/ports/workflow-engine.port';
 import { InMemoryWorkflowAdapter } from '../in-memory-workflow.adapter';
 
 /**
@@ -23,18 +26,18 @@ describe('InMemoryWorkflowAdapter', () => {
 
 	// ── 1. enqueue delay=0 → sẵn sàng chạy ngay ─────────────────────────────
 	it('enqueue with delayMs=0 makes job immediately due', async () => {
-		await adapter.enqueue('dist.orchestrate', payload());
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload());
 
 		expect(adapter.all).toHaveLength(1);
 		expect(adapter.due()).toHaveLength(1);
-		expect(adapter.due()[0].queue).toBe('dist.orchestrate');
+		expect(adapter.due()[0].queue).toBe(QUEUES.ORCHESTRATE);
 	});
 
 	// ── 2. "chờ không block" — cốt lõi của Phase 2 ──────────────────────────
 	it('enqueue with delayMs keeps job pending until advanceTime reaches runAt', async () => {
 		const ONE_DAY = 24 * 60 * 60 * 1000;
 
-		await adapter.enqueue('dist.status-sync', payload(), {
+		await adapter.enqueue(QUEUES.STATUS_SYNC, payload(), {
 			delayMs: ONE_DAY,
 			jobId: 'wait-partner:ch:0',
 		});
@@ -54,9 +57,9 @@ describe('InMemoryWorkflowAdapter', () => {
 	// ── 3. dedupe theo jobId — lớp phòng thủ 1 ──────────────────────────────
 	it('rejects duplicate enqueue when jobId matches (BullMQ layer 1 simulation)', async () => {
 		const opts = { jobId: 'abc:packageBuilt:v1' };
-		await adapter.enqueue('dist.orchestrate', payload('abc'), opts);
-		await adapter.enqueue('dist.orchestrate', payload('abc'), opts); // trùng
-		await adapter.enqueue('dist.orchestrate', payload('abc'), opts); // trùng
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('abc'), opts);
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('abc'), opts); // trùng
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('abc'), opts); // trùng
 
 		expect(adapter.all).toHaveLength(1);
 	});
@@ -64,7 +67,7 @@ describe('InMemoryWorkflowAdapter', () => {
 	// ── 4. schedule tại mốc thời gian tuyệt đối ─────────────────────────────
 	it('schedule places job at absolute time; due after setTime(at)', async () => {
 		const wakeUp = new Date('2026-07-17T09:00:00Z');
-		await adapter.schedule('dist.status-sync', payload(), wakeUp);
+		await adapter.schedule(QUEUES.STATUS_SYNC, payload(), wakeUp);
 
 		expect(adapter.due()).toHaveLength(0);
 
@@ -75,9 +78,9 @@ describe('InMemoryWorkflowAdapter', () => {
 
 	// ── 5. FIFO khi cùng runAt — deterministic ──────────────────────────────
 	it('consumes jobs in enqueue order when runAt is equal', async () => {
-		await adapter.enqueue('dist.orchestrate', payload('a', 'k-a'));
-		await adapter.enqueue('dist.orchestrate', payload('b', 'k-b'));
-		await adapter.enqueue('dist.orchestrate', payload('c', 'k-c'));
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('a', 'k-a'));
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('b', 'k-b'));
+		await adapter.enqueue(QUEUES.ORCHESTRATE, payload('c', 'k-c'));
 
 		expect(adapter.consume()?.payload.key).toBe('k-a');
 		expect(adapter.consume()?.payload.key).toBe('k-b');
