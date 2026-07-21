@@ -29,7 +29,7 @@ export class LogsService {
 	 */
 	private readonly saveDbLevels: LogLevel[] = [
 		LogLevel.SUCCESS,
-		LogLevel.LOG,
+		LogLevel.INFO,
 		LogLevel.ERROR,
 		LogLevel.WARNING,
 	];
@@ -49,7 +49,7 @@ export class LogsService {
 	log(dto: Omit<WriteLogDto, 'level'>) {
 		this.saveDbAndSendNotificationToDev_Safe({
 			...dto,
-			level: LogLevel.LOG,
+			level: LogLevel.INFO,
 		});
 	}
 
