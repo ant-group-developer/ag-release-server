@@ -4,11 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { AppConfigService } from '../app-config/app-config.service';
 import { BucketModule2 } from '../bucket2/bucket2.module';
+import { Aggregator } from '../distribution/aggregator/entities/aggregator.entity';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
 import { SftpConnectModule } from '../distribution/sftp-connect/sftp-connect.module';
 import { ErnModule2 } from '../ern2/ern.module';
 import { IsrcModule } from '../external/isrc/isrc.module';
 import { UpcModule } from '../external/upc/upc.module';
+import { NotificationModule } from '../notification/notification.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
@@ -21,16 +23,36 @@ import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
 import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
-import { PACKAGE_BUILDER } from './application/step-runners/build-package.runner';
-import { INGEST_RESULT_READER } from './application/step-runners/ci-import-check.runner';
-import { IDENTIFIER_PROVISIONER } from './application/step-runners/provision-id.runner';
-import { QA_CHECKER } from './application/step-runners/qa.runner';
-import { PACKAGE_UPLOADER } from './application/step-runners/sftp-upload.runner';
-import { DELIVERY_STATUS_READER } from './application/step-runners/status-sync.runner';
+import {
+	BuildPackageRunner,
+	PACKAGE_BUILDER,
+} from './application/step-runners/build-package.runner';
+import {
+	CiImportCheckRunner,
+	INGEST_RESULT_READER,
+} from './application/step-runners/ci-import-check.runner';
+import {
+	EXPORTER,
+	ExportBatchRunner,
+} from './application/step-runners/export-batch.runner';
+import {
+	IDENTIFIER_PROVISIONER,
+	ProvisionIdRunner,
+} from './application/step-runners/provision-id.runner';
+import { QA_CHECKER, QaRunner } from './application/step-runners/qa.runner';
+import {
+	PACKAGE_UPLOADER,
+	SftpUploadRunner,
+} from './application/step-runners/sftp-upload.runner';
+import {
+	DELIVERY_STATUS_READER,
+	StatusSyncRunner,
+} from './application/step-runners/status-sync.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
 import { DdexXmlPackageBuilder } from './infrastructure/adapters/ddex-xml-package-builder.adapter';
+import { ExporterAdapter } from './infrastructure/adapters/exporter.adapter';
 import { GrpcIdentifierAdapter } from './infrastructure/adapters/grpc-identifier.adapter';
 import {
 	PostgresTicketAdapter,
@@ -86,7 +108,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C) ✅ WIRED
  *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D) ✅ WIRED
  *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D) ✅ WIRED
- *   · EXPORTER                 → ExporterAdapter (Group E)
+ *   · EXPORTER                 → ExporterAdapter (Group E) ✅ WIRED
  */
 @Module({
 	imports: [
@@ -97,6 +119,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			OutboxEventOrmEntity,
 			OrchestrationTicketOrmEntity,
 			ReleaseSnapshotOrmEntity,
+			Aggregator, // Group E: ExporterAdapter queries State51 aggregator
 		]),
 		AppConfigModule, // For CI API config + generator config (UPC/ISRC prefix IDs)
 		CiModule, // Keep v3 services for backward compatibility
@@ -109,6 +132,8 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		UpcModule, // UpcService — gRPC UPC provisioning
 		IsrcModule, // IsrcService — gRPC ISRC provisioning
 		SftpConnectModule, // SftpConnectService — SFTP/S3 upload
+		// Group E: ExporterAdapter dependencies
+		NotificationModule, // NotificationResendService — Resend API email
 	],
 	controllers: [DistributionController],
 	providers: [
@@ -144,6 +169,16 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: PACKAGE_BUILDER, useClass: DdexXmlPackageBuilder },
 		{ provide: IDENTIFIER_PROVISIONER, useClass: GrpcIdentifierAdapter },
 		{ provide: PACKAGE_UPLOADER, useClass: SftpUploaderAdapter },
+		{ provide: EXPORTER, useClass: ExporterAdapter },
+		// Step runners (consumers for BullMQ jobs)
+		BuildPackageRunner,
+		ProvisionIdRunner,
+		SftpUploadRunner,
+		CiImportCheckRunner,
+		QaRunner,
+		StatusSyncRunner,
+		ExportBatchRunner,
+		// Application services
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
