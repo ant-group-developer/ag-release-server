@@ -5,11 +5,16 @@ import { DspReportController } from './controllers/dsp-report.controller';
 import { FtpExcludePatternController } from './controllers/ftp-exclude-pattern.controller';
 import { DspReportService } from './services/dsp-report.service';
 import { ExcludePatternService } from './services/ftp-exclude-pattern.service';
+import { FtpParserConfigService } from './services/ftp-parser-config.service';
 
 @Module({
 	imports: [DspModule, ReleaseModule],
 	controllers: [DspReportController, FtpExcludePatternController],
-	providers: [DspReportService, ExcludePatternService],
-	exports: [DspReportService, ExcludePatternService],
+	providers: [
+		DspReportService,
+		ExcludePatternService,
+		FtpParserConfigService,
+	],
+	exports: [DspReportService, ExcludePatternService, FtpParserConfigService],
 })
 export class DspReportModule {}

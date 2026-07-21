@@ -1,9 +1,12 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Delete,
 	Get,
+	NotFoundException,
 	Param,
+	Patch,
 	Post,
 	Put,
 	Query,
@@ -16,14 +19,140 @@ import {
 	QueryGetListDspReportDto,
 } from '../dto/dsp-report.dto';
 import {
+	FtpSourceCategory,
+	PreviewFtpParserConfigDto,
+	UpdateFtpParserFieldMappingsDto,
+	UpsertFtpParserConfigDto,
+} from '../dto/ftp-parser-config.dto';
+import {
 	DspReportService,
 	DspsReportResponse,
 } from '../services/dsp-report.service';
+import { FtpParserConfigService } from '../services/ftp-parser-config.service';
 
 @ApiTags('dsp-report')
 @Controller('dsp-report')
 export class DspReportController {
-	constructor(private readonly dspReportService: DspReportService) {}
+	constructor(
+		private readonly dspReportService: DspReportService,
+		private readonly ftpParserConfigService: FtpParserConfigService,
+	) {}
+
+	@Get('parser-catalog')
+	async parserCatalog(): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.getCatalog(),
+		});
+	}
+
+	/** Parser catalog sync also runs automatically at startup; this endpoint is safe to call because unchanged source hashes are skipped. */
+	@Post('parser-catalog/sync')
+	async syncParserCatalog(): Promise<
+		ResponseSuccess<{ filesScanned: number; parsersSynced: number }>
+	> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.syncParserCatalog(),
+		});
+	}
+
+	@Get('parser-catalog/:parserCode')
+	async parserCatalogDetail(
+		@Param('parserCode') parserCode: string,
+	): Promise<ResponseSuccess<unknown>> {
+		const parser =
+			await this.ftpParserConfigService.getCatalogByParserCode(
+				parserCode,
+			);
+		if (!parser) {
+			throw new NotFoundException(
+				`Parser catalog not found: ${parserCode}. Run POST /dsp-report/parser-catalog/sync first.`,
+			);
+		}
+		return new ResponseSuccess({ data: parser });
+	}
+
+	/** Legacy folder mappings are seeded automatically at startup; this endpoint is idempotent. */
+	@Post('ftp-parser-configs/seed-legacy')
+	async seedLegacyFtpParserConfigs(): Promise<
+		ResponseSuccess<{ reportsScanned: number; configsCreated: number }>
+	> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.seedLegacyConfigs(),
+		});
+	}
+
+	@Get(':id/ftp-parser-configs')
+	async getFtpParserConfigs(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.findAllDetailsByDspReport(
+				id,
+			),
+		});
+	}
+
+	@Get(':id/ftp-parser-configs/:category')
+	async getFtpParserConfig(
+		@Param('id') id: string,
+		@Param('category') category: FtpSourceCategory,
+	): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.findByDspReportAndCategory(
+				id,
+				category,
+			),
+		});
+	}
+
+	@Put(':id/ftp-parser-configs/:category')
+	async upsertFtpParserConfig(
+		@Param('id') id: string,
+		@Param('category') category: FtpSourceCategory,
+		@Body() dto: UpsertFtpParserConfigDto,
+	): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.upsert(id, category, dto),
+		});
+	}
+
+	@Delete(':id/ftp-parser-configs/:category')
+	async disableFtpParserConfig(
+		@Param('id') id: string,
+		@Param('category') category: FtpSourceCategory,
+	): Promise<ResponseSuccess<{ success: boolean }>> {
+		await this.ftpParserConfigService.disable(id, category);
+		return new ResponseSuccess({ data: { success: true } });
+	}
+
+	@Patch('parser-catalog/:parserCode/field-mappings')
+	async updateParserFieldMappings(
+		@Param('parserCode') parserCode: string,
+		@Body() dto: UpdateFtpParserFieldMappingsDto,
+	): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.updateParserFieldMappings(
+				parserCode,
+				dto.fieldMappings,
+			),
+		});
+	}
+
+	@Post(':id/ftp-parser-configs/:category/preview')
+	previewFtpParserConfig(
+		@Param('category') category: FtpSourceCategory,
+		@Body() dto: PreviewFtpParserConfigDto,
+	): ResponseSuccess<unknown> {
+		if (!dto.config)
+			throw new BadRequestException('config is required for preview');
+		return new ResponseSuccess({
+			data: this.ftpParserConfigService.preview(
+				category,
+				dto.config,
+				dto.filePaths,
+			),
+		});
+	}
 
 	@Get()
 	async findAll(

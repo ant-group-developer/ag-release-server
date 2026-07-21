@@ -311,6 +311,7 @@ export class SyncController {
 				period,
 				force,
 				categories,
+				jobId,
 			);
 			await this.importJobsService.updateProgress(
 				jobId,
@@ -371,6 +372,7 @@ export class SyncController {
 						period,
 						force,
 						categories,
+						jobId,
 					);
 					results.push(result);
 					if (
