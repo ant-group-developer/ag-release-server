@@ -31,22 +31,19 @@ export enum LogModule {
 @Entity('logs')
 export class Logs extends BaseUUIDEntity {
 	@Column({
-		type: 'enum',
-		enum: LogLevel,
+		type: 'varchar',
 		default: LogLevel.INFO,
 	})
 	level: LogLevel;
 
 	@Column({
-		type: 'enum',
-		enum: LogCategory,
+		type: 'varchar',
 		default: LogCategory.BUSINESS,
 	})
 	type: LogCategory;
 
 	@Column({
-		type: 'enum',
-		enum: LogModule,
+		type: 'varchar',
 		nullable: true,
 	})
 	module: LogModule | null;
