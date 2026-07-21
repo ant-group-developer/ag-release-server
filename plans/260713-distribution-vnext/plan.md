@@ -20,7 +20,7 @@
 | 2 | BullMQ thay cron-poll + DB-queue | ✅ Done | 7/7 step · 136+ test xanh | [phase-02](phase-02-bullmq-engine.md) |
 | 3 | Timeline read-side + SSE (projection) | ✅ Done | 5/5 step · 30 test xanh | [phase-03](phase-03-outbox-timeline.md) |
 | 4 | ACL adapter cho SFTP/CI/gRPC/email + test double | ✅ Done | Group A–E xong · 50 test (44 unit + 6 integration) | [phase-04](phase-04-integration-acl.md) |
-| 5 | Bật lại REVIEW gate + resilience | ⬜ Chưa | Skeleton | [phase-05](phase-05-review-resilience.md) |
+| 5 | Khép vòng lặp Worker + REVIEW gate + resilience | ⬜ Chưa | Chi tiết hoá xong (5 khối A–E) | [phase-05](phase-05-review-resilience.md) |
 | 6 | (tùy chọn) WorkflowEnginePort → Temporal | ⬜ Optional | Skeleton | [phase-06](phase-06-temporal-optional.md) |
 
 ## Dependencies
