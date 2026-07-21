@@ -3,6 +3,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { AppConfigService } from '../app-config/app-config.service';
+import { BucketModule2 } from '../bucket2/bucket2.module';
+import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
+import { ErnModule2 } from '../ern2/ern.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
@@ -15,12 +18,14 @@ import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
 import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
+import { PACKAGE_BUILDER } from './application/step-runners/build-package.runner';
 import { INGEST_RESULT_READER } from './application/step-runners/ci-import-check.runner';
 import { QA_CHECKER } from './application/step-runners/qa.runner';
 import { DELIVERY_STATUS_READER } from './application/step-runners/status-sync.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
+import { DdexXmlPackageBuilder } from './infrastructure/adapters/ddex-xml-package-builder.adapter';
 import {
 	PostgresTicketAdapter,
 	TICKET_SERVICE,
@@ -35,6 +40,7 @@ import { DistributionOrmEntity } from './infrastructure/persistence/distribution
 import { TypeOrmDistributionRepository } from './infrastructure/persistence/distribution.repository';
 import { OrchestrationTicketOrmEntity } from './infrastructure/persistence/orchestration-ticket.orm-entity';
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
+import { ReleaseSnapshotOrmEntity } from './infrastructure/persistence/release-snapshot.orm-entity';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
 import { DistributionSseService } from './infrastructure/sse/distribution-sse.service';
@@ -69,9 +75,8 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
  * Module CHƯA export gì — module khác chưa gọi handler qua DI (Step 7+ mới wire
  * queue consumer). Test unit inject handler trực tiếp qua constructor.
  *
- * Remaining Phase 4 adapters (Group B-E):
  *   · TICKET_SERVICE           → PostgresTicketAdapter (Group B) ✅ WIRED
- *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C)
+ *   · PACKAGE_BUILDER          → DdexXmlPackageBuilder (Group C) ✅ WIRED
  *   · IDENTIFIER_PROVISIONER   → GrpcIdentifierAdapter (Group D)
  *   · PACKAGE_UPLOADER         → SftpUploaderAdapter (Group D)
  *   · EXPORTER                 → ExporterAdapter (Group E)
@@ -84,10 +89,15 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 			DistributionEventOrmEntity,
 			OutboxEventOrmEntity,
 			OrchestrationTicketOrmEntity,
+			ReleaseSnapshotOrmEntity,
 		]),
 		AppConfigModule, // For CI API config
 		CiModule, // Keep v3 services for backward compatibility
 		CiApiModule, // New CI API services for orchestration
+		// Group C: DdexXmlPackageBuilder dependencies
+		ErnModule2, // ErnService2 — DDEX XML generation
+		BucketModule2, // BucketService2 — download audio/cover from cloud
+		DspRoutingConfigsModule, // DspRoutingConfigsService — resolve ERN config
 	],
 	controllers: [DistributionController],
 	providers: [
@@ -120,6 +130,7 @@ import { BullMqWorkflowAdapter } from './infrastructure/workflow/bullmq-workflow
 		{ provide: QA_CHECKER, useClass: CiQaAdapter },
 		{ provide: DELIVERY_STATUS_READER, useClass: CiDeliverDesireAdapter },
 		{ provide: TICKET_SERVICE, useClass: PostgresTicketAdapter },
+		{ provide: PACKAGE_BUILDER, useClass: DdexXmlPackageBuilder },
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
