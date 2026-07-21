@@ -7,14 +7,22 @@ import {
 	forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { from, lastValueFrom } from 'rxjs';
+import { mergeMap, toArray } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
+import { ErrorType, LogLevel } from 'src/modules/log/entites/logs.entity';
+import { LogsService } from 'src/modules/log/services/logs.services';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.service';
 import { CiImportService } from 'src/modules/partners-api/ci/services/ci-import.service';
+import { CiReleaseService } from 'src/modules/partners-api/ci/services/ci-release.service';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { ReleaseStatus } from 'src/modules/release/enum/release.enum';
 import { ReleaseDspDeliveryService } from 'src/modules/release/services/release-dsp-services/release-dsp-delivery.service';
 import { ReleaseService } from 'src/modules/release/services/release.service';
+import { assignMatchTrack } from 'src/modules/release/utils/release-ci-data.util';
+import { Track } from 'src/modules/track/entities/track.entity';
+import { normalizeStr } from 'src/utils/string.util';
 import { getFileExcelFromRaw } from 'src/utils/util.file';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -49,6 +57,13 @@ export class ReleaseCiDataService {
 
 		@Inject(forwardRef(() => ReleaseDspDeliveryService))
 		private readonly releaseDspDeliveryService: ReleaseDspDeliveryService,
+
+		private readonly ciReleaseService: CiReleaseService,
+
+		@InjectRepository(Track)
+		private readonly trackRepo: Repository<Track>,
+
+		private readonly logsService: LogsService,
 	) {}
 
 	async upsertByReleaseId(
@@ -918,5 +933,352 @@ export class ReleaseCiDataService {
 		}
 
 		orderAndPaging2({ qb, filter });
+	}
+
+	async bulkSyncTrackOrder(filter?: BulkSyncDataCiDto) {
+		const {
+			ids = [],
+			releaseIds: filterReleaseIds = [],
+			latestSyncedAt,
+		} = filter ?? {};
+
+		const concurrency = 5;
+		const targetReleaseIds = new Set<string>(filterReleaseIds);
+		const hasFilterIds = ids.length > 0 || filterReleaseIds.length > 0;
+
+		if (ids.length > 0) {
+			const ciDataItems = await this.repo
+				.createQueryBuilder('releaseCiData')
+				.select(['releaseCiData.releaseId'])
+				.where('releaseCiData.id IN (:...ids)', { ids })
+				.getMany();
+
+			ciDataItems.forEach((item) => targetReleaseIds.add(item.releaseId));
+		}
+
+		if (hasFilterIds && targetReleaseIds.size === 0) {
+			this.logger.log('No releases found for bulk sync track order.');
+			return {
+				total: 0,
+				batchSize: concurrency,
+				synced: 0,
+				failed: 0,
+				errors: [],
+			};
+		}
+
+		const qb = this.releaseRepo
+			.createQueryBuilder('release')
+			.select(['release.id'])
+			.innerJoin('release.ciData', 'ciData')
+			.where('release.upc IS NOT NULL')
+			.andWhere("release.upc != ''")
+			.andWhere('ciData.status = :ciStatus', {
+				ciStatus: ReleaseCiDataStatus.EXISTS_ON_CI,
+			});
+
+		if (targetReleaseIds.size > 0) {
+			qb.andWhere('release.id IN (:...ids)', {
+				ids: Array.from(targetReleaseIds),
+			});
+		} else if (latestSyncedAt === null) {
+			qb.andWhere('ciData.latestSyncedAt IS NULL');
+		}
+
+		const pendingItems = await qb
+			.orderBy('release.createdAt', 'ASC')
+			.getMany();
+		const releaseIds = pendingItems.map((item) => item.id);
+
+		if (releaseIds.length === 0) {
+			this.logger.log('No releases found for bulk sync track order.');
+			return {
+				total: 0,
+				batchSize: concurrency,
+				synced: 0,
+				failed: 0,
+				errors: [],
+			};
+		}
+
+		let synced = 0;
+		let skipped = 0;
+		const failed: { releaseId: string; message: string }[] = [];
+
+		this.logger.log(
+			`Starting bulk sync track order. Total pending: ${releaseIds.length}, concurrency: ${concurrency}`,
+		);
+
+		const syncProcess$ = from(releaseIds).pipe(
+			mergeMap(async (releaseId) => {
+				try {
+					await this.syncTrackOrderByReleaseId(releaseId);
+					synced += 1;
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+
+					// Lọc bỏ những release không có trên CI
+					if (
+						message.includes('Release not found on CI') ||
+						message.includes('Release UPC is missing') ||
+						message.includes('No tracks found in CI')
+					) {
+						this.logger.warn(
+							`Skipped release ${releaseId}: ${message}`,
+						);
+						skipped += 1;
+						return;
+					}
+
+					failed.push({ releaseId, message });
+					this.logger.error(
+						`Failed to sync track order for release ${releaseId}. Error: ${message}`,
+					);
+				}
+			}, concurrency),
+			toArray(),
+		);
+
+		await lastValueFrom(syncProcess$);
+
+		this.logger.log(
+			`Finished bulk sync track order. Total: ${releaseIds.length}, synced: ${synced}, skipped: ${skipped}, failed: ${failed.length}`,
+		);
+
+		return {
+			total: releaseIds.length,
+			batchSize: concurrency,
+			synced,
+			skipped,
+			failed: failed.length,
+			errors: failed,
+		};
+	}
+
+	async syncTrackOrderByReleaseId(releaseId: string) {
+		const release = await this.releaseRepo.findOne({
+			where: { id: releaseId },
+			select: { id: true, upc: true, title: true },
+			relations: { tracks: true },
+		});
+
+		if (!release) throw new NotFoundException('Release not found');
+		if (!release.upc) {
+			throw new BadRequestException('Release UPC is missing');
+		}
+
+		if (!release.tracks?.length) return;
+
+		// 1. Lấy release_id từ CI qua API v1
+		const ciReleases = await this.ciReleaseService.getReleasesV1({
+			gtin: [release.upc],
+		});
+
+		const embedded = ciReleases?._embedded;
+		const ciReleaseId = embedded?.[embedded.length - 1]?.id;
+		if (!ciReleaseId) {
+			throw new BadRequestException('Release not found on CI (V1)');
+		}
+
+		// 2. Lấy metadata chứa mảng track[] có field track_number
+		const metadata =
+			await this.ciReleaseService.getReleaseMetadataV1(ciReleaseId);
+		const ciTracks = metadata?.tracks;
+		if (!Array.isArray(ciTracks) || !ciTracks.length) {
+			throw new BadRequestException(
+				`No tracks found in CI metadata for release ${releaseId}`,
+			);
+		}
+
+		const ciTrackByIsrc = new Map<string, any>();
+		const ciTrackByTitle = new Map<string, any[]>();
+
+		for (const ciTrack of ciTracks) {
+			const isrc = ciTrack.recording?.isrc?.toUpperCase();
+			if (isrc && !ciTrackByIsrc.has(isrc)) {
+				ciTrackByIsrc.set(isrc, ciTrack);
+			}
+
+			const titleNorm = normalizeStr(ciTrack.recording?.title);
+			if (!titleNorm) continue;
+
+			if (!ciTrackByTitle.has(titleNorm)) {
+				ciTrackByTitle.set(titleNorm, []);
+			}
+			ciTrackByTitle.get(titleNorm)!.push(ciTrack);
+		}
+
+		const trackTempOrders = release.tracks.map((track) => ({
+			track,
+			tempOrder: track.order,
+			matchType: 'UNMATCHED',
+			matchedCiTrack: null as any,
+		}));
+
+		const usedCiTracks = new Set<any>();
+
+		// TẦNG 1: Map theo ISRC (O(N))
+		for (const item of trackTempOrders) {
+			if (!item.track.isrc) continue;
+			const ciTrack = ciTrackByIsrc.get(item.track.isrc.toUpperCase());
+			if (ciTrack && !usedCiTracks.has(ciTrack)) {
+				assignMatchTrack(item, ciTrack, 'ISRC', usedCiTracks);
+			}
+		}
+
+		// TẦNG 2: Map theo Title
+		for (const item of trackTempOrders.filter(
+			(t) => t.matchType === 'UNMATCHED',
+		)) {
+			const dbTitleNorm = normalizeStr(item.track.title);
+			if (!dbTitleNorm) continue;
+			const ciTrackList = ciTrackByTitle.get(dbTitleNorm);
+			if (ciTrackList) {
+				// Tìm track đầu tiên có cùng tên mà chưa bị dùng
+				const unusedCiTrack = ciTrackList.find(
+					(ci) => !usedCiTracks.has(ci),
+				);
+				if (unusedCiTrack) {
+					assignMatchTrack(
+						item,
+						unusedCiTrack,
+						'TITLE',
+						usedCiTracks,
+					);
+				}
+			}
+		}
+
+		// Chuẩn bị danh sách CI tracks còn thừa lại cho Tầng 3 (O(M))
+		const remainingCiTracks = ciTracks.filter(
+			(ci) => !usedCiTracks.has(ci),
+		);
+		// TẦNG 3: Map theo Vị trí trống (O(N))
+		for (const item of trackTempOrders.filter(
+			(t) => t.matchType === 'UNMATCHED',
+		)) {
+			if (remainingCiTracks.length > 0) {
+				assignMatchTrack(
+					item,
+					remainingCiTracks.shift(),
+					'INDEX',
+					usedCiTracks,
+				);
+			}
+		}
+		// TẦNG 4: Đẩy xuống cuối cùng (O(N))
+		let appendOrder = 999999;
+		for (const item of trackTempOrders.filter(
+			(t) => t.matchType === 'UNMATCHED',
+		)) {
+			item.tempOrder = appendOrder++;
+			item.matchType = 'APPEND';
+		}
+
+		// Sắp xếp các track theo thứ tự tạm thời
+		trackTempOrders.sort((a, b) => a.tempOrder - b.tempOrder);
+
+		// Dồn hàng: Đánh số lại từ 1 đến N để đảm bảo không bị đứt đoạn (gaps)
+		const finalOrders = new Map<string, number>();
+		let currentOrder = 1;
+		for (const item of trackTempOrders) {
+			finalOrders.set(item.track.id, currentOrder);
+			currentOrder++;
+		}
+
+		const tracksToUpdate = trackTempOrders.filter(
+			(item) => finalOrders.get(item.track.id) !== item.track.order,
+		);
+
+		if (tracksToUpdate.length > 0) {
+			const offset = Date.now() % 1000000000;
+			const idList = tracksToUpdate
+				.map((t) => `'${t.track.id}'`)
+				.join(',');
+
+			// BULK PHASE 1: Dọn chỗ bằng số âm để tránh Duplicate Key
+			const phase1Cases = tracksToUpdate
+				.map(
+					(t, idx) =>
+						`WHEN "id" = '${t.track.id}' THEN -(${offset} + ${idx})`,
+				)
+				.join(' ');
+
+			await this.trackRepo.query(
+				`UPDATE "tracks" SET "order" = CASE ${phase1Cases} END WHERE "id" IN (${idList})`,
+			);
+
+			// BULK PHASE 2: Gán order thật
+			const phase2Cases = tracksToUpdate
+				.map(
+					(t) =>
+						`WHEN "id" = '${t.track.id}' THEN ${finalOrders.get(t.track.id)}`,
+				)
+				.join(' ');
+
+			await this.trackRepo.query(
+				`UPDATE "tracks" SET "order" = CASE ${phase2Cases} END WHERE "id" IN (${idList})`,
+			);
+		}
+
+		// Ghi log cho Admin
+		for (const item of trackTempOrders) {
+			const track = item.track;
+			const newOrder = finalOrders.get(track.id) ?? 0;
+			const oldOrder = track.order;
+
+			// Thoát sớm nếu không có sự thay đổi order
+			if (oldOrder === newOrder) continue;
+
+			const baseData = {
+				releaseId,
+				trackId: track.id,
+				isrc: track.isrc,
+				oldOrder,
+				newOrder,
+				matchedCiIsrc: item.matchedCiTrack?.recording?.isrc,
+			};
+
+			const trackInfo = `Release: ${release.title} (${release.upc}) | Track: ${track.title} (${track.isrc || 'No ISRC'})`;
+
+			switch (item.matchType) {
+				case 'TITLE':
+					this.logsService.warning({
+						module: LogLevel.LOG,
+						type: ErrorType.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Sai ISRC nhưng khớp Title. Tự động lấp vào vị trí số ${newOrder}.`,
+						data: baseData,
+					});
+					break;
+
+				case 'INDEX':
+					this.logsService.warning({
+						module: LogLevel.LOG,
+						type: ErrorType.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Sai ISRC và Title. Tự động đưa vào vị trí trống số ${newOrder} theo phương pháp loại trừ.`,
+						data: baseData,
+					});
+					break;
+
+				case 'APPEND':
+					this.logsService.warning({
+						module: LogLevel.LOG,
+						type: ErrorType.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Dư thừa track so với CI. Tự động xếp xuống cuối danh sách (Thứ tự mới: ${newOrder}).`,
+						data: baseData,
+					});
+					break;
+
+				default:
+					this.logsService.log({
+						module: LogLevel.LOG,
+						type: ErrorType.BUSINESS,
+						message: `[UPDATE] | ${trackInfo} | Đổi thứ tự từ ${oldOrder} sang ${newOrder}`,
+						data: baseData,
+					});
+					break;
+			}
+		}
 	}
 }

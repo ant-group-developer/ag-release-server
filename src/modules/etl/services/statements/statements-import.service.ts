@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { ClickHouseService } from '../../../clickhouse/clickhouse.service';
+import { ImportJobSourceType } from '../../interfaces';
+import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
 import { ImportService } from '../import/import.service';
 import { SyncService } from '../sync/sync.service';
 import { CanonicalFile, ResolveResult } from './statements-resolver.service';
@@ -45,6 +46,7 @@ export interface StatementsSummary {
 export interface StatementsImportOptions {
 	onProgress?: (label: string, current: number, total: number) => void;
 	totalFilesInFolder?: number;
+	jobId?: string;
 }
 
 @Injectable()
@@ -54,7 +56,7 @@ export class StatementsImportService {
 	constructor(
 		private readonly importService: ImportService,
 		private readonly syncService: SyncService,
-		private readonly clickHouseService: ClickHouseService,
+		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
 
 	async import(
@@ -62,7 +64,7 @@ export class StatementsImportService {
 		opts: StatementsImportOptions = {},
 	): Promise<StatementsSummary> {
 		const { toImport, skipped } = resolveResult;
-		const { onProgress, totalFilesInFolder = 0 } = opts;
+		const { onProgress, totalFilesInFolder = 0, jobId } = opts;
 
 		const startTime = Date.now();
 		const batchId = uuidv4();
@@ -185,23 +187,32 @@ export class StatementsImportService {
 							fileNames: dspResult.fileNames,
 						});
 
-						// Write etl_import_history per period
-						const periods = [
-							...new Set(dspFiles.map((f) => f.period)),
-						];
-						for (const period of periods) {
-							const periodFiles = dspFiles
-								.filter((f) => f.period === period)
-								.map((f) => f.canonicalName);
-							await this.upsertTracking({
-								period,
-								dspFolder: dspFolderName,
-								batchId,
-								rowsImported: dspResult.rows,
-								filesProcessed: periodFiles.length,
-								filesList: periodFiles,
-								durationMs: dspResult.durationMs,
-							});
+						// Write per-file records to etl_import_history
+						if (jobId && dspResult.fileStats?.length) {
+							for (const stat of dspResult.fileStats) {
+								const fileCanonical = dspFiles.find(
+									(f) => path.basename(f.localPath) === stat.fileName,
+								);
+								await this.etlImportHistoryRepository.upsert({
+									job_id: jobId,
+									batch_id: batchId,
+									period: fileCanonical?.period ?? '',
+									source_type: ImportJobSourceType.STATEMENTS_UPLOAD,
+									category: 'sales',
+									dsp_folder: dspFolderName,
+									file_name: stat.fileName,
+									file_directory: stat.fileDirectory,
+									file_path: stat.filePath,
+									status: 'done',
+									total_lines: stat.totalLines,
+									processed_rows: stat.processedRows,
+									skipped_rows: stat.skippedRows,
+									error_rows: stat.errorRows,
+									duration_ms: dspResult.durationMs,
+								}).catch((err) =>
+									this.logger.warn(`Failed to write etl_import_history for ${stat.fileName}: ${(err as Error).message}`),
+								);
+							}
 						}
 					}
 				} catch (err) {
@@ -216,40 +227,5 @@ export class StatementsImportService {
 
 		summary.totalDurationMs = Date.now() - startTime;
 		return summary;
-	}
-
-	private async upsertTracking(data: {
-		period: string;
-		dspFolder: string;
-		batchId: string;
-		rowsImported: number;
-		filesProcessed: number;
-		filesList: string[];
-		durationMs: number;
-	}) {
-		await this.clickHouseService.insert('etl_import_history', [
-			{
-				id: uuidv4(),
-				period: data.period,
-				source_type: 'manual',
-				category: 'sales',
-				dsp_folder: data.dspFolder,
-				status: 'done',
-				rows_imported: data.rowsImported,
-				files_processed: data.filesProcessed,
-				files_list: data.filesList,
-				duration_ms: data.durationMs,
-				error_message: '',
-				batch_id: data.batchId,
-				started_at: new Date()
-					.toISOString()
-					.replace('T', ' ')
-					.substring(0, 19),
-				completed_at: new Date()
-					.toISOString()
-					.replace('T', ' ')
-					.substring(0, 19),
-			},
-		]);
 	}
 }

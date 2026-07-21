@@ -5,9 +5,16 @@ import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../../clickhouse';
+import { FtpSourceCategory } from '../../../dsp-report/dto/ftp-parser-config.dto';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import {
+	FtpParserConfigService,
+	ResolvedFtpParserConfig,
+} from '../../../dsp-report/services/ftp-parser-config.service';
 import { UpdateSyncConfigDto } from '../../dto/sync-config.dto';
+import { ImportJobSourceType } from '../../interfaces';
 import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
+import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import { FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
@@ -59,17 +66,22 @@ export interface SyncPeriodResult {
 
 export interface ImportHistoryRow {
 	id: string;
+	job_id: string;
+	batch_id: string;
 	period: string;
 	source_type: string;
 	category: string;
 	dsp_folder: string;
+	file_name: string;
+	file_directory: string;
+	file_path: string;
 	status: string;
-	rows_imported: string;
-	files_processed: string;
-	files_list: string[];
+	total_lines: string;
+	processed_rows: string;
+	skipped_rows: string;
+	error_rows: string;
 	duration_ms: string;
 	error_message: string;
-	batch_id: string;
 	started_at: string;
 	completed_at: string;
 }
@@ -89,48 +101,11 @@ export class SyncService {
 		private readonly exchangeRateService: ExchangeRateService,
 		private readonly excludePatternService: ExcludePatternService,
 		private readonly cubeRebuildService: CubeRebuildService,
+		private readonly ftpParserConfigService: FtpParserConfigService,
+		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
 
-	// ── Tracking helpers ──────────────────────────────────
-
-	private async upsertTracking(data: {
-		period: string;
-		source_type: string;
-		category: string;
-		dsp_folder: string;
-		status: string;
-		rows_imported?: number;
-		files_processed?: number;
-		files_list?: string[];
-		duration_ms?: number;
-		error_message?: string;
-		batch_id?: string;
-	}) {
-		await this.clickHouseService.insert('etl_import_history', [
-			{
-				id: uuidv4(),
-				period: data.period,
-				source_type: data.source_type,
-				category: data.category,
-				dsp_folder: data.dsp_folder,
-				status: data.status,
-				rows_imported: data.rows_imported || 0,
-				files_processed: data.files_processed || 0,
-				files_list: data.files_list || [],
-				duration_ms: data.duration_ms || 0,
-				error_message: data.error_message || '',
-				batch_id: data.batch_id || '',
-				started_at: new Date()
-					.toISOString()
-					.replace('T', ' ')
-					.substring(0, 19),
-				completed_at: new Date()
-					.toISOString()
-					.replace('T', ' ')
-					.substring(0, 19),
-			},
-		]);
-	}
+	// ── Tracking helpers ─────────────────────────────────
 
 	/**
 	 * Get import history for all periods, or filter by period.
@@ -168,14 +143,31 @@ export class SyncService {
 	/**
 	 * Get detailed import info for change detection.
 	 * Returns a Map of "period|category|dsp_folder" → { status, files_list }
+	 * Built from per-file records: aggregates file_name list per (job_id, period, category, dsp_folder).
+	 * Uses the latest completed job per folder (max job_id as proxy for recency).
 	 */
 	private async getImportedDetails(): Promise<
-		Map<string, { status: string; files_list: string[] }>
+		Map<
+			string,
+			{
+				status: string;
+				files_list: string[];
+				file_manifest: string[];
+				parser_config_version: number;
+			}
+		>
 	> {
 		const sql = `
-      SELECT period, category, dsp_folder, status, files_list
+      SELECT
+        period,
+        category,
+        dsp_folder,
+        'done' AS status,
+        groupArray(file_name) AS files_list
       FROM etl_import_history FINAL
       WHERE status = 'done'
+        AND source_type IN ('FTP_SYNC_PERIOD', 'FTP_SYNC_ALL', 'FTP_RETRY', 'FTP_AUTO_CRON')
+      GROUP BY period, category, dsp_folder
     `;
 		const rows = await this.clickHouseService.query<{
 			period: string;
@@ -185,11 +177,21 @@ export class SyncService {
 			files_list: string[];
 		}>(sql);
 
-		const map = new Map<string, { status: string; files_list: string[] }>();
+		const map = new Map<
+			string,
+			{
+				status: string;
+				files_list: string[];
+				file_manifest: string[];
+				parser_config_version: number;
+			}
+		>();
 		for (const r of rows) {
 			map.set(`${r.period}|${r.category}|${r.dsp_folder}`, {
 				status: r.status,
 				files_list: r.files_list || [],
+				file_manifest: r.files_list || [],
+				parser_config_version: 0,
 			});
 		}
 		return map;
@@ -298,6 +300,7 @@ export class SyncService {
 		categories?: Array<
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
+		jobId?: string,
 	): Promise<SyncPeriodResult> {
 		const config = await this.getSyncConfig();
 		const resolvedForce = force ?? config.force;
@@ -378,6 +381,46 @@ export class SyncService {
 			for (const dspFolder of dspFolders) {
 				const key = `${period}|${category}|${dspFolder}`;
 				const existing = importedDetails.get(key);
+				let parserConfig: ResolvedFtpParserConfig;
+				try {
+					parserConfig = await this.ftpParserConfigService.resolve(
+						dspFolder,
+						category as FtpSourceCategory,
+					);
+				} catch (err) {
+					this.logger.error(
+						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'error',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						error: err.message,
+					});
+					continue;
+				}
+				const remoteFiles = await this.ftpService.listRemoteFiles(
+					category,
+					period,
+					dspFolder,
+					parserConfig.selectFile,
+				);
+				if (remoteFiles.length === 0) {
+					this.logger.warn(
+						`No files matched parser config for ${category}/${dspFolder}`,
+					);
+					categoryResult.folders.push({
+						dsp_folder: dspFolder,
+						status: 'skipped',
+						rows: 0,
+						files: 0,
+						durationMs: 0,
+						reason: 'no files matched parser config',
+					});
+					continue;
+				}
 
 				// ── Change detection: compare file lists ──
 				if (existing && existing.status === 'done') {
@@ -389,15 +432,10 @@ export class SyncService {
 							dspFolder,
 						);
 					} else {
-						// List files on FTP without downloading
-						const remoteFiles =
-							await this.ftpService.listRemoteFiles(
-								category,
-								period,
-								dspFolder,
-							);
 						const previousFiles = (
-							existing.files_list || []
+							existing.file_manifest ||
+							existing.files_list ||
+							[]
 						).sort();
 
 						// Compare: if identical → skip
@@ -426,7 +464,7 @@ export class SyncService {
 						);
 						this.logger.log(
 							`  🔄 ${category}/${dspFolder} — ${newFiles.length} new files detected ` +
-								`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}). Re-syncing...`,
+								`(FTP: ${remoteFiles.length}, imported: ${previousFiles.length}, config v${parserConfig.configVersion}). Re-syncing...`,
 						);
 
 						// Delete old data for this specific folder before re-import
@@ -442,16 +480,6 @@ export class SyncService {
 				const folderStart = Date.now();
 				const isUpdate = existing && existing.status === 'done';
 				try {
-					// Track: downloading
-					await this.upsertTracking({
-						period,
-						source_type: 'ftp',
-						category,
-						dsp_folder: dspFolder,
-						status: 'downloading',
-						batch_id: batchId,
-					});
-
 					// Download from FTPS
 					const { localPath, fileCount } =
 						await this.ftpService.downloadDspFolder(
@@ -459,17 +487,8 @@ export class SyncService {
 							category,
 							dspFolder,
 							this.tempBaseDir,
+							parserConfig.selectFile,
 						);
-
-					// Track: parsing
-					await this.upsertTracking({
-						period,
-						source_type: 'ftp',
-						category,
-						dsp_folder: dspFolder,
-						status: 'parsing',
-						batch_id: batchId,
-					});
 
 					// Parse using existing import service
 					const dspResult = await this.importService.importDspFolder(
@@ -477,6 +496,8 @@ export class SyncService {
 						dspFolder,
 						batchId,
 						category,
+						'ftp',
+						parserConfig,
 					);
 
 					// If no parser found, log and skip
@@ -498,22 +519,33 @@ export class SyncService {
 
 					const rows = dspResult.rows || 0;
 					const files = dspResult.files || 0;
-					const fileNames = dspResult.fileNames || [];
+					const fileNames = remoteFiles;
 					const durationMs = Date.now() - folderStart;
 
-					// Track: done (with updated files_list for future change detection)
-					await this.upsertTracking({
-						period,
-						source_type: 'ftp',
-						category,
-						dsp_folder: dspFolder,
-						status: 'done',
-						rows_imported: rows,
-						files_processed: files,
-						files_list: fileNames,
-						duration_ms: durationMs,
-						batch_id: batchId,
-					});
+					// Write per-file records to etl_import_history
+					if (jobId && dspResult.fileStats?.length) {
+						for (const stat of dspResult.fileStats) {
+							await this.etlImportHistoryRepository.upsert({
+								job_id: jobId,
+								batch_id: batchId,
+								period,
+								source_type: ImportJobSourceType.FTP_SYNC_PERIOD,
+								category,
+								dsp_folder: dspFolder,
+								file_name: stat.fileName,
+								file_directory: stat.fileDirectory,
+								file_path: stat.filePath,
+								status: 'done',
+								total_lines: stat.totalLines,
+								processed_rows: stat.processedRows,
+								skipped_rows: stat.skippedRows,
+								error_rows: stat.errorRows,
+								duration_ms: durationMs,
+							}).catch((err) =>
+								this.logger.warn(`Failed to write etl_import_history for ${stat.fileName}: ${err.message}`),
+							);
+						}
+					}
 
 					// Cleanup temp
 					this.ftpService.cleanupTemp(localPath);
@@ -559,17 +591,6 @@ export class SyncService {
 					);
 				} catch (err) {
 					const durationMs = Date.now() - folderStart;
-
-					await this.upsertTracking({
-						period,
-						source_type: 'ftp',
-						category,
-						dsp_folder: dspFolder,
-						status: 'error',
-						error_message: err.message,
-						duration_ms: durationMs,
-						batch_id: batchId,
-					});
 
 					categoryResult.folders.push({
 						dsp_folder: dspFolder,
@@ -674,13 +695,21 @@ export class SyncService {
 		const importedDetails = await this.getImportedDetails();
 		const history = await this.getImportHistory();
 
-		// Build history lookup
-		const historyMap = new Map<string, ImportHistoryRow>();
+		// Build history lookup: aggregate per (period|category|dsp_folder)
+		// sum processed_rows, use latest completed_at
+		const historyMap = new Map<string, ImportHistoryRow & { _totalRows: number }>();
 		for (const row of history) {
-			historyMap.set(
-				`${row.period}|${row.category}|${row.dsp_folder}`,
-				row,
-			);
+			const key = `${row.period}|${row.category}|${row.dsp_folder}`;
+			const existing = historyMap.get(key);
+			if (!existing) {
+				historyMap.set(key, { ...row, _totalRows: Number(row.processed_rows) });
+			} else {
+				existing._totalRows += Number(row.processed_rows);
+				if (row.completed_at > existing.completed_at) {
+					existing.completed_at = row.completed_at;
+					existing.status = row.status;
+				}
+			}
 		}
 
 		const result: any[] = [];
@@ -702,8 +731,8 @@ export class SyncService {
 					return {
 						name: f,
 						status: hist?.status || 'pending',
-						rows: hist ? Number(hist.rows_imported) : 0,
-						files_imported: hist ? Number(hist.files_processed) : 0,
+						rows: hist ? hist._totalRows : 0,
+						files_imported: 0,
 						imported_at: hist?.completed_at || null,
 					};
 				});

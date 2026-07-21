@@ -16,6 +16,7 @@ import { FtpService } from './services/ftp/ftp.service';
 import { ImportService } from './services/import/import.service';
 import { JobService } from './services/job/job.service';
 import { SchedulerService } from './services/scheduler/scheduler.service';
+import { EtlImportHistoryRepository } from './services/etl-import-history/etl-import-history.repository';
 import { StatementsImportService } from './services/statements/statements-import.service';
 import { StatementsResolverService } from './services/statements/statements-resolver.service';
 import { SyncService } from './services/sync/sync.service';
@@ -46,6 +47,7 @@ import { SyncService } from './services/sync/sync.service';
 		CubeRebuildService,
 		StatementsResolverService,
 		StatementsImportService,
+		EtlImportHistoryRepository,
 	],
 	exports: [
 		ImportService,
@@ -53,6 +55,7 @@ import { SyncService } from './services/sync/sync.service';
 		ImportJobsModule,
 		ExchangeRateService,
 		CubeRebuildService,
+		EtlImportHistoryRepository,
 	],
 })
 export class EtlModule {}

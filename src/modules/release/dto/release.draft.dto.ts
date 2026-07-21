@@ -257,6 +257,11 @@ export class SyncReleaseToTracksDto {
 	@ApiPropertyOptional({ example: true })
 	@IsOptional()
 	@IsBoolean()
+	syncIsInstrumental?: boolean;
+
+	@ApiPropertyOptional({ example: true })
+	@IsOptional()
+	@IsBoolean()
 	syncCopyright?: boolean;
 
 	@ApiPropertyOptional({ example: true })
