@@ -1167,17 +1167,24 @@ export class ReleaseCiDataService {
 				);
 			}
 		}
+
 		// TẦNG 4: Đẩy xuống cuối cùng (O(N))
-		let appendOrder = 999999;
 		for (const item of trackTempOrders.filter(
 			(t) => t.matchType === 'UNMATCHED',
 		)) {
-			item.tempOrder = appendOrder++;
+			item.tempOrder = 999999;
 			item.matchType = 'APPEND';
 		}
 
 		// Sắp xếp các track theo thứ tự tạm thời
-		trackTempOrders.sort((a, b) => a.tempOrder - b.tempOrder);
+		trackTempOrders.sort((a, b) => {
+			if (a.tempOrder !== b.tempOrder) {
+				return a.tempOrder - b.tempOrder;
+			}
+			const orderDiff = (a.track.order || 0) - (b.track.order || 0);
+			if (orderDiff !== 0) return orderDiff;
+			return a.track.id.localeCompare(b.track.id);
+		});
 
 		// Dồn hàng: Đánh số lại từ 1 đến N để đảm bảo không bị đứt đoạn (gaps)
 		const finalOrders = new Map<string, number>();
