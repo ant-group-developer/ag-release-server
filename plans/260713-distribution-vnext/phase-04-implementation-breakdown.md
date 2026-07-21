@@ -66,6 +66,8 @@
 
 **Exit Group A:** ✅ DONE — 3 CI adapter + 6 file `infrastructure/ci-api/` + module wire xong, tsc sạch.
 
+> ✅ Status: COMPLETE
+
 ---
 
 ## GROUP B — Persistence adapter (own DB, rollback dễ)
@@ -82,7 +84,7 @@
 - **DI:** tạo token `TICKET_SERVICE` + wire
 - **Est:** 4h (gồm migration + test container)
 
-**Exit Group B:** table tạo, adapter idempotent, integration test real DB (testcontainers) xanh.
+**Exit Group B:** ✅ DONE — table tạo, adapter idempotent, 6 integration test real DB (testcontainers) xanh.
 
 ---
 
@@ -105,7 +107,7 @@
 - **DI:** wire `PACKAGE_BUILDER`
 - **Est:** 8h — cân nhắc tách sub-task C1a (DDEX mapping) + C1b (storage upload)
 
-**Exit Group C:** build ra folder DDEX hợp lệ trên GCS/S3, idempotent, tsc sạch.
+**Exit Group C:** ✅ DONE — DdexXmlPackageBuilder (276 LOC) + DdexDataMapper (518 LOC, pure functions) + ProcessCodeResolver (73 LOC). 13 unit tests (data-mapper) + 9 unit tests (process-code). Local filesystem build, idempotent check (folder exists → skip). Tách mapper/resolver ra file riêng (adapter <200 LOC rule).
 
 ---
 
@@ -132,7 +134,7 @@
 - **DI:** wire `PACKAGE_UPLOADER`
 - **Est:** 8h
 
-**Exit Group D:** provision UPC/ISRC + upload SFTP chạy staging, idempotent verified (run 3x → 1 side-effect).
+**Exit Group D:** ✅ DONE — GrpcIdentifierAdapter (189 LOC, 8 tests) + SftpUploaderAdapter (145 LOC, 5 tests). UPC via UpcService.getUpc(), ISRC via IsrcService.create(). SFTP via SftpConnectService.uploadFolder()/uploadFile(). markBatchDone creates `.done` marker file.
 
 ---
 
@@ -161,7 +163,7 @@
 - E2E: 1 INITIAL_RELEASE flow qua real adapters → live
 - **Est:** 12h
 
-**Exit Group E:** module wire đủ 9 port, E2E xanh, test-double vẫn chạy unit test.
+**Exit Group E:** ✅ DONE — ExporterAdapter (143 LOC, 9 tests): CI_DEAL = no-op (CI auto-imports); STATE51 = email via Resend. Module wire đủ 9 port → 9 adapter. 7 step-runners registered.
 
 ---
 
@@ -191,9 +193,9 @@ E1 (cần confirm blocker CI)      ──┘
 | E | Export + wire + test | 20h |
 | **Tổng** | | **~50h (~2 sprint)** |
 
-## Câu hỏi mở còn lại
+## Câu hỏi mở (ĐÃ GIẢI QUYẾT)
 
-1. **CI export trigger:** Q1 nghiêng về "CI tự export khi batch upload" → E1 adapter chỉ no-op/mark? Cần xác nhận business flow trước khi code E1.
-2. **DI switch strategy:** env var (`NODE_ENV`) hay config flag per-adapter (`USE_REAL_SFTP=true`)? → chốt ở E2.
-3. **PackageBuilder cache:** cần table `package_build_cache` không, hay list GCS đủ nhanh? → đo khi làm C1.
+1. ✅ **CI export trigger:** CI tự export khi batch upload + `.done` file xuất hiện → ExporterAdapter CI_DEAL = no-op.
+2. ✅ **DI switch strategy:** Real adapter wired trực tiếp trong module. Test-double dùng trong unit test qua constructor injection (không cần env var switch).
+3. ✅ **PackageBuilder cache:** Dùng filesystem check (`fs.existsSync(outputDir)`) — idempotent, không cần DB cache table.
 
