@@ -10,6 +10,7 @@ import { InMemoryDistributionRepository } from '../../infrastructure/test-double
 import { InMemoryIdentifierProvisioner } from '../../infrastructure/test-doubles/in-memory-identifier-provisioner';
 import { InMemoryPackageBuilder } from '../../infrastructure/test-doubles/in-memory-package-builder';
 import { InMemoryPackageUploader } from '../../infrastructure/test-doubles/in-memory-package-uploader';
+import { InMemoryTicketService } from '../../infrastructure/test-doubles/in-memory-ticket-service';
 import { InMemoryUnitOfWork } from '../../infrastructure/test-doubles/in-memory-unit-of-work';
 import { InMemoryWorkflowAdapter } from '../../infrastructure/workflow/in-memory-workflow.adapter';
 import { DistributionCommand } from '../commands/distribution.command';
@@ -75,6 +76,7 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 		const builder = new InMemoryPackageBuilder();
 		const uploader = new InMemoryPackageUploader();
 		const statusReader = new InMemoryDeliveryStatusReader();
+		const ticketService = new InMemoryTicketService();
 
 		// Handler + runners
 		const handler = new OrchestrateHandler(
@@ -95,11 +97,21 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 				provisioner,
 			),
 			[QUEUES.BUILD_PACKAGE]: new BuildPackageRunner(uow, repo, builder),
-			[QUEUES.SFTP_UPLOAD]: new SftpUploadRunner(uow, repo, uploader),
+			[QUEUES.SFTP_UPLOAD]: new SftpUploadRunner(
+				uow,
+				repo,
+				uploader,
+				ticketService,
+			),
 			[QUEUES.CI_IMPORT_CHECK]: undefined,
 			[QUEUES.CI_QA_CHECK]: undefined,
 			[QUEUES.EXPORT_BATCH]: undefined,
-			[QUEUES.STATUS_SYNC]: new StatusSyncRunner(uow, repo, statusReader),
+			[QUEUES.STATUS_SYNC]: new StatusSyncRunner(
+				uow,
+				repo,
+				statusReader,
+				ticketService,
+			),
 		};
 
 		// ── Helper: sync outbox → workflow adapter (giả outbox-relay Step 6) ──

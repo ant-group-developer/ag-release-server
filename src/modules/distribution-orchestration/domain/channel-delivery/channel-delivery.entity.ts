@@ -6,7 +6,7 @@ import { ChannelDeliverySpec } from './channel-delivery-spec';
 import { advance } from './channel-interpreter';
 import { ChannelInput, ChannelPosition } from './channel-interpreter.types';
 import { ChannelState, isChannelTerminal } from './channel-state.enum';
-import { DeliveryProcess, Stage } from './delivery-process';
+import { DeliveryProcess, Stage, StageKind } from './delivery-process';
 import { getProcess } from './delivery-process.registry';
 
 /** Snapshot row to rehydrate a ChannelDelivery from persistence (phase 2 repo). */
@@ -105,6 +105,26 @@ export class ChannelDelivery {
 	 */
 	get currentStage(): Stage | undefined {
 		return this.process.stages[this._pos];
+	}
+
+	/**
+	 * willExhaustOnNextActionFail — read-only predicate mirroring the interpreter's INV-C2
+	 * (channel-interpreter.ts ACTION_FAIL branch). Answers: "if the current ACTION stage fails
+	 * ONE more time, does the channel go to ISSUES (true) or retry in place (false)?"
+	 *
+	 * Khối C: an ACTION runner (SFTP) opens a ticket + attaches ticketRef ONLY when this is true.
+	 * On a non-exhausting fail it returns ACTION_FAIL WITHOUT a ticket — the interpreter counts the
+	 * retry and re-drives the stage; opening a ticket there would orphan it (the interpreter drops
+	 * ticketRef unless it actually enters ISSUES). Keeping the arithmetic here (not in the runner)
+	 * keeps it in lock-step with the interpreter — one source of truth for exhaustion.
+	 *
+	 * Non-ACTION stages return false (GATE/WAIT fail their own way, straight to ISSUES).
+	 */
+	get willExhaustOnNextActionFail(): boolean {
+		const stage = this.currentStage;
+		if (!stage || stage.kind !== StageKind.ACTION) return false;
+		const nextRetryCount = this._retryCount + 1;
+		return !(stage.retryable && this.retry.canRetry(nextRetryCount));
 	}
 
 	/**

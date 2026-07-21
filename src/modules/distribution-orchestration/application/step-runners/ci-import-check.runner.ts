@@ -2,7 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { ChannelInputType } from '../../domain/channel-delivery/channel-interpreter.types';
 import { IngestResultReader } from '../../domain/ports/ingest-result-reader.port';
+import { TicketService } from '../../domain/ports/ticket-service.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
+import { TicketReason } from '../../domain/value-objects/ticket-ref.vo';
 import { ApplyChannelInputCommand } from '../commands/distribution.command';
 import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
 import {
@@ -10,18 +12,19 @@ import {
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
+import { TICKET_SERVICE } from '../../infrastructure/adapters/postgres-ticket.adapter';
 import { ChannelJobPayload } from './runner-payload';
+import { ticketIdempotencyKey } from './ticket-idempotency-key';
 
 /**
  * CiImportCheckRunner — consumer của `dist.ci-import-check` (WAIT INGEST).
  *
  * Poll CI xem đã process batch imported chưa:
- *  · 'pending' → runner return null (BullMQ delayed re-poll — Step 6 wire delayMs)
+ *  · 'pending' → runner return null (BullMQ delayed re-poll)
  *  · 'ok'      → ARRIVED (wake up WAIT INGEST → next stage)
- *  · 'problem' → WAIT_FAIL (channel → ISSUES, cần ticketRef)
+ *  · 'problem' → open ticket INGEST_FAIL → WAIT_FAIL + ticketRef (ISSUES)
  *
- * batchId ở Step 5b: derived từ `${distId}:${channelId}` — batchId thật lấy từ
- * uploader.upload result ở Step 6 (chưa cần ở integration test).
+ * Khối C: problem = lỗi nghiệp vụ → ticket + WAIT_FAIL, KHÔNG throw.
  */
 export const INGEST_RESULT_READER = Symbol('IngestResultReader');
 
@@ -33,6 +36,7 @@ export class CiImportCheckRunner {
 		private readonly repo: DistributionRepository,
 		@Inject(INGEST_RESULT_READER)
 		private readonly reader: IngestResultReader,
+		@Inject(TICKET_SERVICE) private readonly ticketService: TicketService,
 	) {}
 
 	async run(
@@ -59,14 +63,36 @@ export class CiImportCheckRunner {
 			key: IdempotencyKey.create(payload.key),
 		});
 
-		if (status.kind === 'pending') return null; // re-poll (Step 6 delayMs)
+		if (status.kind === 'pending') return null; // re-poll (delayMs)
+
 		if (status.kind === 'problem') {
-			// WAIT_FAIL cần ticketRef — Step 6 mở ticket qua TicketService rồi phát command.
-			// Step 5b: throw để runner đơn giản; test integration không đi qua path này.
-			throw new Error(
-				`CiImportCheckRunner: ingest problem for ${payload.channelId}`,
-			);
+			// Khối C: ingest problem = lỗi nghiệp vụ → mở ticket → WAIT_FAIL + ticketRef.
+			// Interpreter chuyển ISSUES. KHÔNG throw.
+			const ticketRef = await this.ticketService.open({
+				distributionId: dist.id,
+				channelId: payload.channelId,
+				reason: TicketReason.INGEST_FAIL,
+				detail: `CI ingest batch problem: ${batchId}`,
+				// Stable key (channel, reason, retry generation) — NOT payload.key which drifts.
+				key: ticketIdempotencyKey(
+					payload.channelId,
+					TicketReason.INGEST_FAIL,
+					dist.retryCount,
+				),
+			});
+
+			return {
+				type: 'APPLY_CHANNEL_INPUT',
+				distributionId: dist.id,
+				key: `${payload.key}:fail`,
+				channelId: payload.channelId,
+				input: {
+					type: ChannelInputType.WAIT_FAIL,
+					ticketRef: ticketRef.value,
+				},
+			};
 		}
+
 		return {
 			type: 'APPLY_CHANNEL_INPUT',
 			distributionId: dist.id,

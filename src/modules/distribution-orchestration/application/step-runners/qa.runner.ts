@@ -2,7 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { ChannelInputType } from '../../domain/channel-delivery/channel-interpreter.types';
 import { QaChecker } from '../../domain/ports/qa-checker.port';
+import { TicketService } from '../../domain/ports/ticket-service.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
+import { TicketReason } from '../../domain/value-objects/ticket-ref.vo';
 import { ApplyChannelInputCommand } from '../commands/distribution.command';
 import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
 import {
@@ -10,13 +12,17 @@ import {
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
+import { TICKET_SERVICE } from '../../infrastructure/adapters/postgres-ticket.adapter';
 import { ChannelJobPayload } from './runner-payload';
+import { ticketIdempotencyKey } from './ticket-idempotency-key';
 
 /**
  * QaRunner — consumer của `dist.ci-qa-check` (GATE qa).
  *
- * clean → GATE_PASS · flagged → GATE_FAIL (cần ticketRef → mở TicketService).
- * Step 5b: flagged → throw để test không cần TicketService plumbing.
+ * clean → GATE_PASS · flagged → open ticket QA_FLAG → GATE_FAIL + ticketRef
+ * (interpreter chuyển ISSUES).
+ *
+ * Khối C: flagged = lỗi nghiệp vụ (không phải transient) → ticket + GATE_FAIL, KHÔNG throw.
  */
 export const QA_CHECKER = Symbol('QaChecker');
 
@@ -27,6 +33,7 @@ export class QaRunner {
 		@Inject(DISTRIBUTION_REPOSITORY)
 		private readonly repo: DistributionRepository,
 		@Inject(QA_CHECKER) private readonly checker: QaChecker,
+		@Inject(TICKET_SERVICE) private readonly ticketService: TicketService,
 	) {}
 
 	async run(payload: ChannelJobPayload): Promise<ApplyChannelInputCommand> {
@@ -47,11 +54,35 @@ export class QaRunner {
 			upc,
 			key: IdempotencyKey.create(payload.key),
 		});
+
 		if (result.kind === 'flagged') {
-			throw new Error(
-				`QaRunner: QA flagged for ${payload.channelId}: ${result.flags.join(',')}`,
-			);
+			// Khối C: QA flagged = lỗi nghiệp vụ → mở ticket → GATE_FAIL + ticketRef.
+			// Interpreter chuyển ISSUES. KHÔNG throw.
+			const ticketRef = await this.ticketService.open({
+				distributionId: dist.id,
+				channelId: payload.channelId,
+				reason: TicketReason.QA_FLAG,
+				detail: `QA flags: ${result.flags.join(', ')}`,
+				// Stable key (channel, reason, retry generation) — NOT payload.key which drifts.
+				key: ticketIdempotencyKey(
+					payload.channelId,
+					TicketReason.QA_FLAG,
+					dist.retryCount,
+				),
+			});
+
+			return {
+				type: 'APPLY_CHANNEL_INPUT',
+				distributionId: dist.id,
+				key: `${payload.key}:fail`,
+				channelId: payload.channelId,
+				input: {
+					type: ChannelInputType.GATE_FAIL,
+					ticketRef: ticketRef.value,
+				},
+			};
 		}
+
 		return {
 			type: 'APPLY_CHANNEL_INPUT',
 			distributionId: dist.id,

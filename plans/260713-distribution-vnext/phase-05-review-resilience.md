@@ -2,7 +2,7 @@
 
 **Priority:** Cao · **Status:** 🔄 In Progress (Khối A ✅ Done) · **Depends on:** Phase 2–4 ✅ · **Blocks:** UI write-flow, Phase 6
 
-**Progress:** [✅] Khối A [ ] Khối B [ ] Khối C [ ] Khối D [ ] Khối E
+**Progress:** [✅] Khối A [✅] Khối C [ ] Khối B [ ] Khối D [ ] Khối E
 
 ## Context Links
 
@@ -148,13 +148,42 @@ Ranh giới: runner nhận biết qua kết quả port (vd `result.ok===false` s
 
 ### Todo Khối C
 
-- [ ] Inject TICKET_SERVICE vào 4 runner
-- [ ] sftp-upload: fail → open(UPLOAD_FAIL) + ACTION_FAIL
-- [ ] qa: flagged → open(QA_FLAG) + GATE_FAIL
-- [ ] ci-import-check: problem → open(INGEST_FAIL) + WAIT_FAIL
-- [ ] status-sync: rejected → open(PARTNER_FAIL) + WAIT_FAIL
-- [ ] Unit test mỗi runner: happy + fail→ticket→command
-- [ ] Integration test: channel → ISSUES → aggregate PARTIALLY_DISTRIBUTED
+- [✅] Inject TICKET_SERVICE vào 4 runner
+- [✅] sftp-upload: fail → open(UPLOAD_FAIL) + ACTION_FAIL
+- [✅] qa: flagged → open(QA_FLAG) + GATE_FAIL
+- [✅] ci-import-check: problem → open(INGEST_FAIL) + WAIT_FAIL
+- [✅] status-sync: rejected → open(PARTNER_FAIL) + WAIT_FAIL
+- [✅] Unit test mỗi runner: happy + fail→ticket→command
+- [✅] Integration test: channel → ISSUES → aggregate PARTIALLY_DISTRIBUTED
+
+**Status:** ✅ DONE (2026-07-21) — 4 runner inject ticket service; unit + integration pass.
+**Tests:** 263 pass (runInBand), +24 so với baseline 239 sau Khối A.
+
+**Review fixes (2026-07-21) — sau review Khối C, 3 lỗi:**
+1. **SFTP mở ticket quá sớm + key trôi (nghiêm trọng):** `sftp-upload.runner` cũ mở ticket + gắn
+   ticketRef ở MỖI lần `ok:false`, kể cả khi interpreter còn retry-in-place (chưa ISSUES). Vì
+   interpreter drop `ticketRef` trên ACTION_FAIL không-cạn → ticket mồ côi mỗi vòng. Thêm nữa key
+   ticket derive từ `payload.key` (trôi `:fail` mỗi turn) → mỗi lần fail 1 ticket mới.
+   **Fix:** getter domain read-only `ChannelDelivery.willExhaustOnNextActionFail` (mirror INV-C2)
+   → runner chỉ mở ticket + gắn ticketRef khi CẠN (lần fail tới → ISSUES); còn lại trả ACTION_FAIL
+   trần. Quyết định #(a): runner quyết theo attempt-count, nhưng đếm bằng interpreter counter
+   (`channel.retryCount` + RetryPolicy) — KHÔNG dùng `job.attemptsMade` (sẽ lệch pha interpreter).
+2. **Key ticket không ổn định (nghiêm trọng):** thêm `ticket-idempotency-key.ts` →
+   `${channelId}:${reason}:g${dist.retryCount}`. Ổn định trong 1 retry-generation, đổi khi admin
+   RESET (Khối E bump retryCount). Áp cho cả 4 runner. Idempotent re-run → 1 ticket duy nhất.
+3. **E2E spec vỡ compile (C-1):** `orchestrate.e2e.spec` dựng SftpUpload/StatusSync runner thiếu
+   arg `ticketService` → cả suite e2e không chạy (số "259 pass" ảo). Fix: inject
+   `InMemoryTicketService`. Suite e2e chạy lại xanh.
+
+**Test mới/cập nhật:** `sftp-upload.runner.spec` (rehydrate ChannelDelivery thật; case
+non-exhaust=KHÔNG ticket, exhaust=CÓ ticket + key `ch-1:UPLOAD_FAIL:g0`); 3 spec WAIT/GATE assert
+đúng stable key; `channel-issues-partial.integration.spec` (2 case: 1 live + 1 rejected →
+ISSUES + PARTIALLY_DISTRIBUTED + đúng 1 ticket; re-run poll idempotent → vẫn 1 ticket).
+
+**CÒN LẠI:** SFTP business-fail (`result.ok===false`) hiện vẫn là nhánh chờ Khối D — adapter thật
+`SftpUploaderAdapter.upload()` chỉ `throw` (transient) hoặc `{ok:true}`, chưa bao giờ trả
+`{ok:false}`. Cầu nối "BullMQ cạn attempts → ISSUES" là việc Khối D (retry-backoff mapping). Nhánh
+ACTION_FAIL đã đúng logic + có test, nhưng production chỉ kích hoạt khi Khối D map attempts.
 
 ---
 

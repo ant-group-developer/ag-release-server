@@ -2,7 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { ChannelInputType } from '../../domain/channel-delivery/channel-interpreter.types';
 import { DeliveryStatusReader } from '../../domain/ports/delivery-status-reader.port';
+import { TicketService } from '../../domain/ports/ticket-service.port';
 import { DspCode } from '../../domain/value-objects/dsp-code.vo';
+import { TicketReason } from '../../domain/value-objects/ticket-ref.vo';
 import { ApplyChannelInputCommand } from '../commands/distribution.command';
 import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
 import {
@@ -10,15 +12,19 @@ import {
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
+import { TICKET_SERVICE } from '../../infrastructure/adapters/postgres-ticket.adapter';
 import { ChannelJobPayload } from './runner-payload';
+import { ticketIdempotencyKey } from './ticket-idempotency-key';
 
 /**
  * StatusSyncRunner — consumer của `dist.status-sync` (WAIT PARTNER / GO_LIVE / TAKEDOWN).
  *
  * Poll DSP live status:
- *  · 'pending'  → null (re-poll với delayMs — Step 6)
+ *  · 'pending'  → null (re-poll với delayMs)
  *  · 'live'     → ARRIVED (WAIT sang stage kế; nếu là stage cuối → aggregate bubble-up)
- *  · 'rejected' → WAIT_FAIL (channel → ISSUES, cần ticketRef → Step 6 mở ticket)
+ *  · 'rejected' → open ticket PARTNER_FAIL → WAIT_FAIL + ticketRef (ISSUES)
+ *
+ * Khối C: rejected = lỗi nghiệp vụ → ticket + WAIT_FAIL, KHÔNG throw.
  */
 export const DELIVERY_STATUS_READER = Symbol('DeliveryStatusReader');
 
@@ -30,6 +36,7 @@ export class StatusSyncRunner {
 		private readonly repo: DistributionRepository,
 		@Inject(DELIVERY_STATUS_READER)
 		private readonly reader: DeliveryStatusReader,
+		@Inject(TICKET_SERVICE) private readonly ticketService: TicketService,
 	) {}
 
 	async run(
@@ -66,11 +73,35 @@ export class StatusSyncRunner {
 		const status = statuses.get(dspCode.value) ?? 'pending';
 
 		if (status === 'pending') return null;
+
 		if (status === 'rejected') {
-			throw new Error(
-				`StatusSyncRunner: DSP rejected ${payload.channelId}`,
-			);
+			// Khối C: DSP rejected = lỗi nghiệp vụ → mở ticket → WAIT_FAIL + ticketRef.
+			// Interpreter chuyển ISSUES. KHÔNG throw.
+			const ticketRef = await this.ticketService.open({
+				distributionId: dist.id,
+				channelId: payload.channelId,
+				reason: TicketReason.PARTNER_FAIL,
+				detail: `DSP ${channel.spec.dspCode} rejected release`,
+				// Stable key (channel, reason, retry generation) — NOT payload.key which drifts.
+				key: ticketIdempotencyKey(
+					payload.channelId,
+					TicketReason.PARTNER_FAIL,
+					dist.retryCount,
+				),
+			});
+
+			return {
+				type: 'APPLY_CHANNEL_INPUT',
+				distributionId: dist.id,
+				key: `${payload.key}:fail`,
+				channelId: payload.channelId,
+				input: {
+					type: ChannelInputType.WAIT_FAIL,
+					ticketRef: ticketRef.value,
+				},
+			};
 		}
+
 		return {
 			type: 'APPLY_CHANNEL_INPUT',
 			distributionId: dist.id,
