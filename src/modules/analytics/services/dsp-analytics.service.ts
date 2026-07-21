@@ -1111,15 +1111,15 @@ export class DspAnalyticsService {
 	// TOP TERRITORIES
 	// ─────────────────────────────────────────────────────
 
-	async getTopTerritories(
-		dto: DspTopQueryDto,
-		tenantId: string,
-	): Promise<PageDto<EntityTopTerItem>> {
-		const key = this.cache.buildKey('dsp:top-ters', tenantId, dto);
-		return this.cache.wrap(key, () =>
-			this.computeTopTerritories(dto, tenantId),
-		);
-	}
+	// async getTopTerritories(
+	// 	dto: DspTopQueryDto,
+	// 	tenantId: string,
+	// ): Promise<PageDto<EntityTopTerItem>> {
+	// 	const key = this.cache.buildKey('dsp:top-ters', tenantId, dto);
+	// 	return this.cache.wrap(key, () =>
+	// 		this.computeTopTerritories(dto, tenantId),
+	// 	);
+	// }
 
 	private async computeTopTerritories(
 		dto: DspTopQueryDto,

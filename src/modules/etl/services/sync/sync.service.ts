@@ -536,6 +536,7 @@ export class SyncService {
 								file_directory: `${category}/${period}/${dspFolder}`,
 								file_path: `${category}/${period}/${dspFolder}/${stat.fileName}`,
 								status: 'done',
+								file_size_bytes: stat.fileSizeBytes,
 								total_lines: stat.totalLines,
 								processed_rows: stat.processedRows,
 								skipped_rows: stat.skippedRows,

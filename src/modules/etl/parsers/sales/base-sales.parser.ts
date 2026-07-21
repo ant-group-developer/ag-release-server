@@ -74,6 +74,7 @@ export abstract class BaseSalesParser {
 				filePath,
 				fileName: path.basename(filePath),
 				fileDirectory: path.dirname(filePath),
+				fileSizeBytes: (() => { try { return fs.statSync(filePath).size; } catch { return 0; } })(),
 				totalLines: rows.length,
 				processedRows: rows.length,
 				skippedRows: 0,

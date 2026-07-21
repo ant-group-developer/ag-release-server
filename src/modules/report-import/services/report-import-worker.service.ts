@@ -649,6 +649,7 @@ export class ReportImportWorkerService
 					file_directory: `${fileCategory}/${file.parserCode ?? ''}`,
 					file_path: `${fileCategory}/${file.parserCode ?? ''}/${filename}`,
 					status: 'done',
+					file_size_bytes: typeof file.size === 'number' ? file.size : 0,
 					total_lines: fileProcessedRows,
 					processed_rows: fileProcessedRows,
 					skipped_rows: 0,

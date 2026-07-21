@@ -55,17 +55,18 @@ export class JobController {
 				grouped[period][category][dspFolder] = [];
 
 			grouped[period][category][dspFolder].push({
-				file_name: row.file_name,
-				file_path: row.file_path,
+				fileName: row.file_name,
+				filePath: row.file_path,
 				status: row.status,
-				total_lines: row.total_lines,
-				processed_rows: row.processed_rows,
-				skipped_rows: row.skipped_rows,
-				error_rows: row.error_rows,
-				duration_ms: row.duration_ms,
-				error_message: row.error_message || null,
-				started_at: row.started_at,
-				completed_at: row.completed_at,
+				fileSizeBytes: Number(row.file_size_bytes ?? 0),
+				totalLines: Number(row.total_lines),
+				processedRows: Number(row.processed_rows),
+				skippedRows: Number(row.skipped_rows),
+				errorRows: Number(row.error_rows),
+				durationMs: Number(row.duration_ms),
+				errorMessage: row.error_message || null,
+				startedAt: row.started_at,
+				completedAt: row.completed_at,
 			});
 		}
 

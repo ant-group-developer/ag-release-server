@@ -204,6 +204,7 @@ export class StatementsImportService {
 									file_directory: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}`,
 									file_path: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}/${stat.fileName}`,
 									status: 'done',
+									file_size_bytes: stat.fileSizeBytes,
 									total_lines: stat.totalLines,
 									processed_rows: stat.processedRows,
 									skipped_rows: stat.skippedRows,
