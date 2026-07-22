@@ -9,6 +9,7 @@ import {
 	QueueName,
 	WorkflowEnginePort,
 } from '../../application/ports/workflow-engine.port';
+import { queueRetry } from '../resilience/queue-resilience.config';
 
 /**
  * Sanitize jobId cho BullMQ — thay `:` thành `-`.
@@ -74,13 +75,17 @@ export class BullMqWorkflowAdapter
 		const q = this.getOrCreateQueue(queue);
 		const sanitizedId = sanitizeJobId(opts?.jobId);
 
+		// Khối D: attempts + backoff per-queue (map RetryPolicy VO → BullMQ). Caller có thể
+		// override `attempts` (vd SUBMIT=1 idempotent); backoff base lấy theo queue.
+		const retry = queueRetry(queue);
+
 		await q.add(queue, payload, {
 			jobId: sanitizedId,
 			delay: opts?.delayMs,
-			attempts: opts?.attempts ?? 1,
-			backoff: { type: 'exponential', delay: 1_000 },
+			attempts: opts?.attempts ?? retry.attempts,
+			backoff: { type: 'exponential', delay: retry.backoffMs },
 			removeOnComplete: true,
-			removeOnFail: 1_000,
+			removeOnFail: 1_000, // native DLQ: giữ 1000 job failed gần nhất + metadata
 		});
 	}
 

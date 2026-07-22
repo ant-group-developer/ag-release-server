@@ -5,6 +5,7 @@ import {
 } from '../../domain/ports/ingest-result-reader.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { CiImportApiService } from '../ci-api/ci-import-api.service';
+import { CircuitBreaker } from '../resilience/circuit-breaker';
 
 /**
  * CiImportAdapter — ACL adapter wrapping CiImportApiService.
@@ -28,6 +29,13 @@ import { CiImportApiService } from '../ci-api/ci-import-api.service';
 export class CiImportAdapter implements IngestResultReader {
 	private readonly logger = new Logger(CiImportAdapter.name);
 
+	// Khối D: breaker cho CI import API (đã có timeout 30s ở CiApiService). CI sập → fail-fast.
+	private readonly breaker = new CircuitBreaker({
+		name: 'ci-import',
+		failureThreshold: 5,
+		cooldownMs: 30_000,
+	});
+
 	constructor(private readonly ciImportApiService: CiImportApiService) {}
 
 	async read(input: {
@@ -38,8 +46,9 @@ export class CiImportAdapter implements IngestResultReader {
 		const { batchId, upc } = input;
 
 		try {
-			const result =
-				await this.ciImportApiService.getImportBatch(batchId);
+			const result = await this.breaker.execute(() =>
+				this.ciImportApiService.getImportBatch(batchId),
+			);
 
 			// Batch not found = not ingested yet
 			if (!result.found) {

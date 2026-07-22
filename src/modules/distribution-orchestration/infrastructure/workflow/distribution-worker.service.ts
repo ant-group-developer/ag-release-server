@@ -5,7 +5,7 @@ import {
 	OnModuleDestroy,
 	OnModuleInit,
 } from '@nestjs/common';
-import { ConnectionOptions, Worker } from 'bullmq';
+import { ConnectionOptions, UnrecoverableError, Worker } from 'bullmq';
 import Redis from 'ioredis';
 
 import { Inject } from '@nestjs/common';
@@ -17,6 +17,8 @@ import {
 	WORKFLOW_ENGINE,
 	WorkflowEnginePort,
 } from '../../application/ports/workflow-engine.port';
+import { RetryLimitExceededError } from '../../domain/errors/domain-errors';
+import { queueConcurrency } from '../resilience/queue-resilience.config';
 import { REPOLL_DELAY_MS } from './repoll-delay.config';
 import { RunnerDispatchMap } from './runner-dispatch-map';
 
@@ -77,12 +79,15 @@ export class DistributionWorkerService
 		this.logger.log('Starting Distribution Workers...');
 
 		for (const queue of this.queues) {
+			// Khối D: bulkhead (concurrency) + rate-limit (limiter) per-queue.
+			const cfg = queueConcurrency(queue);
 			const worker = new Worker(
 				queue,
 				async (job) => this.processJob(queue, job.data),
 				{
 					connection: this.connectionOpts,
-					concurrency: 1, // Khối D sẽ config per-queue
+					concurrency: cfg.concurrency,
+					...(cfg.limiter ? { limiter: cfg.limiter } : {}),
 				},
 			);
 
@@ -123,7 +128,18 @@ export class DistributionWorkerService
 		queue: QueueName,
 		payload: JobPayload,
 	): Promise<void> {
-		const command = await this.dispatchMap.dispatch(queue, payload);
+		let command;
+		try {
+			command = await this.dispatchMap.dispatch(queue, payload);
+		} catch (err) {
+			// Khối D poison detection: RetryLimitExceededError (retryCount≥3) là lỗi nghiệp vụ
+			// KHÔNG thể tự khỏi bằng retry → UnrecoverableError: BullMQ KHÔNG retry, vào failed-set
+			// (DLQ native) ngay để người xử lý thủ công. Lỗi transient khác → throw để retry.
+			if (err instanceof RetryLimitExceededError) {
+				throw new UnrecoverableError(err.message);
+			}
+			throw err;
+		}
 
 		// dist.orchestrate: handler tự persist, không trả command → xong.
 		if (queue === QUEUES.ORCHESTRATE) return;
@@ -134,10 +150,9 @@ export class DistributionWorkerService
 			return;
 		}
 
-		// Runner trả command → enqueue lại vào dist.orchestrate.
+		// Runner trả command → enqueue lại vào dist.orchestrate (attempts/backoff theo queue).
 		const opts: EnqueueOptions = {
 			jobId: `${command.distributionId}:${command.type}:${command.key}`,
-			attempts: 3, // Default retry; Khối D map theo RetryPolicy
 		};
 
 		await this.workflowEngine.enqueue(

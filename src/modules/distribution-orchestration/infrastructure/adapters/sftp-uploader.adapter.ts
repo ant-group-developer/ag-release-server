@@ -12,6 +12,8 @@ import {
 import { DspCode } from '../../domain/value-objects/dsp-code.vo';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { PackagePath } from '../../domain/value-objects/package-path.vo';
+import { CircuitBreaker } from '../resilience/circuit-breaker';
+import { withTimeout } from '../resilience/with-timeout';
 
 /**
  * SftpUploaderAdapter — uploads DDEX packages via SFTP/S3.
@@ -34,6 +36,14 @@ import { PackagePath } from '../../domain/value-objects/package-path.vo';
 export class SftpUploaderAdapter implements PackageUploader {
 	private readonly logger = new Logger(SftpUploaderAdapter.name);
 	private readonly baseDir: string;
+
+	// Khối D: timeout 120s/upload + breaker (SFTP sập → fail-fast, half-open sau 60s).
+	private static readonly UPLOAD_TIMEOUT_MS = 120_000;
+	private readonly breaker = new CircuitBreaker({
+		name: 'sftp-upload',
+		failureThreshold: 5,
+		cooldownMs: 60_000,
+	});
 
 	constructor(
 		private readonly sftpService: SftpConnectService,
@@ -76,11 +86,20 @@ export class SftpUploaderAdapter implements PackageUploader {
 			`[upload] localDir=${batchDir} remoteDir=${remoteDir} type=${config.sftp.type ?? 'sftp'}`,
 		);
 
-		await this.sftpService.uploadFolder({
-			sftp: config.sftp,
-			localDir: batchDir,
-			remoteDir,
-		});
+		// Khối D: breaker(timeout(uploadFolder)). Lỗi mạng/timeout/breaker-open → throw →
+		// BullMQ retry theo backoff (3 lần exp 30s); cạn attempts → failed-set. Transient, KHÔNG
+		// trả ok:false (ok:false dành cho lỗi nghiệp vụ dứt khoát — hiện SFTP không có loại đó).
+		await this.breaker.execute(() =>
+			withTimeout(
+				this.sftpService.uploadFolder({
+					sftp: config.sftp,
+					localDir: batchDir,
+					remoteDir,
+				}),
+				SftpUploaderAdapter.UPLOAD_TIMEOUT_MS,
+				`SFTP uploadFolder ${dspCode.value}`,
+			),
+		);
 
 		this.logger.log(`[upload] Upload complete for ${dspCode.value}`);
 		return { ok: true };
