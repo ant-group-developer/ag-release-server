@@ -1001,7 +1001,7 @@ export class ReleaseQueryService {
 			needImportAgain,
 			hasQaFlag,
 			dspDelivery,
-
+			hangingExecutionDays,
 			fieldOrder,
 			orderBy,
 
@@ -1075,6 +1075,19 @@ export class ReleaseQueryService {
 						)`,
 				);
 			}
+		}
+
+		if (hangingExecutionDays !== undefined) {
+			qb.innerJoin(
+				'release_excutions3',
+				're3',
+				're3.release_id = release.id',
+			);
+			qb.andWhere('re3.completed_at IS NULL');
+			qb.andWhere(
+				`re3.created_at <= NOW() - (INTERVAL '1 day' * :hangingExecutionDays)`,
+				{ hangingExecutionDays },
+			);
 		}
 
 		const dspDeliveryInclude = (dspDelivery?.include ?? []).filter(
