@@ -193,9 +193,23 @@ export class ReleaseExecution3Consumer {
 
 			// Các job trong batch chạy đồng thời; lỗi của một job không làm
 			// dừng hoặc reject toàn bộ các job còn lại.
-			await Promise.allSettled(
-				selected.map(({ job }) => this.processRunPipelineJob(job)),
-			);
+			// await Promise.allSettled(
+			// 	selected.map(({ job }) => this.processRunPipelineJob(job)),
+			// );
+
+			// new handle promise procressRunPipelineJob
+			const MAX_CONCURRENCY = 4; // Số release chạy đồng thời tối đa
+			const executing: Promise<void>[] = [];
+			for (const { job } of selected) {
+				const p = this.processRunPipelineJob(job).finally(() => {
+					executing.splice(executing.indexOf(p), 1);
+				});
+				executing.push(p);
+				if (executing.length >= MAX_CONCURRENCY) {
+					await Promise.race(executing); // Khi 1 job bất kỳ xong, gắp ngay job tiếp theo vào
+				}
+			}
+			await Promise.allSettled(executing);
 		} finally {
 			this.isConsumingRunPipeline = false;
 		}
