@@ -626,7 +626,7 @@ export function getTrendViewLineChartQuery(
 ): string {
 	return `
     SELECT
-      formatDateTime(toStartOfMonth(s.reporting_date), '%Y-%m') AS period,
+      formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
       sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
     ${joinSql}
@@ -634,16 +634,19 @@ export function getTrendViewLineChartQuery(
       AND s.reporting_date >= toDate({from:String})
       AND s.reporting_date <= toDate({to:String})
       ${filterSql}
-    GROUP BY period
-    ORDER BY period ASC
+    GROUP BY s.reporting_date, period
+    ORDER BY s.reporting_date ASC
   `;
 }
 
-export function getTrendViewDspBarChartTotalQuery(filterSql: string): string {
+export function getTrendViewDspBarChartTotalQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
 	return `
     SELECT sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     WHERE 1=1
       AND s.reporting_date >= toDate({from:String})
       AND s.reporting_date <= toDate({to:String})
@@ -652,6 +655,7 @@ export function getTrendViewDspBarChartTotalQuery(filterSql: string): string {
 }
 
 export function getTrendViewDspBarChartQuery(
+	joinSql: string,
 	filterSql: string,
 	resolvedDspName: string,
 	joinExpr: string,
@@ -661,7 +665,7 @@ export function getTrendViewDspBarChartQuery(
       ${resolvedDspName} AS dsp_name,
       sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-    INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
+    ${joinSql}
     ${joinExpr}
     WHERE 1=1
       AND s.reporting_date >= toDate({from:String})
@@ -699,11 +703,11 @@ export function getTrendViewTerritoryBarChartTotalQuery(
 ): string {
 	return `
     SELECT sum(s.total_quantity) AS total_views
-    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
     ${joinSql}
     WHERE 1=1
-      AND s.period >= toDate({from:String})
-      AND s.period <= toDate({to:String})
+      AND s.reporting_date >= toDate({from:String})
+      AND s.reporting_date <= toDate({to:String})
       ${filterSql}
   `;
 }
@@ -716,11 +720,11 @@ export function getTrendViewTerritoryBarChartQuery(
     SELECT
       s.territory_code AS territory,
       sum(s.total_quantity) AS total_views
-    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+    FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
     ${joinSql}
     WHERE 1=1
-      AND s.period >= toDate({from:String})
-      AND s.period <= toDate({to:String})
+      AND s.reporting_date >= toDate({from:String})
+      AND s.reporting_date <= toDate({to:String})
       ${filterSql}
     GROUP BY territory
     ORDER BY total_views DESC

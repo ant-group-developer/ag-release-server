@@ -45,7 +45,7 @@ export class DspAnalyticsController {
 	}
 
 	@Post('trend-view/line-chart')
-	@ApiOperation({ summary: 'Trend view line chart cho 1 DSP (monthly)' })
+	@ApiOperation({ summary: 'Daily trend view line chart for one DSP' })
 	async trendViewLineChart(
 		@Body() dto: DspChartQueryDto,
 		@Req() req: Request,

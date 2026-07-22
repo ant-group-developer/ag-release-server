@@ -426,9 +426,9 @@ export interface RevenueReleaseVideoItem {
 // Chart APIs (line-chart / bar-chart)
 // ═══════════════════════════════════════════════════════
 
-/** Một điểm trên line-chart trend-view theo tháng */
+/** Một điểm trên line-chart trend-view theo ngày */
 export interface TrendViewLineChartItem {
-	period: string; // 'YYYY-MM'
+	period: string; // 'YYYY-MM-DD'
 	totalViews: number;
 }
 

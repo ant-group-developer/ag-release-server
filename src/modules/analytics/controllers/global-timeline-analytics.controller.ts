@@ -318,10 +318,10 @@ export class TimelineAnalyticsController {
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({
-		summary: 'Get monthly trend views line chart data',
+		summary: 'Get daily trend views line chart data',
 		description:
-			'Returns total trend views aggregated by month. Uses trends_dsp_daily_cube, ' +
-			'grouping daily data into months based on the exact fromDate/toDate range.',
+			'Returns total trend views aggregated by day for the exact fromDate/toDate range. ' +
+			'Uses trends_dsp_daily_cube.',
 	})
 	@ApiResponse({
 		status: 201,
@@ -365,7 +365,7 @@ export class TimelineAnalyticsController {
 		summary: 'Get top 5 territories by trend views bar chart data',
 		description:
 			'Returns top 5 territories by total trend views with an "Other" bucket for the rest. ' +
-			'Uses trends_ter_monthly_cube for territory trend data.',
+			'Uses trends_ter_daily_cube for the exact fromDate/toDate range.',
 	})
 	@ApiResponse({
 		status: 201,

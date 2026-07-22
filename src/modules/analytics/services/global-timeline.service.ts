@@ -2390,8 +2390,8 @@ export class TimelineAnalyticsService {
 	}
 
 	// ═══════════════════════════════════════════════════════
-	// CHART API 1: TREND-VIEW LINE CHART (Monthly)
-	// Tổng trend-view theo tháng từ trends_dsp_daily_cube
+	// CHART API 1: TREND-VIEW LINE CHART (daily)
+	// Tổng trend-view theo ngày từ trends_dsp_daily_cube
 	// ═══════════════════════════════════════════════════════
 	async getTrendViewLineChart(
 		tenantId: string,
@@ -2407,40 +2407,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<TrendViewLineChartItem[]> {
-		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = {
-			from: query.fromDate,
-			to: query.toDate,
-		};
-
-		let joinSql = '';
-		let filterSql = '';
-		const hasSubFilter = !!(
-			query.labelId ||
-			query.releaseId ||
-			query.releaseType
+		const { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
 		);
-
-		if (!isSystem || hasSubFilter) {
-			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-			filterSql = 'AND t.is_deleted = 0';
-			if (!isSystem) {
-				filterSql += ' AND t.tenant_id = {tenantId:String}';
-				params.tenantId = tenantId;
-			}
-			if (query.labelId) {
-				filterSql += ' AND t.label_id = {labelId:String}';
-				params.labelId = query.labelId;
-			}
-			if (query.releaseId) {
-				filterSql += ' AND t.release_id = {releaseId:String}';
-				params.releaseId = query.releaseId;
-			}
-			if (query.releaseType) {
-				filterSql += ' AND t.release_type = {releaseType:String}';
-				params.releaseType = query.releaseType;
-			}
-		}
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const sql = queries.getTrendViewLineChartQuery(joinSql, filterSql);
 
@@ -2477,29 +2449,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<DspBarChartItem[]> {
-		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = {
-			from: query.fromDate,
-			to: query.toDate,
-		};
-
-		let filterSql = 'AND t.is_deleted = 0';
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
+		const { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+		);
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 		const joinExpr = `
@@ -2508,7 +2463,10 @@ export class TimelineAnalyticsService {
     `;
 
 		// Step 1: Get total views across all DSPs
-		const totalSql = queries.getTrendViewDspBarChartTotalQuery(filterSql);
+		const totalSql = queries.getTrendViewDspBarChartTotalQuery(
+			joinSql,
+			filterSql,
+		);
 		const totalResult = await this.clickHouseService.query<{
 			total_views: string;
 		}>(totalSql, params);
@@ -2516,6 +2474,7 @@ export class TimelineAnalyticsService {
 
 		// Step 2: Get top 5 DSPs
 		const sql = queries.getTrendViewDspBarChartQuery(
+			joinSql,
 			filterSql,
 			resolvedDspName,
 			joinExpr,
@@ -2567,14 +2526,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { joinSql, filterSql, params } = this.buildTenantFilters(
 			tenantId,
 			query,
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const totalSql = queries.getTrendViewTerritoryBarChartTotalQuery(
 			joinSql,

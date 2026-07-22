@@ -415,7 +415,7 @@ export class DspAnalyticsService {
 	}
 
 	// ─────────────────────────────────────────────────────
-	// TREND VIEW LINE CHART (monthly)
+	// TREND VIEW LINE CHART (daily)
 	// ─────────────────────────────────────────────────────
 	async getTrendViewLineChart(
 		dto: DspChartQueryDto,
@@ -442,14 +442,14 @@ export class DspAnalyticsService {
 
 		const sql = `
       SELECT
-        formatDateTime(toStartOfMonth(s.reporting_date), '%Y-%m') AS period,
+        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY period
-      ORDER BY period ASC
+      GROUP BY s.reporting_date, period
+      ORDER BY s.reporting_date ASC
     `;
 		const rows = await this.clickHouseService.query<{
 			period: string;
@@ -531,23 +531,20 @@ export class DspAnalyticsService {
 		dto: DspChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildDspFilters(
 			tenantId,
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ tableHasDspId: false },
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		params.from = dto.fromDate;
+		params.to = dto.toDate;
 
 		const totalSql = `
       SELECT sum(s.total_quantity) AS total_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
       ${joinSql}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
+      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
     `;
 		const totalRows = await this.clickHouseService.query<{
@@ -559,9 +556,9 @@ export class DspAnalyticsService {
       SELECT
         s.territory_code AS territory,
         sum(s.total_quantity) AS total_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
       ${joinSql}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
+      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
       GROUP BY territory
       ORDER BY total_views DESC

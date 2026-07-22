@@ -203,30 +203,28 @@ export class TerAnalyticsService {
 		isoCode: string,
 		dto: ChartQueryDto,
 	): Promise<TrendViewLineChartItem[]> {
-		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { terFilter, trackJoin, trackFilter, params } =
 			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
-		params.fromMonth = fromMonth;
-		params.toMonth = toMonth;
+		params.fromDate = dto.fromDate;
+		params.toDate = dto.toDate;
 
 		const sql = `
 			SELECT
-				toStartOfMonth(s.period) AS period,
+				formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
 				sum(s.total_quantity) AS total_views
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+			WHERE s.reporting_date >= toDate({fromDate:String}) AND s.reporting_date <= toDate({toDate:String})
 				${terFilter} ${trackFilter}
-			GROUP BY period
-			ORDER BY period ASC
+			GROUP BY s.reporting_date, period
+			ORDER BY s.reporting_date ASC
 		`;
 		const rows = await this.clickHouseService.query<{
 			period: string;
 			total_views: string;
 		}>(sql, params);
 		return rows.map((r) => ({
-			period: r.period.substring(0, 7),
+			period: r.period,
 			totalViews: Number(r.total_views),
 		}));
 	}

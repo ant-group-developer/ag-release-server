@@ -25,7 +25,7 @@ export class TerAnalyticsController {
 	}
 
 	@Post('trend-view/line-chart')
-	@ApiOperation({ summary: 'Monthly trend view line chart for a territory' })
+	@ApiOperation({ summary: 'Daily trend view line chart for a territory' })
 	async trendViewLineChart(
 		@Param('isoCode') isoCode: string,
 		@Body() dto: ChartQueryDto,
