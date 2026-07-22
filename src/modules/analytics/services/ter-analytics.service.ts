@@ -58,17 +58,17 @@ export class TerAnalyticsService {
 
 	private buildTrendsSource(
 		isoCode: string,
-		fromMonth: string,
-		toMonth: string,
+		fromDate: string,
+		toDate: string,
 		importSource?: string,
 		releaseType?: string,
 	): { fromClause: string; params: Record<string, any> } {
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
-			fromMonth,
-			toMonth,
+			fromDate,
+			toDate,
 		};
-		let where = `period >= toDate({fromMonth:String}) AND period <= toDate({toMonth:String}) AND territory_code = {isoCode:String}`;
+		let where = `reporting_date >= toDate({fromDate:String}) AND reporting_date <= toDate({toDate:String}) AND territory_code = {isoCode:String}`;
 		if (importSource) {
 			where += ' AND import_source = {importSource:String}';
 			params.importSource = importSource;
@@ -77,7 +77,7 @@ export class TerAnalyticsService {
 			where += ` AND isrc IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0 AND release_type = {releaseType:String})`;
 			params.releaseType = releaseType;
 		}
-		const fromClause = `(SELECT dsp_id, isrc, period, territory_code, import_source, total_quantity FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} WHERE ${where}) s`;
+		const fromClause = `(SELECT dsp_id, isrc, reporting_date, territory_code, import_source, total_quantity FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} WHERE ${where}) s`;
 		return { fromClause, params };
 	}
 
@@ -318,6 +318,8 @@ export class TerAnalyticsService {
 
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
+			from: dto.fromDate,
+			to: dto.toDate,
 			fromMonth,
 			toMonth,
 		};
@@ -330,8 +332,8 @@ export class TerAnalyticsService {
 		const countSql = `
 			SELECT uniq(sub.isrc) AS total
 			FROM (
-				SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${terFilter} ${importFilter}
 				UNION ALL
 				SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
@@ -357,8 +359,8 @@ export class TerAnalyticsService {
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
 			LEFT JOIN (
 				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
@@ -463,6 +465,8 @@ export class TerAnalyticsService {
 
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
+			from: dto.fromDate,
+			to: dto.toDate,
 			fromMonth,
 			toMonth,
 		};
@@ -476,8 +480,8 @@ export class TerAnalyticsService {
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
 			LEFT JOIN (
 				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
@@ -506,8 +510,8 @@ export class TerAnalyticsService {
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
 			LEFT JOIN (
 				SELECT isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
@@ -601,11 +605,13 @@ export class TerAnalyticsService {
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { fromClause, params } = this.buildTrendsSource(
 			isoCode,
-			fromMonth,
-			toMonth,
+			dto.fromDate,
+			dto.toDate,
 			dto.importSource,
 			dto.releaseType,
 		);
+		params.fromMonth = fromMonth;
+		params.toMonth = toMonth;
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;

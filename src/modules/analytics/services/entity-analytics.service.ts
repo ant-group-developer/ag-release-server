@@ -1483,7 +1483,13 @@ export class EntityAnalyticsService {
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = { entityId, fromMonth, toMonth };
+		const params: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
 		const effectiveImportSource =
 			entityType === 'sourceType' ? entityId : dto.importSource;
@@ -1518,7 +1524,10 @@ export class EntityAnalyticsService {
 
 		const primaryTable = sortByRevenue
 			? CLICKHOUSE_TABLES.SALES_DSP_MONTHLY
-			: CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY;
+			: CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE;
+		const primaryDateColumn = sortByRevenue ? 'period' : 'reporting_date';
+		const primaryFromParam = sortByRevenue ? 'fromMonth' : 'from';
+		const primaryToParam = sortByRevenue ? 'toMonth' : 'to';
 		const importFilterSal = effectiveImportSource
 			? 'AND tr_sub.import_source = {importSource:String}'
 			: '';
@@ -1531,7 +1540,7 @@ export class EntityAnalyticsService {
 			SELECT uniq(s.dsp_id) AS total
 			FROM music_analytics.${primaryTable} s
 			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+			WHERE s.${primaryDateColumn} >= toDate({${primaryFromParam}:String}) AND s.${primaryDateColumn} <= toDate({${primaryToParam}:String})
 				${importFilter} ${whereTrack}
 		`;
 
@@ -1549,8 +1558,8 @@ export class EntityAnalyticsService {
 			${trackJoin}
 			LEFT JOIN (
 				SELECT dsp_id, isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} tr_sub
-				WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} tr_sub
+				WHERE tr_sub.reporting_date >= toDate({from:String}) AND tr_sub.reporting_date <= toDate({to:String})
 					${importFilterSal}
 				GROUP BY dsp_id, isrc
 			) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
@@ -1568,7 +1577,7 @@ export class EntityAnalyticsService {
 				sum(s.total_quantity) AS total_views,
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
 				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
 			${this.dspNameJoin}
 			${trackJoin}
 			LEFT JOIN (
@@ -1578,7 +1587,7 @@ export class EntityAnalyticsService {
 					${importFilterSal}
 				GROUP BY dsp_id, isrc
 			) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
 			ORDER BY ${sortCol} DESC
@@ -1607,8 +1616,8 @@ export class EntityAnalyticsService {
 				${trackJoin}
 				LEFT JOIN (
 					SELECT dsp_id, isrc, sum(total_quantity) AS total_views
-					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} tr_sub
-					WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} tr_sub
+					WHERE tr_sub.reporting_date >= toDate({from:String}) AND tr_sub.reporting_date <= toDate({to:String})
 						${importFilterSal}
 					GROUP BY dsp_id, isrc
 				) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
@@ -1617,7 +1626,7 @@ export class EntityAnalyticsService {
 			`
 				: `
 				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
 				${trackJoin}
 				LEFT JOIN (
 					SELECT dsp_id, isrc, sum(total_revenue_usd) AS total_revenue_usd
@@ -1626,7 +1635,7 @@ export class EntityAnalyticsService {
 						${importFilterSal}
 					GROUP BY dsp_id, isrc
 				) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${importFilter} ${whereTrack}
 			`;
 			const totalsRow = (
@@ -1729,7 +1738,13 @@ export class EntityAnalyticsService {
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = { entityId, fromMonth, toMonth };
+		const params: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
 		const effectiveImportSource =
 			entityType === 'sourceType' ? entityId : dto.importSource;
@@ -1764,7 +1779,10 @@ export class EntityAnalyticsService {
 
 		const primaryTable = sortByRevenue
 			? CLICKHOUSE_TABLES.SALES_TER_MONTHLY
-			: CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY;
+			: CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE;
+		const primaryDateColumn = sortByRevenue ? 'period' : 'reporting_date';
+		const primaryFromParam = sortByRevenue ? 'fromMonth' : 'from';
+		const primaryToParam = sortByRevenue ? 'toMonth' : 'to';
 		const importFilterSal = effectiveImportSource
 			? 'AND tr_sub.import_source = {importSource:String}'
 			: '';
@@ -1777,7 +1795,7 @@ export class EntityAnalyticsService {
 			SELECT uniq(s.territory_code) AS total
 			FROM music_analytics.${primaryTable} s
 			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+			WHERE s.${primaryDateColumn} >= toDate({${primaryFromParam}:String}) AND s.${primaryDateColumn} <= toDate({${primaryToParam}:String})
 				${importFilter} ${whereTrack}
 		`;
 
@@ -1792,8 +1810,8 @@ export class EntityAnalyticsService {
 			${trackJoin}
 			LEFT JOIN (
 				SELECT territory_code, isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
-				WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} tr_sub
+				WHERE tr_sub.reporting_date >= toDate({from:String}) AND tr_sub.reporting_date <= toDate({to:String})
 					${importFilterSal}
 				GROUP BY territory_code, isrc
 			) tr ON s.territory_code = tr.territory_code AND s.isrc = tr.isrc
@@ -1809,7 +1827,7 @@ export class EntityAnalyticsService {
 				sum(s.total_quantity) AS total_views,
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
 				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 			${trackJoin}
 			LEFT JOIN (
 				SELECT territory_code, isrc, sum(total_revenue_usd) AS total_revenue_usd
@@ -1818,7 +1836,7 @@ export class EntityAnalyticsService {
 					${importFilterSal}
 				GROUP BY territory_code, isrc
 			) sa ON s.territory_code = sa.territory_code AND s.isrc = sa.isrc
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.territory_code
 			ORDER BY ${sortCol} DESC
@@ -1860,8 +1878,8 @@ export class EntityAnalyticsService {
 				${trackJoin}
 				LEFT JOIN (
 					SELECT territory_code, isrc, sum(total_quantity) AS total_views
-					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
-					WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
+					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} tr_sub
+					WHERE tr_sub.reporting_date >= toDate({from:String}) AND tr_sub.reporting_date <= toDate({to:String})
 						${importFilterSal}
 					GROUP BY territory_code, isrc
 				) tr ON s.territory_code = tr.territory_code AND s.isrc = tr.isrc
@@ -1870,7 +1888,7 @@ export class EntityAnalyticsService {
 			`
 				: `
 				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 				${trackJoin}
 				LEFT JOIN (
 					SELECT territory_code, isrc, sum(total_revenue_usd) AS total_revenue_usd
@@ -1879,7 +1897,7 @@ export class EntityAnalyticsService {
 						${importFilterSal}
 					GROUP BY territory_code, isrc
 				) sa ON s.territory_code = sa.territory_code AND s.isrc = sa.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
+				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${importFilter} ${whereTrack}
 			`;
 			const totalsRow = (
