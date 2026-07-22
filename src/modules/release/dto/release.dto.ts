@@ -666,6 +666,18 @@ export class QueryGetListReleaseDto extends BaseQueryDto {
 	})
 	hasQaFlag?: boolean;
 
+	@ApiPropertyOptional({
+		type: Number,
+		description:
+			'Filter releases with executions hanging for more than N days',
+		example: 3,
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsNumber()
+	@Min(0)
+	hangingExecutionDays?: number;
+
 	@ApiPropertyOptional({ type: QueryReleaseDspDeliveryDto })
 	@IsOptional()
 	@Transform(({ value }) => parseJsonObjectQueryValue(value))
