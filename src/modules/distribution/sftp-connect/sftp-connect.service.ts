@@ -767,27 +767,16 @@ export class SftpConnectService {
 			} else if (entry.isFile()) {
 				const key = this.buildS3Key(config.path, remotePath);
 				const stats = fs.statSync(localPath);
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-				const abortController = new AbortController();
->>>>>>> a6ba3166 (update (uploadFolderS3): fix out of memory)
-=======
->>>>>>> 36754eaf (update (uploadFolderS3): handle multipart upload to fix out of memory)
 				const fileStream = fs.createReadStream(localPath);
 				let parallelUploads3: Upload | null = null;
 				const timeout = setTimeout(() => {
 					this.logger.error(
 						`S3 upload timed out after 1 hour: ${key}`,
 					);
-<<<<<<< HEAD
-					abortController.abort();
-=======
 					if (parallelUploads3) {
 						parallelUploads3.abort();
 					}
 					fileStream.destroy();
->>>>>>> 36754eaf (update (uploadFolderS3): handle multipart upload to fix out of memory)
 				}, this.s3UploadTimeoutMs);
 
 				this.logger.log(`file size ${stats.size}`);
@@ -800,10 +789,6 @@ export class SftpConnectService {
 							Bucket: config.bucket!,
 							Key: key,
 							Body: fileStream,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 36754eaf (update (uploadFolderS3): handle multipart upload to fix out of memory)
 						},
 						leavePartsOnError: false,
 						queueSize: 4, // Upload song song tối đa 4 part cùng lúc
@@ -811,15 +796,6 @@ export class SftpConnectService {
 					});
 
 					await parallelUploads3.done();
-<<<<<<< HEAD
-=======
-							ContentLength: stats.size, // <--- Báo kích thước file để không nạp đệm toàn bộ vào RAM
-						}),
-						{ abortSignal: abortController.signal },
-					);
->>>>>>> a6ba3166 (update (uploadFolderS3): fix out of memory)
-=======
->>>>>>> 36754eaf (update (uploadFolderS3): handle multipart upload to fix out of memory)
 					this.logger.log(`Completed S3 upload: ${key}`);
 				} catch (error) {
 					this.logger.error(
