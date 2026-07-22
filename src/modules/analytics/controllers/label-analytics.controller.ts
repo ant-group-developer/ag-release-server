@@ -9,7 +9,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -68,95 +67,9 @@ export class LabelAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a label (monthly)' })
-	async trendViewTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTrendViewDspTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a label (monthly)' })
-	async salesViewTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getSalesViewDspTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a label' })
-	async trendViewDailyTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTrendViewDspDailyTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a label (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getRevenueTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a label' })

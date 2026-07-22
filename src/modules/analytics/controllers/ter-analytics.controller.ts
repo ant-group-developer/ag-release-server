@@ -5,7 +5,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { TerAnalyticsService } from '../services/ter-analytics.service';
 
@@ -47,31 +46,7 @@ export class TerAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Monthly DSP trend view timeline for a territory',
-	})
-	async trendViewDspTimeline(
-		@Param('isoCode') isoCode: string,
-		@Body() dto: EntityTimelineQueryDto,
-	) {
-		return new ResponseSuccess({
-			data: await this.terSvc.getTrendViewDspTimeline(isoCode, dto),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Monthly revenue timeline (DSP breakdown) for a territory',
-	})
-	async revenueTimeline(
-		@Param('isoCode') isoCode: string,
-		@Body() dto: EntityTimelineQueryDto,
-	) {
-		return new ResponseSuccess({
-			data: await this.terSvc.getRevenueTimeline(isoCode, dto),
-		});
-	}
 
 	@Post('top-tracks')
 	@ApiOperation({

@@ -15,7 +15,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -62,79 +61,9 @@ export class TenantAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a tenant (monthly)' })
-	async trendViewTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a tenant (monthly)' })
-	async salesViewTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a tenant' })
-	async trendViewDailyTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a tenant (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a tenant' })

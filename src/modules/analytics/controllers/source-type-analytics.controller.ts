@@ -6,7 +6,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -35,81 +34,9 @@ export class SourceTypeAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Trend view DSP timeline for a source type (monthly)',
-	})
-	async trendViewTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Sales view DSP timeline for a source type (monthly)',
-	})
-	async salesViewTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({
-		summary: 'Trend view DSP daily timeline for a source type',
-	})
-	async trendViewDailyTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a source type (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a source type' })

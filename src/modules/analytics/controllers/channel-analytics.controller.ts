@@ -13,7 +13,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -41,75 +40,9 @@ export class ChannelAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Trend view DSP timeline for a channel (monthly)',
-	})
-	async trendViewTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getTrendViewDspTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Sales view DSP timeline for a channel (monthly)',
-	})
-	async salesViewTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getSalesViewDspTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a channel' })
-	async trendViewDailyTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getTrendViewDspDailyTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a channel (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getRevenueTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a channel' })

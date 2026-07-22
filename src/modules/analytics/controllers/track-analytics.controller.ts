@@ -6,7 +6,6 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -24,76 +23,6 @@ export class TrackAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getOverview(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a track (monthly)' })
-	async trendViewTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a track (monthly)' })
-	async salesViewTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a track' })
-	async trendViewDailyTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a track (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
 				'track',
 				isrc,
 				dto,
