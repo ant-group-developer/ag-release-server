@@ -1,8 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
 import { DistributionState } from '../domain/distribution/distribution-state.enum';
 import { Distribution } from '../domain/distribution/distribution.aggregate';
+import { RetryExecutionPolicy } from '../domain/policies/retry-execution.policy';
 import { Clock } from '../domain/ports/clock.port';
+import { TicketService } from '../domain/ports/ticket-service.port';
+import { TicketRef } from '../domain/value-objects/ticket-ref.vo';
+import { TICKET_SERVICE } from '../infrastructure/adapters/postgres-ticket.adapter';
 import { pickChannelQueue } from './channel-stage-to-queue';
 import {
 	ApplyChannelInputCommand,
@@ -57,17 +61,31 @@ export class OrchestrateHandler {
 		private readonly repo: DistributionRepository,
 		@Inject(POLICY_RESOLVER) private readonly policies: PolicyResolver,
 		@Inject(CLOCK) private readonly clock: Clock,
+		// Optional: chỉ Khối E cần (resolve ticket khi RESET). Test cũ dựng handler 4-arg vẫn chạy.
+		@Optional()
+		@Inject(TICKET_SERVICE)
+		private readonly ticketService?: TicketService,
 	) {}
 
 	async handle(command: DistributionCommand): Promise<void> {
+		// Khối E: chụp ticketRef của channel ISSUES SẼ bị reset (trong tx) để resolve SAU commit.
+		let ticketsToResolve: string[] = [];
+
 		await this.uow.run(async (ctx) => {
 			const dist = await this.loadOrCreate(ctx, command);
 			const prevState = dist.state;
+			if (command.type === 'RESET_FOR_RETRY') {
+				ticketsToResolve = this.collectResolvableTickets(dist, command);
+			}
 			this.applyCommand(dist, command);
 			const events = dist.pullDomainEvents();
 			const outbox = this.buildOutbox(dist, command, prevState);
 			await this.repo.saveWithOutbox(ctx, dist, events, outbox);
 		});
+
+		// Best-effort resolve NGOÀI tx: reset đã commit; nếu resolve lỗi thì job có thể retry
+		// nhưng reset idempotent (channel đã rời ISSUES) → không reset kép. Nuốt lỗi resolve.
+		await this.resolveTickets(ticketsToResolve);
 	}
 
 	// ─── LOAD / CREATE ────────────────────────────────────────────────────
@@ -183,19 +201,53 @@ export class OrchestrateHandler {
 		dist.applyChannelInput(cmd.channelId, cmd.input, this.clock);
 	}
 
+	/**
+	 * RESET_FOR_RETRY (quyết định #3): wrap policy gốc vào RetryExecutionPolicy — chỉ nó
+	 * `canRetry()=true`. Không wrap → INITIAL/UPDATE/TAKEDOWN policy trả false → luôn throw.
+	 * Phần còn lại delegate policy gốc → channel reset resume đúng process. Không đụng DB (không
+	 * thêm cột wrapped_type): RETRY mutate aggregate cũ, type trong DB giữ nguyên.
+	 */
 	private applyResetForRetry(
 		dist: Distribution,
 		cmd: ResetForRetryCommand,
 	): void {
-		dist.resetForRetry(
-			cmd.scope,
-			this.policies.resolve(dist.type),
-			this.clock,
-		);
+		const base = this.policies.resolve(dist.type);
+		const retryPolicy = new RetryExecutionPolicy(base);
+		dist.resetForRetry(cmd.scope, retryPolicy, this.clock);
 	}
 
 	private applyMarkTakenDown(dist: Distribution): void {
 		dist.markTakenDown(this.policies.resolve(dist.type), this.clock);
+	}
+
+	// ─── Khối E: resolve ticket khi RESET ─────────────────────────────────
+
+	/**
+	 * Ticket của channel SẼ bị reset (giao với scope): scope.channelIds nếu có, else mọi channel
+	 * ISSUES. Đọc TRƯỚC apply() vì sau reset channel rời ISSUES + ticketRef vẫn giữ trên entity.
+	 */
+	private collectResolvableTickets(
+		dist: Distribution,
+		cmd: ResetForRetryCommand,
+	): string[] {
+		const target = cmd.scope.channelIds;
+		return dist.channels
+			.filter((c) => c.state === 'ISSUES' && !!c.ticketRef)
+			.filter((c) => !target || target.includes(c.channelId))
+			.map((c) => c.ticketRef as string);
+	}
+
+	private async resolveTickets(refs: string[]): Promise<void> {
+		if (!this.ticketService || refs.length === 0) return;
+		for (const ref of refs) {
+			try {
+				await this.ticketService.resolve({
+					ticket: TicketRef.create(ref),
+				});
+			} catch {
+				// best-effort: reset đã commit; ticket còn open không chặn luồng.
+			}
+		}
 	}
 
 	// ─── OUTBOX derivation ────────────────────────────────────────────────

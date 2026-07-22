@@ -14,6 +14,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { CiModule } from '../partners-api/ci/ci.module';
 import { ReleaseModule } from '../release/release.module';
 import { Tenant } from '../tenant/tenant.entity';
+import { TenantModule } from '../tenant/tenant.module';
 import { DistributionCommandService } from './application/distribution-command.service';
 import { OrchestrateHandler } from './application/orchestrate.handler';
 import {
@@ -24,6 +25,8 @@ import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
 import { RELEASE_SNAPSHOT_READER } from './application/ports/release-snapshot-reader.port';
 import { RELEASE_SNAPSHOT_WRITER } from './application/ports/release-snapshot-writer.port';
+import { REVIEW_REPOSITORY } from './application/ports/review-repository.port';
+import { TENANT_READER } from './application/ports/tenant-reader.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
@@ -67,6 +70,7 @@ import {
 import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
 import { ReleaseSnapshotWriterAdapter } from './infrastructure/adapters/release-snapshot-writer.adapter';
 import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
+import { TenantReaderAdapter } from './infrastructure/adapters/tenant.reader';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
@@ -79,6 +83,8 @@ import { TypeOrmDistributionRepository } from './infrastructure/persistence/dist
 import { OrchestrationTicketOrmEntity } from './infrastructure/persistence/orchestration-ticket.orm-entity';
 import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.orm-entity';
 import { ReleaseSnapshotOrmEntity } from './infrastructure/persistence/release-snapshot.orm-entity';
+import { ReviewOrmEntity } from './infrastructure/persistence/review.orm-entity';
+import { TypeOrmReviewRepository } from './infrastructure/persistence/review.repository';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
 import { DistributionSseService } from './infrastructure/sse/distribution-sse.service';
@@ -130,8 +136,9 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 			OutboxEventOrmEntity,
 			OrchestrationTicketOrmEntity,
 			ReleaseSnapshotOrmEntity,
+			ReviewOrmEntity, // Khối B: audit quyết định duyệt
 			Aggregator, // Group E: ExporterAdapter queries State51 aggregator
-			Tenant, // ValidateRunner reads tenant (Khối B will add requiresManualReview)
+			Tenant, // ValidateRunner reads tenant.requiresManualReview (Khối B)
 		]),
 		AppConfigModule, // For CI API config + generator config (UPC/ISRC prefix IDs)
 		CiModule, // Keep v3 services for backward compatibility
@@ -148,6 +155,8 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 		NotificationModule, // NotificationResendService — Resend API email
 		// Khối A fix: snapshot writer bọc ReleaseQueryService
 		ReleaseModule, // ReleaseQueryService — findOneReleaseFull cho snapshot
+		// Khối B: tenant-scope cho reviewer (getDescendantIds)
+		TenantModule, // TenantService — resolve tenant hierarchy cho RBAC scope
 	],
 	controllers: [DistributionController, DistributionCommandController],
 	providers: [
@@ -192,6 +201,9 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 			provide: RELEASE_SNAPSHOT_WRITER,
 			useClass: ReleaseSnapshotWriterAdapter,
 		},
+		// Khối B: REVIEW gate
+		{ provide: REVIEW_REPOSITORY, useClass: TypeOrmReviewRepository },
+		{ provide: TENANT_READER, useClass: TenantReaderAdapter },
 		// Step runners (consumers for BullMQ jobs)
 		BuildPackageRunner,
 		ProvisionIdRunner,

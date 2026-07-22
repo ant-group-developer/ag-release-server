@@ -17,6 +17,10 @@ import {
 	ReleaseSnapshot,
 	ReleaseSnapshotReader,
 } from '../ports/release-snapshot-reader.port';
+import {
+	TENANT_READER,
+	TenantReader,
+} from '../ports/tenant-reader.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
 import { JobPayload } from '../ports/workflow-engine.port';
 import { TICKET_SERVICE } from './../../infrastructure/adapters/postgres-ticket.adapter';
@@ -47,6 +51,8 @@ export class ValidateRunner {
 		private readonly snapshotReader: ReleaseSnapshotReader,
 		@Inject(TICKET_SERVICE)
 		private readonly ticketService: TicketService,
+		@Inject(TENANT_READER)
+		private readonly tenantReader: TenantReader,
 	) {}
 
 	async run(
@@ -94,9 +100,10 @@ export class ValidateRunner {
 			};
 		}
 
-		// 4. Load Tenant to check requiresManualReview flag
-		// NOTE: Khối A hardcode false; Khối B sẽ thêm cột tenant.requiresManualReview
-		const requiresReview = false;
+		// 4. Read tenant flag: bật → distribution dừng IN_REVIEW chờ duyệt thủ công (Khối B)
+		const requiresReview = await this.tenantReader.requiresManualReview(
+			dist.tenantId,
+		);
 
 		// 5. Clean → MARK_VALIDATED
 		return {

@@ -1,9 +1,15 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
 import { User } from 'src/common/decorators/req.decorators';
 import { UserReq } from 'src/common/interface/common.interface';
+import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
+import { Permission } from 'src/modules/permission/constants/permission.data.constant';
+import { TenantService } from 'src/modules/tenant/tenant.service';
+import { UserType } from 'src/modules/user/enum/user.enum';
 import { DistributionCommandService } from '../../application/distribution-command.service';
+import { ReviewDecisionDto } from './dto/review-decision.dto';
+import { RetryDistributionDto } from './dto/retry-distribution.dto';
 import { SubmitDistributionDto } from './dto/submit-distribution.dto';
 
 /**
@@ -16,7 +22,10 @@ import { SubmitDistributionDto } from './dto/submit-distribution.dto';
 @ApiTags('Distribution Orchestration')
 @Controller('distributions')
 export class DistributionCommandController {
-	constructor(private readonly commandService: DistributionCommandService) {}
+	constructor(
+		private readonly commandService: DistributionCommandService,
+		private readonly tenantService: TenantService,
+	) {}
 
 	/**
 	 * POST /distributions — submit distribution.
@@ -40,5 +49,95 @@ export class DistributionCommandController {
 		});
 
 		return { distributionId };
+	}
+
+	/**
+	 * POST /distributions/:id/review/approve.
+	 *
+	 * RBAC: permission `release_review.approve` (PolicyGuard). Ghi review row (approved) +
+	 * enqueue APPROVE_REVIEW → aggregate tiếp (PROVISIONING_IDS/DELIVERING).
+	 * Tenant-scope: reviewer chỉ duyệt release thuộc tenant mình (+descendants); system admin bỏ qua.
+	 */
+	@Post(':id/review/approve')
+	@RequirePermissions(Permission.RELEASE_REVIEW.APPROVE)
+	@ApiOperation({ summary: 'Duyệt distribution đang IN_REVIEW' })
+	@ApiParam({ name: 'id', format: 'uuid' })
+	async approveReview(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: ReviewDecisionDto,
+		@User() user: UserReq,
+	): Promise<{ ok: true }> {
+		await this.commandService.approveReview({
+			distributionId: id,
+			reviewerId: user.id,
+			allowedTenantIds: await this.resolveScope(user),
+			idempotencyKey: body.idempotencyKey,
+		});
+		return { ok: true };
+	}
+
+	/**
+	 * POST /distributions/:id/review/reject.
+	 *
+	 * RBAC: permission `release_review.reject`. Mở ticket REVIEW_REJECT + review row (rejected) +
+	 * enqueue REJECT_REVIEW → aggregate về ACTION_REQUIRED kèm ticketRef + note. User sửa → RESUBMIT.
+	 */
+	@Post(':id/review/reject')
+	@RequirePermissions(Permission.RELEASE_REVIEW.REJECT)
+	@ApiOperation({ summary: 'Từ chối distribution đang IN_REVIEW' })
+	@ApiParam({ name: 'id', format: 'uuid' })
+	async rejectReview(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: ReviewDecisionDto,
+		@User() user: UserReq,
+	): Promise<{ ok: true }> {
+		await this.commandService.rejectReview({
+			distributionId: id,
+			reviewerId: user.id,
+			note: body.note,
+			allowedTenantIds: await this.resolveScope(user),
+			idempotencyKey: body.idempotencyKey,
+		});
+		return { ok: true };
+	}
+
+	/**
+	 * POST /distributions/:id/retry — reset subtree ISSUES → resume (Khối E).
+	 *
+	 * RBAC: permission update release (`release_audio.update` OR `release_video.update`) — retry là
+	 * hành động recovery cấp release. Tenant-scope như review. Body `channelIds?` chọn nhánh reset.
+	 * Poison (retryCount≥3) → 409 (service pre-validate).
+	 */
+	@Post(':id/retry')
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
+	@ApiOperation({
+		summary: 'Retry distribution ISSUES (reset subtree → resume)',
+	})
+	@ApiParam({ name: 'id', format: 'uuid' })
+	async retry(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() body: RetryDistributionDto,
+		@User() user: UserReq,
+	): Promise<{ ok: true }> {
+		await this.commandService.retry({
+			distributionId: id,
+			channelIds: body.channelIds,
+			allowedTenantIds: await this.resolveScope(user),
+			idempotencyKey: body.idempotencyKey,
+		});
+		return { ok: true };
+	}
+
+	/**
+	 * Tenant-scope cho reviewer: tập tenant được phép duyệt = tenant hiện tại + descendants.
+	 * System admin → undefined (bỏ qua scope, duyệt mọi tenant). Khớp `AccessControlService`
+	 * (ADMIN = full-access cross-tenant).
+	 */
+	private async resolveScope(user: UserReq): Promise<string[] | undefined> {
+		if (user?.type === UserType.ADMIN) return undefined;
+		return this.tenantService.getDescendantIds(user.tenantId);
 	}
 }

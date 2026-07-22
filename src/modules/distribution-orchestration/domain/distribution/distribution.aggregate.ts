@@ -54,6 +54,20 @@ export class Distribution {
 	get retryCount(): number {
 		return this._retryCount;
 	}
+	/**
+	 * True khi đã cạn hạn retry (poison). Mirror guard trong resetForRetry (INV-D8) — cho
+	 * application (Khối E) pre-validate → trả HTTP 409 TRƯỚC khi enqueue, thay vì để worker
+	 * throw RetryLimitExceededError chìm trong job.
+	 */
+	get retriesExhausted(): boolean {
+		return this._retryCount >= POISON_LIMIT;
+	}
+	/** Channel đang ISSUES (điểm hỏng) — application đọc để resolve ticket khi RESET (Khối E). */
+	get issuesChannelIds(): string[] {
+		return this._channels
+			.filter((c) => c.state === 'ISSUES')
+			.map((c) => c.channelId);
+	}
 	get version(): number {
 		return this._version;
 	}

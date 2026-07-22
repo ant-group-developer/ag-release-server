@@ -27,6 +27,7 @@ describe('ValidateRunner', () => {
 	let tickets: InMemoryTicketService;
 	let snapshotById: Map<string, ReleaseSnapshot | null>;
 	let reader: ReleaseSnapshotReader;
+	let requiresReviewFlag: boolean;
 	let runner: ValidateRunner;
 
 	const specs: ChannelDeliverySpec[] = [
@@ -85,7 +86,11 @@ describe('ValidateRunner', () => {
 		reader = {
 			loadById: async (id: string) => snapshotById.get(id) ?? null,
 		};
-		runner = new ValidateRunner(uow, repo, reader, tickets);
+		requiresReviewFlag = false;
+		const tenantReader = {
+			requiresManualReview: async () => requiresReviewFlag,
+		};
+		runner = new ValidateRunner(uow, repo, reader, tickets, tenantReader);
 
 		// Seed a submitted distribution (state VALIDATING)
 		const dist = Distribution.create(createProps());
@@ -104,6 +109,16 @@ describe('ValidateRunner', () => {
 			requiresReview: false,
 		});
 		expect(tickets.tickets).toHaveLength(0);
+	});
+
+	it('clean snapshot + tenant.requiresManualReview=true → MARK_VALIDATED requiresReview=true', async () => {
+		snapshotById.set(SNAP_ID, validSnapshot());
+		requiresReviewFlag = true;
+
+		const cmd = await runner.run(payload);
+
+		expect(cmd.type).toBe('MARK_VALIDATED');
+		expect(cmd).toMatchObject({ requiresReview: true });
 	});
 
 	it('missing required fields → FLAG_VALIDATION_ERRORS + opens VALIDATION ticket', async () => {

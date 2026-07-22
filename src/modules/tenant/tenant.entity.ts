@@ -100,6 +100,15 @@ export class Tenant extends BaseUserTrackedUUIDEntity {
 	isActive: boolean;
 
 	@Column({
+		type: 'boolean',
+		name: 'requires_manual_review',
+		default: false,
+		comment:
+			'Bật = distribution của tenant phải qua duyệt thủ công (IN_REVIEW) trước khi phát hành',
+	})
+	requiresManualReview: boolean;
+
+	@Column({
 		type: 'enum',
 		enum: TenantType,
 		default: TenantType.LABEL,
