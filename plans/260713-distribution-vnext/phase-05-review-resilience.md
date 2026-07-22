@@ -1,8 +1,8 @@
 # Phase 5 — Khép vòng lặp Worker + REVIEW gate + Resilience
 
-**Priority:** Cao · **Status:** 🔄 In Progress (Khối A ✅ Done) · **Depends on:** Phase 2–4 ✅ · **Blocks:** UI write-flow, Phase 6
+**Priority:** Cao · **Status:** ✅ DONE (A·B·C·D·E) · **Depends on:** Phase 2–4 ✅ · **Blocks:** UI write-flow, Phase 6
 
-**Progress:** [✅] Khối A [✅] Khối C [ ] Khối B [ ] Khối D [ ] Khối E
+**Progress:** [✅] Khối A [✅] Khối C [✅] Khối B [✅] Khối D [✅] Khối E — **Phase 5 hoàn thành, 294 test pass**
 
 ## Context Links
 
@@ -226,14 +226,40 @@ Domain đã sẵn (`IN_REVIEW`, `markValidated(requiresReview)`, `approveReview`
 
 ### Todo Khối B
 
-- [ ] Cột `requires_manual_review` + migration
-- [ ] Bảng `review` + ORM entity + migration
-- [ ] ReviewRepository port + adapter
-- [ ] ValidateRunner đọc cờ tenant
-- [ ] Endpoint approve/reject + RBAC
-- [ ] DistributionCommandService.approveReview/rejectReview
-- [ ] Wire module
-- [ ] Integration test: submit (tenant review=on) → IN_REVIEW → approve → tiếp; → reject → ACTION_REQUIRED
+- [✅] Cột `requires_manual_review` + migration
+- [✅] Bảng `review` (distribution_review) + ORM entity + migration
+- [✅] ReviewRepository port + adapter
+- [✅] ValidateRunner đọc cờ tenant (qua TenantReader port)
+- [✅] Endpoint approve/reject + RBAC (permission `release_review.approve/reject` + tenant-scope)
+- [✅] DistributionCommandService.approveReview/rejectReview (guard tenant-scope + IN_REVIEW state)
+- [✅] Wire module (+ TenantModule cho scope)
+- [✅] Integration test: submit (tenant review=on) → IN_REVIEW → approve → tiếp; → reject → ACTION_REQUIRED
+
+**Status:** ✅ DONE (2026-07-21) — 273 test pass (+10 vs baseline 263 Khối C).
+
+**Files tạo:**
+- `application/ports/review-repository.port.ts` (REVIEW_REPOSITORY) + `infrastructure/persistence/review.orm-entity.ts` + `review.repository.ts`
+- `application/ports/tenant-reader.port.ts` (TENANT_READER) + `infrastructure/adapters/tenant.reader.ts`
+- `infrastructure/http/dto/review-decision.dto.ts`
+- Migration `1784500000000-AddTenantRequiresManualReview` + `1784500000001-CreateDistributionReview`
+- Test double `in-memory-review-repository.ts`; test `review-gate.integration.spec`, `distribution-command-review.spec`
+
+**Files sửa:** `tenant.entity.ts` (+cột), `validate.runner.ts` (đọc cờ thật thay hardcode false),
+`distribution-command.service.ts` (+approveReview/rejectReview), `distribution-command.controller.ts`
+(+2 endpoint admin-only), `distribution-orchestration.module.ts` (wire 2 provider + ReviewOrmEntity),
+`validate.runner.spec.ts` (+ctor tenantReader + case flag=true).
+
+**Quyết định phát sinh (đã chốt với user):**
+- RBAC **permission-based**: `@RequirePermissions(RELEASE_REVIEW.APPROVE / .REJECT)` qua PolicyGuard
+  global (system admin bypass). KHÔNG hardcode admin-only.
+- **Tenant-scope**: reviewer chỉ duyệt release thuộc tenant mình + descendants. Controller resolve
+  `TenantService.getDescendantIds(user.tenantId)` (self-inclusive) → truyền `allowedTenantIds` xuống
+  service; service load dist, check `dist.tenantId ∈ allowedTenantIds` → 403 nếu ngoài scope. System
+  admin → undefined (bỏ qua scope). Service cũng guard state IN_REVIEW (409) + tồn tại (404).
+- Review row = audit (ai/khi nào/note); ticket REVIEW_REJECT = điểm hỏng cho user sửa. Tách 2 bảng.
+- Ticket reject dùng key ổn định `review-reject:${distributionId}` → double-reject không tạo ticket kép.
+- Bảng đặt tên `distribution_review` (không phải `review` trần) để tránh va tên global.
+- RESUBMIT endpoint (ACTION_REQUIRED→VALIDATING) hoãn sang UI write-flow (user OK).
 
 ---
 
@@ -272,13 +298,40 @@ Domain đã sẵn (`IN_REVIEW`, `markValidated(requiresReview)`, `approveReview`
 
 ### Todo Khối D
 
-- [ ] `queue-concurrency.config` (SFTP concurrency thấp + limiter tĩnh)
-- [ ] Worker đọc config set concurrency/limiter
-- [ ] `circuit-breaker` wrapper + bọc CI/SFTP adapter
-- [ ] `with-timeout` + áp SFTP/gRPC/build
-- [ ] Backoff mapping per queue trong adapter
-- [ ] Worker bắt RetryLimitExceededError → không retry
-- [ ] Test: SFTP timeout → retry → cạn → ISSUES; breaker mở khi lỗi liên tục
+- [✅] `queue-resilience.config` (SFTP concurrency thấp 2 + limiter tĩnh 5/1s)
+- [✅] Worker đọc config set concurrency/limiter per-queue
+- [✅] `circuit-breaker` wrapper (tự viết, không opossum) + bọc SFTP + CI import adapter
+- [✅] `with-timeout` + áp SFTP uploadFolder (120s). CI đã có timeout 30s ở CiApiService.
+- [✅] Backoff mapping per queue trong bullmq adapter (SFTP 3x exp 30s, khớp RetryPolicy)
+- [✅] Worker bắt RetryLimitExceededError → UnrecoverableError (không retry, vào failed-set)
+- [✅] Test: breaker (6 case state machine), timeout (3), config (4)
+
+**Status:** ✅ DONE (2026-07-21) — 294 test pass (+13 vs 281 sau Khối E).
+
+**Files tạo:**
+- `infrastructure/resilience/with-timeout.ts` (Promise.race + TimeoutError, clear timer)
+- `infrastructure/resilience/circuit-breaker.ts` (closed/open/half-open, tự viết, inject `now` để test)
+- `infrastructure/resilience/queue-resilience.config.ts` (concurrency+limiter | attempts+backoff per queue)
+- Test: `circuit-breaker.spec`, `with-timeout.spec`, `queue-resilience.config.spec`
+
+**Files sửa:**
+- `distribution-worker.service.ts` — đọc `queueConcurrency` set concurrency+limiter; catch
+  RetryLimitExceededError → `UnrecoverableError` (DLQ native, không retry); bỏ hardcode `attempts:3`
+- `bullmq-workflow.adapter.ts` — `enqueue` đọc `queueRetry` (attempts+backoff per queue) thay
+  hardcode `attempts??1` + `delay:1000`. Caller vẫn override được `attempts`.
+- `sftp-uploader.adapter.ts` — `uploadFolder` bọc `breaker(withTimeout(...))`. Transient throw → retry.
+- `ci-import.adapter.ts` — `getImportBatch` bọc breaker.
+
+**Quyết định phát sinh:**
+- **Circuit breaker tự viết** (không thêm dep opossum) — KISS, đủ closed/open/half-open per-service.
+  Per-host là follow-up.
+- **DLQ = BullMQ failed-set native** (`removeOnFail: 1000`), không tạo `dist.dlq.*` (quyết định #6).
+  Poison → `UnrecoverableError` vào failed-set ngay.
+- **SFTP vẫn KHÔNG trả `ok:false`**: mọi lỗi SFTP là transient (mạng/timeout) → throw → retry →
+  cạn attempts → failed-set. Nhánh `result.ok===false` của Khối C vẫn là dead branch (chờ khi có
+  DSP thật trả lỗi nghiệp vụ dứt khoát). "SFTP cạn attempts → ISSUES qua ACTION_FAIL" cần worker
+  bắt final-attempt (job.attemptsMade) → phát ACTION_FAIL — GHI NHẬN là gap còn lại, KHÔNG làm ở
+  Phase 5 (spec Khối D dừng ở failed-set; ISSUES-hoá SFTP là mở rộng sau).
 
 ---
 
@@ -308,11 +361,33 @@ Domain `resetForRetry` guard `policy.canRetry()` — chỉ `RetryExecutionPolicy
 
 ### Todo Khối E
 
-- [ ] Handler wrap RetryExecutionPolicy cho RESET_FOR_RETRY
-- [ ] Endpoint POST /:id/retry admin-only + RBAC
-- [ ] Bắt RetryLimitExceededError → HTTP 409
-- [ ] Resolve ticket khi reset thành công
-- [ ] Test: PARTIALLY_DISTRIBUTED → retry → DELIVERING (chỉ channel ISSUES); poison=3 → 409
+- [✅] Handler wrap RetryExecutionPolicy cho RESET_FOR_RETRY
+- [✅] Endpoint POST /:id/retry + RBAC (permission release_audio/video.update + tenant-scope)
+- [✅] Poison → HTTP 409 (service pre-validate `dist.retriesExhausted`, không để worker throw chìm)
+- [✅] Resolve ticket khi reset thành công (handler best-effort sau commit)
+- [✅] Test: PARTIALLY_DISTRIBUTED → retry → DELIVERING (LIVE giữ nguyên); poison=3 → 409
+
+**Status:** ✅ DONE (2026-07-21) — 281 test pass (+8 vs 273 sau Khối B).
+
+**Files tạo:** `infrastructure/http/dto/retry-distribution.dto.ts`; test
+`distribution-command-retry.spec`, `retry-reset.integration.spec`.
+
+**Files sửa:**
+- `distribution.aggregate.ts` — +getter `retriesExhausted` (mirror POISON_LIMIT) + `issuesChannelIds`
+- `orchestrate.handler.ts` — `applyResetForRetry` wrap `RetryExecutionPolicy` (quyết định #3);
+  `handle()` chụp ticket channel ISSUES-in-scope TRƯỚC apply, resolve SAU commit (best-effort,
+  optional `TICKET_SERVICE` qua `@Optional()` → test 4-arg cũ vẫn chạy)
+- `distribution-command.service.ts` — +`retry()`: pre-validate exists(404)/scope(403)/state(409)/
+  poison(409) → enqueue RESET_FOR_RETRY. `enqueueOrchestrate` mở rộng type nhận ResetForRetryCommand
+- `distribution-command.controller.ts` — +POST `/:id/retry` @RequirePermissions + resolveScope
+
+**Quyết định phát sinh:**
+- **Poison→409 đồng bộ:** reset chạy async ở worker → `RetryLimitExceededError` không về được HTTP.
+  Service pre-validate `dist.retriesExhausted` trước enqueue. Domain guard vẫn là net cuối (worker).
+- **Resolve ticket ngoài tx, best-effort:** reset đã commit; resolve lỗi không rollback (nuốt lỗi) —
+  reset idempotent (channel rời ISSUES) nên job retry không reset kép.
+- **RBAC retry** dùng `release_audio/video.update` (retry = recovery cấp release), không tạo
+  permission mới. Tenant-scope như review.
 
 ---
 
@@ -353,7 +428,63 @@ A trước tiên (blocker). C là tiền đề E. B/D/E chạy song song sau A+C
 
 ## Unresolved Questions
 
-- Reviewer role riêng hay chỉ ADMIN duyệt? (mặc định ADMIN, chốt với nghiệp vụ)
-- Validation: danh sách trường bắt buộc chính xác của release? (cần rà `release.entity.ts` + track/cover/audio khi code ValidateRunner)
-- Circuit breaker: tự viết hay dùng `opossum`? (đề xuất opossum — battle-tested)
-- Export batch (`dist.export-batch`): admin trigger thủ công hay auto theo lịch? (đã treo từ Phase 4 Group E — chốt trước khi hoàn thiện runner export)
+- ~~Reviewer role riêng hay chỉ ADMIN duyệt?~~ **CHỐT (Khối B):** permission-based `release_review.approve/reject` + tenant-scope; system admin bypass.
+- ~~Validation: trường bắt buộc chính xác?~~ **CHỐT (Khối A):** ValidateRunner check title/label/genre/format/priceTier/cLine/pLine/releaseDate + ≥1 track(title+isrc)/artist/coverArt + territory.
+- ~~Circuit breaker: tự viết hay opossum?~~ **CHỐT (Khối D):** tự viết (KISS, không thêm dep), per-service.
+- Export batch (`dist.export-batch`): admin trigger thủ công hay auto theo lịch? (treo từ Phase 4 Group E — chốt trước khi hoàn thiện runner export)
+
+## Follow-up (ngoài scope Phase 5 — có thiết kế riêng khi làm)
+
+### FU-1 — SFTP-exhausted → ISSUES (defer, quyết định 2026-07-21)
+
+**Vấn đề:** khi SFTP upload cạn retry BullMQ (3 lần), job vào failed-set nhưng aggregate vẫn kẹt
+DELIVERING vĩnh viễn — không lên UI, RETRY (Khối E) không cứu được (chỉ chạy từ PARTIALLY/FAILED).
+Nhánh `result.ok===false` trong `sftp-upload.runner` (Khối C) là **dead branch** vì
+`SftpUploaderAdapter.upload()` chỉ throw (transient) hoặc trả `ok:true`.
+
+**Vì sao KHÓ — hai bộ đếm retry không ăn khớp:**
+- BullMQ `attemptsMade`: nhích khi runner *throw*; interpreter không thấy → `channel.retryCount` giữ 0.
+- Interpreter `retryCount` vs `RetryPolicy.maxAttempts`: chỉ nhích khi runner *trả* ACTION_FAIL.
+- SFTP hiện đi đường throw → interpreter chưa bao giờ đếm. Nếu worker gọi ACTION_FAIL ở lần thất bại
+  cuối, interpreter thấy retryCount=0<3 → `willExhaustOnNextActionFail=false` → **lại retry** → lặp.
+
+**Hai hướng (chốt trước khi code):**
+1. Thêm input interpreter kiểu "ACTION fail dứt điểm → ISSUES ngay bất kể đếm" — **sửa domain + invariant**
+   (vùng nhạy, từng có bug ở Khối C).
+2. Bỏ retry BullMQ cho SFTP, để interpreter tự đếm + re-enqueue — **mất backoff native** (re-enqueue
+   interpreter đi ngay, không delay), config backoff Khối D thành vô dụng cho SFTP → phải làm lại.
+
+**Vì sao DEFER (không làm ở Phase 5):** SFTP cạn retry gần như luôn là **sự cố hạ tầng** (sai
+credential/host sập/hết đĩa/mạng) — việc của **ops**, không phải lỗi nghiệp vụ user tự sửa. Ticket
+"SFTP upload failed" gửi label thì họ bó tay. Đổi một thay đổi domain rủi ro cao lấy việc biến sự cố
+ops thành ticket user là **không tương xứng**, nhất là hệ chưa chạy live. Failed-set + alert cho ops
+là mô hình đúng hơn cho loại lỗi này.
+
+**Điều kiện để làm FU-1 sau:** (a) có tích hợp SFTP/DSP thật để test tới kịch bản cạn retry; (b) chốt
+hướng 1 hay 2; (c) xác định rõ SFTP-hỏng-vĩnh-viễn là tình huống **user xử lý trên UI** (mới bõ đụng
+domain) hay **ops xử lý** (thì chỉ cần alert trên failed-set, KHÔNG cần FU-1).
+
+**Lỗ hổng tạm chấp nhận đến khi làm FU-1:** release có channel SFTP hỏng hẳn sẽ kẹt DELIVERING, chỉ
+khôi phục bằng requeue thủ công trong Redis (thao tác ops). Chấp nhận vì hệ chưa live.
+
+### FU-2 — Vệ sinh layering: TICKET_SERVICE token
+
+7 file `application/` import `TICKET_SERVICE` từ `infrastructure/adapters/postgres-ticket.adapter`
+(ngược chiều hexagonal). Pattern có từ Khối A, Khối B–E nhân rộng. Gom symbol về cạnh port
+`domain/ports/ticket-service.port.ts` (hoặc file token `application/`) + sửa 7 import. Rẻ, thuần cơ học,
+không đổi hành vi. `no-framework-import.spec` vẫn xanh (token là Symbol, không phải framework) nên
+không bị guard bắt — cần làm thủ công.
+
+### FU-3 — Test coverage bù
+
+- Worker poison→`UnrecoverableError`: chỉ test ở tầng domain (throw `RetryLimitExceededError`), chưa có
+  test worker convert sang UnrecoverableError. Logic đơn giản nhưng nên có 1 case.
+- BullMQ e2e (`bullmq-e2e.integration.spec`) cover relay→adapter→Redis (enqueue/dedupe/delay), CHƯA
+  cover worker consume với concurrency/limiter/breaker thật. Resilience mới test ở tầng unit.
+
+### FU-4 — Cross-block ops (trước production)
+
+- Chạy migration Khối B (`1784500000000` requires_manual_review, `1784500000001` distribution_review).
+- Seed permission `release_review.approve/reject` + gán role reviewer của tenant.
+- RESUBMIT endpoint (ACTION_REQUIRED→VALIDATING) — aggregate có `resubmit()` nhưng chưa có HTTP; làm
+  cùng UI write-flow.
