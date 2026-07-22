@@ -263,6 +263,14 @@ export interface EntityOverviewResponse {
 	} | null;
 }
 
+/** Unified response for the new analytics summary endpoints. */
+export interface AnalyticsSummaryResponse {
+	totalTrendViews: number;
+	totalUsage: number;
+	totalRevenueUsd: number;
+	totalRevenueUsdExact: string;
+}
+
 export interface RevenueLabelItem {
 	rank: number;
 	labelId: string;

@@ -9,11 +9,13 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
 	DspChartQueryDto,
+	DspAnalyticsSummaryQueryDto,
 	DspOverviewQueryDto,
 	DspTopQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspMeta,
+	AnalyticsSummaryResponse,
 	DspOverviewResponse,
 	DspTopReleaseItem,
 	DspTopTrackItem,
@@ -95,7 +97,7 @@ export class DspAnalyticsService {
 		pgDspId?: string,
 		dspReportId?: string,
 		releaseType?: 'audio' | 'video',
-		opts?: { tableHasDspId?: boolean },
+		opts?: { tableHasDspId?: boolean; importSource?: string },
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -112,6 +114,10 @@ export class DspAnalyticsService {
 		// phải đi qua isrc JOIN pg_tracks_sync → dsps_report thay vì s.dsp_id trực tiếp.
 		const tableHasDspId = opts?.tableHasDspId !== false;
 		const params: Record<string, any> = {};
+		const importSourceFilter = opts?.importSource
+			? ' AND s.import_source = {importSource:String}'
+			: '';
+		if (opts?.importSource) params.importSource = opts.importSource;
 
 		let dspFilter: string;
 		if (tableHasDspId) {
@@ -153,7 +159,7 @@ export class DspAnalyticsService {
 		if (isSystem && !releaseType && tableHasDspId) {
 			return {
 				joinSql: '',
-				filterSql: dspFilter,
+				filterSql: `${dspFilter}${importSourceFilter}`,
 				params,
 			};
 		}
@@ -168,12 +174,84 @@ export class DspAnalyticsService {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = releaseType;
 		}
-		filterSql += dspFilter;
+		filterSql += `${dspFilter}${importSourceFilter}`;
 
 		return { joinSql, filterSql, params };
 	}
 
 	// Map iso2 codes → country names (dùng cho territory bar chart)
+	async getSummary(
+		dto: DspAnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		if (dto.fromDate > dto.toDate) {
+			throw new BadRequestException('fromDate must be before or equal to toDate');
+		}
+
+		const key = this.cache.buildKey('dsp:summary', tenantId, dto);
+		return this.cache.wrap(key, () => this.computeSummary(dto, tenantId));
+	}
+
+	private async computeSummary(
+		dto: DspAnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		const { joinSql, filterSql, params } = this.buildDspFilters(
+			tenantId,
+			dto.pgDspId,
+			dto.dspReportId,
+			dto.releaseType,
+			{ importSource: dto.importSource },
+		);
+		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
+		const salesParams = {
+			...params,
+			from: normalizeDateToFirstOfMonth(dto.fromDate),
+			to: normalizeDateToFirstOfMonth(dto.toDate),
+		};
+
+		const trendSql = `
+      SELECT sum(s.total_quantity) AS total_trend_views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      ${joinSql}
+      WHERE s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${filterSql}
+    `;
+		const salesSql = `
+      SELECT
+        sum(s.total_quantity) AS total_usage,
+        sum(s.total_revenue_usd) AS total_revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+    `;
+
+		const [trendRows, salesRows] = await Promise.all([
+			this.clickHouseService.query<{ total_trend_views: string }>(
+				trendSql,
+				trendParams,
+			),
+			this.clickHouseService.query<{
+				total_usage: string;
+				total_revenue_usd: string;
+			}>(salesSql, salesParams),
+		]);
+
+		return {
+			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
+			totalUsage: Number(salesRows[0]?.total_usage ?? 0),
+			totalRevenueUsd: this.revenueNumber(
+				salesRows[0]?.total_revenue_usd,
+			),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRows[0]?.total_revenue_usd,
+			),
+		};
+	}
+
 	private async mapTerritoryCodesToCountryNames(
 		items: TerritoryBarChartItem[],
 	): Promise<TerritoryBarChartItem[]> {

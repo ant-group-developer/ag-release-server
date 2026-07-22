@@ -10,6 +10,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
@@ -20,6 +21,22 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/release/:releaseId')
 export class ReleaseAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a release' })
+	async summary(
+		@Param('releaseId', ParseUUIDPipe) releaseId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getSummary(
+			'release',
+			releaseId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
 
 	@Post('overview')
 	@ApiOperation({

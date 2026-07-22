@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
@@ -10,6 +10,7 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
 	ChartQueryDto,
+	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -17,6 +18,7 @@ import {
 	DspBarChartItem,
 	DspTopReleaseItem,
 	DspTopTrackItem,
+	AnalyticsSummaryResponse,
 	EntityOverviewResponse,
 	EntityTopDspItem,
 	EntityTopTerItem,
@@ -50,6 +52,12 @@ export class EntityAnalyticsService {
 
 	private revenueExact(value?: string | null): string {
 		return value?.toString() ?? '0';
+	}
+
+	private validateSummaryDateRange(dto: AnalyticsSummaryQueryDto): void {
+		if (dto.fromDate > dto.toDate) {
+			throw new BadRequestException('fromDate must be before or equal to toDate');
+		}
 	}
 
 	private addRevenueExact(values: Array<string | null | undefined>): string {
@@ -237,6 +245,95 @@ export class EntityAnalyticsService {
 		return this.cache.wrap(key, () =>
 			this.computeOverview(entityType, entityId, dto, tenantId),
 		);
+	}
+
+	async getSummary(
+		entityType: EntityType,
+		entityId: string,
+		dto: AnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		this.validateSummaryDateRange(dto);
+		if (
+			entityType === 'sourceType' &&
+			dto.importSource &&
+			dto.importSource !== entityId
+		) {
+			throw new BadRequestException(
+				'importSource must match sourceType path parameter',
+			);
+		}
+
+		const key = this.cache.buildKey('ent:summary', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeSummary(entityType, entityId, dto, tenantId),
+		);
+	}
+
+	private async computeSummary(
+		entityType: EntityType,
+		entityId: string,
+		dto: AnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		const { joinSql, filterSql, params } = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+		);
+		const salesParams = {
+			...params,
+			from: normalizeDateToFirstOfMonth(dto.fromDate),
+			to: normalizeDateToFirstOfMonth(dto.toDate),
+		};
+		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
+
+		const trendSql = `
+      SELECT sum(s.total_quantity) AS total_trend_views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      ${joinSql}
+      WHERE s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${filterSql}
+    `;
+		const salesSql = `
+      SELECT
+        sum(s.total_quantity) AS total_usage,
+        sum(s.total_revenue_usd) AS total_revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+    `;
+
+		const [trendRows, salesRows] = await Promise.all([
+			this.clickHouseService.query<{ total_trend_views: string }>(
+				trendSql,
+				trendParams,
+			),
+			this.clickHouseService.query<{
+				total_usage: string;
+				total_revenue_usd: string;
+			}>(salesSql, salesParams),
+		]);
+
+		return {
+			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
+			totalUsage: Number(salesRows[0]?.total_usage ?? 0),
+			totalRevenueUsd: this.revenueNumber(
+				salesRows[0]?.total_revenue_usd,
+			),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRows[0]?.total_revenue_usd,
+			),
+		};
 	}
 
 	private async computeOverview(

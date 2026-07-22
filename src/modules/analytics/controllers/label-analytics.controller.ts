@@ -6,6 +6,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { EntityManager } from 'typeorm';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
@@ -43,6 +44,23 @@ export class LabelAnalyticsController {
 					logo: label.tenant.logo || null,
 				}
 			: null;
+	}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a label' })
+	async summary(
+		@Param('labelId') labelId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
 	}
 
 	@Post('overview')

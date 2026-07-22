@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
@@ -13,6 +14,23 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/artist/:artistId')
 export class ArtistAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for an artist' })
+	async summary(
+		@Param('artistId') artistId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for an artist' })

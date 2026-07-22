@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
@@ -13,6 +14,23 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/source-type/:sourceType')
 export class SourceTypeAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a source type' })
+	async summary(
+		@Param('sourceType') sourceType: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'sourceType',
+				sourceType,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 
 	@Post('overview')
 	@ApiOperation({

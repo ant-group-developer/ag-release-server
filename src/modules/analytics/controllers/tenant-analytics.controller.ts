@@ -12,6 +12,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
@@ -41,6 +42,24 @@ export class TenantAnalyticsController {
 				`You do not have access to tenant ${targetTenantId}`,
 			);
 		}
+	}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a tenant' })
+	async summary(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
 	}
 
 	@Post('overview')

@@ -2,9 +2,14 @@ import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { ChartQueryDto, TimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	AnalyticsSummaryQueryDto,
+	ChartQueryDto,
+	TimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import {
 	DspBarChartItem,
+	AnalyticsSummaryResponse,
 	OverviewTrendsResponse,
 	RevenueArtistItem,
 	RevenueChannelItem,
@@ -30,6 +35,23 @@ import { TimelineAnalyticsService } from '../services/global-timeline.service';
 @Controller('analytics')
 export class TimelineAnalyticsController {
 	constructor(private readonly timelineService: TimelineAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({
+		summary: 'Get unified analytics summary for the current tenant',
+		description:
+			'Trend views use the exact day range. Usage and revenue include every reporting month intersecting the range.',
+	})
+	async getSummary(
+		@Req() req: Request,
+		@Body() query: AnalyticsSummaryQueryDto,
+	): Promise<ResponseSuccess<AnalyticsSummaryResponse>> {
+		const data = await this.timelineService.getSummary(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
 
 	// ═══════════════════════════════════════════════════════
 	// DSP TIMELINE ENDPOINTS
