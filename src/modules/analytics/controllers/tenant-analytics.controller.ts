@@ -194,7 +194,7 @@ export class TenantAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của tenant (sortBy: views | revenue)',
+		summary: 'Top tracks của tenant (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('tenantId') tenantId: string,
@@ -214,7 +214,7 @@ export class TenantAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của tenant (sortBy: views | revenue)',
+		summary: 'Top releases của tenant (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('tenantId') tenantId: string,

@@ -222,7 +222,7 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | usage | revenue)' })
 	async topTracks(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -242,7 +242,7 @@ export class LabelAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của label (sortBy: views | revenue)',
+		summary: 'Top releases của label (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('labelId') labelId: string,

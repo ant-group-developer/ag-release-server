@@ -503,6 +503,7 @@ export interface DspTopTrackItem {
 	releaseId: string;
 	releaseTitle: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }
@@ -517,6 +518,7 @@ export interface DspTopReleaseItem {
 	labelName: string | null;
 	trackCount: number;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }

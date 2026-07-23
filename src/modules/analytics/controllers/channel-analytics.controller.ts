@@ -143,7 +143,7 @@ export class ChannelAnalyticsController {
 	@Post('top-releases')
 	@ApiOperation({
 		summary:
-			'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)',
+			'Top releases của channel (sortBy: views | usage | revenue, trả cả 3 metric)',
 	})
 	async topReleases(
 		@Param('channelId', ParseUUIDPipe) channelId: string,

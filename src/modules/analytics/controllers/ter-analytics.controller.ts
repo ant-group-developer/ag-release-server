@@ -50,7 +50,7 @@ export class TerAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks in a territory (sortBy: views | revenue)',
+		summary: 'Top tracks in a territory (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('isoCode') isoCode: string,
@@ -63,7 +63,7 @@ export class TerAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases in a territory (sortBy: views | revenue)',
+		summary: 'Top releases in a territory (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('isoCode') isoCode: string,

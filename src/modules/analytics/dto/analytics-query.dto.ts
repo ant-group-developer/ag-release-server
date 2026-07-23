@@ -523,13 +523,13 @@ export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {
  */
 export class EntityRankingQueryDto extends ChartQueryDto {
 	@ApiPropertyOptional({
-		description: 'Sort order: views (default) or revenue',
-		enum: ['views', 'revenue'],
+		description: 'Sort order: views (default), usage quantity, or revenue',
+		enum: ['views', 'usage', 'revenue'],
 		default: 'views',
 	})
 	@IsOptional()
-	@IsIn(['views', 'revenue'])
-	sortBy?: 'views' | 'revenue';
+	@IsIn(['views', 'usage', 'revenue'])
+	sortBy?: 'views' | 'usage' | 'revenue';
 
 	@ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })
 	@IsOptional()

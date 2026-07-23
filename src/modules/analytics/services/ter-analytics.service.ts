@@ -305,8 +305,12 @@ export class TerAnalyticsService {
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
 		const topNSkip = useTopN ? 0 : dto.skip;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const importFilter = dto.importSource
@@ -330,18 +334,24 @@ export class TerAnalyticsService {
 		const terFilter = 'AND s.territory_code = {isoCode:String}';
 
 		const countSql = `
-			SELECT uniq(sub.isrc) AS total
-			FROM (
-				SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
+			SELECT uniq(t.isrc) AS total
+			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
+			LEFT JOIN (
+				SELECT isrc, sum(total_quantity) AS total_views
+				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 				WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
 					${terFilter} ${importFilter}
-				UNION ALL
-				SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+				GROUP BY isrc
+			) tr ON t.isrc = tr.isrc
+			LEFT JOIN (
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
+				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${terFilter} ${importFilter}
-			) sub
-			INNER JOIN (SELECT isrc, release_type FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON sub.isrc = t.isrc
-			WHERE 1 = 1 ${releaseTypeFilter}
+				GROUP BY isrc
+			) sa ON t.isrc = sa.isrc
+			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+				${releaseTypeFilter}
 		`;
 
 		const dataSql = `
@@ -354,6 +364,7 @@ export class TerAnalyticsService {
 				arrayStringConcat(t.artist_names, ', ') AS artist_name,
 				t.cover_75, t.cover_100, t.cover_160, t.cover_300, t.cover_original,
 				coalesce(tr.total_views, 0) AS total_views,
+				coalesce(sa.total_usage, 0) AS total_usage,
 				coalesce(sa.total_revenue_usd, 0) AS total_revenue_usd_raw,
 				toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -365,15 +376,15 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
-			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 				${releaseTypeFilter}
-			ORDER BY ${sortCol} DESC
+			ORDER BY ${sortCol} DESC, t.isrc ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
 
@@ -392,6 +403,7 @@ export class TerAnalyticsService {
 				cover_300: string;
 				cover_original: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
@@ -407,6 +419,7 @@ export class TerAnalyticsService {
 			releaseId: row.release_id || '',
 			releaseTitle: row.release_title || '',
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {
@@ -452,8 +465,12 @@ export class TerAnalyticsService {
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
 		const topNSkip = useTopN ? 0 : dto.skip;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const importFilter = dto.importSource
@@ -486,13 +503,13 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
-			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 				AND t.release_id != '' ${releaseTypeFilter}
 		`;
 
@@ -505,6 +522,7 @@ export class TerAnalyticsService {
 				any(t.cover_original) AS cover_original,
 				uniq(t.isrc) AS track_count,
 				sum(coalesce(tr.total_views, 0)) AS total_views,
+				sum(coalesce(sa.total_usage, 0)) AS total_usage,
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
 				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -516,16 +534,16 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 					${terFilter} ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
-			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 				AND t.release_id != '' ${releaseTypeFilter}
 			GROUP BY t.release_id
-			ORDER BY ${sortCol} DESC
+			ORDER BY ${sortCol} DESC, t.release_id ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
 
@@ -544,6 +562,7 @@ export class TerAnalyticsService {
 				cover_original: string;
 				track_count: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
@@ -559,6 +578,7 @@ export class TerAnalyticsService {
 			labelName: row.label_name || null,
 			trackCount: Number(row.track_count),
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {

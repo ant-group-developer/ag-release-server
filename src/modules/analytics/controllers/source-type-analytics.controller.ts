@@ -162,7 +162,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của source type (sortBy: views | revenue)',
+		summary: 'Top tracks của source type (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('sourceType') sourceType: string,
@@ -181,7 +181,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của source type (sortBy: views | revenue)',
+		summary: 'Top releases của source type (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('sourceType') sourceType: string,

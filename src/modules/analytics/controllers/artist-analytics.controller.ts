@@ -157,7 +157,7 @@ export class ArtistAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của artist (sortBy: views | revenue)',
+		summary: 'Top tracks của artist (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('artistId') artistId: string,
@@ -176,7 +176,7 @@ export class ArtistAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của artist (sortBy: views | revenue)',
+		summary: 'Top releases của artist (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('artistId') artistId: string,
