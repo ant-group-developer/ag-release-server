@@ -488,3 +488,23 @@ không bị guard bắt — cần làm thủ công.
 - Seed permission `release_review.approve/reject` + gán role reviewer của tenant.
 - RESUBMIT endpoint (ACTION_REQUIRED→VALIDATING) — aggregate có `resubmit()` nhưng chưa có HTTP; làm
   cùng UI write-flow.
+
+### FU-5 — Resilience Khối D chưa phủ hết (rà soát 2026-07-23)
+
+Khối D todo ghi "bọc circuit breaker cho ci-import, ci-qa, ci-deliver-desire" + "gRPC timeout" nhưng
+code chỉ áp một phần:
+- `ci-qa.adapter.ts` + `ci-deliver-desire.adapter.ts`: **không có** `CircuitBreaker` (chỉ `ci-import.adapter.ts`
+  có, threshold 5 / cooldown 30s). Hệ quả: CI QA/deliver-desire sập → runner throw liên tục cạn BullMQ
+  attempts thay vì fail-fast qua breaker đã mở.
+- `grpc-identifier.adapter.ts`: `getUpc()`/`create()` **không** bọc `withTimeout` → PROVISIONING_IDS có
+  thể treo nếu gRPC không trả lời (chỉ dựa timeout tầng transport, chưa explicit).
+Cơ học, không đụng domain. Nên áp cùng pattern `ci-import`/`sftp-uploader` đã có.
+
+### FU-6 — Idempotency chưa bền + index thiếu (rà soát 2026-07-23)
+
+- `ddex-xml-package-builder.adapter.ts` `deriveBatchId(key)` bỏ qua `key`, luôn `genBatchId()` mới →
+  check `fs.existsSync(outputDir)` không bao giờ hit (dead code). Retry tạo folder mới, re-download media.
+  Fix: derive batchId từ key (hash/prefix) để cùng key → cùng folder.
+- `grpc-identifier.provisionUpc()` không truyền `releaseId`, không check "release này đã có UPC chưa" →
+  redeliver sau crash có thể cấp nhiều UPC. Cần xác nhận contract `UpcService.getUpc()` (get-or-create?).
+- Thiếu index `(channel_id, status)` trên `orchestration_ticket` (breakdown B1 yêu cầu 3, ORM chỉ có 2).

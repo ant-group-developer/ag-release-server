@@ -309,6 +309,7 @@ Dùng BullMQ, **mỗi loại công việc một queue riêng** (tách concern + 
 | Queue | Job | Concurrency | Lý do tách riêng |
 |-------|-----|-------------|------------------|
 | `dist.orchestrate` | tiến 1 bước process manager | trung bình | điều phối, nhẹ |
+| `dist.validate` | validate snapshot + đọc cờ review tenant | trung bình | tách bước VALIDATING (thêm ở Phase 5 Khối A) |
 | `dist.provision-id` | cấp UPC/ISRC (gRPC) | thấp | phụ thuộc gRPC server ngoài |
 | `dist.build-package` | sinh DDEX XML + folder | trung bình | CPU + disk |
 | `dist.sftp-upload` | upload 1 package lên 1 host | **rate-limited per host** | **nút cổ chai — bulkhead** |
@@ -316,7 +317,7 @@ Dùng BullMQ, **mỗi loại công việc một queue riêng** (tách concern + 
 | `dist.ci-qa-check` | check QA flags | thấp | gọi CI API |
 | `dist.export-batch` | gom UPC → export CI / email State51 | 1 (batch theo lịch) | gom batch, tránh spam |
 | `dist.status-sync` | poll deliver_desire | thấp | reconcile nền |
-| `dist.dlq.*` | dead-letter mỗi queue | — | job chết sau max-retry vào đây để soi |
+| DLQ (BullMQ failed-set) | job chết sau max-retry | — | **triển khai bằng `removeOnFail: 1000`** (native failed-set), không tạo queue `dist.dlq.*` riêng; cần API/UI admin để soi + requeue (chưa có) |
 
 Mô hình chờ dài (điểm quan trọng nhất):
 
@@ -352,11 +353,12 @@ Mỗi hệ thống ngoài bọc trong 1 adapter + interface, domain chỉ thấy
 | `IdentifierProvisioner` | `GrpcIdentifierAdapter` | gRPC server UPC/ISRC |
 | `PackageBuilder` | `DdexXmlPackageBuilder` | xmlbuilder2 + GCS/S3 |
 | `PackageUploader` | `SftpUploaderAdapter` | ssh2-sftp-client |
-| `ImportChecker` | `CiImportAdapter` | CI REST `/imports/v1/...` |
+| `IngestResultReader` (spec cũ gọi `ImportChecker`) | `CiImportAdapter` | CI REST `/imports/v1/...` |
 | `QaChecker` | `CiQaAdapter` | CI REST `/releases/v2/.../qaflags` |
-| `Exporter` | `CiExportAdapter` / `State51EmailAdapter` | export.antmusic.net / email |
+| `Exporter` | `ExporterAdapter` (facade: CI_DEAL no-op + STATE51 email Resend) | export.antmusic.net / email |
 | `DeliveryStatusReader` | `CiDeliverDesireAdapter` | CI REST `/exports/v1/.../deliver_desire` |
-| `IdentifierProvisioner`... | test doubles | in-memory (cho unit test) |
+| `TicketService` | `PostgresTicketAdapter` | Postgres (`orchestration_ticket`) |
+| tất cả port trên | test doubles | in-memory (cho unit test) |
 
 Lợi ích: đổi aggregator (CI → aggregator khác) = viết adapter mới, domain **không đổi một dòng**.
 Đây chính là chỗ dạy được **Dependency Inversion** và **ACL** thực chiến.

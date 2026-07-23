@@ -56,7 +56,7 @@
 - **Est:** 2h
 
 ### A3 — CiDeliverDesireAdapter (DeliveryStatusReader)
-- **Port:** `read({batchId, dspCodes[]}) → Map<dspCode, DspLiveStatus>`
+- **Port:** `read({upc, dspCodes[]}) → Map<dspCode, DspLiveStatus>` (đã đổi từ `batchId` → `upc`: CI deliver_desire tra theo UPC, không theo batchId — xem comment adapter)
 - **V3 reuse:** ~~`ci-export.service.ts`~~ → Tạo mới `infrastructure/ci-api/ci-deliver-desire-api.service.ts`
 - **ACL:** CI `{deliver_desire:[{dsp,status}]}` → Map
 - **Timeout:** 30s
@@ -79,6 +79,7 @@
   - ORM entity `orchestration-ticket.orm-entity.ts` (id, distribution_id, channel_id?, reason, detail, status, idempotency_key, created_at, resolved_at)
   - Migration `CreateOrchestrationTicketTable`
   - Index: `(distribution_id, status)`, `(channel_id, status)`, unique `idempotency_key`
+    - ⚠️ Rà soát 2026-07-23: ORM hiện chỉ có `(distribution_id, status)` + unique `idempotency_key`; **thiếu `(channel_id, status)`** → xem FU-6 (phase-05).
 - **Idempotency:** query ticket theo `key` → có thì return, chưa thì INSERT
 - **File:** `infrastructure/adapters/postgres-ticket.adapter.ts` + `infrastructure/persistence/orchestration-ticket.orm-entity.ts`
 - **DI:** tạo token `TICKET_SERVICE` + wire
