@@ -333,8 +333,8 @@ export class SftpConnectService {
 						Body: fileStream,
 					},
 					leavePartsOnError: false,
-					queueSize: 4,
-					partSize: 10 * 1024 * 1024,
+					queueSize: 2,
+					partSize: 5 * 1024 * 1024,
 				});
 				await upload.done();
 			} finally {
@@ -791,8 +791,8 @@ export class SftpConnectService {
 							Body: fileStream,
 						},
 						leavePartsOnError: false,
-						queueSize: 4, // Upload song song tối đa 4 part cùng lúc
-						partSize: 10 * 1024 * 1024, // Chia nhỏ 10MB mỗi part
+						queueSize: 2, // Upload song song tối đa 4 part cùng lúc
+						partSize: 5 * 1024 * 1024, // Chia nhỏ 10MB mỗi part
 					});
 
 					await parallelUploads3.done();
