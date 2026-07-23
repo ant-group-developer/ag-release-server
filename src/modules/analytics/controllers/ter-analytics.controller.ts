@@ -76,7 +76,7 @@ export class TerAnalyticsController {
 
 	@Post('dsp')
 	@ApiOperation({
-		summary: 'Top DSPs in a territory (sortBy: views | revenue)',
+		summary: 'Top DSPs in a territory (sortBy: views | usage | revenue)',
 	})
 	async topDsps(
 		@Param('isoCode') isoCode: string,

@@ -152,7 +152,7 @@ export class TrackAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('isrc') isrc: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -170,7 +170,7 @@ export class TrackAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của track (sortBy: views | revenue)',
+		summary: 'Top territories của track (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('isrc') isrc: string,

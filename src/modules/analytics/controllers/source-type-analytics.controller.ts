@@ -200,7 +200,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('dsp')
 	@ApiOperation({
-		summary: 'Top DSPs của source type (sortBy: views | revenue)',
+		summary: 'Top DSPs của source type (sortBy: views | usage | revenue)',
 	})
 	async topDsps(
 		@Param('sourceType') sourceType: string,
@@ -219,7 +219,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của source type (sortBy: views | revenue)',
+		summary: 'Top territories của source type (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('sourceType') sourceType: string,

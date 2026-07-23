@@ -158,7 +158,7 @@ export class ReleaseAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của release (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của release (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -175,7 +175,7 @@ export class ReleaseAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của release (sortBy: views | revenue)',
+		summary: 'Top territories của release (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,

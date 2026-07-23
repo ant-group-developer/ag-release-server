@@ -266,7 +266,7 @@ export interface EntityOverviewResponse {
 /** Unified response for the new analytics summary endpoints. */
 export interface AnalyticsSummaryResponse {
 	totalTrendViews: number;
-	totalUsage: number;
+	totalUsage?: number;
 	totalRevenueUsd: number;
 	totalRevenueUsdExact: string;
 }
@@ -455,6 +455,7 @@ export interface EntityTopDspItem {
 	dspReportId: string;
 	dspName: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 }
 
@@ -463,6 +464,7 @@ export interface EntityTopTerItem {
 	isoCode: string;
 	territory: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 }
 

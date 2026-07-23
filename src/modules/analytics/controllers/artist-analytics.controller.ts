@@ -194,7 +194,7 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -212,7 +212,7 @@ export class ArtistAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của artist (sortBy: views | revenue)',
+		summary: 'Top territories của artist (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('artistId') artistId: string,
