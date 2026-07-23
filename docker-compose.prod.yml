@@ -19,8 +19,8 @@ services:
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro
             - ./release_parsed:${RELEASE_PARSED_DIR}
-        mem_limit: 4g
-        cpus: 2
+        mem_limit: 3g
+        cpus: 1
         depends_on:
             - app-prod-worker
 
@@ -39,5 +39,5 @@ services:
             - ./secrets:/app/secrets:ro
             - ./database.rclone.conf:/app/database.rclone.conf:ro
             - ./release_parsed:${RELEASE_PARSED_DIR}
-        mem_limit: 1g
-        cpus: 1  
+        mem_limit: 2g
+        cpus: 2  
