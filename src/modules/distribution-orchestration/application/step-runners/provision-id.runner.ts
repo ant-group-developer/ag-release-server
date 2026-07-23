@@ -15,8 +15,9 @@ import { JobPayload } from '../ports/workflow-engine.port';
  * ProvisionIdRunner — consumer của `dist.provision-id`.
  *
  * 1. Load Distribution → lấy `releaseId`
- * 2. Gọi IdentifierProvisioner.provisionUpc() — port idempotent theo releaseId
- * 3. Trả `MARK_IDS_PROVISIONED {upc}` — loop driver (Step 8 BullMQ worker /
+ * 2. Nếu `dist.upc` đã có → skip gRPC (idempotency guard, xem trong run()).
+ * 3. Gọi IdentifierProvisioner.provisionUpc()
+ * 4. Trả `MARK_IDS_PROVISIONED {upc}` — loop driver (Step 8 BullMQ worker /
  *    Step 5b test) đưa command này về OrchestrateHandler.
  *
  * Runner KHÔNG gọi OrchestrateHandler trực tiếp — decouple để Step 8 BullMQ
@@ -39,6 +40,18 @@ export class ProvisionIdRunner {
 			this.repo.load(ctx, payload.distributionId),
 		);
 		if (!dist) throw new AggregateNotFoundError(payload.distributionId);
+
+		// Idempotency guard: nếu UPC đã cấp (job redeliver sau crash / retry BullMQ trước khi
+		// MARK_IDS_PROVISIONED commit) → KHÔNG gọi gRPC lần nữa (getUpc cấp GTIN mới mỗi lần,
+		// không get-or-create theo releaseId). Trả lại UPC đã có → command idempotent.
+		if (dist.upc) {
+			return {
+				type: 'MARK_IDS_PROVISIONED',
+				distributionId: dist.id,
+				key: `${payload.key}:done`,
+				upc: dist.upc,
+			};
+		}
 
 		const upc = await this.provisioner.provisionUpc({
 			releaseId: dist.releaseId,

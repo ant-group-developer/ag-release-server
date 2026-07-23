@@ -9,6 +9,7 @@ import { IdentifierProvisioner } from '../../domain/ports/identifier-provisioner
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { Isrc } from '../../domain/value-objects/isrc.vo';
 import { Upc } from '../../domain/value-objects/upc.vo';
+import { withTimeout } from '../resilience/with-timeout';
 import { ReleaseSnapshotOrmEntity } from '../persistence/release-snapshot.orm-entity';
 import { ReleaseSnapshotPayload } from './ddex-data-mapper';
 
@@ -26,6 +27,12 @@ import { ReleaseSnapshotPayload } from './ddex-data-mapper';
 @Injectable()
 export class GrpcIdentifierAdapter implements IdentifierProvisioner {
 	private readonly logger = new Logger(GrpcIdentifierAdapter.name);
+
+	// Khối D: deadline tường minh ở tầng adapter. UpcService/IsrcService đã có timeout(10s) ở
+	// rxjs, nhưng bọc withTimeout thêm ở đây làm backstop (phòng khi service layer đổi) + phủ
+	// cả các call phụ. Bước treo → TimeoutError → BullMQ retry (transient). 15s > 10s service-level
+	// để timeout gRPC bắn trước (message rõ hơn), adapter chỉ bắt khi service treo bất thường.
+	private static readonly GRPC_TIMEOUT_MS = 15_000;
 
 	constructor(
 		private readonly upcService: UpcService,
@@ -52,7 +59,11 @@ export class GrpcIdentifierAdapter implements IdentifierProvisioner {
 			`[provisionUpc] releaseId=${input.releaseId} prefixUpcId=${prefixUpcId}`,
 		);
 
-		const res = await this.upcService.getUpc({ prefixUpcId });
+		const res = await withTimeout(
+			this.upcService.getUpc({ prefixUpcId }),
+			GrpcIdentifierAdapter.GRPC_TIMEOUT_MS,
+			`gRPC getUpc prefix=${prefixUpcId}`,
+		);
 
 		if (!res?.upc) {
 			throw new Error(
@@ -103,7 +114,11 @@ export class GrpcIdentifierAdapter implements IdentifierProvisioner {
 				`[provisionIsrcs] trackId=${trackId} title=${track?.title}`,
 			);
 
-			const res = await this.isrcService.create(isrcPayload);
+			const res = await withTimeout(
+				this.isrcService.create(isrcPayload),
+				GrpcIdentifierAdapter.GRPC_TIMEOUT_MS,
+				`gRPC createIsrc track=${trackId}`,
+			);
 
 			if (!res?.data?.code) {
 				throw new Error(

@@ -43,14 +43,19 @@ Phase 1 (domain) ──▶ Phase 2 (engine + write-side) ──▶ Phase 3 (time
 
 **Phase 1–5 ĐÃ HOÀN THÀNH** (Phase 5 còn follow-up resilience — xem dưới). Bước kế: **UI** (dùng Timeline API + SSE đã có từ Phase 3) hoặc **dọn follow-up** trước production.
 
-### Follow-up còn nợ (từ rà soát 2026-07-23)
+### Follow-up (từ rà soát 2026-07-23)
 
-Ưu tiên xử lý trước go-live (không chặn correctness luồng chính):
+**✅ Đã xử lý (2026-07-23) — nhóm "Quan trọng":**
 
-- **Resilience Khối D chưa phủ hết:** circuit breaker thiếu ở `ci-qa.adapter.ts` + `ci-deliver-desire.adapter.ts` (chỉ `ci-import` có); `withTimeout` thiếu ở `grpc-identifier.adapter.ts`.
-- **Idempotency chưa bền khi retry/redeliver:** `ddex-xml-package-builder.adapter.ts` `deriveBatchId(key)` bỏ qua key → luôn tạo batchId mới, check `existsSync` là dead code; `grpc-identifier.provisionUpc()` không check "đã cấp chưa" theo releaseId.
-- **SSE (Phase 3):** thiếu auth guard trên `/stream` + `/timeline`; chưa xử lý `Last-Event-ID` khi reconnect.
-- **SFTP bulkhead per-queue, chưa per-host** (đã ghi trong phase-05 Khối D — 1 host chậm ăn hết concurrency).
+- **Resilience Khối D:** thêm circuit breaker cho `ci-qa.adapter.ts` + `ci-deliver-desire.adapter.ts` (threshold 5 / cooldown 30s, 404 không trip mạch); `withTimeout` backstop 15s cho `grpc-identifier.adapter.ts` (getUpc + createIsrc).
+- **Idempotency:** guard ở app-layer runner — `provision-id.runner` skip gRPC nếu `dist.upc` đã set; `build-package.runner` skip build nếu `dist.packageUri` đã set (tránh cấp UPC trùng / re-download media khi redeliver). Comment DDEX builder sửa lại cho đúng (idempotency chính ở runner, không phải `existsSync`).
+- **SSE auth:** ✅ KHÔNG phải gap — `JwtAuthGuard` + `PolicyGuard` đã đăng ký global (APP_GUARD, `app.module.ts:204-205`); `/stream` + `/timeline` đã yêu cầu JWT (false positive trong rà soát).
+- **Test:** +21 test mới (provision-id, build-package, ci-qa CB, ci-deliver-desire CB) xanh.
+
+**⬜ Còn nợ (chưa chặn go-live):**
+
+- **SSE `Last-Event-ID`:** chưa replay missed events khi reconnect (cải tiến UX, không phải security).
+- **SFTP bulkhead per-queue, chưa per-host** (1 host chậm ăn hết concurrency).
 - **Domain nhỏ:** `markTakenDown` thiếu guard from-state `∈{DISTRIBUTED, PARTIALLY_DISTRIBUTED}`; event `CHANNEL_STARTED` khai báo nhưng interpreter không emit; `DefaultPolicyResolver` hardcode wrap `InitialReleasePolicy` cho RETRY (sai nếu retry UPDATE/TAKEDOWN).
 - **Thiếu index** `(channel_id, status)` trên `orchestration_ticket`.
 - **FU-1..4** trong [phase-05](phase-05-review-resilience.md) (SFTP-exhausted→ISSUES, TICKET_SERVICE token layering, test coverage bù, cross-block ops).

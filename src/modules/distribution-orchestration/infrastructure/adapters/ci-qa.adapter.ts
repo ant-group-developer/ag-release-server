@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { QaChecker, QaResult } from '../../domain/ports/qa-checker.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { CiQaApiService } from '../ci-api/ci-qa-api.service';
+import { CircuitBreaker } from '../resilience/circuit-breaker';
 
 /**
  * CiQaAdapter — ACL adapter wrapping CiQaApiService.
@@ -30,6 +31,15 @@ import { CiQaApiService } from '../ci-api/ci-qa-api.service';
 export class CiQaAdapter implements QaChecker {
 	private readonly logger = new Logger(CiQaAdapter.name);
 
+	// Khối D: breaker cho CI QA API (đã có timeout 30s ở CiApiService). CI sập → fail-fast,
+	// half-open sau 30s. 404 (release not found) được xử lý là clean TRƯỚC khi vào breaker →
+	// không tính là lỗi mạch (lỗi nghiệp vụ, không phải service down).
+	private readonly breaker = new CircuitBreaker({
+		name: 'ci-qa',
+		failureThreshold: 5,
+		cooldownMs: 30_000,
+	});
+
 	constructor(private readonly ciQaApiService: CiQaApiService) {}
 
 	async check(input: {
@@ -39,9 +49,14 @@ export class CiQaAdapter implements QaChecker {
 		const { upc } = input;
 
 		try {
-			// Step 1 (B8.1): Get CI internal release_id by UPC
-			const ciReleaseId =
-				await this.ciQaApiService.getReleaseIdByUpc(upc);
+			// Step 1 (B8.1): Get CI internal release_id by UPC.
+			// 404 handled inside closure → returns null (business "not found"), NOT a breaker failure.
+			const ciReleaseId = await this.breaker.execute(() =>
+				this.ciQaApiService.getReleaseIdByUpc(upc).catch((err: any) => {
+					if (err?.response?.status === 404) return null;
+					throw err;
+				}),
+			);
 
 			if (!ciReleaseId) {
 				this.logger.log(
@@ -51,7 +66,9 @@ export class CiQaAdapter implements QaChecker {
 			}
 
 			// Step 2 (B8.2): Get QA flags (open flags split into blocking vs warning)
-			const result = await this.ciQaApiService.getQaFlags(ciReleaseId);
+			const result = await this.breaker.execute(() =>
+				this.ciQaApiService.getQaFlags(ciReleaseId),
+			);
 
 			// Non-blocker open flags are surfaced as warnings but do NOT gate (B8.3).
 			if (result.warningFlags.length > 0) {

@@ -43,6 +43,18 @@ export class BuildPackageRunner {
 			);
 		}
 
+		// Idempotency guard: nếu package đã build (job redeliver / retry BullMQ trước khi
+		// MARK_PACKAGE_BUILT commit) → KHÔNG build lại (builder sinh batchId/folder mới mỗi lần,
+		// re-download media tốn kém). Trả lại packageUri đã có → command idempotent.
+		if (dist.packageUri) {
+			return {
+				type: 'MARK_PACKAGE_BUILT',
+				distributionId: dist.id,
+				key: `${payload.key}:done`,
+				packageUri: dist.packageUri,
+			};
+		}
+
 		const path = await this.builder.build({
 			snapshotId: dist.snapshotId,
 			processCode: dist.channelSpecs[0].processCode,

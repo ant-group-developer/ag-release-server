@@ -489,10 +489,15 @@ không bị guard bắt — cần làm thủ công.
 - RESUBMIT endpoint (ACTION_REQUIRED→VALIDATING) — aggregate có `resubmit()` nhưng chưa có HTTP; làm
   cùng UI write-flow.
 
-### FU-5 — Resilience Khối D chưa phủ hết (rà soát 2026-07-23)
+### FU-5 — Resilience Khối D chưa phủ hết (rà soát 2026-07-23) — ✅ ĐÃ XỬ LÝ 2026-07-23
 
-Khối D todo ghi "bọc circuit breaker cho ci-import, ci-qa, ci-deliver-desire" + "gRPC timeout" nhưng
-code chỉ áp một phần:
+**Đã xử lý:** thêm CircuitBreaker cho `ci-qa.adapter.ts` + `ci-deliver-desire.adapter.ts` (name riêng,
+threshold 5 / cooldown 30s; 404 bọc trong closure → KHÔNG trip mạch vì là lỗi nghiệp vụ). Thêm
+`withTimeout` 15s cho `grpc-identifier.adapter.ts` (getUpc + createIsrc) làm backstop trên timeout(10s)
+sẵn có ở rxjs. +12 test CB (ci-qa, ci-deliver-desire) xanh.
+
+**(Nội dung gốc để tham chiếu:)** Khối D todo ghi "bọc circuit breaker cho ci-import, ci-qa,
+ci-deliver-desire" + "gRPC timeout" nhưng code chỉ áp một phần:
 - `ci-qa.adapter.ts` + `ci-deliver-desire.adapter.ts`: **không có** `CircuitBreaker` (chỉ `ci-import.adapter.ts`
   có, threshold 5 / cooldown 30s). Hệ quả: CI QA/deliver-desire sập → runner throw liên tục cạn BullMQ
   attempts thay vì fail-fast qua breaker đã mở.
@@ -502,9 +507,21 @@ Cơ học, không đụng domain. Nên áp cùng pattern `ci-import`/`sftp-uploa
 
 ### FU-6 — Idempotency chưa bền + index thiếu (rà soát 2026-07-23)
 
-- `ddex-xml-package-builder.adapter.ts` `deriveBatchId(key)` bỏ qua `key`, luôn `genBatchId()` mới →
-  check `fs.existsSync(outputDir)` không bao giờ hit (dead code). Retry tạo folder mới, re-download media.
-  Fix: derive batchId từ key (hash/prefix) để cùng key → cùng folder.
-- `grpc-identifier.provisionUpc()` không truyền `releaseId`, không check "release này đã có UPC chưa" →
-  redeliver sau crash có thể cấp nhiều UPC. Cần xác nhận contract `UpcService.getUpc()` (get-or-create?).
-- Thiếu index `(channel_id, status)` trên `orchestration_ticket` (breakdown B1 yêu cầu 3, ORM chỉ có 2).
+- ✅ **ĐÃ XỬ LÝ (idempotency):** guard ở app-layer runner thay vì đụng adapter (an toàn, không đổi format
+  folder CI). `provision-id.runner` skip `provisionUpc()` nếu `dist.upc` đã set; `build-package.runner`
+  skip `builder.build()` nếu `dist.packageUri` đã set → redeliver/retry không cấp UPC trùng, không
+  re-download media. +9 test (provision-id, build-package) xanh. Comment DDEX builder sửa cho đúng
+  (idempotency chính ở runner, `existsSync` chỉ là lớp phụ). `deriveBatchId` giữ genBatchId (không đổi
+  format CI) — nếu sau cần batchId ổn định theo key thì derive ở đó (ghi trong code comment).
+- ⬜ **CÒN NỢ:** thiếu index `(channel_id, status)` trên `orchestration_ticket` (breakdown B1 yêu cầu 3,
+  ORM chỉ có 2) — cần migration + ORM `@Index`. Impact thấp khi volume nhỏ.
+- ⬜ **ĐÃ CHỐT hành vi — CÒN NỢ fix triệt để:** `getUpc()` **cấp MỚI 1 UPC mỗi lần gọi** (server
+  metadata allocate, KHÔNG get-or-create — `GetUpcRequest` chỉ nhận `prefixUpcId`, không có
+  `releaseId`/key). Guard app-layer (`provision-id.runner` skip nếu `dist.upc` đã set) đóng được
+  case job chạy lại SAU commit. Nhưng còn **khe hở crash-trước-commit rò UPC**: gọi getUpc → nhận
+  UPC-A → crash trước khi `MARK_IDS_PROVISIONED` commit → chạy lại (dist.upc vẫn undefined, guard
+  không chặn) → getUpc lần nữa → UPC-B, UPC-A mồ côi. Khe hở này KHÔNG đóng được ở app-layer.
+  **Fix triệt để (phía UPC service, task riêng):** thêm `releaseId`/`idempotencyKey` vào
+  `GetUpcRequest` → server get-or-create theo release, gọi lại trả đúng UPC đã cấp. Mức độ: không
+  chặn go-live (window crash hiếm + chưa live), nhưng nếu trúng sẽ âm thầm đốt UPC pool → cần fix
+  trước production thật.

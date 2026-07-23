@@ -5,6 +5,7 @@ import {
 } from '../../domain/ports/delivery-status-reader.port';
 import { DspCode } from '../../domain/value-objects/dsp-code.vo';
 import { CiDeliverDesireApiService } from '../ci-api/ci-deliver-desire-api.service';
+import { CircuitBreaker } from '../resilience/circuit-breaker';
 
 /**
  * CiDeliverDesireAdapter — ACL adapter wrapping CiDeliverDesireApiService.
@@ -31,6 +32,14 @@ import { CiDeliverDesireApiService } from '../ci-api/ci-deliver-desire-api.servi
 export class CiDeliverDesireAdapter implements DeliveryStatusReader {
 	private readonly logger = new Logger(CiDeliverDesireAdapter.name);
 
+	// Khối D: breaker cho CI deliver_desire API (đã có timeout 30s ở CiApiService). CI sập →
+	// fail-fast, half-open sau 30s. 404 xử lý là "all pending" TRƯỚC khi tính lỗi mạch.
+	private readonly breaker = new CircuitBreaker({
+		name: 'ci-deliver-desire',
+		failureThreshold: 5,
+		cooldownMs: 30_000,
+	});
+
 	constructor(
 		private readonly ciDeliverDesireApiService: CiDeliverDesireApiService,
 	) {}
@@ -45,11 +54,23 @@ export class CiDeliverDesireAdapter implements DeliveryStatusReader {
 
 		try {
 			const dspCodeStrings = dspCodes.map((code) => code.value);
-			const deliveryStatuses =
-				await this.ciDeliverDesireApiService.getDeliverDesire(
-					upc,
-					dspCodeStrings,
-				);
+			// 404 → return null inside closure (business "not found"), NOT a breaker failure.
+			const deliveryStatuses = await this.breaker.execute(() =>
+				this.ciDeliverDesireApiService
+					.getDeliverDesire(upc, dspCodeStrings)
+					.catch((err: any) => {
+						if (err?.response?.status === 404) return null;
+						throw err;
+					}),
+			);
+
+			if (deliveryStatuses === null) {
+				this.logger.log(`[read] upc=${upc}: 404 → all DSPs pending`);
+				for (const dspCode of dspCodes) {
+					result.set(dspCode.value, 'pending');
+				}
+				return result;
+			}
 
 			// Map CI delivery status to domain DspLiveStatus
 			for (const dspCode of dspCodes) {
