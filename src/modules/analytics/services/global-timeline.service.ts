@@ -62,6 +62,12 @@ export class TimelineAnalyticsService {
 		return value?.toString() ?? '0';
 	}
 
+	private revenueTopSortColumn(
+		query: TimelineQueryDto,
+	): 'revenue_usd' | 'quantity' {
+		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
+	}
+
 	private addRevenueExact(values: Array<string | null | undefined>): string {
 		const decimals = values.map((value) => this.revenueExact(value));
 		const scale = Math.max(
@@ -415,6 +421,7 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -603,6 +610,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopArtistQuery(
 			filterSql,
 			!!query.keyword,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -862,6 +870,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTrackQuery(
 			joinSql,
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1141,6 +1150,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopLabelQuery(
 			joinSql,
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1340,6 +1350,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopChannelQuery(
 			joinSql,
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1550,6 +1561,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTenantQuery(
 			joinSql,
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1754,6 +1766,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopSourceTypeQuery(
 			joinSql,
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1974,7 +1987,12 @@ export class TimelineAnalyticsService {
 		const totalItems = Number(countResult[0]?.total ?? 0);
 
 		// Data query
-		const sql = queries.getRevenueTopReleaseQuery(filterSql, limit, offset);
+		const sql = queries.getRevenueTopReleaseQuery(
+			filterSql,
+			this.revenueTopSortColumn(query),
+			limit,
+			offset,
+		);
 		const rows = await this.clickHouseService.query<{
 			releaseId: string;
 			revenue_usd: string;
@@ -2214,6 +2232,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseVideoQuery(
 			filterSql,
+			this.revenueTopSortColumn(query),
 			limit,
 			offset,
 		);

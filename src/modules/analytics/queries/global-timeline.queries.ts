@@ -41,6 +41,7 @@ export function getRevenueTopDspQuery(
 	joinExpr: string,
 	filterSql: string,
 	resolvedDspName: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -59,7 +60,7 @@ export function getRevenueTopDspQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY dsp_name
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -105,6 +106,7 @@ export function getRevenueTopArtistCountQuery(
 export function getRevenueTopArtistQuery(
 	filterSql: string,
 	hasKeywordFilter: boolean,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -122,7 +124,7 @@ export function getRevenueTopArtistQuery(
       ${filterSql}
     GROUP BY artistId
     HAVING artistId != '' ${hasKeywordFilter ? `AND artistId IN ({matchedArtistIds:Array(String)})` : ''}
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -165,6 +167,7 @@ export function getRevenueTopTrackCountQuery(
 export function getRevenueTopTrackQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -194,7 +197,7 @@ export function getRevenueTopTrackQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY isrc
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -249,6 +252,7 @@ export function getRevenueTopLabelCountQuery(
 export function getRevenueTopLabelQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -267,7 +271,7 @@ export function getRevenueTopLabelQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY labelId
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -309,6 +313,7 @@ export function getRevenueTopChannelCountQuery(
 export function getRevenueTopChannelQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -327,7 +332,7 @@ export function getRevenueTopChannelQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY channelId
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -369,6 +374,7 @@ export function getRevenueTopTenantCountQuery(
 export function getRevenueTopTenantQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -385,7 +391,7 @@ export function getRevenueTopTenantQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY tenantId
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -426,6 +432,7 @@ export function getRevenueTopSourceTypeCountQuery(
 export function getRevenueTopSourceTypeQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -441,7 +448,7 @@ export function getRevenueTopSourceTypeQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY sourceType
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -478,6 +485,7 @@ export function getRevenueTopReleaseCountQuery(filterSql: string): string {
 
 export function getRevenueTopReleaseQuery(
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -507,7 +515,7 @@ export function getRevenueTopReleaseQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY releaseId
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }
@@ -543,6 +551,7 @@ export function getRevenueTopReleaseVideoCountQuery(filterSql: string): string {
 
 export function getRevenueTopReleaseVideoQuery(
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
@@ -561,7 +570,7 @@ export function getRevenueTopReleaseVideoQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY releaseId
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
 }

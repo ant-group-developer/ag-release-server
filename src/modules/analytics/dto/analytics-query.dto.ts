@@ -113,6 +113,16 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 	includeOther?: boolean;
 
 	@ApiPropertyOptional({
+		description:
+			'Order revenue top results by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
+
+	@ApiPropertyOptional({
 		description: 'Filter analytics by specific Release ID',
 		format: 'uuid',
 		example: '123e4567-e89b-12d3-a456-426614174000',
