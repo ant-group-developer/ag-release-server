@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
@@ -6,14 +6,17 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
-import { getImportSourceLabel } from '../constants/import-source.constants';
-import { ChartQueryDto, TimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	AnalyticsSummaryQueryDto,
+	ChartQueryDto,
+	RevenueChartQueryDto,
+	TimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import {
 	AnalyticsChannelInfo,
+	AnalyticsSummaryResponse,
 	AnalyticsWorkspaceInfo,
 	DspBarChartItem,
-	DspTimelinePeriod,
-	DspTimelineResponse,
 	OverviewTrendsResponse,
 	RevenueArtistItem,
 	RevenueChannelItem,
@@ -25,18 +28,18 @@ import {
 	RevenueReleaseVideoItem,
 	RevenueSourceTypeItem,
 	RevenueTenantItem,
-	RevenueTimelineResponse,
 	RevenueTrackItem,
 	SourceBreakdownItem,
 	TerritoryBarChartItem,
-	TerTimelinePeriod,
-	TerTimelineResponse,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 @Injectable()
 export class TimelineAnalyticsService {
@@ -52,6 +55,7 @@ export class TimelineAnalyticsService {
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -60,6 +64,12 @@ export class TimelineAnalyticsService {
 
 	private revenueExact(value?: string | null): string {
 		return value?.toString() ?? '0';
+	}
+
+	private revenueSortColumn(
+		query: { sortBy?: 'revenue' | 'usage' },
+	): 'revenue_usd' | 'quantity' {
+		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 	}
 
 	private addRevenueExact(values: Array<string | null | undefined>): string {
@@ -138,15 +148,19 @@ export class TimelineAnalyticsService {
 			quantity: string;
 			revenue_usd?: string;
 		}>(sql, params);
-		return rows.map((r) => ({
-			source: r.source,
-			sourceLabel: getImportSourceLabel(r.source),
-			quantity: Number(r.quantity),
-			...(includeRevenue && {
-				revenueUsd: this.revenueNumber(r.revenue_usd),
-				revenueUsdExact: this.revenueExact(r.revenue_usd),
-			}),
-		}));
+		return rows.map((r) => {
+			const source = this.sourceTypeConfigService.resolve(r.source);
+			return {
+				source: r.source,
+				sourceLabel: source.label,
+				imageUrl: source.imageUrl,
+				quantity: Number(r.quantity),
+				...(includeRevenue && {
+					revenueUsd: this.revenueNumber(r.revenue_usd),
+					revenueUsdExact: this.revenueExact(r.revenue_usd),
+				}),
+			};
+		});
 	}
 
 	// ═══════════════════════════════════════════════════════
@@ -214,448 +228,103 @@ export class TimelineAnalyticsService {
 		return { joinSql, filterSql, params };
 	}
 
-	// ═══════════════════════════════════════════════════════
-	// DSP SALES TIMELINE (Có Doanh thu + Lượt nghe đối soát)
-	// ═══════════════════════════════════════════════════════
-	async getDspSalesTimeline(
+	async getSummary(
 		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('tl:dsp-sales', tenantId, query);
+		query: AnalyticsSummaryQueryDto,
+	): Promise<AnalyticsSummaryResponse> {
+		if (query.fromDate > query.toDate) {
+			throw new BadRequestException('fromDate must be before or equal to toDate');
+		}
+
+		const key = this.cache.buildKey('tl:summary', tenantId, query);
 		return this.cache.wrap(key, () =>
-			this.computeDspSalesTimeline(tenantId, query),
+			this.computeSummary(tenantId, query),
 		);
 	}
 
-	private async computeDspSalesTimeline(
+	private async computeSummary(
 		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { topN = 5, includeOther = true } = query;
+		query: AnalyticsSummaryQueryDto,
+	): Promise<AnalyticsSummaryResponse> {
 		const { joinSql, filterSql, params } = this.buildTenantFilters(
 			tenantId,
 			query,
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		const trendParams = { ...params, from: query.fromDate, to: query.toDate };
+		const salesParams = {
+			...params,
+			from: normalizeDateToFirstOfMonth(query.fromDate),
+			to: normalizeDateToFirstOfMonth(query.toDate),
+		};
 
-		// DSP name: chua assign → dsps_report.dsp_name, da assign → pg_dsps_sync.dsp_name
-		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
-		const dspNameExpr = `${resolvedDspName} AS dsp_name`;
-		const joinExpr = `
-      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+		const trendSql = `
+      SELECT sum(s.total_quantity) AS total_trend_views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      ${joinSql}
+      WHERE s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${filterSql}
+    `;
+		const salesSql = `
+      SELECT
+        sum(s.total_quantity) AS total_usage,
+        sum(s.total_revenue_usd) AS total_revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
     `;
 
-		// 1. Tim Top N DSPs dua tren views cua tenant
-		const topDspsSql = queries.getDspSalesTimelineTopDspsQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			resolvedDspName,
-			topN,
-		);
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
+		const [trendRows, salesRows] = await Promise.all([
+			this.clickHouseService.query<{ total_trend_views: string }>(
+				trendSql,
+				trendParams,
+			),
+			this.clickHouseService.query<{
+				total_usage: string;
+				total_revenue_usd: string;
+			}>(salesSql, salesParams),
+		]);
 
-		if (!topDspIds.length) {
-			return { topDsps: [], items: [] };
-		}
-
-		// 2. Query monthly timeline native JOIN
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
-			: dspNameExpr;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = queries.getDspSalesTimelineQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			dspExpr,
-			whereDsp,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			sales_views: string;
-			revenue_usd: string;
-		}>(timelineSql, params);
-
-		// Group ket qua
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			period.series.push({
-				dsp: row.dsp_name,
-				salesViews: Number(row.sales_views),
-				revenueUsd: this.revenueNumber(row.revenue_usd),
-				revenueUsdExact: this.revenueExact(row.revenue_usd),
-			});
-		}
-
-		return { topDsps, items: Array.from(periodMap.values()) };
+		return {
+			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
+			totalUsage: Number(salesRows[0]?.total_usage ?? 0),
+			totalRevenueUsd: this.revenueNumber(
+				salesRows[0]?.total_revenue_usd,
+			),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRows[0]?.total_revenue_usd,
+			),
+		};
 	}
 
-	// ═══════════════════════════════════════════════════════
-	// DSP TRENDS TIMELINE (Lượt nghe hàng ngày xu hướng)
-	// ═══════════════════════════════════════════════════════
-	async getDspTrendsTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('tl:dsp-trends', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeDspTrendsTimeline(tenantId, query),
-		);
-	}
-
-	private async computeDspTrendsTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { topN = 5, includeOther = true } = query;
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
-			tenantId,
-			query,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		// DSP name: chua assign -> dsps_report.dsp_name, da assign -> pg_dsps_sync.dsp_name
-		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
-		const dspNameExpr = `${resolvedDspName} AS dsp_name`;
-		const joinExpr = `
-      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
-    `;
-
-		// 1. Tim Top N DSPs trends
-		const topDspsSql = queries.getDspTrendsTimelineTopDspsQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			resolvedDspName,
-			topN,
-		);
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-
-		if (!topDspIds.length) {
-			return { topDsps: [], items: [] };
+	private getPaginationParams(query: TimelineQueryDto): {
+		limit: number;
+		offset: number;
+		page: number;
+		pageSize: number;
+		isPaginated: boolean;
+	} {
+		if (query.topN !== undefined && query.topN !== null) {
+			return {
+				limit: query.topN,
+				offset: 0,
+				page: 1,
+				pageSize: query.topN,
+				isPaginated: false,
+			};
 		}
 
-		// 2. Query timeline
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
-			: dspNameExpr;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = queries.getDspTrendsTimelineQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			dspExpr,
-			whereDsp,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			trend_views: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			period.series.push({
-				dsp: row.dsp_name,
-				trendViews: Number(row.trend_views),
-			});
-		}
-
-		return { topDsps, items: Array.from(periodMap.values()) };
-	}
-
-	// ═══════════════════════════════════════════════════════
-	// DSP TRENDS DAILY TIMELINE (Lượt nghe hàng ngày xu hướng)
-	// ═══════════════════════════════════════════════════════
-	async getDspTrendsDailyTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('tl:dsp-trends-daily', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeDspTrendsDailyTimeline(tenantId, query),
-		);
-	}
-
-	private async computeDspTrendsDailyTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<DspTimelineResponse> {
-		const { fromDate, toDate, topN = 5, includeOther = true } = query;
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
-			tenantId,
-			query,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		const joinExpr = `
-      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
-    `;
-
-		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
-		const dspNameExpr = `${resolvedDspName} AS dsp_name`;
-
-		// 1. Tim Top N DSPs trends daily
-		const topDspsSql = queries.getDspTrendsDailyTimelineTopDspsQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			resolvedDspName,
-			topN,
-		);
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-
-		if (!topDspIds.length) {
-			return { topDsps: [], items: [] };
-		}
-
-		// 2. Query daily timeline
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
-			: dspNameExpr;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = queries.getDspTrendsDailyTimelineQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			dspExpr,
-			whereDsp,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			trend_views: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			period.series.push({
-				dsp: row.dsp_name,
-				trendViews: Number(row.trend_views),
-			});
-		}
-
-		return { topDsps, items: Array.from(periodMap.values()) };
-	}
-
-	// ═══════════════════════════════════════════════════════
-	// TERRITORY SALES TIMELINE
-	// ═══════════════════════════════════════════════════════
-	async getTerSalesTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<TerTimelineResponse> {
-		const key = this.cache.buildKey('tl:ter-sales', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeTerSalesTimeline(tenantId, query),
-		);
-	}
-
-	private async computeTerSalesTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<TerTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { topN = 5, includeOther = true } = query;
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
-			tenantId,
-			query,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		// 1. Tim Top N Territories
-		const topTersSql = queries.getTerSalesTimelineTopTersQuery(
-			joinSql,
-			filterSql,
-			topN,
-		);
-		const topTersRows = await this.clickHouseService.query<{
-			territory: string;
-		}>(topTersSql, params);
-		const topTerritories = topTersRows.map((r) => r.territory);
-
-		if (!topTerritories.length) {
-			return { topTerritories: [], items: [] };
-		}
-
-		// 2. Query timeline
-		params.topTers = topTerritories;
-		const terExpr = includeOther
-			? `multiIf(s.territory_code IN ({topTers:Array(String)}), s.territory_code, 'Other')`
-			: 's.territory_code';
-		const whereTer = includeOther
-			? ''
-			: 'AND s.territory_code IN ({topTers:Array(String)})';
-
-		const timelineSql = queries.getTerSalesTimelineQuery(
-			joinSql,
-			filterSql,
-			terExpr,
-			whereTer,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			ter_name: string;
-			sales_views: string;
-			revenue_usd: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, TerTimelinePeriod>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			period.series.push({
-				territory: row.ter_name,
-				salesViews: Number(row.sales_views),
-				revenueUsd: this.revenueNumber(row.revenue_usd),
-				revenueUsdExact: this.revenueExact(row.revenue_usd),
-			});
-		}
-
-		return { topTerritories, items: Array.from(periodMap.values()) };
-	}
-
-	// ═══════════════════════════════════════════════════════
-	// TERRITORY TRENDS TIMELINE
-	// ═══════════════════════════════════════════════════════
-	async getTerTrendsTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<TerTimelineResponse> {
-		const key = this.cache.buildKey('tl:ter-trends', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeTerTrendsTimeline(tenantId, query),
-		);
-	}
-
-	private async computeTerTrendsTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<TerTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { topN = 5, includeOther = true } = query;
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
-			tenantId,
-			query,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		// 1. Tim Top N Territories
-		const topTersSql = queries.getTerTrendsTimelineTopTersQuery(
-			joinSql,
-			filterSql,
-			topN,
-		);
-		const topTersRows = await this.clickHouseService.query<{
-			territory: string;
-		}>(topTersSql, params);
-		const topTerritories = topTersRows.map((r) => r.territory);
-
-		if (!topTerritories.length) {
-			return { topTerritories: [], items: [] };
-		}
-
-		// 2. Query timeline
-		params.topTers = topTerritories;
-		const terExpr = includeOther
-			? `multiIf(s.territory_code IN ({topTers:Array(String)}), s.territory_code, 'Other')`
-			: 's.territory_code';
-		const whereTer = includeOther
-			? ''
-			: 'AND s.territory_code IN ({topTers:Array(String)})';
-
-		const timelineSql = queries.getTerTrendsTimelineQuery(
-			joinSql,
-			filterSql,
-			terExpr,
-			whereTer,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			ter_name: string;
-			trend_views: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, TerTimelinePeriod>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			period.series.push({
-				territory: row.ter_name,
-				trendViews: Number(row.trend_views),
-			});
-		}
-
-		return { topTerritories, items: Array.from(periodMap.values()) };
+		const page = query.page ?? 1;
+		const pageSize = query.pageSize ?? 20;
+		return {
+			limit: pageSize,
+			offset: (page - 1) * pageSize,
+			page,
+			pageSize,
+			isPaginated: true,
+		};
 	}
 
 	// ═══════════════════════════════════════════════════════
@@ -697,158 +366,6 @@ export class TimelineAnalyticsService {
 			totalRevenueUsdExact: this.revenueExact(rows[0]?.total_revenue_usd),
 			totalQuantity: Number(rows[0]?.total_quantity ?? 0),
 			totalTerritories: Number(rows[0]?.total_territories ?? 0),
-		};
-	}
-
-	// ═══════════════════════════════════════════════════════
-	// REVENUE TIMELINE (Biểu đồ doanh thu theo chu kỳ tháng + Top DSPs)
-	// ═══════════════════════════════════════════════════════
-	async getRevenueTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<RevenueTimelineResponse> {
-		const key = this.cache.buildKey('tl:rev-timeline', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeRevenueTimeline(tenantId, query),
-		);
-	}
-
-	private async computeRevenueTimeline(
-		tenantId: string,
-		query: TimelineQueryDto,
-	): Promise<RevenueTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { topN = 5, includeOther = true } = query;
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
-			tenantId,
-			query,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		// DSP name: ưu tiên pg_dsps_sync → dsps_report → dsp_id gốc
-		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
-		const dspNameExpr = `${resolvedDspName} AS dsp_name`;
-		const joinExpr = `
-      LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-      LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
-    `;
-
-		// 1. Tìm Top N DSPs theo revenue trong khoảng thời gian
-		const topDspsSql = queries.getRevenueTimelineTopDspsQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			resolvedDspName,
-			topN,
-		);
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-
-		if (!topDspIds.length) {
-			return { topDsps: [], items: [] };
-		}
-
-		// 2. Query monthly timeline có breakdown theo DSP
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${resolvedDspName}, 'Other') AS dsp_name`
-			: dspNameExpr;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = queries.getRevenueTimelineQuery(
-			joinSql,
-			joinExpr,
-			filterSql,
-			dspExpr,
-			whereDsp,
-		);
-
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			quantity: string;
-			revenue_usd: string;
-		}>(timelineSql, params);
-
-		// Group kết quả: mỗi period có tổng + series DSP breakdown
-		const periodMap = new Map<
-			string,
-			{
-				revenueUsdExactParts: string[];
-				quantity: number;
-				series: {
-					dsp: string;
-					revenueUsd: number;
-					revenueUsdExact: string;
-					quantity: number;
-				}[];
-			}
-		>();
-		for (const row of rows) {
-			let period = periodMap.get(row.period_str);
-			if (!period) {
-				period = { revenueUsdExactParts: [], quantity: 0, series: [] };
-				periodMap.set(row.period_str, period);
-			}
-			const revExact = this.revenueExact(row.revenue_usd);
-			const rev = this.revenueNumber(row.revenue_usd);
-			const qty = Number(row.quantity);
-			period.revenueUsdExactParts.push(revExact);
-			period.quantity += qty;
-			period.series.push({
-				dsp: row.dsp_name,
-				revenueUsd: rev,
-				revenueUsdExact: revExact,
-				quantity: qty,
-			});
-		}
-
-		const items = Array.from(periodMap.entries()).map(([key, val]) => ({
-			period: key,
-			revenueUsd: this.revenueNumber(
-				this.addRevenueExact(val.revenueUsdExactParts),
-			),
-			revenueUsdExact: this.addRevenueExact(val.revenueUsdExactParts),
-			quantity: val.quantity,
-			series: val.series,
-		}));
-
-		return { topDsps, items };
-	}
-
-	private getPaginationParams(query: TimelineQueryDto): {
-		limit: number;
-		offset: number;
-		page: number;
-		pageSize: number;
-		isPaginated: boolean;
-	} {
-		if (query.topN !== undefined && query.topN !== null) {
-			return {
-				limit: query.topN,
-				offset: 0,
-				page: 1,
-				pageSize: query.topN,
-				isPaginated: false,
-			};
-		}
-
-		const page = query.page ?? 1;
-		const pageSize = query.pageSize ?? 20;
-		return {
-			limit: pageSize,
-			offset: (page - 1) * pageSize,
-			page,
-			pageSize,
-			isPaginated: true,
 		};
 	}
 
@@ -912,6 +429,7 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -919,6 +437,7 @@ export class TimelineAnalyticsService {
 			pg_dsp_id: string;
 			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			quantity: string;
 			revenue_usd: string;
 		}>(sql, params);
@@ -927,6 +446,7 @@ export class TimelineAnalyticsService {
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
 			quantity: Number(r.quantity),
@@ -988,6 +508,7 @@ export class TimelineAnalyticsService {
 					pgDspId: null,
 					dspReportId: '',
 					dspName: 'Other',
+					imageUrl: null,
 					revenueUsd: otherRev > 0 ? otherRev : 0,
 					revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 					quantity: otherQty > 0 ? otherQty : 0,
@@ -1100,6 +621,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopArtistQuery(
 			filterSql,
 			!!query.keyword,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1359,6 +881,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTrackQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1638,6 +1161,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopLabelQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1837,6 +1361,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopChannelQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2047,6 +1572,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTenantQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2251,6 +1777,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopSourceTypeQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2264,10 +1791,12 @@ export class TimelineAnalyticsService {
 
 		if (rows.length > 0) {
 			rows.forEach((r, index) => {
+				const source = this.sourceTypeConfigService.resolve(r.sourceType);
 				items.push({
 					rank: offset + index + 1,
 					sourceType: r.sourceType,
-					sourceTypeLabel: getImportSourceLabel(r.sourceType),
+					sourceTypeLabel: source.label,
+					imageUrl: source.imageUrl,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
@@ -2311,6 +1840,7 @@ export class TimelineAnalyticsService {
 						rank: items.length + 1,
 						sourceType: 'other',
 						sourceTypeLabel: 'Other',
+						imageUrl: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
@@ -2471,7 +2001,12 @@ export class TimelineAnalyticsService {
 		const totalItems = Number(countResult[0]?.total ?? 0);
 
 		// Data query
-		const sql = queries.getRevenueTopReleaseQuery(filterSql, limit, offset);
+		const sql = queries.getRevenueTopReleaseQuery(
+			filterSql,
+			this.revenueSortColumn(query),
+			limit,
+			offset,
+		);
 		const rows = await this.clickHouseService.query<{
 			releaseId: string;
 			revenue_usd: string;
@@ -2711,6 +2246,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseVideoQuery(
 			filterSql,
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2887,8 +2423,8 @@ export class TimelineAnalyticsService {
 	}
 
 	// ═══════════════════════════════════════════════════════
-	// CHART API 1: TREND-VIEW LINE CHART (Monthly)
-	// Tổng trend-view theo tháng từ trends_dsp_daily_cube
+	// CHART API 1: TREND-VIEW LINE CHART (daily)
+	// Tổng trend-view theo ngày từ trends_dsp_daily_cube
 	// ═══════════════════════════════════════════════════════
 	async getTrendViewLineChart(
 		tenantId: string,
@@ -2904,40 +2440,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<TrendViewLineChartItem[]> {
-		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = {
-			from: query.fromDate,
-			to: query.toDate,
-		};
-
-		let joinSql = '';
-		let filterSql = '';
-		const hasSubFilter = !!(
-			query.labelId ||
-			query.releaseId ||
-			query.releaseType
+		const { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
 		);
-
-		if (!isSystem || hasSubFilter) {
-			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
-			filterSql = 'AND t.is_deleted = 0';
-			if (!isSystem) {
-				filterSql += ' AND t.tenant_id = {tenantId:String}';
-				params.tenantId = tenantId;
-			}
-			if (query.labelId) {
-				filterSql += ' AND t.label_id = {labelId:String}';
-				params.labelId = query.labelId;
-			}
-			if (query.releaseId) {
-				filterSql += ' AND t.release_id = {releaseId:String}';
-				params.releaseId = query.releaseId;
-			}
-			if (query.releaseType) {
-				filterSql += ' AND t.release_type = {releaseType:String}';
-				params.releaseType = query.releaseType;
-			}
-		}
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const sql = queries.getTrendViewLineChartQuery(joinSql, filterSql);
 
@@ -2974,29 +2482,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<DspBarChartItem[]> {
-		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = {
-			from: query.fromDate,
-			to: query.toDate,
-		};
-
-		let filterSql = 'AND t.is_deleted = 0';
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
-		if (query.labelId) {
-			filterSql += ' AND t.label_id = {labelId:String}';
-			params.labelId = query.labelId;
-		}
-		if (query.releaseId) {
-			filterSql += ' AND t.release_id = {releaseId:String}';
-			params.releaseId = query.releaseId;
-		}
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
+		const { joinSql, filterSql, params } = this.buildTenantFilters(
+			tenantId,
+			query,
+		);
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 		const joinExpr = `
@@ -3005,7 +2496,10 @@ export class TimelineAnalyticsService {
     `;
 
 		// Step 1: Get total views across all DSPs
-		const totalSql = queries.getTrendViewDspBarChartTotalQuery(filterSql);
+		const totalSql = queries.getTrendViewDspBarChartTotalQuery(
+			joinSql,
+			filterSql,
+		);
 		const totalResult = await this.clickHouseService.query<{
 			total_views: string;
 		}>(totalSql, params);
@@ -3013,17 +2507,24 @@ export class TimelineAnalyticsService {
 
 		// Step 2: Get top 5 DSPs
 		const sql = queries.getTrendViewDspBarChartQuery(
+			joinSql,
 			filterSql,
 			resolvedDspName,
 			joinExpr,
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			total_views: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: Number(r.total_views),
 		}));
 
@@ -3034,7 +2535,13 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ dspName: 'Other', totalViews: otherViews });
+			items.push({
+				pgDspId: null,
+				dspReportId: '',
+				dspName: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return items;
@@ -3064,14 +2571,12 @@ export class TimelineAnalyticsService {
 		tenantId: string,
 		query: ChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
-		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(query.toDate);
 		const { joinSql, filterSql, params } = this.buildTenantFilters(
 			tenantId,
 			query,
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		params.from = query.fromDate;
+		params.to = query.toDate;
 
 		const totalSql = queries.getTrendViewTerritoryBarChartTotalQuery(
 			joinSql,
@@ -3093,6 +2598,7 @@ export class TimelineAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			totalViews: Number(r.total_views),
 		}));
 
@@ -3102,7 +2608,11 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -3110,7 +2620,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('tl:chart-rev-line', tenantId, query);
 		return this.cache.wrap(key, () =>
@@ -3120,7 +2630,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -3178,7 +2688,7 @@ export class TimelineAnalyticsService {
 	// ═══════════════════════════════════════════════════════
 	async getRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-dsp-bar',
@@ -3192,7 +2702,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -3241,8 +2751,10 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		// Step 2: Get top 5 DSPs by revenue
 		const sql = queries.getRevenueDspBarChartQuery(
@@ -3250,17 +2762,26 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: undefined, // ensure matching expected type
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		// Step 3: Calculate Other
@@ -3272,11 +2793,17 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
+				pgDspId: null,
+				dspReportId: '',
 				dspName: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -3285,7 +2812,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-ter-bar',
@@ -3299,7 +2826,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -3316,22 +2843,28 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		const sql = queries.getRevenueTerritoryBarChartQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		const top5TotalExact = this.addRevenueExact(
@@ -3342,11 +2875,15 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -3367,33 +2904,49 @@ export class TimelineAnalyticsService {
 			),
 		);
 
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 
 		const countries = await this.entityManager.query(
 			`
-        SELECT UPPER(iso2) AS iso2, name
+        SELECT UPPER(iso2) AS iso2, name, flag_image_key
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
 		);
-		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [
-				country.iso2,
-				country.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(country: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					country.iso2,
+					{
+						name: country.name,
+						imageUrl: toCountryFlagImageUrl(country.flag_image_key),
+					},
+				],
+			),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				iso2 && iso2 !== 'OTHER'
-					? (countryNameByIso2.get(iso2) ?? item.territory)
+					? (country?.name ?? item.territory)
 					: item.territory
 			) as string;
 			return {
 				...item,
 				territory,
+				imageUrl: iso2 && iso2 !== 'OTHER' ? (country?.imageUrl ?? null) : null,
 			};
 		});
 	}

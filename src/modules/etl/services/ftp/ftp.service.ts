@@ -48,26 +48,48 @@ export class FtpService {
 
 	/**
 	 * Create and connect a new FTP client.
+	 * Retries up to 3 times with 2s delay on failure.
 	 * Caller is responsible for closing via client.close().
 	 */
 	async connect(): Promise<ftp.Client> {
 		const config = this.getConfig();
-		const client = new ftp.Client();
-		client.ftp.verbose = false;
+		const maxAttempts = 3;
+		const retryDelayMs = 2000;
+		let lastError: Error | undefined;
 
-		this.logger.log(`Connecting to FTPS ${config.host}:${config.port}...`);
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			const client = new ftp.Client();
+			client.ftp.verbose = false;
 
-		await client.access({
-			host: config.host,
-			port: config.port,
-			user: config.user,
-			password: config.password,
-			secure: config.secure, // TLS Explicit
-			secureOptions: { rejectUnauthorized: false },
-		});
+			try {
+				this.logger.log(
+					`Connecting to FTPS ${config.host}:${config.port}...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`,
+				);
+				await client.access({
+					host: config.host,
+					port: config.port,
+					user: config.user,
+					password: config.password,
+					secure: config.secure,
+					secureOptions: { rejectUnauthorized: false },
+				});
+				this.logger.log('FTPS connected successfully');
+				return client;
+			} catch (err) {
+				client.close();
+				lastError = err as Error;
+				this.logger.warn(
+					`FTPS connection attempt ${attempt}/${maxAttempts} failed: ${lastError.message}`,
+				);
+				if (attempt < maxAttempts) {
+					await new Promise((resolve) =>
+						setTimeout(resolve, retryDelayMs),
+					);
+				}
+			}
+		}
 
-		this.logger.log('FTPS connected successfully');
-		return client;
+		throw lastError;
 	}
 
 	/**

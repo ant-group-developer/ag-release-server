@@ -19,6 +19,7 @@ export interface ParseFileStats {
 	filePath: string;
 	fileName: string;
 	fileDirectory: string;
+	fileSizeBytes: number;
 	totalLines: number;
 	processedRows: number;
 	skippedRows: number;
@@ -74,10 +75,13 @@ export abstract class BaseParser {
 		const lowerPath = filePath.toLowerCase();
 		if (lowerPath.endsWith('.zip')) {
 			const rows = await this.parseZipFile(filePath, batchId);
+			let zipSize = 0;
+			try { zipSize = fs.statSync(filePath).size; } catch {}
 			const stats: ParseFileStats = {
 				filePath,
 				fileName: path.basename(filePath),
 				fileDirectory: path.dirname(filePath),
+				fileSizeBytes: zipSize,
 				totalLines: rows.length,
 				processedRows: rows.length,
 				skippedRows: 0,
@@ -246,6 +250,9 @@ export abstract class BaseParser {
 			filePath,
 			fileName: path.basename(filePath),
 			fileDirectory: path.dirname(filePath),
+			fileSizeBytes: (() => {
+				try { return fs.statSync(filePath).size; } catch { return 0; }
+			})(),
 			totalLines: lineNum,
 			processedRows: rows.length,
 			skippedRows,

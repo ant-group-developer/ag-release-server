@@ -15,6 +15,7 @@ import {
 	readSourceValue,
 	transformMappedValue,
 } from '../field-mapping-overlay';
+import { ParseFileStats } from '../base.parser';
 
 const AdmZip = require('adm-zip');
 
@@ -55,6 +56,31 @@ export abstract class BaseSalesParser {
 		}
 
 		return this.parseSingleFile(filePath, batchId);
+	}
+
+	/**
+	 * Parse a sales file with the same result shape as BaseParser.
+	 * ImportService uses this to retain per-file ETL audit information for every
+	 * category, including sales.
+	 */
+	async parseFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactSalesRow[]; stats: ParseFileStats }> {
+		const rows = await this.parseFile(filePath, batchId);
+		return {
+			rows,
+			stats: {
+				filePath,
+				fileName: path.basename(filePath),
+				fileDirectory: path.dirname(filePath),
+				fileSizeBytes: (() => { try { return fs.statSync(filePath).size; } catch { return 0; } })(),
+				totalLines: rows.length,
+				processedRows: rows.length,
+				skippedRows: 0,
+				errorRows: 0,
+			},
+		};
 	}
 
 	/**
