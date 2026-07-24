@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	DspChartQueryDto,
+	DspRevenueChartQueryDto,
 	DspAnalyticsSummaryQueryDto,
 	DspOverviewQueryDto,
 	DspTopQueryDto,
@@ -59,7 +60,10 @@ export class DspAnalyticsController {
 
 	@Post('revenue/line-chart')
 	@ApiOperation({ summary: 'Revenue line chart cho 1 DSP (monthly)' })
-	async revenueLineChart(@Body() dto: DspChartQueryDto, @Req() req: Request) {
+	async revenueLineChart(
+		@Body() dto: DspRevenueChartQueryDto,
+		@Req() req: Request,
+	) {
 		const data = await this.dspSvc.getRevenueLineChart(
 			dto,
 			req.user!.tenantId,
@@ -87,7 +91,7 @@ export class DspAnalyticsController {
 		summary: 'Revenue territory bar chart cho 1 DSP (top 5 + Other)',
 	})
 	async revenueTerritoryBarChart(
-		@Body() dto: DspChartQueryDto,
+		@Body() dto: DspRevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.dspSvc.getRevenueTerritoryBarChart(

@@ -11,6 +11,7 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -64,7 +65,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a channel' })
 	async revenueLineChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueLineChart(
@@ -112,7 +113,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a channel' })
 	async revenueDspBarChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueDspBarChart(
@@ -128,7 +129,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a channel' })
 	async revenueTerritoryBarChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueTerritoryBarChart(

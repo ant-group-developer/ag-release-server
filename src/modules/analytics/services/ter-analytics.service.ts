@@ -9,6 +9,7 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspTopReleaseItem,
@@ -17,11 +18,14 @@ import {
 	RevenueLineChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 export interface TerOverviewResponse {
 	isoCode: string;
 	territory: string;
+	imageUrl: string | null;
 	totalTrendViews: number;
 	totalSalesViews: number;
 	totalRevenueUsd: number;
@@ -35,9 +39,9 @@ export class TerAnalyticsService {
 	private readonly resolvedDspName = `coalesce(nullIf(dsp_map.resolved_dsp_name, ''), s.dsp_id)`;
 	private readonly dspNameJoin = `
     LEFT JOIN (
-      SELECT r.id_dsps_report AS dsp_key, r.pg_uuid AS pg_uuid, coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, '')) AS resolved_dsp_name
+      SELECT r.id_dsps_report AS dsp_key, r.pg_uuid AS pg_uuid, p.picture AS image_url, coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, '')) AS resolved_dsp_name
       FROM (SELECT id_dsps_report, pg_uuid, dsp_name FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
-      LEFT JOIN (SELECT pg_uuid, dsp_name FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+      LEFT JOIN (SELECT pg_uuid, dsp_name, picture FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
     ) dsp_map ON s.dsp_id = dsp_map.dsp_key
   `;
 
@@ -113,12 +117,17 @@ export class TerAnalyticsService {
 		return { terFilter, trackJoin, trackFilter, params };
 	}
 
-	private async resolveCountryName(isoCode: string): Promise<string> {
+	private async resolveCountry(
+		isoCode: string,
+	): Promise<{ name: string; imageUrl: string | null }> {
 		const rows = await this.entityManager.query(
-			`SELECT name FROM countries WHERE UPPER(iso2) = $1 LIMIT 1`,
+			`SELECT name, flag_image_key FROM countries WHERE UPPER(iso2) = $1 LIMIT 1`,
 			[isoCode.toUpperCase()],
 		);
-		return rows[0]?.name ?? isoCode;
+		return {
+			name: rows[0]?.name ?? isoCode,
+			imageUrl: toCountryFlagImageUrl(rows[0]?.flag_image_key),
+		};
 	}
 
 	// ── Overview ──────────────────────────────────────────
@@ -160,7 +169,7 @@ export class TerAnalyticsService {
 				${terFilter} ${trackFilter}
 		`;
 
-		const [[trendRow], [salesRow], countryName] = await Promise.all([
+		const [[trendRow], [salesRow], country] = await Promise.all([
 			this.clickHouseService.query<{ total_trend_views: string }>(
 				trendSql,
 				params,
@@ -169,12 +178,13 @@ export class TerAnalyticsService {
 				total_sales_views: string;
 				total_revenue_usd: string;
 			}>(salesSql, params),
-			this.resolveCountryName(isoCode),
+			this.resolveCountry(isoCode),
 		]);
 
 		return {
 			isoCode: isoCode.toUpperCase(),
-			territory: countryName,
+			territory: country.name,
+			imageUrl: country.imageUrl,
 			totalTrendViews: Number(trendRow?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRow?.total_sales_views ?? 0),
 			totalRevenueUsd: this.revenueNumber(salesRow?.total_revenue_usd),
@@ -233,7 +243,7 @@ export class TerAnalyticsService {
 
 	async getRevenueLineChart(
 		isoCode: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('ter:rev-line', 'system', {
 			isoCode,
@@ -246,7 +256,7 @@ export class TerAnalyticsService {
 
 	private async computeRevenueLineChart(
 		isoCode: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
@@ -677,6 +687,7 @@ export class TerAnalyticsService {
 				s.dsp_id AS dsp_id,
 				dsp_map.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
+				dsp_map.image_url AS image_url,
 				s.total_views AS total_views,
 				s.total_usage AS total_usage,
 				s.total_revenue_usd_raw AS total_revenue_usd_raw,
@@ -693,6 +704,7 @@ export class TerAnalyticsService {
 				dsp_id: string;
 				pg_dsp_id: string | null;
 				dsp_name: string;
+				image_url: string | null;
 				total_views: string;
 				total_usage: string;
 				total_revenue_usd: string;
@@ -743,6 +755,7 @@ export class TerAnalyticsService {
 				pgDspId: row.pg_dsp_id || null,
 				dspReportId: row.dsp_id,
 				dspName: row.dsp_name || row.dsp_id,
+				imageUrl: toDspImageUrl(row.image_url),
 				totalViews: Number(row.total_views),
 				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
@@ -753,6 +766,7 @@ export class TerAnalyticsService {
 					pgDspId: null,
 					dspReportId: 'other',
 					dspName: 'Other',
+					imageUrl: null,
 					totalViews: otherViews,
 					totalUsage: otherUsage,
 					totalRevenueUsd: otherRev.toString(),
@@ -770,6 +784,7 @@ export class TerAnalyticsService {
 			pgDspId: row.pg_dsp_id || null,
 			dspReportId: row.dsp_id,
 			dspName: row.dsp_name || row.dsp_id,
+			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
 			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',

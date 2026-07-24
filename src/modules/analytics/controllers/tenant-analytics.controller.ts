@@ -14,6 +14,7 @@ import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -106,7 +107,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a tenant' })
 	async revenueLineChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
@@ -160,7 +161,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a tenant' })
 	async revenueDspBarChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
@@ -178,7 +179,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a tenant' })
 	async revenueTerritoryBarChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);

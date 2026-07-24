@@ -8,6 +8,7 @@ import { EntityManager } from 'typeorm';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -115,7 +116,7 @@ export class LabelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a label' })
 	async revenueLineChart(
 		@Param('labelId') labelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const [data, tenant] = await Promise.all([
@@ -181,7 +182,7 @@ export class LabelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a label' })
 	async revenueDspBarChart(
 		@Param('labelId') labelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const [data, tenant] = await Promise.all([
@@ -203,7 +204,7 @@ export class LabelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a label' })
 	async revenueTerritoryBarChart(
 		@Param('labelId') labelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const [data, tenant] = await Promise.all([

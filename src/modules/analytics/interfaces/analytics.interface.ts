@@ -13,6 +13,7 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 export interface SourceBreakdownItem {
 	source: string; // raw value: 'ftp', 'wmg_report', 'spotify_report', ...
 	sourceLabel: string; // human-readable: 'Merlin', 'WMG', 'Spotify', ...
+	imageUrl: string | null;
 	quantity: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
@@ -73,6 +74,7 @@ export interface RevenueDspItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
@@ -261,6 +263,11 @@ export interface EntityOverviewResponse {
 		title: string;
 		logo: string | null;
 	} | null;
+	source?: {
+		sourceType: string;
+		sourceLabel: string;
+		imageUrl: string | null;
+	} | null;
 }
 
 /** Unified response for the new analytics summary endpoints. */
@@ -363,6 +370,7 @@ export interface DspRankingItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	totalViews: number;
 	bySource?: SourceBreakdownItem[];
 }
@@ -371,6 +379,7 @@ export interface SourceTypeRankingItem {
 	rank: number;
 	sourceType: string;
 	sourceTypeLabel: string;
+	imageUrl: string | null;
 	totalViews: number;
 }
 
@@ -378,6 +387,7 @@ export interface RevenueSourceTypeItem {
 	rank: number;
 	sourceType: string;
 	sourceTypeLabel: string;
+	imageUrl: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
@@ -435,18 +445,24 @@ export interface TrendViewLineChartItem {
 /** Một cột trong bar-chart DSP (top 5 + Other) */
 export interface DspBarChartItem {
 	dspName: string;
+	pgDspId?: string | null;
+	dspReportId?: string;
+	imageUrl: string | null;
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
+	quantity?: number;
 }
 
 /** Một điểm trên line-chart revenue theo tháng */
 export interface TerritoryBarChartItem {
 	territory: string;
 	isoCode?: string;
+	imageUrl: string | null;
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
+	quantity?: number;
 }
 
 export interface EntityTopDspItem {
@@ -454,6 +470,7 @@ export interface EntityTopDspItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	totalViews: number;
 	totalUsage?: number;
 	totalRevenueUsd: string;
@@ -463,6 +480,7 @@ export interface EntityTopTerItem {
 	rank: number;
 	isoCode: string;
 	territory: string;
+	imageUrl: string | null;
 	totalViews: number;
 	totalUsage?: number;
 	totalRevenueUsd: string;
@@ -482,6 +500,7 @@ export interface DspMeta {
 	name: string;
 	code: string | null;
 	picture: string | null;
+	imageUrl: string | null;
 	isActive: boolean | null;
 	type: string | null;
 }

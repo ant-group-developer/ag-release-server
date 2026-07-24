@@ -50,6 +50,7 @@ export function getRevenueTopDspQuery(
       any(r.pg_uuid) AS pg_dsp_id,
       any(s.dsp_id) AS dsp_report_id,
       ${resolvedDspName} AS dsp_name,
+      any(p.picture) AS image_url,
       sum(s.total_quantity) AS quantity,
       sum(s.total_revenue_usd) AS revenue_usd
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
@@ -671,7 +672,10 @@ export function getTrendViewDspBarChartQuery(
 ): string {
 	return `
     SELECT
+      s.dsp_id AS dsp_report_id,
+      r.pg_uuid AS pg_dsp_id,
       ${resolvedDspName} AS dsp_name,
+      p.picture AS image_url,
       sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
     ${joinSql}
@@ -680,7 +684,7 @@ export function getTrendViewDspBarChartQuery(
       AND s.reporting_date >= toDate({from:String})
       AND s.reporting_date <= toDate({to:String})
       ${filterSql}
-    GROUP BY dsp_name
+    GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
     ORDER BY total_views DESC
     LIMIT 5
   `;
@@ -746,7 +750,9 @@ export function getRevenueDspBarChartTotalQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT sum(s.total_revenue_usd) AS total_rev
+    SELECT
+      sum(s.total_revenue_usd) AS total_rev,
+      sum(s.total_quantity) AS total_qty
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     WHERE 1=1
@@ -761,11 +767,16 @@ export function getRevenueDspBarChartQuery(
 	joinExpr: string,
 	filterSql: string,
 	resolvedDspName: string,
+	orderBy: 'revenue_usd' | 'quantity',
 ): string {
 	return `
     SELECT
+      s.dsp_id AS dsp_report_id,
+      r.pg_uuid AS pg_dsp_id,
       ${resolvedDspName} AS dsp_name,
-      sum(s.total_revenue_usd) AS revenue_usd
+      p.picture AS image_url,
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     ${joinExpr}
@@ -773,8 +784,8 @@ export function getRevenueDspBarChartQuery(
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
-    GROUP BY dsp_name
-    ORDER BY revenue_usd DESC
+    GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
+    ORDER BY ${orderBy} DESC, dsp_report_id ASC
     LIMIT 5
   `;
 }
@@ -784,7 +795,9 @@ export function getRevenueTerritoryBarChartTotalQuery(
 	filterSql: string,
 ): string {
 	return `
-    SELECT sum(s.total_revenue_usd) AS total_rev
+    SELECT
+      sum(s.total_revenue_usd) AS total_rev,
+      sum(s.total_quantity) AS total_qty
     FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
     ${joinSql}
     WHERE 1=1
@@ -797,11 +810,13 @@ export function getRevenueTerritoryBarChartTotalQuery(
 export function getRevenueTerritoryBarChartQuery(
 	joinSql: string,
 	filterSql: string,
+	orderBy: 'revenue_usd' | 'quantity',
 ): string {
 	return `
     SELECT
       s.territory_code AS territory,
-      sum(s.total_revenue_usd) AS revenue_usd
+      sum(s.total_revenue_usd) AS revenue_usd,
+      sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
     ${joinSql}
     WHERE 1=1
@@ -809,7 +824,7 @@ export function getRevenueTerritoryBarChartQuery(
       AND s.period <= toDate({to:String})
       ${filterSql}
     GROUP BY territory
-    ORDER BY revenue_usd DESC
+    ORDER BY ${orderBy} DESC, territory ASC
     LIMIT 5
   `;
 }

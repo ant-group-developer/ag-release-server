@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
+import { AnalyticsCacheService } from 'src/modules/analytics/services/analytics-cache.service';
+import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { Repository } from 'typeorm';
 
 import { CountryMessage } from '../constants/country.constant';
@@ -23,6 +25,8 @@ export class CountryService implements OnModuleInit {
 		private readonly countryRepo: Repository<Country>,
 
 		private readonly countryQueryService: CountryQueryService,
+		private readonly bucketR2Service: BucketR2Service,
+		private readonly analyticsCache: AnalyticsCacheService,
 	) {}
 
 	async onModuleInit() {
@@ -111,6 +115,80 @@ export class CountryService implements OnModuleInit {
 
 	getListSimpleCache() {
 		return this.listCountriesCache;
+	}
+
+	async syncFlags(force = false): Promise<{
+		total: number;
+		uploaded: number;
+		skipped: number;
+		failed: Array<{ iso2: string; error: string }>;
+	}> {
+		const countries = await this.countryRepo.find({
+			select: ['id', 'iso2', 'flagImageKey'],
+		});
+		const result = {
+			total: countries.length,
+			uploaded: 0,
+			skipped: 0,
+			failed: [] as Array<{ iso2: string; error: string }>,
+		};
+
+		for (const country of countries) {
+			const iso2 = country.iso2?.trim().toLowerCase();
+			if (!iso2 || !/^[a-z]{2}$/.test(iso2)) {
+				result.skipped += 1;
+				result.failed.push({
+					iso2: country.iso2 || '',
+					error: 'Country ISO-2 code must contain exactly two letters',
+				});
+				continue;
+			}
+			if (!force && country.flagImageKey) {
+				result.skipped += 1;
+				continue;
+			}
+
+			try {
+				const response = await fetch(
+					'https://flagcdn.com/' + iso2 + '.svg',
+					{ signal: AbortSignal.timeout(15_000) },
+				);
+				if (!response.ok) {
+					throw new Error('FlagCDN returned HTTP ' + response.status);
+				}
+				const contentType = response.headers.get('content-type') || '';
+				if (!contentType.includes('image/svg+xml')) {
+					throw new Error(
+						'FlagCDN returned unsupported content type: ' +
+							(contentType || 'unknown'),
+					);
+				}
+				const buffer = Buffer.from(await response.arrayBuffer());
+				if (!buffer.toString('utf8', 0, 512).includes('<svg')) {
+					throw new Error('FlagCDN response is not a valid SVG');
+				}
+
+				const key = 'flags/countries/' + iso2 + '.svg';
+				await this.bucketR2Service.uploadBuffer({
+					key,
+					buffer,
+					contentType: 'image/svg+xml',
+					isPublic: true,
+				});
+				await this.countryRepo.update(country.id, { flagImageKey: key });
+				result.uploaded += 1;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				this.logger.warn('Unable to sync flag for ' + iso2 + ': ' + message);
+				result.failed.push({ iso2, error: message });
+			}
+		}
+
+		if (result.uploaded > 0) {
+			await this.reloadCache();
+			this.analyticsCache.clear();
+		}
+		return result;
 	}
 
 	// update

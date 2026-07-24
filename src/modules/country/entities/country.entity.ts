@@ -32,6 +32,14 @@ export class Country extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
+		length: 255,
+		nullable: true,
+		comment: 'R2 public object key for the country flag SVG',
+	})
+	flagImageKey: string | null;
+
+	@Column({
+		type: 'varchar',
 		length: 10,
 		comment: 'Mã quốc gia dạng số',
 	})

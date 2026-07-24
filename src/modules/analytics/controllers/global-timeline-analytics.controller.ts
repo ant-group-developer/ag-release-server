@@ -5,6 +5,7 @@ import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	TimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import {
@@ -207,7 +208,7 @@ export class TimelineAnalyticsController {
 	@ApiOperation({
 		summary: 'Get top source types by revenue',
 		description:
-			'Returns import sources (ftp, wmg_report, spotify_report, ...) sorted by USD revenue. System-tenant sees all, normal tenant sees only self.',
+			'Returns configured raw import sources sorted by USD revenue. System-tenant sees all, normal tenant sees only self.',
 	})
 	@ApiResponse({
 		status: 201,
@@ -396,7 +397,7 @@ export class TimelineAnalyticsController {
 	})
 	async getRevenueLineChart(
 		@Req() req: Request,
-		@Body() query: ChartQueryDto,
+		@Body() query: RevenueChartQueryDto,
 	): Promise<ResponseSuccess<RevenueLineChartItem[]>> {
 		const data = await this.timelineService.getRevenueLineChart(
 			req.user!.tenantId,
@@ -418,7 +419,7 @@ export class TimelineAnalyticsController {
 	})
 	async getRevenueDspBarChart(
 		@Req() req: Request,
-		@Body() query: ChartQueryDto,
+		@Body() query: RevenueChartQueryDto,
 	): Promise<ResponseSuccess<DspBarChartItem[]>> {
 		const data = await this.timelineService.getRevenueDspBarChart(
 			req.user!.tenantId,
@@ -440,7 +441,7 @@ export class TimelineAnalyticsController {
 	})
 	async getRevenueTerritoryBarChart(
 		@Req() req: Request,
-		@Body() query: ChartQueryDto,
+		@Body() query: RevenueChartQueryDto,
 	): Promise<ResponseSuccess<TerritoryBarChartItem[]>> {
 		const data = await this.timelineService.getRevenueTerritoryBarChart(
 			req.user!.tenantId,

@@ -6,10 +6,10 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
-import { getImportSourceLabel } from '../constants/import-source.constants';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	TimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import {
@@ -35,8 +35,11 @@ import {
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 @Injectable()
 export class TimelineAnalyticsService {
@@ -52,6 +55,7 @@ export class TimelineAnalyticsService {
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -62,8 +66,8 @@ export class TimelineAnalyticsService {
 		return value?.toString() ?? '0';
 	}
 
-	private revenueTopSortColumn(
-		query: TimelineQueryDto,
+	private revenueSortColumn(
+		query: { sortBy?: 'revenue' | 'usage' },
 	): 'revenue_usd' | 'quantity' {
 		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 	}
@@ -144,15 +148,19 @@ export class TimelineAnalyticsService {
 			quantity: string;
 			revenue_usd?: string;
 		}>(sql, params);
-		return rows.map((r) => ({
-			source: r.source,
-			sourceLabel: getImportSourceLabel(r.source),
-			quantity: Number(r.quantity),
-			...(includeRevenue && {
-				revenueUsd: this.revenueNumber(r.revenue_usd),
-				revenueUsdExact: this.revenueExact(r.revenue_usd),
-			}),
-		}));
+		return rows.map((r) => {
+			const source = this.sourceTypeConfigService.resolve(r.source);
+			return {
+				source: r.source,
+				sourceLabel: source.label,
+				imageUrl: source.imageUrl,
+				quantity: Number(r.quantity),
+				...(includeRevenue && {
+					revenueUsd: this.revenueNumber(r.revenue_usd),
+					revenueUsdExact: this.revenueExact(r.revenue_usd),
+				}),
+			};
+		});
 	}
 
 	// ═══════════════════════════════════════════════════════
@@ -421,7 +429,7 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -429,6 +437,7 @@ export class TimelineAnalyticsService {
 			pg_dsp_id: string;
 			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			quantity: string;
 			revenue_usd: string;
 		}>(sql, params);
@@ -437,6 +446,7 @@ export class TimelineAnalyticsService {
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
 			quantity: Number(r.quantity),
@@ -498,6 +508,7 @@ export class TimelineAnalyticsService {
 					pgDspId: null,
 					dspReportId: '',
 					dspName: 'Other',
+					imageUrl: null,
 					revenueUsd: otherRev > 0 ? otherRev : 0,
 					revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 					quantity: otherQty > 0 ? otherQty : 0,
@@ -610,7 +621,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopArtistQuery(
 			filterSql,
 			!!query.keyword,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -870,7 +881,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTrackQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1150,7 +1161,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopLabelQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1350,7 +1361,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopChannelQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1561,7 +1572,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTenantQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1766,7 +1777,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopSourceTypeQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1780,10 +1791,12 @@ export class TimelineAnalyticsService {
 
 		if (rows.length > 0) {
 			rows.forEach((r, index) => {
+				const source = this.sourceTypeConfigService.resolve(r.sourceType);
 				items.push({
 					rank: offset + index + 1,
 					sourceType: r.sourceType,
-					sourceTypeLabel: getImportSourceLabel(r.sourceType),
+					sourceTypeLabel: source.label,
+					imageUrl: source.imageUrl,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
@@ -1827,6 +1840,7 @@ export class TimelineAnalyticsService {
 						rank: items.length + 1,
 						sourceType: 'other',
 						sourceTypeLabel: 'Other',
+						imageUrl: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,
@@ -1989,7 +2003,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseQuery(
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2232,7 +2246,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseVideoQuery(
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2499,12 +2513,18 @@ export class TimelineAnalyticsService {
 			joinExpr,
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			total_views: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: Number(r.total_views),
 		}));
 
@@ -2515,7 +2535,13 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ dspName: 'Other', totalViews: otherViews });
+			items.push({
+				pgDspId: null,
+				dspReportId: '',
+				dspName: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return items;
@@ -2572,6 +2598,7 @@ export class TimelineAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			totalViews: Number(r.total_views),
 		}));
 
@@ -2581,7 +2608,11 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -2589,7 +2620,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('tl:chart-rev-line', tenantId, query);
 		return this.cache.wrap(key, () =>
@@ -2599,7 +2630,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2657,7 +2688,7 @@ export class TimelineAnalyticsService {
 	// ═══════════════════════════════════════════════════════
 	async getRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-dsp-bar',
@@ -2671,7 +2702,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2720,8 +2751,10 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		// Step 2: Get top 5 DSPs by revenue
 		const sql = queries.getRevenueDspBarChartQuery(
@@ -2729,17 +2762,26 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: undefined, // ensure matching expected type
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		// Step 3: Calculate Other
@@ -2751,11 +2793,17 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
+				pgDspId: null,
+				dspReportId: '',
 				dspName: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -2764,7 +2812,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-ter-bar',
@@ -2778,7 +2826,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2795,22 +2843,28 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		const sql = queries.getRevenueTerritoryBarChartQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		const top5TotalExact = this.addRevenueExact(
@@ -2821,11 +2875,15 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -2846,33 +2904,49 @@ export class TimelineAnalyticsService {
 			),
 		);
 
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 
 		const countries = await this.entityManager.query(
 			`
-        SELECT UPPER(iso2) AS iso2, name
+        SELECT UPPER(iso2) AS iso2, name, flag_image_key
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
 		);
-		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [
-				country.iso2,
-				country.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(country: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					country.iso2,
+					{
+						name: country.name,
+						imageUrl: toCountryFlagImageUrl(country.flag_image_key),
+					},
+				],
+			),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				iso2 && iso2 !== 'OTHER'
-					? (countryNameByIso2.get(iso2) ?? item.territory)
+					? (country?.name ?? item.territory)
 					: item.territory
 			) as string;
 			return {
 				...item,
 				territory,
+				imageUrl: iso2 && iso2 !== 'OTHER' ? (country?.imageUrl ?? null) : null,
 			};
 		});
 	}

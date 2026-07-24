@@ -23,4 +23,5 @@ export const CLICKHOUSE_TABLES = {
 	FTP_PARSER_FIELD_MAPPINGS: 'ftp_parser_field_mappings',
 	FTP_PARSER_CATALOG: 'ftp_parser_catalog',
 	METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',
+	ANALYTICS_SOURCE_TYPE_CONFIGS: 'analytics_source_type_configs',
 } as const;
