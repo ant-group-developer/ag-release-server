@@ -1,6 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import {
+	IsArray,
+	IsBoolean,
+	IsEnum,
+	IsOptional,
+	IsUUID,
+} from 'class-validator';
 
 import { QueryGetListReleaseDto2 } from 'src/modules/release/dto/release.dto';
 import { DistributionState } from '../../../domain/distribution/distribution-state.enum';
@@ -8,11 +14,12 @@ import { DistributionState } from '../../../domain/distribution/distribution-sta
 /**
  * ListDistributionDto — query cho GET /distributions (list release-centric).
  *
- * Kế thừa QueryGetListReleaseDto2 (khớp ReleaseService.getList2 / getManyAndCountOptimized)
- * để tái dùng logic list tối ưu. `distributionState` lọc theo milestone v-next.
+ * Kế thừa QueryGetListReleaseDto2 (khớp ReleaseService.getList2 / getManyAndCountOptimized).
+ * `distributionState` lọc theo milestone v-next (post-query filter).
  *
- * Lưu ý: DTO2 KHÔNG khai `isImportedFromReport` (chỉ DTO1 có) nhưng filterByQuery2 vẫn
- * dùng field này → phải tự khai lại ở đây, nếu không whitelist:true strip mất filter.
+ * ⚠ DTO2 có `releaseIds` nhưng `filterByQuery2` bên trong destructure field `ids` (DTO1).
+ * Khai thêm `ids` ở đây để NestJS whitelist giữ lại → runtime destructure hoạt động đúng.
+ * `isImportedFromReport` tương tự (DTO2 không khai, filterByQuery2 đọc).
  */
 export class ListDistributionDto extends QueryGetListReleaseDto2 {
 	@ApiPropertyOptional({
@@ -23,6 +30,18 @@ export class ListDistributionDto extends QueryGetListReleaseDto2 {
 	@IsOptional()
 	@IsEnum(DistributionState)
 	distributionState?: DistributionState;
+
+	@ApiPropertyOptional({
+		description: 'Lọc theo release IDs cụ thể (UUID[]).',
+		type: [String],
+	})
+	@IsOptional()
+	@IsArray()
+	@IsUUID('4', { each: true })
+	@Transform(({ value }) =>
+		Array.isArray(value) ? value : value ? [value] : [],
+	)
+	ids?: string[];
 
 	@ApiPropertyOptional({
 		description: 'Ẩn release nhập từ report (mặc định client gửi false).',

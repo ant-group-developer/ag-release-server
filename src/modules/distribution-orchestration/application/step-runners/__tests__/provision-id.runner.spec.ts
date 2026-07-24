@@ -16,11 +16,16 @@ describe('ProvisionIdRunner', () => {
 	let mockUow: any;
 	let mockRepo: any;
 	let mockProvisioner: any;
+	let mockSnapshotReader: any;
 
 	beforeEach(async () => {
 		mockUow = { run: jest.fn((cb) => cb({})) };
 		mockRepo = { load: jest.fn() };
-		mockProvisioner = { provisionUpc: jest.fn(), provisionIsrcs: jest.fn() };
+		mockProvisioner = {
+			provisionUpc: jest.fn(),
+			provisionIsrcs: jest.fn().mockResolvedValue(new Map()),
+		};
+		mockSnapshotReader = { loadById: jest.fn() };
 
 		const module = await Test.createTestingModule({
 			providers: [
@@ -28,6 +33,7 @@ describe('ProvisionIdRunner', () => {
 				{ provide: UNIT_OF_WORK, useValue: mockUow },
 				{ provide: DISTRIBUTION_REPOSITORY, useValue: mockRepo },
 				{ provide: IDENTIFIER_PROVISIONER, useValue: mockProvisioner },
+				{ provide: 'RELEASE_SNAPSHOT_READER', useValue: mockSnapshotReader },
 			],
 		}).compile();
 

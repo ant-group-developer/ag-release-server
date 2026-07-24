@@ -17,9 +17,12 @@ export interface DomainEvent {
  * Two-tier level (spec §Domain Events):
  *  - 'milestone': tied to a state transition; the timeline shows it prominently to the user.
  *  - 'progress': a self-loop within one state; detail for admin/dev, hidden from the user.
+ *  - 'error': a step/runner failed after exhausting retries; written by StepErrorRecorder
+ *             outside the aggregate (no state transition). The read-side projection (phase 3)
+ *             can surface these to dev dashboards / admin timeline.
  * The read-side projection (phase 3) filters by `level`.
  */
-export type DomainEventLevel = 'milestone' | 'progress';
+export type DomainEventLevel = 'milestone' | 'progress' | 'error';
 
 export interface DomainEventPayload {
 	readonly level: DomainEventLevel;

@@ -18,6 +18,7 @@ import {
 	WorkflowEnginePort,
 } from '../../application/ports/workflow-engine.port';
 import { RetryLimitExceededError } from '../../domain/errors/domain-errors';
+import { StepErrorRecorder } from '../persistence/step-error-recorder';
 import { queueConcurrency } from '../resilience/queue-resilience.config';
 import { REPOLL_DELAY_MS } from './repoll-delay.config';
 import { RunnerDispatchMap } from './runner-dispatch-map';
@@ -71,6 +72,7 @@ export class DistributionWorkerService
 		@Inject(WORKFLOW_ENGINE)
 		private readonly workflowEngine: WorkflowEnginePort,
 		private readonly dispatchMap: RunnerDispatchMap,
+		private readonly errorRecorder: StepErrorRecorder,
 	) {
 		this.connectionOpts = extractConnectionOpts(redis);
 	}
@@ -96,11 +98,32 @@ export class DistributionWorkerService
 				this.logger.error(`Worker ${queue} error:`, err);
 			});
 
-			worker.on('failed', (job, err) => {
+			worker.on('failed', async (job, err) => {
 				this.logger.error(
 					`Job ${job?.id} failed on ${queue}:`,
 					err.message,
 				);
+
+				// Ghi error event vào distribution_event khi hết retry (final failure)
+				const isFinal =
+					!job || job.attemptsMade >= (job.opts?.attempts ?? 1);
+				if (isFinal && job?.data?.distributionId) {
+					await this.errorRecorder
+						.record({
+							distributionId: job.data.distributionId,
+							channelId: job.data.channelId,
+							queue,
+							error: err.message,
+							attemptsMade: job.attemptsMade,
+							jobId: job.id,
+						})
+						.catch((e) =>
+							this.logger.error(
+								'Failed to record step error event',
+								e,
+							),
+						);
+				}
 			});
 
 			this.workers.push(worker);

@@ -95,6 +95,7 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 				uow,
 				repo,
 				provisioner,
+				snapshotReader,
 			),
 			[QUEUES.BUILD_PACKAGE]: new BuildPackageRunner(uow, repo, builder),
 			[QUEUES.SFTP_UPLOAD]: new SftpUploadRunner(

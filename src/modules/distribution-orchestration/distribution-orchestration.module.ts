@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from '../app-config/app-config.module';
-import { AppConfigService } from '../app-config/app-config.service';
 import { BucketModule2 } from '../bucket2/bucket2.module';
 import { Aggregator } from '../distribution/aggregator/entities/aggregator.entity';
 import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing.module';
@@ -12,6 +11,7 @@ import { IsrcModule } from '../external/isrc/isrc.module';
 import { UpcModule } from '../external/upc/upc.module';
 import { NotificationModule } from '../notification/notification.module';
 import { CiModule } from '../partners-api/ci/ci.module';
+import { Release } from '../release/entities/release.entity';
 import { ReleaseModule } from '../release/release.module';
 import { Tenant } from '../tenant/tenant.entity';
 import { TenantModule } from '../tenant/tenant.module';
@@ -62,10 +62,10 @@ import {
 } from './application/step-runners/status-sync.runner';
 import { ValidateRunner } from './application/step-runners/validate.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
-import { DspSpecResolverAdapter } from './infrastructure/adapters/dsp-spec-resolver.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
 import { DdexXmlPackageBuilder } from './infrastructure/adapters/ddex-xml-package-builder.adapter';
+import { DspSpecResolverAdapter } from './infrastructure/adapters/dsp-spec-resolver.adapter';
 import { ExporterAdapter } from './infrastructure/adapters/exporter.adapter';
 import { GrpcIdentifierAdapter } from './infrastructure/adapters/grpc-identifier.adapter';
 import {
@@ -76,7 +76,6 @@ import { ReleaseSnapshotWriterAdapter } from './infrastructure/adapters/release-
 import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
 import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
 import { TenantReaderAdapter } from './infrastructure/adapters/tenant.reader';
-import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
 import { CiApiModule } from './infrastructure/ci-api/ci-api.module';
 import { SystemClock } from './infrastructure/clock/system-clock.adapter';
 import { DistributionCommandController } from './infrastructure/http/distribution-command.controller';
@@ -90,6 +89,7 @@ import { OutboxEventOrmEntity } from './infrastructure/persistence/outbox-event.
 import { ReleaseSnapshotOrmEntity } from './infrastructure/persistence/release-snapshot.orm-entity';
 import { ReviewOrmEntity } from './infrastructure/persistence/review.orm-entity';
 import { TypeOrmReviewRepository } from './infrastructure/persistence/review.repository';
+import { StepErrorRecorder } from './infrastructure/persistence/step-error-recorder';
 import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work.adapter';
 import { OutboxRelay } from './infrastructure/relay/outbox-relay';
 import { DistributionSseService } from './infrastructure/sse/distribution-sse.service';
@@ -144,6 +144,7 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 			ReviewOrmEntity, // Khối B: audit quyết định duyệt
 			Aggregator, // Group E: ExporterAdapter queries State51 aggregator
 			Tenant, // ValidateRunner reads tenant.requiresManualReview (Khối B)
+			Release, // Command controller resolves tenantId from release for system admin
 		]),
 		AppConfigModule, // For CI API config + generator config (UPC/ISRC prefix IDs)
 		CiModule, // Keep v3 services for backward compatibility
@@ -215,6 +216,7 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 		// Khối A: Worker + dispatch
 		DistributionWorkerService,
 		RunnerDispatchMap,
+		StepErrorRecorder,
 	],
 })
 export class DistributionOrchestrationModule {}

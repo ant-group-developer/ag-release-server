@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { QueryGetListReleaseDto } from 'src/modules/release/dto/release.dto';
+import { QueryGetListReleaseDto2 } from 'src/modules/release/dto/release.dto';
 import { ReleaseService } from 'src/modules/release/services/release.service';
 
 /**
@@ -41,11 +41,11 @@ export class DistributionListQueryService {
 	) {}
 
 	async list(
-		query: QueryGetListReleaseDto,
+		query: QueryGetListReleaseDto2,
 		filter?: { distributionState?: string },
 	): Promise<PageDto<DistributionListItem>> {
-		// 1. Trang release (đủ display fields + DSP live/total) — logic v3 tái dùng.
-		const page = await this.releaseService.getList(query);
+		// 1. Trang release (đủ display fields + DSP live/total) — logic v3 tối ưu.
+		const page = await this.releaseService.getList2(query);
 		const releases = page.items as unknown as Array<
 			Record<string, unknown>
 		>;
@@ -117,5 +117,14 @@ export class DistributionListQueryService {
 			});
 		}
 		return map;
+	}
+
+	/**
+	 * Lấy distribution MỚI NHẤT cho 1 releaseId — dùng cho detail page.
+	 * Trả null nếu release chưa từng submit.
+	 */
+	async getByRelease(releaseId: string): Promise<LatestDistributionInfo | null> {
+		const map = await this.loadLatestDistributions([releaseId]);
+		return map.get(releaseId) ?? null;
 	}
 }

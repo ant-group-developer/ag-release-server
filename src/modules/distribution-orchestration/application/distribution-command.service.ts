@@ -12,7 +12,7 @@ import { TicketService } from '../domain/ports/ticket-service.port';
 import { ExecutionTypeEnum } from '../domain/value-objects/execution-type.enum';
 import { IdempotencyKey } from '../domain/value-objects/idempotency-key.vo';
 import { TicketIssueItem } from '../domain/value-objects/ticket-metadata.vo';
-import { TicketReason, TicketRef } from '../domain/value-objects/ticket-ref.vo';
+import { TicketReason } from '../domain/value-objects/ticket-ref.vo';
 import { TICKET_SERVICE } from '../infrastructure/adapters/postgres-ticket.adapter';
 import {
 	ApproveReviewCommand,
@@ -184,8 +184,7 @@ export class DistributionCommandService {
 			reason: TicketReason.REVIEW_REJECT,
 			detail: note?.trim() || 'Review rejected by reviewer',
 			// Ghi flag cấu trúc reviewer tạo → client render chung với lỗi CI/QA.
-			metadata:
-				items && items.length > 0 ? { items } : undefined,
+			metadata: items && items.length > 0 ? { items } : undefined,
 			key: IdempotencyKey.create(`review-reject:${distributionId}`),
 		});
 
@@ -219,9 +218,13 @@ export class DistributionCommandService {
 		ticketId: string;
 		allowedTenantIds?: string[];
 	}): Promise<void> {
-		await this.assertReviewable(input.distributionId, input.allowedTenantIds, {
-			requireInReview: false,
-		});
+		await this.assertReviewable(
+			input.distributionId,
+			input.allowedTenantIds,
+			{
+				requireInReview: false,
+			},
+		);
 
 		const ok = await this.ticketService.resolveScoped({
 			distributionId: input.distributionId,

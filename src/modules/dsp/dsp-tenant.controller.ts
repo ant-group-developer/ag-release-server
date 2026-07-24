@@ -1,10 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Get,
+	Param,
+	Patch,
+	Post,
+	Query,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/common/decorators/req.decorators';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { UserReq } from 'src/common/interface/common.interface';
+import { Repository } from 'typeorm';
 import { SystemAdminOnly } from '../auth/decorators/auth.decorator';
 import { PartialTestConnectionDto } from '../distribution/sftp-configs/type/sftp-config.type';
+import { Release } from '../release/entities/release.entity';
+import { checkIsSystemTenant } from '../user/utils/user-type.util';
 import { AdminToggleDspDto, UpdateTenantDspAgreementDto } from './dto/dsp.dto';
 import { TenantDspAgreementService } from './services/dsp-tenant.service';
 
@@ -13,6 +25,8 @@ import { TenantDspAgreementService } from './services/dsp-tenant.service';
 export class TenantDspAgreementController {
 	constructor(
 		private readonly tenantDspAgreementService: TenantDspAgreementService,
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
 	) {}
 
 	// @SystemAdminOnly()
@@ -56,12 +70,28 @@ export class TenantDspAgreementController {
 	@Get('tenant/dsps')
 	@ApiOperation({
 		summary: 'TENANT: Lấy danh sách DSP đã được cấp quyền',
+		description:
+			'System admin truyền releaseId để lấy DSP theo tenant của release.',
 	})
-	async tenantGetDsps(@User() user: UserReq) {
+	async tenantGetDsps(
+		@User() user: UserReq,
+		@Query('releaseId') releaseId?: string,
+	) {
+		let tenantId = user.tenantId;
+
+		// System admin: resolve tenant từ release thay vì dùng system-tenant
+		if (checkIsSystemTenant(tenantId) && releaseId) {
+			const release = await this.releaseRepo.findOne({
+				where: { id: releaseId },
+				select: ['tenantId'],
+			});
+			if (release?.tenantId) {
+				tenantId = release.tenantId;
+			}
+		}
+
 		return new ResponseSuccess({
-			data: await this.tenantDspAgreementService.tenantGetDsps(
-				user.tenantId,
-			),
+			data: await this.tenantDspAgreementService.tenantGetDsps(tenantId),
 		});
 	}
 

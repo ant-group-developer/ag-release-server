@@ -61,6 +61,22 @@ export class DistributionController {
 	}
 
 	/**
+	 * GET /distributions/by-release/:releaseId — distribution mới nhất của 1 release.
+	 * Detail page dùng endpoint này thay vì gọi list rồi lấy phần tử đầu.
+	 */
+	@Get('by-release/:releaseId')
+	@ApiOperation({
+		summary: 'Lấy distribution mới nhất theo releaseId',
+		description:
+			'Trả distributionId + state + type + updatedAt hoặc null nếu chưa submit.',
+	})
+	@ApiParam({ name: 'releaseId', format: 'uuid' })
+	async getByRelease(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
+		const info = await this.listQuery.getByRelease(releaseId);
+		return AppResponseSuccess.COMMON(info);
+	}
+
+	/**
 	 * GET /distributions/:id/timeline
 	 * Admin: all events. User: milestone only. Cursor pagination.
 	 */

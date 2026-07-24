@@ -6,6 +6,7 @@ import { DspRoutingConfigsModule } from '../distribution/dsp-routing/dsp-routing
 import { SftpConfigsModule } from '../distribution/sftp-configs/sftp-config.module';
 import { DspActionModule } from '../dsp-action/dsp-action.module';
 import { DspAction } from '../dsp-action/entities/dsp-action.entities';
+import { Release } from '../release/entities/release.entity';
 import { TenantDspAgreementController } from './dsp-tenant.controller';
 import { DspController } from './dsp.controller';
 import { TenantDspAgreement } from './entities/dsp-tenant.entity';
@@ -18,7 +19,7 @@ import { DspService } from './services/dsp.service';
 
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([Dsp, DspAction, TenantDspAgreement]),
+		TypeOrmModule.forFeature([Dsp, DspAction, TenantDspAgreement, Release]),
 		BucketModule2,
 		DspActionModule,
 		DspRoutingConfigsModule,

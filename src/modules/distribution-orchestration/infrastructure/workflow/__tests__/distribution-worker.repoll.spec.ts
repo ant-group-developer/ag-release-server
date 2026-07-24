@@ -42,7 +42,13 @@ describe('DistributionWorkerService.processJob routing', () => {
 		} as any;
 		// Redis chỉ dùng cho onModuleInit (không gọi trong test này) → stub tối thiểu.
 		const fakeRedis = { options: {} } as any;
-		return new DistributionWorkerService(fakeRedis, engine, dispatchMap);
+		const errorRecorder = { record: async () => {} } as any;
+		return new DistributionWorkerService(
+			fakeRedis,
+			engine,
+			dispatchMap,
+			errorRecorder,
+		);
 	}
 
 	beforeEach(() => {
@@ -88,7 +94,9 @@ describe('DistributionWorkerService.processJob routing', () => {
 		expect(enqueued).toHaveLength(1);
 		const call = enqueued[0];
 		expect(call.queue).toBe(QUEUES.CI_IMPORT_CHECK); // re-poll SAME queue
-		expect(call.opts?.delayMs).toBe(REPOLL_DELAY_MS(QUEUES.CI_IMPORT_CHECK));
+		expect(call.opts?.delayMs).toBe(
+			REPOLL_DELAY_MS(QUEUES.CI_IMPORT_CHECK),
+		);
 		expect(call.payload.pollAttempt).toBe(1);
 		expect(call.opts?.jobId).toContain('poll-1');
 	});

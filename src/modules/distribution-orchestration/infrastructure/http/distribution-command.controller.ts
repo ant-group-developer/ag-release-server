@@ -1,15 +1,19 @@
 import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
+import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/common/decorators/req.decorators';
 import { UserReq } from 'src/common/interface/common.interface';
 import { RequirePermissions } from 'src/modules/auth/decorators/auth.decorator';
 import { Permission } from 'src/modules/permission/constants/permission.data.constant';
+import { Release } from 'src/modules/release/entities/release.entity';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { UserType } from 'src/modules/user/enum/user.enum';
+import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { Repository } from 'typeorm';
 import { DistributionCommandService } from '../../application/distribution-command.service';
-import { ReviewDecisionDto } from './dto/review-decision.dto';
 import { RetryDistributionDto } from './dto/retry-distribution.dto';
+import { ReviewDecisionDto } from './dto/review-decision.dto';
 import { SubmitDistributionDto } from './dto/submit-distribution.dto';
 
 /**
@@ -25,6 +29,8 @@ export class DistributionCommandController {
 	constructor(
 		private readonly commandService: DistributionCommandService,
 		private readonly tenantService: TenantService,
+		@InjectRepository(Release)
+		private readonly releaseRepo: Repository<Release>,
 	) {}
 
 	/**
@@ -40,11 +46,23 @@ export class DistributionCommandController {
 		@Body() body: SubmitDistributionDto,
 		@User() user: UserReq,
 	): Promise<{ distributionId: string }> {
+		// System admin: resolve tenantId từ release ("system-tenant" không phải UUID hợp lệ)
+		let tenantId = user.tenantId;
+		if (checkIsSystemTenant(tenantId)) {
+			const release = await this.releaseRepo.findOne({
+				where: { id: body.releaseId },
+				select: ['tenantId'],
+			});
+			if (release?.tenantId) {
+				tenantId = release.tenantId;
+			}
+		}
+
 		const distributionId = await this.commandService.submit({
 			releaseId: body.releaseId,
 			type: body.type,
 			dspCodes: body.dspCodes,
-			tenantId: user.tenantId,
+			tenantId,
 			idempotencyKey: body.idempotencyKey,
 		});
 

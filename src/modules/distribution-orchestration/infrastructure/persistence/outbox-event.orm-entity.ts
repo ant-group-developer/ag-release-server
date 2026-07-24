@@ -31,7 +31,7 @@ export class OutboxEventOrmEntity {
 	payload!: object;
 
 	/** Idempotency key = BullMQ jobId. UNIQUE constraint chặn trùng. */
-	@Column({ type: 'varchar', length: 120 })
+	@Column({ type: 'varchar', length: 255 })
 	jobId!: string;
 
 	@Column({ type: 'int', default: 0 })
