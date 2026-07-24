@@ -13,6 +13,7 @@ import {
 	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspBarChartItem,
@@ -26,7 +27,10 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 export type EntityType =
 	| 'release'
@@ -44,6 +48,7 @@ export class EntityAnalyticsService {
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -176,7 +181,7 @@ export class EntityAnalyticsService {
 	private readonly resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 	private readonly dspNameJoin = `
     LEFT JOIN (SELECT id_dsps_report, pg_uuid, dsp_name FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-    LEFT JOIN (SELECT pg_uuid, dsp_name FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+    LEFT JOIN (SELECT pg_uuid, dsp_name, picture FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
   `;
 
 	private async mapTerritoryCodesToCountryNames(
@@ -193,35 +198,51 @@ export class EntityAnalyticsService {
 			),
 		);
 
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 
 		const countries = await this.entityManager.query(
 			`
-        SELECT UPPER(iso2) AS iso2, name
+        SELECT UPPER(iso2) AS iso2, name, flag_image_key
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
 		);
-		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [
-				country.iso2,
-				country.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(country: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					country.iso2,
+					{
+						name: country.name,
+						imageUrl: toCountryFlagImageUrl(country.flag_image_key),
+					},
+				],
+			),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				isOther
 					? item.territory
-					: (countryNameByIso2.get(iso2) ?? item.territory)
+					: (country?.name ?? item.territory)
 			) as string;
 			return {
 				...item,
 				territory,
 				isoCode: isOther ? undefined : iso2,
+				imageUrl: isOther ? null : (country?.imageUrl ?? null),
 			};
 		});
 	}
@@ -436,6 +457,18 @@ export class EntityAnalyticsService {
 			}
 		}
 
+		const sourceMeta =
+			entityType === 'sourceType'
+				? (() => {
+					const source = this.sourceTypeConfigService.resolve(entityId);
+					return {
+						sourceType: source.sourceType,
+						sourceLabel: source.label,
+						imageUrl: source.imageUrl,
+					};
+				})()
+				: null;
+
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
@@ -447,6 +480,7 @@ export class EntityAnalyticsService {
 			),
 			artist: artistMeta,
 			tenant: tenantMeta,
+			source: sourceMeta,
 		};
 	}
 
@@ -507,7 +541,7 @@ export class EntityAnalyticsService {
 	async getRevenueLineChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-line-chart', tenantId, {
@@ -523,7 +557,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueLineChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -615,24 +649,33 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
+        s.dsp_id AS dsp_report_id,
+        r.pg_uuid AS pg_dsp_id,
         ${this.resolvedDspName} AS dsp_name,
+        p.picture AS image_url,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_name
+      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
       ORDER BY total_views DESC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
+			dsp_report_id: string;
+			pg_dsp_id: string | null;
 			dsp_name: string;
+			image_url: string | null;
 			total_views: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((row) => ({
+			pgDspId: row.pg_dsp_id || null,
+			dspReportId: row.dsp_report_id,
 			dspName: row.dsp_name,
+			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
 		}));
 		const top5Total = items.reduce(
@@ -641,7 +684,13 @@ export class EntityAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ dspName: 'Other', totalViews: otherViews });
+			items.push({
+				pgDspId: null,
+				dspReportId: '',
+				dspName: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return items;
@@ -715,6 +764,7 @@ export class EntityAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			totalViews: Number(row.total_views),
 		}));
 		const top5Total = items.reduce(
@@ -723,7 +773,11 @@ export class EntityAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -732,7 +786,7 @@ export class EntityAnalyticsService {
 	async getRevenueDspBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-dsp-bar', tenantId, {
@@ -748,7 +802,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueDspBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -762,9 +816,12 @@ export class EntityAnalyticsService {
 		);
 		params.from = fromDate;
 		params.to = toDate;
+		const orderBy = dto.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 
 		const totalSql = `
-      SELECT sum(s.total_revenue_usd) AS total_rev
+      SELECT
+        sum(s.total_revenue_usd) AS total_rev,
+        sum(s.total_quantity) AS total_qty
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
@@ -772,31 +829,45 @@ export class EntityAnalyticsService {
     `;
 		const totalRows = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
+		const grandTotalQuantity = Number(totalRows[0]?.total_qty ?? 0);
 
 		const sql = `
       SELECT
+        s.dsp_id AS dsp_report_id,
+        r.pg_uuid AS pg_dsp_id,
         ${this.resolvedDspName} AS dsp_name,
-        sum(s.total_revenue_usd) AS revenue_usd
+        p.picture AS image_url,
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_name
-      ORDER BY revenue_usd DESC
+      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
+      ORDER BY ${orderBy} DESC, dsp_report_id ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
+			dsp_report_id: string;
+			pg_dsp_id: string | null;
 			dsp_name: string;
+			image_url: string | null;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((row) => ({
+			pgDspId: row.pg_dsp_id || null,
+			dspReportId: row.dsp_report_id,
 			dspName: row.dsp_name,
+			imageUrl: toDspImageUrl(row.image_url),
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
+			quantity: Number(row.quantity),
 		}));
 		const top5TotalExact = this.addRevenueExact(
 			items.map((item) => item.revenueUsdExact),
@@ -806,11 +877,20 @@ export class EntityAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
+				pgDspId: null,
+				dspReportId: '',
 				dspName: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -820,7 +900,7 @@ export class EntityAnalyticsService {
 	async getRevenueTerritoryBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-ter-bar', tenantId, {
@@ -841,7 +921,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueTerritoryBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -855,9 +935,12 @@ export class EntityAnalyticsService {
 		);
 		params.from = fromDate;
 		params.to = toDate;
+		const orderBy = dto.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 
 		const totalSql = `
-      SELECT sum(s.total_revenue_usd) AS total_rev
+      SELECT
+        sum(s.total_revenue_usd) AS total_rev,
+        sum(s.total_quantity) AS total_qty
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
@@ -865,30 +948,36 @@ export class EntityAnalyticsService {
     `;
 		const totalRows = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
+		const grandTotalQuantity = Number(totalRows[0]?.total_qty ?? 0);
 
 		const sql = `
       SELECT
         s.territory_code AS territory,
-        sum(s.total_revenue_usd) AS revenue_usd
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
       GROUP BY territory
-      ORDER BY revenue_usd DESC
+      ORDER BY ${orderBy} DESC, territory ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
+			quantity: Number(row.quantity),
 		}));
 		const top5TotalExact = this.addRevenueExact(
 			items.map((item) => item.revenueUsdExact),
@@ -898,11 +987,18 @@ export class EntityAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -1610,6 +1706,7 @@ export class EntityAnalyticsService {
 				s.dsp_id AS dsp_id,
 				r.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
+				p.picture AS image_url,
 				s.total_views AS total_views,
 				s.total_usage AS total_usage,
 				s.total_revenue_usd_raw AS total_revenue_usd_raw,
@@ -1626,6 +1723,7 @@ export class EntityAnalyticsService {
 				dsp_id: string;
 				pg_dsp_id: string | null;
 				dsp_name: string;
+				image_url: string | null;
 				total_views: string;
 				total_usage: string;
 				total_revenue_usd: string;
@@ -1678,6 +1776,7 @@ export class EntityAnalyticsService {
 				pgDspId: row.pg_dsp_id || null,
 				dspReportId: row.dsp_id,
 				dspName: row.dsp_name || row.dsp_id,
+				imageUrl: toDspImageUrl(row.image_url),
 				totalViews: Number(row.total_views),
 				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1692,6 +1791,7 @@ export class EntityAnalyticsService {
 					pgDspId: null,
 					dspReportId: 'other',
 					dspName: 'Other',
+					imageUrl: null,
 					totalViews: Math.max(0, otherViews),
 					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
@@ -1709,6 +1809,7 @@ export class EntityAnalyticsService {
 			pgDspId: row.pg_dsp_id || null,
 			dspReportId: row.dsp_id,
 			dspName: row.dsp_name || row.dsp_id,
+			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
 			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1865,17 +1966,29 @@ export class EntityAnalyticsService {
 		const iso2Codes = dataRows
 			.map((r) => r.iso_code?.trim().toUpperCase())
 			.filter(Boolean);
-		let nameMap = new Map<string, string>();
+		let countryMap = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>();
 		if (iso2Codes.length) {
 			const countries = await this.entityManager.query(
-				`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+				`SELECT UPPER(iso2) AS iso2, name, flag_image_key FROM countries WHERE UPPER(iso2) = ANY($1)`,
 				[iso2Codes],
 			);
-			nameMap = new Map(
-				countries.map((c: { iso2: string; name: string }) => [
-					c.iso2,
-					c.name,
-				]),
+			countryMap = new Map(
+				countries.map(
+					(c: {
+						iso2: string;
+						name: string;
+						flag_image_key: string | null;
+					}) => [
+						c.iso2,
+						{
+							name: c.name,
+							imageUrl: toCountryFlagImageUrl(c.flag_image_key),
+						},
+					],
+				),
 			);
 		}
 
@@ -1919,10 +2032,12 @@ export class EntityAnalyticsService {
 
 			const items: EntityTopTerItem[] = dataRows.map((row, i) => {
 				const isoCode = row.iso_code?.trim().toUpperCase() || '';
+				const country = countryMap.get(isoCode);
 				return {
 					rank: i + 1,
 					isoCode,
-					territory: nameMap.get(isoCode) ?? isoCode,
+					territory: country?.name ?? isoCode,
+					imageUrl: country?.imageUrl ?? null,
 					totalViews: Number(row.total_views),
 					totalUsage: Number(row.total_usage),
 					totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1937,6 +2052,7 @@ export class EntityAnalyticsService {
 					rank: items.length + 1,
 					isoCode: '',
 					territory: 'Other',
+					imageUrl: null,
 					totalViews: Math.max(0, otherViews),
 					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
@@ -1951,10 +2067,12 @@ export class EntityAnalyticsService {
 		const rankOffset = useTopN ? 0 : dto.skip;
 		const items: EntityTopTerItem[] = dataRows.map((row, i) => {
 			const isoCode = row.iso_code?.trim().toUpperCase() || '';
+			const country = countryMap.get(isoCode);
 			return {
 				rank: rankOffset + i + 1,
 				isoCode,
-				territory: nameMap.get(isoCode) ?? isoCode,
+				territory: country?.name ?? isoCode,
+				imageUrl: country?.imageUrl ?? null,
 				totalViews: Number(row.total_views),
 				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',

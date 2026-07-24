@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -35,7 +36,7 @@ export class SourceTypeAnalyticsController {
 	@Post('overview')
 	@ApiOperation({
 		summary:
-			'Overview stats for a source type (ftp, wmg_report, spotify_report, ...)',
+			'Overview stats for a configured raw import source type',
 	})
 	async overview(
 		@Param('sourceType') sourceType: string,
@@ -77,7 +78,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a source type' })
 	async revenueLineChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -130,7 +131,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a source type' })
 	async revenueDspBarChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -147,7 +148,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a source type' })
 	async revenueTerritoryBarChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({

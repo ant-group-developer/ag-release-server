@@ -9,6 +9,7 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
 	DspChartQueryDto,
+	DspRevenueChartQueryDto,
 	DspAnalyticsSummaryQueryDto,
 	DspOverviewQueryDto,
 	DspTopQueryDto,
@@ -24,6 +25,8 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 /**
@@ -265,29 +268,45 @@ export class DspAnalyticsService {
 					),
 			),
 		);
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 		const countries = await this.entityManager.query(
-			`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+			`SELECT UPPER(iso2) AS iso2, name, flag_image_key FROM countries WHERE UPPER(iso2) = ANY($1)`,
 			[iso2Codes],
 		);
-		const nameByIso2 = new Map(
-			countries.map((c: { iso2: string; name: string }) => [
-				c.iso2,
-				c.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(c: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					c.iso2,
+					{
+						name: c.name,
+						imageUrl: toCountryFlagImageUrl(c.flag_image_key),
+					},
+				],
+			),
 		);
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				isOther
 					? item.territory
-					: (nameByIso2.get(iso2) ?? item.territory)
+					: (country?.name ?? item.territory)
 			) as string;
 			return {
 				...item,
 				territory,
 				isoCode: isOther ? undefined : iso2,
+				imageUrl: isOther ? null : (country?.imageUrl ?? null),
 			};
 		});
 	}
@@ -303,18 +322,14 @@ export class DspAnalyticsService {
 				select: ['id', 'name', 'code', 'picture', 'isActive', 'type'],
 			});
 			if (dsp) {
-				const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
-				const pictureUrl = dsp.picture
-					? dsp.picture.startsWith('http')
-						? dsp.picture
-						: `${domain}/${dsp.picture}`
-					: null;
+				const pictureUrl = toDspImageUrl(dsp.picture);
 				return {
 					pgDspId: dsp.id,
 					dspReportId: dspReportId ?? null,
 					name: dsp.name,
 					code: dsp.code ?? null,
 					picture: pictureUrl,
+					imageUrl: pictureUrl,
 					isActive: dsp.isActive,
 					type: dsp.type ?? null,
 				};
@@ -326,8 +341,13 @@ export class DspAnalyticsService {
 			const rows = await this.clickHouseService.query<{
 				dsp_name: string;
 				pg_uuid: string;
+				picture: string | null;
 			}>(
-				`SELECT dsp_name, pg_uuid FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report = {dspReportId:String} LIMIT 1`,
+				`SELECT r.dsp_name, r.pg_uuid, p.picture
+				 FROM (SELECT id_dsps_report, dsp_name, pg_uuid FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
+				 LEFT JOIN (SELECT pg_uuid, picture FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+				 WHERE r.id_dsps_report = {dspReportId:String}
+				 LIMIT 1`,
 				{ dspReportId },
 			);
 			if (rows.length) {
@@ -336,7 +356,8 @@ export class DspAnalyticsService {
 					dspReportId,
 					name: rows[0].dsp_name || dspReportId,
 					code: null,
-					picture: null,
+					picture: toDspImageUrl(rows[0].picture),
+					imageUrl: toDspImageUrl(rows[0].picture),
 					isActive: null,
 					type: null,
 				};
@@ -465,7 +486,7 @@ export class DspAnalyticsService {
 	// REVENUE LINE CHART (monthly)
 	// ─────────────────────────────────────────────────────
 	async getRevenueLineChart(
-		dto: DspChartQueryDto,
+		dto: DspRevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('dsp:rev-line-chart', tenantId, dto);
@@ -475,7 +496,7 @@ export class DspAnalyticsService {
 	}
 
 	private async computeRevenueLineChart(
-		dto: DspChartQueryDto,
+		dto: DspRevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -571,6 +592,7 @@ export class DspAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			totalViews: Number(row.total_views),
 		}));
 		const top5Total = items.reduce(
@@ -579,7 +601,11 @@ export class DspAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 		return this.mapTerritoryCodesToCountryNames(items);
 	}
@@ -588,7 +614,7 @@ export class DspAnalyticsService {
 	// REVENUE TERRITORY BAR CHART (top 5 + Other)
 	// ─────────────────────────────────────────────────────
 	async getRevenueTerritoryBarChart(
-		dto: DspChartQueryDto,
+		dto: DspRevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey('dsp:rev-ter-bar', tenantId, dto);
@@ -598,7 +624,7 @@ export class DspAnalyticsService {
 	}
 
 	private async computeRevenueTerritoryBarChart(
-		dto: DspChartQueryDto,
+		dto: DspRevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -612,9 +638,12 @@ export class DspAnalyticsService {
 		);
 		params.from = fromDate;
 		params.to = toDate;
+		const orderBy = dto.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 
 		const totalSql = `
-      SELECT sum(s.total_revenue_usd) AS total_rev
+      SELECT
+        sum(s.total_revenue_usd) AS total_rev,
+        sum(s.total_quantity) AS total_qty
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
@@ -622,30 +651,36 @@ export class DspAnalyticsService {
     `;
 		const totalRows = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
+		const grandTotalQuantity = Number(totalRows[0]?.total_qty ?? 0);
 
 		const sql = `
       SELECT
         s.territory_code AS territory,
-        sum(s.total_revenue_usd) AS revenue_usd
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
       GROUP BY territory
-      ORDER BY revenue_usd DESC
+      ORDER BY ${orderBy} DESC, territory ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
+			quantity: Number(row.quantity),
 		}));
 		const top5TotalExact = this.addRevenueExact(
 			items.map((item) => item.revenueUsdExact),
@@ -655,11 +690,18 @@ export class DspAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -1285,14 +1327,20 @@ export class DspAnalyticsService {
 
 		// Resolve country names
 		const isoCodes = dataRows.map((r) => r.iso_code).filter(Boolean);
-		const nameByIso2 = new Map<string, string>();
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>();
 		if (isoCodes.length > 0) {
 			const nameRows = await this.entityManager.query(
-				`SELECT iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+				`SELECT iso2, name, flag_image_key FROM countries WHERE UPPER(iso2) = ANY($1)`,
 				[isoCodes.map((c) => c.toUpperCase())],
 			);
 			for (const row of nameRows) {
-				nameByIso2.set(row.iso2?.toUpperCase(), row.name);
+				countryByIso2.set(row.iso2?.toUpperCase(), {
+					name: row.name,
+					imageUrl: toCountryFlagImageUrl(row.flag_image_key),
+				});
 			}
 		}
 
@@ -1345,19 +1393,23 @@ export class DspAnalyticsService {
 			);
 			const otherViews = Math.max(0, grandTotalViews - topViews);
 
-			const items: EntityTopTerItem[] = dataRows.map((row, i) => ({
-				rank: i + 1,
-				isoCode: row.iso_code,
-				territory:
-					nameByIso2.get(row.iso_code?.toUpperCase()) ?? row.iso_code,
-				totalViews: Number(row.total_views),
-				totalRevenueUsd: row.total_revenue_usd || '0',
-			}));
+			const items: EntityTopTerItem[] = dataRows.map((row, i) => {
+				const country = countryByIso2.get(row.iso_code?.toUpperCase());
+				return {
+					rank: i + 1,
+					isoCode: row.iso_code,
+					territory: country?.name ?? row.iso_code,
+					imageUrl: country?.imageUrl ?? null,
+					totalViews: Number(row.total_views),
+					totalRevenueUsd: row.total_revenue_usd || '0',
+				};
+			});
 			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
 				items.push({
 					rank: items.length + 1,
 					isoCode: 'other',
 					territory: 'Other',
+					imageUrl: null,
 					totalViews: otherViews,
 					totalRevenueUsd: otherRevExact,
 				});
@@ -1369,14 +1421,17 @@ export class DspAnalyticsService {
 		}
 
 		const rankOffset = useTopN ? 0 : dto.skip;
-		const items: EntityTopTerItem[] = dataRows.map((row, i) => ({
-			rank: rankOffset + i + 1,
+		const items: EntityTopTerItem[] = dataRows.map((row, i) => {
+			const country = countryByIso2.get(row.iso_code?.toUpperCase());
+			return {
+				rank: rankOffset + i + 1,
 			isoCode: row.iso_code,
-			territory:
-				nameByIso2.get(row.iso_code?.toUpperCase()) ?? row.iso_code,
+			territory: country?.name ?? row.iso_code,
+			imageUrl: country?.imageUrl ?? null,
 			totalViews: Number(row.total_views),
 			totalRevenueUsd: row.total_revenue_usd || '0',
-		}));
+		};
+	});
 		return new PageDto({
 			items,
 			metadata: {

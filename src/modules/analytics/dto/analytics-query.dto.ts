@@ -64,7 +64,7 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify). Extensible — pass any raw source value.',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -192,6 +192,18 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
  * DTO cho DSP chart endpoints (line-chart, bar-chart).
  */
 export class DspChartQueryDto extends DspOverviewQueryDto {}
+
+/** DTO dành riêng cho revenue chart của một DSP. */
+export class DspRevenueChartQueryDto extends DspChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
+}
 
 /**
  * DTO cho DSP top-tracks / top-releases endpoints.
@@ -332,12 +344,24 @@ export class ChartQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
 	@IsString()
 	importSource?: string;
+}
+
+/** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
+export class RevenueChartQueryDto extends ChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
 }
 
 export class EntityTimelineQueryDto {
@@ -396,7 +420,7 @@ export class EntityTimelineQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -435,7 +459,7 @@ export class EntityOverviewQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
