@@ -64,7 +64,7 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify). Extensible — pass any raw source value.',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -344,7 +344,7 @@ export class ChartQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -420,7 +420,7 @@ export class EntityTimelineQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -459,7 +459,7 @@ export class EntityOverviewQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()

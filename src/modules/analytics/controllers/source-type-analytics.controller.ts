@@ -36,7 +36,7 @@ export class SourceTypeAnalyticsController {
 	@Post('overview')
 	@ApiOperation({
 		summary:
-			'Overview stats for a source type (ftp, wmg_report, spotify_report, ...)',
+			'Overview stats for a configured raw import source type',
 	})
 	async overview(
 		@Param('sourceType') sourceType: string,

@@ -30,6 +30,7 @@ import {
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 export type EntityType =
 	| 'release'
@@ -47,6 +48,7 @@ export class EntityAnalyticsService {
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -455,6 +457,18 @@ export class EntityAnalyticsService {
 			}
 		}
 
+		const sourceMeta =
+			entityType === 'sourceType'
+				? (() => {
+					const source = this.sourceTypeConfigService.resolve(entityId);
+					return {
+						sourceType: source.sourceType,
+						sourceLabel: source.label,
+						imageUrl: source.imageUrl,
+					};
+				})()
+				: null;
+
 		return {
 			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRows[0]?.total_sales_views ?? 0),
@@ -466,6 +480,7 @@ export class EntityAnalyticsService {
 			),
 			artist: artistMeta,
 			tenant: tenantMeta,
+			source: sourceMeta,
 		};
 	}
 

@@ -6,7 +6,6 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
-import { getImportSourceLabel } from '../constants/import-source.constants';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
@@ -40,6 +39,7 @@ import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 @Injectable()
 export class TimelineAnalyticsService {
@@ -55,6 +55,7 @@ export class TimelineAnalyticsService {
 		@InjectEntityManager()
 		private readonly entityManager: EntityManager,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	private revenueNumber(value?: string | null): number {
@@ -147,15 +148,19 @@ export class TimelineAnalyticsService {
 			quantity: string;
 			revenue_usd?: string;
 		}>(sql, params);
-		return rows.map((r) => ({
-			source: r.source,
-			sourceLabel: getImportSourceLabel(r.source),
-			quantity: Number(r.quantity),
-			...(includeRevenue && {
-				revenueUsd: this.revenueNumber(r.revenue_usd),
-				revenueUsdExact: this.revenueExact(r.revenue_usd),
-			}),
-		}));
+		return rows.map((r) => {
+			const source = this.sourceTypeConfigService.resolve(r.source);
+			return {
+				source: r.source,
+				sourceLabel: source.label,
+				imageUrl: source.imageUrl,
+				quantity: Number(r.quantity),
+				...(includeRevenue && {
+					revenueUsd: this.revenueNumber(r.revenue_usd),
+					revenueUsdExact: this.revenueExact(r.revenue_usd),
+				}),
+			};
+		});
 	}
 
 	// ═══════════════════════════════════════════════════════
@@ -1786,10 +1791,12 @@ export class TimelineAnalyticsService {
 
 		if (rows.length > 0) {
 			rows.forEach((r, index) => {
+				const source = this.sourceTypeConfigService.resolve(r.sourceType);
 				items.push({
 					rank: offset + index + 1,
 					sourceType: r.sourceType,
-					sourceTypeLabel: getImportSourceLabel(r.sourceType),
+					sourceTypeLabel: source.label,
+					imageUrl: source.imageUrl,
 					revenueUsd: this.revenueNumber(r.revenue_usd),
 					revenueUsdExact: this.revenueExact(r.revenue_usd),
 					quantity: Number(r.quantity),
@@ -1833,6 +1840,7 @@ export class TimelineAnalyticsService {
 						rank: items.length + 1,
 						sourceType: 'other',
 						sourceTypeLabel: 'Other',
+						imageUrl: null,
 						revenueUsd: otherRev > 0 ? otherRev : 0,
 						revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 						quantity: otherQty > 0 ? otherQty : 0,

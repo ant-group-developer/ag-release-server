@@ -13,6 +13,7 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
 export interface SourceBreakdownItem {
 	source: string; // raw value: 'ftp', 'wmg_report', 'spotify_report', ...
 	sourceLabel: string; // human-readable: 'Merlin', 'WMG', 'Spotify', ...
+	imageUrl: string | null;
 	quantity: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
@@ -262,6 +263,11 @@ export interface EntityOverviewResponse {
 		title: string;
 		logo: string | null;
 	} | null;
+	source?: {
+		sourceType: string;
+		sourceLabel: string;
+		imageUrl: string | null;
+	} | null;
 }
 
 /** Unified response for the new analytics summary endpoints. */
@@ -373,6 +379,7 @@ export interface SourceTypeRankingItem {
 	rank: number;
 	sourceType: string;
 	sourceTypeLabel: string;
+	imageUrl: string | null;
 	totalViews: number;
 }
 
@@ -380,6 +387,7 @@ export interface RevenueSourceTypeItem {
 	rank: number;
 	sourceType: string;
 	sourceTypeLabel: string;
+	imageUrl: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;

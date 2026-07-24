@@ -249,7 +249,7 @@ export class RankingController {
 	@ApiOperation({
 		summary: 'Get top source types ranking',
 		description:
-			'Returns import sources (ftp, wmg_report, spotify_report, ...) ranked by near real-time daily play counts (Trend views).',
+			'Returns configured raw import sources ranked by near real-time daily play counts (Trend views).',
 	})
 	@ApiResponse({
 		status: 201,

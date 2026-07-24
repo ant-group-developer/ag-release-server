@@ -208,7 +208,7 @@ export class TimelineAnalyticsController {
 	@ApiOperation({
 		summary: 'Get top source types by revenue',
 		description:
-			'Returns import sources (ftp, wmg_report, spotify_report, ...) sorted by USD revenue. System-tenant sees all, normal tenant sees only self.',
+			'Returns configured raw import sources sorted by USD revenue. System-tenant sees all, normal tenant sees only self.',
 	})
 	@ApiResponse({
 		status: 201,

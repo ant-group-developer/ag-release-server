@@ -26,6 +26,7 @@ import { RankingController } from './controllers/global.ranking.controller';
 import { LabelAnalyticsController } from './controllers/label-analytics.controller';
 import { ReleaseAnalyticsController } from './controllers/release-analytics.controller';
 import { SourceTypeAnalyticsController } from './controllers/source-type-analytics.controller';
+import { SourceTypeConfigController } from './controllers/source-type-config.controller';
 import { TenantAnalyticsController } from './controllers/tenant-analytics.controller';
 import { TerAnalyticsController } from './controllers/ter-analytics.controller';
 import { TrackAnalyticsController } from './controllers/track-analytics.controller';
@@ -43,6 +44,7 @@ import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { IsrcResolverService } from './services/isrc-resolver.service';
 import { RankingService } from './services/ranking.service';
 import { TerAnalyticsService } from './services/ter-analytics.service';
+import { SourceTypeConfigService } from './services/source-type-config.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({
@@ -75,6 +77,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 		ChannelAnalyticsController,
 		DspAnalyticsController,
 		SourceTypeAnalyticsController,
+		SourceTypeConfigController,
 		TerAnalyticsController,
 	],
 	providers: [
@@ -91,6 +94,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 		AnalyticsCacheService,
 		DspAnalyticsService,
 		TerAnalyticsService,
+		SourceTypeConfigService,
 	],
 	exports: [IsrcResolverService, AnalyticsCacheService],
 })
