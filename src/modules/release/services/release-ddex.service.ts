@@ -71,14 +71,16 @@ export class ReleaseDdexService {
 		recipient,
 		sender,
 		dspCode,
+		batchId: externalBatchId,
 	}: {
 		release: Release;
 		ernVersion: ErnVersion2;
 		sender: { partyId: string; name: string };
 		recipient: { partyId: string; name: string };
 		dspCode?: string;
+		batchId?: string;
 	}) {
-		const batchId = genBatchId();
+		const batchId = externalBatchId || genBatchId();
 
 		const upc = release.upc ?? 'new_upc';
 		const releaseReference =

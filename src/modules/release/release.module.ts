@@ -95,7 +95,10 @@ import { ReleaseExecutionStepEngine } from './modules/release-executions3/servic
 import { ReleaseExecution3QueryService } from './modules/release-executions3/services/release-execution3.query.service';
 import { ReleaseExecution3Worker } from './modules/release-executions3/services/release-execution3.worker';
 
+import { ReleaseExecutionConfig } from './modules/release-executions3/entites/release-execution-config.entity';
 import { ReleaseExecution3RunPipelineQueue } from './modules/release-executions3/entites/release-execution3.queue.entity';
+import { ReleaseExecutionConfigService } from './modules/release-executions3/services/release-execution-config.service';
+import { ReleaseExecution3CleanupService } from './modules/release-executions3/services/release-execution3-cleanup.service';
 import { ReleaseExecution3WorkerTest } from './modules/release-executions3/services/release-execution3-test.worker';
 
 @Module({
@@ -125,6 +128,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 			ReleaseExecution,
 			ReleaseExecutionDsp,
 			ReleaseExecutionStep,
+			ReleaseExecutionConfig,
 
 			ReleaseExecution3,
 			ReleaseExecutionStep3,
@@ -216,6 +220,8 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3Worker,
 		CiDistributionJob3Service,
 		ReleaseExecution3WorkerTest,
+		ReleaseExecution3CleanupService,
+		ReleaseExecutionConfigService,
 	],
 	exports: [
 		ReleaseDdexService,
@@ -228,6 +234,7 @@ import { ReleaseExecution3WorkerTest } from './modules/release-executions3/servi
 		ReleaseExecution3Service,
 		ReleaseExecution3ResultService,
 		ReleaseDspDeliveryService,
+		ReleaseExecutionConfigService,
 	],
 })
 export class ReleaseModule {}

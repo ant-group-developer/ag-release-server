@@ -160,27 +160,45 @@ export class ReleaseQueryService {
 			relations: [...new Set([...itemsToJoin, ...itemsDetail])],
 		});
 
-		const [dataFromDb] = await Promise.all([qbDetail.getRawAndEntities()]);
+		const dataFromDb = await qbDetail.getRawAndEntities();
 
-		const populatedReleases = this.assigneeVirtualColumn(dataFromDb);
+		const rawReleaseMap = new Map();
+		for (const r of dataFromDb.raw) {
+			if (!rawReleaseMap.has(r.release_id)) {
+				rawReleaseMap.set(r.release_id, r);
+			}
+		}
 
-		// Parse JSON arrays and map them back to entities
-		for (const entity of populatedReleases) {
-			const raw = dataFromDb.raw.find((r) => r.release_id === entity.id);
-			if (raw) {
-				entity.releaseCoverArts = parseJson(raw.releaseCoverArts_json);
-				entity.releaseArtists = parseJson(raw.releaseArtists_json);
+		const releaseMap = new Map();
+		for (const entity of dataFromDb.entities) {
+			releaseMap.set(entity.id, entity);
+			const rawRelease = rawReleaseMap.get(entity.id);
+
+			if (rawRelease) {
+				entity.tracksCount = Number(rawRelease.tracks_count);
+				entity.totalDuration = Number(rawRelease.total_duration);
+				entity.dspsLiveCount = Number(rawRelease.dsps_live_count ?? 0);
+				entity.dspsTotalCount = Number(
+					rawRelease.dsps_total_count ?? 0,
+				);
+				entity.dspsLive = `${entity.dspsLiveCount}/${entity.dspsTotalCount}`;
+
+				entity.releaseCoverArts = parseJson(
+					rawRelease.releaseCoverArts_json,
+				);
+				entity.releaseArtists = parseJson(
+					rawRelease.releaseArtists_json,
+				);
 				entity.releaseContributors = parseJson(
-					raw.releaseContributors_json,
+					rawRelease.releaseContributors_json,
 				);
 				entity.releaseDspDeliveries = parseJson(
-					raw.releaseDspDeliveries_json,
+					rawRelease.releaseDspDeliveries_json,
 				);
 			}
 		}
 
 		// Reorder
-		const releaseMap = new Map(populatedReleases.map((r) => [r.id, r]));
 		const sortedReleases = releaseIds
 			.map((id) => releaseMap.get(id))
 			.filter(Boolean) as Release[];
@@ -234,24 +252,30 @@ export class ReleaseQueryService {
 		if (!fieldOrder) return;
 
 		switch (fieldOrder) {
-			case FieldOrderRelease.DSPS_LIVE:
+			case FieldOrderRelease.DSPS_LIVE as string:
 			case 'dsps_live_count':
-				qbId.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count');
-				break;
-			case FieldOrderRelease.TRACKS_COUNT:
 				qbId.addSelect(
-					this.countTracksSubQuery,
+					(qb) => this.countDspsLiveSubQuery(qb),
+					'dsps_live_count',
+				);
+				break;
+			case FieldOrderRelease.TRACKS_COUNT as string:
+				qbId.addSelect(
+					(qb) => this.countTracksSubQuery(qb),
 					FieldOrderRelease.TRACKS_COUNT,
 				);
 				break;
-			case FieldOrderRelease.TOTAL_DURATION:
+			case FieldOrderRelease.TOTAL_DURATION as string:
 				qbId.addSelect(
-					this.sumDurationSubQuery,
+					(qb) => this.sumDurationSubQuery(qb),
 					FieldOrderRelease.TOTAL_DURATION,
 				);
 				break;
 			case 'dsps_total_count':
-				qbId.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+				qbId.addSelect(
+					(qb) => this.countDspsTotalSubQuery(qb),
+					'dsps_total_count',
+				);
 				break;
 			default:
 				qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
@@ -611,17 +635,6 @@ export class ReleaseQueryService {
 
 		return release;
 	}
-
-	// async findOneFull(id: string): Promise<Release> {
-	// 	const qb = this.findOneFull(id);
-	// 	const release = await qb.getOne();
-
-	// 	if (!release) {
-	// 		throw ReleaseException.NOT_FOUND();
-	// 	}
-
-	// 	return release;
-	// }
 
 	// private
 	private filterByQuery({
@@ -1619,13 +1632,22 @@ export class ReleaseQueryService {
 				'channel.youtubeChannelId',
 				'channel.thumbUrl',
 			])
-			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
 			.addSelect(
-				this.sumDurationSubQuery,
+				(qb) => this.countTracksSubQuery(qb),
+				FieldOrderRelease.TRACKS_COUNT,
+			)
+			.addSelect(
+				(qb) => this.sumDurationSubQuery(qb),
 				FieldOrderRelease.TOTAL_DURATION,
 			)
-			.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count')
-			.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+			.addSelect(
+				(qb) => this.countDspsLiveSubQuery(qb),
+				'dsps_live_count',
+			)
+			.addSelect(
+				(qb) => this.countDspsTotalSubQuery(qb),
+				'dsps_total_count',
+			);
 
 		return { itemsToJoin };
 	}

@@ -17,7 +17,7 @@ import { ReleaseService } from 'src/modules/release/services/release.service';
 import { ReleaseValidateService } from 'src/modules/release/services/release.validate.service';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { VideoService } from 'src/modules/video/video.service';
-import { removeFolder } from 'src/utils/util';
+import { genBatchId, removeFolder } from 'src/utils/util';
 import { EntityManager, IsNull } from 'typeorm';
 import { ReleaseExecutionResultDto } from '../dtos/release-execution3.dto';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
@@ -141,7 +141,9 @@ export class ReleaseExecution3Worker {
 				return this.syncResultToRelease(context);
 
 			default:
-				throw new Error(`Unsupported step type: ${step.type}`);
+				throw new Error(
+					`Unsupported step type: ${step.type as string}`,
+				);
 		}
 	}
 
@@ -854,6 +856,23 @@ export class ReleaseExecution3Worker {
 				generatedIsrcs,
 			});
 
+			const preBatchId = genBatchId();
+			const baseDir =
+				process.env.RELEASE_PARSED_DIR ||
+				path.resolve('release_parsed');
+			const preOutputDir = path.join(baseDir, preBatchId);
+
+			step.metadata = {
+				...step.metadata,
+				output: {
+					...step.metadata?.output,
+					batchId: preBatchId,
+					outputDir: preOutputDir,
+				},
+			};
+
+			await this.manager.save(ReleaseExecutionStep3, step);
+
 			const { outputDir, batchId, releaseReference, xml } =
 				await this.releaseDdexService.createMetadataOnServer({
 					release: releaseForMetadata,
@@ -861,6 +880,7 @@ export class ReleaseExecution3Worker {
 					sender: config.sender,
 					recipient: config.recipient,
 					dspCode,
+					batchId: preBatchId,
 				});
 
 			step.metadata = {
@@ -871,6 +891,7 @@ export class ReleaseExecution3Worker {
 					dspCode,
 				},
 				output: {
+					...step.metadata?.output,
 					outputDir,
 					batchId,
 					releaseReference,

@@ -6,6 +6,10 @@ import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 import { DspReportService } from '../dsp-report/services/dsp-report.service';
+import {
+	EXECUTION_CONFIG_EVENT,
+	ReleaseExecutionConfigService,
+} from '../release/modules/release-executions3/services/release-execution-config.service';
 import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
 
 @Injectable()
@@ -19,6 +23,7 @@ export class ScheduleService implements OnApplicationBootstrap {
 
 		private readonly releaseExecution3CronJobService: ReleaseExecution3CronJobService,
 		private readonly dspReportService: DspReportService,
+		private readonly releaseExecutionConfigService: ReleaseExecutionConfigService,
 	) {}
 
 	onApplicationBootstrap() {
@@ -49,9 +54,16 @@ export class ScheduleService implements OnApplicationBootstrap {
 		this.reloadConfig();
 	}
 
+	@OnEvent(EXECUTION_CONFIG_EVENT)
+	handleExecutionConfigUpdated() {
+		// Nhận event từ FE gửi xuống -> Cài lại cron mới
+		this.addJobCleanupStuckSteps();
+	}
+
 	private reloadConfig() {
 		this.addJobBackup();
 		this.addJobCiDailySend();
+		this.addJobCleanupStuckSteps();
 	}
 
 	private addJobBackup() {
@@ -118,6 +130,38 @@ export class ScheduleService implements OnApplicationBootstrap {
 		if (jobs.has(jobName)) {
 			this.schedulerRegistry.deleteCronJob(jobName);
 			this.logger.log(`Deleted existing cron job: ${jobName}`);
+		}
+	}
+
+	private addJobCleanupStuckSteps() {
+		const jobName = 'cleanup-stuck-steps-v3';
+		this.deleteIfExists({ jobName });
+		try {
+			const config =
+				this.releaseExecutionConfigService.getCleanupConfig();
+
+			const cronValue = config?.cleanupCronValue || '0 * * * *';
+			const job = new CronJob(cronValue, () => {
+				this.releaseExecution3CronJobService
+					.cleanupStuckSteps()
+					.catch((err) => {
+						this.logger.error(
+							`[CRON] Cleanup stuck steps failed: ${err.message}`,
+						);
+					});
+			});
+
+			this.schedulerRegistry.addCronJob(jobName, job);
+
+			job.start();
+
+			this.logger.log(
+				`Added cron job: ${jobName} with expression: ${cronValue}`,
+			);
+		} catch (err) {
+			this.logger.error(
+				`Failed to create cron job [${jobName}]: ${(err as Error).message}`,
+			);
 		}
 	}
 

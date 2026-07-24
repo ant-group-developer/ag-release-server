@@ -1,25 +1,32 @@
 // controllers/release-execution3.controller.ts
 
 import {
+	Body,
 	Controller,
 	Get,
 	Param,
+	ParseArrayPipe,
 	ParseUUIDPipe,
 	Post,
 	Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 
 import { AppResponseSuccess } from 'src/app.const';
-import { QueryGetListReleaseExecution3Dto } from '../dtos/release-execution3.dto';
+import {
+	QueryGetListReleaseExecution3Dto,
+	StepCleanupConfigItem,
+	UpdateCleanupConfigDto,
+} from '../dtos/release-execution3.dto';
+import { ReleaseExecutionConfigService } from '../services/release-execution-config.service';
 import { ReleaseExecution3Service } from '../services/release-execution3.service';
 
 @ApiTags('Release Executions 3')
 @Controller('release-executions3')
-// @Controller('release-submits')
 export class ReleaseExecution3Controller {
 	constructor(
+		private readonly releaseExecutionConfigService: ReleaseExecutionConfigService,
 		private readonly releaseExecution3Service: ReleaseExecution3Service,
 	) {}
 
@@ -40,6 +47,41 @@ export class ReleaseExecution3Controller {
 	@ApiOperation({ summary: 'Get release execution list' })
 	async getList(@Query() query: QueryGetListReleaseExecution3Dto) {
 		const result = await this.releaseExecution3Service.getList(query);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('cancel-old-executions')
+	@ApiOperation({
+		summary: 'Cancel executions older than a specified time (e.g., 3d)',
+	})
+	@ApiBody({ type: [StepCleanupConfigItem] })
+	async cancelOldExecutions(
+		@Body(new ParseArrayPipe({ items: StepCleanupConfigItem }))
+		manualStepConfigs: StepCleanupConfigItem[],
+	) {
+		const result =
+			await this.releaseExecution3Service.cancelOldExecutions(
+				manualStepConfigs,
+			);
+
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Get('get-cleanup-config')
+	@ApiOperation({ summary: 'Get configuration for stuck steps cleanup' })
+	getCleanupConfig() {
+		const config = this.releaseExecutionConfigService.getCleanupConfig();
+		return new ResponseSuccess({ data: config });
+	}
+
+	@Post('set-cleanup-config')
+	@ApiOperation({ summary: 'Update configuration for stuck steps cleanup' })
+	async updateCleanupConfig(@Body() body: UpdateCleanupConfigDto) {
+		const result = await this.releaseExecutionConfigService.updateConfig(
+			body.cleanupCronValue,
+			body.stepConfigs,
+		);
 
 		return new ResponseSuccess({ data: result });
 	}

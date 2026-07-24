@@ -12,10 +12,11 @@ import {
 	ReleaseReviewStatus,
 } from 'src/modules/release/modules/release-reviews/entities/release-review.entity';
 import { ReleaseService } from 'src/modules/release/services/release.service';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, LessThan, Repository } from 'typeorm';
 import {
 	QueryGetListReleaseExecution3Dto,
 	ReleaseExecutionPageDto,
+	StepCleanupConfigItem,
 } from '../dtos/release-execution3.dto';
 import { CiDistributionJob3 } from '../entites/ci-distribution-job3.entity';
 import { ReleaseExecutionStep3 } from '../entites/release-execution3-step.entity';
@@ -28,6 +29,7 @@ import {
 	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3Queue } from './queue/release-execution3.queue';
+import { ReleaseExecutionConfigService } from './release-execution-config.service';
 import { ReleaseExecution3ResultService } from './release-execution3-result.service';
 import { ReleaseExecution3Builder } from './release-execution3.builder';
 import { ReleaseExecutionStepEngine } from './release-execution3.engine';
@@ -58,6 +60,7 @@ export class ReleaseExecution3Service {
 		private readonly engine: ReleaseExecutionStepEngine,
 		private readonly queryService: ReleaseExecution3QueryService,
 		private readonly releaseExecution3ResultService: ReleaseExecution3ResultService,
+		private readonly releaseExecutionConfigService: ReleaseExecutionConfigService,
 	) {}
 
 	// đẩy vào queue, consumer tự quét và xử lí
@@ -116,6 +119,102 @@ export class ReleaseExecution3Service {
 
 		// enqueue pipeline execution vì nó nặng
 		await this.queueService.queueRunPipeline(id);
+	}
+
+	async cleanupStuckSteps() {
+		const config = this.releaseExecutionConfigService.getCleanupConfig();
+		const stepConfigs = config?.stepConfigs || [];
+		if (!stepConfigs.length) return;
+
+		const totalStuckSteps: ReleaseExecutionStep3[] = [];
+
+		for (const stepConfig of stepConfigs) {
+			const timeoutThreshold = new Date();
+			timeoutThreshold.setMinutes(
+				timeoutThreshold.getMinutes() - stepConfig.timeoutMinutes,
+			);
+
+			const stuckSteps = await this.stepRepo.find({
+				where: {
+					status: ReleaseExecutionStepStatus.PROCESSING,
+					type: stepConfig.stepType,
+					updatedAt: LessThan(timeoutThreshold),
+				},
+			});
+
+			totalStuckSteps.push(...stuckSteps);
+		}
+
+		if (!totalStuckSteps.length) return;
+
+		// Lấy danh sách ID của các Execution chứa các step này (loại bỏ trùng lặp)
+		const executionIdsToCancel = [
+			...new Set(totalStuckSteps.map((s) => s.releaseExecutionId)),
+		];
+
+		// 1. Dọn dẹp và đánh CANCELLED từng step
+		for (const step of totalStuckSteps) {
+			await this.engine.cancelStep(step);
+		}
+
+		// 2. Cập nhật trạng thái CANCELLED cho các Execution cha
+		await this.executionRepo.update(
+			{ id: In(executionIdsToCancel) },
+			{ status: ReleaseExecutionStatus.CANCELLED },
+		);
+	}
+
+	async cancelOldExecutions(manualStepConfigs: StepCleanupConfigItem[]) {
+		if (!manualStepConfigs || !manualStepConfigs.length) {
+			return {
+				message: 'Không có cấu hình dọn dẹp nào được cung cấp.',
+			};
+		}
+
+		const totalStuckSteps: ReleaseExecutionStep3[] = [];
+
+		for (const stepConfig of manualStepConfigs) {
+			const timeoutThreshold = new Date();
+			timeoutThreshold.setMinutes(
+				timeoutThreshold.getMinutes() - stepConfig.timeoutMinutes,
+			);
+
+			const stuckSteps = await this.stepRepo.find({
+				where: {
+					status: ReleaseExecutionStepStatus.PROCESSING,
+					type: stepConfig.stepType,
+					updatedAt: LessThan(timeoutThreshold),
+				},
+			});
+
+			totalStuckSteps.push(...stuckSteps);
+		}
+
+		if (totalStuckSteps.length === 0) {
+			return {
+				message: 'Không có step cũ nào đang chạy để hủy.',
+			};
+		}
+
+		// Lấy danh sách ID của các Execution chứa các step này (loại bỏ trùng lặp)
+		const executionIdsToCancel = [
+			...new Set(totalStuckSteps.map((s) => s.releaseExecutionId)),
+		];
+
+		// 1. Dọn dẹp và đánh CANCELLED từng step
+		for (const step of totalStuckSteps) {
+			await this.engine.cancelStep(step);
+		}
+
+		// 2. Cập nhật trạng thái CANCELLED cho các Execution cha
+		await this.executionRepo.update(
+			{ id: In(executionIdsToCancel) },
+			{ status: ReleaseExecutionStatus.CANCELLED },
+		);
+
+		return {
+			message: `Đã hủy thành công ${totalStuckSteps.length} steps và ${executionIdsToCancel.length} executions.`,
+		};
 	}
 
 	async runPipeline(id: string): Promise<void> {

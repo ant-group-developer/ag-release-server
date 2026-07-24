@@ -37,14 +37,18 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 	}
 }
 
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
+	IsInt,
+	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
+	Min,
 	ValidateNested,
 } from 'class-validator';
 import { BaseQueryDto2 } from 'src/common/dtos/common.base-query.dto';
@@ -95,6 +99,36 @@ export class QueryReleaseExecutionStepDto {
 	})
 	@IsBoolean()
 	exclude?: boolean;
+}
+
+export class StepCleanupConfigItem {
+	@ApiProperty({ enum: ReleaseExecutionStepType })
+	@IsEnum(ReleaseExecutionStepType)
+	stepType: ReleaseExecutionStepType;
+
+	@ApiProperty({
+		example: 4320,
+		description: 'Số phút tối đa trước khi bị hủy (VD: 4320 = 3 ngày)',
+	})
+	@IsInt()
+	@Min(1)
+	timeoutMinutes: number;
+}
+
+export class UpdateCleanupConfigDto {
+	@ApiProperty({
+		example: '0 * * * *',
+		description: 'Lịch chạy CronJob (VD: chạy mỗi đầu giờ)',
+	})
+	@IsString()
+	@IsNotEmpty()
+	cleanupCronValue: string;
+
+	@ApiProperty({ type: [StepCleanupConfigItem] })
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => StepCleanupConfigItem)
+	stepConfigs: StepCleanupConfigItem[];
 }
 
 export class QueryGetListReleaseExecution3Dto extends BaseQueryDto2 {

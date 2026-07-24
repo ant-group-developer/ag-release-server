@@ -10,13 +10,10 @@ import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
-	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3ResultService } from './release-execution3-result.service';
 
-// organize-imports-ignore
-import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
-// organize-imports-ignore
+import { ReleaseExecution3CleanupService } from './release-execution3-cleanup.service';
 import { ReleaseExecution3Worker } from './release-execution3.worker';
 
 @Injectable()
@@ -28,6 +25,7 @@ export class ReleaseExecutionStepEngine {
 		@InjectRepository(ReleaseExecution3)
 		private readonly executionRepo: Repository<ReleaseExecution3>,
 
+		private readonly cleanupService: ReleaseExecution3CleanupService,
 		private readonly releaseExecution3Worker: ReleaseExecution3Worker,
 		// private readonly releaseExecution3Worker: ReleaseExecution3WorkerTest,
 		private readonly releaseExecution3ResultService: ReleaseExecution3ResultService,
@@ -143,8 +141,30 @@ export class ReleaseExecutionStepEngine {
 		}
 
 		throw new Error(
-			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
+			`Unknown childExecutionMode: ${STEP.childExecutionMode as string}`,
 		);
+	}
+
+	async cancelStep(step: ReleaseExecutionStep3) {
+		try {
+			await this.cleanupService.cleanupStepTask({ step });
+
+			// Đánh fail step
+			await this.updateStepStatus(
+				step,
+				ReleaseExecutionStepStatus.CANCELLED,
+			);
+		} catch (error) {
+			this.logService.error({
+				message: `[CLEANUP_STEP] Failed to cleanup step ${step.id}: ${(error as Error).message}`,
+				releaseExecutionId: step.releaseExecutionId,
+				releaseExecutionStepId: step.id,
+			});
+			await this.updateStepStatus(
+				step,
+				ReleaseExecutionStepStatus.CANCELLED,
+			);
+		}
 	}
 
 	private async isExecutionCancelled(executionId: string): Promise<boolean> {

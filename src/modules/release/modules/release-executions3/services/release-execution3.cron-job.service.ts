@@ -30,4 +30,8 @@ export class ReleaseExecution3CronJobService {
 	async consumeRunPipelineQueue() {
 		await this.releaseExecution3Consumer.consumeRunPipelineQueue();
 	}
+
+	async cleanupStuckSteps() {
+		await this.releaseExecution3Service.cleanupStuckSteps();
+	}
 }
