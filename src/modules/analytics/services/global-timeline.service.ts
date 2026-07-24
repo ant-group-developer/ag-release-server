@@ -35,6 +35,7 @@ import {
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -429,6 +430,7 @@ export class TimelineAnalyticsService {
 			pg_dsp_id: string;
 			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			quantity: string;
 			revenue_usd: string;
 		}>(sql, params);
@@ -437,6 +439,7 @@ export class TimelineAnalyticsService {
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
 			quantity: Number(r.quantity),
@@ -498,6 +501,7 @@ export class TimelineAnalyticsService {
 					pgDspId: null,
 					dspReportId: '',
 					dspName: 'Other',
+					imageUrl: null,
 					revenueUsd: otherRev > 0 ? otherRev : 0,
 					revenueUsdExact: otherRev > 0 ? otherRevExact : '0',
 					quantity: otherQty > 0 ? otherQty : 0,
@@ -2499,12 +2503,18 @@ export class TimelineAnalyticsService {
 			joinExpr,
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			total_views: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: Number(r.total_views),
 		}));
 
@@ -2515,7 +2525,13 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ dspName: 'Other', totalViews: otherViews });
+			items.push({
+				pgDspId: null,
+				dspReportId: '',
+				dspName: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return items;
@@ -2731,12 +2747,18 @@ export class TimelineAnalyticsService {
 			resolvedDspName,
 		);
 		const rows = await this.clickHouseService.query<{
+			pg_dsp_id: string | null;
+			dsp_report_id: string;
 			dsp_name: string;
+			image_url: string | null;
 			revenue_usd: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
+			pgDspId: r.pg_dsp_id || null,
+			dspReportId: r.dsp_report_id,
 			dspName: r.dsp_name,
+			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: undefined, // ensure matching expected type
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
@@ -2753,7 +2775,10 @@ export class TimelineAnalyticsService {
 		const otherRev = this.revenueNumber(otherRevExact);
 		if (otherRev > 0) {
 			items.push({
+				pgDspId: null,
+				dspReportId: '',
 				dspName: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
 			});

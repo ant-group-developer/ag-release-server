@@ -26,6 +26,7 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 export type EntityType =
@@ -176,7 +177,7 @@ export class EntityAnalyticsService {
 	private readonly resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
 	private readonly dspNameJoin = `
     LEFT JOIN (SELECT id_dsps_report, pg_uuid, dsp_name FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
-    LEFT JOIN (SELECT pg_uuid, dsp_name FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
+    LEFT JOIN (SELECT pg_uuid, dsp_name, picture FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
   `;
 
 	private async mapTerritoryCodesToCountryNames(
@@ -615,24 +616,33 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
+        s.dsp_id AS dsp_report_id,
+        r.pg_uuid AS pg_dsp_id,
         ${this.resolvedDspName} AS dsp_name,
+        p.picture AS image_url,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_name
+      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
       ORDER BY total_views DESC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
+			dsp_report_id: string;
+			pg_dsp_id: string | null;
 			dsp_name: string;
+			image_url: string | null;
 			total_views: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((row) => ({
+			pgDspId: row.pg_dsp_id || null,
+			dspReportId: row.dsp_report_id,
 			dspName: row.dsp_name,
+			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
 		}));
 		const top5Total = items.reduce(
@@ -641,7 +651,13 @@ export class EntityAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ dspName: 'Other', totalViews: otherViews });
+			items.push({
+				pgDspId: null,
+				dspReportId: '',
+				dspName: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return items;
@@ -777,24 +793,33 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
+        s.dsp_id AS dsp_report_id,
+        r.pg_uuid AS pg_dsp_id,
         ${this.resolvedDspName} AS dsp_name,
+        p.picture AS image_url,
         sum(s.total_revenue_usd) AS revenue_usd
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_name
+      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
       ORDER BY revenue_usd DESC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
+			dsp_report_id: string;
+			pg_dsp_id: string | null;
 			dsp_name: string;
+			image_url: string | null;
 			revenue_usd: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((row) => ({
+			pgDspId: row.pg_dsp_id || null,
+			dspReportId: row.dsp_report_id,
 			dspName: row.dsp_name,
+			imageUrl: toDspImageUrl(row.image_url),
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
 		}));
@@ -808,7 +833,10 @@ export class EntityAnalyticsService {
 		const otherRev = this.revenueNumber(otherRevExact);
 		if (otherRev > 0) {
 			items.push({
+				pgDspId: null,
+				dspReportId: '',
 				dspName: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
 			});
@@ -1610,6 +1638,7 @@ export class EntityAnalyticsService {
 				s.dsp_id AS dsp_id,
 				r.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
+				p.picture AS image_url,
 				s.total_views AS total_views,
 				s.total_usage AS total_usage,
 				s.total_revenue_usd_raw AS total_revenue_usd_raw,
@@ -1626,6 +1655,7 @@ export class EntityAnalyticsService {
 				dsp_id: string;
 				pg_dsp_id: string | null;
 				dsp_name: string;
+				image_url: string | null;
 				total_views: string;
 				total_usage: string;
 				total_revenue_usd: string;
@@ -1678,6 +1708,7 @@ export class EntityAnalyticsService {
 				pgDspId: row.pg_dsp_id || null,
 				dspReportId: row.dsp_id,
 				dspName: row.dsp_name || row.dsp_id,
+				imageUrl: toDspImageUrl(row.image_url),
 				totalViews: Number(row.total_views),
 				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1692,6 +1723,7 @@ export class EntityAnalyticsService {
 					pgDspId: null,
 					dspReportId: 'other',
 					dspName: 'Other',
+					imageUrl: null,
 					totalViews: Math.max(0, otherViews),
 					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
@@ -1709,6 +1741,7 @@ export class EntityAnalyticsService {
 			pgDspId: row.pg_dsp_id || null,
 			dspReportId: row.dsp_id,
 			dspName: row.dsp_name || row.dsp_id,
+			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
 			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',

@@ -24,6 +24,7 @@ import {
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 /**
@@ -303,18 +304,14 @@ export class DspAnalyticsService {
 				select: ['id', 'name', 'code', 'picture', 'isActive', 'type'],
 			});
 			if (dsp) {
-				const domain = process.env.R2_PUBLIC_BASE_URL || 'default.com';
-				const pictureUrl = dsp.picture
-					? dsp.picture.startsWith('http')
-						? dsp.picture
-						: `${domain}/${dsp.picture}`
-					: null;
+				const pictureUrl = toDspImageUrl(dsp.picture);
 				return {
 					pgDspId: dsp.id,
 					dspReportId: dspReportId ?? null,
 					name: dsp.name,
 					code: dsp.code ?? null,
 					picture: pictureUrl,
+					imageUrl: pictureUrl,
 					isActive: dsp.isActive,
 					type: dsp.type ?? null,
 				};
@@ -326,8 +323,13 @@ export class DspAnalyticsService {
 			const rows = await this.clickHouseService.query<{
 				dsp_name: string;
 				pg_uuid: string;
+				picture: string | null;
 			}>(
-				`SELECT dsp_name, pg_uuid FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL WHERE id_dsps_report = {dspReportId:String} LIMIT 1`,
+				`SELECT r.dsp_name, r.pg_uuid, p.picture
+				 FROM (SELECT id_dsps_report, dsp_name, pg_uuid FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL) r
+				 LEFT JOIN (SELECT pg_uuid, picture FROM music_analytics.${CLICKHOUSE_TABLES.PG_DSPS_SYNC} FINAL) p ON r.pg_uuid = p.pg_uuid
+				 WHERE r.id_dsps_report = {dspReportId:String}
+				 LIMIT 1`,
 				{ dspReportId },
 			);
 			if (rows.length) {
@@ -336,7 +338,8 @@ export class DspAnalyticsService {
 					dspReportId,
 					name: rows[0].dsp_name || dspReportId,
 					code: null,
-					picture: null,
+					picture: toDspImageUrl(rows[0].picture),
+					imageUrl: toDspImageUrl(rows[0].picture),
 					isActive: null,
 					type: null,
 				};

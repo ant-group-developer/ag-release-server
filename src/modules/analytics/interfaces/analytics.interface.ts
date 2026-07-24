@@ -73,6 +73,7 @@ export interface RevenueDspItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	revenueUsd: number;
 	revenueUsdExact?: string;
 	quantity: number;
@@ -363,6 +364,7 @@ export interface DspRankingItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	totalViews: number;
 	bySource?: SourceBreakdownItem[];
 }
@@ -435,6 +437,9 @@ export interface TrendViewLineChartItem {
 /** Một cột trong bar-chart DSP (top 5 + Other) */
 export interface DspBarChartItem {
 	dspName: string;
+	pgDspId?: string | null;
+	dspReportId?: string;
+	imageUrl: string | null;
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
@@ -454,6 +459,7 @@ export interface EntityTopDspItem {
 	pgDspId: string | null;
 	dspReportId: string;
 	dspName: string;
+	imageUrl: string | null;
 	totalViews: number;
 	totalUsage?: number;
 	totalRevenueUsd: string;
@@ -482,6 +488,7 @@ export interface DspMeta {
 	name: string;
 	code: string | null;
 	picture: string | null;
+	imageUrl: string | null;
 	isActive: boolean | null;
 	type: string | null;
 }

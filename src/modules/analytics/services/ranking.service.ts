@@ -21,6 +21,7 @@ import {
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -1451,6 +1452,7 @@ export class RankingService {
         s.dsp_id AS dspReportId,
         r.pg_uuid AS pgDspId,
         ${resolvedDspName} AS dspName,
+        any(p.picture) AS imageUrl,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
@@ -1467,6 +1469,7 @@ export class RankingService {
 			dspReportId: string;
 			pgDspId: string;
 			dspName: string;
+			imageUrl: string | null;
 			totalViews: string;
 		}>(dataSql, params);
 
@@ -1475,6 +1478,7 @@ export class RankingService {
 			pgDspId: r.pgDspId || null,
 			dspReportId: r.dspReportId,
 			dspName: r.dspName,
+			imageUrl: toDspImageUrl(r.imageUrl),
 			totalViews: Number(r.totalViews),
 		}));
 
