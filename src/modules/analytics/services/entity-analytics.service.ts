@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { Artist } from 'src/modules/artist/entities/artist.entity';
@@ -10,21 +10,19 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
 	ChartQueryDto,
+	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspBarChartItem,
-	DspTimelinePeriod,
-	DspTimelineResponse,
 	DspTopReleaseItem,
 	DspTopTrackItem,
+	AnalyticsSummaryResponse,
 	EntityOverviewResponse,
 	EntityTopDspItem,
 	EntityTopTerItem,
 	RevenueLineChartItem,
-	RevenueTimelineResponse,
 	TerritoryBarChartItem,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
@@ -54,6 +52,12 @@ export class EntityAnalyticsService {
 
 	private revenueExact(value?: string | null): string {
 		return value?.toString() ?? '0';
+	}
+
+	private validateSummaryDateRange(dto: AnalyticsSummaryQueryDto): void {
+		if (dto.fromDate > dto.toDate) {
+			throw new BadRequestException('fromDate must be before or equal to toDate');
+		}
 	}
 
 	private addRevenueExact(values: Array<string | null | undefined>): string {
@@ -243,6 +247,95 @@ export class EntityAnalyticsService {
 		);
 	}
 
+	async getSummary(
+		entityType: EntityType,
+		entityId: string,
+		dto: AnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		this.validateSummaryDateRange(dto);
+		if (
+			entityType === 'sourceType' &&
+			dto.importSource &&
+			dto.importSource !== entityId
+		) {
+			throw new BadRequestException(
+				'importSource must match sourceType path parameter',
+			);
+		}
+
+		const key = this.cache.buildKey('ent:summary', tenantId, {
+			entityType,
+			entityId,
+			...dto,
+		});
+		return this.cache.wrap(key, () =>
+			this.computeSummary(entityType, entityId, dto, tenantId),
+		);
+	}
+
+	private async computeSummary(
+		entityType: EntityType,
+		entityId: string,
+		dto: AnalyticsSummaryQueryDto,
+		tenantId: string,
+	): Promise<AnalyticsSummaryResponse> {
+		const { joinSql, filterSql, params } = this.buildEntityFilters(
+			tenantId,
+			entityType,
+			entityId,
+			dto.releaseType,
+			dto.importSource,
+		);
+		const salesParams = {
+			...params,
+			from: normalizeDateToFirstOfMonth(dto.fromDate),
+			to: normalizeDateToFirstOfMonth(dto.toDate),
+		};
+		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
+
+		const trendSql = `
+      SELECT sum(s.total_quantity) AS total_trend_views
+      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+      ${joinSql}
+      WHERE s.reporting_date >= toDate({from:String})
+        AND s.reporting_date <= toDate({to:String})
+        ${filterSql}
+    `;
+		const salesSql = `
+      SELECT
+        sum(s.total_quantity) AS total_usage,
+        sum(s.total_revenue_usd) AS total_revenue_usd
+      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+      ${joinSql}
+      WHERE s.period >= toDate({from:String})
+        AND s.period <= toDate({to:String})
+        ${filterSql}
+    `;
+
+		const [trendRows, salesRows] = await Promise.all([
+			this.clickHouseService.query<{ total_trend_views: string }>(
+				trendSql,
+				trendParams,
+			),
+			this.clickHouseService.query<{
+				total_usage: string;
+				total_revenue_usd: string;
+			}>(salesSql, salesParams),
+		]);
+
+		return {
+			totalTrendViews: Number(trendRows[0]?.total_trend_views ?? 0),
+			totalUsage: Number(salesRows[0]?.total_usage ?? 0),
+			totalRevenueUsd: this.revenueNumber(
+				salesRows[0]?.total_revenue_usd,
+			),
+			totalRevenueUsdExact: this.revenueExact(
+				salesRows[0]?.total_revenue_usd,
+			),
+		};
+	}
+
 	private async computeOverview(
 		entityType: EntityType,
 		entityId: string,
@@ -357,459 +450,6 @@ export class EntityAnalyticsService {
 		};
 	}
 
-	// ─────────────────────────────────────────────────────
-	// TREND VIEW DSP TIMELINE (monthly)
-	// Table: trends_dsp_monthly_cube | period column: period
-	// ─────────────────────────────────────────────────────
-	async getTrendViewDspTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:trend-dsp-tl', tenantId, {
-			entityType,
-			entityId,
-			...dto,
-		});
-		return this.cache.wrap(key, () =>
-			this.computeTrendViewDspTimeline(
-				entityType,
-				entityId,
-				dto,
-				tenantId,
-			),
-		);
-	}
-
-	private async computeTrendViewDspTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { topN = 5, includeOther = true } = dto;
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
-			tenantId,
-			entityType,
-			entityId,
-			dto.releaseType,
-			dto.importSource,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		const topDspsSql = `
-      SELECT s.dsp_id, ${this.resolvedDspName} AS dsp_name, sum(s.total_quantity) AS views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
-      GROUP BY s.dsp_id, dsp_name
-      ORDER BY views DESC
-      LIMIT ${topN}
-    `;
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-		if (!topDspIds.length) return { topDsps: [], items: [] };
-
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name`
-			: `${this.resolvedDspName} AS dsp_name`;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = `
-      SELECT
-        toStartOfMonth(s.period) AS period_date,
-        formatDateTime(s.period, '%Y-%m') AS period_str,
-        ${dspExpr},
-        sum(s.total_quantity) AS trend_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${whereDsp} ${filterSql}
-      GROUP BY period_date, period_str, dsp_name
-      ORDER BY period_date ASC, trend_views DESC
-    `;
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			trend_views: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let p = periodMap.get(row.period_str);
-			if (!p) {
-				p = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, p);
-			}
-			p.series.push({
-				dsp: row.dsp_name,
-				trendViews: Number(row.trend_views),
-			});
-		}
-		return { topDsps, items: Array.from(periodMap.values()) };
-	}
-
-	// ─────────────────────────────────────────────────────
-	// SALES VIEW DSP TIMELINE (monthly)
-	// Table: sales_dsp_monthly_cube_v2 | period column: period
-	// ─────────────────────────────────────────────────────
-	async getSalesViewDspTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:sales-dsp-tl', tenantId, {
-			entityType,
-			entityId,
-			...dto,
-		});
-		return this.cache.wrap(key, () =>
-			this.computeSalesViewDspTimeline(
-				entityType,
-				entityId,
-				dto,
-				tenantId,
-			),
-		);
-	}
-
-	private async computeSalesViewDspTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { topN = 5, includeOther = true } = dto;
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
-			tenantId,
-			entityType,
-			entityId,
-			dto.releaseType,
-			dto.importSource,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		const topDspsSql = `
-      SELECT s.dsp_id, ${this.resolvedDspName} AS dsp_name, sum(s.total_quantity) AS views
-      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
-      GROUP BY s.dsp_id, dsp_name
-      ORDER BY views DESC
-      LIMIT ${topN}
-    `;
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-		if (!topDspIds.length) return { topDsps: [], items: [] };
-
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name`
-			: `${this.resolvedDspName} AS dsp_name`;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = `
-      SELECT
-        toStartOfMonth(s.period) AS period_date,
-        formatDateTime(s.period, '%Y-%m') AS period_str,
-        ${dspExpr},
-        sum(s.total_quantity) AS sales_views,
-        sum(s.total_revenue_usd) AS revenue_usd
-      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${whereDsp} ${filterSql}
-      GROUP BY period_date, period_str, dsp_name
-      ORDER BY period_date ASC, sales_views DESC
-    `;
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			sales_views: string;
-			revenue_usd: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let p = periodMap.get(row.period_str);
-			if (!p) {
-				p = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, p);
-			}
-			p.series.push({
-				dsp: row.dsp_name,
-				salesViews: Number(row.sales_views),
-				revenueUsd: this.revenueNumber(row.revenue_usd),
-				revenueUsdExact: this.revenueExact(row.revenue_usd),
-			});
-		}
-		return { topDsps, items: Array.from(periodMap.values()) };
-	}
-
-	// ─────────────────────────────────────────────────────
-	// TREND VIEW DSP DAILY TIMELINE
-	// Table: trends_dsp_daily_cube | date column: reporting_date
-	// ─────────────────────────────────────────────────────
-	async getTrendViewDspDailyTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const key = this.cache.buildKey('ent:trend-dsp-daily-tl', tenantId, {
-			entityType,
-			entityId,
-			...dto,
-		});
-		return this.cache.wrap(key, () =>
-			this.computeTrendViewDspDailyTimeline(
-				entityType,
-				entityId,
-				dto,
-				tenantId,
-			),
-		);
-	}
-
-	private async computeTrendViewDspDailyTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<DspTimelineResponse> {
-		const { fromDate, toDate, topN = 5, includeOther = true } = dto;
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
-			tenantId,
-			entityType,
-			entityId,
-			dto.releaseType,
-			dto.importSource,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		const topDspsSql = `
-      SELECT s.dsp_id, ${this.resolvedDspName} AS dsp_name, sum(s.total_quantity) AS views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
-        ${filterSql}
-      GROUP BY s.dsp_id, dsp_name
-      ORDER BY views DESC
-      LIMIT ${topN}
-    `;
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-		if (!topDspIds.length) return { topDsps: [], items: [] };
-
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name`
-			: `${this.resolvedDspName} AS dsp_name`;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = `
-      SELECT
-        s.reporting_date AS period_date,
-        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period_str,
-        ${dspExpr},
-        sum(s.total_quantity) AS trend_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
-        ${whereDsp} ${filterSql}
-      GROUP BY period_date, period_str, dsp_name
-      ORDER BY period_date ASC, trend_views DESC
-    `;
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			trend_views: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<string, DspTimelinePeriod>();
-		for (const row of rows) {
-			let p = periodMap.get(row.period_str);
-			if (!p) {
-				p = { period: row.period_str, series: [] };
-				periodMap.set(row.period_str, p);
-			}
-			p.series.push({
-				dsp: row.dsp_name,
-				trendViews: Number(row.trend_views),
-			});
-		}
-		return { topDsps, items: Array.from(periodMap.values()) };
-	}
-
-	// ─────────────────────────────────────────────────────
-	// REVENUE TIMELINE (monthly, DSP breakdown)
-	// Table: sales_dsp_monthly_cube_v2
-	// ─────────────────────────────────────────────────────
-	async getRevenueTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<RevenueTimelineResponse> {
-		const key = this.cache.buildKey('ent:rev-tl', tenantId, {
-			entityType,
-			entityId,
-			...dto,
-		});
-		return this.cache.wrap(key, () =>
-			this.computeRevenueTimeline(entityType, entityId, dto, tenantId),
-		);
-	}
-
-	private async computeRevenueTimeline(
-		entityType: EntityType,
-		entityId: string,
-		dto: EntityTimelineQueryDto,
-		tenantId: string,
-	): Promise<RevenueTimelineResponse> {
-		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
-		const { topN = 5, includeOther = true } = dto;
-		const { joinSql, filterSql, params } = this.buildEntityFilters(
-			tenantId,
-			entityType,
-			entityId,
-			dto.releaseType,
-			dto.importSource,
-		);
-		params.from = fromDate;
-		params.to = toDate;
-
-		const topDspsSql = `
-      SELECT s.dsp_id, ${this.resolvedDspName} AS dsp_name, sum(s.total_revenue_usd) AS revenue
-      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${filterSql}
-      GROUP BY s.dsp_id, dsp_name
-      ORDER BY revenue DESC
-      LIMIT ${topN}
-    `;
-		const topDspsRows = await this.clickHouseService.query<{
-			dsp_id: string;
-			dsp_name: string;
-		}>(topDspsSql, params);
-		const topDspIds = topDspsRows.map((r) => r.dsp_id);
-		const topDsps = topDspsRows.map((r) => r.dsp_name);
-		if (!topDspIds.length) return { topDsps: [], items: [] };
-
-		params.topDsps = topDspIds;
-		const dspExpr = includeOther
-			? `multiIf(s.dsp_id IN ({topDsps:Array(String)}), ${this.resolvedDspName}, 'Other') AS dsp_name`
-			: `${this.resolvedDspName} AS dsp_name`;
-		const whereDsp = includeOther
-			? ''
-			: 'AND s.dsp_id IN ({topDsps:Array(String)})';
-
-		const timelineSql = `
-      SELECT
-        toStartOfMonth(s.period) AS period_date,
-        formatDateTime(s.period, '%Y-%m') AS period_str,
-        ${dspExpr},
-        sum(s.total_quantity) AS quantity,
-        sum(s.total_revenue_usd) AS revenue_usd
-      FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-      ${joinSql}
-      ${this.dspNameJoin}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
-        ${whereDsp} ${filterSql}
-      GROUP BY period_date, period_str, dsp_name
-      ORDER BY period_date ASC, revenue_usd DESC
-    `;
-		const rows = await this.clickHouseService.query<{
-			period_str: string;
-			dsp_name: string;
-			quantity: string;
-			revenue_usd: string;
-		}>(timelineSql, params);
-
-		const periodMap = new Map<
-			string,
-			{
-				revenueUsdExactParts: string[];
-				quantity: number;
-				series: {
-					dsp: string;
-					revenueUsd: number;
-					revenueUsdExact: string;
-					quantity: number;
-				}[];
-			}
-		>();
-		for (const row of rows) {
-			let p = periodMap.get(row.period_str);
-			if (!p) {
-				p = { revenueUsdExactParts: [], quantity: 0, series: [] };
-				periodMap.set(row.period_str, p);
-			}
-			const revExact = this.revenueExact(row.revenue_usd);
-			const rev = this.revenueNumber(row.revenue_usd);
-			const qty = Number(row.quantity);
-			p.revenueUsdExactParts.push(revExact);
-			p.quantity += qty;
-			p.series.push({
-				dsp: row.dsp_name,
-				revenueUsd: rev,
-				revenueUsdExact: revExact,
-				quantity: qty,
-			});
-		}
-		return {
-			topDsps,
-			items: Array.from(periodMap.entries()).map(([key, val]) => ({
-				period: key,
-				revenueUsd: this.revenueNumber(
-					this.addRevenueExact(val.revenueUsdExactParts),
-				),
-				revenueUsdExact: this.addRevenueExact(val.revenueUsdExactParts),
-				quantity: val.quantity,
-				series: val.series,
-			})),
-		};
-	}
-
 	async getTrendViewLineChart(
 		entityType: EntityType,
 		entityId: string,
@@ -844,14 +484,14 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
-        formatDateTime(toStartOfMonth(s.reporting_date), '%Y-%m') AS period,
+        formatDateTime(s.reporting_date, '%Y-%m-%d') AS period,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY period
-      ORDER BY period ASC
+      GROUP BY s.reporting_date, period
+      ORDER BY s.reporting_date ASC
     `;
 		const rows = await this.clickHouseService.query<{
 			period: string;
@@ -1034,8 +674,6 @@ export class EntityAnalyticsService {
 		dto: ChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
-		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
-		const toDate = normalizeDateToFirstOfMonth(dto.toDate);
 		const { joinSql, filterSql, params } = this.buildEntityFilters(
 			tenantId,
 			entityType,
@@ -1043,14 +681,14 @@ export class EntityAnalyticsService {
 			dto.releaseType,
 			dto.importSource,
 		);
-		params.from = fromDate;
-		params.to = toDate;
+		params.from = dto.fromDate;
+		params.to = dto.toDate;
 
 		const totalSql = `
       SELECT sum(s.total_quantity) AS total_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
       ${joinSql}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
+      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
     `;
 		const totalRows = await this.clickHouseService.query<{
@@ -1062,9 +700,9 @@ export class EntityAnalyticsService {
       SELECT
         s.territory_code AS territory,
         sum(s.total_quantity) AS total_views
-      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+      FROM ${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
       ${joinSql}
-      WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
+      WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
       GROUP BY territory
       ORDER BY total_views DESC
@@ -1303,8 +941,12 @@ export class EntityAnalyticsService {
 		const topNSkip = useTopN ? 0 : dto.skip;
 		const limit = topNLimit;
 		const skip = topNSkip;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -1358,13 +1000,13 @@ export class EntityAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
-				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 				AND t.release_id != ''
 		`;
 
@@ -1382,6 +1024,7 @@ export class EntityAnalyticsService {
 				any(t.cover_original) AS cover_original,
 				uniq(t.isrc) AS track_count,
 				sum(coalesce(tr.total_views, 0)) AS total_views,
+				sum(coalesce(sa.total_usage, 0)) AS total_usage,
 				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
 				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -1392,16 +1035,16 @@ export class EntityAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
-				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 				AND t.release_id != ''
 			GROUP BY t.release_id
-			ORDER BY ${sortCol} DESC
+			ORDER BY ${sortCol} DESC, t.release_id ASC
 			LIMIT ${limit} OFFSET ${skip}
 		`;
 
@@ -1423,6 +1066,7 @@ export class EntityAnalyticsService {
 				cover_original: string;
 				track_count: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, baseParams),
 		]);
@@ -1441,6 +1085,7 @@ export class EntityAnalyticsService {
 			labelName: row.label_name || null,
 			trackCount: Number(row.track_count),
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {
@@ -1457,6 +1102,7 @@ export class EntityAnalyticsService {
 			const totalsSql = `
 				SELECT
 					sum(coalesce(tr.total_views, 0)) AS total_views,
+					sum(coalesce(sa.total_usage, 0)) AS total_usage,
 					toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 				FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
 				LEFT JOIN (
@@ -1466,22 +1112,24 @@ export class EntityAnalyticsService {
 					GROUP BY isrc
 				) tr ON t.isrc = tr.isrc
 				LEFT JOIN (
-					SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+					SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 					FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 					WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 					GROUP BY isrc
 				) sa ON t.isrc = sa.isrc
 				WHERE ${whereConditions}
-					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 					AND t.release_id != ''
 			`;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, baseParams)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -1492,16 +1140,25 @@ export class EntityAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = grandTotalViews - topViews;
+			const otherUsage = grandTotalUsage - topUsage;
 
 			const items: DspTopReleaseItem[] = dataRows.map((row, i) =>
 				mapRow(row, i + 1),
 			);
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					releaseId: 'other',
@@ -1511,6 +1168,7 @@ export class EntityAnalyticsService {
 					labelName: null,
 					trackCount: 0,
 					totalViews: Math.max(0, otherViews),
+					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
 					release: {
 						coverArtThumbnails: {
@@ -1575,8 +1233,12 @@ export class EntityAnalyticsService {
 		const topNSkip = useTopN ? 0 : dto.skip;
 		const limit = topNLimit;
 		const skip = topNSkip;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -1630,13 +1292,13 @@ export class EntityAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
-				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 		`;
 
 		const dataSql = `
@@ -1653,6 +1315,7 @@ export class EntityAnalyticsService {
 				t.cover_300 AS cover_300,
 				t.cover_original AS cover_original,
 				coalesce(tr.total_views, 0) AS total_views,
+				coalesce(sa.total_usage, 0) AS total_usage,
 				coalesce(sa.total_revenue_usd, 0) AS total_revenue_usd_raw,
 				toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
 			FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -1663,14 +1326,14 @@ export class EntityAnalyticsService {
 				GROUP BY isrc
 			) tr ON t.isrc = tr.isrc
 			LEFT JOIN (
-				SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+				SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE ${whereConditions}
-				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
-			ORDER BY ${sortCol} DESC
+				AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+			ORDER BY ${sortCol} DESC, t.isrc ASC
 			LIMIT ${limit} OFFSET ${skip}
 		`;
 
@@ -1692,6 +1355,7 @@ export class EntityAnalyticsService {
 				cover_300: string;
 				cover_original: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd_raw: string;
 				total_revenue_usd: string;
 			}>(dataSql, baseParams),
@@ -1711,6 +1375,7 @@ export class EntityAnalyticsService {
 			releaseId: row.release_id || '',
 			releaseTitle: row.release_title || '',
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {
@@ -1727,6 +1392,7 @@ export class EntityAnalyticsService {
 			const totalsSql = `
 				SELECT
 					sum(coalesce(tr.total_views, 0)) AS total_views,
+					sum(coalesce(sa.total_usage, 0)) AS total_usage,
 					toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
 				FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
 				LEFT JOIN (
@@ -1736,21 +1402,23 @@ export class EntityAnalyticsService {
 					GROUP BY isrc
 				) tr ON t.isrc = tr.isrc
 				LEFT JOIN (
-					SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+					SELECT isrc, sum(total_quantity) AS total_usage, sum(total_revenue_usd) AS total_revenue_usd
 					FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 					WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
 					GROUP BY isrc
 				) sa ON t.isrc = sa.isrc
 				WHERE ${whereConditions}
-					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+					AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
 			`;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, baseParams)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -1761,16 +1429,25 @@ export class EntityAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = grandTotalViews - topViews;
+			const otherUsage = grandTotalUsage - topUsage;
 
 			const items: DspTopTrackItem[] = dataRows.map((row, i) =>
 				mapTrackRow(row, i + 1),
 			);
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					isrc: 'other',
@@ -1780,6 +1457,7 @@ export class EntityAnalyticsService {
 					releaseId: '',
 					releaseTitle: '',
 					totalViews: Math.max(0, otherViews),
+					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
 					release: {
 						coverArtThumbnails: {
@@ -1839,13 +1517,23 @@ export class EntityAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<EntityTopDspItem>> {
 		const page = dto.page ?? 1;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = { entityId, fromMonth, toMonth };
+		const params: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
 		const effectiveImportSource =
 			entityType === 'sourceType' ? entityId : dto.importSource;
@@ -1878,72 +1566,57 @@ export class EntityAnalyticsService {
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
 		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
 
-		const primaryTable = sortByRevenue
-			? CLICKHOUSE_TABLES.SALES_DSP_MONTHLY
-			: CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY;
-		const importFilterSal = effectiveImportSource
-			? 'AND tr_sub.import_source = {importSource:String}'
-			: '';
-
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
 		const topNSkip = useTopN ? 0 : dto.skip;
 
-		const countSql = `
-			SELECT uniq(s.dsp_id) AS total
-			FROM music_analytics.${primaryTable} s
+		const metricSource = `
+			SELECT
+				s.dsp_id AS dsp_id,
+				sum(s.total_quantity) AS total_views,
+				0 AS total_usage,
+				0 AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
+			${trackJoin}
+			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
+				${importFilter} ${whereTrack}
+			GROUP BY s.dsp_id
+			UNION ALL
+			SELECT
+				s.dsp_id AS dsp_id,
+				0 AS total_views,
+				sum(s.total_quantity) AS total_usage,
+				sum(s.total_revenue_usd) AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
 			${trackJoin}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
+			GROUP BY s.dsp_id
+		`;
+		const groupedMetrics = `
+			SELECT
+				dsp_id,
+				sum(total_views) AS total_views,
+				sum(total_usage) AS total_usage,
+				sum(total_revenue_usd) AS total_revenue_usd_raw
+			FROM (${metricSource})
+			GROUP BY dsp_id
+			HAVING total_views > 0 OR total_usage > 0 OR total_revenue_usd_raw > 0
 		`;
 
-		const dataSql = sortByRevenue
-			? `
+		const countSql = `SELECT count() AS total FROM (${groupedMetrics})`;
+		const dataSql = `
 			SELECT
 				s.dsp_id AS dsp_id,
 				r.pg_uuid AS pg_dsp_id,
 				${this.resolvedDspName} AS dsp_name,
-				sum(s.total_revenue_usd) AS total_revenue_usd_raw,
-				toString(sum(s.total_revenue_usd)) AS total_revenue_usd,
-				coalesce(sum(tr.total_views), 0) AS total_views
-			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
+				s.total_views AS total_views,
+				s.total_usage AS total_usage,
+				s.total_revenue_usd_raw AS total_revenue_usd_raw,
+				toString(s.total_revenue_usd_raw) AS total_revenue_usd
+			FROM (${groupedMetrics}) s
 			${this.dspNameJoin}
-			${trackJoin}
-			LEFT JOIN (
-				SELECT dsp_id, isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} tr_sub
-				WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
-					${importFilterSal}
-				GROUP BY dsp_id, isrc
-			) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${importFilter} ${whereTrack}
-			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
-			ORDER BY ${sortCol} DESC
-			LIMIT ${topNLimit} OFFSET ${topNSkip}
-		`
-			: `
-			SELECT
-				s.dsp_id AS dsp_id,
-				r.pg_uuid AS pg_dsp_id,
-				${this.resolvedDspName} AS dsp_name,
-				sum(s.total_quantity) AS total_views,
-				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
-				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-			${this.dspNameJoin}
-			${trackJoin}
-			LEFT JOIN (
-				SELECT dsp_id, isrc, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} sal
-				WHERE sal.period >= toDate({fromMonth:String}) AND sal.period <= toDate({toMonth:String})
-					${importFilterSal}
-				GROUP BY dsp_id, isrc
-			) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${importFilter} ${whereTrack}
-			GROUP BY s.dsp_id, r.pg_uuid, dsp_name
-			ORDER BY ${sortCol} DESC
+			ORDER BY ${sortCol} DESC, s.dsp_id ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
 
@@ -1954,6 +1627,7 @@ export class EntityAnalyticsService {
 				pg_dsp_id: string | null;
 				dsp_name: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
@@ -1962,42 +1636,22 @@ export class EntityAnalyticsService {
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
 			// Fetch grand totals to compute "Other"
-			const totalsSql = sortByRevenue
-				? `
-				SELECT toString(sum(s.total_revenue_usd)) AS total_revenue_usd, sum(tr.total_views) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
-				${trackJoin}
-				LEFT JOIN (
-					SELECT dsp_id, isrc, sum(total_quantity) AS total_views
-					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} tr_sub
-					WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
-						${importFilterSal}
-					GROUP BY dsp_id, isrc
-				) tr ON s.dsp_id = tr.dsp_id AND s.isrc = tr.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-					${importFilter} ${whereTrack}
-			`
-				: `
-				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} s
-				${trackJoin}
-				LEFT JOIN (
-					SELECT dsp_id, isrc, sum(total_revenue_usd) AS total_revenue_usd
-					FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} sal
-					WHERE sal.period >= toDate({fromMonth:String}) AND sal.period <= toDate({toMonth:String})
-						${importFilterSal}
-					GROUP BY dsp_id, isrc
-				) sa ON s.dsp_id = sa.dsp_id AND s.isrc = sa.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-					${importFilter} ${whereTrack}
+			const totalsSql = `
+				SELECT
+					sum(total_views) AS total_views,
+					sum(total_usage) AS total_usage,
+					toString(sum(total_revenue_usd_raw)) AS total_revenue_usd
+				FROM (${groupedMetrics})
 			`;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, params)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -2008,11 +1662,16 @@ export class EntityAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = grandTotalViews - topViews;
+			const otherUsage = grandTotalUsage - topUsage;
 
 			const items: EntityTopDspItem[] = dataRows.map((row, i) => ({
 				rank: i + 1,
@@ -2020,15 +1679,21 @@ export class EntityAnalyticsService {
 				dspReportId: row.dsp_id,
 				dspName: row.dsp_name || row.dsp_id,
 				totalViews: Number(row.total_views),
+				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
 			}));
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					pgDspId: null,
 					dspReportId: 'other',
 					dspName: 'Other',
 					totalViews: Math.max(0, otherViews),
+					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
 				});
 			}
@@ -2045,6 +1710,7 @@ export class EntityAnalyticsService {
 			dspReportId: row.dsp_id,
 			dspName: row.dsp_name || row.dsp_id,
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 		}));
 
@@ -2085,13 +1751,23 @@ export class EntityAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<EntityTopTerItem>> {
 		const page = dto.page ?? 1;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const params: Record<string, any> = { entityId, fromMonth, toMonth };
+		const params: Record<string, any> = {
+			entityId,
+			from: dto.fromDate,
+			to: dto.toDate,
+			fromMonth,
+			toMonth,
+		};
 		if (!isSystem && entityType !== 'tenant') params.tenantId = tenantId;
 		const effectiveImportSource =
 			entityType === 'sourceType' ? entityId : dto.importSource;
@@ -2124,66 +1800,54 @@ export class EntityAnalyticsService {
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
 		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
 
-		const primaryTable = sortByRevenue
-			? CLICKHOUSE_TABLES.SALES_TER_MONTHLY
-			: CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY;
-		const importFilterSal = effectiveImportSource
-			? 'AND tr_sub.import_source = {importSource:String}'
-			: '';
-
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
 		const topNSkip = useTopN ? 0 : dto.skip;
 
-		const countSql = `
-			SELECT uniq(s.territory_code) AS total
-			FROM music_analytics.${primaryTable} s
-			${trackJoin}
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${importFilter} ${whereTrack}
-		`;
-
-		const dataSql = sortByRevenue
-			? `
-			SELECT
-				s.territory_code AS iso_code,
-				sum(s.total_revenue_usd) AS total_revenue_usd_raw,
-				toString(sum(s.total_revenue_usd)) AS total_revenue_usd,
-				coalesce(sum(tr.total_views), 0) AS total_views
-			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-			${trackJoin}
-			LEFT JOIN (
-				SELECT territory_code, isrc, sum(total_quantity) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
-				WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
-					${importFilterSal}
-				GROUP BY territory_code, isrc
-			) tr ON s.territory_code = tr.territory_code AND s.isrc = tr.isrc
-			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-				${importFilter} ${whereTrack}
-			GROUP BY s.territory_code
-			ORDER BY ${sortCol} DESC
-			LIMIT ${topNLimit} OFFSET ${topNSkip}
-		`
-			: `
+		const metricSource = `
 			SELECT
 				s.territory_code AS iso_code,
 				sum(s.total_quantity) AS total_views,
-				sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
-				toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
+				0 AS total_usage,
+				0 AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} s
 			${trackJoin}
-			LEFT JOIN (
-				SELECT territory_code, isrc, sum(total_revenue_usd) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} sal
-				WHERE sal.period >= toDate({fromMonth:String}) AND sal.period <= toDate({toMonth:String})
-					${importFilterSal}
-				GROUP BY territory_code, isrc
-			) sa ON s.territory_code = sa.territory_code AND s.isrc = sa.isrc
+			WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
+				${importFilter} ${whereTrack}
+			GROUP BY s.territory_code
+			UNION ALL
+			SELECT
+				s.territory_code AS iso_code,
+				0 AS total_views,
+				sum(s.total_quantity) AS total_usage,
+				sum(s.total_revenue_usd) AS total_revenue_usd
+			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
+			${trackJoin}
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				${importFilter} ${whereTrack}
 			GROUP BY s.territory_code
-			ORDER BY ${sortCol} DESC
+		`;
+		const groupedMetrics = `
+			SELECT
+				iso_code,
+				sum(total_views) AS total_views,
+				sum(total_usage) AS total_usage,
+				sum(total_revenue_usd) AS total_revenue_usd_raw
+			FROM (${metricSource})
+			GROUP BY iso_code
+			HAVING total_views > 0 OR total_usage > 0 OR total_revenue_usd_raw > 0
+		`;
+
+		const countSql = `SELECT count() AS total FROM (${groupedMetrics})`;
+		const dataSql = `
+			SELECT
+				iso_code,
+				total_views,
+				total_usage,
+				total_revenue_usd_raw,
+				toString(total_revenue_usd_raw) AS total_revenue_usd
+			FROM (${groupedMetrics})
+			ORDER BY ${sortCol} DESC, iso_code ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
 
@@ -2192,6 +1856,7 @@ export class EntityAnalyticsService {
 			this.clickHouseService.query<{
 				iso_code: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, params),
 		]);
@@ -2215,42 +1880,22 @@ export class EntityAnalyticsService {
 		}
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
-			const totalsSql = sortByRevenue
-				? `
-				SELECT toString(sum(s.total_revenue_usd)) AS total_revenue_usd, sum(tr.total_views) AS total_views
-				FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
-				${trackJoin}
-				LEFT JOIN (
-					SELECT territory_code, isrc, sum(total_quantity) AS total_views
-					FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} tr_sub
-					WHERE tr_sub.period >= toDate({fromMonth:String}) AND tr_sub.period <= toDate({toMonth:String})
-						${importFilterSal}
-					GROUP BY territory_code, isrc
-				) tr ON s.territory_code = tr.territory_code AND s.isrc = tr.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-					${importFilter} ${whereTrack}
-			`
-				: `
-				SELECT sum(s.total_quantity) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
-				FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} s
-				${trackJoin}
-				LEFT JOIN (
-					SELECT territory_code, isrc, sum(total_revenue_usd) AS total_revenue_usd
-					FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} sal
-					WHERE sal.period >= toDate({fromMonth:String}) AND sal.period <= toDate({toMonth:String})
-						${importFilterSal}
-					GROUP BY territory_code, isrc
-				) sa ON s.territory_code = sa.territory_code AND s.isrc = sa.isrc
-				WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
-					${importFilter} ${whereTrack}
+			const totalsSql = `
+				SELECT
+					sum(total_views) AS total_views,
+					sum(total_usage) AS total_usage,
+					toString(sum(total_revenue_usd_raw)) AS total_revenue_usd
+				FROM (${groupedMetrics})
 			`;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, params)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -2261,11 +1906,16 @@ export class EntityAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = grandTotalViews - topViews;
+			const otherUsage = grandTotalUsage - topUsage;
 
 			const items: EntityTopTerItem[] = dataRows.map((row, i) => {
 				const isoCode = row.iso_code?.trim().toUpperCase() || '';
@@ -2274,15 +1924,21 @@ export class EntityAnalyticsService {
 					isoCode,
 					territory: nameMap.get(isoCode) ?? isoCode,
 					totalViews: Number(row.total_views),
+					totalUsage: Number(row.total_usage),
 					totalRevenueUsd: row.total_revenue_usd || '0',
 				};
 			});
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					isoCode: '',
 					territory: 'Other',
 					totalViews: Math.max(0, otherViews),
+					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
 				});
 			}
@@ -2300,6 +1956,7 @@ export class EntityAnalyticsService {
 				isoCode,
 				territory: nameMap.get(isoCode) ?? isoCode,
 				totalViews: Number(row.total_views),
+				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
 			};
 		});

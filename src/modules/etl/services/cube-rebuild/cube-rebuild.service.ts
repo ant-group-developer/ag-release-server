@@ -175,6 +175,16 @@ export class CubeRebuildService {
 
 				await this.clickHouseService
 					.execute(
+						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} DROP PARTITION '${partition}'`,
+					)
+					.catch((err) =>
+						this.logger.debug(
+							`DROP PARTITION on trends ter daily failed: ${err.message}`,
+						),
+					);
+
+				await this.clickHouseService
+					.execute(
 						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} DROP PARTITION '${partition}'`,
 					)
 					.catch((err) =>
@@ -227,7 +237,23 @@ export class CubeRebuildService {
           GROUP BY reporting_date, dsp_id, isrc, import_source
         `);
 
-				// 5. Re-insert aggregated data for trends isrc daily cube
+				// 5. Re-insert aggregated data for trends territory daily cube
+				await this.clickHouseService.execute(`
+          INSERT INTO music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE}
+          SELECT
+              reporting_period AS reporting_date,
+              territory_code,
+              dsp_id,
+              isrc,
+              if(import_source = '', 'ftp', import_source) AS import_source,
+              sum(quantity_total) AS total_quantity,
+              sum(quantity_unique_users) AS total_unique_users
+          FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+          WHERE toYYYYMM(reporting_period) = '${partition}'
+          GROUP BY reporting_date, territory_code, dsp_id, isrc, import_source
+        `);
+
+				// 6. Re-insert aggregated data for trends isrc daily cube
 				await this.clickHouseService.execute(`
           INSERT INTO music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE}
           SELECT

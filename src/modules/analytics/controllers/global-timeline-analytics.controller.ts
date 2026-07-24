@@ -2,10 +2,14 @@ import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { ChartQueryDto, TimelineQueryDto } from '../dto/analytics-query.dto';
+import {
+	AnalyticsSummaryQueryDto,
+	ChartQueryDto,
+	TimelineQueryDto,
+} from '../dto/analytics-query.dto';
 import {
 	DspBarChartItem,
-	DspTimelineResponse,
+	AnalyticsSummaryResponse,
 	OverviewTrendsResponse,
 	RevenueArtistItem,
 	RevenueChannelItem,
@@ -17,10 +21,8 @@ import {
 	RevenueReleaseVideoItem,
 	RevenueSourceTypeItem,
 	RevenueTenantItem,
-	RevenueTimelineResponse,
 	RevenueTrackItem,
 	TerritoryBarChartItem,
-	TerTimelineResponse,
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { TimelineAnalyticsService } from '../services/global-timeline.service';
@@ -34,118 +36,35 @@ import { TimelineAnalyticsService } from '../services/global-timeline.service';
 export class TimelineAnalyticsController {
 	constructor(private readonly timelineService: TimelineAnalyticsService) {}
 
+	@Post('summary')
+	@ApiOperation({
+		summary: 'Get unified analytics summary for the current tenant',
+		description:
+			'Trend views use the exact day range. Usage and revenue include every reporting month intersecting the range.',
+	})
+	async getSummary(
+		@Req() req: Request,
+		@Body() query: AnalyticsSummaryQueryDto,
+	): Promise<ResponseSuccess<AnalyticsSummaryResponse>> {
+		const data = await this.timelineService.getSummary(
+			req.user!.tenantId,
+			query,
+		);
+		return new ResponseSuccess({ data });
+	}
+
 	// ═══════════════════════════════════════════════════════
 	// DSP TIMELINE ENDPOINTS
 	// ═══════════════════════════════════════════════════════
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Get DSP Sales statistics timeline',
-		description:
-			'Returns play counts from official SALES data, grouped by top N DSPs.',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Sales timeline retrieved successfully.',
-	})
-	async getDspSalesTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<DspTimelineResponse>> {
-		const data = await this.timelineService.getDspSalesTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Get DSP Trends statistics timeline',
-		description:
-			'Returns near real-time play counts from TRENDS data, grouped by top N DSPs.',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Trends timeline retrieved successfully.',
-	})
-	async getDspTrendsTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<DspTimelineResponse>> {
-		const data = await this.timelineService.getDspTrendsTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({
-		summary: 'Get DSP Trends daily statistics timeline',
-		description:
-			'Returns near real-time daily play counts from TRENDS data, grouped by top N DSPs.',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Trends daily timeline retrieved successfully.',
-	})
-	async getDspTrendsDailyTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<DspTimelineResponse>> {
-		const data = await this.timelineService.getDspTrendsDailyTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
 	// ═══════════════════════════════════════════════════════
 	// TERRITORY TIMELINE ENDPOINTS
 	// ═══════════════════════════════════════════════════════
 
-	@Post('sales-view/ter/timeline')
-	@ApiOperation({
-		summary: 'Get Territory Sales statistics timeline',
-		description:
-			'Returns play counts from official SALES data, grouped by top N Territories (countries).',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Sales territory timeline retrieved successfully.',
-	})
-	async getTerSalesTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<TerTimelineResponse>> {
-		const data = await this.timelineService.getTerSalesTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('trend-view/ter/timeline')
-	@ApiOperation({
-		summary: 'Get Territory Trends statistics timeline',
-		description:
-			'Returns near real-time play counts from TRENDS data, grouped by top N Territories (countries).',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Trends territory timeline retrieved successfully.',
-	})
-	async getTerTrendsTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<TerTimelineResponse>> {
-		const data = await this.timelineService.getTerTrendsTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
 	// ═══════════════════════════════════════════════════════
 	// REVENUE ANALYTICS
@@ -173,27 +92,6 @@ export class TimelineAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Get monthly revenue timeline for tenant',
-		description:
-			'Returns monthly revenue (USD) and quantity timeline series to draw charts. ' +
-			'System-tenant sees all data; normal tenant sees only their own.',
-	})
-	@ApiResponse({
-		status: 201,
-		description: 'Revenue timeline retrieved successfully.',
-	})
-	async getRevenueTimeline(
-		@Req() req: Request,
-		@Body() query: TimelineQueryDto,
-	): Promise<ResponseSuccess<RevenueTimelineResponse>> {
-		const data = await this.timelineService.getRevenueTimeline(
-			req.user!.tenantId,
-			query,
-		);
-		return new ResponseSuccess({ data });
-	}
 
 	@Post('revenue/top-dsp')
 	@ApiOperation({
@@ -420,10 +318,10 @@ export class TimelineAnalyticsController {
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({
-		summary: 'Get monthly trend views line chart data',
+		summary: 'Get daily trend views line chart data',
 		description:
-			'Returns total trend views aggregated by month. Uses trends_dsp_daily_cube, ' +
-			'grouping daily data into months based on the exact fromDate/toDate range.',
+			'Returns total trend views aggregated by day for the exact fromDate/toDate range. ' +
+			'Uses trends_dsp_daily_cube.',
 	})
 	@ApiResponse({
 		status: 201,
@@ -467,7 +365,7 @@ export class TimelineAnalyticsController {
 		summary: 'Get top 5 territories by trend views bar chart data',
 		description:
 			'Returns top 5 territories by total trend views with an "Other" bucket for the rest. ' +
-			'Uses trends_ter_monthly_cube for territory trend data.',
+			'Uses trends_ter_daily_cube for the exact fromDate/toDate range.',
 	})
 	@ApiResponse({
 		status: 201,

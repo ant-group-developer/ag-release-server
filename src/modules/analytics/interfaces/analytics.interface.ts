@@ -6,7 +6,6 @@ import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.inte
  * Chỉ metrics (views) lấy từ ClickHouse.
  *
  * Response format:
- * - DSP Timeline: ResponseSuccess<DspTimelineResponse>
  * - Rankings: ResponseSuccess<PageDto<*RankingItem>>
  */
 
@@ -60,46 +59,6 @@ export interface AnalyticsVideoInfo {
 	youtubeMatchScannedAt: Date | null;
 }
 
-export interface DspTimelineSeriesItem {
-	dsp: string;
-	salesViews?: number;
-	trendViews?: number;
-	revenueUsd?: number;
-	revenueUsdExact?: string;
-}
-
-export interface DspTimelinePeriod {
-	period: string; // 'YYYY-MM'
-	series: DspTimelineSeriesItem[];
-}
-
-export interface DspTimelineResponse {
-	topDsps: string[];
-	items: DspTimelinePeriod[];
-}
-
-export interface TerTimelineSeriesItem {
-	territory: string; // ISO country code (e.g. 'US', 'VN')
-	salesViews?: number;
-	trendViews?: number;
-	revenueUsd?: number;
-	revenueUsdExact?: string;
-}
-
-export interface TerTimelinePeriod {
-	period: string; // 'YYYY-MM'
-	series: TerTimelineSeriesItem[];
-}
-
-export interface TerTimelineResponse {
-	topTerritories: string[];
-	items: TerTimelinePeriod[];
-}
-
-// ═══════════════════════════════════════════════════════
-// Revenue Analytics (POST /analytics/revenue/*)
-// ═══════════════════════════════════════════════════════
-
 export interface RevenueOverviewResponse {
 	/** Tổng doanh thu quy đổi USD trong khoảng thời gian */
 	totalRevenueUsd: number;
@@ -121,31 +80,6 @@ export interface RevenueDspItem {
 }
 
 export type RevenueTopDspResponse = RevenueDspItem[];
-
-export interface RevenueTimelineDspItem {
-	dsp: string;
-	revenueUsd: number;
-	revenueUsdExact?: string;
-	quantity: number;
-}
-
-export interface RevenueTimelinePeriod {
-	period: string; // 'YYYY-MM'
-	revenueUsd: number;
-	revenueUsdExact?: string;
-	quantity: number;
-	series: RevenueTimelineDspItem[];
-}
-
-export interface RevenueTimelineResponse {
-	topDsps: string[];
-	items: RevenueTimelinePeriod[];
-}
-
-// ═══════════════════════════════════════════════════════
-// Rankings (API 2-5 — Trends data)
-// Paginated bằng PageDto<T> (page/pageSize/totalItems/totalPages)
-// ═══════════════════════════════════════════════════════
 
 export interface TrackRankingItem {
 	rank: number;
@@ -329,6 +263,14 @@ export interface EntityOverviewResponse {
 	} | null;
 }
 
+/** Unified response for the new analytics summary endpoints. */
+export interface AnalyticsSummaryResponse {
+	totalTrendViews: number;
+	totalUsage?: number;
+	totalRevenueUsd: number;
+	totalRevenueUsdExact: string;
+}
+
 export interface RevenueLabelItem {
 	rank: number;
 	labelId: string;
@@ -484,9 +426,9 @@ export interface RevenueReleaseVideoItem {
 // Chart APIs (line-chart / bar-chart)
 // ═══════════════════════════════════════════════════════
 
-/** Một điểm trên line-chart trend-view theo tháng */
+/** Một điểm trên line-chart trend-view theo ngày */
 export interface TrendViewLineChartItem {
-	period: string; // 'YYYY-MM'
+	period: string; // 'YYYY-MM-DD'
 	totalViews: number;
 }
 
@@ -513,6 +455,7 @@ export interface EntityTopDspItem {
 	dspReportId: string;
 	dspName: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 }
 
@@ -521,6 +464,7 @@ export interface EntityTopTerItem {
 	isoCode: string;
 	territory: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 }
 
@@ -561,6 +505,7 @@ export interface DspTopTrackItem {
 	releaseId: string;
 	releaseTitle: string;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }
@@ -575,6 +520,7 @@ export interface DspTopReleaseItem {
 	labelName: string | null;
 	trackCount: number;
 	totalViews: number;
+	totalUsage?: number;
 	totalRevenueUsd: string;
 	release: { coverArtThumbnails: ICoverArtThumbnails } | null;
 }

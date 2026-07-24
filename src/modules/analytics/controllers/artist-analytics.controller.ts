@@ -3,10 +3,10 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -14,6 +14,23 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/artist/:artistId')
 export class ArtistAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for an artist' })
+	async summary(
+		@Param('artistId') artistId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'artist',
+				artistId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for an artist' })
@@ -32,79 +49,9 @@ export class ArtistAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Trend view DSP timeline for an artist (monthly)',
-	})
-	async trendViewTimeline(
-		@Param('artistId') artistId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'artist',
-				artistId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Sales view DSP timeline for an artist (monthly)',
-	})
-	async salesViewTimeline(
-		@Param('artistId') artistId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'artist',
-				artistId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for an artist' })
-	async trendViewDailyTimeline(
-		@Param('artistId') artistId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'artist',
-				artistId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for an artist (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('artistId') artistId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
-				'artist',
-				artistId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for an artist' })
@@ -210,7 +157,7 @@ export class ArtistAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của artist (sortBy: views | revenue)',
+		summary: 'Top tracks của artist (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('artistId') artistId: string,
@@ -229,7 +176,7 @@ export class ArtistAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của artist (sortBy: views | revenue)',
+		summary: 'Top releases của artist (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('artistId') artistId: string,
@@ -247,7 +194,7 @@ export class ArtistAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của artist (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('artistId') artistId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -265,7 +212,7 @@ export class ArtistAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của artist (sortBy: views | revenue)',
+		summary: 'Top territories của artist (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('artistId') artistId: string,

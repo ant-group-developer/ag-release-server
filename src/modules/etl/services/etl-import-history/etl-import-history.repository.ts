@@ -13,6 +13,7 @@ export interface EtlImportHistoryRecord {
 	file_directory?: string;
 	file_path: string;
 	status: 'processing' | 'done' | 'error';
+	file_size_bytes?: number;
 	total_lines?: number;
 	processed_rows?: number;
 	skipped_rows?: number;
@@ -33,6 +34,7 @@ export interface EtlImportHistoryRow {
 	file_directory: string;
 	file_path: string;
 	status: string;
+	file_size_bytes: string;
 	total_lines: string;
 	processed_rows: string;
 	skipped_rows: string;
@@ -62,6 +64,7 @@ export class EtlImportHistoryRepository {
 				file_directory: record.file_directory ?? '',
 				file_path: record.file_path,
 				status: record.status,
+				file_size_bytes: record.file_size_bytes ?? 0,
 				total_lines: record.total_lines ?? 0,
 				processed_rows: record.processed_rows ?? 0,
 				skipped_rows: record.skipped_rows ?? 0,
