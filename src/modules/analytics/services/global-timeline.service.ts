@@ -10,6 +10,7 @@ import { getImportSourceLabel } from '../constants/import-source.constants';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	TimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import {
@@ -64,8 +65,8 @@ export class TimelineAnalyticsService {
 		return value?.toString() ?? '0';
 	}
 
-	private revenueTopSortColumn(
-		query: TimelineQueryDto,
+	private revenueSortColumn(
+		query: { sortBy?: 'revenue' | 'usage' },
 	): 'revenue_usd' | 'quantity' {
 		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 	}
@@ -423,7 +424,7 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -615,7 +616,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopArtistQuery(
 			filterSql,
 			!!query.keyword,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -875,7 +876,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTrackQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1155,7 +1156,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopLabelQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1355,7 +1356,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopChannelQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1566,7 +1567,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopTenantQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1771,7 +1772,7 @@ export class TimelineAnalyticsService {
 		const sql = queries.getRevenueTopSourceTypeQuery(
 			joinSql,
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -1994,7 +1995,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseQuery(
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2237,7 +2238,7 @@ export class TimelineAnalyticsService {
 		// Data query
 		const sql = queries.getRevenueTopReleaseVideoQuery(
 			filterSql,
-			this.revenueTopSortColumn(query),
+			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
@@ -2611,7 +2612,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('tl:chart-rev-line', tenantId, query);
 		return this.cache.wrap(key, () =>
@@ -2621,7 +2622,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueLineChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2679,7 +2680,7 @@ export class TimelineAnalyticsService {
 	// ═══════════════════════════════════════════════════════
 	async getRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-dsp-bar',
@@ -2693,7 +2694,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueDspBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2742,8 +2743,10 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		// Step 2: Get top 5 DSPs by revenue
 		const sql = queries.getRevenueDspBarChartQuery(
@@ -2751,6 +2754,7 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
 			pg_dsp_id: string | null;
@@ -2758,6 +2762,7 @@ export class TimelineAnalyticsService {
 			dsp_name: string;
 			image_url: string | null;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((r) => ({
@@ -2768,6 +2773,7 @@ export class TimelineAnalyticsService {
 			totalViews: undefined, // ensure matching expected type
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		// Step 3: Calculate Other
@@ -2779,7 +2785,9 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				pgDspId: null,
 				dspReportId: '',
@@ -2787,6 +2795,7 @@ export class TimelineAnalyticsService {
 				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -2795,7 +2804,7 @@ export class TimelineAnalyticsService {
 
 	async getRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey(
 			'tl:chart-rev-ter-bar',
@@ -2809,7 +2818,7 @@ export class TimelineAnalyticsService {
 
 	private async computeRevenueTerritoryBarChart(
 		tenantId: string,
-		query: ChartQueryDto,
+		query: RevenueChartQueryDto,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
@@ -2826,16 +2835,20 @@ export class TimelineAnalyticsService {
 		);
 		const totalResult = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalResult[0]?.total_rev);
+		const grandTotalQuantity = Number(totalResult[0]?.total_qty ?? 0);
 
 		const sql = queries.getRevenueTerritoryBarChartQuery(
 			joinSql,
 			filterSql,
+			this.revenueSortColumn(query),
 		);
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
@@ -2843,6 +2856,7 @@ export class TimelineAnalyticsService {
 			imageUrl: null,
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
+			quantity: Number(r.quantity),
 		}));
 
 		const top5TotalExact = this.addRevenueExact(
@@ -2853,12 +2867,15 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
 				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 

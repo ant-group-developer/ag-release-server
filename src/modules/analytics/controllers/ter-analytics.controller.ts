@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -39,7 +40,7 @@ export class TerAnalyticsController {
 	@ApiOperation({ summary: 'Monthly revenue line chart for a territory' })
 	async revenueLineChart(
 		@Param('isoCode') isoCode: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 	) {
 		return new ResponseSuccess({
 			data: await this.terSvc.getRevenueLineChart(isoCode, dto),

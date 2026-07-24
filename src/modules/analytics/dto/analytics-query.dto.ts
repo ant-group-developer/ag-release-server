@@ -193,6 +193,18 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
  */
 export class DspChartQueryDto extends DspOverviewQueryDto {}
 
+/** DTO dành riêng cho revenue chart của một DSP. */
+export class DspRevenueChartQueryDto extends DspChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
+}
+
 /**
  * DTO cho DSP top-tracks / top-releases endpoints.
  */
@@ -338,6 +350,18 @@ export class ChartQueryDto {
 	@IsOptional()
 	@IsString()
 	importSource?: string;
+}
+
+/** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
+export class RevenueChartQueryDto extends ChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
 }
 
 export class EntityTimelineQueryDto {

@@ -9,6 +9,7 @@ import {
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspTopReleaseItem,
@@ -242,7 +243,7 @@ export class TerAnalyticsService {
 
 	async getRevenueLineChart(
 		isoCode: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('ter:rev-line', 'system', {
 			isoCode,
@@ -255,7 +256,7 @@ export class TerAnalyticsService {
 
 	private async computeRevenueLineChart(
 		isoCode: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 	): Promise<RevenueLineChartItem[]> {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);

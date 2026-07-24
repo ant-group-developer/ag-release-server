@@ -13,6 +13,7 @@ import {
 	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
 	DspBarChartItem,
@@ -525,7 +526,7 @@ export class EntityAnalyticsService {
 	async getRevenueLineChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-line-chart', tenantId, {
@@ -541,7 +542,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueLineChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<RevenueLineChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -770,7 +771,7 @@ export class EntityAnalyticsService {
 	async getRevenueDspBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-dsp-bar', tenantId, {
@@ -786,7 +787,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueDspBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<DspBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -800,9 +801,12 @@ export class EntityAnalyticsService {
 		);
 		params.from = fromDate;
 		params.to = toDate;
+		const orderBy = dto.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 
 		const totalSql = `
-      SELECT sum(s.total_revenue_usd) AS total_rev
+      SELECT
+        sum(s.total_revenue_usd) AS total_rev,
+        sum(s.total_quantity) AS total_qty
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
@@ -810,8 +814,10 @@ export class EntityAnalyticsService {
     `;
 		const totalRows = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
+		const grandTotalQuantity = Number(totalRows[0]?.total_qty ?? 0);
 
 		const sql = `
       SELECT
@@ -819,14 +825,15 @@ export class EntityAnalyticsService {
         r.pg_uuid AS pg_dsp_id,
         ${this.resolvedDspName} AS dsp_name,
         p.picture AS image_url,
-        sum(s.total_revenue_usd) AS revenue_usd
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
       GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
-      ORDER BY revenue_usd DESC
+      ORDER BY ${orderBy} DESC, dsp_report_id ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
@@ -835,6 +842,7 @@ export class EntityAnalyticsService {
 			dsp_name: string;
 			image_url: string | null;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: DspBarChartItem[] = rows.map((row) => ({
@@ -844,6 +852,7 @@ export class EntityAnalyticsService {
 			imageUrl: toDspImageUrl(row.image_url),
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
+			quantity: Number(row.quantity),
 		}));
 		const top5TotalExact = this.addRevenueExact(
 			items.map((item) => item.revenueUsdExact),
@@ -853,7 +862,12 @@ export class EntityAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				pgDspId: null,
 				dspReportId: '',
@@ -861,6 +875,7 @@ export class EntityAnalyticsService {
 				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 
@@ -870,7 +885,7 @@ export class EntityAnalyticsService {
 	async getRevenueTerritoryBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const key = this.cache.buildKey('ent:rev-ter-bar', tenantId, {
@@ -891,7 +906,7 @@ export class EntityAnalyticsService {
 	private async computeRevenueTerritoryBarChart(
 		entityType: EntityType,
 		entityId: string,
-		dto: ChartQueryDto,
+		dto: RevenueChartQueryDto,
 		tenantId: string,
 	): Promise<TerritoryBarChartItem[]> {
 		const fromDate = normalizeDateToFirstOfMonth(dto.fromDate);
@@ -905,9 +920,12 @@ export class EntityAnalyticsService {
 		);
 		params.from = fromDate;
 		params.to = toDate;
+		const orderBy = dto.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 
 		const totalSql = `
-      SELECT sum(s.total_revenue_usd) AS total_rev
+      SELECT
+        sum(s.total_revenue_usd) AS total_rev,
+        sum(s.total_quantity) AS total_qty
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
@@ -915,24 +933,28 @@ export class EntityAnalyticsService {
     `;
 		const totalRows = await this.clickHouseService.query<{
 			total_rev: string;
+			total_qty: string;
 		}>(totalSql, params);
 		const grandTotalExact = this.revenueExact(totalRows[0]?.total_rev);
+		const grandTotalQuantity = Number(totalRows[0]?.total_qty ?? 0);
 
 		const sql = `
       SELECT
         s.territory_code AS territory,
-        sum(s.total_revenue_usd) AS revenue_usd
+        sum(s.total_revenue_usd) AS revenue_usd,
+        sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
       ${joinSql}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
       GROUP BY territory
-      ORDER BY revenue_usd DESC
+      ORDER BY ${orderBy} DESC, territory ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
 			territory: string;
 			revenue_usd: string;
+			quantity: string;
 		}>(sql, params);
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
@@ -940,6 +962,7 @@ export class EntityAnalyticsService {
 			imageUrl: null,
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
+			quantity: Number(row.quantity),
 		}));
 		const top5TotalExact = this.addRevenueExact(
 			items.map((item) => item.revenueUsdExact),
@@ -949,12 +972,18 @@ export class EntityAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		if (otherRev > 0) {
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
+		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
+		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
 				territory: 'Other',
 				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
+				quantity: otherQuantity,
 			});
 		}
 

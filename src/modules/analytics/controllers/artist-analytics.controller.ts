@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -74,7 +75,7 @@ export class ArtistAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for an artist' })
 	async revenueLineChart(
 		@Param('artistId') artistId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -125,7 +126,7 @@ export class ArtistAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for an artist' })
 	async revenueDspBarChart(
 		@Param('artistId') artistId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -142,7 +143,7 @@ export class ArtistAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for an artist' })
 	async revenueTerritoryBarChart(
 		@Param('artistId') artistId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({

@@ -443,6 +443,7 @@ export interface DspBarChartItem {
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
+	quantity?: number;
 }
 
 /** Một điểm trên line-chart revenue theo tháng */
@@ -453,6 +454,7 @@ export interface TerritoryBarChartItem {
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
+	quantity?: number;
 }
 
 export interface EntityTopDspItem {
