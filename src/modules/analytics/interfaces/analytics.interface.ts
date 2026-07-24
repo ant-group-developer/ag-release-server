@@ -449,6 +449,7 @@ export interface DspBarChartItem {
 export interface TerritoryBarChartItem {
 	territory: string;
 	isoCode?: string;
+	imageUrl: string | null;
 	totalViews?: number;
 	revenueUsd?: number;
 	revenueUsdExact?: string;
@@ -469,6 +470,7 @@ export interface EntityTopTerItem {
 	rank: number;
 	isoCode: string;
 	territory: string;
+	imageUrl: string | null;
 	totalViews: number;
 	totalUsage?: number;
 	totalRevenueUsd: string;

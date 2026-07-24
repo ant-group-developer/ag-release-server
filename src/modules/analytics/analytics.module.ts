@@ -92,6 +92,6 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 		DspAnalyticsService,
 		TerAnalyticsService,
 	],
-	exports: [IsrcResolverService],
+	exports: [IsrcResolverService, AnalyticsCacheService],
 })
 export class AnalyticsModule {}

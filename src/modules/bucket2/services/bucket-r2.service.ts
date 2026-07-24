@@ -110,6 +110,41 @@ export class BucketR2Service {
 		return { bucketName, key };
 	}
 
+	async uploadBuffer(data: {
+		key: string;
+		buffer: Buffer;
+		contentType: string;
+		isPublic?: boolean;
+	}): Promise<{ bucketName: string; key: string }> {
+		const { key, buffer, contentType, isPublic = false } = data;
+		const bucketName = this.getBucketName({ isPublic });
+		const maxAttempts = 3;
+		let lastError: unknown;
+
+		for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+			try {
+				await this.client.send(
+					new PutObjectCommand({
+						Bucket: bucketName,
+						Key: key,
+						Body: buffer,
+						ContentType: contentType,
+						ContentLength: buffer.length,
+					}),
+				);
+				return { bucketName, key };
+			} catch (error) {
+				lastError = error;
+				if (attempt >= maxAttempts || !this.isRetryableUploadError(error)) {
+					throw error;
+				}
+				await this.sleep(500 * attempt);
+			}
+		}
+
+		throw lastError;
+	}
+
 	private async sendPutObjectWithRetry(data: {
 		bucketName: string;
 		key: string;

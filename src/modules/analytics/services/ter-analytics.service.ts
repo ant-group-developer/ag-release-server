@@ -18,11 +18,13 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 export interface TerOverviewResponse {
 	isoCode: string;
 	territory: string;
+	imageUrl: string | null;
 	totalTrendViews: number;
 	totalSalesViews: number;
 	totalRevenueUsd: number;
@@ -114,12 +116,17 @@ export class TerAnalyticsService {
 		return { terFilter, trackJoin, trackFilter, params };
 	}
 
-	private async resolveCountryName(isoCode: string): Promise<string> {
+	private async resolveCountry(
+		isoCode: string,
+	): Promise<{ name: string; imageUrl: string | null }> {
 		const rows = await this.entityManager.query(
-			`SELECT name FROM countries WHERE UPPER(iso2) = $1 LIMIT 1`,
+			`SELECT name, flag_image_key FROM countries WHERE UPPER(iso2) = $1 LIMIT 1`,
 			[isoCode.toUpperCase()],
 		);
-		return rows[0]?.name ?? isoCode;
+		return {
+			name: rows[0]?.name ?? isoCode,
+			imageUrl: toCountryFlagImageUrl(rows[0]?.flag_image_key),
+		};
 	}
 
 	// ── Overview ──────────────────────────────────────────
@@ -161,7 +168,7 @@ export class TerAnalyticsService {
 				${terFilter} ${trackFilter}
 		`;
 
-		const [[trendRow], [salesRow], countryName] = await Promise.all([
+		const [[trendRow], [salesRow], country] = await Promise.all([
 			this.clickHouseService.query<{ total_trend_views: string }>(
 				trendSql,
 				params,
@@ -170,12 +177,13 @@ export class TerAnalyticsService {
 				total_sales_views: string;
 				total_revenue_usd: string;
 			}>(salesSql, params),
-			this.resolveCountryName(isoCode),
+			this.resolveCountry(isoCode),
 		]);
 
 		return {
 			isoCode: isoCode.toUpperCase(),
-			territory: countryName,
+			territory: country.name,
+			imageUrl: country.imageUrl,
 			totalTrendViews: Number(trendRow?.total_trend_views ?? 0),
 			totalSalesViews: Number(salesRow?.total_sales_views ?? 0),
 			totalRevenueUsd: this.revenueNumber(salesRow?.total_revenue_usd),

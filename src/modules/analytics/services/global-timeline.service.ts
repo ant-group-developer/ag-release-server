@@ -36,6 +36,7 @@ import {
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -2588,6 +2589,7 @@ export class TimelineAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			totalViews: Number(r.total_views),
 		}));
 
@@ -2597,7 +2599,11 @@ export class TimelineAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -2834,6 +2840,7 @@ export class TimelineAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((r) => ({
 			territory: r.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(r.revenue_usd),
 			revenueUsdExact: this.revenueExact(r.revenue_usd),
 		}));
@@ -2849,6 +2856,7 @@ export class TimelineAnalyticsService {
 		if (otherRev > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
 			});
@@ -2871,33 +2879,49 @@ export class TimelineAnalyticsService {
 			),
 		);
 
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 
 		const countries = await this.entityManager.query(
 			`
-        SELECT UPPER(iso2) AS iso2, name
+        SELECT UPPER(iso2) AS iso2, name, flag_image_key
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
 		);
-		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [
-				country.iso2,
-				country.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(country: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					country.iso2,
+					{
+						name: country.name,
+						imageUrl: toCountryFlagImageUrl(country.flag_image_key),
+					},
+				],
+			),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				iso2 && iso2 !== 'OTHER'
-					? (countryNameByIso2.get(iso2) ?? item.territory)
+					? (country?.name ?? item.territory)
 					: item.territory
 			) as string;
 			return {
 				...item,
 				territory,
+				imageUrl: iso2 && iso2 !== 'OTHER' ? (country?.imageUrl ?? null) : null,
 			};
 		});
 	}

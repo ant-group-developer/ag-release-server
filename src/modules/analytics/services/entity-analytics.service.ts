@@ -27,6 +27,7 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 export type EntityType =
@@ -194,35 +195,51 @@ export class EntityAnalyticsService {
 			),
 		);
 
-		if (!iso2Codes.length) return items;
+		if (!iso2Codes.length) {
+			return items.map((item) => ({ ...item, imageUrl: null }));
+		}
 
 		const countries = await this.entityManager.query(
 			`
-        SELECT UPPER(iso2) AS iso2, name
+        SELECT UPPER(iso2) AS iso2, name, flag_image_key
         FROM countries
         WHERE UPPER(iso2) = ANY($1)
       `,
 			[iso2Codes],
 		);
-		const countryNameByIso2 = new Map(
-			countries.map((country: { iso2: string; name: string }) => [
-				country.iso2,
-				country.name,
-			]),
+		const countryByIso2 = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>(
+			countries.map(
+				(country: {
+					iso2: string;
+					name: string;
+					flag_image_key: string | null;
+				}) => [
+					country.iso2,
+					{
+						name: country.name,
+						imageUrl: toCountryFlagImageUrl(country.flag_image_key),
+					},
+				],
+			),
 		);
 
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
+			const country = iso2 ? countryByIso2.get(iso2) : undefined;
 			const territory = (
 				isOther
 					? item.territory
-					: (countryNameByIso2.get(iso2) ?? item.territory)
+					: (country?.name ?? item.territory)
 			) as string;
 			return {
 				...item,
 				territory,
 				isoCode: isOther ? undefined : iso2,
+				imageUrl: isOther ? null : (country?.imageUrl ?? null),
 			};
 		});
 	}
@@ -731,6 +748,7 @@ export class EntityAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			totalViews: Number(row.total_views),
 		}));
 		const top5Total = items.reduce(
@@ -739,7 +757,11 @@ export class EntityAnalyticsService {
 		);
 		const otherViews = grandTotal - top5Total;
 		if (otherViews > 0) {
-			items.push({ territory: 'Other', totalViews: otherViews });
+			items.push({
+				territory: 'Other',
+				imageUrl: null,
+				totalViews: otherViews,
+			});
 		}
 
 		return this.mapTerritoryCodesToCountryNames(items);
@@ -915,6 +937,7 @@ export class EntityAnalyticsService {
 
 		const items: TerritoryBarChartItem[] = rows.map((row) => ({
 			territory: row.territory,
+			imageUrl: null,
 			revenueUsd: this.revenueNumber(row.revenue_usd),
 			revenueUsdExact: this.revenueExact(row.revenue_usd),
 		}));
@@ -929,6 +952,7 @@ export class EntityAnalyticsService {
 		if (otherRev > 0) {
 			items.push({
 				territory: 'Other',
+				imageUrl: null,
 				revenueUsd: otherRev,
 				revenueUsdExact: otherRevExact,
 			});
@@ -1898,17 +1922,29 @@ export class EntityAnalyticsService {
 		const iso2Codes = dataRows
 			.map((r) => r.iso_code?.trim().toUpperCase())
 			.filter(Boolean);
-		let nameMap = new Map<string, string>();
+		let countryMap = new Map<
+			string,
+			{ name: string; imageUrl: string | null }
+		>();
 		if (iso2Codes.length) {
 			const countries = await this.entityManager.query(
-				`SELECT UPPER(iso2) AS iso2, name FROM countries WHERE UPPER(iso2) = ANY($1)`,
+				`SELECT UPPER(iso2) AS iso2, name, flag_image_key FROM countries WHERE UPPER(iso2) = ANY($1)`,
 				[iso2Codes],
 			);
-			nameMap = new Map(
-				countries.map((c: { iso2: string; name: string }) => [
-					c.iso2,
-					c.name,
-				]),
+			countryMap = new Map(
+				countries.map(
+					(c: {
+						iso2: string;
+						name: string;
+						flag_image_key: string | null;
+					}) => [
+						c.iso2,
+						{
+							name: c.name,
+							imageUrl: toCountryFlagImageUrl(c.flag_image_key),
+						},
+					],
+				),
 			);
 		}
 
@@ -1952,10 +1988,12 @@ export class EntityAnalyticsService {
 
 			const items: EntityTopTerItem[] = dataRows.map((row, i) => {
 				const isoCode = row.iso_code?.trim().toUpperCase() || '';
+				const country = countryMap.get(isoCode);
 				return {
 					rank: i + 1,
 					isoCode,
-					territory: nameMap.get(isoCode) ?? isoCode,
+					territory: country?.name ?? isoCode,
+					imageUrl: country?.imageUrl ?? null,
 					totalViews: Number(row.total_views),
 					totalUsage: Number(row.total_usage),
 					totalRevenueUsd: row.total_revenue_usd || '0',
@@ -1970,6 +2008,7 @@ export class EntityAnalyticsService {
 					rank: items.length + 1,
 					isoCode: '',
 					territory: 'Other',
+					imageUrl: null,
 					totalViews: Math.max(0, otherViews),
 					totalUsage: Math.max(0, otherUsage),
 					totalRevenueUsd: otherRevExact,
@@ -1984,10 +2023,12 @@ export class EntityAnalyticsService {
 		const rankOffset = useTopN ? 0 : dto.skip;
 		const items: EntityTopTerItem[] = dataRows.map((row, i) => {
 			const isoCode = row.iso_code?.trim().toUpperCase() || '';
+			const country = countryMap.get(isoCode);
 			return {
 				rank: rankOffset + i + 1,
 				isoCode,
-				territory: nameMap.get(isoCode) ?? isoCode,
+				territory: country?.name ?? isoCode,
+				imageUrl: country?.imageUrl ?? null,
 				totalViews: Number(row.total_views),
 				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',

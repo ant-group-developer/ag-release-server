@@ -1,10 +1,12 @@
 import {
+	IsBoolean,
 	IsEnum,
 	IsNumber,
 	IsOptional,
 	IsString,
 	ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 import { ApiProperty, PartialType } from '@nestjs/swagger';
@@ -204,4 +206,11 @@ export class QueryGetListCountryDto extends BaseQueryDto {
 	@IsOptional()
 	@IsEnum(FieldOrderCountry)
 	fieldOrder: FieldOrderCountry = FieldOrderCountry.NAME;
+}
+
+export class SyncCountryFlagsDto {
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => value === true || value === 'true')
+	force?: boolean = false;
 }
