@@ -25,6 +25,7 @@ describe('QaRunner', () => {
 		mockTicketService = {
 			open: jest.fn(),
 			resolve: jest.fn(),
+			resolveScoped: jest.fn(),
 		};
 
 		const module = await Test.createTestingModule({

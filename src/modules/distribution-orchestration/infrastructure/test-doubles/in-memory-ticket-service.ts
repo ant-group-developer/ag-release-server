@@ -54,4 +54,18 @@ export class InMemoryTicketService implements TicketService {
 		const ticket = this.tickets.find((t) => t.ref.equals(input.ticket));
 		if (ticket) ticket.resolved = true;
 	}
+
+	async resolveScoped(input: {
+		distributionId: string;
+		ticketId: string;
+	}): Promise<boolean> {
+		const ticket = this.tickets.find(
+			(t) =>
+				t.ref.value === input.ticketId &&
+				t.distributionId === input.distributionId,
+		);
+		if (!ticket) return false;
+		ticket.resolved = true;
+		return true;
+	}
 }

@@ -92,6 +92,7 @@ export class DspReportService {
 		pageSize?: number;
 		keyword?: string;
 		status?: string;
+		source?: string;
 		fieldOrder?: string;
 		orderBy?: string;
 	}): Promise<{ items: DspsReportResponse[]; totalItems: number }> {
@@ -107,6 +108,12 @@ export class DspReportService {
 			conditions.push(`r.pg_uuid != ''`);
 		} else if (query.status === 'unassigned') {
 			conditions.push(`r.pg_uuid = ''`);
+		}
+
+		// Source filter (ftp_folder, wmg_report, spotify_report)
+		if (query.source) {
+			conditions.push(`r.source = {source:String}`);
+			params.source = query.source;
 		}
 
 		// Keyword search (search in dsps_report and assigned pg_dsps_sync fields)

@@ -11,7 +11,8 @@ import { DistributionState } from '../domain/distribution/distribution-state.enu
 import { TicketService } from '../domain/ports/ticket-service.port';
 import { ExecutionTypeEnum } from '../domain/value-objects/execution-type.enum';
 import { IdempotencyKey } from '../domain/value-objects/idempotency-key.vo';
-import { TicketReason } from '../domain/value-objects/ticket-ref.vo';
+import { TicketIssueItem } from '../domain/value-objects/ticket-metadata.vo';
+import { TicketReason, TicketRef } from '../domain/value-objects/ticket-ref.vo';
 import { TICKET_SERVICE } from '../infrastructure/adapters/postgres-ticket.adapter';
 import {
 	ApproveReviewCommand,
@@ -23,6 +24,10 @@ import {
 	DISTRIBUTION_REPOSITORY,
 	DistributionRepository,
 } from './ports/distribution-repository.port';
+import {
+	DSP_SPEC_RESOLVER,
+	DspSpecResolver,
+} from './ports/dsp-spec-resolver.port';
 import {
 	RELEASE_SNAPSHOT_WRITER,
 	ReleaseSnapshotWriter,
@@ -60,6 +65,8 @@ export class DistributionCommandService {
 		private readonly uow: UnitOfWork,
 		@Inject(DISTRIBUTION_REPOSITORY)
 		private readonly repo: DistributionRepository,
+		@Inject(DSP_SPEC_RESOLVER)
+		private readonly dspSpecResolver: DspSpecResolver,
 	) {}
 
 	/**
@@ -71,7 +78,7 @@ export class DistributionCommandService {
 		releaseId: string;
 		tenantId: string;
 		type: ExecutionTypeEnum;
-		channelSpecs: unknown[];
+		dspCodes: string[];
 		idempotencyKey?: string;
 	}): Promise<string> {
 		const distributionId = uuidv4();
@@ -82,12 +89,17 @@ export class DistributionCommandService {
 		const key =
 			input.idempotencyKey ?? `submit:${input.releaseId}:${input.type}`;
 
-		// 1. Tạo snapshot bất biến (chụp release tại thời điểm submit)
+		// 1. Resolve dspCodes → ChannelDeliverySpec[] (topology/aggregator/hasDeal server-side)
+		const channelSpecs = await this.dspSpecResolver.resolveMany(
+			input.dspCodes,
+		);
+
+		// 2. Tạo snapshot bất biến (chụp release tại thời điểm submit)
 		const snapshotId = await this.snapshotWriter.createFromRelease(
 			input.releaseId,
 		);
 
-		// 2. Enqueue SUBMIT với snapshotId vừa tạo
+		// 3. Enqueue SUBMIT với snapshotId vừa tạo
 		const command: SubmitCommand = {
 			type: 'SUBMIT',
 			distributionId,
@@ -99,7 +111,7 @@ export class DistributionCommandService {
 				tenantId: input.tenantId,
 				type: input.type,
 				correlationId,
-				channelSpecs: input.channelSpecs as never,
+				channelSpecs,
 			},
 		};
 
@@ -159,17 +171,21 @@ export class DistributionCommandService {
 		distributionId: string;
 		reviewerId: string;
 		note?: string;
+		items?: TicketIssueItem[];
 		allowedTenantIds?: string[];
 		idempotencyKey?: string;
 	}): Promise<void> {
-		const { distributionId, reviewerId, note } = input;
+		const { distributionId, reviewerId, note, items } = input;
 		await this.assertReviewable(distributionId, input.allowedTenantIds);
 		const key = input.idempotencyKey ?? `review-reject:${distributionId}`;
 
 		const ticketRef = await this.ticketService.open({
 			distributionId,
 			reason: TicketReason.REVIEW_REJECT,
-			detail: 'Review rejected by reviewer',
+			detail: note?.trim() || 'Review rejected by reviewer',
+			// Ghi flag cấu trúc reviewer tạo → client render chung với lỗi CI/QA.
+			metadata:
+				items && items.length > 0 ? { items } : undefined,
 			key: IdempotencyKey.create(`review-reject:${distributionId}`),
 		});
 
@@ -193,6 +209,32 @@ export class DistributionCommandService {
 	}
 
 	/**
+	 * Resolve 1 ticket (flag lỗi) — user đánh dấu đã sửa.
+	 *
+	 * KHÔNG tự resume aggregate (user RESUBMIT thủ công — v1). Chỉ đóng ticket.
+	 * Tenant-scope như review; ticket phải thuộc đúng distribution (404 nếu không).
+	 */
+	async resolveTicket(input: {
+		distributionId: string;
+		ticketId: string;
+		allowedTenantIds?: string[];
+	}): Promise<void> {
+		await this.assertReviewable(input.distributionId, input.allowedTenantIds, {
+			requireInReview: false,
+		});
+
+		const ok = await this.ticketService.resolveScoped({
+			distributionId: input.distributionId,
+			ticketId: input.ticketId,
+		});
+		if (!ok) {
+			throw new NotFoundException(
+				'Ticket not found for this distribution',
+			);
+		}
+	}
+
+	/**
 	 * Guard trước khi ghi review + enqueue:
 	 *  · distribution tồn tại (404)
 	 *  · tenant-scope: reviewer chỉ duyệt release thuộc tenant mình (+descendants). `allowedTenantIds`
@@ -202,7 +244,9 @@ export class DistributionCommandService {
 	private async assertReviewable(
 		distributionId: string,
 		allowedTenantIds?: string[],
+		opts: { requireInReview?: boolean } = {},
 	): Promise<void> {
+		const { requireInReview = true } = opts;
 		const dist = await this.uow.run((ctx) =>
 			this.repo.load(ctx, distributionId),
 		);
@@ -216,7 +260,7 @@ export class DistributionCommandService {
 				'You cannot review a distribution outside your tenant scope',
 			);
 		}
-		if (dist.state !== DistributionState.IN_REVIEW) {
+		if (requireInReview && dist.state !== DistributionState.IN_REVIEW) {
 			throw new ConflictException(
 				`Distribution ${distributionId} is not IN_REVIEW (current: ${dist.state})`,
 			);

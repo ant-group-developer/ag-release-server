@@ -121,6 +121,12 @@ export class ReleaseQueryService {
 			qbId.leftJoin('release.releaseDspDeliveries', 'releaseDspDelivery');
 			qbId.leftJoin('releaseDspDelivery.dsp', 'releaseDspDeliveryDsp');
 		}
+		if (itemsToJoin.includes('release.video')) {
+			qbId.leftJoinAndSelect('release.video', 'video');
+		}
+		if (itemsToJoin.includes('release.releaseArtists')) {
+			qbId.leftJoinAndSelect('release.releaseArtists', 'releaseArtist');
+		}
 
 		this.applyOrderFieldSelect(qbId, query.fieldOrder);
 
@@ -995,7 +1001,7 @@ export class ReleaseQueryService {
 			needImportAgain,
 			hasQaFlag,
 			dspDelivery,
-
+			hangingExecutionDays,
 			fieldOrder,
 			orderBy,
 
@@ -1069,6 +1075,19 @@ export class ReleaseQueryService {
 						)`,
 				);
 			}
+		}
+
+		if (hangingExecutionDays !== undefined) {
+			qb.innerJoin(
+				'release_excutions3',
+				're3',
+				're3.release_id = release.id',
+			);
+			qb.andWhere('re3.completed_at IS NULL');
+			qb.andWhere(
+				`re3.created_at <= NOW() - (INTERVAL '1 day' * :hangingExecutionDays)`,
+				{ hangingExecutionDays },
+			);
 		}
 
 		const dspDeliveryInclude = (dspDelivery?.include ?? []).filter(
@@ -1190,12 +1209,14 @@ export class ReleaseQueryService {
 		}
 
 		if (artistId?.length) {
+			itemsToJoin.push('release.releaseArtists');
 			qb.andWhere('releaseArtist.artistId IN (:...artistId)', {
 				artistId,
 			});
 		}
 
 		if (channelId?.length) {
+			itemsToJoin.push('release.video');
 			qb.andWhere('video.channelId IN (:...channelId)', {
 				channelId,
 			});
@@ -1716,7 +1737,8 @@ export class ReleaseQueryService {
 							'code', dsp.code,
 							'codeCi', dsp.code_ci,
 							'picture', dsp.picture,
-							'type', dsp.type
+							'type', dsp.type,
+							'isActive', dsp.is_active
 						)
 					)
 				) FILTER (WHERE rdd.id IS NOT NULL), '[]')`,

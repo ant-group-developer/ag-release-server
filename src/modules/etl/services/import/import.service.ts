@@ -4,6 +4,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../../clickhouse';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { ResolvedFtpParserConfig } from '../../../dsp-report/services/ftp-parser-config.service';
 import { DspMappingService } from '../../../dsp/services/dsp-mapping.service';
 import {
 	FactDspRow,
@@ -28,6 +29,8 @@ import {
 
 const REVELATOR_IMPORT_SOURCE = 'bombshelter';
 
+import { ParseFileStats } from '../../parsers/base.parser';
+
 export interface ImportResult {
 	batchId: string;
 	totalRows: number;
@@ -40,6 +43,7 @@ export interface ImportResult {
 		rows: number;
 		durationMs: number;
 		fileNames: string[];
+		fileStats?: ParseFileStats[];
 		releases?: {
 			totalReleases: number;
 			created: number;
@@ -403,6 +407,7 @@ export class ImportService {
 		batchId: string,
 		sourceCategory: string = '',
 		importSource: string = 'ftp',
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Pre-load file exclude check once (avoids repeated async calls inside findDataFiles)
 		const fileExcluder = async (name: string) =>
@@ -416,6 +421,7 @@ export class ImportService {
 				batchId,
 				fileExcluder,
 				importSource,
+				parserConfig,
 			);
 		}
 		if (sourceCategory === 'illegitimate_activity') {
@@ -425,6 +431,7 @@ export class ImportService {
 				batchId,
 				fileExcluder,
 				importSource,
+				parserConfig,
 			);
 		}
 		// Default: trends / usage → existing parsers → fact_dsp
@@ -435,6 +442,7 @@ export class ImportService {
 			sourceCategory,
 			fileExcluder,
 			importSource,
+			parserConfig,
 		);
 	}
 
@@ -448,15 +456,18 @@ export class ImportService {
 		sourceCategory: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
-			await this.dspMappingService.resolveOrCreateDspReport(
+			parserConfig?.dspReport ??
+			(await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
 				importSource === 'ftp' ? 'ftp_folder' : importSource,
-			);
+			));
 
-		const parser = getParserForFolder(folderName);
+		const parser: any =
+			parserConfig?.parser ?? getParserForFolder(folderName);
 		if (!parser) {
 			this.logger.warn(`No trends parser for folder: ${folderName}`);
 			return null;
@@ -468,10 +479,12 @@ export class ImportService {
 		);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactDspRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				for (const row of rows) {
 					if (sourceCategory) {
@@ -523,6 +536,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -535,18 +549,21 @@ export class ImportService {
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const isRevelator = this.isRevelatorSalesFolder(folderName);
 
 		const dspsReport: { id_dsps_report: string; pg_uuid: string | null } =
-			isRevelator
+			parserConfig?.dspReport ??
+			(isRevelator
 				? { id_dsps_report: '', pg_uuid: null }
 				: await this.dspMappingService.resolveOrCreateDspReport(
 						folderName,
 						importSource === 'ftp' ? 'ftp_folder' : importSource,
-					);
+					));
 
-		const parser = getSalesParserForFolder(folderName);
+		const parser: any =
+			parserConfig?.parser ?? getSalesParserForFolder(folderName);
 		if (!parser) {
 			this.logger.warn(
 				`⚠️ [UNKNOWN DSP] No sales parser found for folder: "${folderName}" — data skipped. Please add a parser for this DSP.`,
@@ -558,10 +575,13 @@ export class ImportService {
 		this.logger.log(`Parsing SALES folder: ${folderName}`);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactSalesRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
+		const parseErrors: string[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report from dsps_report
 				for (const row of rows) {
@@ -579,10 +599,22 @@ export class ImportService {
 				}
 				allRows.push(...rows);
 			} catch (err) {
+				parseErrors.push(
+					`${path.basename(filePath)}: ${err.message}`,
+				);
 				this.logger.error(
 					`Error parsing sales ${path.basename(filePath)}: ${err.message}`,
 				);
 			}
+		}
+
+		// A folder with no successfully parsed file must not be recorded as
+		// "done" with zero rows: otherwise the incremental sync will skip it on
+		// subsequent runs even though none of its data was imported.
+		if (files.length > 0 && parseErrors.length === files.length) {
+			throw new Error(
+				`Failed to parse every sales file in ${folderName}: ${parseErrors.join('; ')}`,
+			);
 		}
 
 		let entityResult:
@@ -619,6 +651,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -631,14 +664,19 @@ export class ImportService {
 		batchId: string,
 		fileExcluder: (name: string) => Promise<boolean>,
 		importSource: string,
+		parserConfig?: ResolvedFtpParserConfig,
 	): Promise<ImportResult['dspResults'][0] | null> {
 		const prefix = folderName.split('-')[0];
-		let parser;
-		if (prefix === 'dzr') parser = new DeezerIllegitimateParser();
-		else if (prefix === 'scu') parser = new SoundCloudIllegitimateParser();
-		else if (prefix === 'spo') parser = new SpotifyIllegitimateParser();
-		else if (prefix === 'tiktok') parser = new TiktokIllegitimateParser();
-		else {
+		let parser: any = parserConfig?.parser;
+		if (!parser) {
+			if (prefix === 'dzr') parser = new DeezerIllegitimateParser();
+			else if (prefix === 'scu')
+				parser = new SoundCloudIllegitimateParser();
+			else if (prefix === 'spo') parser = new SpotifyIllegitimateParser();
+			else if (prefix === 'tiktok')
+				parser = new TiktokIllegitimateParser();
+		}
+		if (!parser) {
 			this.logger.warn(
 				`No illegitimate parser for folder: ${folderName}`,
 			);
@@ -647,19 +685,22 @@ export class ImportService {
 
 		// Resolve or create dsps_report for this folder
 		const dspsReport =
-			await this.dspMappingService.resolveOrCreateDspReport(
+			parserConfig?.dspReport ??
+			(await this.dspMappingService.resolveOrCreateDspReport(
 				folderName,
 				importSource === 'ftp' ? 'ftp_folder' : importSource,
-			);
+			));
 
 		const startTime = Date.now();
 		this.logger.log(`Parsing ILLEGITIMATE folder: ${folderName}`);
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactDspRow[] = [];
+		const allFileStats: ParseFileStats[] = [];
 
 		for (const filePath of files) {
 			try {
-				const rows = await parser.parseFile(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report
 				for (const row of rows) {
@@ -709,6 +750,7 @@ export class ImportService {
 			allRows.length,
 			startTime,
 			entityResult,
+			allFileStats,
 		);
 	}
 
@@ -725,6 +767,7 @@ export class ImportService {
 			inDb: number;
 			pending: number;
 		},
+		fileStats?: ParseFileStats[],
 	): ImportResult['dspResults'][0] {
 		const duration = Date.now() - startTime;
 		this.logger.log(
@@ -740,6 +783,7 @@ export class ImportService {
 			rows: totalRows,
 			durationMs: duration,
 			fileNames: files.map((f) => path.basename(f)),
+			fileStats,
 			releases: entityResult
 				? {
 						totalReleases: entityResult.totalReleases,

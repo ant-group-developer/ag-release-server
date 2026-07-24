@@ -48,26 +48,48 @@ export class FtpService {
 
 	/**
 	 * Create and connect a new FTP client.
+	 * Retries up to 3 times with 2s delay on failure.
 	 * Caller is responsible for closing via client.close().
 	 */
 	async connect(): Promise<ftp.Client> {
 		const config = this.getConfig();
-		const client = new ftp.Client();
-		client.ftp.verbose = false;
+		const maxAttempts = 3;
+		const retryDelayMs = 2000;
+		let lastError: Error | undefined;
 
-		this.logger.log(`Connecting to FTPS ${config.host}:${config.port}...`);
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			const client = new ftp.Client();
+			client.ftp.verbose = false;
 
-		await client.access({
-			host: config.host,
-			port: config.port,
-			user: config.user,
-			password: config.password,
-			secure: config.secure, // TLS Explicit
-			secureOptions: { rejectUnauthorized: false },
-		});
+			try {
+				this.logger.log(
+					`Connecting to FTPS ${config.host}:${config.port}...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`,
+				);
+				await client.access({
+					host: config.host,
+					port: config.port,
+					user: config.user,
+					password: config.password,
+					secure: config.secure,
+					secureOptions: { rejectUnauthorized: false },
+				});
+				this.logger.log('FTPS connected successfully');
+				return client;
+			} catch (err) {
+				client.close();
+				lastError = err as Error;
+				this.logger.warn(
+					`FTPS connection attempt ${attempt}/${maxAttempts} failed: ${lastError.message}`,
+				);
+				if (attempt < maxAttempts) {
+					await new Promise((resolve) =>
+						setTimeout(resolve, retryDelayMs),
+					);
+				}
+			}
+		}
 
-		this.logger.log('FTPS connected successfully');
-		return client;
+		throw lastError;
 	}
 
 	/**
@@ -140,13 +162,19 @@ export class FtpService {
 		category: string,
 		period: string,
 		dspFolder: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<string[]> {
 		const config = this.getConfig();
 		const client = await this.connect();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
-			const files = await this.listFilesRecursive(client, remotePath, '');
+			const files = await this.listFilesRecursive(
+				client,
+				remotePath,
+				'',
+				fileSelector,
+			);
 			return files.sort();
 		} catch (err) {
 			this.logger.warn(
@@ -167,6 +195,7 @@ export class FtpService {
 		client: ftp.Client,
 		remotePath: string,
 		prefix: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<string[]> {
 		const list = await client.list(remotePath);
 		const files: string[] = [];
@@ -178,9 +207,11 @@ export class FtpService {
 					client,
 					`${remotePath}/${item.name}`,
 					relativeName,
+					fileSelector,
 				);
 				files.push(...subFiles);
 			} else if (item.isFile) {
+				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
 					await this.excludePatternService.shouldExclude(
 						item.name,
@@ -206,6 +237,8 @@ export class FtpService {
 		client: ftp.Client,
 		remotePath: string,
 		localPath: string,
+		prefix: string = '',
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<number> {
 		// Ensure local directory exists
 		fs.mkdirSync(localPath, { recursive: true });
@@ -216,14 +249,18 @@ export class FtpService {
 		for (const item of list) {
 			const remoteItemPath = `${remotePath}/${item.name}`;
 			const localItemPath = path.join(localPath, item.name);
+			const relativeName = prefix ? `${prefix}/${item.name}` : item.name;
 
 			if (item.isDirectory) {
 				fileCount += await this.downloadFolder(
 					client,
 					remoteItemPath,
 					localItemPath,
+					relativeName,
+					fileSelector,
 				);
 			} else if (item.isFile) {
+				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
 					await this.excludePatternService.shouldExclude(
 						item.name,
@@ -325,6 +362,7 @@ export class FtpService {
 		category: string,
 		dspFolder: string,
 		tempDir: string,
+		fileSelector?: (relativePath: string) => boolean,
 	): Promise<{ localPath: string; fileCount: number }> {
 		const config = this.getConfig();
 		const client = await this.connect();
@@ -336,6 +374,8 @@ export class FtpService {
 				client,
 				remotePath,
 				localPath,
+				'',
+				fileSelector,
 			);
 			return { localPath, fileCount };
 		} finally {

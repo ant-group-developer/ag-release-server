@@ -43,7 +43,7 @@ export class DistributionCommandController {
 		const distributionId = await this.commandService.submit({
 			releaseId: body.releaseId,
 			type: body.type,
-			channelSpecs: body.channelSpecs,
+			dspCodes: body.dspCodes,
 			tenantId: user.tenantId,
 			idempotencyKey: body.idempotencyKey,
 		});
@@ -95,8 +95,36 @@ export class DistributionCommandController {
 			distributionId: id,
 			reviewerId: user.id,
 			note: body.note,
+			items: body.items,
 			allowedTenantIds: await this.resolveScope(user),
 			idempotencyKey: body.idempotencyKey,
+		});
+		return { ok: true };
+	}
+
+	/**
+	 * POST /distributions/:id/tickets/:ticketId/resolve — user đánh dấu flag đã sửa.
+	 *
+	 * RBAC: permission update release (recovery cấp release). Tenant-scope như review.
+	 * Chỉ đóng ticket (status resolved) — KHÔNG tự resubmit (user bấm Submit lại thủ công).
+	 */
+	@Post(':id/tickets/:ticketId/resolve')
+	@RequirePermissions(
+		Permission.RELEASE_AUDIO.UPDATE,
+		Permission.RELEASE_VIDEO.UPDATE,
+	)
+	@ApiOperation({ summary: 'Đánh dấu flag lỗi đã được sửa (resolve ticket)' })
+	@ApiParam({ name: 'id', format: 'uuid' })
+	@ApiParam({ name: 'ticketId', format: 'uuid' })
+	async resolveTicket(
+		@Param('id', ParseUUIDPipe) id: string,
+		@Param('ticketId', ParseUUIDPipe) ticketId: string,
+		@User() user: UserReq,
+	): Promise<{ ok: true }> {
+		await this.commandService.resolveTicket({
+			distributionId: id,
+			ticketId,
+			allowedTenantIds: await this.resolveScope(user),
 		});
 		return { ok: true };
 	}

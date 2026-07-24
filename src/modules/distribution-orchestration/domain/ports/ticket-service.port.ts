@@ -17,4 +17,12 @@ export interface TicketService {
 		key: IdempotencyKey;
 	}): Promise<TicketRef>;
 	resolve(input: { ticket: TicketRef }): Promise<void>;
+	/**
+	 * Resolve có kiểm tra ticket thuộc đúng distribution (chống resolve nhầm ticket
+	 * distribution khác). Trả false nếu ticket không tồn tại / không thuộc distribution.
+	 */
+	resolveScoped(input: {
+		distributionId: string;
+		ticketId: string;
+	}): Promise<boolean>;
 }

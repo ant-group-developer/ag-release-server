@@ -311,6 +311,7 @@ export class SyncController {
 				period,
 				force,
 				categories,
+				jobId,
 			);
 			await this.importJobsService.updateProgress(
 				jobId,
@@ -348,6 +349,7 @@ export class SyncController {
 
 			const results: unknown[] = [];
 			let totalRows = 0;
+			let totalFolderErrors = 0;
 			const releases = {
 				total: 0,
 				imported: 0,
@@ -371,6 +373,7 @@ export class SyncController {
 						period,
 						force,
 						categories,
+						jobId,
 					);
 					results.push(result);
 					if (
@@ -387,22 +390,46 @@ export class SyncController {
 						releases.inDb += result.releases.inDb;
 						releases.pending += result.releases.pending;
 					}
+					// Count folder-level errors within the period result
+					if (result?.categories) {
+						for (const cat of result.categories) {
+							totalFolderErrors += cat.folders.filter(
+								(f) => f.status === 'error',
+							).length;
+						}
+					}
 				} catch (err) {
-					results.push({ period, error: err.message });
+					totalFolderErrors++;
+					results.push({ period, error: (err as Error).message });
 				}
 			}
 
-			await this.importJobsService.updateProgress(
-				jobId,
-				{ progressCurrent: periods.length, progressLabel: 'Done' },
-				true,
-			);
-			await this.importJobsService.markCompleted(jobId, {
+			const summary = {
 				totalPeriods: periods.length,
 				totalRows,
+				totalFolderErrors,
 				results,
 				releases,
-			});
+			};
+
+			await this.importJobsService.updateProgress(
+				jobId,
+				{ progressCurrent: periods.length, progressLabel: totalFolderErrors > 0 ? `Done with ${totalFolderErrors} error(s)` : 'Done' },
+				true,
+			);
+			if (totalFolderErrors > 0) {
+				await this.importJobsService.updateProgress(
+					jobId,
+					{ totalRows, processedRows: totalRows },
+					true,
+				);
+				await this.importJobsService.markFailed(
+					jobId,
+					new Error(`Sync completed with ${totalFolderErrors} folder error(s). Rows imported: ${totalRows}. See result for details.`),
+				);
+			} else {
+				await this.importJobsService.markCompleted(jobId, summary);
+			}
 		} catch (err) {
 			await this.importJobsService.markFailed(jobId, err);
 		}

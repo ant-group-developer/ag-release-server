@@ -67,6 +67,7 @@ describe('DistributionCommandService — review decisions (Khối B)', () => {
 			tickets,
 			uow,
 			repo,
+			{ resolveMany: async () => [] },
 		);
 		await seedInReview();
 	});
@@ -149,5 +150,126 @@ describe('DistributionCommandService — review decisions (Khối B)', () => {
 				reviewerId: REVIEWER,
 			}),
 		).rejects.toThrow(/not found/i);
+	});
+
+	it('rejectReview w/ items[] → ticket metadata chứa items (flag reviewer)', async () => {
+		await service.rejectReview({
+			distributionId: DIST_ID,
+			reviewerId: REVIEWER,
+			note: 'Fix cover + audio',
+			items: [
+				{
+					code: 'COVER001',
+					message: 'Cover art blurry',
+					severity: 'error',
+					location: 'Cover',
+				},
+				{
+					code: 'AUD002',
+					message: 'Clipping',
+					severity: 'warning',
+					suggestion: 'Re-master track 3',
+				},
+			],
+		});
+
+		expect(tickets.tickets).toHaveLength(1);
+		expect(tickets.tickets[0].metadata?.items).toHaveLength(2);
+		expect(tickets.tickets[0].metadata?.items[0]).toMatchObject({
+			code: 'COVER001',
+			severity: 'error',
+		});
+	});
+
+	it('rejectReview không items → metadata undefined', async () => {
+		await service.rejectReview({
+			distributionId: DIST_ID,
+			reviewerId: REVIEWER,
+			note: 'chỉ note',
+		});
+		expect(tickets.tickets[0].metadata).toBeUndefined();
+	});
+
+	it('resolveTicket → đóng ticket đúng distribution', async () => {
+		// mở 1 ticket qua reject trước
+		await service.rejectReview({
+			distributionId: DIST_ID,
+			reviewerId: REVIEWER,
+			items: [{ code: 'X', message: 'y', severity: 'error' }],
+		});
+		const ticketId = tickets.tickets[0].ref.value;
+
+		await service.resolveTicket({
+			distributionId: DIST_ID,
+			ticketId,
+		});
+
+		expect(tickets.tickets[0].resolved).toBe(true);
+	});
+
+	it('resolveTicket ticket không thuộc distribution → NotFoundException', async () => {
+		await service.rejectReview({
+			distributionId: DIST_ID,
+			reviewerId: REVIEWER,
+		});
+		await expect(
+			service.resolveTicket({
+				distributionId: DIST_ID,
+				ticketId: 'ticket-not-exist',
+			}),
+		).rejects.toThrow(/not found/i);
+	});
+
+	it('resolveTicket tenant out of scope → ForbiddenException', async () => {
+		await service.rejectReview({
+			distributionId: DIST_ID,
+			reviewerId: REVIEWER,
+		});
+		const ticketId = tickets.tickets[0].ref.value;
+		await expect(
+			service.resolveTicket({
+				distributionId: DIST_ID,
+				ticketId,
+				allowedTenantIds: ['other-tenant'],
+			}),
+		).rejects.toThrow(/tenant scope/i);
+	});
+
+	it('submit → resolve dspCodes thành channelSpecs + enqueue SUBMIT', async () => {
+		const resolvedSpecs = [
+			{
+				dspCode: 'SPOTIFY',
+				topology: ChannelTopology.DIRECT,
+				processCode: '',
+			},
+		];
+		const resolver = { resolveMany: jest.fn(async () => resolvedSpecs) };
+		const svc = new DistributionCommandService(
+			workflow,
+			{ createFromRelease: async () => 'snap-1' },
+			reviewRepo,
+			tickets,
+			uow,
+			repo,
+			resolver,
+		);
+
+		const distId = await svc.submit({
+			releaseId: '22222222-2222-2222-2222-222222222222',
+			tenantId: TENANT_ID,
+			type: ExecutionTypeEnum.INITIAL_RELEASE,
+			dspCodes: ['SPOTIFY'],
+		});
+
+		expect(distId).toBeTruthy();
+		expect(resolver.resolveMany).toHaveBeenCalledWith(['SPOTIFY']);
+
+		const submitJob = workflow.all.find(
+			(j) => (j.payload.command as any).type === 'SUBMIT',
+		);
+		expect(submitJob).toBeTruthy();
+		expect((submitJob!.payload.command as any).create.channelSpecs).toEqual(
+			resolvedSpecs,
+		);
 	});
 });

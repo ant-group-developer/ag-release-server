@@ -316,6 +316,10 @@ export class ReleaseDraftService {
 					updateTrack.pLineOwner = release.pLineOwner;
 				}
 
+				if (dto.syncIsInstrumental) {
+					updateTrack.isInstrumental = release.isInstrumental;
+				}
+
 				// if (dto.syncArtists) {
 				// 	updateTrack.copyArtistsFromRelease = true;
 				// }

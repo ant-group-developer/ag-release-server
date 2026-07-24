@@ -30,12 +30,14 @@ export class SubmitDistributionDto {
 	type!: ExecutionTypeEnum;
 
 	@ApiProperty({
-		type: [Object],
-		description: 'Danh sách channel delivery spec (≥1)',
+		type: [String],
+		description:
+			'Danh sách DSP code muốn phát hành (≥1). Server tự resolve routing/topology.',
 	})
 	@IsArray()
 	@ArrayNotEmpty()
-	channelSpecs!: unknown[];
+	@IsString({ each: true })
+	dspCodes!: string[];
 
 	@ApiPropertyOptional({
 		description:

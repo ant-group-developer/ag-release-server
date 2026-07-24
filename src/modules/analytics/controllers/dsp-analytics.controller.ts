@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	DspChartQueryDto,
+	DspAnalyticsSummaryQueryDto,
 	DspOverviewQueryDto,
 	DspTopQueryDto,
 } from '../dto/analytics-query.dto';
@@ -19,6 +20,20 @@ import { DspAnalyticsService } from '../services/dsp-analytics.service';
 export class DspAnalyticsController {
 	constructor(private readonly dspSvc: DspAnalyticsService) {}
 
+	@Post('summary')
+	@ApiOperation({
+		summary: 'Unified analytics summary for one DSP',
+		description:
+			'Requires pgDspId or dspReportId. Trend views use exact days; usage and revenue use intersecting reporting months.',
+	})
+	async summary(
+		@Body() dto: DspAnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.dspSvc.getSummary(dto, req.user!.tenantId);
+		return new ResponseSuccess({ data });
+	}
+
 	@Post('overview')
 	@ApiOperation({
 		summary:
@@ -30,7 +45,7 @@ export class DspAnalyticsController {
 	}
 
 	@Post('trend-view/line-chart')
-	@ApiOperation({ summary: 'Trend view line chart cho 1 DSP (monthly)' })
+	@ApiOperation({ summary: 'Daily trend view line chart for one DSP' })
 	async trendViewLineChart(
 		@Body() dto: DspChartQueryDto,
 		@Req() req: Request,
@@ -102,15 +117,15 @@ export class DspAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Post('ter')
-	@ApiOperation({
-		summary: 'Top territories của 1 DSP (sortBy: views | revenue)',
-	})
-	async topTerritories(@Body() dto: DspTopQueryDto, @Req() req: Request) {
-		const data = await this.dspSvc.getTopTerritories(
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
+	// @Post('ter')
+	// @ApiOperation({
+	// 	summary: 'Top territories của 1 DSP (sortBy: views | revenue)',
+	// })
+	// async topTerritories(@Body() dto: DspTopQueryDto, @Req() req: Request) {
+	// 	const data = await this.dspSvc.getTopTerritories(
+	// 		dto,
+	// 		req.user!.tenantId,
+	// 	);
+	// 	return new ResponseSuccess({ data });
+	// }
 }

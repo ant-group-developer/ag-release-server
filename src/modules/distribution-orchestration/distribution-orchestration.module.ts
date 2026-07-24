@@ -23,6 +23,7 @@ import {
 } from './application/policy-resolver';
 import { CLOCK } from './application/ports/clock.port.token';
 import { DISTRIBUTION_REPOSITORY } from './application/ports/distribution-repository.port';
+import { DSP_SPEC_RESOLVER } from './application/ports/dsp-spec-resolver.port';
 import { RELEASE_SNAPSHOT_READER } from './application/ports/release-snapshot-reader.port';
 import { RELEASE_SNAPSHOT_WRITER } from './application/ports/release-snapshot-writer.port';
 import { REVIEW_REPOSITORY } from './application/ports/review-repository.port';
@@ -30,6 +31,9 @@ import { TENANT_READER } from './application/ports/tenant-reader.port';
 import { UNIT_OF_WORK } from './application/ports/unit-of-work.port';
 import { WORKFLOW_ENGINE } from './application/ports/workflow-engine.port';
 import { ReleaseDspDeliveryProjection } from './application/projection/release-dsp-delivery.projection';
+import { DistributionChannelQueryService } from './application/queries/distribution-channel-query.service';
+import { DistributionListQueryService } from './application/queries/distribution-list-query.service';
+import { DistributionTicketQueryService } from './application/queries/distribution-ticket-query.service';
 import { DistributionTimelineQueryService } from './application/queries/distribution-timeline-query.service';
 import {
 	BuildPackageRunner,
@@ -58,6 +62,7 @@ import {
 } from './application/step-runners/status-sync.runner';
 import { ValidateRunner } from './application/step-runners/validate.runner';
 import { CiDeliverDesireAdapter } from './infrastructure/adapters/ci-deliver-desire.adapter';
+import { DspSpecResolverAdapter } from './infrastructure/adapters/dsp-spec-resolver.adapter';
 import { CiImportAdapter } from './infrastructure/adapters/ci-import.adapter';
 import { CiQaAdapter } from './infrastructure/adapters/ci-qa.adapter';
 import { DdexXmlPackageBuilder } from './infrastructure/adapters/ddex-xml-package-builder.adapter';
@@ -67,8 +72,8 @@ import {
 	PostgresTicketAdapter,
 	TICKET_SERVICE,
 } from './infrastructure/adapters/postgres-ticket.adapter';
-import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
 import { ReleaseSnapshotWriterAdapter } from './infrastructure/adapters/release-snapshot-writer.adapter';
+import { ReleaseSnapshotReaderAdapter } from './infrastructure/adapters/release-snapshot.reader';
 import { SftpUploaderAdapter } from './infrastructure/adapters/sftp-uploader.adapter';
 import { TenantReaderAdapter } from './infrastructure/adapters/tenant.reader';
 import { CI_API_CONFIG } from './infrastructure/ci-api/ci-api.config';
@@ -160,24 +165,8 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 	],
 	controllers: [DistributionController, DistributionCommandController],
 	providers: [
-		// CI API Config provider
-		{
-			provide: CI_API_CONFIG,
-			useFactory: (appConfigService: AppConfigService) => ({
-				baseUrl: appConfigService.getValue<string>(
-					'config.partners.ci.baseUrl',
-				),
-				organisationId: appConfigService.getValue<string>(
-					'config.partners.ci.organisationId',
-				),
-				token: appConfigService.getValue<string>(
-					'config.partners.ci.token',
-				),
-				timeout: 30000, // 30s timeout per docs
-			}),
-			inject: [AppConfigService],
-		},
 		{ provide: WORKFLOW_ENGINE, useClass: BullMqWorkflowAdapter },
+		{ provide: DSP_SPEC_RESOLVER, useClass: DspSpecResolverAdapter },
 		{ provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
 		{
 			provide: DISTRIBUTION_REPOSITORY,
@@ -217,6 +206,9 @@ import { RunnerDispatchMap } from './infrastructure/workflow/runner-dispatch-map
 		OrchestrateHandler,
 		OutboxRelay,
 		DistributionTimelineQueryService,
+		DistributionTicketQueryService,
+		DistributionListQueryService,
+		DistributionChannelQueryService,
 		DistributionSseService,
 		ReleaseDspDeliveryProjection,
 		DistributionCommandService,

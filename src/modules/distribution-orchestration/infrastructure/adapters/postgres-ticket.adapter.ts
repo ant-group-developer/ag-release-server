@@ -94,6 +94,21 @@ export class PostgresTicketAdapter implements TicketService {
 			);
 		}
 	}
+
+	/**
+	 * Resolve chỉ khi ticket thuộc đúng distribution — UPDATE ... WHERE id AND distribution_id.
+	 * affected=0 nghĩa ticket không tồn tại hoặc thuộc distribution khác → trả false (caller → 404).
+	 */
+	async resolveScoped(input: {
+		distributionId: string;
+		ticketId: string;
+	}): Promise<boolean> {
+		const result = await this.ticketRepo.update(
+			{ id: input.ticketId, distributionId: input.distributionId },
+			{ status: 'resolved', resolvedAt: new Date() },
+		);
+		return (result.affected ?? 0) > 0;
+	}
 }
 
 /** Detect Postgres unique_violation (23505). */

@@ -6,8 +6,25 @@ import * as readline from 'readline';
 import * as zlib from 'zlib';
 import { FactDspRow } from '../interfaces';
 import { normalizeTextValue } from '../utils/fact-row-normalizer.util';
+import {
+	applyInputAliases,
+	ConfiguredFieldMapping,
+	readSourceValue,
+	transformMappedValue,
+} from './field-mapping-overlay';
 
 const AdmZip = require('adm-zip');
+
+export interface ParseFileStats {
+	filePath: string;
+	fileName: string;
+	fileDirectory: string;
+	fileSizeBytes: number;
+	totalLines: number;
+	processedRows: number;
+	skippedRows: number;
+	errorRows: number;
+}
 
 /**
  * Abstract base parser for all DSP data files.
@@ -16,10 +33,21 @@ const AdmZip = require('adm-zip');
 export abstract class BaseParser {
 	protected readonly logger: Logger;
 	protected readonly dspId: string;
+	private fieldMappingOverrides: ConfiguredFieldMapping[] = [];
 
 	constructor(dspId: string) {
 		this.dspId = dspId;
 		this.logger = new Logger(`${this.constructor.name}`);
+	}
+
+	/**
+	 * Keep the legacy parser as the base implementation and apply database
+	 * configuration as aliases/overrides around it. This avoids losing parser
+	 * rules that have not been made configurable yet.
+	 */
+	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
+		this.fieldMappingOverrides = mappings;
+		return this;
 	}
 
 	/**
@@ -34,6 +62,34 @@ export abstract class BaseParser {
 		}
 
 		return this.parseSingleFile(filePath, batchId);
+	}
+
+	/**
+	 * Parse a file and return both rows and per-file stats (totalLines, processedRows, etc.).
+	 * Used by importers that write to etl_import_history.
+	 */
+	async parseFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
+		const lowerPath = filePath.toLowerCase();
+		if (lowerPath.endsWith('.zip')) {
+			const rows = await this.parseZipFile(filePath, batchId);
+			let zipSize = 0;
+			try { zipSize = fs.statSync(filePath).size; } catch {}
+			const stats: ParseFileStats = {
+				filePath,
+				fileName: path.basename(filePath),
+				fileDirectory: path.dirname(filePath),
+				fileSizeBytes: zipSize,
+				totalLines: rows.length,
+				processedRows: rows.length,
+				skippedRows: 0,
+				errorRows: 0,
+			};
+			return { rows, stats };
+		}
+		return this.parseSingleFileWithStats(filePath, batchId);
 	}
 
 	/**
@@ -106,6 +162,17 @@ export abstract class BaseParser {
 		filePath: string,
 		batchId: string,
 	): Promise<FactDspRow[]> {
+		const { rows } = await this.parseSingleFileWithStats(filePath, batchId);
+		return rows;
+	}
+
+	/**
+	 * Core single-file parser that tracks per-file stats.
+	 */
+	private async parseSingleFileWithStats(
+		filePath: string,
+		batchId: string,
+	): Promise<{ rows: FactDspRow[]; stats: ParseFileStats }> {
 		const rows: FactDspRow[] = [];
 		const delimiter = this.getDelimiter(filePath);
 		const isGzipped = filePath.toLowerCase().endsWith('.gz');
@@ -127,6 +194,8 @@ export abstract class BaseParser {
 
 		let headers: string[] = [];
 		let lineNum = 0;
+		let skippedRows = 0;
+		let errorRows = 0;
 
 		for await (const rawLine of rl) {
 			lineNum++;
@@ -140,22 +209,35 @@ export abstract class BaseParser {
 
 			try {
 				const values = this.parseLine(line, delimiter);
-				if (values.length < headers.length * 0.5) continue;
+				if (values.length < headers.length * 0.5) {
+					skippedRows++;
+					continue;
+				}
 
 				const record: Record<string, string> = {};
 				headers.forEach((h, i) => {
 					record[h.trim()] = (values[i] || '').trim();
 				});
+				applyInputAliases(record, this.fieldMappingOverrides);
 
 				const parsed = this.parseRow(record, batchId, filePath);
 				if (parsed) {
 					if (Array.isArray(parsed)) {
-						rows.push(...parsed);
+						rows.push(
+							...parsed.map((row) =>
+								this.applyFieldMappingOverrides(row, record),
+							),
+						);
 					} else {
-						rows.push(parsed);
+						rows.push(
+							this.applyFieldMappingOverrides(parsed, record),
+						);
 					}
+				} else {
+					skippedRows++;
 				}
 			} catch (err) {
+				errorRows++;
 				if (lineNum <= 5) {
 					this.logger.warn(
 						`Line ${lineNum} error in ${path.basename(filePath)}: ${err.message}`,
@@ -164,7 +246,20 @@ export abstract class BaseParser {
 			}
 		}
 
-		return rows;
+		const stats: ParseFileStats = {
+			filePath,
+			fileName: path.basename(filePath),
+			fileDirectory: path.dirname(filePath),
+			fileSizeBytes: (() => {
+				try { return fs.statSync(filePath).size; } catch { return 0; }
+			})(),
+			totalLines: lineNum,
+			processedRows: rows.length,
+			skippedRows,
+			errorRows,
+		};
+
+		return { rows, stats };
 	}
 
 	/**
@@ -176,6 +271,43 @@ export abstract class BaseParser {
 		batchId: string,
 		filePath: string,
 	): FactDspRow | FactDspRow[] | null;
+
+	private applyFieldMappingOverrides(
+		row: FactDspRow,
+		record: Record<string, string>,
+	): FactDspRow {
+		for (const mapping of this.fieldMappingOverrides) {
+			const value = transformMappedValue(
+				readSourceValue(record, mapping.reportColumn),
+				mapping.transform,
+			);
+			if (mapping.targetColumn.startsWith('metadata.')) {
+				row.metadata[mapping.targetColumn.slice('metadata.'.length)] =
+					value;
+				continue;
+			}
+			const target = mapping.targetColumn as keyof FactDspRow;
+			if (
+				[
+					'quantity_total',
+					'quantity_unique_users',
+					'quantity_invalid',
+				].includes(mapping.targetColumn)
+			) {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.safeInt(value);
+			} else if (mapping.targetColumn === 'reporting_period') {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeDate(value);
+			} else if (mapping.targetColumn === 'territory_code') {
+				(row as unknown as Record<string, unknown>)[target] =
+					this.normalizeCountryCode(value);
+			} else {
+				(row as unknown as Record<string, unknown>)[target] = value;
+			}
+		}
+		return row;
+	}
 
 	/**
 	 * Determine file delimiter from extension/content.

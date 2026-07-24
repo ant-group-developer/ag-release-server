@@ -28,6 +28,7 @@ import { CurrencyModule } from './modules/currency/currency.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { DDEXModule } from './modules/ddex';
 import { DistributionModule } from './modules/distribution/distribution.module';
+import { DistributionOrchestrationModule } from './modules/distribution-orchestration/distribution-orchestration.module';
 import { DspActionModule } from './modules/dsp-action/dsp-action.module';
 import { DspReportModule } from './modules/dsp-report/dsp-report.module';
 import { DspModule } from './modules/dsp/dsp.module';
@@ -185,6 +186,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 		VideoGenreModule,
 
 		DistributionModule,
+		DistributionOrchestrationModule,
 
 		DDEXModule,
 		IsrcModule,

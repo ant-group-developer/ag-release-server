@@ -6,10 +6,10 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { Label } from 'src/modules/label/entities/label.entity';
 import { EntityManager } from 'typeorm';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -46,6 +46,23 @@ export class LabelAnalyticsController {
 			: null;
 	}
 
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a label' })
+	async summary(
+		@Param('labelId') labelId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'label',
+				labelId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a label' })
 	async overview(
@@ -68,95 +85,9 @@ export class LabelAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a label (monthly)' })
-	async trendViewTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTrendViewDspTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a label (monthly)' })
-	async salesViewTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getSalesViewDspTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a label' })
-	async trendViewDailyTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getTrendViewDspDailyTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a label (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('labelId') labelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const [data, tenant] = await Promise.all([
-			this.entitySvc.getRevenueTimeline(
-				'label',
-				labelId,
-				dto,
-				req.user!.tenantId,
-			),
-			this.getLabelTenant(labelId),
-		]);
-		return new ResponseSuccess({
-			data,
-			tenant,
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a label' })
@@ -291,7 +222,7 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | usage | revenue)' })
 	async topTracks(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -311,7 +242,7 @@ export class LabelAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của label (sortBy: views | revenue)',
+		summary: 'Top releases của label (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('labelId') labelId: string,
@@ -331,7 +262,7 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của label (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của label (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -348,7 +279,7 @@ export class LabelAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của label (sortBy: views | revenue)',
+		summary: 'Top territories của label (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('labelId') labelId: string,

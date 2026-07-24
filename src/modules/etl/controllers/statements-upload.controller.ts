@@ -282,6 +282,7 @@ export class StatementsUploadController {
 
 			const summary = await this.importService.import(resolveResult, {
 				totalFilesInFolder: allFiles.length,
+				jobId,
 				onProgress: (label, current, total) => {
 					this.importJobsService.updateProgress(jobId, {
 						progressLabel: label,

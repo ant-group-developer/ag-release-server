@@ -61,6 +61,7 @@ describe('DistributionCommandService — retry (Khối E)', () => {
 			new InMemoryTicketService(),
 			uow,
 			repo,
+			{ resolveMany: async () => [] },
 		);
 	});
 
