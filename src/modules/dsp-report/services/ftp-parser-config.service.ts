@@ -163,10 +163,23 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 	) {}
 
 	async onApplicationBootstrap(): Promise<void> {
+		if (process.env.APP_ROLE !== 'worker') {
+			this.logger.debug(
+				'Skipping automatic parser catalog sync (not worker role)',
+			);
+			return;
+		}
+
 		try {
+			this.logger.log(
+				'Worker bootstrap: seeding FTP parser configs and syncing parser catalog',
+			);
 			await this.clickHouseMigrationService.waitForMigrations();
-			await this.seedLegacyConfigs();
-			await this.syncParserCatalog();
+			const seedResult = await this.seedLegacyConfigs();
+			const syncResult = await this.syncParserCatalog();
+			this.logger.log(
+				`Worker bootstrap parser catalog sync completed: ${syncResult.parsersSynced} definitions from ${syncResult.filesScanned} files; ${seedResult.configsCreated} legacy configs created`,
+			);
 		} catch (err) {
 			const error = err as Error;
 			this.logger.error(
@@ -1186,7 +1199,10 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 	}> {
 		const definitions: Array<{ parserName: string; parserSource: string }> =
 			[];
-		const classPattern = /export\s+(?:abstract\s+)?class\s+(\w+Parser)\b/g;
+		// Development scans TypeScript (`export class FooParser`); production
+		// scans CommonJS output in dist (`class FooParser`). Support both.
+		const classPattern =
+			/(?:export\s+(?:abstract\s+)?class|class)\s+(\w+Parser)\b/g;
 		for (const match of source.matchAll(classPattern)) {
 			const parserName = match[1];
 			if (parserName.startsWith('Base')) continue;

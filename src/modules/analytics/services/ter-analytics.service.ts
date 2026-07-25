@@ -3,6 +3,7 @@ import { InjectEntityManager } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
+import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
@@ -19,7 +20,6 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
-import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 export interface TerOverviewResponse {
