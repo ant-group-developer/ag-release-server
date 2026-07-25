@@ -2,11 +2,13 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { AppRole, currentRole } from 'src/common/constants/app-role';
 import { AppEvent } from 'src/common/enums/common';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DatabaseBackupService } from '../database/services/database.backup.service';
 import { DspReportService } from '../dsp-report/services/dsp-report.service';
 import { ReleaseExecution3CronJobService } from '../release/modules/release-executions3/services/release-execution3.cron-job.service';
+import { cronAllowedOnRole } from './cron-role-map';
 
 @Injectable()
 export class ScheduleService implements OnApplicationBootstrap {
@@ -22,13 +24,21 @@ export class ScheduleService implements OnApplicationBootstrap {
 	) {}
 
 	onApplicationBootstrap() {
-		if (process.env.APP_ROLE !== 'worker') {
-			const jobs = this.schedulerRegistry.getCronJobs();
-			for (const name of jobs.keys()) {
-				this.schedulerRegistry.deleteCronJob(name); // Dừng và xóa
+		const role = currentRole();
+
+		// Chỉ gỡ các cron KHÔNG được phép chạy ở role này (theo cron-role-map),
+		// thay vì xóa sạch — tránh chặt oan cron của module khác (outbox-relay,
+		// projection, etl…). Cron chưa khai báo trong map mặc định chỉ chạy ở worker.
+		const jobs = this.schedulerRegistry.getCronJobs();
+		for (const name of jobs.keys()) {
+			if (!cronAllowedOnRole(name, role)) {
+				this.schedulerRegistry.deleteCronJob(name);
+				this.logger.log(`Skip cron '${name}' on role '${role}'`);
 			}
-			return;
 		}
+
+		// Job động (backup, CI daily) + startup backfill chỉ dựng ở worker.
+		if (role !== AppRole.WORKER) return;
 
 		this.reloadConfig();
 

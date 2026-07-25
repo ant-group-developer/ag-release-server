@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { isWorker } from 'src/common/constants/app-role';
 import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { ReportSourceConfigs } from '../configs';
@@ -13,7 +14,7 @@ export class ConfigSyncService implements OnModuleInit {
 	) {}
 
 	onModuleInit() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping report source configs sync (not worker role)',
 			);

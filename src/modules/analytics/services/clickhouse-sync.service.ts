@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { Client } from 'pg';
+import { isWorker } from 'src/common/constants/app-role';
 import { ClickHouseMigrationService } from 'src/modules/clickhouse/clickhouse-migration.service';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
@@ -88,7 +89,7 @@ export class ClickHouseSyncService implements OnModuleInit, OnModuleDestroy {
 	// ======================================================
 
 	onModuleInit() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping ClickHouse sync listener (not worker role)',
 			);

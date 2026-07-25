@@ -4,6 +4,7 @@ import { CronJob } from 'cron';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { isWorker } from 'src/common/constants/app-role';
 import { pipeline } from 'stream/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
@@ -14,7 +15,7 @@ import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.se
 import { UpdateSpotifyR2SyncConfigDto } from '../dto/spotify-r2-sync-config.dto';
 import { ReportDetectorService } from './report-detector.service';
 import { ReportImportQueueService } from './report-import-queue.service';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const AdmZip = require('adm-zip');
 
 export interface SpotifyR2SyncConfig {
@@ -52,7 +53,7 @@ export class SpotifyR2SyncService implements OnApplicationBootstrap {
 	) {}
 
 	onApplicationBootstrap() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping Spotify R2 sync cron (not worker role)',
 			);

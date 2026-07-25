@@ -4,6 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
 
+import { CRON_JOBS } from '../../../schedule/cron-job-names';
 import { DISTRIBUTION_EVENT_SAVED } from '../../application/events/distribution-sse-event-names';
 import {
 	EnqueueOptions,
@@ -77,7 +78,7 @@ export class OutboxRelay {
 		private readonly eventEmitter: EventEmitter2,
 	) {}
 
-	@Cron('*/5 * * * * *')
+	@Cron('*/5 * * * * *', { name: CRON_JOBS.OUTBOX_RELAY })
 	async tick(): Promise<void> {
 		if (this._polling) return;
 		try {

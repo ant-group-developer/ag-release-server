@@ -8,6 +8,7 @@ import {
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
+import { isWorker } from 'src/common/constants/app-role';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -33,7 +34,7 @@ export class SpotifySonarScheduleService implements OnModuleInit {
 	) {}
 
 	onModuleInit(): void {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping Spotify Sonar scan schedules (not worker role)',
 			);

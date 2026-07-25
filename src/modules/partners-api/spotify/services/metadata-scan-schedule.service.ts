@@ -8,6 +8,7 @@ import {
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CronJob } from 'cron';
+import { isWorker } from 'src/common/constants/app-role';
 import { MetadataScanSchedule } from 'src/modules/release/entities/metadata-scan-schedule.entity';
 import {
 	MetadataScanSession,
@@ -39,7 +40,7 @@ export class MetadataScanScheduleService implements OnModuleInit {
 	) {}
 
 	onModuleInit(): void {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping metadata scan schedules (not worker role)',
 			);

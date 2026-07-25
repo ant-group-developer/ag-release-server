@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { isWorker } from 'src/common/constants/app-role';
 import { pipeline } from 'stream/promises';
 import { Repository } from 'typeorm';
 import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
@@ -24,6 +25,7 @@ import {
 import { SpotifyReportSalesParser } from '../../etl/parsers/sales/spotify-report-sales.parser';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
 import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild.service';
+import { EtlImportHistoryRepository } from '../../etl/services/etl-import-history/etl-import-history.repository';
 import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
 import {
@@ -35,7 +37,6 @@ import {
 	ExtractedRow,
 	ReportEntityExtractorService,
 } from '../../release/services/report-entity-extractor.service';
-import { EtlImportHistoryRepository } from '../../etl/services/etl-import-history/etl-import-history.repository';
 import { ReportImportQueueService } from './report-import-queue.service';
 
 type ReportImportStage =
@@ -87,7 +88,7 @@ export class ReportImportWorkerService
 	) {}
 
 	onApplicationBootstrap() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping report import worker loop (not worker role)',
 			);
@@ -638,30 +639,33 @@ export class ReportImportWorkerService
 				const firstPeriod = Array.from(fileAffectedPeriods)[0] ?? '';
 				const periodYYYYMM = firstPeriod.replace('-', '');
 				const fileCategory = file.reportType ?? 'sales';
-				await this.etlImportHistoryRepository.upsert({
-					job_id: jobId,
-					batch_id: jobId,
-					period: periodYYYYMM,
-					source_type: ImportJobSourceType.REPORT_UPLOAD,
-					category: fileCategory,
-					dsp_folder: file.parserCode ?? '',
-					file_name: filename,
-					file_directory: `${fileCategory}/${file.parserCode ?? ''}`,
-					file_path: `${fileCategory}/${file.parserCode ?? ''}/${filename}`,
-					status: 'done',
-					file_size_bytes: typeof file.size === 'number' ? file.size : 0,
-					total_lines: fileProcessedRows,
-					processed_rows: fileProcessedRows,
-					skipped_rows: 0,
-					error_rows: 0,
-					duration_ms: fileStartedAt
-						? Date.now() - new Date(fileStartedAt).getTime()
-						: 0,
-				}).catch((err) =>
-					this.logger.warn(
-						`Failed to write etl_import_history for ${filename}: ${(err as Error).message}`,
-					),
-				);
+				await this.etlImportHistoryRepository
+					.upsert({
+						job_id: jobId,
+						batch_id: jobId,
+						period: periodYYYYMM,
+						source_type: ImportJobSourceType.REPORT_UPLOAD,
+						category: fileCategory,
+						dsp_folder: file.parserCode ?? '',
+						file_name: filename,
+						file_directory: `${fileCategory}/${file.parserCode ?? ''}`,
+						file_path: `${fileCategory}/${file.parserCode ?? ''}/${filename}`,
+						status: 'done',
+						file_size_bytes:
+							typeof file.size === 'number' ? file.size : 0,
+						total_lines: fileProcessedRows,
+						processed_rows: fileProcessedRows,
+						skipped_rows: 0,
+						error_rows: 0,
+						duration_ms: fileStartedAt
+							? Date.now() - new Date(fileStartedAt).getTime()
+							: 0,
+					})
+					.catch((err) =>
+						this.logger.warn(
+							`Failed to write etl_import_history for ${filename}: ${(err as Error).message}`,
+						),
+					);
 
 				state.files[fileKey] = {
 					status: 'FACT_IMPORTED',

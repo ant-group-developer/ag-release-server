@@ -5,15 +5,16 @@ import { AppModule } from './app.module';
 import { createDynamicCorsConfig } from './common/config/cors.config';
 import { setupSwagger } from './common/config/swagger.config';
 import { globalValidationPipe } from './common/config/validation.config';
+import { AppRole, currentRole } from './common/constants/app-role';
 import { TenantDomainService } from './modules/tenant-domain/tenant-domain.service';
 
 export let APP_GOLBAL: INestApplication<any>;
 
 async function bootstrap() {
-	const role = process.env.APP_ROLE || 'api';
+	const role = currentRole();
 	const logger = new Logger('Bootstrap');
 
-	if (role === 'worker') {
+	if (role === AppRole.WORKER) {
 		const app = await NestFactory.createApplicationContext(AppModule);
 		app.enableShutdownHooks();
 		logger.log('⚙️  Worker instance started (no HTTP port)');

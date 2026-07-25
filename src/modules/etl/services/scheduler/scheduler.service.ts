@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { isWorker } from 'src/common/constants/app-role';
 import { ClickHouseMigrationService } from '../../../clickhouse';
 import { ImportJobSourceType } from '../../interfaces';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
@@ -18,7 +19,7 @@ export class SchedulerService implements OnModuleInit {
 	) {}
 
 	onModuleInit() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug('Skipping ETL scheduler (not worker role)');
 			return;
 		}

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { isWorker } from 'src/common/constants/app-role';
 import { ClickHouseMigrationService } from '../../clickhouse/clickhouse-migration.service';
 import { ClickHouseService } from '../../clickhouse/clickhouse.service';
 import { UpdateSpotifyExportSchedulerConfigDto } from '../dto/spotify-export-scheduler-config.dto';
@@ -34,7 +35,7 @@ export class SpotifyExportSchedulerService implements OnApplicationBootstrap {
 	) {}
 
 	onApplicationBootstrap() {
-		if (process.env.APP_ROLE !== 'worker') {
+		if (!isWorker()) {
 			this.logger.debug(
 				'Skipping Spotify export scheduler (not worker role)',
 			);
