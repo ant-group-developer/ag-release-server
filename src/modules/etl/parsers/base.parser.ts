@@ -27,6 +27,19 @@ export interface ParseFileStats {
 }
 
 /**
+ * Read-only catalog metadata for a parser. Multi-file parsers provide this
+ * explicitly because their joins and conditional assignments cannot be
+ * recovered reliably from source-code scanning.
+ */
+export interface ParserCatalogFieldMapping {
+	reportColumn: string;
+	/** Raw header used by parser code; reportColumn may add a source-file label. */
+	parserColumn?: string;
+	targetColumn: string;
+	transform?: string;
+}
+
+/**
  * Abstract base parser for all DSP data files.
  * Each DSP parser extends this and implements parseRow().
  */
@@ -48,6 +61,14 @@ export abstract class BaseParser {
 	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
 		this.fieldMappingOverrides = mappings;
 		return this;
+	}
+
+	/**
+	 * Override only for parsers that combine different source files. Returning
+	 * null keeps the regular source-assignment catalog extractor in use.
+	 */
+	getCatalogFieldMappings(): ParserCatalogFieldMapping[] | null {
+		return null;
 	}
 
 	/**
