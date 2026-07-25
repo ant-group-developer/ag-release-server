@@ -121,4 +121,7 @@ export class Country extends BaseUUIDEntity {
 	releaseMetadataLanguageCountriesCount?: number;
 	trackMetadataLanguageCountriesCount?: number;
 	trackRecordingCountriesCount?: number;
+
+	/** Public R2 URL resolved from flagImageKey, computed at read time. */
+	imageUrl?: string | null;
 }

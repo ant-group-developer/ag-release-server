@@ -5,6 +5,7 @@ import { AnalyticsCacheService } from 'src/modules/analytics/services/analytics-
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { Repository } from 'typeorm';
 
+import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { CountryMessage } from '../constants/country.constant';
 import {
 	CreateCountryDto,
@@ -14,6 +15,11 @@ import {
 import { Country } from '../entities/country.entity';
 import { IContinentWithCountries } from '../interfaces/country.interface';
 import { CountryQueryService } from './country.query.service';
+
+function withImageUrl(country: Country): Country {
+	country.imageUrl = toCountryFlagImageUrl(country.flagImageKey);
+	return country;
+}
 
 @Injectable()
 export class CountryService implements OnModuleInit {
@@ -75,7 +81,7 @@ export class CountryService implements OnModuleInit {
 			throw new ResponseError(CountryMessage.NOT_FOUND);
 		}
 
-		return country;
+		return withImageUrl(country);
 	}
 
 	private async findOneWithCountRelation(id: string): Promise<Country> {
@@ -96,7 +102,7 @@ export class CountryService implements OnModuleInit {
 		const [countries, totalItems] = await queryGetList.getManyAndCount();
 
 		return new PageDto({
-			items: countries,
+			items: countries.map(withImageUrl),
 			metadata: {
 				page,
 				pageSize,
