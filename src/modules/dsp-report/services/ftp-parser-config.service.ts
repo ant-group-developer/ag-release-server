@@ -280,7 +280,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 	 * JavaScript in production) and persists its implementation and
 	 * the report-column -> fact-column mappings found in its row assignments.
 	 */
-	async syncParserCatalog(): Promise<{
+	async syncParserCatalog(force = false): Promise<{
 		filesScanned: number;
 		parsersSynced: number;
 	}> {
@@ -422,6 +422,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							isSupportedFieldTransform(mapping.transform),
 						);
 					if (
+						!force &&
 						existingHashes.get(catalogKey) === sourceHash &&
 						(fieldMappings.length === 0 ||
 							(existingCatalogMappings.has(catalogKey) &&
