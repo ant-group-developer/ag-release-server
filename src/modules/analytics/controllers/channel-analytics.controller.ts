@@ -12,6 +12,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
 	RevenueChartQueryDto,
+	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 } from '../dto/analytics-query.dto';
@@ -21,6 +22,22 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/channel/:channelId')
 export class ChannelAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a channel' })
+	async summary(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getSummary(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
 
 	@Post('overview')
 	@ApiOperation({

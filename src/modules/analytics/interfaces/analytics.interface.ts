@@ -446,6 +446,9 @@ export interface TrendViewLineChartItem {
 export interface DspBarChartItem {
 	dspName: string;
 	pgDspId?: string | null;
+	/** All raw dsps_report IDs aggregated into this DSP bar. */
+	dspReportIds?: string[];
+	/** First deterministic raw report ID; use dspReportIds when a pgDspId has multiple reports. */
 	dspReportId?: string;
 	imageUrl: string | null;
 	totalViews?: number;

@@ -2515,6 +2515,7 @@ export class TimelineAnalyticsService {
 		const rows = await this.clickHouseService.query<{
 			pg_dsp_id: string | null;
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			dsp_name: string;
 			image_url: string | null;
 			total_views: string;
@@ -2523,6 +2524,7 @@ export class TimelineAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((r) => ({
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
+			dspReportIds: r.dsp_report_ids,
 			dspName: r.dsp_name,
 			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: Number(r.total_views),
@@ -2767,6 +2769,7 @@ export class TimelineAnalyticsService {
 		const rows = await this.clickHouseService.query<{
 			pg_dsp_id: string | null;
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			dsp_name: string;
 			image_url: string | null;
 			revenue_usd: string;
@@ -2776,6 +2779,7 @@ export class TimelineAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((r) => ({
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
+			dspReportIds: r.dsp_report_ids,
 			dspName: r.dsp_name,
 			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: undefined, // ensure matching expected type

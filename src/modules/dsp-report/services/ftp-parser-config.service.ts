@@ -14,7 +14,11 @@ import {
 	DspMappingService,
 	DspsReport,
 } from '../../dsp/services/dsp-mapping.service';
-import { BaseParser, PARSER_REGISTRY } from '../../etl/parsers';
+import {
+	BaseParser,
+	PARSER_REGISTRY,
+	ParserCatalogFieldMapping,
+} from '../../etl/parsers';
 import {
 	ConfiguredDspFieldMappingParser,
 	ConfiguredSalesFieldMappingParser,
@@ -280,7 +284,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 	 * JavaScript in production) and persists its implementation and
 	 * the report-column -> fact-column mappings found in its row assignments.
 	 */
-	async syncParserCatalog(): Promise<{
+	async syncParserCatalog(force = false): Promise<{
 		filesScanned: number;
 		parsersSynced: number;
 	}> {
@@ -372,7 +376,11 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 						];
 				for (const entry of catalogEntries) {
 					const catalogKey = `${entry.code}|${entry.category}`;
+					const explicitFieldMappings = this.getExplicitCatalogFieldMappings(
+						entry,
+					);
 					const fieldMappings =
+						explicitFieldMappings ||
 						this.extractFieldMappings(parserSource);
 					const staleCategoryRows = entries.length
 						? []
@@ -422,6 +430,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							isSupportedFieldTransform(mapping.transform),
 						);
 					if (
+						!force &&
 						existingHashes.get(catalogKey) === sourceHash &&
 						(fieldMappings.length === 0 ||
 							(existingCatalogMappings.has(catalogKey) &&
@@ -449,13 +458,24 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							config_version: 0,
 							mapping_key: this.makeMappingKey(mapping),
 							report_column: mapping.reportColumn,
-							parser_column: mapping.reportColumn,
+							parser_column:
+								mapping.parserColumn || mapping.reportColumn,
 							target_column: mapping.targetColumn,
 							transform: mapping.transform || 'trim',
 							is_active: 1,
 							updated_at: now,
 						})),
 					);
+					if (explicitFieldMappings) {
+						this.logger.log(
+							`Parser catalog mapping sync ${entry.code} (${entry.category}): ${fieldMappings.length} multi-file mappings: ${fieldMappings
+								.map(
+									(mapping) =>
+										`${mapping.reportColumn} -> ${mapping.targetColumn} [${mapping.transform || 'trim'}]`,
+								)
+								.join('; ')}`,
+						);
+					}
 					const nextKeys = new Set(
 						fieldMappings.map((mapping) =>
 							this.makeMappingKey(mapping),
@@ -1309,6 +1329,31 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			seen.add(key);
 			return true;
 		});
+	}
+
+	/**
+	 * Parsers that merge reports expose a complete, source-labelled catalog.
+	 * Their mappings must not be inferred from assignments because that loses
+	 * joins, fallbacks, and duplicate header names from different files.
+	 */
+	private getExplicitCatalogFieldMappings(
+		entry: CatalogEntry,
+	): FtpParserFieldMapping[] | null {
+		// Source-only entries are created from files not present in the runtime
+		// registry. Their factory intentionally throws and they must continue to
+		// use source scanning only.
+		if (entry.code.startsWith('source.')) return null;
+		const parser = entry.factory();
+		if (!(parser instanceof BaseParser)) return null;
+
+		const mappings = parser.getCatalogFieldMappings();
+		if (!mappings) return null;
+		return mappings.map((mapping: ParserCatalogFieldMapping) => ({
+			reportColumn: mapping.reportColumn,
+			parserColumn: mapping.parserColumn,
+			targetColumn: mapping.targetColumn,
+			transform: mapping.transform || 'trim',
+		}));
 	}
 
 	private extractReportColumns(expression: string): string[] {

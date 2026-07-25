@@ -672,10 +672,11 @@ export function getTrendViewDspBarChartQuery(
 ): string {
 	return `
     SELECT
-      s.dsp_id AS dsp_report_id,
-      r.pg_uuid AS pg_dsp_id,
-      ${resolvedDspName} AS dsp_name,
-      p.picture AS image_url,
+      nullIf(any(r.pg_uuid), '') AS pg_dsp_id,
+      arrayElement(arraySort(groupUniqArray(s.dsp_id)), 1) AS dsp_report_id,
+      arraySort(groupUniqArray(s.dsp_id)) AS dsp_report_ids,
+      any(${resolvedDspName}) AS dsp_name,
+      any(p.picture) AS image_url,
       sum(s.total_quantity) AS total_views
     FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
     ${joinSql}
@@ -684,8 +685,8 @@ export function getTrendViewDspBarChartQuery(
       AND s.reporting_date >= toDate({from:String})
       AND s.reporting_date <= toDate({to:String})
       ${filterSql}
-    GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
-    ORDER BY total_views DESC
+    GROUP BY if(empty(ifNull(r.pg_uuid, '')), concat('report:', s.dsp_id), concat('pg:', r.pg_uuid)) AS dsp_group_key
+    ORDER BY total_views DESC, dsp_group_key ASC
     LIMIT 5
   `;
 }
@@ -771,10 +772,11 @@ export function getRevenueDspBarChartQuery(
 ): string {
 	return `
     SELECT
-      s.dsp_id AS dsp_report_id,
-      r.pg_uuid AS pg_dsp_id,
-      ${resolvedDspName} AS dsp_name,
-      p.picture AS image_url,
+      nullIf(any(r.pg_uuid), '') AS pg_dsp_id,
+      arrayElement(arraySort(groupUniqArray(s.dsp_id)), 1) AS dsp_report_id,
+      arraySort(groupUniqArray(s.dsp_id)) AS dsp_report_ids,
+      any(${resolvedDspName}) AS dsp_name,
+      any(p.picture) AS image_url,
       sum(s.total_revenue_usd) AS revenue_usd,
       sum(s.total_quantity) AS quantity
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
@@ -784,8 +786,8 @@ export function getRevenueDspBarChartQuery(
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
-    GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
-    ORDER BY ${orderBy} DESC, dsp_report_id ASC
+    GROUP BY if(empty(ifNull(r.pg_uuid, '')), concat('report:', s.dsp_id), concat('pg:', r.pg_uuid)) AS dsp_group_key
+    ORDER BY ${orderBy} DESC, dsp_group_key ASC
     LIMIT 5
   `;
 }

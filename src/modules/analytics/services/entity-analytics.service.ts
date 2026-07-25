@@ -649,22 +649,24 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
-        s.dsp_id AS dsp_report_id,
-        r.pg_uuid AS pg_dsp_id,
-        ${this.resolvedDspName} AS dsp_name,
-        p.picture AS image_url,
+        nullIf(any(r.pg_uuid), '') AS pg_dsp_id,
+        arrayElement(arraySort(groupUniqArray(s.dsp_id)), 1) AS dsp_report_id,
+        arraySort(groupUniqArray(s.dsp_id)) AS dsp_report_ids,
+        any(${this.resolvedDspName}) AS dsp_name,
+        any(p.picture) AS image_url,
         sum(s.total_quantity) AS total_views
       FROM ${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} s
       ${joinSql}
       ${this.dspNameJoin}
       WHERE s.reporting_date >= toDate({from:String}) AND s.reporting_date <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
-      ORDER BY total_views DESC
+      GROUP BY if(empty(ifNull(r.pg_uuid, '')), concat('report:', s.dsp_id), concat('pg:', r.pg_uuid)) AS dsp_group_key
+      ORDER BY total_views DESC, dsp_group_key ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			pg_dsp_id: string | null;
 			dsp_name: string;
 			image_url: string | null;
@@ -674,6 +676,7 @@ export class EntityAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((row) => ({
 			pgDspId: row.pg_dsp_id || null,
 			dspReportId: row.dsp_report_id,
+			dspReportIds: row.dsp_report_ids,
 			dspName: row.dsp_name,
 			imageUrl: toDspImageUrl(row.image_url),
 			totalViews: Number(row.total_views),
@@ -836,10 +839,11 @@ export class EntityAnalyticsService {
 
 		const sql = `
       SELECT
-        s.dsp_id AS dsp_report_id,
-        r.pg_uuid AS pg_dsp_id,
-        ${this.resolvedDspName} AS dsp_name,
-        p.picture AS image_url,
+        nullIf(any(r.pg_uuid), '') AS pg_dsp_id,
+        arrayElement(arraySort(groupUniqArray(s.dsp_id)), 1) AS dsp_report_id,
+        arraySort(groupUniqArray(s.dsp_id)) AS dsp_report_ids,
+        any(${this.resolvedDspName}) AS dsp_name,
+        any(p.picture) AS image_url,
         sum(s.total_revenue_usd) AS revenue_usd,
         sum(s.total_quantity) AS quantity
       FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
@@ -847,12 +851,13 @@ export class EntityAnalyticsService {
       ${this.dspNameJoin}
       WHERE s.period >= toDate({from:String}) AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY dsp_report_id, pg_dsp_id, dsp_name, image_url
-      ORDER BY ${orderBy} DESC, dsp_report_id ASC
+      GROUP BY if(empty(ifNull(r.pg_uuid, '')), concat('report:', s.dsp_id), concat('pg:', r.pg_uuid)) AS dsp_group_key
+      ORDER BY ${orderBy} DESC, dsp_group_key ASC
       LIMIT 5
     `;
 		const rows = await this.clickHouseService.query<{
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			pg_dsp_id: string | null;
 			dsp_name: string;
 			image_url: string | null;
@@ -863,6 +868,7 @@ export class EntityAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((row) => ({
 			pgDspId: row.pg_dsp_id || null,
 			dspReportId: row.dsp_report_id,
+			dspReportIds: row.dsp_report_ids,
 			dspName: row.dsp_name,
 			imageUrl: toDspImageUrl(row.image_url),
 			revenueUsd: this.revenueNumber(row.revenue_usd),
