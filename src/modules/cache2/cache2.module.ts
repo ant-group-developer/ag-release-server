@@ -35,5 +35,24 @@ export class Cache2Module {
 				`Redis (ioredis) connection error: ${err.message}`,
 			);
 		});
+
+		this.redis.on('ready', () => {
+			void (async () => {
+				try {
+					await this.redis.config(
+						'SET',
+						'maxmemory-policy',
+						'noeviction',
+					);
+					this.logger.log(
+						'Redis maxmemory-policy set to "noeviction"',
+					);
+				} catch (err) {
+					this.logger.warn(
+						`Failed to set maxmemory-policy: ${(err as Error).message}`,
+					);
+				}
+			})();
+		});
 	}
 }
