@@ -398,7 +398,7 @@ export class BatchImportService {
 					);
 					this.appendLogError(
 						log,
-						`[INFO] Existing release found for UPC "${upc}" (id: ${releaseId}). Updating release.`,
+						`[LOG] Existing release found for UPC "${upc}" (id: ${releaseId}). Updating release.`,
 					);
 
 					// Delete all old sub-entities (including localizes)

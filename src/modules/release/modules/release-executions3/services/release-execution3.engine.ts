@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ErrorType } from 'src/modules/log/entites/logs.entity';
+import { LogCategory, LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { Repository } from 'typeorm';
@@ -10,13 +10,8 @@ import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
-	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3ResultService } from './release-execution3-result.service';
-
-// organize-imports-ignore
-import { ReleaseExecution3WorkerTest } from './release-execution3-test.worker';
-// organize-imports-ignore
 import { ReleaseExecution3Worker } from './release-execution3.worker';
 
 @Injectable()
@@ -132,18 +127,11 @@ export class ReleaseExecutionStepEngine {
 				),
 			);
 
-			// for (const child of STEP.childSteps!) {
-			// 	await this.processStep({
-			// 		step: child,
-			// 		releaseExecution,
-			// 	});
-			// }
-
 			return this.resolveStatusByChild_AndUpdateDb(STEP);
 		}
 
 		throw new Error(
-			`Unknown childExecutionMode: ${STEP.childExecutionMode}`,
+			`Unknown childExecutionMode: ${(STEP as any).childExecutionMode}`,
 		);
 	}
 
@@ -268,8 +256,8 @@ export class ReleaseExecutionStepEngine {
 			await this.syncDeliveryStatusByStepStatus(step, status);
 		} catch (error) {
 			this.logService.error({
-				type: ErrorType.SYSTEM,
-				module: ReleaseExecutionStepEngine.name,
+				type: LogCategory.SYSTEM,
+				module: LogModule.RELEASE_EXECUTION,
 				releaseExecutionId: step.releaseExecutionId,
 				releaseExecutionStepId: step.id,
 				message: `Failed to sync delivery status for step ${step.id}`,
@@ -348,6 +336,7 @@ export class ReleaseExecutionStepEngine {
 			releaseExecutionStepId: step.id,
 			releaseId: delivery?.releaseId,
 			results,
+			isOverrideStatus: step.metadata?.input?.isOverrideStatus,
 		});
 	}
 
@@ -373,6 +362,14 @@ export class ReleaseExecutionStepEngine {
 		// 		? ReleaseDspStatus.PROCESSING
 		// 		: null;
 		// }
+
+		const isParentStep = !!step.childSteps?.length;
+
+		if (isParentStep) {
+			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
+				? ReleaseDspStatus.PROCESSING
+				: null;
+		}
 
 		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {

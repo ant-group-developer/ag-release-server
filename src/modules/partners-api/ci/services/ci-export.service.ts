@@ -68,7 +68,6 @@ export class CiExportService {
 			const response = await this.client.get(endpoint, {
 				params: this.buildParams({
 					...params,
-					status: 'complete',
 					transfer_batch_status: 'transferred',
 				}),
 			});

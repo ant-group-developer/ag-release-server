@@ -37,6 +37,7 @@ export class ReleaseExecutionPageDto<T> extends PageDto<T> {
 	}
 }
 
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
@@ -76,6 +77,18 @@ export class CreateReleaseExecution3Dto {
 	@IsOptional()
 	@IsEnum(ExecutionType)
 	type?: ExecutionType;
+}
+
+export class RetryReleaseExecutionStepDto {
+	@ApiPropertyOptional({
+		description:
+			'Bỏ qua kiểm tra độ ưu tiên, luôn ghi đè trạng thái mới nhất xuống Database',
+		type: Boolean,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => value === 'true' || value === true)
+	isOverrideStatus?: boolean;
 }
 
 export class QueryReleaseExecutionStepDto {
