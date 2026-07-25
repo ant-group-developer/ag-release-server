@@ -31,8 +31,7 @@ export enum LogModule {
 @Entity('logs')
 export class Logs extends BaseUUIDEntity {
 	@Column({
-		type: 'enum',
-		enum: LogLevel,
+		type: 'varchar',
 		default: LogLevel.LOG,
 	})
 	level: LogLevel;

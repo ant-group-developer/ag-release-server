@@ -645,12 +645,35 @@ export class ReleaseExecution3Service {
 		return null;
 	}
 
-	async retryStep(stepId: string): Promise<void> {
+	async retryStep(stepId: string, isOverrideStatus?: boolean): Promise<void> {
 		const step = await this.stepRepo.findOne({
 			where: { id: stepId },
 		});
 
 		if (!step) throw new Error('Step not found');
+
+		if (isOverrideStatus) {
+			step.metadata = {
+				...step.metadata,
+				input: {
+					...step.metadata?.input,
+					isOverrideStatus: true,
+				},
+			};
+			await this.stepRepo.save(step);
+		} else {
+			const existedOverride = !!step.metadata?.input?.isOverrideStatus;
+			if (existedOverride) {
+				step.metadata = {
+					...step.metadata,
+					input: {
+						...step.metadata?.input,
+						isOverrideStatus: false,
+					},
+				};
+				await this.stepRepo.save(step);
+			}
+		}
 
 		await this.setStepAndChildrenStatusRecursive({
 			step,

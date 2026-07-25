@@ -336,6 +336,7 @@ export class ReleaseExecutionStepEngine {
 			releaseExecutionStepId: step.id,
 			releaseId: delivery?.releaseId,
 			results,
+			isOverrideStatus: step.metadata?.input?.isOverrideStatus,
 		});
 	}
 
@@ -361,6 +362,14 @@ export class ReleaseExecutionStepEngine {
 		// 		? ReleaseDspStatus.PROCESSING
 		// 		: null;
 		// }
+
+		const isParentStep = !!step.childSteps?.length;
+
+		if (isParentStep) {
+			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
+				? ReleaseDspStatus.PROCESSING
+				: null;
+		}
 
 		// Delivery step hoàn tất thành công thì DSP được xem là đã phân phối.
 		if (stepStatus === ReleaseExecutionStepStatus.DONE) {

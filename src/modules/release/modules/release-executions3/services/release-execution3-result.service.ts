@@ -39,6 +39,7 @@ export class ReleaseExecution3ResultService {
 		releaseExecutionStepId?: string | null;
 		releaseId?: string | null;
 		results: ReleaseExecutionResultDto[];
+		isOverrideStatus?: boolean;
 	}): Promise<void> {
 		await this.upsertResults(input);
 		await this.syncToReleaseDspDelivery(input.releaseExecutionId);
@@ -49,6 +50,7 @@ export class ReleaseExecution3ResultService {
 		releaseExecutionStepId?: string | null;
 		releaseId?: string | null;
 		results: ReleaseExecutionResultDto[];
+		isOverrideStatus?: boolean;
 	}): Promise<ReleaseExecutionResult3[]> {
 		if (!input.results.length) return [];
 
@@ -83,7 +85,20 @@ export class ReleaseExecution3ResultService {
 		const upsertableResults = [...highestByDspId.values()].filter(
 			(result) => {
 				const existing = existingByDspId.get(result.dspId);
-				return !existing || this.hasHigherPriority(result, existing);
+
+				if (
+					!input.releaseExecutionStepId &&
+					result.status === ReleaseDspStatus.DISTRIBUTED &&
+					existing?.status === ReleaseDspStatus.PROCESSING
+				) {
+					return false;
+				}
+
+				return (
+					!existing ||
+					input.isOverrideStatus ||
+					this.hasHigherPriority(result, existing)
+				);
 			},
 		);
 
