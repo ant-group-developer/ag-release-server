@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
@@ -91,4 +91,16 @@ export class PreviewFtpParserConfigDto {
 	@ApiPropertyOptional({ type: UpsertFtpParserConfigDto })
 	@IsOptional()
 	config?: UpsertFtpParserConfigDto;
+}
+
+export class SyncParserCatalogDto {
+	@ApiPropertyOptional({
+		description:
+			'Rewrite the parser catalog and its default field mappings even when source hashes are unchanged.',
+		default: false,
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => value === true || value === 'true')
+	force?: boolean = false;
 }

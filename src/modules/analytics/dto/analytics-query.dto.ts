@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsBoolean,
 	IsDateString,
@@ -14,6 +14,13 @@ import {
 	Min,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+
+const normalizeOptionalReleaseType = (value: unknown): unknown => {
+	if (typeof value !== 'string') return value;
+
+	const normalized = value.trim().toLowerCase();
+	return normalized === '' || normalized === 'all' ? undefined : normalized;
+};
 
 /**
  * Base DTO cho tất cả analytics queries.
@@ -58,6 +65,7 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -183,6 +191,7 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
 			'Filter by release type: audio or video. Omit to include both.',
 		enum: ['audio', 'video'],
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -224,18 +233,19 @@ export class DspTopQueryDto extends DspAnalyticsBaseDto {
 		description: 'Filter by release type',
 		enum: ['audio', 'video'],
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
-		description: 'Sort order: views (default) or revenue',
-		enum: ['views', 'revenue'],
+		description: 'Sort order: views (default), usage, or revenue',
+		enum: ['views', 'usage', 'revenue'],
 		default: 'views',
 	})
 	@IsOptional()
-	@IsIn(['views', 'revenue'])
-	sortBy?: 'views' | 'revenue';
+	@IsIn(['views', 'usage', 'revenue'])
+	sortBy?: 'views' | 'usage' | 'revenue';
 
 	@ApiPropertyOptional({
 		description: 'Filter by import source',
@@ -338,6 +348,7 @@ export class ChartQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -414,6 +425,7 @@ export class EntityTimelineQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -453,6 +465,7 @@ export class EntityOverviewQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -491,6 +504,7 @@ export class AnalyticsSummaryQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -521,6 +535,7 @@ export class DspAnalyticsSummaryQueryDto extends DspAnalyticsBaseDto {
 	toDate: string;
 
 	@ApiPropertyOptional({ enum: ['audio', 'video'], example: 'audio' })
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';

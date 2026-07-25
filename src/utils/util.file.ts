@@ -120,7 +120,7 @@ export function getFileTxtFromRelease(options: {
 
 	const lines: string[] = [];
 
-	// RELEASE INFO
+	// RELEASE LOG
 	lines.push(release.title);
 	lines.push(
 		`Performed by: ${

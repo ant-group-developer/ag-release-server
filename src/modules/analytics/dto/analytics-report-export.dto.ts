@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
 	ArrayNotEmpty,
 	IsArray,
@@ -8,6 +9,13 @@ import {
 	IsUUID,
 	Matches,
 } from 'class-validator';
+
+const normalizeOptionalReleaseType = (value: unknown): unknown => {
+	if (typeof value !== 'string') return value;
+
+	const normalized = value.trim().toLowerCase();
+	return normalized === '' || normalized === 'all' ? undefined : normalized;
+};
 
 export class AnalyticsReportExportDto {
 	@ApiProperty({
@@ -101,6 +109,7 @@ export class AnalyticsReportExportDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';

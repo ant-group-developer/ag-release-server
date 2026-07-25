@@ -21,6 +21,7 @@ import {
 import {
 	FtpSourceCategory,
 	PreviewFtpParserConfigDto,
+	SyncParserCatalogDto,
 	UpdateFtpParserFieldMappingsDto,
 	UpsertFtpParserConfigDto,
 } from '../dto/ftp-parser-config.dto';
@@ -45,13 +46,17 @@ export class DspReportController {
 		});
 	}
 
-	/** Parser catalog sync also runs automatically at startup; this endpoint is safe to call because unchanged source hashes are skipped. */
+	/** Parser catalog sync also runs automatically at startup; pass force=true to rewrite unchanged source hashes. */
 	@Post('parser-catalog/sync')
-	async syncParserCatalog(): Promise<
+	async syncParserCatalog(
+		@Query() query: SyncParserCatalogDto,
+	): Promise<
 		ResponseSuccess<{ filesScanned: number; parsersSynced: number }>
 	> {
 		return new ResponseSuccess({
-			data: await this.ftpParserConfigService.syncParserCatalog(),
+			data: await this.ftpParserConfigService.syncParserCatalog(
+				query.force ?? false,
+			),
 		});
 	}
 

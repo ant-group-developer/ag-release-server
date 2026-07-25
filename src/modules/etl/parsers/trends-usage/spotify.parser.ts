@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FactDspRow } from '../../interfaces';
-import { BaseParser } from '../base.parser';
+import { BaseParser, ParserCatalogFieldMapping } from '../base.parser';
 
 /**
  * Spotify Parser
@@ -18,6 +18,34 @@ import { BaseParser } from '../base.parser';
 export class SpotifyParser extends BaseParser {
 	constructor() {
 		super('spotify');
+	}
+
+	/** weekly-topd is the imported sub-report; other Spotify folders are skipped. */
+	getCatalogFieldMappings(): ParserCatalogFieldMapping[] {
+		const mapping = (
+			reportColumn: string,
+			targetColumn: string,
+			transform = 'trim',
+		): ParserCatalogFieldMapping => ({
+			reportColumn: `${reportColumn} (weekly-topd)`,
+			parserColumn: reportColumn,
+			targetColumn,
+			transform,
+		});
+
+		return [
+			mapping('week_start_date', 'reporting_period'),
+			mapping('isrc', 'isrc', 'isrc'),
+			mapping('country', 'territory_code'),
+			mapping('track_name', 'track_title'),
+			mapping('artists', 'artist_name'),
+			mapping('merlin_licensor', 'licensor'),
+			mapping('streams30s', 'quantity_total'),
+			mapping('rank', 'metadata.rank'),
+			mapping('age_bucket', 'metadata.age_bucket'),
+			mapping('gender', 'metadata.gender'),
+			mapping('week_end_date', 'metadata.week_end_date'),
+		];
 	}
 
 	private processedFolders = new Set<string>();
