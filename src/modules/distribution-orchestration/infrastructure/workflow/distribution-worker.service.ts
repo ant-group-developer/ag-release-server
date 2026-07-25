@@ -98,7 +98,10 @@ export class DistributionWorkerService
 				this.logger.error(`Worker ${queue} error:`, err);
 			});
 
-			worker.on('failed', async (job, err) => {
+			worker.on('failed', (job, err) => {
+				console.error(
+					`❌ [failed] queue=${queue} jobId=${job?.id} attempt=${job?.attemptsMade}/${job?.opts?.attempts} error=${err.message}`,
+				);
 				this.logger.error(
 					`Job ${job?.id} failed on ${queue}:`,
 					err.message,
@@ -108,7 +111,7 @@ export class DistributionWorkerService
 				const isFinal =
 					!job || job.attemptsMade >= (job.opts?.attempts ?? 1);
 				if (isFinal && job?.data?.distributionId) {
-					await this.errorRecorder
+					this.errorRecorder
 						.record({
 							distributionId: job.data.distributionId,
 							channelId: job.data.channelId,
@@ -151,6 +154,9 @@ export class DistributionWorkerService
 		queue: QueueName,
 		payload: JobPayload,
 	): Promise<void> {
+		console.log(
+			`🔧 [processJob] queue=${queue} distId=${payload.distributionId} key=${payload.key}`,
+		);
 		let command;
 		try {
 			command = await this.dispatchMap.dispatch(queue, payload);

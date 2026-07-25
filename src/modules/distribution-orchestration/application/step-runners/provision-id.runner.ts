@@ -18,12 +18,12 @@ import { JobPayload } from '../ports/workflow-engine.port';
 /**
  * ProvisionIdRunner — consumer của `dist.provision-id`.
  *
- * 1. Load Distribution → lấy `releaseId`
- * 2. Load Snapshot → nếu snapshot có `upc`, dùng upc có sẵn (skip gRPC).
- * 3. Nếu `dist.upc` đã có → skip gRPC (idempotency guard).
- * 4. Gọi IdentifierProvisioner.provisionUpc()
- * 5. Trả `MARK_IDS_PROVISIONED {upc}` — loop driver (Step 8 BullMQ worker /
- *    Step 5b test) đưa command này về OrchestrateHandler.
+ * 1. Load Distribution + Snapshot
+ * 2. ISRC (luôn chạy): kiểm tra tracks thiếu ISRC → gọi gRPC provisionIsrcs → cập nhật snapshot.
+ *    Chạy TRƯỚC UPC guard vì snapshot update dùng tx riêng — có thể fail độc lập.
+ * 3. UPC idempotency guard: nếu `dist.upc` đã có → skip gRPC (dùng UPC cũ).
+ * 4. UPC resolve: dùng snapshot.upc nếu user đã nhập, hoặc gọi gRPC provisionUpc.
+ * 5. Trả `MARK_IDS_PROVISIONED {upc}` — loop driver đưa command về OrchestrateHandler.
  *
  * Runner KHÔNG gọi OrchestrateHandler trực tiếp — decouple để Step 8 BullMQ
  * worker enqueue command vào `dist.orchestrate` mà không đổi runner.
@@ -43,24 +43,17 @@ export class ProvisionIdRunner {
 	) {}
 
 	async run(payload: JobPayload): Promise<MarkIdsProvisionedCommand> {
+		console.log(
+			`🆔 [ProvisionIdRunner] start: distId=${payload.distributionId} key=${payload.key}`,
+		);
 		const dist = await this.uow.run((ctx) =>
 			this.repo.load(ctx, payload.distributionId),
 		);
 		if (!dist) throw new AggregateNotFoundError(payload.distributionId);
 
-		// Idempotency guard: nếu UPC đã cấp (job redeliver sau crash / retry BullMQ trước khi
-		// MARK_IDS_PROVISIONED commit) → KHÔNG gọi gRPC lần nữa (getUpc cấp GTIN mới mỗi lần,
-		// không get-or-create theo releaseId). Trả lại UPC đã có → command idempotent.
-		if (dist.upc) {
-			return {
-				type: 'MARK_IDS_PROVISIONED',
-				distributionId: dist.id,
-				key: `${payload.key}:done`,
-				upc: dist.upc,
-			};
-		}
-
-		// Skip logic: Nếu user đã cung cấp UPC trong metadata (lưu trong snapshot)
+		// ── 1. ISRC provisioning (luôn chạy, bất kể UPC đã có hay chưa) ──
+		// Snapshot update chạy tx riêng nên có thể fail độc lập với MARK_IDS_PROVISIONED.
+		// Nếu chỉ guard bằng dist.upc thì retry sẽ skip ISRC vĩnh viễn → build-package lỗi.
 		const snapshot = await this.snapshotReader.loadById(dist.snapshotId);
 		if (!snapshot) {
 			throw new Error(`Snapshot ${dist.snapshotId} not found`);
@@ -77,30 +70,43 @@ export class ProvisionIdRunner {
 				.map((t: any) => t.id)
 				.filter(Boolean) as string[];
 
-			if (trackIds.length > 0) {
-				const provisionedIsrcs = await this.provisioner.provisionIsrcs({
-					trackIds,
-					releaseId: dist.releaseId,
-					key: IdempotencyKey.create(payload.key + ':isrc'),
-				});
-
-				// Cập nhật lại snapshot.payload với ISRC mới
-				snapshotPayload.tracks.forEach((t: any) => {
-					if (t.id && provisionedIsrcs.has(t.id)) {
-						t.isrc = provisionedIsrcs.get(t.id)!.value;
-					}
-				});
-
-				// Lưu lại snapshot (dùng Entity Manager hoặc raw update)
-				// Để không phải inject Repository vào runner, ta dùng uow.run()
-				await this.uow.run(async (ctx) => {
-					await ctx.manager.update(
-						'release_snapshot',
-						{ id: dist.snapshotId },
-						{ payload: snapshotPayload },
-					);
-				});
+			if (trackIds.length === 0) {
+				throw new Error(
+					`${missingIsrcTracks.length} track(s) missing ISRC but have no 'id' field — cannot provision. ` +
+						`distributionId=${dist.id}, snapshotId=${dist.snapshotId}`,
+				);
 			}
+
+			const provisionedIsrcs = await this.provisioner.provisionIsrcs({
+				trackIds,
+				releaseId: dist.releaseId,
+				key: IdempotencyKey.create(payload.key + ':isrc'),
+			});
+
+			snapshotPayload.tracks.forEach((t: any) => {
+				if (t.id && provisionedIsrcs.has(t.id)) {
+					t.isrc = provisionedIsrcs.get(t.id)!.value;
+				}
+			});
+
+			await this.uow.run(async (ctx) => {
+				await ctx.manager.update(
+					'release_snapshot',
+					{ id: dist.snapshotId },
+					{ payload: snapshotPayload },
+				);
+			});
+		}
+
+		// ── 2. UPC: idempotency guard rồi mới resolve ──
+		// Guard chỉ skip UPC provisioning (ISRC đã xử lý xong ở trên).
+		if (dist.upc) {
+			return {
+				type: 'MARK_IDS_PROVISIONED',
+				distributionId: dist.id,
+				key: `${payload.key}:done`,
+				upc: dist.upc,
+			};
 		}
 
 		if (snapshotPayload.upc) {

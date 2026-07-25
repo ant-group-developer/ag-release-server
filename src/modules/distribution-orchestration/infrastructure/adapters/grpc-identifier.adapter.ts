@@ -9,8 +9,8 @@ import { IdentifierProvisioner } from '../../domain/ports/identifier-provisioner
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { Isrc } from '../../domain/value-objects/isrc.vo';
 import { Upc } from '../../domain/value-objects/upc.vo';
-import { withTimeout } from '../resilience/with-timeout';
 import { ReleaseSnapshotOrmEntity } from '../persistence/release-snapshot.orm-entity';
+import { withTimeout } from '../resilience/with-timeout';
 import { ReleaseSnapshotPayload } from './ddex-data-mapper';
 
 /**
