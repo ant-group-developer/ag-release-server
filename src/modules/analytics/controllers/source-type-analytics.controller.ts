@@ -3,10 +3,11 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -15,10 +16,27 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 export class SourceTypeAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
 
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a source type' })
+	async summary(
+		@Param('sourceType') sourceType: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'sourceType',
+				sourceType,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
 	@Post('overview')
 	@ApiOperation({
 		summary:
-			'Overview stats for a source type (ftp, wmg_report, spotify_report, ...)',
+			'Overview stats for a configured raw import source type',
 	})
 	async overview(
 		@Param('sourceType') sourceType: string,
@@ -35,81 +53,9 @@ export class SourceTypeAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Trend view DSP timeline for a source type (monthly)',
-	})
-	async trendViewTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Sales view DSP timeline for a source type (monthly)',
-	})
-	async salesViewTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({
-		summary: 'Trend view DSP daily timeline for a source type',
-	})
-	async trendViewDailyTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a source type (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('sourceType') sourceType: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
-				'sourceType',
-				sourceType,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a source type' })
@@ -132,7 +78,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a source type' })
 	async revenueLineChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -185,7 +131,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a source type' })
 	async revenueDspBarChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -202,7 +148,7 @@ export class SourceTypeAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a source type' })
 	async revenueTerritoryBarChart(
 		@Param('sourceType') sourceType: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -217,7 +163,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của source type (sortBy: views | revenue)',
+		summary: 'Top tracks của source type (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('sourceType') sourceType: string,
@@ -236,7 +182,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của source type (sortBy: views | revenue)',
+		summary: 'Top releases của source type (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('sourceType') sourceType: string,
@@ -255,7 +201,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('dsp')
 	@ApiOperation({
-		summary: 'Top DSPs của source type (sortBy: views | revenue)',
+		summary: 'Top DSPs của source type (sortBy: views | usage | revenue)',
 	})
 	async topDsps(
 		@Param('sourceType') sourceType: string,
@@ -274,7 +220,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của source type (sortBy: views | revenue)',
+		summary: 'Top territories của source type (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('sourceType') sourceType: string,

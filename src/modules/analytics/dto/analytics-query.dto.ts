@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
 	IsBoolean,
 	IsDateString,
@@ -14,6 +14,13 @@ import {
 	Min,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+
+const normalizeOptionalReleaseType = (value: unknown): unknown => {
+	if (typeof value !== 'string') return value;
+
+	const normalized = value.trim().toLowerCase();
+	return normalized === '' || normalized === 'all' ? undefined : normalized;
+};
 
 /**
  * Base DTO cho tất cả analytics queries.
@@ -58,13 +65,14 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify). Extensible — pass any raw source value.',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -111,6 +119,16 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 	@Type(() => Boolean)
 	@IsBoolean()
 	includeOther?: boolean;
+
+	@ApiPropertyOptional({
+		description:
+			'Order revenue top results by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
 
 	@ApiPropertyOptional({
 		description: 'Filter analytics by specific Release ID',
@@ -173,6 +191,7 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
 			'Filter by release type: audio or video. Omit to include both.',
 		enum: ['audio', 'video'],
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
@@ -182,6 +201,18 @@ export class DspOverviewQueryDto extends DspAnalyticsBaseDto {
  * DTO cho DSP chart endpoints (line-chart, bar-chart).
  */
 export class DspChartQueryDto extends DspOverviewQueryDto {}
+
+/** DTO dành riêng cho revenue chart của một DSP. */
+export class DspRevenueChartQueryDto extends DspChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
+}
 
 /**
  * DTO cho DSP top-tracks / top-releases endpoints.
@@ -202,18 +233,19 @@ export class DspTopQueryDto extends DspAnalyticsBaseDto {
 		description: 'Filter by release type',
 		enum: ['audio', 'video'],
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
-		description: 'Sort order: views (default) or revenue',
-		enum: ['views', 'revenue'],
+		description: 'Sort order: views (default), usage, or revenue',
+		enum: ['views', 'usage', 'revenue'],
 		default: 'views',
 	})
 	@IsOptional()
-	@IsIn(['views', 'revenue'])
-	sortBy?: 'views' | 'revenue';
+	@IsIn(['views', 'usage', 'revenue'])
+	sortBy?: 'views' | 'usage' | 'revenue';
 
 	@ApiPropertyOptional({
 		description: 'Filter by import source',
@@ -316,18 +348,31 @@ export class ChartQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
 	@IsString()
 	importSource?: string;
+}
+
+/** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
+export class RevenueChartQueryDto extends ChartQueryDto {
+	@ApiPropertyOptional({
+		description: 'Order bar-chart items by revenue (default) or usage quantity',
+		enum: ['revenue', 'usage'],
+		default: 'revenue',
+	})
+	@IsOptional()
+	@IsIn(['revenue', 'usage'])
+	sortBy?: 'revenue' | 'usage';
 }
 
 export class EntityTimelineQueryDto {
@@ -380,13 +425,14 @@ export class EntityTimelineQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
 	@IsOptional()
@@ -419,15 +465,82 @@ export class EntityOverviewQueryDto {
 		enum: ['audio', 'video'],
 		example: 'audio',
 	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
 	@IsOptional()
 	@IsIn(['audio', 'video'])
 	releaseType?: 'audio' | 'video';
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by import source. Known values: ftp (Merlin), wmg_report (WMG), spotify_report (Spotify).',
+			'Filter by raw import source. Source labels and images are configured dynamically by a system admin.',
 		example: 'wmg_report',
 	})
+	@IsOptional()
+	@IsString()
+	importSource?: string;
+}
+
+/**
+ * Payload cho summary analytics. Trend views được lọc chính xác theo ngày;
+ * sales usage và revenue được tổng hợp theo các tháng giao với khoảng ngày.
+ */
+export class AnalyticsSummaryQueryDto {
+	@ApiProperty({
+		description: 'Start date of the filter range (inclusive)',
+		example: '2026-01-01',
+	})
+	@IsDateString()
+	fromDate: string;
+
+	@ApiProperty({
+		description: 'End date of the filter range (inclusive)',
+		example: '2026-06-30',
+	})
+	@IsDateString()
+	toDate: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by release type: audio or video.',
+		enum: ['audio', 'video'],
+		example: 'audio',
+	})
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	releaseType?: 'audio' | 'video';
+
+	@ApiPropertyOptional({
+		description: 'Filter by raw import source.',
+		example: 'wmg_report',
+	})
+	@IsOptional()
+	@IsString()
+	importSource?: string;
+}
+
+/** Summary payload for a specific DSP. At least one DSP identifier is required. */
+export class DspAnalyticsSummaryQueryDto extends DspAnalyticsBaseDto {
+	@ApiProperty({
+		description: 'Start date of the filter range (inclusive)',
+		example: '2026-01-01',
+	})
+	@IsDateString()
+	fromDate: string;
+
+	@ApiProperty({
+		description: 'End date of the filter range (inclusive)',
+		example: '2026-06-30',
+	})
+	@IsDateString()
+	toDate: string;
+
+	@ApiPropertyOptional({ enum: ['audio', 'video'], example: 'audio' })
+	@Transform(({ value }) => normalizeOptionalReleaseType(value))
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	releaseType?: 'audio' | 'video';
+
+	@ApiPropertyOptional({ example: 'wmg_report' })
 	@IsOptional()
 	@IsString()
 	importSource?: string;
@@ -449,13 +562,13 @@ export class DashboardAnalyticsQueryDto extends EntityTimelineQueryDto {
  */
 export class EntityRankingQueryDto extends ChartQueryDto {
 	@ApiPropertyOptional({
-		description: 'Sort order: views (default) or revenue',
-		enum: ['views', 'revenue'],
+		description: 'Sort order: views (default), usage quantity, or revenue',
+		enum: ['views', 'usage', 'revenue'],
 		default: 'views',
 	})
 	@IsOptional()
-	@IsIn(['views', 'revenue'])
-	sortBy?: 'views' | 'revenue';
+	@IsIn(['views', 'usage', 'revenue'])
+	sortBy?: 'views' | 'usage' | 'revenue';
 
 	@ApiPropertyOptional({ description: 'Page number', minimum: 1, default: 1 })
 	@IsOptional()

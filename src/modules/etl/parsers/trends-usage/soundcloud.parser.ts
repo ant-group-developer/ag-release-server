@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import { FactDspRow } from '../../interfaces';
-import { BaseParser } from '../base.parser';
+import { BaseParser, ParserCatalogFieldMapping } from '../base.parser';
 
 /**
  * SoundCloud Parser
@@ -19,6 +19,47 @@ import { BaseParser } from '../base.parser';
 export class SoundCloudParser extends BaseParser {
 	constructor() {
 		super('soundcloud');
+	}
+
+	/**
+	 * SoundCloud joins Streamlevelreport and Trackinformation. Keep the source
+	 * file in reportColumn so the catalog does not hide two different headers
+	 * behind one field name; parserColumn remains the exact TSV header.
+	 */
+	getCatalogFieldMappings(): ParserCatalogFieldMapping[] {
+		const mapping = (
+			reportColumn: string,
+			sourceFile: 'Streamlevelreport' | 'Trackinformation',
+			targetColumn: string,
+			transform = 'trim',
+		): ParserCatalogFieldMapping => ({
+			reportColumn: `${reportColumn} (${sourceFile})`,
+			parserColumn: reportColumn,
+			targetColumn,
+			transform,
+		});
+
+		return [
+			mapping('reporting_start_date', 'Streamlevelreport', 'reporting_period'),
+			mapping('isrc', 'Streamlevelreport', 'isrc', 'isrc'),
+			mapping('country', 'Streamlevelreport', 'territory_code'),
+			mapping('track_id', 'Streamlevelreport', 'track_id_internal'),
+			mapping('client_application', 'Streamlevelreport', 'metadata.client'),
+			mapping('operating_system', 'Streamlevelreport', 'metadata.os'),
+			mapping('play_length', 'Streamlevelreport', 'metadata.play_length_ms'),
+			mapping('track_favorited', 'Streamlevelreport', 'metadata.favorited'),
+			mapping(
+				'track_reposted_shared',
+				'Streamlevelreport',
+				'metadata.reposted',
+			),
+			mapping('track_id', 'Trackinformation', 'track_id_internal'),
+			mapping('isrc', 'Trackinformation', 'isrc', 'isrc'),
+			mapping('track_artist', 'Trackinformation', 'artist_name'),
+			mapping('track_title', 'Trackinformation', 'track_title'),
+			mapping('album_name', 'Trackinformation', 'album_title'),
+			mapping('album_code', 'Trackinformation', 'upc'),
+		];
 	}
 
 	/** Process once per folder */

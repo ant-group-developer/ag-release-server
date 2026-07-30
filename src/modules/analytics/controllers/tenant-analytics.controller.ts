@@ -12,10 +12,11 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -44,6 +45,24 @@ export class TenantAnalyticsController {
 		}
 	}
 
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a tenant' })
+	async summary(
+		@Param('tenantId') tenantId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		await this.validateTenantAccess(req.user!.tenantId, tenantId);
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'tenant',
+				tenantId,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
+
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a tenant' })
 	async overview(
@@ -62,79 +81,9 @@ export class TenantAnalyticsController {
 		});
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a tenant (monthly)' })
-	async trendViewTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a tenant (monthly)' })
-	async salesViewTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a tenant' })
-	async trendViewDailyTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a tenant (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('tenantId') tenantId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		await this.validateTenantAccess(req.user!.tenantId, tenantId);
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
-				'tenant',
-				tenantId,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a tenant' })
@@ -158,7 +107,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a tenant' })
 	async revenueLineChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
@@ -212,7 +161,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a tenant' })
 	async revenueDspBarChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
@@ -230,7 +179,7 @@ export class TenantAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a tenant' })
 	async revenueTerritoryBarChart(
 		@Param('tenantId') tenantId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		await this.validateTenantAccess(req.user!.tenantId, tenantId);
@@ -246,7 +195,7 @@ export class TenantAnalyticsController {
 
 	@Post('top-tracks')
 	@ApiOperation({
-		summary: 'Top tracks của tenant (sortBy: views | revenue)',
+		summary: 'Top tracks của tenant (sortBy: views | usage | revenue)',
 	})
 	async topTracks(
 		@Param('tenantId') tenantId: string,
@@ -266,7 +215,7 @@ export class TenantAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của tenant (sortBy: views | revenue)',
+		summary: 'Top releases của tenant (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('tenantId') tenantId: string,
@@ -285,7 +234,7 @@ export class TenantAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của tenant (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của tenant (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('tenantId') tenantId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -304,7 +253,7 @@ export class TenantAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của tenant (sortBy: views | revenue)',
+		summary: 'Top territories của tenant (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('tenantId') tenantId: string,

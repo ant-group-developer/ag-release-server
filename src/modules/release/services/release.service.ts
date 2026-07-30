@@ -1039,6 +1039,7 @@ export class ReleaseService {
 			case 'in_progress':
 			case 'queued':
 			case 'waiting':
+			case 'ok':
 				return ReleaseDspStatus.PROCESSING;
 
 			case 'not_found':

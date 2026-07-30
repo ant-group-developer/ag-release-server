@@ -47,4 +47,4 @@ export function getParserForFolder(folderName: string): BaseParser | null {
 	return factory ? factory() : null;
 }
 
-export { BaseParser } from './base.parser';
+export { BaseParser, ParserCatalogFieldMapping } from './base.parser';

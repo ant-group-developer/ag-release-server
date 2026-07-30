@@ -3,10 +3,11 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
+	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
+	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -14,6 +15,23 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/track/:isrc')
 export class TrackAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a track' })
+	async summary(
+		@Param('isrc') isrc: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		return new ResponseSuccess({
+			data: await this.entitySvc.getSummary(
+				'track',
+				isrc,
+				dto,
+				req.user!.tenantId,
+			),
+		});
+	}
 
 	@Post('overview')
 	@ApiOperation({ summary: 'Overview stats for a track' })
@@ -24,76 +42,6 @@ export class TrackAnalyticsController {
 	) {
 		return new ResponseSuccess({
 			data: await this.entitySvc.getOverview(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({ summary: 'Trend view DSP timeline for a track (monthly)' })
-	async trendViewTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({ summary: 'Sales view DSP timeline for a track (monthly)' })
-	async salesViewTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getSalesViewDspTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a track' })
-	async trendViewDailyTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getTrendViewDspDailyTimeline(
-				'track',
-				isrc,
-				dto,
-				req.user!.tenantId,
-			),
-		});
-	}
-
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a track (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('isrc') isrc: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		return new ResponseSuccess({
-			data: await this.entitySvc.getRevenueTimeline(
 				'track',
 				isrc,
 				dto,
@@ -123,7 +71,7 @@ export class TrackAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a track' })
 	async revenueLineChart(
 		@Param('isrc') isrc: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -174,7 +122,7 @@ export class TrackAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a track' })
 	async revenueDspBarChart(
 		@Param('isrc') isrc: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -191,7 +139,7 @@ export class TrackAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a track' })
 	async revenueTerritoryBarChart(
 		@Param('isrc') isrc: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		return new ResponseSuccess({
@@ -205,7 +153,7 @@ export class TrackAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của track (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('isrc') isrc: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -223,7 +171,7 @@ export class TrackAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của track (sortBy: views | revenue)',
+		summary: 'Top territories của track (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('isrc') isrc: string,

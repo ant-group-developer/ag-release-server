@@ -11,9 +11,10 @@ import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	ChartQueryDto,
+	RevenueChartQueryDto,
+	AnalyticsSummaryQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
-	EntityTimelineQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -21,6 +22,22 @@ import { EntityAnalyticsService } from '../services/entity-analytics.service';
 @Controller('analytics/channel/:channelId')
 export class ChannelAnalyticsController {
 	constructor(private readonly entitySvc: EntityAnalyticsService) {}
+
+	@Post('summary')
+	@ApiOperation({ summary: 'Unified analytics summary for a channel' })
+	async summary(
+		@Param('channelId', ParseUUIDPipe) channelId: string,
+		@Body() dto: AnalyticsSummaryQueryDto,
+		@Req() req: Request,
+	) {
+		const data = await this.entitySvc.getSummary(
+			'channel',
+			channelId,
+			dto,
+			req.user!.tenantId,
+		);
+		return new ResponseSuccess({ data });
+	}
 
 	@Post('overview')
 	@ApiOperation({
@@ -41,75 +58,9 @@ export class ChannelAnalyticsController {
 		return new ResponseSuccess({ data });
 	}
 
-	@Post('trend-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Trend view DSP timeline for a channel (monthly)',
-	})
-	async trendViewTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getTrendViewDspTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('sales-view/dsp/timeline')
-	@ApiOperation({
-		summary: 'Sales view DSP timeline for a channel (monthly)',
-	})
-	async salesViewTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getSalesViewDspTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('trend-view/dsp/timeline/daily')
-	@ApiOperation({ summary: 'Trend view DSP daily timeline for a channel' })
-	async trendViewDailyTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getTrendViewDspDailyTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
-	@Post('revenue/timeline')
-	@ApiOperation({
-		summary: 'Revenue timeline for a channel (monthly, DSP breakdown)',
-	})
-	async revenueTimeline(
-		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: EntityTimelineQueryDto,
-		@Req() req: Request,
-	) {
-		const data = await this.entitySvc.getRevenueTimeline(
-			'channel',
-			channelId,
-			dto,
-			req.user!.tenantId,
-		);
-		return new ResponseSuccess({ data });
-	}
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a channel' })
@@ -131,7 +82,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue line chart for a channel' })
 	async revenueLineChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueLineChart(
@@ -179,7 +130,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue DSP bar chart for a channel' })
 	async revenueDspBarChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueDspBarChart(
@@ -195,7 +146,7 @@ export class ChannelAnalyticsController {
 	@ApiOperation({ summary: 'Revenue territory bar chart for a channel' })
 	async revenueTerritoryBarChart(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
-		@Body() dto: ChartQueryDto,
+		@Body() dto: RevenueChartQueryDto,
 		@Req() req: Request,
 	) {
 		const data = await this.entitySvc.getRevenueTerritoryBarChart(
@@ -210,7 +161,7 @@ export class ChannelAnalyticsController {
 	@Post('top-releases')
 	@ApiOperation({
 		summary:
-			'Top releases của channel (sortBy: views | revenue, trả cả 2 metric)',
+			'Top releases của channel (sortBy: views | usage | revenue, trả cả 3 metric)',
 	})
 	async topReleases(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
@@ -227,7 +178,7 @@ export class ChannelAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của channel (sortBy: views | revenue)' })
+	@ApiOperation({ summary: 'Top DSPs của channel (sortBy: views | usage | revenue)' })
 	async topDsps(
 		@Param('channelId', ParseUUIDPipe) channelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -244,7 +195,7 @@ export class ChannelAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của channel (sortBy: views | revenue)',
+		summary: 'Top territories của channel (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('channelId', ParseUUIDPipe) channelId: string,

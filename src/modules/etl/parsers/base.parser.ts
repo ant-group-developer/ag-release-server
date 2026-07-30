@@ -19,10 +19,24 @@ export interface ParseFileStats {
 	filePath: string;
 	fileName: string;
 	fileDirectory: string;
+	fileSizeBytes: number;
 	totalLines: number;
 	processedRows: number;
 	skippedRows: number;
 	errorRows: number;
+}
+
+/**
+ * Read-only catalog metadata for a parser. Multi-file parsers provide this
+ * explicitly because their joins and conditional assignments cannot be
+ * recovered reliably from source-code scanning.
+ */
+export interface ParserCatalogFieldMapping {
+	reportColumn: string;
+	/** Raw header used by parser code; reportColumn may add a source-file label. */
+	parserColumn?: string;
+	targetColumn: string;
+	transform?: string;
 }
 
 /**
@@ -50,6 +64,14 @@ export abstract class BaseParser {
 	}
 
 	/**
+	 * Override only for parsers that combine different source files. Returning
+	 * null keeps the regular source-assignment catalog extractor in use.
+	 */
+	getCatalogFieldMappings(): ParserCatalogFieldMapping[] | null {
+		return null;
+	}
+
+	/**
 	 * Parse an entire file into standardized rows.
 	 */
 	async parseFile(filePath: string, batchId: string): Promise<FactDspRow[]> {
@@ -74,10 +96,13 @@ export abstract class BaseParser {
 		const lowerPath = filePath.toLowerCase();
 		if (lowerPath.endsWith('.zip')) {
 			const rows = await this.parseZipFile(filePath, batchId);
+			let zipSize = 0;
+			try { zipSize = fs.statSync(filePath).size; } catch {}
 			const stats: ParseFileStats = {
 				filePath,
 				fileName: path.basename(filePath),
 				fileDirectory: path.dirname(filePath),
+				fileSizeBytes: zipSize,
 				totalLines: rows.length,
 				processedRows: rows.length,
 				skippedRows: 0,
@@ -246,6 +271,9 @@ export abstract class BaseParser {
 			filePath,
 			fileName: path.basename(filePath),
 			fileDirectory: path.dirname(filePath),
+			fileSizeBytes: (() => {
+				try { return fs.statSync(filePath).size; } catch { return 0; }
+			})(),
 			totalLines: lineNum,
 			processedRows: rows.length,
 			skippedRows,

@@ -4,7 +4,6 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { ICoverArtThumbnails } from 'src/modules/release/interfaces/release.interface';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
-import { getImportSourceLabel } from '../constants/import-source.constants';
 import { RankingQueryDto } from '../dto/analytics-query.dto';
 import {
 	AnalyticsChannelInfo,
@@ -21,8 +20,10 @@ import {
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
+import { SourceTypeConfigService } from './source-type-config.service';
 
 /**
  * Service xếp hạng hiệu năng (Rankings) cho Tracks, Releases, Artists, Labels.
@@ -41,6 +42,7 @@ export class RankingService {
 		private readonly clickHouseService: ClickHouseService,
 		private readonly isrcResolverService: IsrcResolverService,
 		private readonly cache: AnalyticsCacheService,
+		private readonly sourceTypeConfigService: SourceTypeConfigService,
 	) {}
 
 	// ═══════════════════════════════════════════════════════
@@ -116,11 +118,16 @@ export class RankingService {
 			source: string;
 			quantity: string;
 		}>(sql, { ...baseParams, ...groupParams });
-		return rows.map((r) => ({
-			source: r.source || 'ftp',
-			sourceLabel: getImportSourceLabel(r.source || 'ftp'),
-			quantity: Number(r.quantity),
-		}));
+		return rows.map((r) => {
+			const sourceType = r.source || 'ftp';
+			const source = this.sourceTypeConfigService.resolve(sourceType);
+			return {
+				source: sourceType,
+				sourceLabel: source.label,
+				imageUrl: source.imageUrl,
+				quantity: Number(r.quantity),
+			};
+		});
 	}
 
 	// ═══════════════════════════════════════════════════════
@@ -1362,12 +1369,16 @@ export class RankingService {
 			totalViews: string;
 		}>(dataSql, params);
 
-		const items: SourceTypeRankingItem[] = paged.map((r, index) => ({
-			rank: query.skip + index + 1,
-			sourceType: r.sourceType,
-			sourceTypeLabel: getImportSourceLabel(r.sourceType),
-			totalViews: Number(r.totalViews),
-		}));
+		const items: SourceTypeRankingItem[] = paged.map((r, index) => {
+			const source = this.sourceTypeConfigService.resolve(r.sourceType);
+			return {
+				rank: query.skip + index + 1,
+				sourceType: r.sourceType,
+				sourceTypeLabel: source.label,
+				imageUrl: source.imageUrl,
+				totalViews: Number(r.totalViews),
+			};
+		});
 
 		return new PageDto({ items, metadata: { page, pageSize, totalItems } });
 	}
@@ -1451,6 +1462,7 @@ export class RankingService {
         s.dsp_id AS dspReportId,
         r.pg_uuid AS pgDspId,
         ${resolvedDspName} AS dspName,
+        any(p.picture) AS imageUrl,
         sum(s.total_quantity) AS totalViews
       FROM ${table} s
       INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc
@@ -1467,6 +1479,7 @@ export class RankingService {
 			dspReportId: string;
 			pgDspId: string;
 			dspName: string;
+			imageUrl: string | null;
 			totalViews: string;
 		}>(dataSql, params);
 
@@ -1475,6 +1488,7 @@ export class RankingService {
 			pgDspId: r.pgDspId || null,
 			dspReportId: r.dspReportId,
 			dspName: r.dspName,
+			imageUrl: toDspImageUrl(r.imageUrl),
 			totalViews: Number(r.totalViews),
 		}));
 

@@ -20,6 +20,7 @@ import {
 	computeProgressDetail,
 } from '../services/import-jobs/import-jobs.service';
 import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
+import { EtlImportHistoryRepository } from '../services/etl-import-history/etl-import-history.repository';
 
 @ApiTags('ETL')
 @Controller('etl')
@@ -27,7 +28,50 @@ export class JobController {
 	constructor(
 		private readonly importJobsService: ImportJobsService,
 		private readonly jobEvents: JobEventsGateway,
+		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
+
+	@Get('jobs/:id/status-detail')
+	@ApiOperation({
+		summary: 'Get per-file import detail for a job',
+		description:
+			'Returns etl_import_history records grouped by period → category → dsp_folder → files[]',
+	})
+	@ApiParam({ name: 'id', description: 'Job ID' })
+	async getJobStatusDetail(
+		@Param('id') id: string,
+	): Promise<ResponseSuccess<any>> {
+		const rows = await this.etlImportHistoryRepository.findByJobId(id);
+		const grouped: Record<string, Record<string, Record<string, any[]>>> = {};
+
+		for (const row of rows) {
+			const period = row.period || '_';
+			const category = row.category || '_';
+			const dspFolder = row.dsp_folder || '_';
+
+			if (!grouped[period]) grouped[period] = {};
+			if (!grouped[period][category]) grouped[period][category] = {};
+			if (!grouped[period][category][dspFolder])
+				grouped[period][category][dspFolder] = [];
+
+			grouped[period][category][dspFolder].push({
+				fileName: row.file_name,
+				filePath: row.file_path,
+				status: row.status,
+				fileSizeBytes: Number(row.file_size_bytes ?? 0),
+				totalLines: Number(row.total_lines),
+				processedRows: Number(row.processed_rows),
+				skippedRows: Number(row.skipped_rows),
+				errorRows: Number(row.error_rows),
+				durationMs: Number(row.duration_ms),
+				errorMessage: row.error_message || null,
+				startedAt: row.started_at,
+				completedAt: row.completed_at,
+			});
+		}
+
+		return new ResponseSuccess({ data: grouped });
+	}
 
 	@Get('jobs/:id')
 	@ApiOperation({

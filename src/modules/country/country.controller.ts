@@ -16,6 +16,7 @@ import { CountryMessageCodeSuccess } from './constants/country.constant';
 import {
 	CreateCountryDto,
 	QueryGetListCountryDto,
+	SyncCountryFlagsDto,
 	UpdateCountryDto,
 } from './dto/country.dto';
 import { Country } from './entities/country.entity';
@@ -62,6 +63,13 @@ export class CountryController {
 		return new ResponseSuccess({
 			data: result,
 		});
+	}
+
+	@SystemAdminOnly()
+	@Post('flags/sync')
+	async syncFlags(@Query() query: SyncCountryFlagsDto) {
+		const result = await this.countryService.syncFlags(query.force ?? false);
+		return new ResponseSuccess({ data: result });
 	}
 
 	@Get(':id')

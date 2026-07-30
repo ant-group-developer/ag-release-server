@@ -576,6 +576,7 @@ export class ImportService {
 		const files = await this.findDataFiles(folderPath, fileExcluder);
 		const allRows: FactSalesRow[] = [];
 		const allFileStats: ParseFileStats[] = [];
+		const parseErrors: string[] = [];
 
 		for (const filePath of files) {
 			try {
@@ -598,10 +599,22 @@ export class ImportService {
 				}
 				allRows.push(...rows);
 			} catch (err) {
+				parseErrors.push(
+					`${path.basename(filePath)}: ${err.message}`,
+				);
 				this.logger.error(
 					`Error parsing sales ${path.basename(filePath)}: ${err.message}`,
 				);
 			}
+		}
+
+		// A folder with no successfully parsed file must not be recorded as
+		// "done" with zero rows: otherwise the incremental sync will skip it on
+		// subsequent runs even though none of its data was imported.
+		if (files.length > 0 && parseErrors.length === files.length) {
+			throw new Error(
+				`Failed to parse every sales file in ${folderName}: ${parseErrors.join('; ')}`,
+			);
 		}
 
 		let entityResult:

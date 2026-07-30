@@ -4,6 +4,7 @@ import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
+import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
@@ -91,7 +92,10 @@ export class DashboardAnalyticsService {
 
 		const sql = `
       SELECT
+        s.dsp_id AS dspReportId,
+        r.pg_uuid AS pgDspId,
         ${resolvedDspName} AS name,
+        p.picture AS imageUrl,
         ${selectVal} AS value
       FROM ${table} s
       ${joinSql}
@@ -99,18 +103,24 @@ export class DashboardAnalyticsService {
       WHERE s.period >= toDate({from:String})
         AND s.period <= toDate({to:String})
         ${filterSql}
-      GROUP BY name
+      GROUP BY dspReportId, pgDspId, name, imageUrl
       ORDER BY value DESC
     `;
 
 		const rows = await this.clickHouseService.query<{
+			dspReportId: string;
+			pgDspId: string | null;
 			name: string;
+			imageUrl: string | null;
 			value: string;
 		}>(sql, params);
 
 		const sorted = rows
 			.map((r) => ({
+				pgDspId: r.pgDspId || null,
+				dspReportId: r.dspReportId,
 				name: r.name || 'Unknown DSP',
+				imageUrl: toDspImageUrl(r.imageUrl),
 				value: Number(r.value || 0),
 			}))
 			.sort((a, b) => b.value - a.value);
@@ -125,7 +135,13 @@ export class DashboardAnalyticsService {
 				.slice(topN)
 				.reduce((acc, item) => acc + item.value, 0);
 			if (otherValue > 0) {
-				topItems.push({ name: 'Other', value: otherValue });
+				topItems.push({
+					pgDspId: null,
+					dspReportId: '',
+					name: 'Other',
+					imageUrl: null,
+					value: otherValue,
+				});
 			}
 		}
 		return topItems.sort((a, b) => b.value - a.value);
