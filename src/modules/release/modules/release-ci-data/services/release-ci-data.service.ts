@@ -744,6 +744,7 @@ export class ReleaseCiDataService {
 			releaseId,
 			status,
 			keyword,
+			type,
 			neverExported,
 			lastImportIsFailed,
 			needImportAgain,
@@ -757,6 +758,10 @@ export class ReleaseCiDataService {
 
 		if (status) {
 			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
 		}
 
 		if (neverExported) {
@@ -832,7 +837,7 @@ export class ReleaseCiDataService {
 				`COALESCE(jsonb_array_length("releaseCiData"."export_parsed_data"), 0)`,
 				'dsps_live_count',
 			);
-		} else if (filter.keyword?.length) {
+		} else if (filter.keyword?.length || filter.type) {
 			qb.leftJoin('releaseCiData.release', 'release');
 		}
 
@@ -853,6 +858,7 @@ export class ReleaseCiDataService {
 			releaseId,
 			status,
 			keyword,
+			type,
 			neverExported,
 			lastImportIsFailed,
 			needImportAgain,
@@ -866,6 +872,10 @@ export class ReleaseCiDataService {
 
 		if (status) {
 			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
 		}
 
 		if (neverExported) {
