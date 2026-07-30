@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
+	IsEnum,
 	IsOptional,
 	IsString,
 	ValidateNested,
@@ -13,6 +14,39 @@ export enum FtpSourceCategory {
 	USAGE = 'usage',
 	SALES = 'sales',
 	ILLEGITIMATE_ACTIVITY = 'illegitimate_activity',
+}
+
+export enum FtpFieldMappingTransform {
+	TRIM = 'trim',
+	RAW = 'raw',
+	UPPERCASE = 'uppercase',
+	LOWERCASE = 'lowercase',
+	ISRC = 'isrc',
+}
+
+export enum FtpFieldMappingTarget {
+	SKIP = 'skip',
+	METADATA = 'metadata',
+	REPORTING_PERIOD = 'reporting_period',
+	REPORTING_PERIOD_START = 'reporting_period_start',
+	REPORTING_PERIOD_END = 'reporting_period_end',
+	TERRITORY_CODE = 'territory_code',
+	ISRC = 'isrc',
+	UPC = 'upc',
+	TRACK_TITLE = 'track_title',
+	ARTIST_NAME = 'artist_name',
+	ALBUM_TITLE = 'album_title',
+	COMPOSER_NAME = 'composer_name',
+	TRACK_ID_INTERNAL = 'track_id_internal',
+	QUANTITY_TOTAL = 'quantity_total',
+	QUANTITY_UNIQUE_USERS = 'quantity_unique_users',
+	QUANTITY_INVALID = 'quantity_invalid',
+	QUANTITY = 'quantity',
+	QUANTITY_CREATIONS = 'quantity_creations',
+	QUANTITY_VIEWS = 'quantity_views',
+	REVENUE_USD = 'revenue_usd',
+	REVENUE_LOCAL = 'revenue_local',
+	REVENUE_CURRENCY = 'revenue_currency',
 }
 
 export class FtpParserFieldMappingDto {
@@ -38,6 +72,27 @@ export class FtpParserFieldMappingDto {
 	@IsOptional()
 	@IsString()
 	transform?: string;
+}
+
+/** Multipart-friendly, one-row field mapping update. */
+export class UpsertFtpParserFieldMappingDto {
+	@ApiProperty({ example: 'ISRC' })
+	@IsString()
+	reportColumn: string;
+
+	@ApiProperty({ enum: FtpFieldMappingTarget })
+	@IsEnum(FtpFieldMappingTarget)
+	targetColumn: FtpFieldMappingTarget;
+
+	@ApiPropertyOptional({ description: 'Required only when targetColumn is metadata' })
+	@IsOptional()
+	@IsString()
+	metadataKey?: string;
+
+	@ApiPropertyOptional({ enum: FtpFieldMappingTransform, default: FtpFieldMappingTransform.TRIM })
+	@IsOptional()
+	@IsEnum(FtpFieldMappingTransform)
+	transform?: FtpFieldMappingTransform;
 }
 
 export class UpsertFtpParserConfigDto {

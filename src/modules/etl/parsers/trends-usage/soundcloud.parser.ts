@@ -186,6 +186,7 @@ export class SoundCloudParser extends BaseParser {
 					headers.forEach((h, idx) => {
 						record[h.trim()] = (values[idx] || '').trim();
 					});
+					this.prepareRecord(record);
 
 					const trackId = record['track_id'];
 					if (trackId) {
@@ -217,6 +218,7 @@ export class SoundCloudParser extends BaseParser {
 					headers.forEach((h, idx) => {
 						record[h.trim()] = (values[idx] || '').trim();
 					});
+					this.prepareRecord(record);
 
 					let isrc = record['isrc']?.trim() || '';
 					const trackId = record['track_id'] || '';

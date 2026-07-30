@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../../clickhouse';
 import { FtpSourceCategory } from '../../../dsp-report/dto/ftp-parser-config.dto';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
+import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
 import {
 	FtpParserConfigService,
 	ResolvedFtpParserConfig,
@@ -102,6 +103,7 @@ export class SyncService {
 		private readonly excludePatternService: ExcludePatternService,
 		private readonly cubeRebuildService: CubeRebuildService,
 		private readonly ftpParserConfigService: FtpParserConfigService,
+		private readonly ftpReportFileRuleService: FtpReportFileRuleService,
 		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
 
@@ -383,10 +385,36 @@ export class SyncService {
 				const existing = importedDetails.get(key);
 				let parserConfig: ResolvedFtpParserConfig;
 				try {
-					parserConfig = await this.ftpParserConfigService.resolve(
+					const availableFiles = await this.ftpService.listRemoteFiles(
+						category,
+						period,
+						dspFolder,
+					);
+					const ruleDecision = await this.ftpReportFileRuleService.resolveFiles(
+						'ftp',
+						category as FtpSourceCategory,
+						dspFolder,
+						availableFiles,
+					);
+					if (ruleDecision.pending.length) {
+						this.logger.warn(
+							`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
+						);
+					}
+					if (!ruleDecision.selected.length || !ruleDecision.parserCode) {
+						categoryResult.folders.push({
+							dsp_folder: dspFolder, status: 'skipped', rows: 0, files: 0, durationMs: 0,
+							reason: ruleDecision.pending.length ? 'files pending admin confirmation' : 'no import rule matched files',
+						});
+						continue;
+					}
+					parserConfig = await this.ftpParserConfigService.resolveForParserCode(
 						dspFolder,
 						category as FtpSourceCategory,
+						ruleDecision.parserCode,
 					);
+					const selectedNames = new Set(ruleDecision.selected);
+					parserConfig.selectFile = (path) => selectedNames.has(path);
 				} catch (err) {
 					this.logger.error(
 						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,

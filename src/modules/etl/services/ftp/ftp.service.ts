@@ -16,6 +16,13 @@ export interface FtpConfig {
 	syncCron: string;
 }
 
+export interface FtpRemoteFolderFiles {
+	category: string;
+	period: string;
+	dspFolder: string;
+	files: string[];
+}
+
 @Injectable()
 export class FtpService {
 	private readonly logger = new Logger(FtpService.name);
@@ -163,6 +170,7 @@ export class FtpService {
 		period: string,
 		dspFolder: string,
 		fileSelector?: (relativePath: string) => boolean,
+		applyGlobalExcludes = true,
 	): Promise<string[]> {
 		const config = this.getConfig();
 		const client = await this.connect();
@@ -174,6 +182,7 @@ export class FtpService {
 				remotePath,
 				'',
 				fileSelector,
+				applyGlobalExcludes,
 			);
 			return files.sort();
 		} catch (err) {
@@ -181,6 +190,52 @@ export class FtpService {
 				`Cannot list files for ${category}/${period}/${dspFolder}: ${err.message}`,
 			);
 			return [];
+		} finally {
+			client.close();
+		}
+	}
+
+	/**
+	 * Discovery traversal using exactly one FTPS connection. It deliberately
+	 * bypasses import selectors and global exclude patterns so admins can see
+	 * every remote file before deciding whether it is importable.
+	 */
+	async listAllRemoteReportFiles(
+		categories: string[],
+	): Promise<FtpRemoteFolderFiles[]> {
+		const config = this.getConfig();
+		const client = await this.connect();
+		const results: FtpRemoteFolderFiles[] = [];
+		try {
+			for (const category of categories) {
+				let periodEntries: ftp.FileInfo[] = [];
+				try {
+					periodEntries = await client.list(`${config.basePath}/${category}`);
+				} catch (error) {
+					this.logger.warn(`Cannot list discovery category ${category}: ${error.message}`);
+					continue;
+				}
+				for (const periodEntry of periodEntries.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))) {
+					const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
+					let folderEntries: ftp.FileInfo[] = [];
+					try { folderEntries = await client.list(periodPath); } catch (error) {
+						this.logger.warn(`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`);
+						continue;
+					}
+					for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
+						const folderPath = `${periodPath}/${folderEntry.name}`;
+						try {
+							results.push({
+								category, period: periodEntry.name, dspFolder: folderEntry.name,
+								files: (await this.listFilesRecursive(client, folderPath, '', undefined, false)).sort(),
+							});
+						} catch (error) {
+							this.logger.warn(`Cannot list discovery folder ${category}/${periodEntry.name}/${folderEntry.name}: ${error.message}`);
+						}
+					}
+				}
+			}
+			return results;
 		} finally {
 			client.close();
 		}
@@ -196,6 +251,7 @@ export class FtpService {
 		remotePath: string,
 		prefix: string,
 		fileSelector?: (relativePath: string) => boolean,
+		applyGlobalExcludes = true,
 	): Promise<string[]> {
 		const list = await client.list(remotePath);
 		const files: string[] = [];
@@ -208,11 +264,13 @@ export class FtpService {
 					`${remotePath}/${item.name}`,
 					relativeName,
 					fileSelector,
+					applyGlobalExcludes,
 				);
 				files.push(...subFiles);
 			} else if (item.isFile) {
 				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
+					applyGlobalExcludes &&
 					await this.excludePatternService.shouldExclude(
 						item.name,
 						'file',
