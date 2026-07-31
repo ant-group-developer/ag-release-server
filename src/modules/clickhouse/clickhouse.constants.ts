@@ -22,6 +22,12 @@ export const CLICKHOUSE_TABLES = {
 	FTP_DSP_PARSER_CONFIGS: 'ftp_dsp_parser_configs',
 	FTP_PARSER_FIELD_MAPPINGS: 'ftp_parser_field_mappings',
 	FTP_PARSER_CATALOG: 'ftp_parser_catalog',
+	FTP_REPORT_FILE_CATALOG: 'ftp_report_file_catalog',
+	FTP_REPORT_FILE_RULES: 'ftp_report_file_rules',
+	FTP_REPORT_FILE_SCAN_RUNS: 'ftp_report_file_scan_runs',
+	FTP_REPORT_FILE_DISCOVERY_CONFIG: 'ftp_report_file_discovery_config',
+	FTP_REPORT_FILE_DISCOVERY_CHECKPOINTS: 'ftp_report_file_discovery_checkpoints',
+	FTP_REPORT_FILE_PERIOD_OBSERVATIONS: 'ftp_report_file_period_observations',
 	METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',
 	ANALYTICS_SOURCE_TYPE_CONFIGS: 'analytics_source_type_configs',
 } as const;

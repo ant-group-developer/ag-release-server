@@ -54,6 +54,7 @@ export class ConfiguredDspFieldMappingParser extends BaseParser {
 		mapping: ConfiguredFieldMapping,
 		value: string,
 	): void {
+		if (mapping.targetColumn === 'skip') return;
 		if (mapping.targetColumn.startsWith('metadata.')) {
 			row.metadata[mapping.targetColumn.slice('metadata.'.length)] =
 				this.transform(value, mapping.transform);

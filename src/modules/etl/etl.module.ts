@@ -9,10 +9,12 @@ import { ImportController } from './controllers/import.controller';
 import { JobController } from './controllers/job.controller';
 import { StatementsUploadController } from './controllers/statements-upload.controller';
 import { SyncController } from './controllers/sync.controller';
+import { FtpReportFileDiscoveryController } from './controllers/ftp-report-file-discovery.controller';
 import { ImportJobsModule } from './import-jobs.module';
 import { CubeRebuildService } from './services/cube-rebuild/cube-rebuild.service';
 import { ExchangeRateService } from './services/exchange-rate/exchange-rate.service';
 import { FtpService } from './services/ftp/ftp.service';
+import { FtpReportFileDiscoveryService } from './services/ftp/ftp-report-file-discovery.service';
 import { ImportService } from './services/import/import.service';
 import { JobService } from './services/job/job.service';
 import { SchedulerService } from './services/scheduler/scheduler.service';
@@ -36,10 +38,12 @@ import { SyncService } from './services/sync/sync.service';
 		JobController,
 		ExchangeRateController,
 		StatementsUploadController,
+		FtpReportFileDiscoveryController,
 	],
 	providers: [
 		ImportService,
 		FtpService,
+		FtpReportFileDiscoveryService,
 		SyncService,
 		SchedulerService,
 		JobService, // @deprecated — giữ tạm, sẽ remove sau khi confirm không nơi khác inject

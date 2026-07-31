@@ -10,8 +10,10 @@ import {
 	Post,
 	Put,
 	Query,
+	UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { PageDto, ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AssignDspReportDto,
@@ -22,6 +24,8 @@ import {
 	FtpSourceCategory,
 	PreviewFtpParserConfigDto,
 	SyncParserCatalogDto,
+	FtpFieldMappingTarget,
+	UpsertFtpParserFieldMappingDto,
 	UpdateFtpParserFieldMappingsDto,
 	UpsertFtpParserConfigDto,
 } from '../dto/ftp-parser-config.dto';
@@ -140,6 +144,38 @@ export class DspReportController {
 				parserCode,
 				dto.fieldMappings,
 			),
+		});
+	}
+
+	@Put('parser-catalog/:parserCode/field-mapping')
+	@ApiConsumes('multipart/form-data')
+	@UseInterceptors(FileInterceptor('file'))
+	async upsertParserFieldMapping(
+		@Param('parserCode') parserCode: string,
+		@Body() dto: UpsertFtpParserFieldMappingDto,
+	): Promise<ResponseSuccess<unknown>> {
+		const targetColumn =
+			dto.targetColumn === FtpFieldMappingTarget.METADATA
+				? `metadata.${dto.metadataKey || ''}`
+				: dto.targetColumn;
+		if (dto.targetColumn === FtpFieldMappingTarget.METADATA && !dto.metadataKey)
+			throw new BadRequestException('metadataKey is required when targetColumn is metadata');
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.upsertParserFieldMapping(
+				parserCode,
+				{ reportColumn: dto.reportColumn, targetColumn, transform: dto.transform },
+			),
+		});
+	}
+
+	@Delete('parser-catalog/:parserCode/field-mapping')
+	async removeParserFieldMapping(
+		@Param('parserCode') parserCode: string,
+		@Query('reportColumn') reportColumn?: string,
+	): Promise<ResponseSuccess<unknown>> {
+		if (!reportColumn) throw new BadRequestException('reportColumn is required');
+		return new ResponseSuccess({
+			data: await this.ftpParserConfigService.removeParserFieldMapping(parserCode, reportColumn),
 		});
 	}
 
