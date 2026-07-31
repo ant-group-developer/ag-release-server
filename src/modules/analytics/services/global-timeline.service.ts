@@ -4,6 +4,7 @@ import { PageDto } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
@@ -36,7 +37,6 @@ import {
 import * as queries from '../queries/global-timeline.queries';
 import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
-import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 import { SourceTypeConfigService } from './source-type-config.service';
@@ -2515,6 +2515,7 @@ export class TimelineAnalyticsService {
 		const rows = await this.clickHouseService.query<{
 			pg_dsp_id: string | null;
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			dsp_name: string;
 			image_url: string | null;
 			total_views: string;
@@ -2523,6 +2524,7 @@ export class TimelineAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((r) => ({
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
+			dspReportIds: r.dsp_report_ids,
 			dspName: r.dsp_name,
 			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: Number(r.total_views),
@@ -2767,6 +2769,7 @@ export class TimelineAnalyticsService {
 		const rows = await this.clickHouseService.query<{
 			pg_dsp_id: string | null;
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			dsp_name: string;
 			image_url: string | null;
 			revenue_usd: string;
@@ -2776,6 +2779,7 @@ export class TimelineAnalyticsService {
 		const items: DspBarChartItem[] = rows.map((r) => ({
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
+			dspReportIds: r.dsp_report_ids,
 			dspName: r.dsp_name,
 			imageUrl: toDspImageUrl(r.image_url),
 			totalViews: undefined, // ensure matching expected type

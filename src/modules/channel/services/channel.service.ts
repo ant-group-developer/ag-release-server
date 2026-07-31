@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
+import { LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { TelegramService } from 'src/modules/notification/services/notification.telegram-service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
@@ -53,12 +54,12 @@ export class ChannelService {
 			const response = await this.vevoService.newChannel(name);
 
 			this.logsService.log({
-				module: 'channel',
+				module: LogModule.VEVO_REQUEST,
 				data: {
 					request: { channelName: name },
 					response,
 				},
-				message: 'Response create channel vevo',
+				message: `[CREATE_CHANNEL] Sent request to create Vevo channel: ${name}`,
 			});
 
 			if (response.errors?.length || !response.data?.createChannel) {

@@ -4,15 +4,28 @@ import { ReleaseExecution3 } from 'src/modules/release/modules/release-execution
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 export enum LogLevel {
-	SUCCESS = 'SUCCESS',
 	LOG = 'LOG',
-	ERROR = 'ERROR',
+	SUCCESS = 'SUCCESS',
 	WARNING = 'WARNING',
+	ERROR = 'ERROR',
 }
 
-export enum ErrorType {
+export enum LogCategory {
 	BUSINESS = 'BUSINESS',
 	SYSTEM = 'SYSTEM',
+}
+
+export enum LogModule {
+	// Release
+	RELEASE = 'RELEASE',
+	RELEASE_EXECUTION = 'RELEASE_EXECUTION',
+
+	// Vevo
+	VEVO_REQUEST = 'VEVO_REQUEST',
+	VEVO_WEBHOOK = 'VEVO_WEBHOOK',
+
+	// Common
+	COMMON = 'COMMON',
 }
 
 @Entity('logs')
@@ -25,16 +38,15 @@ export class Logs extends BaseUUIDEntity {
 
 	@Column({
 		type: 'varchar',
-		default: ErrorType.BUSINESS,
+		default: LogCategory.BUSINESS,
 	})
-	type: ErrorType;
+	type: LogCategory;
 
 	@Column({
 		type: 'varchar',
-		default: LogLevel.LOG,
 		nullable: true,
 	})
-	module: string | null;
+	module: LogModule | null;
 
 	@Column({ type: 'text', nullable: true })
 	message: string | null;

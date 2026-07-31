@@ -4,6 +4,7 @@ import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
+	IsIn,
 	IsInt,
 	IsObject,
 	IsOptional,
@@ -110,6 +111,14 @@ export class GetListReleaseCiDataDto extends BaseQueryDto2 {
 	@IsOptional()
 	@IsUUID()
 	releaseId?: string;
+
+	@ApiPropertyOptional({
+		enum: ['audio', 'video'],
+		description: 'Loại bản phát hành (audio hoặc video)',
+	})
+	@IsOptional()
+	@IsIn(['audio', 'video'])
+	type?: 'audio' | 'video';
 
 	@ApiPropertyOptional({ enum: ReleaseCiDataStatus })
 	@IsOptional()

@@ -1,13 +1,69 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FactDspRow } from '../../interfaces';
-import { BaseParser } from '../base.parser';
+import { BaseParser, ParserCatalogFieldMapping } from '../base.parser';
 
 const AdmZip = require('adm-zip');
 
 export class FacebookParser extends BaseParser {
 	constructor() {
 		super('facebook');
+	}
+
+	/**
+	 * Facebook merges MERLIN, Daily, and Usage-Report files. The labeled source
+	 * prevents same-named headers in different reports from being conflated in
+	 * the read-only parser catalog.
+	 */
+	getCatalogFieldMappings(): ParserCatalogFieldMapping[] {
+		const mapping = (
+			reportColumn: string,
+			sourceFile: string,
+			targetColumn: string,
+			transform = 'trim',
+		): ParserCatalogFieldMapping => ({
+			reportColumn: `${reportColumn} (${sourceFile})`,
+			parserColumn: reportColumn,
+			targetColumn,
+			transform,
+		});
+
+		return [
+			mapping('isrc', 'MERLIN_DAILY_TOP_1K', 'isrc', 'isrc'),
+			mapping('upc', 'MERLIN_DAILY_TOP_1K', 'isrc', 'isrc'),
+			mapping('product_code', 'MERLIN_DAILY_TOP_1K', 'isrc', 'isrc'),
+			mapping('country', 'MERLIN_DAILY_TOP_1K', 'territory_code'),
+			mapping('title', 'MERLIN_DAILY_TOP_1K', 'track_title'),
+			mapping('track_artist', 'MERLIN_DAILY_TOP_1K', 'artist_name'),
+			mapping('owner_name', 'MERLIN_DAILY_TOP_1K', 'licensor'),
+			mapping('event_count', 'MERLIN_DAILY_TOP_1K', 'quantity_total'),
+			mapping('product', 'MERLIN_DAILY_TOP_1K', 'metadata.product'),
+			mapping('genre', 'MERLIN_DAILY_TOP_1K', 'metadata.genre'),
+			mapping('al_or_ugc', 'MERLIN_DAILY_TOP_1K', 'metadata.al_or_ugc'),
+			mapping('isrc', 'Daily_consumption|Daily_production', 'isrc', 'isrc'),
+			mapping('upc', 'Daily_consumption|Daily_production', 'isrc', 'isrc'),
+			mapping('product_code', 'Daily_consumption|Daily_production', 'isrc', 'isrc'),
+			mapping('country_code', 'Daily_consumption|Daily_production', 'territory_code'),
+			mapping('upc', 'Daily_consumption|Daily_production', 'upc'),
+			mapping('events', 'Daily_consumption|Daily_production', 'quantity_total'),
+			mapping('product', 'Daily_consumption|Daily_production', 'metadata.product'),
+			mapping('start_date', 'Usage-Report', 'reporting_period'),
+			mapping('elected_isrc', 'Usage-Report', 'isrc', 'isrc'),
+			mapping('isrcs', 'Usage-Report', 'isrc', 'isrc'),
+			mapping('upc', 'Usage-Report', 'isrc', 'isrc'),
+			mapping('product_code', 'Usage-Report', 'isrc', 'isrc'),
+			mapping('country', 'Usage-Report', 'territory_code'),
+			mapping('track_title', 'Usage-Report', 'track_title'),
+			mapping('track_artist', 'Usage-Report', 'artist_name'),
+			mapping('event_count', 'Usage-Report', 'quantity_total'),
+			mapping('product', 'Usage-Report', 'metadata.product'),
+			mapping(
+				'event_count_including_estimates',
+				'Usage-Report',
+				'metadata.estimated_events',
+			),
+			mapping('service', 'Usage-Report', 'metadata.service'),
+		];
 	}
 
 	private processedFolders = new Set<string>();

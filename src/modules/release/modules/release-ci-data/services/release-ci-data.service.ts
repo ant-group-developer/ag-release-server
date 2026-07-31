@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { from, lastValueFrom } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import { PageDto } from 'src/common/dtos/common.response.dto';
-import { ErrorType, LogLevel } from 'src/modules/log/entites/logs.entity';
+import { LogCategory, LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { orderAndPaging2 } from 'src/modules/orm/utils/orm.utils';
 import { CiExportService } from 'src/modules/partners-api/ci/services/ci-export.service';
@@ -744,6 +744,7 @@ export class ReleaseCiDataService {
 			releaseId,
 			status,
 			keyword,
+			type,
 			neverExported,
 			lastImportIsFailed,
 			needImportAgain,
@@ -757,6 +758,10 @@ export class ReleaseCiDataService {
 
 		if (status) {
 			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
 		}
 
 		if (neverExported) {
@@ -832,7 +837,7 @@ export class ReleaseCiDataService {
 				`COALESCE(jsonb_array_length("releaseCiData"."export_parsed_data"), 0)`,
 				'dsps_live_count',
 			);
-		} else if (filter.keyword?.length) {
+		} else if (filter.keyword?.length || filter.type) {
 			qb.leftJoin('releaseCiData.release', 'release');
 		}
 
@@ -853,6 +858,7 @@ export class ReleaseCiDataService {
 			releaseId,
 			status,
 			keyword,
+			type,
 			neverExported,
 			lastImportIsFailed,
 			needImportAgain,
@@ -866,6 +872,10 @@ export class ReleaseCiDataService {
 
 		if (status) {
 			qb.andWhere('releaseCiData.status = :status', { status });
+		}
+
+		if (type) {
+			qb.andWhere('release.type = :type', { type });
 		}
 
 		if (neverExported) {
@@ -975,7 +985,10 @@ export class ReleaseCiDataService {
 			.andWhere("release.upc != ''")
 			.andWhere('ciData.status = :ciStatus', {
 				ciStatus: ReleaseCiDataStatus.EXISTS_ON_CI,
-			});
+			})
+			.andWhere(
+				`("ciData"."import_parsed_data" ->> 'status' != 'complete' OR "ciData"."import_parsed_data" ->> 'status' IS NULL)`,
+			);
 
 		if (targetReleaseIds.size > 0) {
 			qb.andWhere('release.id IN (:...ids)', {
@@ -1252,35 +1265,35 @@ export class ReleaseCiDataService {
 			switch (item.matchType) {
 				case 'TITLE':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | ISRC mismatch but Title matches. Auto-filling at position ${newOrder}.`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | ISRC mismatched but Title matched. Automatically placed at position ${newOrder}.`,
 						data: baseData,
 					});
 					break;
 
 				case 'INDEX':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | ISRC and Title mismatch. Auto-filling empty position ${newOrder} by elimination.`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | ISRC and Title mismatched. Automatically placed in empty position ${newOrder} using elimination method.`,
 						data: baseData,
 					});
 					break;
 
 				case 'APPEND':
 					this.logsService.warning({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
-						message: `[WARNING] | ${trackInfo} | Extra track compared to CI. Automatically placed at the end of the list (New order: ${newOrder}).`,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
+						message: `[WARNING] | ${trackInfo} | Extra track compared to CI. Automatically appended to the end of the list (New position: ${newOrder}).`,
 						data: baseData,
 					});
 					break;
 
 				default:
 					this.logsService.log({
-						module: LogLevel.LOG,
-						type: ErrorType.BUSINESS,
+						module: LogModule.RELEASE,
+						type: LogCategory.BUSINESS,
 						message: `[UPDATE] | ${trackInfo} | Changed order from ${oldOrder} to ${newOrder}`,
 						data: baseData,
 					});

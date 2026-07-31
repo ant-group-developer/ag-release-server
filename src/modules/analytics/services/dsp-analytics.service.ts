@@ -5,6 +5,7 @@ import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { checkIsSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
@@ -26,7 +27,6 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
-import { toCountryFlagImageUrl } from '../utils/country-flag-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
 
 /**
@@ -724,9 +724,12 @@ export class DspAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<DspTopTrackItem>> {
 		const page = dto.page ?? 1;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		// sort on numeric column, cast to string only in SELECT
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -773,13 +776,16 @@ export class DspAnalyticsService {
         GROUP BY isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
-        SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+        SELECT
+          isrc,
+          sum(total_quantity) AS total_usage,
+          sum(total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
         WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
         GROUP BY isrc
       ) sa ON t.isrc = sa.isrc
       WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
     `;
 
 		const dataSql = `
@@ -796,6 +802,7 @@ export class DspAnalyticsService {
         t.cover_300 AS cover_300,
         t.cover_original AS cover_original,
         coalesce(tr.total_views, 0) AS total_views,
+        coalesce(sa.total_usage, 0) AS total_usage,
         coalesce(sa.total_revenue_usd, 0) AS total_revenue_usd_raw,
         toString(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -806,13 +813,16 @@ export class DspAnalyticsService {
         GROUP BY isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
-        SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+        SELECT
+          isrc,
+          sum(total_quantity) AS total_usage,
+          sum(total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
         WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
         GROUP BY isrc
       ) sa ON t.isrc = sa.isrc
       WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
       ORDER BY ${sortCol} DESC
       LIMIT ${topNLimit} OFFSET ${topNSkip}
     `;
@@ -835,6 +845,7 @@ export class DspAnalyticsService {
 				cover_300: string;
 				cover_original: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, baseParams),
 		]);
@@ -843,7 +854,10 @@ export class DspAnalyticsService {
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
 			const totalsSql = `
-        SELECT sum(coalesce(tr.total_views, 0)) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+				SELECT
+          sum(coalesce(tr.total_views, 0)) AS total_views,
+          sum(coalesce(sa.total_usage, 0)) AS total_usage,
+          toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
         FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
         LEFT JOIN (
           SELECT isrc, sum(total_quantity) AS total_views
@@ -852,21 +866,26 @@ export class DspAnalyticsService {
           GROUP BY isrc
         ) tr ON t.isrc = tr.isrc
         LEFT JOIN (
-          SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+          SELECT
+            isrc,
+            sum(total_quantity) AS total_usage,
+            sum(total_revenue_usd) AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
           WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
           GROUP BY isrc
         ) sa ON t.isrc = sa.isrc
         WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
       `;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, baseParams)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -877,11 +896,16 @@ export class DspAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = Math.max(0, grandTotalViews - topViews);
+			const otherUsage = Math.max(0, grandTotalUsage - topUsage);
 
 			const items: DspTopTrackItem[] = dataRows.map((row, i) => ({
 				rank: i + 1,
@@ -892,6 +916,7 @@ export class DspAnalyticsService {
 				releaseId: row.release_id || '',
 				releaseTitle: row.release_title || '',
 				totalViews: Number(row.total_views),
+				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
 				release: {
 					coverArtThumbnails: {
@@ -903,7 +928,7 @@ export class DspAnalyticsService {
 					},
 				},
 			}));
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0 || otherUsage > 0) {
 				items.push({
 					rank: items.length + 1,
 					isrc: 'other',
@@ -913,6 +938,7 @@ export class DspAnalyticsService {
 					releaseId: '',
 					releaseTitle: '',
 					totalViews: otherViews,
+					totalUsage: otherUsage,
 					totalRevenueUsd: otherRevExact,
 					release: {
 						coverArtThumbnails: {
@@ -941,6 +967,7 @@ export class DspAnalyticsService {
 			releaseId: row.release_id || '',
 			releaseTitle: row.release_title || '',
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {
@@ -982,8 +1009,12 @@ export class DspAnalyticsService {
 		tenantId: string,
 	): Promise<PageDto<DspTopReleaseItem>> {
 		const page = dto.page ?? 1;
-		const sortByRevenue = dto.sortBy === 'revenue';
-		const sortCol = sortByRevenue ? 'total_revenue_usd_raw' : 'total_views';
+		const sortCol =
+			dto.sortBy === 'revenue'
+				? 'total_revenue_usd_raw'
+				: dto.sortBy === 'usage'
+					? 'total_usage'
+					: 'total_views';
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 
@@ -1030,13 +1061,16 @@ export class DspAnalyticsService {
         GROUP BY isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
-        SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+        SELECT
+          isrc,
+          sum(total_quantity) AS total_usage,
+          sum(total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
         WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
         GROUP BY isrc
       ) sa ON t.isrc = sa.isrc
       WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
         AND t.release_id != ''
     `;
 
@@ -1054,6 +1088,7 @@ export class DspAnalyticsService {
         any(t.cover_original) AS cover_original,
         uniq(t.isrc) AS track_count,
         sum(coalesce(tr.total_views, 0)) AS total_views,
+        sum(coalesce(sa.total_usage, 0)) AS total_usage,
         sum(coalesce(sa.total_revenue_usd, 0)) AS total_revenue_usd_raw,
         toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
       FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
@@ -1064,13 +1099,16 @@ export class DspAnalyticsService {
         GROUP BY isrc
       ) tr ON t.isrc = tr.isrc
       LEFT JOIN (
-        SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+        SELECT
+          isrc,
+          sum(total_quantity) AS total_usage,
+          sum(total_revenue_usd) AS total_revenue_usd
         FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
         WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
         GROUP BY isrc
       ) sa ON t.isrc = sa.isrc
       WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+        AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
         AND t.release_id != ''
       GROUP BY t.release_id
       ORDER BY ${sortCol} DESC
@@ -1095,6 +1133,7 @@ export class DspAnalyticsService {
 				cover_original: string;
 				track_count: string;
 				total_views: string;
+				total_usage: string;
 				total_revenue_usd: string;
 			}>(dataSql, baseParams),
 		]);
@@ -1103,7 +1142,10 @@ export class DspAnalyticsService {
 
 		if (useTopN && dto.includeOther && dataRows.length > 0) {
 			const totalsSql = `
-        SELECT sum(coalesce(tr.total_views, 0)) AS total_views, toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
+				SELECT
+          sum(coalesce(tr.total_views, 0)) AS total_views,
+          sum(coalesce(sa.total_usage, 0)) AS total_usage,
+          toString(sum(coalesce(sa.total_revenue_usd, 0))) AS total_revenue_usd
         FROM (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t
         LEFT JOIN (
           SELECT isrc, sum(total_quantity) AS total_views
@@ -1112,22 +1154,27 @@ export class DspAnalyticsService {
           GROUP BY isrc
         ) tr ON t.isrc = tr.isrc
         LEFT JOIN (
-          SELECT isrc, sum(total_revenue_usd) AS total_revenue_usd
+          SELECT
+            isrc,
+            sum(total_quantity) AS total_usage,
+            sum(total_revenue_usd) AS total_revenue_usd
           FROM music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
           WHERE ${dspSubquery} AND s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String}) ${importFilter}
           GROUP BY isrc
         ) sa ON t.isrc = sa.isrc
         WHERE ${validUpcFilter} ${tenantFilter} ${releaseTypeFilter}
-          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
+          AND (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
           AND t.release_id != ''
       `;
 			const totalsRow = (
 				await this.clickHouseService.query<{
 					total_views: string;
+					total_usage: string;
 					total_revenue_usd: string;
 				}>(totalsSql, baseParams)
 			)[0];
 			const grandTotalViews = Number(totalsRow?.total_views ?? 0);
+			const grandTotalUsage = Number(totalsRow?.total_usage ?? 0);
 			const grandTotalRevExact = this.revenueExact(
 				totalsRow?.total_revenue_usd,
 			);
@@ -1138,11 +1185,16 @@ export class DspAnalyticsService {
 				(s, r) => s + Number(r.total_views),
 				0,
 			);
+			const topUsage = dataRows.reduce(
+				(s, r) => s + Number(r.total_usage),
+				0,
+			);
 			const otherRevExact = this.subtractRevenueExact(
 				grandTotalRevExact,
 				topRevExact,
 			);
 			const otherViews = Math.max(0, grandTotalViews - topViews);
+			const otherUsage = Math.max(0, grandTotalUsage - topUsage);
 
 			const items: DspTopReleaseItem[] = dataRows.map((row, i) => ({
 				rank: i + 1,
@@ -1153,6 +1205,7 @@ export class DspAnalyticsService {
 				labelName: row.label_name || null,
 				trackCount: Number(row.track_count),
 				totalViews: Number(row.total_views),
+				totalUsage: Number(row.total_usage),
 				totalRevenueUsd: row.total_revenue_usd || '0',
 				release: {
 					coverArtThumbnails: {
@@ -1164,7 +1217,7 @@ export class DspAnalyticsService {
 					},
 				},
 			}));
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0) {
+			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0 || otherUsage > 0) {
 				items.push({
 					rank: items.length + 1,
 					releaseId: 'other',
@@ -1174,6 +1227,7 @@ export class DspAnalyticsService {
 					labelName: null,
 					trackCount: 0,
 					totalViews: otherViews,
+					totalUsage: otherUsage,
 					totalRevenueUsd: otherRevExact,
 					release: {
 						coverArtThumbnails: {
@@ -1202,6 +1256,7 @@ export class DspAnalyticsService {
 			labelName: row.label_name || null,
 			trackCount: Number(row.track_count),
 			totalViews: Number(row.total_views),
+			totalUsage: Number(row.total_usage),
 			totalRevenueUsd: row.total_revenue_usd || '0',
 			release: {
 				coverArtThumbnails: {
