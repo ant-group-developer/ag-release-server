@@ -227,16 +227,18 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
-		if (release.type === 'video') {
-			return [];
-		}
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
 
 		if (release) {
 			result.push(...this.validateRelease(release));
 			if (!release.isInstrumental) {
-				result.push(...this.validateLanguage(release.releaseLanguage));
+				result.push(
+					...this.validateLanguage(
+						release.releaseLanguage,
+						release.type === 'video',
+					),
+				);
 			}
 			result.push(...this.validateTracks(release.tracks));
 		}
@@ -540,7 +542,10 @@ export class ReleaseValidateService {
 		return result;
 	}
 
-	private validateLanguage(releaseLanguage: Release['releaseLanguage']) {
+	private validateLanguage(
+		releaseLanguage: Release['releaseLanguage'],
+		isVideo: boolean = false,
+	) {
 		const result: FieldErrorDetails[] = [];
 
 		if (!releaseLanguage?.metadataLanguageCountryId) {
@@ -552,7 +557,7 @@ export class ReleaseValidateService {
 			);
 		}
 
-		if (!releaseLanguage?.audioLanguageId) {
+		if (!isVideo && !releaseLanguage?.audioLanguageId) {
 			result.push(
 				new FieldErrorDetails({
 					page: 'core-detail',
