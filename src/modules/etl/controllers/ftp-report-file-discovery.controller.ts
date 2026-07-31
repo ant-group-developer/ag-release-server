@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../clickhouse';
@@ -14,6 +14,17 @@ class UpdateFtpReportFileDiscoveryConfigDto {
 	isEnabled?: boolean = true;
 }
 
+class ResetFtpReportFileDiscoveryDto {
+	@ApiProperty({ example: 'RESET_FTP_DISCOVERY', description: 'Required confirmation for deleting all FTP discovery catalog and rules.' })
+	@IsString()
+	confirmation: string;
+
+	@ApiPropertyOptional({ default: true, description: 'When true, returns affected counts without deleting data.' })
+	@IsOptional()
+	@IsBoolean()
+	dryRun?: boolean = true;
+}
+
 @ApiTags('ftp-report-file-discovery')
 @Controller('ftp-report-file-discovery')
 export class FtpReportFileDiscoveryController {
@@ -21,6 +32,14 @@ export class FtpReportFileDiscoveryController {
 
 	@Post('run')
 	async run(): Promise<ResponseSuccess<unknown>> { return new ResponseSuccess({ data: await this.service.start() }); }
+
+	@Post('reset')
+	async reset(@Body() dto: ResetFtpReportFileDiscoveryDto): Promise<ResponseSuccess<unknown>> {
+		if (dto.confirmation !== 'RESET_FTP_DISCOVERY') {
+			throw new BadRequestException('confirmation must be RESET_FTP_DISCOVERY');
+		}
+		return new ResponseSuccess({ data: await this.service.resetFtpDiscoveryData(dto.dryRun ?? true) });
+	}
 
 	@Get('runs')
 	async runs(): Promise<ResponseSuccess<unknown>> {

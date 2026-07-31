@@ -23,6 +23,12 @@ export interface FtpRemoteFolderFiles {
 	files: string[];
 }
 
+export interface FtpRemoteCategoryFiles {
+	category: string;
+	periodCount: number;
+	folders: FtpRemoteFolderFiles[];
+}
+
 @Injectable()
 export class FtpService {
 	private readonly logger = new Logger(FtpService.name);
@@ -196,46 +202,60 @@ export class FtpService {
 	}
 
 	/**
-	 * Discovery traversal using exactly one FTPS connection. It deliberately
-	 * bypasses import selectors and global exclude patterns so admins can see
-	 * every remote file before deciding whether it is importable.
+	 * Discovery traversal deliberately bypasses import selectors and global
+	 * exclude patterns so admins can see every remote file before deciding
+	 * whether it is importable. Categories are isolated by connection: an FTP
+	 * session issue while traversing a large category must not make subsequent
+	 * categories disappear from an otherwise "completed" scan.
 	 */
 	async listAllRemoteReportFiles(
 		categories: string[],
-	): Promise<FtpRemoteFolderFiles[]> {
+	): Promise<FtpRemoteCategoryFiles[]> {
+		const results: FtpRemoteCategoryFiles[] = [];
+		for (const category of categories) {
+			results.push(await this.listRemoteReportFilesForCategory(category));
+		}
+		return results;
+	}
+
+	private async listRemoteReportFilesForCategory(
+		category: string,
+	): Promise<FtpRemoteCategoryFiles> {
 		const config = this.getConfig();
 		const client = await this.connect();
-		const results: FtpRemoteFolderFiles[] = [];
+		const folders: FtpRemoteFolderFiles[] = [];
 		try {
-			for (const category of categories) {
-				let periodEntries: ftp.FileInfo[] = [];
-				try {
-					periodEntries = await client.list(`${config.basePath}/${category}`);
-				} catch (error) {
-					this.logger.warn(`Cannot list discovery category ${category}: ${error.message}`);
+			const periodEntries = await client.list(`${config.basePath}/${category}`);
+			const periods = periodEntries
+				.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))
+				.sort((left, right) => right.name.localeCompare(left.name));
+			this.logger.log(`FTP discovery: ${category} has ${periods.length} periods; scanning newest first`);
+			for (const periodEntry of periods) {
+				const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
+				let folderEntries: ftp.FileInfo[] = [];
+				try { folderEntries = await client.list(periodPath); } catch (error) {
+					this.logger.warn(`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`);
 					continue;
 				}
-				for (const periodEntry of periodEntries.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))) {
-					const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
-					let folderEntries: ftp.FileInfo[] = [];
-					try { folderEntries = await client.list(periodPath); } catch (error) {
-						this.logger.warn(`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`);
-						continue;
-					}
-					for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
-						const folderPath = `${periodPath}/${folderEntry.name}`;
-						try {
-							results.push({
-								category, period: periodEntry.name, dspFolder: folderEntry.name,
-								files: (await this.listFilesRecursive(client, folderPath, '', undefined, false)).sort(),
-							});
-						} catch (error) {
-							this.logger.warn(`Cannot list discovery folder ${category}/${periodEntry.name}/${folderEntry.name}: ${error.message}`);
-						}
+				let periodFiles = 0;
+				for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
+					const folderPath = `${periodPath}/${folderEntry.name}`;
+					try {
+						const files = await this.listFilesRecursive(client, folderPath, '', undefined, false);
+						periodFiles += files.length;
+						folders.push({
+							category, period: periodEntry.name, dspFolder: folderEntry.name,
+							files: files.sort(),
+						});
+					} catch (error) {
+						this.logger.warn(`Cannot list discovery folder ${category}/${periodEntry.name}/${folderEntry.name}: ${error.message}`);
 					}
 				}
+				this.logger.log(`FTP discovery: ${category}/${periodEntry.name} scanned ${folderEntries.filter((item) => item.isDirectory).length} folders, ${periodFiles} files`);
 			}
-			return results;
+			const fileCount = folders.reduce((total, folder) => total + folder.files.length, 0);
+			this.logger.log(`FTP discovery: ${category} completed ${periods.length} periods, ${folders.length} folders, ${fileCount} files`);
+			return { category, periodCount: periods.length, folders };
 		} finally {
 			client.close();
 		}

@@ -48,6 +48,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			files_scanned: 0, patterns_upserted: 0, error_message: '', started_at: startedAt,
 			completed_at: startedAt, updated_at: startedAt,
 		}]);
+		this.logger.log(`FTP discovery ${id} started`);
 		void this.execute(id, startedAt);
 		return { id, status: 'running' };
 	}
@@ -58,6 +59,58 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			{ id },
 		);
 		return rows[0] || null;
+	}
+
+	/**
+	 * Removes only derived FTP discovery data. This intentionally does not
+	 * touch scan-run audit records or imported report facts.
+	 */
+	async resetFtpDiscoveryData(dryRun = true): Promise<{
+		dryRun: boolean;
+		catalogRecords: number;
+		ruleRecords: number;
+		rescanRequired: boolean;
+	}> {
+		const activeRuns = await this.clickHouseService.query<{ id: string }>(
+			`SELECT id FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_SCAN_RUNS} FINAL
+			 WHERE source = 'ftp' AND status = 'running'
+			   AND started_at >= now() - INTERVAL 2 HOUR
+			 LIMIT 1`,
+		);
+		if (activeRuns.length) {
+			throw new BadRequestException(
+				`Cannot reset while FTP discovery run ${activeRuns[0].id} is running`,
+			);
+		}
+
+		const [catalog, rules] = await Promise.all([
+			this.clickHouseService.query<{ total: string }>(
+				`SELECT count() AS total FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = 'ftp'`,
+			),
+			this.clickHouseService.query<{ total: string }>(
+				`SELECT count() AS total FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} FINAL WHERE source = 'ftp'`,
+			),
+		]);
+		const result = {
+			dryRun,
+			catalogRecords: Number(catalog[0]?.total || 0),
+			ruleRecords: Number(rules[0]?.total || 0),
+			rescanRequired: true,
+		};
+		if (dryRun) return result;
+
+		await this.clickHouseService.execute(
+			`ALTER TABLE ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} DELETE WHERE source = 'ftp'`,
+		);
+		await this.clickHouseService.execute(
+			`ALTER TABLE ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} DELETE WHERE source = 'ftp'`,
+		);
+		await Promise.all([
+			this.clickHouseService.waitForTableMutations(CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG, { commandContains: "source = 'ftp'" }),
+			this.clickHouseService.waitForTableMutations(CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES, { commandContains: "source = 'ftp'" }),
+		]);
+		this.logger.warn(`Reset ${result.catalogRecords} FTP catalog records and ${result.ruleRecords} FTP file rules`);
+		return result;
 	}
 
 	async getConfig(): Promise<{ cron: string; isEnabled: boolean }> {
@@ -79,7 +132,14 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 
 	private async execute(id: string, startedAt: string): Promise<void> {
 		try {
-			const remoteFolders = await this.ftpService.listAllRemoteReportFiles(CATEGORIES);
+			const categoryScans = await this.ftpService.listAllRemoteReportFiles(CATEGORIES);
+			const missingCategories = CATEGORIES.filter(
+				(category) => !categoryScans.some((scan) => scan.category === category),
+			);
+			if (missingCategories.length) {
+				throw new Error(`FTP discovery did not complete categories: ${missingCategories.join(', ')}`);
+			}
+			const remoteFolders = categoryScans.flatMap((scan) => scan.folders);
 			const periods = new Set(remoteFolders.map((item) => item.period));
 			const observations = new Map<string, { category: FtpSourceCategory; folder: string; pattern: string; files: Set<string>; periods: Set<string> }>();
 			const folders = remoteFolders.length;
@@ -116,7 +176,10 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			}
 			for (const group of byFolder.values()) await this.ruleService.ensureDiscoveredRules('ftp', group.category, group.folder, group.patterns);
 			await this.finishRun(id, startedAt, 'completed', periods.size, folders, files, rows.length);
-			this.logger.log(`FTP discovery completed: ${periods.size} periods, ${folders} folders, ${files} files, ${rows.length} patterns`);
+			const categorySummary = categoryScans
+				.map((scan) => `${scan.category}=${scan.folders.length} folders`)
+				.join(', ');
+			this.logger.log(`FTP discovery completed: ${periods.size} periods, ${folders} folders, ${files} files, ${rows.length} patterns (${categorySummary})`);
 		} catch (error) {
 			await this.finishRun(id, startedAt, 'failed', 0, 0, 0, 0, error.message).catch(() => undefined);
 			this.logger.error(`FTP discovery ${id} failed: ${error.message}`, error.stack);
@@ -129,7 +192,6 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		// present before legacy rules are promoted to import during first scan.
 		await this.parserConfigService.syncParserCatalog();
 		await this.refreshSchedule();
-		await this.start();
 		this.configRefreshTimer = setInterval(() => void this.refreshSchedule(), 60_000);
 		this.configRefreshTimer.unref();
 	}
@@ -157,12 +219,16 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 	}
 
 	private toFilePattern(fileName: string): string {
+		// Date tokens can be surrounded by underscores, so word boundaries cannot
+		// be used here. Digit boundaries still prevent a date-like substring inside
+		// a long timestamp from being treated as a separate YYYYMM/DD token.
 		let value = fileName
 			.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '__UUID__')
-			.replace(/\b(?:19|20)\d{2}[01]\d[0-3]\d\b/g, '__DATE8__')
-			.replace(/\b(?:19|20)\d{2}[01]\d\b/g, '__DATE6__')
-			.replace(/\b\d{4,}\b/g, '__NUMBER__');
+			.replace(/(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8_DASH__')
+			.replace(/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8__')
+			.replace(/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?!\d)/g, '__DATE6__')
+			.replace(/\d{4,}/g, '__NUMBER__');
 		value = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		return `^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__NUMBER__/g, '\\d+')}$`;
+		return `^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__NUMBER__/g, '\\d+')}$`;
 	}
 }
