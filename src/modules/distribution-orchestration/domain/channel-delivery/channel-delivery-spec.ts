@@ -21,3 +21,16 @@ export interface ChannelDeliverySpec {
 	readonly exportMethod?: ExportMethod; // VIA_AGGREGATOR only
 	readonly hasDeal?: boolean; // per-DSP (Dsp.hasDeal) — separates CI deal vs State51
 }
+
+/**
+ * ClusterMember — 1 DSP con trong 1 CI cluster channel.
+ *
+ * Cluster gom N DSP cùng aggregator chạy shared-stages (deliver/ingest/qa/export) 1 lần.
+ * Mỗi member giữ đủ thông tin để: (1) fan-out watcher go-live per-DSP, (2) export theo
+ * distinct exportMethod (deal→no-op, state51→email). dspCode = định danh watcher + projection.
+ */
+export interface ClusterMember {
+	readonly dspCode: string;
+	readonly exportMethod?: ExportMethod;
+	readonly hasDeal?: boolean;
+}

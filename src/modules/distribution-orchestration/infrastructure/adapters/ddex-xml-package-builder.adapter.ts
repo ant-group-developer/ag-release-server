@@ -89,11 +89,16 @@ export class DdexXmlPackageBuilder implements PackageBuilder {
 			);
 		}
 
-		// 4. Resolve DSP delivery config (ernVersion, sender, recipient)
-		const routingConfig =
-			await this.dspRoutingService.resolveFullDeliveryConfig(
-				buildConfig.dspRoute,
-			);
+		// 4. Resolve delivery config (ernVersion, sender, recipient).
+		// Aggregator (CI): dspRoute = aggregator code → recipient = CI, sender = AMG.
+		// Direct: dspRoute = dspCode → recipient = DSP, sender = AMG.
+		const routingConfig = buildConfig.isAggregator
+			? await this.dspRoutingService.resolveAggregatorDeliveryConfig(
+					buildConfig.dspRoute,
+				)
+			: await this.dspRoutingService.resolveFullDeliveryConfig(
+					buildConfig.dspRoute,
+				);
 
 		// Create temp dir for bucket downloads (cleaned in finally)
 		const tempDir = await fs.promises.mkdtemp(

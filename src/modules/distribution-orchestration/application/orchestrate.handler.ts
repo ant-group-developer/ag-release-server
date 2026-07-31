@@ -188,7 +188,7 @@ export class OrchestrateHandler {
 		cmd: MarkPackageBuiltCommand,
 	): void {
 		dist.markPackageBuilt(
-			cmd.packageUri,
+			cmd.packageUris,
 			this.policies.resolve(dist.type),
 			this.clock,
 		);

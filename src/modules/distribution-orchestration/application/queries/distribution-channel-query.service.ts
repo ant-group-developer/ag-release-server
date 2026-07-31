@@ -49,17 +49,52 @@ export class DistributionChannelQueryService {
 			order: { spawnOrder: 'ASC' },
 		});
 
-		return rows.map((r) => ({
-			channelId: r.channelId,
-			dspCode: r.dspCode,
-			topology: r.topology,
-			state: r.state,
-			aggregatorCode: r.aggregatorCode,
-			exportMethod: r.exportMethod,
-			retryCount: r.retryCount,
-			scheduledAt: r.scheduledAt,
-			ticketRef: r.ticketRef,
-		}));
+		// View là PER-DSP. CI cluster (1 row, dspCode=aggregator) KHÔNG hiện như 1 DSP:
+		//  · Chưa fan-out (chưa có watcher) → expand members: mỗi DSP con mang state của cluster
+		//    (đang deliver/ingest/qa/export chung — "cả cụm cùng trạng thái").
+		//  · Đã fan-out → watcher rows (dspCode thật) đã phản ánh go-live per-DSP → dùng chúng,
+		//    bỏ cluster row (SKIPPED, không hiển thị "CI").
+		const views: DistributionChannelView[] = [];
+		for (const r of rows) {
+			if (r.isCluster) {
+				// cluster đã fan-out chưa? (có watcher `{clusterId}:golive:` nào không)
+				const fannedOut = rows.some((w) =>
+					w.channelId.startsWith(`${r.channelId}:golive:`),
+				);
+				if (fannedOut) continue; // watcher rows sẽ tự hiện per-DSP
+				const members =
+					(r.memberDspCodes as Array<{
+						dspCode: string;
+						exportMethod?: string;
+					}> | null) ?? [];
+				for (const m of members) {
+					views.push({
+						channelId: `${r.channelId}:golive:${m.dspCode}`,
+						dspCode: m.dspCode,
+						topology: r.topology,
+						state: r.state, // cả cụm cùng trạng thái tới khi fan-out
+						aggregatorCode: r.aggregatorCode,
+						exportMethod: m.exportMethod ?? null,
+						retryCount: r.retryCount,
+						scheduledAt: r.scheduledAt,
+						ticketRef: r.ticketRef,
+					});
+				}
+				continue;
+			}
+			views.push({
+				channelId: r.channelId,
+				dspCode: r.dspCode,
+				topology: r.topology,
+				state: r.state,
+				aggregatorCode: r.aggregatorCode,
+				exportMethod: r.exportMethod,
+				retryCount: r.retryCount,
+				scheduledAt: r.scheduledAt,
+				ticketRef: r.ticketRef,
+			});
+		}
+		return views;
 	}
 
 	private async assertOwnership(

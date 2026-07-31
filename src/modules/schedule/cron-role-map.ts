@@ -20,7 +20,7 @@ export const CRON_ROLE_MAP: Record<string, readonly AppRole[]> = {
 	// Outbox relay: poll dùng SELECT ... FOR UPDATE SKIP LOCKED nên an toàn
 	// khi chạy song song nhiều process. Hiện để ở worker theo thiết kế tách process.
 	// Muốn SSE realtime ngay trên process api thì thêm AppRole.API vào mảng.
-	[CRON_JOBS.OUTBOX_RELAY]: [AppRole.WORKER],
+	[CRON_JOBS.OUTBOX_RELAY]: [AppRole.API, AppRole.WORKER],
 };
 
 /** Role mặc định cho cron chưa khai báo trong map. */

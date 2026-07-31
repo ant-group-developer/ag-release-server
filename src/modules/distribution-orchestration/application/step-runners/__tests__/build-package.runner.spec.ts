@@ -1,15 +1,16 @@
 import { Test } from '@nestjs/testing';
 
 import { Distribution } from '../../../domain/distribution/distribution.aggregate';
+import { DefaultPolicyResolver, POLICY_RESOLVER } from '../../policy-resolver';
 import { DISTRIBUTION_REPOSITORY } from '../../ports/distribution-repository.port';
 import { UNIT_OF_WORK } from '../../ports/unit-of-work.port';
 import { JobPayload } from '../../ports/workflow-engine.port';
 import { BuildPackageRunner, PACKAGE_BUILDER } from '../build-package.runner';
 
 /**
- * BuildPackageRunner — trọng tâm test: idempotency guard.
+ * BuildPackageRunner — trọng tâm test: gom nhóm theo dspRoute (1 package/nhóm) + idempotency guard.
  * builder.build() sinh batchId/folder MỚI + re-download media mỗi lần, nên runner PHẢI skip
- * build khi dist.packageUri đã set (job redeliver / retry trước khi command commit).
+ * build khi đã build (job redeliver / retry trước khi command commit).
  */
 describe('BuildPackageRunner', () => {
 	let runner: BuildPackageRunner;
@@ -28,13 +29,20 @@ describe('BuildPackageRunner', () => {
 				{ provide: UNIT_OF_WORK, useValue: mockUow },
 				{ provide: DISTRIBUTION_REPOSITORY, useValue: mockRepo },
 				{ provide: PACKAGE_BUILDER, useValue: mockBuilder },
+				{ provide: POLICY_RESOLVER, useClass: DefaultPolicyResolver },
 			],
 		}).compile();
 
 		runner = module.get(BuildPackageRunner);
 	});
 
-	const createDistribution = (packageUri?: string): Distribution => {
+	// processCode='' mirrors the real submit flow: DspSpecResolverAdapter leaves it empty,
+	// the aggregate only fills it on entering DELIVERING (after BUILDING_PACKAGE). The runner
+	// must resolve it via policy itself, else builder gets '' → parseProcessCode throws.
+	const createDistribution = (
+		packageUris?: Record<string, string>,
+		channelSpecs?: any[],
+	): Distribution => {
 		const dist = Distribution.create({
 			id: 'dist-1',
 			releaseId: 'release-1',
@@ -42,16 +50,15 @@ describe('BuildPackageRunner', () => {
 			tenantId: 'tenant-1',
 			type: 'INITIAL_RELEASE' as any,
 			correlationId: 'corr-1',
-			channelSpecs: [
+			channelSpecs: channelSpecs ?? [
 				{
 					dspCode: 'SPOTIFY',
-					topology: 'VIA_AGGREGATOR',
-					processCode: 'fuga.spotify',
-					aggregatorCode: 'FUGA',
+					topology: 'DIRECT',
+					processCode: '',
 				} as any,
 			],
 		});
-		if (packageUri) (dist as any)._packageUri = packageUri;
+		if (packageUris) (dist as any)._packageUris = packageUris;
 		return dist;
 	};
 
@@ -61,24 +68,68 @@ describe('BuildPackageRunner', () => {
 		key: 'build:dist-1',
 	};
 
-	it('builds package when not yet built, returns MARK_PACKAGE_BUILT', async () => {
+	it('builds 1 package for single group, returns MARK_PACKAGE_BUILT map', async () => {
 		mockRepo.load.mockResolvedValue(createDistribution());
 		mockBuilder.build.mockResolvedValue({ uri: 'local://20260723/upc' });
 
 		const result = await runner.run(payload);
 
 		expect(mockBuilder.build).toHaveBeenCalledTimes(1);
+		// Empty spec.processCode resolved via policy → 'spotify.initial' (DIRECT + INITIAL_RELEASE).
+		expect(mockBuilder.build).toHaveBeenCalledWith(
+			expect.objectContaining({ processCode: 'spotify.initial' }),
+		);
 		expect(result).toEqual({
 			type: 'MARK_PACKAGE_BUILT',
 			distributionId: 'dist-1',
 			key: 'build:dist-1:done',
-			packageUri: 'local://20260723/upc',
+			packageUris: { SPOTIFY: 'local://20260723/upc' },
 		});
 	});
 
-	it('idempotency guard: skips build when packageUri already set', async () => {
+	it('builds 1 package PER dspRoute group (Spotify direct + CI aggregator)', async () => {
 		mockRepo.load.mockResolvedValue(
-			createDistribution('local://existing/upc'),
+			createDistribution(undefined, [
+				{ dspCode: 'SPOTIFY', topology: 'DIRECT', processCode: '' },
+				{
+					dspCode: 'APPLE',
+					topology: 'VIA_AGGREGATOR',
+					processCode: '',
+					aggregatorCode: 'CI',
+					hasDeal: false,
+				},
+				{
+					dspCode: 'FACEBOOK',
+					topology: 'VIA_AGGREGATOR',
+					processCode: '',
+					aggregatorCode: 'CI',
+					hasDeal: true,
+				},
+			]),
+		);
+		// build trả uri khác nhau theo lần gọi (nhóm SPOTIFY rồi CI).
+		mockBuilder.build
+			.mockResolvedValueOnce({ uri: 'local://spotify/upc' })
+			.mockResolvedValueOnce({ uri: 'local://ci/upc' });
+
+		const result = await runner.run(payload);
+
+		// 2 nhóm → 2 build (Apple + Facebook gộp CI, không build 3 lần).
+		expect(mockBuilder.build).toHaveBeenCalledTimes(2);
+		expect(result).toEqual({
+			type: 'MARK_PACKAGE_BUILT',
+			distributionId: 'dist-1',
+			key: 'build:dist-1:done',
+			packageUris: {
+				SPOTIFY: 'local://spotify/upc',
+				CI: 'local://ci/upc',
+			},
+		});
+	});
+
+	it('idempotency guard: skips build when packages already built', async () => {
+		mockRepo.load.mockResolvedValue(
+			createDistribution({ SPOTIFY: 'local://existing/upc' }),
 		);
 
 		const result = await runner.run(payload);
@@ -89,7 +140,7 @@ describe('BuildPackageRunner', () => {
 			type: 'MARK_PACKAGE_BUILT',
 			distributionId: 'dist-1',
 			key: 'build:dist-1:done',
-			packageUri: 'local://existing/upc',
+			packageUris: { SPOTIFY: 'local://existing/upc' },
 		});
 	});
 

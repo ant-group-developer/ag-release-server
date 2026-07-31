@@ -4,22 +4,28 @@ import { PackageBuilder } from '../../domain/ports/package-builder.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { MarkPackageBuiltCommand } from '../commands/distribution.command';
 import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
+import { POLICY_RESOLVER, PolicyResolver } from '../policy-resolver';
 import {
 	DISTRIBUTION_REPOSITORY,
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
 import { JobPayload } from '../ports/workflow-engine.port';
+import { groupChannelsByRoute } from './group-channels-by-route';
 
 /**
  * BuildPackageRunner — consumer của `dist.build-package`.
  *
- * Build DDEX + upload folder GCS/S3 → nhận PackagePath.uri.
- * processCode ở đây là ẩn — build không cần biết DSP; nhưng port PackageBuilder
- * yêu cầu processCode. Chọn processCode DUY NHẤT theo distribution: aggregate
- * KHÔNG lộ processCode chung → pick spec đầu tiên (mọi channel cùng release share
- * cùng bộ media asset, sự khác biệt chỉ ở XML layout — chọn processCode đầu ổn cho
- * runner này; real adapter Phase 4 sẽ tách nhánh theo topology nếu cần).
+ * Build DDEX ra 1 package/NHÓM PHÂN PHỐI → nhận map groupKey → PackagePath.uri.
+ * 1 release có thể phát tới nhiều đích khác ernVersion/sender/SFTP (Spotify direct ERN 4.3
+ * vs CI aggregator ERN 3.8.2) → KHÔNG thể dùng chung 1 XML. Gom channelSpecs theo dspRoute
+ * (groupChannelsByRoute), build 1 package cho mỗi nhóm. VD 3 DSP (Spotify/Apple/Facebook)
+ * → 2 package: SPOTIFY + CI. Mỗi channel upload đọc package của nhóm mình (SftpUploadRunner).
+ *
+ * BUILDING_PACKAGE chạy TRƯỚC DELIVERING nên channels CHƯA spawn → spec.processCode
+ * còn rỗng (DspSpecResolverAdapter để trống, aggregate chỉ fill khi ensureChannelsSpawned
+ * vào DELIVERING). Runner PHẢI tự resolve qua policy — giống hệt aggregate — nếu không
+ * builder nhận processCode="" → parseProcessCode throw.
  */
 export const PACKAGE_BUILDER = Symbol('PackageBuilder');
 
@@ -30,6 +36,7 @@ export class BuildPackageRunner {
 		@Inject(DISTRIBUTION_REPOSITORY)
 		private readonly repo: DistributionRepository,
 		@Inject(PACKAGE_BUILDER) private readonly builder: PackageBuilder,
+		@Inject(POLICY_RESOLVER) private readonly policies: PolicyResolver,
 	) {}
 
 	async run(payload: JobPayload): Promise<MarkPackageBuiltCommand> {
@@ -43,29 +50,40 @@ export class BuildPackageRunner {
 			);
 		}
 
-		// Idempotency guard: nếu package đã build (job redeliver / retry BullMQ trước khi
+		// Idempotency guard: nếu đã build (job redeliver / retry BullMQ trước khi
 		// MARK_PACKAGE_BUILT commit) → KHÔNG build lại (builder sinh batchId/folder mới mỗi lần,
-		// re-download media tốn kém). Trả lại packageUri đã có → command idempotent.
-		if (dist.packageUri) {
+		// re-download media tốn kém). Trả lại map đã có → command idempotent.
+		if (dist.hasBuiltPackages) {
 			return {
 				type: 'MARK_PACKAGE_BUILT',
 				distributionId: dist.id,
 				key: `${payload.key}:done`,
-				packageUri: dist.packageUri,
+				packageUris: { ...dist.packageUris },
 			};
 		}
 
-		const path = await this.builder.build({
-			snapshotId: dist.snapshotId,
-			processCode: dist.channelSpecs[0].processCode,
-			key: IdempotencyKey.create(payload.key),
-		});
+		// Gom channelSpecs theo dspRoute → 1 package/nhóm. Resolve processCode qua policy
+		// (spec giữ rỗng tới DELIVERING) — mirror Distribution.ensureChannelsSpawned.
+		const policy = this.policies.resolve(dist.type);
+		const groups = groupChannelsByRoute(dist.channelSpecs, policy);
+
+		// Build tuần tự từng nhóm (số nhóm nhỏ, mỗi build re-download media nặng — không đua
+		// song song để tránh cạnh tranh I/O + trùng temp dir). key theo nhóm → idempotent per group.
+		const packageUris: Record<string, string> = {};
+		for (const group of groups) {
+			const path = await this.builder.build({
+				snapshotId: dist.snapshotId,
+				processCode: group.processCode,
+				key: IdempotencyKey.create(`${payload.key}:${group.groupKey}`),
+			});
+			packageUris[group.groupKey] = path.uri;
+		}
 
 		return {
 			type: 'MARK_PACKAGE_BUILT',
 			distributionId: dist.id,
 			key: `${payload.key}:done`,
-			packageUri: path.uri,
+			packageUris,
 		};
 	}
 }

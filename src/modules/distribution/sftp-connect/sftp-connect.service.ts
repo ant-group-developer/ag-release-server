@@ -48,78 +48,74 @@ export class SftpConnectService {
 		remotePath: string,
 		onFileUploaded?: (file: string) => void,
 	): Promise<void> {
-		return new Promise<void>((resolve, reject) => {
-			let timer: NodeJS.Timeout;
-			const fileName = path.basename(localPath);
-			const stats = fs.statSync(localPath);
-			const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+		const fileName = path.basename(localPath);
+		const stats = fs.statSync(localPath);
+		const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+		const startTime = Date.now();
 
-			this.logger.log(
-				`Bắt đầu tải lên SFTP: ${fileName} (${fileSizeMB} MB)`,
-			);
+		this.logger.log(`Bắt đầu tải lên SFTP: ${fileName} (${fileSizeMB} MB)`);
 
-			const resetTimeout = () => {
-				if (timer) clearTimeout(timer);
-				timer = setTimeout(
-					() => {
-						reject(
-							new Error(
-								`SFTP upload timeout: Quá 5 phút không có dữ liệu mới được tải lên cho file ${fileName}`,
-							),
-						);
-					},
-					5 * 60 * 1000,
-				); // 5 minutes inactivity timeout
-			};
-
-			resetTimeout();
-
-			let lastTransferred = 0;
-			client
-				.put(localPath, remotePath, {
-					step: (
-						total_transferred: number,
-						chunk: number,
-						total_size: number,
-					) => {
-						resetTimeout();
-						const percent =
-							total_size > 0
+		let lastTransferred = 0;
+		return client
+			.put(localPath, remotePath, {
+				step: (
+					total_transferred: number,
+					chunk: number,
+					total_size: number,
+				) => {
+					const percent =
+						total_size > 0
+							? ((total_transferred / total_size) * 100).toFixed(
+									1,
+								)
+							: '0';
+					if (
+						total_transferred - lastTransferred > 512 * 1024 ||
+						total_transferred === total_size
+					) {
+						const elapsedSec = (Date.now() - startTime) / 1000;
+						const speedMBs =
+							elapsedSec > 0
 								? (
-										(total_transferred / total_size) *
-										100
-									).toFixed(1)
+										total_transferred /
+										(1024 * 1024) /
+										elapsedSec
+									).toFixed(2)
 								: '0';
-						if (
-							total_transferred - lastTransferred >
-								5 * 1024 * 1024 ||
-							total_transferred === total_size
-						) {
-							this.logger.log(
-								`Tiến trình tải lên [${fileName}]: ${percent}% (${(
-									total_transferred /
-									(1024 * 1024)
-								).toFixed(2)} MB / ${fileSizeMB} MB)`,
-							);
-							lastTransferred = total_transferred;
-						}
-					},
-				})
-				.then(() => {
-					if (timer) clearTimeout(timer);
-					this.logger.log(`Tải lên SFTP thành công: ${fileName}`);
-					onFileUploaded?.(localPath);
-					resolve();
-				})
-				.catch((err) => {
-					if (timer) clearTimeout(timer);
-					this.logger.error(
-						`Lỗi khi tải file ${fileName} lên SFTP: ${err.message}`,
-						err.stack,
-					);
-					reject(err instanceof Error ? err : new Error(String(err)));
-				});
-		});
+						this.logger.log(
+							`[${fileName}] ${percent}% (${(
+								total_transferred /
+								(1024 * 1024)
+							).toFixed(
+								2,
+							)}/${fileSizeMB} MB) speed=${speedMBs}MB/s`,
+						);
+						lastTransferred = total_transferred;
+					}
+				},
+			})
+			.then(() => {
+				const elapsedMs = Date.now() - startTime;
+				const speedMBs =
+					elapsedMs > 0
+						? (
+								stats.size /
+								(1024 * 1024) /
+								(elapsedMs / 1000)
+							).toFixed(2)
+						: '∞';
+				this.logger.log(
+					`Tải lên SFTP thành công: ${fileName} (${fileSizeMB} MB) elapsed=${elapsedMs}ms speed=${speedMBs}MB/s`,
+				);
+				onFileUploaded?.(localPath);
+			})
+			.catch((err) => {
+				this.logger.error(
+					`Lỗi khi tải file ${fileName} lên SFTP: ${err.message}`,
+					err.stack,
+				);
+				throw err instanceof Error ? err : new Error(String(err));
+			});
 	}
 
 	async testConnect(config: SftpMetadata): Promise<{

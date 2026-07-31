@@ -74,7 +74,8 @@ describe('SftpUploadRunner', () => {
 		});
 
 		(dist as any)._state = 'DELIVERING';
-		(dist as any)._packageUri = 's3://packages/dist-1.zip';
+		// SPEC.processCode 'spotify.initial' → groupKey 'SPOTIFY'.
+		(dist as any)._packageUris = { SPOTIFY: 's3://packages/dist-1.zip' };
 		(dist as any)._channels = [channel];
 
 		return dist;
@@ -177,7 +178,8 @@ describe('SftpUploadRunner', () => {
 			},
 		);
 		(dist as any)._state = 'DELIVERING';
-		(dist as any)._packageUri = 's3://packages/dist-1.zip';
+		// channel processCode 'ci.deal.initial' → groupKey 'CI'.
+		(dist as any)._packageUris = { CI: 's3://packages/dist-1.zip' };
 		(dist as any)._channels = [channel];
 
 		mockRepo.load.mockResolvedValue(dist);
@@ -190,6 +192,47 @@ describe('SftpUploadRunner', () => {
 			dspCode: expect.any(Object),
 			key: expect.any(Object),
 		});
+	});
+
+	it('CI cluster → upload resolve theo aggregatorCode (không phải dspCode)', async () => {
+		const dist = Distribution.create({
+			id: 'dist-1',
+			releaseId: 'release-1',
+			snapshotId: 'snap-1',
+			tenantId: 'tenant-1',
+			type: 'INITIAL_RELEASE' as any,
+			correlationId: 'corr-1',
+			channelSpecs: [],
+		});
+		const cluster = ChannelDelivery.createCluster(
+			'dist-1:ch:0',
+			{
+				dspCode: 'CI',
+				topology: ChannelTopology.VIA_AGGREGATOR,
+				processCode: 'ci.cluster.initial',
+				aggregatorCode: 'CI',
+			},
+			[
+				{ dspCode: 'APPLE', exportMethod: 'STATE51', hasDeal: false },
+				{ dspCode: 'FACEBOOK', exportMethod: 'CI_DEAL', hasDeal: true },
+			],
+		);
+		(dist as any)._state = 'DELIVERING';
+		(dist as any)._packageUris = { CI: 's3://packages/ci.zip' };
+		(dist as any)._channels = [cluster];
+
+		mockRepo.load.mockResolvedValue(dist);
+		mockUploader.upload.mockResolvedValue({ ok: true });
+
+		await runner.run({ ...createPayload(), channelId: 'dist-1:ch:0' });
+
+		// upload nhận aggregatorCode='CI' → adapter resolve theo aggregator, KHÔNG theo dsp.code.
+		expect(mockUploader.upload).toHaveBeenCalledWith(
+			expect.objectContaining({ aggregatorCode: 'CI' }),
+		);
+		expect(mockUploader.markBatchDone).toHaveBeenCalledWith(
+			expect.objectContaining({ aggregatorCode: 'CI' }),
+		);
 	});
 
 	it('aggregate not found → throw', async () => {
@@ -207,12 +250,12 @@ describe('SftpUploadRunner', () => {
 		).rejects.toThrow('channel wrong-ch not found');
 	});
 
-	it('missing packageUri → throw', async () => {
+	it('missing package for channel group → throw', async () => {
 		const dist = createDistribution();
-		(dist as any)._packageUri = null;
+		(dist as any)._packageUris = {}; // nhóm của channel chưa có package
 		mockRepo.load.mockResolvedValue(dist);
 		await expect(runner.run(createPayload())).rejects.toThrow(
-			'missing packageUri',
+			/missing package for group/,
 		);
 	});
 });

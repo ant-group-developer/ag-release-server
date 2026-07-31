@@ -12,6 +12,9 @@ interface DistributionEventRow {
 	readonly occurred_at: string;
 	readonly release_id: string;
 	readonly dsp_code: string | null;
+	/** CI cluster channel: shared-stage event áp cho MỌI member DSP (không phải 1 dsp_code). */
+	readonly is_cluster: boolean | null;
+	readonly member_dsp_codes: Array<{ dspCode: string }> | null;
 }
 
 interface ProjectionUpdate {
@@ -98,7 +101,9 @@ export class ReleaseDspDeliveryProjection {
 			        de.payload,
 			        de.occurred_at,
 			        d.release_id,
-			        cd.dsp_code
+			        cd.dsp_code,
+			        cd.is_cluster,
+			        cd.member_dsp_codes
 			 FROM   distribution_event de
 			 JOIN   distribution        d  ON d.id  = de.distribution_id
 			 LEFT JOIN channel_delivery cd ON cd.channel_id = de.channel_id
@@ -145,8 +150,27 @@ export class ReleaseDspDeliveryProjection {
 
 		const update = mapper(ev);
 
-		if (ev.channel_id && ev.dsp_code) {
-			// Channel-level event → update 1 dsp row
+		if (ev.channel_id && ev.is_cluster) {
+			// CI cluster shared-stage event (deliver/ingest/qa ISSUES…) → áp cho MỌI member DSP.
+			// dsp_code của cluster row là aggregator code, KHÔNG map 1 DSP → expand qua members.
+			const members = ev.member_dsp_codes ?? [];
+			for (const m of members) {
+				const dspId = await this.resolveDspId(m.dspCode);
+				if (!dspId) {
+					this.logger.warn(
+						`No DSP found for cluster member "${m.dspCode}" (event ${ev.id})`,
+					);
+					continue;
+				}
+				await this.upsertDelivery(
+					ev.release_id,
+					dspId,
+					update,
+					new Date(ev.occurred_at),
+				);
+			}
+		} else if (ev.channel_id && ev.dsp_code) {
+			// Channel-level event (direct DSP hoặc go-live watcher) → update 1 dsp row.
 			const dspId = await this.resolveDspId(ev.dsp_code);
 			if (!dspId) {
 				this.logger.warn(
@@ -333,6 +357,11 @@ export class ReleaseDspDeliveryProjection {
 	 * Detect drift between event log and read model.
 	 * Compares the latest status-bearing event per (release_id, dsp_id) with
 	 * the current release_dsp_delivery.status. Returns mismatched rows.
+	 *
+	 * GAP (follow-up): JOIN cd.dsp_code = dsps.code — CI cluster row có dsp_code=aggregator code
+	 * (không khớp DSP nào) nên event CHỈ-cluster (QA/ingest ISSUES TRƯỚC fan-out) không xuất hiện
+	 * cho member DSP ở đây. Luồng chính (applyEvent) đã expand đúng qua member_dsp_codes; drift chỉ
+	 * là công cụ reconciliation admin. Khi cần: expand cluster event qua member_dsp_codes trong CTE.
 	 */
 	async detectDrift(): Promise<DriftRow[]> {
 		return this.dataSource.query(`

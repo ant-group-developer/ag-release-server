@@ -49,8 +49,12 @@ export class DistributionOrmEntity {
 	@Column({ type: 'varchar', length: 14, nullable: true })
 	upc!: string | null;
 
-	@Column({ type: 'text', nullable: true })
-	packageUri!: string | null;
+	/**
+	 * Map groupKey (dspRoute) → package path. 1 package/nhóm phân phối
+	 * (Spotify direct + CI aggregator khác ernVersion/SFTP). {} khi chưa build.
+	 */
+	@Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
+	packageUris!: Record<string, string>;
 
 	@Column({ type: 'int', default: 0 })
 	retryCount!: number;

@@ -5,6 +5,7 @@ import { OutboxEntry } from '../../application/ports/outbox-entry';
 import { TxContext } from '../../application/ports/unit-of-work.port';
 import {
 	ChannelDeliverySpec,
+	ClusterMember,
 	ExportMethod,
 } from '../../domain/channel-delivery/channel-delivery-spec';
 import {
@@ -52,7 +53,12 @@ export class TypeOrmDistributionRepository implements DistributionRepository {
 		if (!distRow) return null;
 
 		const channels = chanRows.map((r) =>
-			ChannelDelivery.rehydrate(toSpec(r), toChannelRow(r)),
+			ChannelDelivery.rehydrate(
+				toSpec(r),
+				toChannelRow(r),
+				undefined,
+				toMembers(r),
+			),
 		);
 		return Distribution.rehydrate(toDistRow(distRow), channels);
 	}
@@ -93,7 +99,7 @@ export class TypeOrmDistributionRepository implements DistributionRepository {
 					correlationId: dist.correlationId,
 					state: dist.state,
 					upc: dist.upc ?? null,
-					packageUri: dist.packageUri ?? null,
+					packageUris: { ...dist.packageUris },
 					retryCount: dist.retryCount,
 					version: 1, // sau khi commit lần đầu, DB version=1
 					channelSpecs: [...dist.channelSpecs] as unknown as object,
@@ -109,7 +115,7 @@ export class TypeOrmDistributionRepository implements DistributionRepository {
 			.set({
 				state: dist.state,
 				upc: dist.upc ?? null,
-				packageUri: dist.packageUri ?? null,
+				packageUris: { ...dist.packageUris },
 				retryCount: dist.retryCount,
 				version: () => '"version" + 1',
 			})
@@ -130,17 +136,21 @@ export class TypeOrmDistributionRepository implements DistributionRepository {
 	): Promise<void> {
 		if (dist.channels.length === 0) return;
 
-		// Chuyển spawnOrder từ channelId "distId:ch:N" → N
-		const rows = dist.channels.map((c) => ({
+		// spawnOrder = index trong dist.channels (deterministic + robust). Watcher spawn động được
+		// append cuối → index lớn hơn cluster cha → load lại đúng thứ tự (cluster trước watcher).
+		// (Không parse channelId nữa: watcher id `...:golive:APPLE` không có N cuối → parse ra NaN.)
+		const rows = dist.channels.map((c, i) => ({
 			channelId: c.channelId,
 			distributionId: dist.id,
-			spawnOrder: parseSpawnOrder(c.channelId),
+			spawnOrder: i,
 			dspCode: c.spec.dspCode,
 			topology: c.spec.topology,
 			processCode: c.spec.processCode,
 			aggregatorCode: c.spec.aggregatorCode ?? null,
 			exportMethod: c.spec.exportMethod ?? null,
 			hasDeal: c.spec.hasDeal ?? null,
+			isCluster: c.isCluster,
+			memberDspCodes: [...c.members] as unknown as object,
 			pos: c.pos,
 			state: c.state,
 			retryCount: c.retryCount,
@@ -217,7 +227,7 @@ function toDistRow(r: DistributionOrmEntity): DistributionSnapshotRow {
 		correlationId: r.correlationId,
 		state: r.state as DistributionState,
 		upc: r.upc ?? undefined,
-		packageUri: r.packageUri ?? undefined,
+		packageUris: r.packageUris ?? {},
 		retryCount: r.retryCount,
 		version: r.version,
 		channelSpecs: (r.channelSpecs as ChannelDeliverySpec[]) ?? [],
@@ -245,9 +255,7 @@ function toSpec(r: ChannelDeliveryOrmEntity): ChannelDeliverySpec {
 	};
 }
 
-/** Extract N from "distId:ch:N" — deterministic order for load(). */
-function parseSpawnOrder(channelId: string): number {
-	const parts = channelId.split(':');
-	const n = Number(parts[parts.length - 1]);
-	return Number.isFinite(n) ? n : 0;
+/** DSP con của 1 cluster row → ClusterMember[] (rỗng nếu không phải cluster). */
+function toMembers(r: ChannelDeliveryOrmEntity): ClusterMember[] {
+	return (r.memberDspCodes as ClusterMember[] | null) ?? [];
 }

@@ -39,8 +39,12 @@ const DSP_CODE = 'spotify';
 const DSP_ID = 'SPT';
 const DSP_CODE_2 = 'apple_music';
 const DSP_ID_2 = 'APL';
+const DSP_CODE_3 = 'facebook';
+const DSP_ID_3 = 'FBK';
 const CHANNEL_ID = `${DIST_ID}:ch:0`;
 const CHANNEL_ID_2 = `${DIST_ID}:ch:1`;
+// CI cluster channel gom APPLE + FACEBOOK (member_dsp_codes).
+const CLUSTER_CHANNEL_ID = `${DIST_ID}:ch:2`;
 
 beforeAll(async () => {
 	pgContainer = await new PostgreSqlContainer('postgres:16-alpine').start();
@@ -119,7 +123,8 @@ beforeAll(async () => {
 		],
 	);
 
-	// Seed: channel_delivery rows for JOIN
+	// Seed: channel_delivery rows for JOIN.
+	// ch:0 SPOTIFY direct; ch:1 APPLE direct; ch:2 CI cluster gom APPLE+FACEBOOK.
 	await dataSource.query(
 		`INSERT INTO "channel_delivery"
 		 ("channel_id", "distribution_id", "spawn_order", "dsp_code", "topology", "process_code")
@@ -127,12 +132,26 @@ beforeAll(async () => {
 		        ($4, $2, 1, $5, 'DIRECT', 'proc-apple')`,
 		[CHANNEL_ID, DIST_ID, DSP_CODE, CHANNEL_ID_2, DSP_CODE_2],
 	);
+	await dataSource.query(
+		`INSERT INTO "channel_delivery"
+		 ("channel_id", "distribution_id", "spawn_order", "dsp_code", "topology",
+		  "process_code", "is_cluster", "member_dsp_codes")
+		 VALUES ($1, $2, 2, 'CI', 'VIA_AGGREGATOR', 'ci.cluster.initial', true, $3::jsonb)`,
+		[
+			CLUSTER_CHANNEL_ID,
+			DIST_ID,
+			JSON.stringify([
+				{ dspCode: DSP_CODE_2 },
+				{ dspCode: DSP_CODE_3 },
+			]),
+		],
+	);
 
 	// Seed: DSPs
 	await dataSource.query(
 		`INSERT INTO "dsps" ("id", "code", "name")
-		 VALUES ($1, $2, 'Spotify'), ($3, $4, 'Apple Music')`,
-		[DSP_ID, DSP_CODE, DSP_ID_2, DSP_CODE_2],
+		 VALUES ($1, $2, 'Spotify'), ($3, $4, 'Apple Music'), ($5, $6, 'Facebook')`,
+		[DSP_ID, DSP_CODE, DSP_ID_2, DSP_CODE_2, DSP_ID_3, DSP_CODE_3],
 	);
 
 	projection = new ReleaseDspDeliveryProjection(dataSource);
@@ -213,6 +232,47 @@ describe('ReleaseDspDeliveryProjection (integration)', () => {
 		expect(row).not.toBeNull();
 		expect(row!.status).toBe('processing');
 		expect(row!.last_enqueued_at).not.toBeNull();
+	});
+
+	it('Cluster — ChannelIssues từ cluster channel → áp cho MỌI member DSP', async () => {
+		// QA fail cả cụm CI: event từ cluster channel (dsp_code=CI, không map DSP) → expand
+		// member_dsp_codes = [APPLE, FACEBOOK]. Cả 2 DSP phải chuyển 'issues'.
+		await insertEvent({
+			type: 'ChannelIssues',
+			channelId: CLUSTER_CHANNEL_ID,
+			level: 'milestone',
+		});
+
+		const projected = await projection.pollAndProject();
+		expect(projected).toBe(1);
+
+		const apple = await getDelivery(RELEASE_ID, DSP_ID_2);
+		const facebook = await getDelivery(RELEASE_ID, DSP_ID_3);
+		expect(apple!.status).toBe('issues');
+		expect(facebook!.status).toBe('issues');
+	});
+
+	it('Cluster — ChannelLive từ go-live watcher → chỉ 1 DSP (không expand)', async () => {
+		// Watcher là channel thường (dsp_code=facebook thật) → update ĐÚNG 1 DSP.
+		const watcherId = `${CLUSTER_CHANNEL_ID}:golive:${DSP_CODE_3}`;
+		await dataSource.query(
+			`INSERT INTO "channel_delivery"
+			 ("channel_id", "distribution_id", "spawn_order", "dsp_code", "topology", "process_code")
+			 VALUES ($1, $2, 3, $3, 'VIA_AGGREGATOR', 'ci.golive')`,
+			[watcherId, DIST_ID, DSP_CODE_3],
+		);
+
+		await insertEvent({
+			type: 'ChannelLive',
+			channelId: watcherId,
+			level: 'milestone',
+		});
+		await projection.pollAndProject();
+
+		const facebook = await getDelivery(RELEASE_ID, DSP_ID_3);
+		expect(facebook!.status).toBe('distributed');
+		// APPLE KHÔNG bị đụng (watcher chỉ áp DSP của mình).
+		expect(await getDelivery(RELEASE_ID, DSP_ID_2)).toBeNull();
 	});
 
 	it('Test 2 — ChannelLive → upsert distributed + hasLiveVersion + lastDeliveredAt', async () => {

@@ -252,7 +252,13 @@ export function advance(
 				);
 			}
 
-			if (current.state !== ChannelState.ISSUES) {
+			// RESET hợp lệ từ ISSUES (retry channel hỏng) HOẶC SKIPPED (revive CI cluster để chạy
+			// lại cả cụm — cluster shared-stages xong = SKIPPED, khác ISSUES). Chỉ cluster dùng
+			// SKIPPED; direct channel không bao giờ SKIPPED nên không lọt nhầm.
+			if (
+				current.state !== ChannelState.ISSUES &&
+				current.state !== ChannelState.SKIPPED
+			) {
 				throw new InvalidTransitionError(
 					current.state,
 					ChannelInputType.RESET,
@@ -314,6 +320,9 @@ function appendLandingEvent(
 		emitted.push(ChannelEventType.CHANNEL_LIVE);
 	} else if (nextState === ChannelState.TAKEN_DOWN) {
 		emitted.push(ChannelEventType.CHANNEL_TAKEN_DOWN);
+	} else if (nextState === ChannelState.SKIPPED) {
+		// CI cluster: shared-stages xong → terminal SKIPPED. Hook cho aggregate fan-out watchers.
+		emitted.push(ChannelEventType.CHANNEL_SKIPPED);
 	} else if (nextState === ChannelState.WAITING) {
 		emitted.push(ChannelEventType.WAITING);
 	}

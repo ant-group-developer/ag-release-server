@@ -52,6 +52,18 @@ export class ChannelDeliveryOrmEntity {
 	@Column({ type: 'boolean', nullable: true })
 	hasDeal!: boolean | null;
 
+	// ── CI cluster (gom N DSP chạy shared-stages) ──
+	/** True nếu là cluster channel. Watcher/direct = false. */
+	@Column({ type: 'boolean', default: false })
+	isCluster!: boolean;
+
+	/**
+	 * DSP con của cluster: [{dspCode, exportMethod?, hasDeal?}]. [] nếu không phải cluster.
+	 * Giữ đủ để fan-out watcher + export distinct-method sau khi load lại.
+	 */
+	@Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+	memberDspCodes!: object;
+
 	// ── state (thay đổi theo turn) ──
 	@Column({ type: 'int', default: 0 })
 	pos!: number;

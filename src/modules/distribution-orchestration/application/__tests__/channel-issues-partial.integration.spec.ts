@@ -61,7 +61,8 @@ describe('Integration — channel ISSUES → PARTIALLY_DISTRIBUTED (Khối C)', 
 				correlationId: 'corr-partial',
 				state: DistributionState.DELIVERING,
 				upc: UPC,
-				packageUri: 's3://packages/dist-1.zip',
+				// Cả 2 channel dùng processCode 'spotify.initial' → groupKey 'SPOTIFY'.
+				packageUris: { SPOTIFY: 's3://packages/dist-1.zip' },
 				retryCount: 0,
 				version: 0, // fresh → saveWithOutbox INSERTs (→ version 1)
 				channelSpecs: [spec('SPOTIFY'), spec('DEEZER')],

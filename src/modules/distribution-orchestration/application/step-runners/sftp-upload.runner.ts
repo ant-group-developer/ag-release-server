@@ -18,13 +18,14 @@ import {
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
+import { groupKeyOf } from './group-channels-by-route';
 import { ChannelJobPayload } from './runner-payload';
 import { ticketIdempotencyKey } from './ticket-idempotency-key';
 
 /**
  * SftpUploadRunner — consumer của `dist.sftp-upload`.
  *
- * 1. Load Distribution → tìm channel theo channelId → dspCode + packageUri
+ * 1. Load Distribution → tìm channel theo channelId → dspCode + package của nhóm (dspRoute)
  * 2. Gọi PackageUploader.upload() — idempotent theo (path, dspCode)
  * 3a. ok → APPLY_CHANNEL_INPUT {STEP_DONE} (interpreter chuyển stage kế)
  * 3b. fail CHƯA cạn retry → APPLY_CHANNEL_INPUT {ACTION_FAIL} KHÔNG ticket
@@ -64,18 +65,32 @@ export class SftpUploadRunner {
 				`SftpUploadRunner: channel ${payload.channelId} not found`,
 			);
 		}
-		if (!dist.packageUri) {
+		// Channel upload package của NHÓM mình (dspRoute), không phải 1 package chung.
+		// groupKey = dspRoute của processCode channel (đã fill khi spawn vào DELIVERING).
+		const groupKey = groupKeyOf(channel.spec.processCode);
+		const packageUri = dist.packageUriFor(groupKey);
+		if (!packageUri) {
 			throw new Error(
-				`SftpUploadRunner: distribution ${dist.id} missing packageUri`,
+				`SftpUploadRunner: distribution ${dist.id} missing package for group ${groupKey}`,
 			);
 		}
 
-		const [bucket, ...keyParts] = dist.packageUri.split('/');
+		const [bucket, ...keyParts] = packageUri.split('/');
 		const path = PackagePath.create(bucket, keyParts.join('/'));
 		const key = IdempotencyKey.create(payload.key);
 		const dspCode = DspCode.create(channel.spec.dspCode);
+		// Cluster CI: upload 1 lần cả cụm → resolve SFTP theo aggregator (dspCode là aggregator
+		// code, resolve theo dsp.code sẽ NOT_FOUND). Direct/legacy per-DSP: resolve theo dspCode.
+		const aggregatorCode = channel.isCluster
+			? channel.spec.aggregatorCode
+			: undefined;
 
-		const result = await this.uploader.upload({ path, dspCode, key });
+		const result = await this.uploader.upload({
+			path,
+			dspCode,
+			key,
+			aggregatorCode,
+		});
 
 		if (!result.ok) {
 			// Khối C: ACTION fail. The interpreter (INV-C2) decides retry-in-place vs ISSUES by
@@ -118,7 +133,12 @@ export class SftpUploadRunner {
 
 		// VIA_AGGREGATOR: đánh dấu .done để CI nhận batch = imported
 		if (channel.spec.aggregatorCode) {
-			await this.uploader.markBatchDone({ path, dspCode, key });
+			await this.uploader.markBatchDone({
+				path,
+				dspCode,
+				key,
+				aggregatorCode,
+			});
 		}
 
 		return {

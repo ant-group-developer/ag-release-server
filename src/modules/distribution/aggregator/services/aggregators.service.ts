@@ -112,6 +112,19 @@ export class AggregatorsService {
 		return entity;
 	}
 
+	/** Resolve aggregator (kèm sftpConfig) theo code, VD 'CI'. Dùng khi build/upload cho nhóm aggregator. */
+	async getByCode(code: string) {
+		const entity = await this.repo.findOne({
+			where: { isActive: true, code },
+			relations: { sftpConfig: true },
+		});
+
+		if (!entity) throw AggregatorException.NOT_FOUND();
+
+		decryptSecretSftpConfigSafe(entity.sftpConfig);
+		return entity;
+	}
+
 	async update({
 		id,
 		data,

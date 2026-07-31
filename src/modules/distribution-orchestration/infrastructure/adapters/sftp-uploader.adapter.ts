@@ -37,8 +37,10 @@ export class SftpUploaderAdapter implements PackageUploader {
 	private readonly logger = new Logger(SftpUploaderAdapter.name);
 	private readonly baseDir: string;
 
-	// Khối D: timeout 120s/upload + breaker (SFTP sập → fail-fast, half-open sau 60s).
-	private static readonly UPLOAD_TIMEOUT_MS = 120_000;
+	// Khối D: timeout động theo dung lượng + breaker (SFTP sập → fail-fast, half-open sau 60s).
+	private static readonly BASE_TIMEOUT_MS = 60_000; // 60s overhead kết nối
+	private static readonly PER_FILE_OVERHEAD_MS = 5_000; // 5s overhead SFTP/file (mkdir, open, close)
+	private static readonly MIN_BANDWIDTH_BPS = 80 * 1024; // 80 KB/s — worst-case SFTP speed
 	private readonly breaker = new CircuitBreaker({
 		name: 'sftp-upload',
 		failureThreshold: 5,
@@ -57,16 +59,22 @@ export class SftpUploaderAdapter implements PackageUploader {
 		path: PackagePath;
 		dspCode: DspCode;
 		key: IdempotencyKey;
+		aggregatorCode?: string;
 	}): Promise<UploadResult> {
-		const { path: packagePath, dspCode, key } = input;
+		const { path: packagePath, dspCode, key, aggregatorCode } = input;
 		this.logger.log(
-			`[upload] path=${packagePath.key} dspCode=${dspCode.value} key=${key.value}`,
+			`[upload] path=${packagePath.key} dspCode=${dspCode.value} aggregatorCode=${aggregatorCode ?? '-'} key=${key.value}`,
 		);
 
-		// 1. Resolve SFTP/S3 config for this DSP
-		const config = await this.dspRoutingService.resolveFullDeliveryConfig(
-			dspCode.value,
-		);
+		// 1. Resolve SFTP/S3 config. CI cluster → theo aggregator (dspCode là aggregator code,
+		// resolve theo dsp.code sẽ NOT_FOUND). Direct/legacy → theo dspCode.
+		const config = aggregatorCode
+			? await this.dspRoutingService.resolveAggregatorDeliveryConfig(
+					aggregatorCode,
+				)
+			: await this.dspRoutingService.resolveFullDeliveryConfig(
+					dspCode.value,
+				);
 
 		// 2. Map PackagePath → local dir
 		// packagePath.key = '{batchId}/{releaseReference}' — parent dir = batchId
@@ -81,14 +89,24 @@ export class SftpUploaderAdapter implements PackageUploader {
 
 		// 3. Upload — use batchDir (parent) so uploadFolder sends the full structure
 		const remoteDir = config.sftp.path || '/';
+		const { fileCount, totalBytes } = this.measureFolder(batchDir);
+		const transferMs = Math.ceil(
+			(totalBytes / SftpUploaderAdapter.MIN_BANDWIDTH_BPS) * 1000,
+		);
+		const timeoutMs =
+			SftpUploaderAdapter.BASE_TIMEOUT_MS +
+			SftpUploaderAdapter.PER_FILE_OVERHEAD_MS * fileCount +
+			transferMs;
 
+		const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
 		this.logger.log(
-			`[upload] localDir=${batchDir} remoteDir=${remoteDir} type=${config.sftp.type ?? 'sftp'}`,
+			`[upload] localDir=${batchDir} remoteDir=${remoteDir} type=${config.sftp.type ?? 'sftp'} files=${fileCount} totalMB=${totalMB} timeoutMs=${timeoutMs}`,
 		);
 
 		// Khối D: breaker(timeout(uploadFolder)). Lỗi mạng/timeout/breaker-open → throw →
 		// BullMQ retry theo backoff (3 lần exp 30s); cạn attempts → failed-set. Transient, KHÔNG
 		// trả ok:false (ok:false dành cho lỗi nghiệp vụ dứt khoát — hiện SFTP không có loại đó).
+		const startMs = Date.now();
 		await this.breaker.execute(() =>
 			withTimeout(
 				this.sftpService.uploadFolder({
@@ -96,12 +114,19 @@ export class SftpUploaderAdapter implements PackageUploader {
 					localDir: batchDir,
 					remoteDir,
 				}),
-				SftpUploaderAdapter.UPLOAD_TIMEOUT_MS,
+				timeoutMs,
 				`SFTP uploadFolder ${dspCode.value}`,
 			),
 		);
 
-		this.logger.log(`[upload] Upload complete for ${dspCode.value}`);
+		const elapsedMs = Date.now() - startMs;
+		const speedMBs =
+			elapsedMs > 0
+				? (totalBytes / (1024 * 1024) / (elapsedMs / 1000)).toFixed(2)
+				: '∞';
+		this.logger.log(
+			`[upload] Upload complete for ${dspCode.value} elapsed=${elapsedMs}ms speed=${speedMBs}MB/s`,
+		);
 		return { ok: true };
 	}
 
@@ -109,16 +134,21 @@ export class SftpUploaderAdapter implements PackageUploader {
 		path: PackagePath;
 		dspCode: DspCode;
 		key: IdempotencyKey;
+		aggregatorCode?: string;
 	}): Promise<void> {
-		const { path: packagePath, dspCode, key } = input;
+		const { path: packagePath, dspCode, key, aggregatorCode } = input;
 		this.logger.log(
-			`[markBatchDone] path=${packagePath.key} dspCode=${dspCode.value}`,
+			`[markBatchDone] path=${packagePath.key} dspCode=${dspCode.value} aggregatorCode=${aggregatorCode ?? '-'}`,
 		);
 
-		// 1. Resolve SFTP config
-		const config = await this.dspRoutingService.resolveFullDeliveryConfig(
-			dspCode.value,
-		);
+		// 1. Resolve SFTP config (aggregator cho cluster, else per-DSP)
+		const config = aggregatorCode
+			? await this.dspRoutingService.resolveAggregatorDeliveryConfig(
+					aggregatorCode,
+				)
+			: await this.dspRoutingService.resolveFullDeliveryConfig(
+					dspCode.value,
+				);
 
 		if (!config.createsDoneFolder) {
 			this.logger.log(
@@ -158,6 +188,30 @@ export class SftpUploaderAdapter implements PackageUploader {
 			fs.promises
 				.rm(tempDir, { recursive: true, force: true })
 				.catch(() => {});
+		}
+	}
+
+	private measureFolder(dir: string): {
+		fileCount: number;
+		totalBytes: number;
+	} {
+		try {
+			let fileCount = 0;
+			let totalBytes = 0;
+			for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+				const fullPath = path.join(dir, entry.name);
+				if (entry.isDirectory()) {
+					const sub = this.measureFolder(fullPath);
+					fileCount += sub.fileCount;
+					totalBytes += sub.totalBytes;
+				} else if (entry.isFile()) {
+					fileCount++;
+					totalBytes += fs.statSync(fullPath).size;
+				}
+			}
+			return { fileCount: fileCount || 1, totalBytes };
+		} catch {
+			return { fileCount: 1, totalBytes: 0 };
 		}
 	}
 }

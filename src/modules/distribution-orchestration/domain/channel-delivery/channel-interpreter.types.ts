@@ -48,6 +48,7 @@ export enum ChannelEventType {
 	ACTION_RETRIED = 'ActionRetried', // progress: ACTION failed but can still retry
 	CHANNEL_RESET = 'ChannelReset', // milestone: RETRY reset back to an earlier stage
 	CHANNEL_TAKEN_DOWN = 'ChannelTakenDown', // terminal milestone: takedown process finished
+	CHANNEL_SKIPPED = 'ChannelSkipped', // terminal milestone: CI cluster shared-stages done → fan-out watchers
 }
 
 /** The interpreter's result (immutable — freshly created, never mutating the input). */

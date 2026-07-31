@@ -5,7 +5,9 @@ import {
 } from '../channel-delivery/channel-interpreter.types';
 import { ChannelState } from '../channel-delivery/channel-state.enum';
 import {
+	CI_CLUSTER_INITIAL,
 	CI_DEAL_INITIAL,
+	CI_GOLIVE,
 	CI_TAKEDOWN,
 	SPOTIFY_INITIAL,
 } from '../channel-delivery/delivery-process.registry';
@@ -55,6 +57,63 @@ describe('deriveState (INV-C5)', () => {
 		expect(deriveState(SPOTIFY_INITIAL, 1)).toBe(ChannelState.WAITING);
 		expect(deriveState(SPOTIFY_INITIAL, 2)).toBe(ChannelState.LIVE);
 		expect(deriveState(CI_DEAL_INITIAL, 2)).toBe(ChannelState.DELIVERING);
+	});
+});
+
+describe('CI cluster process — shared-stages xong → SKIPPED (fan-out hook)', () => {
+	// stages: deliver(0 ACTION) → ingest(1 WAIT) → qa(2 GATE) → export(3 WAIT)
+	it('chạy hết export (past last stage) derives SKIPPED, không phải LIVE', () => {
+		expect(
+			deriveState(CI_CLUSTER_INITIAL, CI_CLUSTER_INITIAL.stages.length),
+		).toBe(ChannelState.SKIPPED);
+	});
+
+	it('export (WAIT) ARRIVED ở stage cuối → SKIPPED + emit CHANNEL_SKIPPED', () => {
+		const res = advance(
+			CI_CLUSTER_INITIAL,
+			{ pos: 3, state: ChannelState.WAITING, retryCount: 0 },
+			{ type: ChannelInputType.ARRIVED },
+			retry,
+		);
+		expect(res.state).toBe(ChannelState.SKIPPED);
+		expect(res.emitted).toContain(ChannelEventType.CHANNEL_SKIPPED);
+		expect(res.emitted).not.toContain(ChannelEventType.CHANNEL_LIVE);
+	});
+
+	it('qa GATE_FAIL → ISSUES (cả cụm), pos giữ nguyên', () => {
+		const res = advance(
+			CI_CLUSTER_INITIAL,
+			{ pos: 2, state: ChannelState.DELIVERING, retryCount: 0 },
+			{ type: ChannelInputType.GATE_FAIL, ticketRef: 'ticket-cluster' },
+			retry,
+		);
+		expect(res.state).toBe(ChannelState.ISSUES);
+		expect(res.pos).toBe(2);
+		expect(res.ticketRef).toBe('ticket-cluster');
+	});
+});
+
+describe('CI go-live watcher — 1 stage golive → LIVE per-DSP', () => {
+	it('golive (WAIT) ARRIVED → LIVE', () => {
+		const res = advance(
+			CI_GOLIVE,
+			{ pos: 0, state: ChannelState.WAITING, retryCount: 0 },
+			{ type: ChannelInputType.ARRIVED },
+			retry,
+		);
+		expect(res.state).toBe(ChannelState.LIVE);
+		expect(res.emitted).toContain(ChannelEventType.CHANNEL_LIVE);
+	});
+
+	it('golive WAIT_FAIL (DSP rejected) → ISSUES với ticket', () => {
+		const res = advance(
+			CI_GOLIVE,
+			{ pos: 0, state: ChannelState.WAITING, retryCount: 0 },
+			{ type: ChannelInputType.WAIT_FAIL, ticketRef: 'ticket-golive' },
+			retry,
+		);
+		expect(res.state).toBe(ChannelState.ISSUES);
+		expect(res.ticketRef).toBe('ticket-golive');
 	});
 });
 

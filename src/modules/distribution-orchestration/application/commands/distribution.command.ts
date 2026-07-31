@@ -89,10 +89,15 @@ export interface MarkIdsProvisionedCommand extends CommandBase {
 	readonly upc?: string;
 }
 
-/** BUILDING_PACKAGE → DELIVERING. `packageUri` là path GCS/S3 vừa build. */
+/**
+ * BUILDING_PACKAGE → DELIVERING.
+ * `packageUris` map groupKey (dspRoute) → package path vừa build. 1 package/nhóm phân phối
+ * (Spotify direct + CI aggregator = 2 nhóm khác ernVersion/sender/SFTP). Mỗi channel upload
+ * đọc package của nhóm mình (xem SftpUploadRunner + groupChannelsByRoute).
+ */
 export interface MarkPackageBuiltCommand extends CommandBase {
 	readonly type: 'MARK_PACKAGE_BUILT';
-	readonly packageUri: string;
+	readonly packageUris: Record<string, string>;
 }
 
 /**

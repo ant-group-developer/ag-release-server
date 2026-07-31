@@ -1,6 +1,9 @@
 import { ChannelDeliverySpec } from '../channel-delivery/channel-delivery-spec';
 import { ChannelDelivery } from '../channel-delivery/channel-delivery.entity';
 import { ChannelInputType } from '../channel-delivery/channel-interpreter.types';
+import { ChannelState } from '../channel-delivery/channel-state.enum';
+import { ChannelTopology } from '../channel-delivery/channel-topology.enum';
+import { planChannelSpawn } from '../channel-delivery/plan-channel-spawn';
 import {
 	InvalidTransitionError,
 	InvariantViolationError,
@@ -9,6 +12,7 @@ import {
 import * as E from '../events/distribution.events';
 import { DomainEvent } from '../events/domain-event.base';
 import { ExecutionPolicy } from '../policies/execution-policy.port';
+import { buildGoliveProcessCode } from '../policies/process-code.helper';
 import { Clock } from '../ports/clock.port';
 import { ExecutionTypeEnum } from '../value-objects/execution-type.enum';
 import { DistributionState } from './distribution-state.enum';
@@ -30,7 +34,8 @@ export class Distribution {
 	private _state: DistributionState = DistributionState.DRAFT;
 	private _channels: ChannelDelivery[] = [];
 	private _upc?: string;
-	private _packageUri?: string;
+	/** Map groupKey (dspRoute) → package path. 1 package/nhóm phân phối. */
+	private _packageUris: Record<string, string> = {};
 	private _retryCount = 0;
 	private _version = 0; // optimistic lock — repo checks (WHERE version=?) then version+1
 	private readonly _pending: DomainEvent[] = [];
@@ -74,8 +79,17 @@ export class Distribution {
 	get upc(): string | undefined {
 		return this._upc;
 	}
-	get packageUri(): string | undefined {
-		return this._packageUri;
+	/** Toàn bộ map groupKey → package path (đọc-only). Rỗng khi chưa build. */
+	get packageUris(): Readonly<Record<string, string>> {
+		return this._packageUris;
+	}
+	/** Đã build ít nhất 1 nhóm chưa (dùng cho idempotency guard ở runner). */
+	get hasBuiltPackages(): boolean {
+		return Object.keys(this._packageUris).length > 0;
+	}
+	/** Package path của 1 nhóm phân phối (undefined nếu nhóm chưa build). */
+	packageUriFor(groupKey: string): string | undefined {
+		return this._packageUris[groupKey];
 	}
 	get channelSpecs(): readonly ChannelDeliverySpec[] {
 		return this._channelSpecs;
@@ -222,7 +236,7 @@ export class Distribution {
 
 	// ── BUILDING_PACKAGE → DELIVERING ──
 	markPackageBuilt(
-		packageUri: string,
+		packageUris: Record<string, string>,
 		policy: ExecutionPolicy,
 		clock: Clock,
 	): void {
@@ -230,16 +244,16 @@ export class Distribution {
 		if (this._state !== DistributionState.BUILDING_PACKAGE) {
 			throw new InvalidTransitionError(this._state, 'markPackageBuilt');
 		}
-		if (!packageUri) {
+		if (!packageUris || Object.keys(packageUris).length === 0) {
 			throw new InvariantViolationError(
 				'Distribution',
-				'markPackageBuilt needs a path',
+				'markPackageBuilt needs ≥1 package path',
 			);
 		}
-		this._packageUri = packageUri;
+		this._packageUris = { ...packageUris };
 		this._state = DistributionState.DELIVERING;
 		this._pending.push(
-			E.makePackageBuilt(this.id, clock.now(), { packageUri }),
+			E.makePackageBuilt(this.id, clock.now(), { packageUris }),
 		);
 		this.ensureChannelsSpawned(policy);
 	}
@@ -261,6 +275,9 @@ export class Distribution {
 		}
 		const events = channel.apply(input, clock, this.id);
 		this._pending.push(...events);
+		// Cluster CI vừa xong shared-stages (→ SKIPPED) → fan-out watcher go-live per-DSP TRƯỚC khi
+		// bubble-up. Nếu không, cluster SKIPPED đứng 1 mình bị resolve thành FAILED (0 LIVE, all terminal).
+		this.fanOutWatchers(clock);
 		this.syncChannelOutcome(clock);
 	}
 
@@ -330,12 +347,29 @@ export class Distribution {
 			this._channels
 				.filter((c) => c.state === 'ISSUES')
 				.map((c) => c.channelId);
+
+		// Nếu 1 go-live watcher ISSUES → reset CẢ CLUSTER cha (quyết định: re-upload + re-QA cả cụm).
+		// Gom cluster cha cần reset TRƯỚC, để xoá watcher + revive cluster (không reset lẻ watcher).
+		const clustersToReset = new Set<string>();
+		for (const c of this._channels) {
+			if (
+				c.state === 'ISSUES' &&
+				targets.includes(c.channelId) &&
+				c.isGoliveWatcher &&
+				c.parentClusterId
+			) {
+				clustersToReset.add(c.parentClusterId);
+			}
+		}
+
 		for (const channel of this._channels) {
 			if (
 				channel.state !== 'ISSUES' ||
 				!targets.includes(channel.channelId)
 			)
 				continue;
+			// Watcher ISSUES đã cuộn vào reset cluster cha → bỏ qua ở đây (không RESET lẻ).
+			if (channel.isGoliveWatcher) continue;
 			const events = channel.apply(
 				{
 					type: ChannelInputType.RESET,
@@ -346,6 +380,32 @@ export class Distribution {
 			);
 			this._pending.push(...events);
 		}
+
+		// Reset cả cluster: xoá watcher (mọi state, kể cả LIVE — làm lại từ deliver) + RESET cluster
+		// từ SKIPPED về stage đầu (deliver). fanOutWatchers sẽ spawn lại watcher khi cluster xong.
+		if (clustersToReset.size > 0) {
+			this._channels = this._channels.filter(
+				(c) =>
+					!(
+						c.isGoliveWatcher &&
+						c.parentClusterId &&
+						clustersToReset.has(c.parentClusterId)
+					),
+			);
+			for (const cluster of this._channels) {
+				if (!clustersToReset.has(cluster.channelId)) continue;
+				const events = cluster.apply(
+					{
+						type: ChannelInputType.RESET,
+						resetToKey: cluster.firstStageKey,
+					},
+					clock,
+					this.id,
+				);
+				this._pending.push(...events);
+			}
+		}
+
 		this._pending.push(
 			E.makeRetryReset(this.id, clock.now(), {
 				scope: JSON.stringify(scope),
@@ -397,7 +457,7 @@ export class Distribution {
 		d._state = row.state;
 		d._channels = channels;
 		d._upc = row.upc;
-		d._packageUri = row.packageUri;
+		d._packageUris = row.packageUris ?? {};
 		d._retryCount = row.retryCount;
 		d._version = row.version;
 		return d;
@@ -414,15 +474,61 @@ export class Distribution {
 			: DistributionState.DELIVERING;
 	}
 
-	/** Spawn ChannelDelivery entities once, on entering DELIVERING. */
+	/**
+	 * Spawn ChannelDelivery entities once, on entering DELIVERING.
+	 * DIRECT → 1 channel/DSP. AGGREGATOR (initial) → 1 CLUSTER channel/aggregator (gom N DSP con
+	 * chạy shared-stages 1 lần). Watcher go-live spawn SAU (fanOutWatchers khi cluster → SKIPPED).
+	 */
 	private ensureChannelsSpawned(policy: ExecutionPolicy): void {
 		if (this._channels.length > 0) return; // idempotent
-		this._channels = this._channelSpecs.map((spec, i) =>
-			ChannelDelivery.create(`${this.id}:ch:${i}`, {
-				...spec,
-				processCode:
-					spec.processCode || policy.resolveProcessCode(spec),
-			}),
-		);
+		const plans = planChannelSpawn(this._channelSpecs, policy);
+		this._channels = plans.map((plan, i) => {
+			const channelId = `${this.id}:ch:${i}`;
+			return plan.kind === 'cluster'
+				? ChannelDelivery.createCluster(
+						channelId,
+						plan.clusterSpec,
+						plan.members,
+					)
+				: ChannelDelivery.create(channelId, plan.spec);
+		});
+	}
+
+	/**
+	 * Fan-out: khi 1 CI cluster channel chạy hết shared-stages (→ SKIPPED), spawn N go-live
+	 * watcher (mỗi member DSP 1 channel `ci.golive`). Mỗi watcher poll go-live độc lập → LIVE/ISSUES.
+	 *
+	 * Idempotent: chỉ spawn watcher cho cluster CHƯA có watcher (chống double-spawn khi job redeliver).
+	 * Watcher id = `{clusterId}:golive:{dspCode}` — deterministic, dò được cluster cha.
+	 */
+	private fanOutWatchers(clock: Clock): void {
+		const newWatchers: ChannelDelivery[] = [];
+		for (const cluster of this._channels) {
+			if (!cluster.isCluster) continue;
+			if (cluster.state !== ChannelState.SKIPPED) continue; // chưa xong shared-stages
+			for (const member of cluster.members) {
+				const watcherId = `${cluster.channelId}:golive:${member.dspCode}`;
+				if (this._channels.some((c) => c.channelId === watcherId)) {
+					continue; // đã fan-out — idempotent
+				}
+				const watcher = ChannelDelivery.create(watcherId, {
+					dspCode: member.dspCode,
+					topology: ChannelTopology.VIA_AGGREGATOR,
+					processCode: buildGoliveProcessCode(),
+					aggregatorCode: cluster.spec.aggregatorCode,
+					exportMethod: member.exportMethod,
+					hasDeal: member.hasDeal,
+				});
+				newWatchers.push(watcher);
+				this._pending.push(
+					E.makeWatcherSpawned(this.id, clock.now(), {
+						clusterChannelId: cluster.channelId,
+						watcherChannelId: watcherId,
+						dspCode: member.dspCode,
+					}),
+				);
+			}
+		}
+		this._channels = [...this._channels, ...newWatchers];
 	}
 }

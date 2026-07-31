@@ -100,7 +100,7 @@ function cloneViaRehydrate(src: Distribution, dbVersion: number): Distribution {
 			correlationId: src.correlationId,
 			state: src.state,
 			upc: src.upc,
-			packageUri: src.packageUri,
+			packageUris: { ...src.packageUris },
 			retryCount: src.retryCount,
 			version: dbVersion,
 			channelSpecs: [...src.channelSpecs],

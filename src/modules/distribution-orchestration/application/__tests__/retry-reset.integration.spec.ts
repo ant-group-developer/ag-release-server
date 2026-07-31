@@ -74,7 +74,10 @@ describe('Integration — RETRY reset → resume + resolve ticket (Khối E)', (
 				correlationId: 'corr-retry',
 				state: DistributionState.PARTIALLY_DISTRIBUTED,
 				upc: '100000000001',
-				packageUri: 's3://packages/dist-1.zip',
+				packageUris: {
+					SPOTIFY: 's3://packages/dist-1-spotify.zip',
+					DEEZER: 's3://packages/dist-1-deezer.zip',
+				},
 				retryCount: 0,
 				version: 0,
 				channelSpecs: [spec('SPOTIFY'), spec('DEEZER')],

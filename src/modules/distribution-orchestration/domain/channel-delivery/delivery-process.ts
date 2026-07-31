@@ -36,8 +36,14 @@ export interface Stage {
 export interface DeliveryProcess {
 	readonly code: string; // e.g. 'spotify.initial'|'ci.deal.initial'|'ci.takedown'
 	readonly stages: readonly Stage[]; // linear order; interpreter walks pos 0 → end
-	/** Terminal state when the process runs to the end. Default LIVE (distribution); takedown → TAKEN_DOWN. */
-	readonly terminalState?: ChannelState.LIVE | ChannelState.TAKEN_DOWN;
+	/**
+	 * Terminal state when the process runs to the end. Default LIVE (distribution);
+	 * takedown → TAKEN_DOWN; CI cluster shared-stages → SKIPPED (cụm xong, go-live do watcher).
+	 */
+	readonly terminalState?:
+		| ChannelState.LIVE
+		| ChannelState.TAKEN_DOWN
+		| ChannelState.SKIPPED;
 }
 
 /**

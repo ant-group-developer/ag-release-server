@@ -24,7 +24,8 @@ export interface DistributionSnapshotRow {
 	readonly correlationId: string;
 	readonly state: DistributionState;
 	readonly upc?: string;
-	readonly packageUri?: string;
+	/** Map groupKey (dspRoute) → package path. Rỗng khi chưa build. */
+	readonly packageUris?: Record<string, string>;
 	readonly retryCount: number;
 	readonly version: number;
 	/** Immutable at INSERT — serialised as jsonb; needed so post-load rehydrate can spawn channels. */

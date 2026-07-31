@@ -434,6 +434,54 @@ export class DspRoutingConfigsService {
 		};
 	}
 
+	/**
+	 * Resolve delivery config cho 1 NHÓM AGGREGATOR (build 1 package/nhóm).
+	 *
+	 * Khác `resolveFullDeliveryConfig` (query theo dsp.code, recipient = DSP): ở đây phát TỚI
+	 * aggregator nên sender = AMG (label), recipient = AGGREGATOR (CI party). SFTP + ernVersion
+	 * lấy từ aggregator.sftpConfig. Dùng cho nhóm gộp nhiều DSP cùng aggregator (Apple+Facebook→CI).
+	 *
+	 * @param aggregatorCode VD 'CI'
+	 */
+	async resolveAggregatorDeliveryConfig(aggregatorCode: string): Promise<{
+		ernVersion: ErnVersion2;
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
+		sftp: SftpMetadata;
+		createsDoneFolder: boolean;
+		isCI: boolean;
+	}> {
+		const agg = await this.aggregatorsService.getByCode(aggregatorCode);
+
+		if (!agg.ddexId || !agg.ddexName) {
+			throw DspRoutingConfigException.AGGREGATOR_MISSING_DDEX_PARTY(
+				aggregatorCode,
+			);
+		}
+		if (!agg.sftpConfig?.metadata) {
+			throw DspRoutingConfigException.NOT_FOUND();
+		}
+
+		const partyId = this.appConfigService.DDEX_PARTY_ID_AMG();
+		const partyName = this.appConfigService.DDEX_PARTY_NAME_AMG();
+		if (!partyId || !partyName) {
+			throw DspRoutingConfigException.MISSING_APP_CONFIG_DDEX_PARTY();
+		}
+
+		const sftpMetadata = agg.sftpConfig.metadata;
+		this.decryptSecretEntity(sftpMetadata);
+
+		return {
+			ernVersion:
+				(agg.sftpConfig.ernVersion as ErnVersion2) ?? ErnVersion2.ERN_382,
+			sender: { partyId, name: partyName },
+			recipient: { partyId: agg.ddexId, name: agg.ddexName },
+			sftp: sftpMetadata,
+			createsDoneFolder: agg.createsDoneFolder ?? false,
+			isCI: agg.code === 'CI',
+		};
+	}
+
 	async resolveRawDeliveryConfig(code: string) {
 		const routing = await this.repo
 			.createQueryBuilder('routing')

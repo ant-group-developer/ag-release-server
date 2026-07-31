@@ -2,7 +2,7 @@ import { makeChannelEvent } from '../events/channel.events';
 import { DomainEvent } from '../events/domain-event.base';
 import { Clock } from '../ports/clock.port';
 import { RetryPolicy } from '../value-objects/retry-policy.vo';
-import { ChannelDeliverySpec } from './channel-delivery-spec';
+import { ChannelDeliverySpec, ClusterMember } from './channel-delivery-spec';
 import { advance } from './channel-interpreter';
 import { ChannelInput, ChannelPosition } from './channel-interpreter.types';
 import { ChannelState, isChannelTerminal } from './channel-state.enum';
@@ -35,6 +35,8 @@ export class ChannelDelivery {
 		private _state: ChannelState,
 		private _retryCount: number,
 		private _ticketRef: string | undefined,
+		// CI cluster: N DSP con chạy shared-stages chung. Rỗng = channel thường (direct/watcher).
+		private readonly _members: readonly ClusterMember[] = [],
 	) {}
 
 	get pos(): number {
@@ -48,6 +50,23 @@ export class ChannelDelivery {
 	}
 	get ticketRef(): string | undefined {
 		return this._ticketRef;
+	}
+	/** DSP con của 1 CI cluster (rỗng nếu là channel thường/direct/watcher). */
+	get members(): readonly ClusterMember[] {
+		return this._members;
+	}
+	/** True nếu channel này là CI cluster (gom N DSP chạy shared-stages). */
+	get isCluster(): boolean {
+		return this._members.length > 0;
+	}
+	/** True nếu là go-live watcher (spawn per-DSP sau cluster). id dạng `{clusterId}:golive:{dsp}`. */
+	get isGoliveWatcher(): boolean {
+		return this.channelId.includes(':golive:');
+	}
+	/** clusterId cha của 1 watcher (phần trước `:golive:`); undefined nếu không phải watcher. */
+	get parentClusterId(): string | undefined {
+		if (!this.isGoliveWatcher) return undefined;
+		return this.channelId.split(':golive:')[0];
 	}
 
 	/** Spawn a fresh channel at stage 0 (PENDING) from its spec. */
@@ -69,11 +88,42 @@ export class ChannelDelivery {
 		);
 	}
 
-	/** Rebuild from a persisted row (phase 2). */
+	/**
+	 * Spawn 1 CI cluster channel — gom N DSP con (members) chạy shared-stages (deliver/ingest/
+	 * qa/export) 1 lần. spec.processCode = 'ci.cluster.initial'. members giữ dspCode+exportMethod
+	 * để fan-out watcher + export distinct-method sau này.
+	 */
+	static createCluster(
+		channelId: string,
+		spec: ChannelDeliverySpec,
+		members: readonly ClusterMember[],
+		retry: RetryPolicy = RetryPolicy.sftpDefault(),
+	): ChannelDelivery {
+		if (members.length === 0) {
+			throw new Error(
+				'ChannelDelivery.createCluster: cluster needs ≥1 member',
+			);
+		}
+		const process = getProcess(spec.processCode);
+		return new ChannelDelivery(
+			channelId,
+			spec,
+			process,
+			retry,
+			0,
+			ChannelState.PENDING,
+			0,
+			undefined,
+			members,
+		);
+	}
+
+	/** Rebuild from a persisted row (phase 2). `members` khi rehydrate 1 CI cluster channel. */
 	static rehydrate(
 		spec: ChannelDeliverySpec,
 		row: ChannelDeliveryRow,
 		retry: RetryPolicy = RetryPolicy.sftpDefault(),
+		members: readonly ClusterMember[] = [],
 	): ChannelDelivery {
 		const process = getProcess(spec.processCode);
 		return new ChannelDelivery(
@@ -85,6 +135,7 @@ export class ChannelDelivery {
 			row.state,
 			row.retryCount,
 			row.ticketRef,
+			members,
 		);
 	}
 

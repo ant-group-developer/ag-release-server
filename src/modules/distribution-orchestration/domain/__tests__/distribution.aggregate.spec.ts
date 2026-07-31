@@ -61,7 +61,7 @@ describe('Distribution aggregate — happy path', () => {
 		d.markIdsProvisioned('123456789012', clock);
 		expect(d.state).toBe(DistributionState.BUILDING_PACKAGE);
 
-		d.markPackageBuilt('bucket/pkg/', initial, clock);
+		d.markPackageBuilt({ SPOTIFY: 'bucket/pkg/' }, initial, clock);
 		expect(d.state).toBe(DistributionState.DELIVERING);
 		expect(d.channels).toHaveLength(1);
 
@@ -75,6 +75,155 @@ describe('Distribution aggregate — happy path', () => {
 		const events = d.pullDomainEvents();
 		expect(events.map((e) => e.type)).toContain('DistributionSubmitted');
 		expect(d.pullDomainEvents()).toHaveLength(0); // cleared
+	});
+});
+
+describe('Distribution aggregate — CI cluster + fan-out watcher', () => {
+	// 1 dist: Spotify direct + 2 DSP qua CI (Apple state51, Facebook deal).
+	const clusterProps = () =>
+		props({
+			channelSpecs: [
+				{
+					dspCode: 'SPOTIFY',
+					topology: ChannelTopology.DIRECT,
+					processCode: 'spotify.initial',
+				},
+				{
+					dspCode: 'APPLE',
+					topology: ChannelTopology.VIA_AGGREGATOR,
+					processCode: '',
+					aggregatorCode: 'CI',
+					hasDeal: false,
+					exportMethod: 'STATE51',
+				},
+				{
+					dspCode: 'FACEBOOK',
+					topology: ChannelTopology.VIA_AGGREGATOR,
+					processCode: '',
+					aggregatorCode: 'CI',
+					hasDeal: true,
+					exportMethod: 'CI_DEAL',
+				},
+			],
+		});
+
+	/** Đưa dist tới DELIVERING với channels đã spawn. */
+	function toDelivering(d: Distribution) {
+		d.submit(clock);
+		d.markValidated(initial, false, clock);
+		d.markIdsProvisioned('123456789012', clock);
+		d.markPackageBuilt({ SPOTIFY: 'pkg/spotify', CI: 'pkg/ci' }, initial, clock);
+	}
+
+	/** Drive CI cluster qua deliver→ingest→qa→export → SKIPPED (fan-out). */
+	function driveClusterDone(d: Distribution, clusterId: string) {
+		d.applyChannelInput(clusterId, { type: ChannelInputType.STEP_DONE }, clock); // deliver
+		d.applyChannelInput(clusterId, { type: ChannelInputType.ARRIVED }, clock); // ingest
+		d.applyChannelInput(clusterId, { type: ChannelInputType.GATE_PASS }, clock); // qa
+		d.applyChannelInput(clusterId, { type: ChannelInputType.ARRIVED }, clock); // export → SKIPPED
+	}
+
+	it('spawn: 3 DSP → 2 channel (1 direct Spotify + 1 cluster CI với 2 member)', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+
+		expect(d.channels).toHaveLength(2);
+		const cluster = d.channels.find((c) => c.isCluster);
+		expect(cluster).toBeDefined();
+		expect(cluster!.members.map((m) => m.dspCode)).toEqual([
+			'APPLE',
+			'FACEBOOK',
+		]);
+		expect(cluster!.spec.processCode).toBe('ci.cluster.initial');
+	});
+
+	it('cluster shared-stages xong (SKIPPED) → fan-out 2 watcher go-live', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+		const cluster = d.channels.find((c) => c.isCluster)!;
+
+		driveClusterDone(d, cluster.channelId);
+
+		expect(cluster.state).toBe(ChannelState.SKIPPED);
+		const watchers = d.channels.filter((c) => c.isGoliveWatcher);
+		expect(watchers).toHaveLength(2);
+		expect(watchers.map((w) => w.spec.dspCode).sort()).toEqual([
+			'APPLE',
+			'FACEBOOK',
+		]);
+		// vẫn DELIVERING (chờ watcher + Spotify), KHÔNG bị FAILED do cluster SKIPPED đứng 1 mình.
+		expect(d.state).toBe(DistributionState.DELIVERING);
+	});
+
+	it('fan-out idempotent: drive cluster xong 2 lần không tạo watcher trùng', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+		const cluster = d.channels.find((c) => c.isCluster)!;
+		driveClusterDone(d, cluster.channelId);
+		// gọi lại ARRIVED (job redeliver) — cluster đã SKIPPED, apply là no-op, fan-out không nhân đôi
+		d.applyChannelInput(
+			cluster.channelId,
+			{ type: ChannelInputType.ARRIVED },
+			clock,
+		);
+		expect(d.channels.filter((c) => c.isGoliveWatcher)).toHaveLength(2);
+	});
+
+	it('mọi watcher LIVE + Spotify LIVE → DISTRIBUTED (cluster SKIPPED bỏ qua)', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+		const cluster = d.channels.find((c) => c.isCluster)!;
+		const spotify = d.channels.find((c) => !c.isCluster)!;
+		driveClusterDone(d, cluster.channelId);
+		driveChannelLive(d, spotify.channelId);
+		for (const w of d.channels.filter((c) => c.isGoliveWatcher)) {
+			d.applyChannelInput(w.channelId, { type: ChannelInputType.ARRIVED }, clock);
+		}
+		expect(d.state).toBe(DistributionState.DISTRIBUTED);
+	});
+
+	it('1 watcher rejected → PARTIALLY_DISTRIBUTED (DSP đó ISSUES, còn lại LIVE)', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+		const cluster = d.channels.find((c) => c.isCluster)!;
+		const spotify = d.channels.find((c) => !c.isCluster)!;
+		driveClusterDone(d, cluster.channelId);
+		driveChannelLive(d, spotify.channelId);
+		const watchers = d.channels.filter((c) => c.isGoliveWatcher);
+		d.applyChannelInput(watchers[0].channelId, { type: ChannelInputType.ARRIVED }, clock);
+		d.applyChannelInput(
+			watchers[1].channelId,
+			{ type: ChannelInputType.WAIT_FAIL, ticketRef: 'tk-golive' },
+			clock,
+		);
+		expect(d.state).toBe(DistributionState.PARTIALLY_DISTRIBUTED);
+	});
+
+	it('retry reset cả cluster: watcher ISSUES → xoá watcher + cluster về deliver', () => {
+		const d = Distribution.create(clusterProps());
+		toDelivering(d);
+		const cluster = d.channels.find((c) => c.isCluster)!;
+		const spotify = d.channels.find((c) => !c.isCluster)!;
+		driveClusterDone(d, cluster.channelId);
+		driveChannelLive(d, spotify.channelId);
+		const watchers = d.channels.filter((c) => c.isGoliveWatcher);
+		d.applyChannelInput(watchers[0].channelId, { type: ChannelInputType.ARRIVED }, clock);
+		d.applyChannelInput(
+			watchers[1].channelId,
+			{ type: ChannelInputType.WAIT_FAIL, ticketRef: 'tk-golive' },
+			clock,
+		);
+		expect(d.state).toBe(DistributionState.PARTIALLY_DISTRIBUTED);
+
+		d.resetForRetry({}, new RetryExecutionPolicy(initial), clock);
+
+		expect(d.state).toBe(DistributionState.DELIVERING);
+		// watcher bị xoá sạch (kể cả LIVE) — sẽ fan-out lại khi cluster chạy xong.
+		expect(d.channels.filter((c) => c.isGoliveWatcher)).toHaveLength(0);
+		// cluster revive về stage đầu (deliver → DELIVERING).
+		const clusterAfter = d.channels.find((c) => c.isCluster)!;
+		expect(clusterAfter.state).toBe(ChannelState.DELIVERING);
+		expect(clusterAfter.currentStage?.key).toBe('deliver');
 	});
 });
 
@@ -127,7 +276,7 @@ describe('Distribution aggregate — invariants', () => {
 		d.submit(clock);
 		d.markValidated(initial, false, clock);
 		d.markIdsProvisioned('123456789012', clock);
-		d.markPackageBuilt('bucket/pkg/', initial, clock);
+		d.markPackageBuilt({ SPOTIFY: 'bucket/pkg/' }, initial, clock);
 
 		driveChannelLive(d, d.channels[0].channelId);
 		// second channel fails delivery permanently
@@ -156,7 +305,7 @@ describe('Distribution aggregate — invariants', () => {
 		d.submit(clock);
 		d.markValidated(initial, false, clock);
 		d.markIdsProvisioned('123456789012', clock);
-		d.markPackageBuilt('bucket/pkg/', initial, clock);
+		d.markPackageBuilt({ SPOTIFY: 'bucket/pkg/' }, initial, clock);
 		const ch = d.channels[0].channelId;
 		d.applyChannelInput(ch, { type: ChannelInputType.STEP_DONE }, clock);
 		d.applyChannelInput(
@@ -181,7 +330,7 @@ describe('Distribution aggregate — invariants', () => {
 		d.submit(clock);
 		d.markValidated(initial, false, clock);
 		d.markIdsProvisioned('123456789012', clock);
-		d.markPackageBuilt('bucket/pkg/', initial, clock);
+		d.markPackageBuilt({ SPOTIFY: 'bucket/pkg/' }, initial, clock);
 		const ch = d.channels[0].channelId;
 		const retry = new RetryExecutionPolicy(initial);
 

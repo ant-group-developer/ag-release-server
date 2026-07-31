@@ -27,3 +27,22 @@ export function buildProcessCode(
 	const lane = spec.hasDeal ? 'deal' : 'state51';
 	return `${agg}.${lane}.${suffix}`;
 }
+
+/**
+ * buildClusterProcessCode — process code cho 1 CI CLUSTER channel (shared-stages N DSP).
+ *
+ * Cụm gom mọi DSP cùng aggregator (bất kể deal/state51) → 1 process cluster chạy
+ * deliver/ingest/qa/export MỘT LẦN. Lane (deal/state51) KHÔNG vào process cluster — nó chỉ
+ * ảnh hưởng stage export (distinct-method), xử lý qua members. VD 'ci.cluster.initial'.
+ */
+export function buildClusterProcessCode(
+	aggregatorCode: string,
+	suffix: 'initial' = 'initial',
+): string {
+	return `${aggregatorCode.toLowerCase()}.cluster.${suffix}`;
+}
+
+/** Process code cho 1 go-live watcher per-DSP (spawn sau khi cluster shared xong). */
+export function buildGoliveProcessCode(): string {
+	return 'ci.golive';
+}

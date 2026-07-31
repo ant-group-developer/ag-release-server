@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { ExportMethod } from '../../domain/channel-delivery/channel-delivery-spec';
 import { ChannelInputType } from '../../domain/channel-delivery/channel-interpreter.types';
 import { Exporter } from '../../domain/ports/exporter.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
@@ -45,22 +46,41 @@ export class ExportBatchRunner {
 				`ExportBatchRunner: channel ${payload.channelId} not found`,
 			);
 		}
-		if (!channel.spec.exportMethod) {
-			throw new Error(
-				`ExportBatchRunner: channel ${payload.channelId} missing exportMethod`,
-			);
-		}
 		if (!dist.upc) {
 			throw new Error(
 				`ExportBatchRunner: distribution ${dist.id} missing UPC`,
 			);
 		}
 
-		await this.exporter.export({
-			method: channel.spec.exportMethod,
-			upcs: [dist.upc],
-			key: IdempotencyKey.create(payload.key),
-		});
+		// Cluster CI: 1 channel gom N DSP có thể trộn method (deal + state51). Export chạy 1 lần cho
+		// mỗi DISTINCT method (deal→no-op, state51→email 1 lần list UPC) — vẫn 1 upload trước đó.
+		// Channel thường: dùng spec.exportMethod của chính nó.
+		const methods = channel.isCluster
+			? [
+					...new Set(
+						channel.members
+							.map((m) => m.exportMethod)
+							.filter((m): m is ExportMethod => !!m),
+					),
+				]
+			: channel.spec.exportMethod
+				? [channel.spec.exportMethod]
+				: [];
+
+		if (methods.length === 0) {
+			throw new Error(
+				`ExportBatchRunner: channel ${payload.channelId} missing exportMethod`,
+			);
+		}
+
+		for (const method of methods) {
+			await this.exporter.export({
+				method,
+				upcs: [dist.upc],
+				// key riêng/method để idempotent khi cụm có nhiều method.
+				key: IdempotencyKey.create(`${payload.key}:${method}`),
+			});
+		}
 
 		return {
 			type: 'APPLY_CHANNEL_INPUT',

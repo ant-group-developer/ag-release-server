@@ -73,7 +73,7 @@ export const makeIdsProvisioned = (
 export const makePackageBuilt = (
 	distributionId: string,
 	at: Date,
-	data: { packageUri: string },
+	data: { packageUris: Record<string, string> },
 ): DomainEvent =>
 	makeEvent('PackageBuilt', distributionId, at, {
 		level: 'milestone',
@@ -114,3 +114,22 @@ export const makeRetryReset = (
 
 export const makeTakenDown = (distributionId: string, at: Date): DomainEvent =>
 	makeEvent('TakenDown', distributionId, at, { level: 'milestone' });
+
+/**
+ * WatcherSpawned — 1 go-live watcher per-DSP nở ra sau khi CI cluster xong shared-stages.
+ * Projection map watcher → dsp_code để theo dõi go-live per-DSP. distributionId-level event
+ * (channelId để trống ở cấp distribution; dspCode nằm trong payload).
+ */
+export const makeWatcherSpawned = (
+	distributionId: string,
+	at: Date,
+	data: {
+		clusterChannelId: string;
+		watcherChannelId: string;
+		dspCode: string;
+	},
+): DomainEvent =>
+	makeEvent('WatcherSpawned', distributionId, at, {
+		level: 'milestone',
+		...data,
+	});

@@ -77,6 +77,20 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 		const uploader = new InMemoryPackageUploader();
 		const statusReader = new InMemoryDeliveryStatusReader();
 		const ticketService = new InMemoryTicketService();
+		// Snapshot đã có UPC + track có ISRC → ProvisionIdRunner short-circuit (không gọi gRPC).
+		const snapshotReader = {
+			loadById: (id: string) =>
+				Promise.resolve({
+					id,
+					releaseId: RELEASE_ID,
+					upc: '0123456789012',
+					tracks: [{ id: 'track-1', isrc: 'USABC1234567' }],
+					payload: {
+						upc: '0123456789012',
+						tracks: [{ id: 'track-1', isrc: 'USABC1234567' }],
+					},
+				}),
+		};
 
 		// Handler + runners
 		const handler = new OrchestrateHandler(
@@ -97,7 +111,12 @@ describe('Distribution E2E — SUBMIT → LIVE (spotify.initial)', () => {
 				provisioner,
 				snapshotReader,
 			),
-			[QUEUES.BUILD_PACKAGE]: new BuildPackageRunner(uow, repo, builder),
+			[QUEUES.BUILD_PACKAGE]: new BuildPackageRunner(
+				uow,
+				repo,
+				builder,
+				new DefaultPolicyResolver(),
+			),
 			[QUEUES.SFTP_UPLOAD]: new SftpUploadRunner(
 				uow,
 				repo,

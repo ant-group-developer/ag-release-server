@@ -59,9 +59,10 @@ function buildProps(
 			processCode: 'spotify.initial',
 		},
 		{
-			dspCode: 'CI',
+			// DSP thật qua CI (processCode rỗng → spawn gom thành 1 cluster CI, member = APPLE).
+			dspCode: 'APPLE',
 			topology: ChannelTopology.VIA_AGGREGATOR,
-			processCode: 'ci.deal.initial',
+			processCode: '',
 			aggregatorCode: 'CI',
 			exportMethod: 'CI_DEAL',
 			hasDeal: true,
@@ -192,7 +193,7 @@ describe('TypeOrmDistributionRepository (integration)', () => {
 		dist.submit(clock);
 		dist.markValidated(policy, false, clock); // → PROVISIONING_IDS
 		dist.markIdsProvisioned('123456789012', clock); // → BUILDING_PACKAGE
-		dist.markPackageBuilt('gs://bucket/pkg', policy, clock); // → DELIVERING, spawn channels
+		dist.markPackageBuilt({ SPOTIFY: 'gs://bucket/pkg' }, policy, clock); // → DELIVERING, spawn channels
 		expect(dist.state).toBe(DistributionState.DELIVERING);
 		expect(dist.channels).toHaveLength(2);
 
@@ -208,18 +209,23 @@ describe('TypeOrmDistributionRepository (integration)', () => {
 		expect(loaded!.state).toBe(DistributionState.DELIVERING);
 		expect(loaded!.type).toBe(ExecutionTypeEnum.INITIAL_RELEASE);
 		expect(loaded!.upc).toBe('123456789012');
-		expect(loaded!.packageUri).toBe('gs://bucket/pkg');
+		expect(loaded!.packageUris).toEqual({ SPOTIFY: 'gs://bucket/pkg' });
 		expect(loaded!.version).toBe(1); // INSERT xong DB=1
 		expect(loaded!.channels).toHaveLength(2);
-		// Order: SPOTIFY (spawnOrder=0), CI (spawnOrder=1) — theo channelSpecs
+		// Order: SPOTIFY direct (spawnOrder=0), CI cluster (spawnOrder=1).
 		expect(loaded!.channels[0].spec.dspCode).toBe('SPOTIFY');
-		expect(loaded!.channels[1].spec.dspCode).toBe('CI');
+		expect(loaded!.channels[0].isCluster).toBe(false);
 		expect(loaded!.channels[0].channelId).toBe(`${dist.id}:ch:0`);
-		expect(loaded!.channels[1].channelId).toBe(`${dist.id}:ch:1`);
-		// Spec optional field round-trip
-		expect(loaded!.channels[1].spec.aggregatorCode).toBe('CI');
-		expect(loaded!.channels[1].spec.exportMethod).toBe('CI_DEAL');
-		expect(loaded!.channels[1].spec.hasDeal).toBe(true);
+
+		// channels[1] = CI cluster (gom APPLE). round-trip cluster fields + members.
+		const cluster = loaded!.channels[1];
+		expect(cluster.channelId).toBe(`${dist.id}:ch:1`);
+		expect(cluster.isCluster).toBe(true);
+		expect(cluster.spec.processCode).toBe('ci.cluster.initial');
+		expect(cluster.spec.aggregatorCode).toBe('CI');
+		expect(cluster.members).toEqual([
+			{ dspCode: 'APPLE', exportMethod: 'CI_DEAL', hasDeal: true },
+		]);
 		// Channels ở PENDING sau spawn (chưa apply input)
 		expect(loaded!.channels[0].state).toBe(ChannelState.PENDING);
 	});
