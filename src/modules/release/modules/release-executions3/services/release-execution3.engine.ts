@@ -10,6 +10,7 @@ import { ReleaseExecution3 } from '../entites/release-execution3.entity';
 import {
 	ReleaseExecutionStatus,
 	ReleaseExecutionStepStatus,
+	ReleaseExecutionStepType,
 } from '../enums/release-execution3.enum';
 import { ReleaseExecution3ResultService } from './release-execution3-result.service';
 import { ReleaseExecution3Worker } from './release-execution3.worker';
@@ -365,7 +366,10 @@ export class ReleaseExecutionStepEngine {
 
 		const isParentStep = !!step.childSteps?.length;
 
-		if (isParentStep) {
+		if (
+			isParentStep &&
+			step.type !== ReleaseExecutionStepType.PROCESS_DIRECT_CHILD
+		) {
 			return stepStatus === ReleaseExecutionStepStatus.PROCESSING
 				? ReleaseDspStatus.PROCESSING
 				: null;
