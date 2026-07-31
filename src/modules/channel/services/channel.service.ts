@@ -6,6 +6,9 @@ import { LogModule } from 'src/modules/log/entites/logs.entity';
 import { LogsService } from 'src/modules/log/services/logs.services';
 import { TelegramService } from 'src/modules/notification/services/notification.telegram-service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
+import { TenantUser } from 'src/modules/user/entities/tenant-user.entity';
+import { User } from 'src/modules/user/entities/user.entity';
+import { TenantUserType } from 'src/modules/user/enum/user.enum';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { ChannelException } from '../constants/channel.constant';
@@ -17,6 +20,7 @@ import {
 import { VevoChannelCallbackDto } from '../dto/vevo.dto';
 import { ChannelHistory } from '../entities/channel-history.entity';
 import { Channel } from '../entities/channel.entity';
+import { UserChannel } from '../entities/user-channel.entity';
 import { ChannelStatus } from '../enum/channel.enum';
 import { VevoCreateChannelResponse } from '../interfaces/vevo.interface';
 import { VevoService } from './vevo.service';
@@ -30,6 +34,10 @@ export class ChannelService {
 		private readonly channelRepo: Repository<Channel>,
 		@InjectRepository(ChannelHistory)
 		private readonly channelHistoryRepo: Repository<ChannelHistory>,
+		@InjectRepository(UserChannel)
+		private readonly userChannelRepo: Repository<UserChannel>,
+		@InjectRepository(TenantUser)
+		private readonly tenantUserRepo: Repository<TenantUser>,
 		@InjectDataSource()
 		private readonly dataSource: DataSource,
 		private readonly tenantService: TenantService,
@@ -115,7 +123,11 @@ export class ChannelService {
 		return { received: true, created: true };
 	}
 
-	async getList(query: QueryGetListChannelDto, actorTenantId: string) {
+	async getList(
+		query: QueryGetListChannelDto,
+		actorTenantId: string,
+		userId?: string,
+	) {
 		const onlyActorTenant = query.onlyActorTenant === true;
 		const { status } = query;
 		const qb = this.createDetailQuery(true);
@@ -125,6 +137,24 @@ export class ChannelService {
 			? undefined
 			: await this.getAccessibleTenantIds(actorTenantId);
 
+		// 1. Phân quyền Role của User (Gom điều kiện, loại bỏ nested if)
+		if (checkIsNotSystemTenant(actorTenantId) && userId) {
+			const tenantUser = await this.tenantUserRepo.findOne({
+				where: { userId, tenantId: actorTenantId },
+			});
+
+			if (tenantUser?.type === TenantUserType.MEMBER) {
+				qb.andWhere('channel.isActive = :isActive', { isActive: true });
+				qb.innerJoin(
+					'user_channels',
+					'uc',
+					'uc.channel_id = channel.id AND uc.user_id = :userId',
+					{ userId },
+				);
+			}
+		}
+
+		// 2. Khởi tạo các filter điều kiện tìm kiếm
 		if (query.keyword) {
 			qb.andWhere('channel.name ILIKE :keyword', {
 				keyword: `%${query.keyword}%`,
@@ -135,10 +165,15 @@ export class ChannelService {
 			qb.andWhere('channel.status = :status', { status });
 		}
 
-		if (onlyActorTenant && checkIsNotSystemTenant(actorTenantId)) {
-			qb.andWhere('channel.tenantId = :actorTenantId', {
-				actorTenantId,
+		if (query.isActive !== undefined) {
+			qb.andWhere('channel.isActive = :isActive', {
+				isActive: query.isActive,
 			});
+		}
+
+		// 3. Áp dụng filter Tenant (Giữ nguyên cấu trúc if-else-if độc lập)
+		if (onlyActorTenant && checkIsNotSystemTenant(actorTenantId)) {
+			qb.andWhere('channel.tenantId = :actorTenantId', { actorTenantId });
 		} else if (query.tenantId) {
 			this.ensureTenantAccessible(query.tenantId, tenantIds);
 			qb.andWhere('channel.tenantId = :tenantId', {
@@ -148,6 +183,7 @@ export class ChannelService {
 			qb.andWhere('channel.tenantId IN (:...tenantIds)', { tenantIds });
 		}
 
+		// 4. Order và Phân trang
 		qb.orderBy(`channel.${query.fieldOrder || 'name'}`, query.orderBy)
 			.skip(query.skip)
 			.take(query.limit);
@@ -167,13 +203,14 @@ export class ChannelService {
 	async getListChannelOnlyActorTenant(
 		query: QueryGetListChannelDto,
 		actorTenantId: string,
+		userId?: string,
 	) {
 		const filter = Object.assign(new QueryGetListChannelDto(), query, {
 			onlyActorTenant: true,
 			status: ChannelStatus.SUCCESS,
 		});
 
-		return this.getList(filter, actorTenantId);
+		return this.getList(filter, actorTenantId, userId);
 	}
 
 	async getListSimple(query: QueryGetListChannelDto, actorTenantId: string) {
@@ -234,6 +271,9 @@ export class ChannelService {
 			(dto.name !== undefined && dto.name !== channel.name) ||
 			(dto.tenantId !== undefined && dto.tenantId !== channel.tenantId);
 
+		const isTenantChanged =
+			dto.tenantId !== undefined && dto.tenantId !== channel.tenantId;
+
 		// Snapshot channel cu va update phai thanh cong/that bai cung nhau.
 		await this.dataSource.transaction(async (manager) => {
 			if (hasImportantChange) {
@@ -247,6 +287,11 @@ export class ChannelService {
 				);
 			}
 
+			// Khi chuyển channel sang workspace khác -> xóa toàn bộ quyền/gán truy cập cũ
+			if (isTenantChanged) {
+				await manager.delete(UserChannel, { channelId: id });
+			}
+
 			await manager.update(Channel, id, {
 				...(dto.name !== undefined ? { name: dto.name } : {}),
 				...(dto.tenantId !== undefined
@@ -258,10 +303,113 @@ export class ChannelService {
 				...(dto.thumbUrl !== undefined
 					? { thumbUrl: dto.thumbUrl }
 					: {}),
+				...(dto.isActive !== undefined
+					? { isActive: dto.isActive }
+					: {}),
 			});
 		});
 
 		return this.findOne(id, actorTenantId);
+	}
+
+	async assignUsersToChannel(
+		channelId: string,
+		userIds: string[],
+		actorTenantId: string,
+		creatorId?: string,
+	) {
+		const channel = await this.findOne(channelId, actorTenantId);
+		const targetTenantId =
+			channel.tenantId ||
+			(checkIsNotSystemTenant(actorTenantId) ? actorTenantId : null);
+
+		if (!targetTenantId) {
+			throw ChannelException.TENANT_NOT_SET();
+		}
+
+		// 1. Kiểm tra danh sách User tồn tại trong hệ thống
+		const existingUsers = await this.dataSource.getRepository(User).find({
+			where: { id: In(userIds) },
+		});
+		if (!existingUsers.length) return;
+
+		// 2. Lấy danh sách các user đã được gán sẵn để tránh gán trùng
+		const validUserIds = existingUsers.map((u) => u.id);
+		const alreadyAssigned = await this.userChannelRepo.find({
+			where: { channelId, userId: In(validUserIds) },
+		});
+
+		const assignedSet = new Set(alreadyAssigned.map((uc) => uc.userId));
+		const newUsersToAssign = validUserIds.filter(
+			(id) => !assignedSet.has(id),
+		);
+		if (!newUsersToAssign.length) return;
+
+		// 3. Tiến hành gán user
+		const validCreatorId =
+			creatorId && checkIsNotSystemTenant(creatorId) ? creatorId : null;
+		const records = newUsersToAssign.map((userId) =>
+			this.userChannelRepo.create({
+				channelId,
+				userId,
+				tenantId: targetTenantId,
+				creatorId: validCreatorId,
+			}),
+		);
+
+		await this.userChannelRepo.save(records);
+	}
+
+	async removeUserFromChannel(id: string, actorTenantId: string) {
+		// 1. Tìm thông tin record định xoá
+		const userChannel = await this.userChannelRepo.findOne({
+			where: { id },
+		});
+		if (!userChannel) return;
+
+		// 2. Lấy danh sách quyền và đối chiếu với tenantId của cái userChannel kia
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		this.ensureTenantAccessible(userChannel.tenantId, tenantIds);
+
+		// 3. Xoá an toàn
+		await this.userChannelRepo.delete({ id });
+	}
+
+	async getUsersInChannel(channelId: string, actorTenantId: string) {
+		await this.findOne(channelId, actorTenantId);
+
+		const assignedUserChannels = await this.userChannelRepo.find({
+			where: { channelId },
+			relations: { user: true },
+		});
+
+		return assignedUserChannels
+			.filter((uc) => uc.user)
+			.map((uc) => ({
+				...uc,
+				user: {
+					id: uc.user.id,
+					name: uc.user.name,
+					email: uc.user.email,
+					avatar: uc.user.avatar,
+					type: uc.user.type,
+					isActive: uc.user.isActive,
+					lastLogin: uc.user.lastLogin,
+					lastActive: uc.user.lastActive,
+				},
+			}));
+	}
+
+	async getUserChannels(userId: string, actorTenantId: string) {
+		const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
+		const userChannels = await this.userChannelRepo.find({
+			where: {
+				userId,
+				...(tenantIds ? { tenantId: In(tenantIds) } : {}),
+			},
+			relations: { channel: true },
+		});
+		return userChannels.filter((uc) => uc.channel && uc.channel.isActive);
 	}
 
 	async remove(id: string, actorTenantId: string) {

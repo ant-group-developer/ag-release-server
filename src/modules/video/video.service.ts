@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AppConfigService } from 'src/modules/app-config/app-config.service';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { IsrcService } from 'src/modules/external/isrc/isrc.service';
+import { ReleaseDspDelivery } from 'src/modules/release/entities/release-dsp-delivery.entity';
+import { ReleaseDspStatus } from 'src/modules/release/enum/release-dsp.enum';
 import { ReleaseLogService } from 'src/modules/release/modules/release-log/services/release-log.service';
-import { ILike, Repository } from 'typeorm';
+import { DataSource, ILike, In, Repository } from 'typeorm';
+import { VideoException } from './constants/video.constant';
 import {
 	CreateVideoDto,
 	UpdateVideoDto,
@@ -27,6 +30,9 @@ export class VideoService {
 
 		@InjectRepository(Channel)
 		private readonly channelRepo: Repository<Channel>,
+
+		@InjectDataSource()
+		private readonly dataSource: DataSource,
 
 		private readonly isrcService: IsrcService,
 		private readonly appConfigService: AppConfigService,
@@ -53,6 +59,23 @@ export class VideoService {
 					releaseId,
 				}),
 			);
+		}
+
+		const isChannelChanging =
+			dto.channelId !== undefined && dto.channelId !== video.channelId;
+		const isIsrcChanging =
+			dto.isrc !== undefined && dto.isrc !== video.isrc;
+
+		if (isChannelChanging || isIsrcChanging) {
+			const isSent = await this.isMetadataSentToVevo(releaseId);
+			if (isSent) {
+				if (isChannelChanging) {
+					throw VideoException.CANNOT_CHANGE_CHANNEL_AFTER_VEVO_SENT();
+				}
+				if (isIsrcChanging) {
+					throw VideoException.CANNOT_CHANGE_ISRC_AFTER_VEVO_SENT();
+				}
+			}
 		}
 
 		Object.assign(video, {
@@ -144,6 +167,23 @@ export class VideoService {
 	async update(id: string, dto: UpdateVideoDto) {
 		await this.ensureChannel(dto.channelId);
 		const video = await this.findOne(id);
+
+		const isChannelChanging =
+			dto.channelId !== undefined && dto.channelId !== video.channelId;
+		const isIsrcChanging =
+			dto.isrc !== undefined && dto.isrc !== video.isrc;
+
+		if (isChannelChanging || isIsrcChanging) {
+			const isSent = await this.isMetadataSentToVevo(video.releaseId);
+			if (isSent) {
+				if (isChannelChanging) {
+					throw VideoException.CANNOT_CHANGE_CHANNEL_AFTER_VEVO_SENT();
+				}
+				if (isIsrcChanging) {
+					throw VideoException.CANNOT_CHANGE_ISRC_AFTER_VEVO_SENT();
+				}
+			}
+		}
 
 		Object.assign(video, dto);
 
@@ -278,6 +318,25 @@ export class VideoService {
 			videoId: result.id,
 			updated: operation === 'delete' || !!externalId,
 		};
+	}
+
+	private async isMetadataSentToVevo(releaseId: string): Promise<boolean> {
+		const delivery = await this.dataSource
+			.getRepository(ReleaseDspDelivery)
+			.findOne({
+				where: {
+					releaseId,
+					dsp: { code: 'VEVO' },
+					status: In([
+						ReleaseDspStatus.PROCESSING,
+						ReleaseDspStatus.ISSUES,
+						ReleaseDspStatus.DISTRIBUTED,
+						ReleaseDspStatus.TAKEN_DOWN,
+					]),
+				},
+				relations: { dsp: true },
+			});
+		return !!delivery;
 	}
 
 	private async ensureChannel(channelId?: string | null) {

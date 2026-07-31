@@ -53,4 +53,13 @@ export class ChannelException {
 			data,
 		});
 	}
+
+	static TENANT_NOT_SET() {
+		return new ResponseError({
+			statusCode: 400,
+			message:
+				'Kênh chưa được gán vào Workspace nào. Vui lòng cập nhật Workspace cho kênh trước khi gán thành viên.',
+			messageCode: 'channel.tenant_not_set',
+		});
+	}
 }

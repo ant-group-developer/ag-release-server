@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+	ArrayNotEmpty,
+	IsArray,
 	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
@@ -54,6 +56,15 @@ export class CreateChannelDto {
 	thumbUrl?: string;
 
 	@ApiPropertyOptional({
+		example: true,
+		description:
+			'Trạng thái hoạt động của kênh (true: active, false: inactive)',
+	})
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean;
+
+	@ApiPropertyOptional({
 		example: false,
 		description:
 			'Set true when the channel already exists in Vevo Backstage. The server will only create the local DB record and will not call Vevo.',
@@ -71,11 +82,31 @@ export class QueryGetListChannelDto extends BaseQueryDto {
 	@IsString()
 	fieldOrder: string = 'name';
 
+	@IsOptional()
+	@IsUUID()
 	tenantId?: string;
 
 	@IsOptional()
 	@IsEnum(ChannelStatus)
 	status?: ChannelStatus;
 
+	@IsOptional()
+	@Transform(({ value }) => value === true || value === 'true')
+	@IsBoolean()
+	isActive?: boolean;
+
 	onlyActorTenant?: boolean;
+}
+
+export class AssignUsersToChannelDto {
+	@ApiProperty({
+		description:
+			'Danh sách ID của các user thuộc workspace được gán vào kênh',
+		type: [String],
+		example: ['d290f1ee-6c54-4b01-90e6-d701748f0851'],
+	})
+	@IsArray()
+	@ArrayNotEmpty()
+	@IsUUID('all', { each: true })
+	userIds: string[];
 }
