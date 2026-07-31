@@ -77,6 +77,14 @@ export class CreateVideoDto {
 	)
 	label?: string | null;
 
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsString()
+	@Transform(({ value }: { value: undefined | string }) =>
+		value === undefined ? null : value,
+	)
+	labelId?: string | null;
+
 	@ApiPropertyOptional({ default: false })
 	@IsOptional()
 	@IsBoolean()

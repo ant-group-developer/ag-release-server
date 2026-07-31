@@ -2,6 +2,7 @@ import { COMMENT_FOR_NULLABLE_DRAFT } from 'src/common/constants/common.default.
 import { BaseUserTrackedUUIDEntity } from 'src/common/entities/user-tracked.entity';
 import { FileEntity } from 'src/modules/bucket2/entities/bucket.file.entity';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
+import { Label } from 'src/modules/label/entities/label.entity';
 import { Release } from 'src/modules/release/entities/release.entity';
 import { VideoArtist } from 'src/modules/video-artist/entities/video-artist.entity';
 import { VideoContributor } from 'src/modules/video-contributor/entities/video-contributor.entity';
@@ -90,6 +91,20 @@ export class Video extends BaseUserTrackedUUIDEntity {
 			COMMENT_FOR_NULLABLE_DRAFT,
 	})
 	label: string | null;
+
+	@Column({
+		type: 'varchar',
+		length: 50,
+		name: 'label_id',
+		nullable: true,
+		comment:
+			'ID nhãn đĩa trỏ sang bảng labels' + COMMENT_FOR_NULLABLE_DRAFT,
+	})
+	labelId: string | null;
+
+	@ManyToOne(() => Label, { onDelete: 'RESTRICT' })
+	@JoinColumn({ name: 'label_id' })
+	labelEntity: Label | null;
 
 	@Column({
 		type: 'boolean',

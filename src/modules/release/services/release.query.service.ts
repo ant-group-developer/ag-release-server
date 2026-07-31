@@ -368,8 +368,9 @@ export class ReleaseQueryService {
 			)
 			.leftJoin('release.timeZone', 'timeZone')
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
-			.leftJoin('release.video', 'video')
-			.leftJoin('video.channel', 'videoChannel')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.channel', 'videoChannel')
+			.leftJoinAndSelect('video.labelEntity', 'videoLabel')
 			.leftJoin('video.videoFile', 'videoFile')
 			.leftJoin('release.captions', 'releaseCaptions')
 			.leftJoin('releaseCaptions.file', 'releaseCaptionFile')
@@ -518,6 +519,7 @@ export class ReleaseQueryService {
 				'video.isrc',
 				'video.externalId',
 				'video.label',
+				'video.labelId',
 				'video.explicit',
 				'video.aiContent',
 				'video.channelId',
@@ -539,6 +541,7 @@ export class ReleaseQueryService {
 				'videoFile.fileSize',
 				'videoFile.contentType',
 			])
+			.addSelect(['videoLabel.id', 'videoLabel.name'])
 			.addSelect([
 				'releaseCaptions.id',
 				'releaseCaptions.releaseId',
@@ -1932,6 +1935,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.channel', 'videoChannel')
+			.leftJoinAndSelect('video.labelEntity', 'videoLabel')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
 			.leftJoinAndSelect('release.captions', 'releaseCaptions')
 			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')
