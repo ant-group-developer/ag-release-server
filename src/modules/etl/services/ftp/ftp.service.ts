@@ -26,7 +26,9 @@ export interface FtpRemoteFolderFiles {
 export interface FtpRemoteCategoryFiles {
 	category: string;
 	periodCount: number;
+	periods: string[];
 	folders: FtpRemoteFolderFiles[];
+	failedPaths: string[];
 }
 
 @Injectable()
@@ -210,55 +212,65 @@ export class FtpService {
 	 */
 	async listAllRemoteReportFiles(
 		categories: string[],
+		minimumPeriods: Record<string, string | undefined> = {},
 	): Promise<FtpRemoteCategoryFiles[]> {
 		const results: FtpRemoteCategoryFiles[] = [];
 		for (const category of categories) {
-			results.push(await this.listRemoteReportFilesForCategory(category));
+			results.push(await this.listRemoteReportFilesForCategory(category, minimumPeriods[category]));
 		}
 		return results;
 	}
 
 	private async listRemoteReportFilesForCategory(
 		category: string,
+		minimumPeriod?: string,
 	): Promise<FtpRemoteCategoryFiles> {
 		const config = this.getConfig();
-		const client = await this.connect();
 		const folders: FtpRemoteFolderFiles[] = [];
-		try {
-			const periodEntries = await client.list(`${config.basePath}/${category}`);
-			const periods = periodEntries
+		const failedPaths: string[] = [];
+		const periodEntries = await this.withFreshDiscoveryClientRetry(
+			`discovery category ${category}`,
+			(client) => client.list(`${config.basePath}/${category}`),
+		);
+			const allPeriods = periodEntries
 				.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))
 				.sort((left, right) => right.name.localeCompare(left.name));
-			this.logger.log(`FTP discovery: ${category} has ${periods.length} periods; scanning newest first`);
+			const periods = minimumPeriod
+				? allPeriods.filter((item) => item.name >= minimumPeriod)
+				: allPeriods;
+			this.logger.log(`FTP discovery: ${category} has ${allPeriods.length} periods; scanning ${periods.length}${minimumPeriod ? ` from ${minimumPeriod}` : ' (full history)'} newest first`);
 			for (const periodEntry of periods) {
 				const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
-				let folderEntries: ftp.FileInfo[] = [];
-				try { folderEntries = await client.list(periodPath); } catch (error) {
+				try {
+					const scan = await this.withFreshDiscoveryClientRetry(
+						`discovery period ${category}/${periodEntry.name}`,
+						async (client) => {
+							const folderEntries = await client.list(periodPath);
+							const periodFolders: FtpRemoteFolderFiles[] = [];
+							let periodFiles = 0;
+							for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
+								const folderPath = `${periodPath}/${folderEntry.name}`;
+								const files = await this.listFilesRecursive(client, folderPath, '', undefined, false);
+								periodFiles += files.length;
+								periodFolders.push({
+									category, period: periodEntry.name, dspFolder: folderEntry.name,
+									files: files.sort(),
+								});
+							}
+							return { folderCount: folderEntries.filter((item) => item.isDirectory).length, periodFiles, periodFolders };
+						},
+					);
+					folders.push(...scan.periodFolders);
+					this.logger.log(`FTP discovery: ${category}/${periodEntry.name} scanned ${scan.folderCount} folders, ${scan.periodFiles} files`);
+				} catch (error) {
 					this.logger.warn(`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`);
-					continue;
+					failedPaths.push(`${category}/${periodEntry.name}`);
 				}
-				let periodFiles = 0;
-				for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
-					const folderPath = `${periodPath}/${folderEntry.name}`;
-					try {
-						const files = await this.listFilesRecursive(client, folderPath, '', undefined, false);
-						periodFiles += files.length;
-						folders.push({
-							category, period: periodEntry.name, dspFolder: folderEntry.name,
-							files: files.sort(),
-						});
-					} catch (error) {
-						this.logger.warn(`Cannot list discovery folder ${category}/${periodEntry.name}/${folderEntry.name}: ${error.message}`);
-					}
-				}
-				this.logger.log(`FTP discovery: ${category}/${periodEntry.name} scanned ${folderEntries.filter((item) => item.isDirectory).length} folders, ${periodFiles} files`);
 			}
 			const fileCount = folders.reduce((total, folder) => total + folder.files.length, 0);
-			this.logger.log(`FTP discovery: ${category} completed ${periods.length} periods, ${folders.length} folders, ${fileCount} files`);
-			return { category, periodCount: periods.length, folders };
-		} finally {
-			client.close();
-		}
+			const suffix = failedPaths.length ? `, ${failedPaths.length} path(s) failed after retries` : '';
+			this.logger.log(`FTP discovery: ${category} completed ${periods.length} periods, ${folders.length} folders, ${fileCount} files${suffix}`);
+			return { category, periodCount: periods.length, periods: periods.map((item) => item.name), folders, failedPaths };
 	}
 
 	/**
@@ -273,7 +285,7 @@ export class FtpService {
 		fileSelector?: (relativePath: string) => boolean,
 		applyGlobalExcludes = true,
 	): Promise<string[]> {
-		const list = await client.list(remotePath);
+		const list = await this.listDirectoryWithRetry(client, remotePath, `directory ${remotePath}`);
 		const files: string[] = [];
 
 		for (const item of list) {
@@ -306,6 +318,56 @@ export class FtpService {
 		}
 
 		return files;
+	}
+
+	private async listDirectoryWithRetry(
+		client: ftp.Client,
+		remotePath: string,
+		label: string,
+		maxAttempts = 3,
+	): Promise<ftp.FileInfo[]> {
+		let lastError: Error | null = null;
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			try {
+				return await client.list(remotePath);
+			} catch (error) {
+				lastError = error as Error;
+				if (this.isDisconnected(lastError)) throw lastError;
+				if (attempt === maxAttempts) break;
+				const delayMs = attempt * 750;
+				this.logger.warn(`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; retrying in ${delayMs}ms`);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+			}
+		}
+		throw lastError || new Error(`Unable to list FTP ${label}`);
+	}
+
+	private async withFreshDiscoveryClientRetry<T>(
+		label: string,
+		action: (client: ftp.Client) => Promise<T>,
+		maxAttempts = 3,
+	): Promise<T> {
+		let lastError: Error | null = null;
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			let client: ftp.Client | null = null;
+			try {
+				client = await this.connect();
+				return await action(client);
+			} catch (error) {
+				lastError = error as Error;
+				if (attempt === maxAttempts) break;
+				const delayMs = attempt * 750;
+				this.logger.warn(`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; reconnecting in ${delayMs}ms`);
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+			} finally {
+				client?.close();
+			}
+		}
+		throw lastError || new Error(`Unable to list FTP ${label}`);
+	}
+
+	private isDisconnected(error: Error): boolean {
+		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(error.message);
 	}
 
 	/**

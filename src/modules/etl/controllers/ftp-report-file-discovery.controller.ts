@@ -1,8 +1,9 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../clickhouse';
+import { FtpSourceCategory } from '../../dsp-report/dto/ftp-parser-config.dto';
 import { FtpReportFileDiscoveryService } from '../services/ftp/ftp-report-file-discovery.service';
 
 class UpdateFtpReportFileDiscoveryConfigDto {
@@ -12,6 +13,32 @@ class UpdateFtpReportFileDiscoveryConfigDto {
 	@IsOptional()
 	@IsBoolean()
 	isEnabled?: boolean = true;
+
+	@ApiPropertyOptional({ default: false, description: 'When true, every scheduled run scans all remote periods. Keep false for incremental scans.' })
+	@IsOptional()
+	@IsBoolean()
+	force?: boolean = false;
+
+	@ApiPropertyOptional({ enum: FtpSourceCategory, isArray: true, description: 'Categories used by the scheduled scan. Empty or omitted means all categories.' })
+	@IsOptional()
+	@IsArray()
+	@ArrayUnique()
+	@IsEnum(FtpSourceCategory, { each: true })
+	categories?: FtpSourceCategory[];
+}
+
+class RunFtpReportFileDiscoveryDto {
+	@ApiPropertyOptional({ default: false, description: 'False scans only the newest already-scanned period plus newer periods. True scans all history and refreshes discovered catalog entries.' })
+	@IsOptional()
+	@IsBoolean()
+	force?: boolean = false;
+
+	@ApiPropertyOptional({ enum: FtpSourceCategory, isArray: true, description: 'Only scan these categories. Omit to scan all categories.' })
+	@IsOptional()
+	@IsArray()
+	@ArrayUnique()
+	@IsEnum(FtpSourceCategory, { each: true })
+	categories?: FtpSourceCategory[];
 }
 
 class ResetFtpReportFileDiscoveryDto {
@@ -31,7 +58,9 @@ export class FtpReportFileDiscoveryController {
 	constructor(private readonly service: FtpReportFileDiscoveryService, private readonly clickHouseService: ClickHouseService) {}
 
 	@Post('run')
-	async run(): Promise<ResponseSuccess<unknown>> { return new ResponseSuccess({ data: await this.service.start() }); }
+	async run(@Body() dto: RunFtpReportFileDiscoveryDto): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({ data: await this.service.start(dto.force ?? false, dto.categories) });
+	}
 
 	@Post('reset')
 	async reset(@Body() dto: ResetFtpReportFileDiscoveryDto): Promise<ResponseSuccess<unknown>> {
@@ -56,7 +85,7 @@ export class FtpReportFileDiscoveryController {
 
 	@Put('config')
 	async updateConfig(@Body() dto: UpdateFtpReportFileDiscoveryConfigDto): Promise<ResponseSuccess<unknown>> {
-		return new ResponseSuccess({ data: await this.service.setConfig(dto.cron, dto.isEnabled ?? true) });
+		return new ResponseSuccess({ data: await this.service.setConfig(dto.cron, dto.isEnabled ?? true, dto.force ?? false, dto.categories ?? []) });
 	}
 
 	@Get('catalog')
