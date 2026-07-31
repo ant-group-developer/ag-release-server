@@ -98,6 +98,7 @@ export class VideoService {
 					label: true,
 				},
 				channel: true,
+				labelEntity: true,
 				videoFile: true,
 				videoArtists: {
 					artist: true,
@@ -179,8 +180,7 @@ export class VideoService {
 			});
 		}
 
-		const registrantName =
-			video.label?.trim() || video.release?.label?.name || '';
+		const registrantName = video.labelEntity?.name?.trim() ?? '';
 		if (!registrantName) {
 			this.releaseLogService.failed({
 				releaseId: video.releaseId,
