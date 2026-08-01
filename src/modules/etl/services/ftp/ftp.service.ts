@@ -366,6 +366,15 @@ export class FtpService {
 		throw lastError || new Error(`Unable to list FTP ${label}`);
 	}
 
+	async downloadDiscoverySampleFile(category: string, period: string, dspFolder: string, relativePath: string, localPath: string): Promise<void> {
+		const config = this.getConfig();
+		fs.mkdirSync(path.dirname(localPath), { recursive: true });
+		await this.withFreshDiscoveryClientRetry(
+			`discovery sample ${category}/${period}/${dspFolder}/${relativePath}`,
+			(client) => client.downloadTo(localPath, `${config.basePath}/${category}/${period}/${dspFolder}/${relativePath}`),
+		);
+	}
+
 	private isDisconnected(error: Error): boolean {
 		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(error.message);
 	}

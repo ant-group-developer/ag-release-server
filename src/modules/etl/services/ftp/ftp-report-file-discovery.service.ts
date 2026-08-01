@@ -1,12 +1,17 @@
 import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { createHash } from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseMigrationService, ClickHouseService } from '../../../clickhouse';
 import { FtpSourceCategory } from '../../../dsp-report/dto/ftp-parser-config.dto';
 import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
 import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-config.service';
 import { FtpService } from './ftp.service';
+import { BucketR2Service } from '../../../bucket2/services/bucket-r2.service';
 
 const CATEGORIES = Object.values(FtpSourceCategory);
 const JOB_NAME = 'ftp-report-file-discovery';
@@ -17,6 +22,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 	private running = false;
 	private scheduledCron = '';
 	private configRefreshTimer: NodeJS.Timeout | null = null;
+	private sampleWorkerTimer: NodeJS.Timeout | null = null;
 
 	constructor(
 		private readonly ftpService: FtpService,
@@ -25,6 +31,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		private readonly clickHouseService: ClickHouseService,
 		private readonly migrationService: ClickHouseMigrationService,
 		private readonly schedulerRegistry: SchedulerRegistry,
+		private readonly bucketR2Service: BucketR2Service,
 	) {}
 
 	onModuleInit(): void {
@@ -36,10 +43,12 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 
 	onModuleDestroy(): void {
 		if (this.configRefreshTimer) clearInterval(this.configRefreshTimer);
+		if (this.sampleWorkerTimer) clearInterval(this.sampleWorkerTimer);
 	}
 
-	async start(force = false, categories: FtpSourceCategory[] = CATEGORIES): Promise<{ id: string; status: 'running'; force: boolean; categories: FtpSourceCategory[] }> {
+	async start(force = false, requestedCategories?: string[]): Promise<{ id: string; status: 'running'; force: boolean; categories: FtpSourceCategory[] }> {
 		if (this.running) throw new Error('FTP report-file discovery is already running');
+		const categories = this.resolveCategories(requestedCategories);
 		if (!categories.length) throw new BadRequestException('At least one FTP source category is required');
 		this.running = true;
 		const id = uuidv4();
@@ -132,7 +141,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		return result;
 	}
 
-	async getConfig(): Promise<{ cron: string; isEnabled: boolean; force: boolean; categories: FtpSourceCategory[] }> {
+	async getConfig(): Promise<{ cron: string; isEnabled: boolean; force: boolean; categories: string[] }> {
 		const rows = await this.clickHouseService.query<any>(
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_DISCOVERY_CONFIG} FINAL WHERE id = 'default' LIMIT 1`,
 		);
@@ -140,11 +149,11 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			cron: rows[0]?.cron || '0 1 * * *',
 			isEnabled: Number(rows[0]?.is_enabled ?? 1) === 1,
 			force: Number(rows[0]?.force ?? 0) === 1,
-			categories: (rows[0]?.source_categories || []) as FtpSourceCategory[],
+			categories: (rows[0]?.source_categories || []) as string[],
 		};
 	}
 
-	async setConfig(cron: string, isEnabled: boolean, force = false, categories: FtpSourceCategory[] = []): Promise<{ cron: string; isEnabled: boolean; force: boolean; categories: FtpSourceCategory[] }> {
+	async setConfig(cron: string, isEnabled: boolean, force = false, categories: string[] = []): Promise<{ cron: string; isEnabled: boolean; force: boolean; categories: string[] }> {
 		try { new CronJob(cron, () => undefined); } catch { throw new BadRequestException('cron must be a valid cron expression'); }
 		await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_FILE_DISCOVERY_CONFIG, [{
 			id: 'default', cron, is_enabled: isEnabled ? 1 : 0, force: force ? 1 : 0, source_categories: categories,
@@ -192,10 +201,11 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			);
 			const existingFirstSeen = new Map(existing.map((row) => [`${row.source_category}|${row.dsp_folder}|${row.file_name_pattern}|${row.period}`, row.first_seen_at]));
 			const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+			const sampleTaskCount = await this.enqueueRepresentativeSamples(id, periodObservations);
 			const periodRows = Array.from(periodObservations.values()).map((item) => ({
 				source: 'ftp', source_category: item.category, dsp_folder: item.folder,
 				file_name_pattern: item.pattern, period: item.period,
-				sample_file_paths: Array.from(item.files).sort().slice(0, 20), observed_file_count: item.files.size,
+				sample_file_paths: Array.from(item.files).sort().slice(0, 20), sample_file_refs: [], observed_file_count: item.files.size,
 				first_seen_at: existingFirstSeen.get(`${item.category}|${item.folder}|${item.pattern}|${item.period}`) || now,
 				last_seen_at: now, last_scan_id: id, updated_at: now,
 			}));
@@ -220,7 +230,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			const categorySummary = categoryScans
 				.map((scan) => `${scan.category}=${scan.folders.length} folders`)
 				.join(', ');
-			const message = `FTP discovery ${status}: ${periods.size} periods, ${folders} folders, ${files} files, ${catalogRows.length} patterns (${categorySummary})`;
+			const message = `FTP discovery ${status}: ${periods.size} periods, ${folders} folders, ${files} files, ${catalogRows.length} patterns, ${sampleTaskCount} sample tasks (${categorySummary})`;
 			if (failedPaths.length) this.logger.warn(`${message}; ${errorMessage}`);
 			else this.logger.log(message);
 		} catch (error) {
@@ -237,6 +247,9 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		await this.refreshSchedule();
 		this.configRefreshTimer = setInterval(() => void this.refreshSchedule(), 60_000);
 		this.configRefreshTimer.unref();
+		this.sampleWorkerTimer = setInterval(() => void this.processSampleTasks(), 5_000);
+		this.sampleWorkerTimer.unref();
+		void this.processSampleTasks();
 	}
 
 	private async refreshSchedule(): Promise<void> {
@@ -247,7 +260,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		if (this.schedulerRegistry.getCronJobs().has(JOB_NAME)) this.schedulerRegistry.deleteCronJob(JOB_NAME);
 		this.scheduledCron = next;
 		if (!next) { this.logger.log('FTP report-file discovery schedule disabled'); return; }
-		const job = new CronJob(next, () => void this.start(config.force, config.categories.length ? config.categories : CATEGORIES).catch((error) => this.logger.error(`Scheduled FTP discovery failed: ${error.message}`, error.stack)), null, false, 'Asia/Ho_Chi_Minh');
+		const job = new CronJob(next, () => void this.start(config.force, config.categories).catch((error) => this.logger.error(`Scheduled FTP discovery failed: ${error.message}`, error.stack)), null, false, 'Asia/Ho_Chi_Minh');
 		this.schedulerRegistry.addCronJob(JOB_NAME, job); job.start();
 		this.logger.log(`FTP report-file discovery scheduled: ${next}`);
 	}
@@ -257,6 +270,13 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			`SELECT source_category, last_completed_period FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_DISCOVERY_CHECKPOINTS} FINAL WHERE source = 'ftp'`,
 		);
 		return new Map(rows.filter((row) => row.last_completed_period).map((row) => [row.source_category, row.last_completed_period]));
+	}
+
+	private resolveCategories(requested?: string[]): FtpSourceCategory[] {
+		if (!requested?.length || requested.includes('all')) return CATEGORIES;
+		const categories = requested.filter((category): category is FtpSourceCategory => CATEGORIES.includes(category as FtpSourceCategory));
+		if (!categories.length) throw new BadRequestException('At least one valid FTP source category is required');
+		return [...new Set(categories)];
 	}
 
 	private async saveCheckpoints(
@@ -301,11 +321,14 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			const key = `${item.source_category}|${item.dsp_folder}|${item.file_name_pattern}`;
 			const current = catalog.get(key) || {
 				source: 'ftp', source_category: item.source_category, dsp_folder: item.dsp_folder,
-				file_name_pattern: item.file_name_pattern, sample_file_paths: new Set<string>(),
+				file_name_pattern: item.file_name_pattern, sample_file_paths: new Set<string>(), sample_file_refs: new Map<string, string>(),
 				observed_file_count: 0, observed_period_count: 0, first_seen_at: item.first_seen_at,
 				last_seen_at: item.last_seen_at, last_scan_id: item.last_scan_id, updated_at: item.updated_at,
 			};
 			for (const sample of item.sample_file_paths || []) current.sample_file_paths.add(sample);
+			for (const rawRef of item.sample_file_refs || []) {
+				try { const ref = JSON.parse(rawRef); if (ref.r2Key) current.sample_file_refs.set(ref.r2Key, rawRef); } catch { /* ignore malformed legacy sample ref */ }
+			}
 			current.observed_file_count += Number(item.observed_file_count || 0);
 			current.observed_period_count += 1;
 			if (item.first_seen_at < current.first_seen_at) current.first_seen_at = item.first_seen_at;
@@ -318,7 +341,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		}
 		const rows = Array.from(catalog.values()).map((item) => ({
 			...item,
-			sample_file_paths: Array.from(item.sample_file_paths).sort().slice(0, 20),
+			sample_file_paths: Array.from(item.sample_file_paths).sort().slice(0, 20), sample_file_refs: Array.from(item.sample_file_refs.values()).slice(0, 2),
 		}));
 		await this.clickHouseService.execute(
 			`ALTER TABLE ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} DELETE WHERE source = 'ftp'`,
@@ -329,6 +352,86 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 		);
 		if (rows.length) await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG, rows);
 		return rows;
+	}
+
+	private async enqueueRepresentativeSamples(runId: string, observations: Map<string, { category: FtpSourceCategory; folder: string; pattern: string; period: string; files: Set<string> }>): Promise<number> {
+		const catalog = await this.clickHouseService.query<any>(`SELECT source_category, dsp_folder, file_name_pattern, sample_file_refs FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = 'ftp'`);
+		const existingTasks = await this.clickHouseService.query<{ id: string; status: string }>(`SELECT id, status FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL WHERE source = 'ftp'`);
+		const existingTaskIds = new Set(existingTasks.filter((task) => ['pending', 'processing', 'completed'].includes(task.status)).map((task) => task.id));
+		const completed = new Set(catalog.filter((r) => (r.sample_file_refs || []).length >= 2).map((r) => `${r.source_category}|${r.dsp_folder}|${r.file_name_pattern}`));
+		const tasks: any[] = [];
+		const chosen = new Map<string, number>();
+		for (const item of Array.from(observations.values()).sort((a, b) => b.period.localeCompare(a.period))) {
+			const key = `${item.category}|${item.folder}|${item.pattern}`;
+			if (completed.has(key) || (chosen.get(key) || 0) >= 2) continue;
+			for (const file of Array.from(item.files).sort()) {
+				if ((chosen.get(key) || 0) >= 2) break;
+				const id = createHash('sha1').update(`${key}|${item.period}|${file}`).digest('hex');
+				if (existingTaskIds.has(id)) continue;
+				tasks.push({ id, source: 'ftp', source_category: item.category, dsp_folder: item.folder, file_name_pattern: item.pattern, period: item.period, ftp_path: file, status: 'pending', attempt: 0, error_message: '', r2_key: '', created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') });
+				chosen.set(key, (chosen.get(key) || 0) + 1);
+			}
+		}
+		if (tasks.length) await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS, tasks);
+		return tasks.length;
+	}
+
+	private async processSampleTasks(): Promise<void> {
+		if (process.env.APP_ROLE !== 'worker') return;
+		const tasks = await this.clickHouseService.query<any>(`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL WHERE status IN ('pending','failed') AND attempt < 3 ORDER BY created_at LIMIT 2`);
+		await Promise.all(tasks.map((task) => this.processSampleTask(task)));
+	}
+
+	private async processSampleTask(task: any): Promise<void> {
+		const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+		try {
+			await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS, [{ ...task, status: 'processing', attempt: Number(task.attempt) + 1, updated_at: now() }]);
+			const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ftp-sample-task-'));
+			try {
+				const localPath = path.join(tempDir, createHash('sha1').update(task.id).digest('hex'));
+				await this.ftpService.downloadDiscoverySampleFile(task.source_category, task.period, task.dsp_folder, task.ftp_path, localPath);
+				const key = `ftp-report-samples/${task.source_category}/${task.dsp_folder}/${task.id}/${encodeURIComponent(path.basename(task.ftp_path))}`;
+				await this.bucketR2Service.uploadFileFromPath({ key, filePath: localPath, contentType: 'application/octet-stream', isPublic: false });
+				await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS, [{ ...task, status: 'completed', attempt: Number(task.attempt) + 1, r2_key: key, error_message: '', updated_at: now() }]);
+			} finally { await fs.promises.rm(tempDir, { recursive: true, force: true }); }
+		} catch (error) { await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS, [{ ...task, status: 'failed', attempt: Number(task.attempt) + 1, error_message: error.message, updated_at: now() }]); }
+	}
+
+	private async uploadRepresentativeSamples(observations: Map<string, { category: FtpSourceCategory; folder: string; pattern: string; period: string; files: Set<string> }>): Promise<Map<string, string[]>> {
+		const selected = new Map<string, Array<{ periodKey: string; category: FtpSourceCategory; folder: string; period: string; file: string }>>();
+		const existing = await this.clickHouseService.query<any>(
+			`SELECT source_category, dsp_folder, file_name_pattern, sample_file_refs FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = 'ftp'`,
+		);
+		const existingRefs = new Map(existing.map((row) => [`${row.source_category}|${row.dsp_folder}|${row.file_name_pattern}`, row.sample_file_refs || []]));
+		const reused = new Set<string>();
+		const result = new Map<string, string[]>();
+		for (const item of Array.from(observations.values()).sort((a, b) => b.period.localeCompare(a.period))) {
+			const key = `${item.category}|${item.folder}|${item.pattern}`;
+			const priorRefs = existingRefs.get(key) || [];
+			if (priorRefs.length >= 2) {
+				if (!reused.has(key)) result.set(`${key}|${item.period}`, priorRefs.slice(0, 2));
+				reused.add(key);
+				continue;
+			}
+			const files = selected.get(key) || [];
+			for (const file of Array.from(item.files).sort()) {
+				if (files.length >= 2) break;
+				files.push({ periodKey: `${key}|${item.period}`, category: item.category, folder: item.folder, period: item.period, file });
+			}
+			selected.set(key, files);
+		}
+		const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ftp-sample-'));
+		try {
+			for (const samples of selected.values()) for (const sample of samples) try {
+				const hash = createHash('sha1').update(`${sample.category}/${sample.folder}/${sample.period}/${sample.file}`).digest('hex');
+				const localPath = path.join(tempDir, hash);
+				await this.ftpService.downloadDiscoverySampleFile(sample.category, sample.period, sample.folder, sample.file, localPath);
+				const key = `ftp-report-samples/${sample.category}/${sample.folder}/${hash}/${encodeURIComponent(path.basename(sample.file))}`;
+				await this.bucketR2Service.uploadFileFromPath({ key, filePath: localPath, contentType: 'application/octet-stream', isPublic: false });
+				result.set(sample.periodKey, [...(result.get(sample.periodKey) || []), JSON.stringify({ ftpPath: sample.file, r2Key: key, fileName: path.basename(sample.file) })]);
+			} catch (error) { this.logger.warn(`Cannot upload FTP sample ${sample.file}: ${error.message}`); }
+		} finally { await fs.promises.rm(tempDir, { recursive: true, force: true }); }
+		return result;
 	}
 
 	private async finishRun(id: string, startedAt: string, status: string, periods: number, folders: number, files: number, patterns: number, error = '', force = false, categories: FtpSourceCategory[] = CATEGORIES): Promise<void> {
@@ -349,8 +452,11 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			.replace(/(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8_DASH__')
 			.replace(/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8__')
 			.replace(/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?!\d)/g, '__DATE6__')
+			// Uppercase two-letter tokens between path/name separators are ISO-3166
+			// territories in provider report names (e.g. _BR_, _DE_, _US_).
+			.replace(/(?<=[_/])(?:AD|AE|AF|AG|AI|AL|AM|AO|AR|AT|AU|AW|AX|AZ|BA|BB|BD|BE|BF|BG|BH|BI|BJ|BN|BO|BQ|BR|BS|BT|BW|BY|BZ|CA|CD|CF|CG|CH|CI|CL|CM|CN|CO|CR|CU|CV|CW|CY|CZ|DE|DJ|DK|DM|DO|DZ|EC|EE|EG|EH|ER|ES|ET|FI|FJ|FK|FM|FO|FR|GA|GB|GD|GE|GF|GG|GH|GI|GL|GM|GN|GP|GQ|GR|GS|GT|GU|GW|GY|HK|HM|HN|HR|HT|HU|ID|IE|IL|IM|IN|IO|IQ|IR|IS|IT|JE|JM|JO|JP|KE|KG|KH|KI|KM|KN|KP|KR|KW|KY|KZ|LA|LB|LC|LI|LK|LR|LS|LT|LU|LV|LY|MA|MC|MD|ME|MG|MH|MK|ML|MM|MN|MO|MP|MQ|MR|MS|MT|MU|MV|MW|MX|MY|MZ|NA|NC|NE|NF|NG|NI|NL|NO|NP|NR|NU|NZ|OM|PA|PE|PF|PG|PH|PK|PL|PM|PN|PR|PS|PT|PW|PY|QA|RE|RO|RS|RU|RW|SA|SB|SC|SD|SE|SG|SH|SI|SJ|SK|SL|SM|SN|SO|SR|SS|ST|SV|SX|SY|SZ|TC|TD|TF|TG|TH|TJ|TK|TL|TM|TN|TO|TR|TT|TV|TW|TZ|UA|UG|UM|US|UY|UZ|VA|VC|VE|VG|VI|VN|VU|WF|WS|YE|YT|ZA|ZM|ZW)(?=[_/])/g, '__COUNTRY_ISO2__')
 			.replace(/\d{4,}/g, '__NUMBER__');
 		value = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		return `^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__NUMBER__/g, '\\d+')}$`;
+		return `^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__COUNTRY_ISO2__/g, '[A-Z]{2}').replace(/__NUMBER__/g, '\\d+')}$`;
 	}
 }

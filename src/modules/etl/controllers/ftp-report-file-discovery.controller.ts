@@ -1,10 +1,12 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../clickhouse';
 import { FtpSourceCategory } from '../../dsp-report/dto/ftp-parser-config.dto';
 import { FtpReportFileDiscoveryService } from '../services/ftp/ftp-report-file-discovery.service';
+
+const DISCOVERY_CATEGORIES = ['all', ...Object.values(FtpSourceCategory)];
 
 class UpdateFtpReportFileDiscoveryConfigDto {
 	@IsString()
@@ -19,12 +21,12 @@ class UpdateFtpReportFileDiscoveryConfigDto {
 	@IsBoolean()
 	force?: boolean = false;
 
-	@ApiPropertyOptional({ enum: FtpSourceCategory, isArray: true, description: 'Categories used by the scheduled scan. Empty or omitted means all categories.' })
+	@ApiPropertyOptional({ enum: DISCOVERY_CATEGORIES, isArray: true, description: 'Categories used by the scheduled scan. Use all, empty, or omit for every category.' })
 	@IsOptional()
 	@IsArray()
 	@ArrayUnique()
-	@IsEnum(FtpSourceCategory, { each: true })
-	categories?: FtpSourceCategory[];
+	@IsIn(DISCOVERY_CATEGORIES, { each: true })
+	categories?: string[];
 }
 
 class RunFtpReportFileDiscoveryDto {
@@ -33,12 +35,12 @@ class RunFtpReportFileDiscoveryDto {
 	@IsBoolean()
 	force?: boolean = false;
 
-	@ApiPropertyOptional({ enum: FtpSourceCategory, isArray: true, description: 'Only scan these categories. Omit to scan all categories.' })
+	@ApiPropertyOptional({ enum: DISCOVERY_CATEGORIES, isArray: true, description: 'Only scan these categories. Use all, empty, or omit to scan every category.' })
 	@IsOptional()
 	@IsArray()
 	@ArrayUnique()
-	@IsEnum(FtpSourceCategory, { each: true })
-	categories?: FtpSourceCategory[];
+	@IsIn(DISCOVERY_CATEGORIES, { each: true })
+	categories?: string[];
 }
 
 class ResetFtpReportFileDiscoveryDto {
@@ -78,6 +80,12 @@ export class FtpReportFileDiscoveryController {
 	@Get('runs/:id')
 	async runDetail(@Param('id') id: string): Promise<ResponseSuccess<unknown>> {
 		return new ResponseSuccess({ data: await this.service.getRun(id) });
+	}
+
+	@Get('sample-tasks')
+	async sampleTasks(@Query('status') status?: string): Promise<ResponseSuccess<unknown>> {
+		const where = status ? `WHERE status = {status:String}` : '';
+		return new ResponseSuccess({ data: await this.clickHouseService.query(`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL ${where} ORDER BY updated_at DESC LIMIT 200`, status ? { status } : {}) });
 	}
 
 	@Get('config')
