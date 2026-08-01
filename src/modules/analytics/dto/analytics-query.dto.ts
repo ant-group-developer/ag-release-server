@@ -97,6 +97,56 @@ export abstract class BaseAnalyticsQueryDto extends BaseQueryDto {
 export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 	@ApiPropertyOptional({
 		description:
+			'Tenant/workspace UUID. Only system tenants may filter another tenant.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by a specific artist UUID',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	artistId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by a specific channel UUID',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	channelId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by an exact ISRC',
+		example: 'USUM72601234',
+	})
+	@IsOptional()
+	@IsString()
+	isrc?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by raw ClickHouse DSP report ID. Ignored when pgDspId is supplied.',
+	})
+	@IsOptional()
+	@IsString()
+	dspReportId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	pgDspId?: string;
+
+	@ApiPropertyOptional({
+		description:
 			'Number of top items to return individually. Remaining ones are grouped as "Other".',
 		minimum: 1,
 		maximum: 100,

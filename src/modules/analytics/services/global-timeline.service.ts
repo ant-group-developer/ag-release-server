@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	Logger,
+} from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
@@ -228,6 +233,99 @@ export class TimelineAnalyticsService {
 		return { joinSql, filterSql, params };
 	}
 
+	/** Revenue-only filters shared by every revenue summary/top endpoint. */
+	private appendRevenueDetailFilters(
+		tenantId: string,
+		query: TimelineQueryDto,
+		filterSql: string,
+		params: Record<string, any>,
+	): string {
+		const isSystem = checkIsSystemTenant(tenantId);
+		if (!isSystem && query.tenantId && query.tenantId !== tenantId) {
+			throw new ForbiddenException(
+				'Only system tenants can filter another tenantId',
+			);
+		}
+
+		const effectiveTenantId = isSystem ? query.tenantId : tenantId;
+		if (effectiveTenantId) {
+			filterSql += ' AND t.tenant_id = {revenueTenantId:String}';
+			params.revenueTenantId = effectiveTenantId;
+		}
+		if (query.labelId) {
+			filterSql += ' AND t.label_id = {revenueLabelId:String}';
+			params.revenueLabelId = query.labelId;
+		}
+		if (query.artistId) {
+			filterSql += ' AND has(t.artist_ids, {artistId:String})';
+			params.artistId = query.artistId;
+		}
+		if (query.releaseId) {
+			filterSql += ' AND t.release_id = {revenueReleaseId:String}';
+			params.revenueReleaseId = query.releaseId;
+		}
+		if (query.releaseType) {
+			filterSql += ' AND t.release_type = {revenueReleaseType:String}';
+			params.revenueReleaseType = query.releaseType;
+		}
+		if (query.channelId) {
+			filterSql += ' AND t.channel_id = {channelId:String}';
+			params.channelId = query.channelId;
+		}
+		if (query.isrc) {
+			filterSql += ' AND s.isrc = {isrc:String}';
+			params.isrc = query.isrc;
+		}
+		if (query.importSource) {
+			filterSql += ' AND s.import_source = {revenueImportSource:String}';
+			params.revenueImportSource = query.importSource;
+		}
+		if (query.pgDspId) {
+			filterSql += ` AND s.dsp_id IN (
+        SELECT id_dsps_report
+        FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+        WHERE pg_uuid = {pgDspId:String}
+      )`;
+			params.pgDspId = query.pgDspId;
+		} else if (query.dspReportId) {
+			filterSql += ' AND s.dsp_id = {dspReportId:String}';
+			params.dspReportId = query.dspReportId;
+		}
+
+		return filterSql;
+	}
+
+	private buildRevenueFilters(
+		tenantId: string,
+		query: TimelineQueryDto,
+	): { joinSql: string; filterSql: string; params: Record<string, any> } {
+		const isSystem = checkIsSystemTenant(tenantId);
+		const needsTrackJoin =
+			!isSystem ||
+			!!(
+				query.tenantId ||
+				query.labelId ||
+				query.artistId ||
+				query.releaseId ||
+				query.releaseType ||
+				query.channelId ||
+				query.isrc
+			);
+		const joinSql = needsTrackJoin
+			? `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`
+			: '';
+		let filterSql = needsTrackJoin ? ' AND t.is_deleted = 0' : '';
+		const params: Record<string, any> = {};
+
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
+		return { joinSql, filterSql, params };
+	}
+
 	async getSummary(
 		tenantId: string,
 		query: AnalyticsSummaryQueryDto,
@@ -346,7 +444,7 @@ export class TimelineAnalyticsService {
 	): Promise<RevenueOverviewResponse> {
 		const fromDate = normalizeDateToFirstOfMonth(query.fromDate);
 		const toDate = normalizeDateToFirstOfMonth(query.toDate);
-		const { joinSql, filterSql, params } = this.buildTenantFilters(
+		const { joinSql, filterSql, params } = this.buildRevenueFilters(
 			tenantId,
 			query,
 		);
@@ -354,7 +452,9 @@ export class TimelineAnalyticsService {
 		params.to = toDate;
 
 		// Truy vấn trên SALES_TER_MONTHLY để lấy cả tổng quantity, tổng USD, và số lượng territory (vùng)
-		const sql = queries.getRevenueOverviewQuery(joinSql, filterSql);
+		const sql = query.pgDspId || query.dspReportId
+			? queries.getRevenueOverviewWithDspQuery(joinSql, filterSql)
+			: queries.getRevenueOverviewQuery(joinSql, filterSql);
 		const rows = await this.clickHouseService.query<{
 			total_quantity: string;
 			total_revenue_usd: string;
@@ -394,12 +494,13 @@ export class TimelineAnalyticsService {
 			joinSql,
 			filterSql: baseFilterSql,
 			params,
-		} = this.buildTenantFilters(tenantId, query);
+		} = this.buildRevenueFilters(tenantId, query);
 		params.from = fromDate;
 		params.to = toDate;
 
 		// Coalesce: ưu tiên pg_dsps_sync, tiếp đến dsps_report, cuối cùng là dsp_id gốc
 		const resolvedDspName = `coalesce(nullIf(p.dsp_name, ''), nullIf(r.dsp_name, ''), s.dsp_id)`;
+		const dspGroupKey = `coalesce(nullIf(r.pg_uuid, ''), concat('__raw__:', s.dsp_id))`;
 		const joinExpr = `
       LEFT JOIN (SELECT * FROM music_analytics.dsps_report FINAL) r ON s.dsp_id = r.id_dsps_report
       LEFT JOIN (SELECT * FROM music_analytics.pg_dsps_sync FINAL) p ON r.pg_uuid = p.pg_uuid
@@ -416,7 +517,7 @@ export class TimelineAnalyticsService {
 			joinSql,
 			joinExpr,
 			filterSql,
-			resolvedDspName,
+			dspGroupKey,
 		);
 		const countResult = await this.clickHouseService.query<{
 			total: string;
@@ -429,13 +530,15 @@ export class TimelineAnalyticsService {
 			joinExpr,
 			filterSql,
 			resolvedDspName,
+			dspGroupKey,
 			this.revenueSortColumn(query),
 			limit,
 			offset,
 		);
 		const rows = await this.clickHouseService.query<{
-			pg_dsp_id: string;
+			pg_dsp_id: string | null;
 			dsp_report_id: string;
+			dsp_report_ids: string[];
 			dsp_name: string;
 			image_url: string | null;
 			quantity: string;
@@ -445,6 +548,7 @@ export class TimelineAnalyticsService {
 		const items: RevenueDspItem[] = rows.map((r) => ({
 			pgDspId: r.pg_dsp_id || null,
 			dspReportId: r.dsp_report_id,
+			dspReportIds: r.dsp_report_ids,
 			dspName: r.dsp_name,
 			imageUrl: toDspImageUrl(r.image_url),
 			revenueUsd: this.revenueNumber(r.revenue_usd),
@@ -456,15 +560,15 @@ export class TimelineAnalyticsService {
 		if (query.groupBySource && items.length > 0) {
 			const breakdowns = await Promise.all(
 				items.map((item) =>
-					item.dspReportId
+					item.dspReportIds.length
 						? this.fetchSourceBreakdown(
 								CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
 								's.period',
 								`${joinSql} ${joinExpr}`,
 								filterSql,
 								{ ...params },
-								'AND s.dsp_id = {_dspId:String}',
-								{ _dspId: item.dspReportId },
+								'AND s.dsp_id IN ({_dspIds:Array(String)})',
+								{ _dspIds: item.dspReportIds },
 								true,
 							)
 						: Promise.resolve([]),
@@ -507,6 +611,7 @@ export class TimelineAnalyticsService {
 				const otherItem: RevenueDspItem = {
 					pgDspId: null,
 					dspReportId: '',
+					dspReportIds: [],
 					dspName: 'Other',
 					imageUrl: null,
 					revenueUsd: otherRev > 0 ? otherRev : 0,
@@ -514,9 +619,7 @@ export class TimelineAnalyticsService {
 					quantity: otherQty > 0 ? otherQty : 0,
 				};
 				if (query.groupBySource) {
-					const topDspIds = items
-						.filter((it) => it.dspReportId)
-						.map((it) => it.dspReportId);
+					const topDspIds = items.flatMap((it) => it.dspReportIds);
 					otherItem.bySource = await this.fetchSourceBreakdown(
 						CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
 						's.period',
@@ -595,6 +698,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedArtistIds =
@@ -865,6 +974,12 @@ export class TimelineAnalyticsService {
 			joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 			filterSql += ' AND t.is_deleted = 0';
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 		filterSql += ` ${this.validReleaseUpcFilter}`;
 
 		// Count query
@@ -1132,6 +1247,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedLabelIds =
@@ -1344,6 +1465,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 
@@ -1542,6 +1669,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedTenantIds =
@@ -1747,6 +1880,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = query.releaseType;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedTenantIds =
@@ -1979,6 +2118,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedReleaseIds =
@@ -2222,6 +2367,12 @@ export class TimelineAnalyticsService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+		filterSql = this.appendRevenueDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		if (query.keyword) {
 			let matchedReleaseIds =

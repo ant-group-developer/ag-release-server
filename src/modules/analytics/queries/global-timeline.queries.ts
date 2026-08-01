@@ -18,14 +18,49 @@ export function getRevenueOverviewQuery(
   `;
 }
 
+/** Uses the fact table when a DSP filter is present because the territory cube has no dsp_id dimension. */
+export function getRevenueOverviewWithDspQuery(
+	joinSql: string,
+	filterSql: string,
+): string {
+	return `
+    SELECT
+      sum(s.quantity) AS total_quantity,
+      toString(sum(
+        if(
+          s.revenue_usd != 0,
+          s.revenue_usd,
+          divideDecimal(
+            s.revenue_local,
+            if(
+              toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)) > 0,
+              toDecimal128OrDefault(toString(er.usd_to_local_rate), 18, toDecimal128(1, 18)),
+              toDecimal128(1, 18)
+            ),
+            18
+          )
+        )
+      )) AS total_revenue_usd,
+      uniq(s.territory_code) AS total_territories
+    FROM ${CLICKHOUSE_TABLES.FACT_SALES_REPORT} s
+    ${joinSql}
+    LEFT JOIN (SELECT * FROM music_analytics.exchange_rates FINAL) er
+      ON formatDateTime(s.reporting_period_start, '%Y-%m') = er.rate_month
+      AND s.revenue_currency = er.currency
+    WHERE s.reporting_period_start >= toDate({from:String})
+      AND s.reporting_period_start <= toDate({to:String})
+      ${filterSql}
+  `;
+}
+
 export function getRevenueTopDspCountQuery(
 	joinSql: string,
 	joinExpr: string,
 	filterSql: string,
-	resolvedDspName: string,
+	dspGroupKey: string,
 ): string {
 	return `
-    SELECT uniq(${resolvedDspName}) AS total
+    SELECT uniq(${dspGroupKey}) AS total
     FROM ${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} s
     ${joinSql}
     ${joinExpr}
@@ -41,15 +76,17 @@ export function getRevenueTopDspQuery(
 	joinExpr: string,
 	filterSql: string,
 	resolvedDspName: string,
+	dspGroupKey: string,
 	orderBy: 'revenue_usd' | 'quantity',
 	limit: number,
 	offset: number,
 ): string {
 	return `
     SELECT
-      any(r.pg_uuid) AS pg_dsp_id,
-      any(s.dsp_id) AS dsp_report_id,
-      ${resolvedDspName} AS dsp_name,
+      nullIf(any(r.pg_uuid), '') AS pg_dsp_id,
+      arrayElement(arraySort(groupUniqArray(s.dsp_id)), 1) AS dsp_report_id,
+      arraySort(groupUniqArray(s.dsp_id)) AS dsp_report_ids,
+      any(${resolvedDspName}) AS dsp_name,
       any(p.picture) AS image_url,
       sum(s.total_quantity) AS quantity,
       sum(s.total_revenue_usd) AS revenue_usd
@@ -60,7 +97,7 @@ export function getRevenueTopDspQuery(
       AND s.period >= toDate({from:String})
       AND s.period <= toDate({to:String})
       ${filterSql}
-    GROUP BY dsp_name
+    GROUP BY ${dspGroupKey}
     ORDER BY ${orderBy} DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
