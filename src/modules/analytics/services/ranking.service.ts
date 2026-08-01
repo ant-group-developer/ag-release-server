@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PageDto } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES } from 'src/modules/clickhouse/clickhouse.constants';
 import { ClickHouseService } from 'src/modules/clickhouse/clickhouse.service';
@@ -58,20 +58,39 @@ export class RankingService {
 		let filterSql = '';
 
 		const isSystem = checkIsSystemTenant(tenantId);
-		const hasSubFilter = !!(query.labelId || query.releaseType);
+		if (!isSystem && query.tenantId && query.tenantId !== tenantId) {
+			throw new ForbiddenException(
+				'Only system tenants can filter another tenantId',
+			);
+		}
+
+		const hasSubFilter = !!(
+			query.tenantId ||
+			query.labelId ||
+			query.artistId ||
+			query.releaseId ||
+			query.releaseType ||
+			query.channelId ||
+			query.isrc
+		);
 
 		// System-tenant WITHOUT sub-filters → skip pg_tracks_sync JOIN entirely
 		if (isSystem && !hasSubFilter) {
-			return { joinSql: '', filterSql: '', params };
+			if (query.importSource) {
+				filterSql = ' AND s.import_source = {importSource:String}';
+				params.importSource = query.importSource;
+			}
+			return { joinSql: '', filterSql, params };
 		}
 
 		// All other cases: JOIN pg_tracks_sync for tenant/label filtering
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 		filterSql += ' AND t.is_deleted = 0';
 
-		if (!isSystem) {
+		const effectiveTenantId = isSystem ? query.tenantId : tenantId;
+		if (effectiveTenantId) {
 			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
+			params.tenantId = effectiveTenantId;
 		}
 
 		if (query.labelId) {
@@ -79,9 +98,29 @@ export class RankingService {
 			params.labelId = query.labelId;
 		}
 
+		if (query.artistId) {
+			filterSql += ' AND has(t.artist_ids, {artistId:String})';
+			params.artistId = query.artistId;
+		}
+
+		if (query.releaseId) {
+			filterSql += ' AND t.release_id = {releaseId:String}';
+			params.releaseId = query.releaseId;
+		}
+
 		if (query.releaseType) {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = query.releaseType;
+		}
+
+		if (query.channelId) {
+			filterSql += ' AND t.channel_id = {channelId:String}';
+			params.channelId = query.channelId;
+		}
+
+		if (query.isrc) {
+			filterSql += ' AND s.isrc = {isrc:String}';
+			params.isrc = query.isrc;
 		}
 
 		if (query.importSource) {
@@ -90,6 +129,33 @@ export class RankingService {
 		}
 
 		return { joinSql, filterSql, params };
+	}
+
+	private hasDspFilter(query: RankingQueryDto): boolean {
+		return !!(query.pgDspId || query.dspReportId || query.dspId);
+	}
+
+	private buildDspFilter(
+		query: RankingQueryDto,
+		params: Record<string, any>,
+	): string {
+		if (query.pgDspId) {
+			params.pgDspId = query.pgDspId;
+			return `AND s.dsp_id IN (
+        SELECT id_dsps_report
+        FROM music_analytics.${CLICKHOUSE_TABLES.DSPS_REPORT} FINAL
+        WHERE pg_uuid = {pgDspId:String}
+      )`;
+		}
+		if (query.dspReportId) {
+			params.dspReportId = query.dspReportId;
+			return 'AND s.dsp_id = {dspReportId:String}';
+		}
+		if (query.dspId) {
+			params.dspId = query.dspId;
+			return 'AND s.dsp_id = {dspId:String}';
+		}
+		return '';
 	}
 
 	private async fetchTrendSourceBreakdown(
@@ -162,8 +228,7 @@ export class RankingService {
 		}
 		filterSql += ` ${this.validReleaseUpcFilter}`;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
 		if (query.keyword) {
 			let matchedIsrcs =
@@ -177,7 +242,7 @@ export class RankingService {
 			params.matchedIsrcs = matchedIsrcs;
 		}
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 
@@ -397,8 +462,7 @@ export class RankingService {
 		params.from = fromDate;
 		params.to = toDate;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
 		if (query.keyword) {
 			let matchedReleaseIds =
@@ -413,7 +477,7 @@ export class RankingService {
 			params.matchedReleaseIds = matchedReleaseIds;
 		}
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -569,8 +633,7 @@ export class RankingService {
 		params.from = fromDate;
 		params.to = toDate;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
 		if (query.keyword) {
 			let matchedReleaseIds =
@@ -585,7 +648,7 @@ export class RankingService {
 			params.matchedReleaseIds = matchedReleaseIds;
 		}
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -759,8 +822,7 @@ export class RankingService {
 		params.from = fromDate;
 		params.to = toDate;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
 		if (query.keyword) {
 			let matchedLabelIds =
@@ -774,7 +836,7 @@ export class RankingService {
 			params.matchedLabelIds = matchedLabelIds;
 		}
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -898,10 +960,9 @@ export class RankingService {
 		params.from = fromDate;
 		params.to = toDate;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -1022,8 +1083,7 @@ export class RankingService {
 		params.from = fromDate;
 		params.to = toDate;
 
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
+		const dspFilter = this.buildDspFilter(query, params);
 
 		if (query.keyword) {
 			let matchedArtistIds =
@@ -1038,7 +1098,7 @@ export class RankingService {
 			params.matchedArtistIds = matchedArtistIds;
 		}
 
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -1158,14 +1218,9 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<TenantRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		const isSystem = checkIsSystemTenant(tenantId);
-
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
+		let { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		params.from = fromDate;
+		params.to = toDate;
 
 		if (query.keyword) {
 			let matchedTenantIds =
@@ -1180,20 +1235,9 @@ export class RankingService {
 			params.matchedTenantIds = matchedTenantIds;
 		}
 
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
+		const dspFilter = this.buildDspFilter(query, params);
 
-		if (query.importSource) {
-			filterSql += ' AND s.import_source = {importSource:String}';
-			params.importSource = query.importSource;
-		}
-
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
-
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';
@@ -1303,24 +1347,13 @@ export class RankingService {
 		query: RankingQueryDto,
 	): Promise<PageDto<SourceTypeRankingItem>> {
 		const { fromDate, toDate, page, pageSize } = query;
-		const isSystem = checkIsSystemTenant(tenantId);
+		const { filterSql, params } = this.buildTenantFilters(tenantId, query);
+		params.from = fromDate;
+		params.to = toDate;
 
-		const params: Record<string, any> = { from: fromDate, to: toDate };
-		let filterSql = 'AND t.is_deleted = 0';
-		if (!isSystem) {
-			filterSql += ' AND t.tenant_id = {tenantId:String}';
-			params.tenantId = tenantId;
-		}
+		const dspFilter = this.buildDspFilter(query, params);
 
-		if (query.releaseType) {
-			filterSql += ' AND t.release_type = {releaseType:String}';
-			params.releaseType = query.releaseType;
-		}
-
-		const dspFilter = query.dspId ? 'AND s.dsp_id = {dspId:String}' : '';
-		if (query.dspId) params.dspId = query.dspId;
-
-		const table = query.dspId
+		const table = this.hasDspFilter(query)
 			? CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE
 			: CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE;
 		const dateCol = 'reporting_date';

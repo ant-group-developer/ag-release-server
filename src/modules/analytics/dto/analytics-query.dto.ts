@@ -194,7 +194,53 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
  * DTO cho API Rankings (tracks, releases, artists, labels).
  * Extends BaseAnalyticsQueryDto — dùng chung page/pageSize từ BaseQueryDto.
  */
-export class RankingQueryDto extends BaseAnalyticsQueryDto {}
+export class RankingQueryDto extends BaseAnalyticsQueryDto {
+	@ApiPropertyOptional({ description: 'Filter by a specific release UUID', format: 'uuid' })
+	@IsOptional()
+	@IsUUID()
+	releaseId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Tenant/workspace UUID. Only system tenants may filter another tenant.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by a specific artist UUID', format: 'uuid' })
+	@IsOptional()
+	@IsUUID()
+	artistId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by a specific channel UUID', format: 'uuid' })
+	@IsOptional()
+	@IsUUID()
+	channelId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by an exact ISRC', example: 'USUM72601234' })
+	@IsOptional()
+	@IsString()
+	isrc?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by raw ClickHouse DSP report ID. Ignored when pgDspId is supplied.',
+	})
+	@IsOptional()
+	@IsString()
+	dspReportId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId and dspId.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	pgDspId?: string;
+}
 
 /**
  * Base DTO cho DSP analytics. Truyền cả pgDspId + dspReportId — ưu tiên pgDspId.
@@ -411,6 +457,47 @@ export class ChartQueryDto {
 	@IsOptional()
 	@IsString()
 	importSource?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Tenant/workspace UUID. Only system tenants may filter another tenant.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by a specific artist UUID', format: 'uuid' })
+	@IsOptional()
+	@IsUUID()
+	artistId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by a specific channel UUID', format: 'uuid' })
+	@IsOptional()
+	@IsUUID()
+	channelId?: string;
+
+	@ApiPropertyOptional({ description: 'Filter by an exact ISRC', example: 'USUM72601234' })
+	@IsOptional()
+	@IsString()
+	isrc?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by raw ClickHouse DSP report ID. Ignored when pgDspId is supplied.',
+	})
+	@IsOptional()
+	@IsString()
+	dspReportId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	pgDspId?: string;
 }
 
 /** DTO dành riêng cho revenue chart; trend-view chart không nhận sortBy này. */
