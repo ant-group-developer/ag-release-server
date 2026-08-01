@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { UserFromRequest } from 'src/modules/token/token.interface';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { checkCanAccessTenantAll } from 'src/modules/user/utils/user-type.util';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
 	Brackets,
@@ -109,10 +111,13 @@ export class ReleaseQueryService {
 		};
 	}
 
-	async getManyAndCountOptimized(query: QueryGetListReleaseDto) {
+	async getManyAndCountOptimized(
+		query: QueryGetListReleaseDto,
+		user: UserFromRequest,
+	) {
 		const qbId = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
-		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query });
+		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query, user });
 
 		if (itemsToJoin.includes('release.ciData')) {
 			qbId.leftJoinAndSelect('release.ciData', 'releaseCiData');
@@ -967,9 +972,11 @@ export class ReleaseQueryService {
 	private filterByQuery2({
 		qb,
 		query,
+		user,
 	}: {
 		qb: SelectQueryBuilder<Release>;
 		query: QueryGetListReleaseDto;
+		user: UserFromRequest;
 	}) {
 		const {
 			keyword,
@@ -1191,6 +1198,25 @@ export class ReleaseQueryService {
 
 		if (type) {
 			qb.andWhere('release.type = :type', { type });
+			if (
+				type === 'video' &&
+				user &&
+				!checkCanAccessTenantAll(user.type, user.tenantUserType)
+			) {
+				// Dùng Subquery: chỉ lấy các release video thuộc kênh ACTIVE mà user được phân quyền trong user_channels
+				qb.andWhere(
+					`release.id IN (
+						SELECT v.release_id FROM videos v
+						WHERE v.channel_id IN (
+							SELECT uc.channel_id 
+							FROM user_channels uc 
+							JOIN channels c ON c.id = uc.channel_id 
+							WHERE uc.user_id = :userIdFilter AND c.is_active = true
+						)
+					)`,
+					{ userIdFilter: user.id },
+				);
+			}
 		}
 
 		if (primaryGenreId?.length) {
