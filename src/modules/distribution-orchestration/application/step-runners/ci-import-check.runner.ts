@@ -5,6 +5,7 @@ import { IngestResultReader } from '../../domain/ports/ingest-result-reader.port
 import { TicketService } from '../../domain/ports/ticket-service.port';
 import { IdempotencyKey } from '../../domain/value-objects/idempotency-key.vo';
 import { TicketReason } from '../../domain/value-objects/ticket-ref.vo';
+import { TICKET_SERVICE } from '../../infrastructure/adapters/postgres-ticket.adapter';
 import { ApplyChannelInputCommand } from '../commands/distribution.command';
 import { AggregateNotFoundError } from '../errors/aggregate-not-found.error';
 import {
@@ -12,7 +13,6 @@ import {
 	DistributionRepository,
 } from '../ports/distribution-repository.port';
 import { UNIT_OF_WORK, UnitOfWork } from '../ports/unit-of-work.port';
-import { TICKET_SERVICE } from '../../infrastructure/adapters/postgres-ticket.adapter';
 import { ChannelJobPayload } from './runner-payload';
 import { ticketIdempotencyKey } from './ticket-idempotency-key';
 
