@@ -9,15 +9,15 @@ import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
-	DspChartQueryDto,
-	DspRevenueChartQueryDto,
 	DspAnalyticsSummaryQueryDto,
+	DspChartQueryDto,
 	DspOverviewQueryDto,
+	DspRevenueChartQueryDto,
 	DspTopQueryDto,
 } from '../dto/analytics-query.dto';
 import {
-	DspMeta,
 	AnalyticsSummaryResponse,
+	DspMeta,
 	DspOverviewResponse,
 	DspTopReleaseItem,
 	DspTopTrackItem,
@@ -28,6 +28,10 @@ import {
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 
 /**
  * DspAnalyticsService — thống kê chi tiết cho 1 DSP cụ thể.
@@ -100,7 +104,11 @@ export class DspAnalyticsService {
 		pgDspId?: string,
 		dspReportId?: string,
 		releaseType?: 'audio' | 'video',
-		opts?: { tableHasDspId?: boolean; importSource?: string },
+		opts?: {
+			tableHasDspId?: boolean;
+			importSource?: string;
+			analyticsVideoScope?: ReturnType<typeof getAnalyticsVideoScope>;
+		},
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -159,7 +167,12 @@ export class DspAnalyticsService {
 		}
 
 		// System tenant + no releaseType: skip pg_tracks_sync join
-		if (isSystem && !releaseType && tableHasDspId) {
+		if (
+			isSystem &&
+			!releaseType &&
+			tableHasDspId &&
+			opts?.analyticsVideoScope?.allowedChannelIds === undefined
+		) {
 			return {
 				joinSql: '',
 				filterSql: `${dspFilter}${importSourceFilter}`,
@@ -177,6 +190,11 @@ export class DspAnalyticsService {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = releaseType;
 		}
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			opts?.analyticsVideoScope,
+		);
 		filterSql += `${dspFilter}${importSourceFilter}`;
 
 		return { joinSql, filterSql, params };
@@ -188,7 +206,9 @@ export class DspAnalyticsService {
 		tenantId: string,
 	): Promise<AnalyticsSummaryResponse> {
 		if (dto.fromDate > dto.toDate) {
-			throw new BadRequestException('fromDate must be before or equal to toDate');
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
 		}
 
 		const key = this.cache.buildKey('dsp:summary', tenantId, dto);
@@ -204,7 +224,10 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ importSource: dto.importSource },
+			{
+				importSource: dto.importSource,
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+			},
 		);
 		const trendParams = { ...params, from: dto.fromDate, to: dto.toDate };
 		const salesParams = {
@@ -297,11 +320,9 @@ export class DspAnalyticsService {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
 			const country = iso2 ? countryByIso2.get(iso2) : undefined;
-			const territory = (
-				isOther
-					? item.territory
-					: (country?.name ?? item.territory)
-			) as string;
+			const territory = isOther
+				? item.territory
+				: (country?.name ?? item.territory);
 			return {
 				...item,
 				territory,
@@ -389,6 +410,7 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
+			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -457,6 +479,7 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
+			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -506,6 +529,7 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
+			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -557,6 +581,7 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
+			{ analyticsVideoScope: getAnalyticsVideoScope(dto) },
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -634,7 +659,10 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ tableHasDspId: false },
+			{
+				tableHasDspId: false,
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+			},
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -928,7 +956,11 @@ export class DspAnalyticsService {
 					},
 				},
 			}));
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0 || otherUsage > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					isrc: 'other',
@@ -1217,7 +1249,11 @@ export class DspAnalyticsService {
 					},
 				},
 			}));
-			if (this.revenueNumber(otherRevExact) > 0 || otherViews > 0 || otherUsage > 0) {
+			if (
+				this.revenueNumber(otherRevExact) > 0 ||
+				otherViews > 0 ||
+				otherUsage > 0
+			) {
 				items.push({
 					rank: items.length + 1,
 					releaseId: 'other',
@@ -1308,7 +1344,10 @@ export class DspAnalyticsService {
 			dto.pgDspId,
 			dto.dspReportId,
 			dto.releaseType,
-			{ tableHasDspId: false },
+			{
+				tableHasDspId: false,
+				analyticsVideoScope: getAnalyticsVideoScope(dto),
+			},
 		);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
@@ -1480,13 +1519,13 @@ export class DspAnalyticsService {
 			const country = countryByIso2.get(row.iso_code?.toUpperCase());
 			return {
 				rank: rankOffset + i + 1,
-			isoCode: row.iso_code,
-			territory: country?.name ?? row.iso_code,
-			imageUrl: country?.imageUrl ?? null,
-			totalViews: Number(row.total_views),
-			totalRevenueUsd: row.total_revenue_usd || '0',
-		};
-	});
+				isoCode: row.iso_code,
+				territory: country?.name ?? row.iso_code,
+				imageUrl: country?.imageUrl ?? null,
+				totalViews: Number(row.total_views),
+				totalRevenueUsd: row.total_revenue_usd || '0',
+			};
+		});
 		return new PageDto({
 			items,
 			metadata: {

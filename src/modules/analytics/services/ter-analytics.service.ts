@@ -21,6 +21,10 @@ import {
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 
 export interface TerOverviewResponse {
 	isoCode: string;
@@ -34,6 +38,18 @@ export interface TerOverviewResponse {
 
 @Injectable()
 export class TerAnalyticsService {
+	private appendVideoScopeIsrcFilter(
+		filterSql: string,
+		params: Record<string, unknown>,
+		dto: object,
+		factAlias = 's',
+	): string {
+		const scope = getAnalyticsVideoScope(dto);
+		if (!scope || scope.allowedChannelIds === undefined) return filterSql;
+		params.analyticsAllowedChannelIds = scope.allowedChannelIds;
+		return `${filterSql} AND ${factAlias}.isrc IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0 AND (release_type != 'video' OR channel_id IN ({analyticsAllowedChannelIds:Array(String)})))`;
+	}
+
 	// s.dsp_id is only resolvable when s is a subquery result (not raw table with JOINs).
 	// All queries using dspNameJoin must use buildTrendsSource() as their FROM clause.
 	private readonly resolvedDspName = `coalesce(nullIf(dsp_map.resolved_dsp_name, ''), s.dsp_id)`;
@@ -66,6 +82,7 @@ export class TerAnalyticsService {
 		toDate: string,
 		importSource?: string,
 		releaseType?: string,
+		analyticsScopeDto?: object,
 	): { fromClause: string; params: Record<string, any> } {
 		const params: Record<string, any> = {
 			isoCode: isoCode.toUpperCase(),
@@ -81,6 +98,13 @@ export class TerAnalyticsService {
 			where += ` AND isrc IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0 AND release_type = {releaseType:String})`;
 			params.releaseType = releaseType;
 		}
+		if (analyticsScopeDto) {
+			where = this.appendVideoScopeIsrcFilter(
+				where,
+				params,
+				analyticsScopeDto,
+			);
+		}
 		const fromClause = `(SELECT dsp_id, isrc, reporting_date, territory_code, import_source, total_quantity FROM music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} WHERE ${where}) s`;
 		return { fromClause, params };
 	}
@@ -89,6 +113,7 @@ export class TerAnalyticsService {
 		isoCode: string,
 		importSource?: string,
 		releaseType?: string,
+		analyticsScopeDto?: object,
 	): {
 		terFilter: string;
 		trackJoin: string;
@@ -112,6 +137,13 @@ export class TerAnalyticsService {
 		if (importSource) {
 			terFilter += ' AND s.import_source = {importSource:String}';
 			params.importSource = importSource;
+		}
+		if (analyticsScopeDto) {
+			trackFilter = this.appendVideoScopeIsrcFilter(
+				trackFilter,
+				params,
+				analyticsScopeDto,
+			);
 		}
 
 		return { terFilter, trackJoin, trackFilter, params };
@@ -150,7 +182,7 @@ export class TerAnalyticsService {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -214,7 +246,7 @@ export class TerAnalyticsService {
 		dto: ChartQueryDto,
 	): Promise<TrendViewLineChartItem[]> {
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
 		params.fromDate = dto.fromDate;
 		params.toDate = dto.toDate;
 
@@ -261,7 +293,7 @@ export class TerAnalyticsService {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType);
+			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -339,6 +371,11 @@ export class TerAnalyticsService {
 		};
 		if (dto.importSource) params.importSource = dto.importSource;
 		if (dto.releaseType) params.releaseType = dto.releaseType;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(dto),
+		);
 
 		const trackJoin = `INNER JOIN (SELECT isrc, release_type, release_id FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
 		const terFilter = 'AND s.territory_code = {isoCode:String}';
@@ -361,7 +398,7 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
-				${releaseTypeFilter}
+				${releaseTypeFilter} ${videoScopeFilter}
 		`;
 
 		const dataSql = `
@@ -393,7 +430,7 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
-				${releaseTypeFilter}
+				${releaseTypeFilter} ${videoScopeFilter}
 			ORDER BY ${sortCol} DESC, t.isrc ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
 		`;
@@ -499,6 +536,11 @@ export class TerAnalyticsService {
 		};
 		if (dto.importSource) params.importSource = dto.importSource;
 		if (dto.releaseType) params.releaseType = dto.releaseType;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(dto),
+		);
 
 		const terFilter = 'AND s.territory_code = {isoCode:String}';
 
@@ -520,7 +562,7 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
-				AND t.release_id != '' ${releaseTypeFilter}
+				AND t.release_id != '' ${releaseTypeFilter} ${videoScopeFilter}
 		`;
 
 		const dataSql = `
@@ -551,7 +593,7 @@ export class TerAnalyticsService {
 				GROUP BY isrc
 			) sa ON t.isrc = sa.isrc
 			WHERE (coalesce(tr.total_views, 0) > 0 OR coalesce(sa.total_usage, 0) > 0 OR coalesce(sa.total_revenue_usd, 0) > 0)
-				AND t.release_id != '' ${releaseTypeFilter}
+				AND t.release_id != '' ${releaseTypeFilter} ${videoScopeFilter}
 			GROUP BY t.release_id
 			ORDER BY ${sortCol} DESC, t.release_id ASC
 			LIMIT ${topNLimit} OFFSET ${topNSkip}
@@ -643,6 +685,7 @@ export class TerAnalyticsService {
 			dto.toDate,
 			dto.importSource,
 			dto.releaseType,
+			dto,
 		);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
@@ -657,6 +700,11 @@ export class TerAnalyticsService {
 		const releaseTypeFilterSal = dto.releaseType
 			? `AND s.isrc IN (SELECT isrc FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0 AND release_type = {releaseType:String})`
 			: '';
+		const videoScopeFilterSal = this.appendVideoScopeIsrcFilter(
+			'',
+			params,
+			dto,
+		);
 		const metricSource = `
 			SELECT s.dsp_id, sum(s.total_quantity) AS total_views, 0 AS total_usage, 0 AS total_revenue_usd
 			FROM ${fromClause}
@@ -666,7 +714,7 @@ export class TerAnalyticsService {
 			FROM music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} s
 			WHERE s.period >= toDate({fromMonth:String}) AND s.period <= toDate({toMonth:String})
 				AND s.territory_code = {isoCode:String}
-				${importFilterSalWhere} ${releaseTypeFilterSal}
+				${importFilterSalWhere} ${releaseTypeFilterSal} ${videoScopeFilterSal}
 			GROUP BY s.dsp_id
 		`;
 		const groupedMetrics = `

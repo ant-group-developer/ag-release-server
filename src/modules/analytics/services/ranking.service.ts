@@ -19,9 +19,13 @@ import {
 	TenantRankingItem,
 	TrackRankingItem,
 } from '../interfaces/analytics.interface';
-import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 import { SourceTypeConfigService } from './source-type-config.service';
 
@@ -127,6 +131,12 @@ export class RankingService {
 			filterSql += ' AND s.import_source = {importSource:String}';
 			params.importSource = query.importSource;
 		}
+
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			getAnalyticsVideoScope(query),
+		);
 
 		return { joinSql, filterSql, params };
 	}

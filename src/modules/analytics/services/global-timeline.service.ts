@@ -40,9 +40,13 @@ import {
 	TrendViewLineChartItem,
 } from '../interfaces/analytics.interface';
 import * as queries from '../queries/global-timeline.queries';
-import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
+import { normalizeSyncedMetadataExternal } from '../utils/metadata-external.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 import { SourceTypeConfigService } from './source-type-config.service';
 
@@ -57,6 +61,7 @@ type DetailAnalyticsFilterQuery = {
 	importSource?: string;
 	dspReportId?: string;
 	pgDspId?: string;
+	analyticsVideoScope?: ReturnType<typeof getAnalyticsVideoScope>;
 };
 
 @Injectable()
@@ -84,9 +89,9 @@ export class TimelineAnalyticsService {
 		return value?.toString() ?? '0';
 	}
 
-	private revenueSortColumn(
-		query: { sortBy?: 'revenue' | 'usage' },
-	): 'revenue_usd' | 'quantity' {
+	private revenueSortColumn(query: {
+		sortBy?: 'revenue' | 'usage';
+	}): 'revenue_usd' | 'quantity' {
 		return query.sortBy === 'usage' ? 'quantity' : 'revenue_usd';
 	}
 
@@ -243,6 +248,12 @@ export class TimelineAnalyticsService {
 			params.importSource = query.importSource;
 		}
 
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			getAnalyticsVideoScope(query),
+		);
+
 		return { joinSql, filterSql, params };
 	}
 
@@ -305,6 +316,12 @@ export class TimelineAnalyticsService {
 			params.dspReportId = query.dspReportId;
 		}
 
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			getAnalyticsVideoScope(query),
+		);
+
 		return filterSql;
 	}
 
@@ -330,7 +347,12 @@ export class TimelineAnalyticsService {
 		let filterSql = needsTrackJoin ? ' AND t.is_deleted = 0' : '';
 		const params: Record<string, any> = {};
 
-		filterSql = this.appendDetailFilters(tenantId, query, filterSql, params);
+		filterSql = this.appendDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 		return { joinSql, filterSql, params };
 	}
 
@@ -346,13 +368,13 @@ export class TimelineAnalyticsService {
 		query: AnalyticsSummaryQueryDto,
 	): Promise<AnalyticsSummaryResponse> {
 		if (query.fromDate > query.toDate) {
-			throw new BadRequestException('fromDate must be before or equal to toDate');
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
 		}
 
 		const key = this.cache.buildKey('tl:summary', tenantId, query);
-		return this.cache.wrap(key, () =>
-			this.computeSummary(tenantId, query),
-		);
+		return this.cache.wrap(key, () => this.computeSummary(tenantId, query));
 	}
 
 	private async computeSummary(
@@ -363,7 +385,11 @@ export class TimelineAnalyticsService {
 			tenantId,
 			query,
 		);
-		const trendParams = { ...params, from: query.fromDate, to: query.toDate };
+		const trendParams = {
+			...params,
+			from: query.fromDate,
+			to: query.toDate,
+		};
 		const salesParams = {
 			...params,
 			from: normalizeDateToFirstOfMonth(query.fromDate),
@@ -467,9 +493,10 @@ export class TimelineAnalyticsService {
 		params.to = toDate;
 
 		// Truy vấn trên SALES_TER_MONTHLY để lấy cả tổng quantity, tổng USD, và số lượng territory (vùng)
-		const sql = query.pgDspId || query.dspReportId
-			? queries.getRevenueOverviewWithDspQuery(joinSql, filterSql)
-			: queries.getRevenueOverviewQuery(joinSql, filterSql);
+		const sql =
+			query.pgDspId || query.dspReportId
+				? queries.getRevenueOverviewWithDspQuery(joinSql, filterSql)
+				: queries.getRevenueOverviewQuery(joinSql, filterSql);
 		const rows = await this.clickHouseService.query<{
 			total_quantity: string;
 			total_revenue_usd: string;
@@ -1945,7 +1972,9 @@ export class TimelineAnalyticsService {
 
 		if (rows.length > 0) {
 			rows.forEach((r, index) => {
-				const source = this.sourceTypeConfigService.resolve(r.sourceType);
+				const source = this.sourceTypeConfigService.resolve(
+					r.sourceType,
+				);
 				items.push({
 					rank: offset + index + 1,
 					sourceType: r.sourceType,
@@ -2041,7 +2070,12 @@ export class TimelineAnalyticsService {
 		const joinSql = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL) t ON s.isrc = t.isrc`;
 		let filterSql = 'AND t.is_deleted = 0';
 
-		filterSql = this.appendDetailFilters(tenantId, query, filterSql, params);
+		filterSql = this.appendDetailFilters(
+			tenantId,
+			query,
+			filterSql,
+			params,
+		);
 
 		// Query 1: views, dsps, tracks, labels
 		const mainSql = queries.getTrendsOverviewMainQuery(joinSql, filterSql);
@@ -2897,7 +2931,10 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
 		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
 		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
@@ -2979,7 +3016,10 @@ export class TimelineAnalyticsService {
 			top5TotalExact,
 		);
 		const otherRev = this.revenueNumber(otherRevExact);
-		const topQuantity = items.reduce((sum, item) => sum + (item.quantity ?? 0), 0);
+		const topQuantity = items.reduce(
+			(sum, item) => sum + (item.quantity ?? 0),
+			0,
+		);
 		const otherQuantity = Math.max(0, grandTotalQuantity - topQuantity);
 		if (otherRev > 0 || otherQuantity > 0) {
 			items.push({
@@ -3042,15 +3082,17 @@ export class TimelineAnalyticsService {
 		return items.map((item) => {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const country = iso2 ? countryByIso2.get(iso2) : undefined;
-			const territory = (
+			const territory =
 				iso2 && iso2 !== 'OTHER'
 					? (country?.name ?? item.territory)
-					: item.territory
-			) as string;
+					: item.territory;
 			return {
 				...item,
 				territory,
-				imageUrl: iso2 && iso2 !== 'OTHER' ? (country?.imageUrl ?? null) : null,
+				imageUrl:
+					iso2 && iso2 !== 'OTHER'
+						? (country?.imageUrl ?? null)
+						: null,
 			};
 		});
 	}
