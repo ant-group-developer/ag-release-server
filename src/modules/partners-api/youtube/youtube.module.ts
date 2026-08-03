@@ -2,11 +2,14 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { YoutubeApiKeyAdminController } from './admin/youtube-api-key.controller';
+import { YoutubeChannelSyncController } from './admin/youtube-channel-sync.controller';
 import { YoutubeApiKey } from './entities/youtube-api-key.entity';
+import { YoutubeChannelSyncLog } from './entities/youtube-channel-sync-log.entity';
 import { YoutubeSearchCache } from './entities/youtube-search-cache.entity';
 import { YoutubeApiClientService } from './services/youtube-api-client.service';
 import { YoutubeApiKeyPoolService } from './services/youtube-api-key-pool.service';
 import { YoutubeApiKeyService } from './services/youtube-api-key.service';
+import { YoutubeChannelSyncService } from './services/youtube-channel-sync.service';
 import { YoutubeEncryptionService } from './services/youtube-encryption.service';
 import { YoutubeEnrichmentService } from './services/youtube-enrichment.service';
 import { YoutubeSearchCacheService } from './services/youtube-search-cache.service';
@@ -14,9 +17,14 @@ import { YoutubeSearchCacheService } from './services/youtube-search-cache.servi
 @Module({
 	imports: [
 		// ScheduleModule.forRoot(),
-		TypeOrmModule.forFeature([YoutubeApiKey, YoutubeSearchCache, Channel]),
+		TypeOrmModule.forFeature([
+			YoutubeApiKey,
+			YoutubeSearchCache,
+			YoutubeChannelSyncLog,
+			Channel,
+		]),
 	],
-	controllers: [YoutubeApiKeyAdminController],
+	controllers: [YoutubeApiKeyAdminController, YoutubeChannelSyncController],
 	providers: [
 		YoutubeEncryptionService,
 		YoutubeApiKeyService,
@@ -24,6 +32,7 @@ import { YoutubeSearchCacheService } from './services/youtube-search-cache.servi
 		YoutubeApiClientService,
 		YoutubeSearchCacheService,
 		YoutubeEnrichmentService,
+		YoutubeChannelSyncService,
 	],
 	exports: [
 		YoutubeEnrichmentService,

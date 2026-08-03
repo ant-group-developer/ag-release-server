@@ -204,11 +204,12 @@ export class FtpService {
 	}
 
 	/**
-	 * Discovery traversal deliberately bypasses import selectors and global
-	 * exclude patterns so admins can see every remote file before deciding
-	 * whether it is importable. Categories are isolated by connection: an FTP
-	 * session issue while traversing a large category must not make subsequent
-	 * categories disappear from an otherwise "completed" scan.
+	 * Discovery deliberately bypasses parser-specific selectors, but honours the
+	 * global exclude configuration. A configured folder/file must not be added to
+	 * the discovery catalog, sample queue, or auto-generated rules. Categories
+	 * are isolated by connection: an FTP session issue while traversing a large
+	 * category must not make subsequent categories disappear from an otherwise
+	 * "completed" scan.
 	 */
 	async listAllRemoteReportFiles(
 		categories: string[],
@@ -249,15 +250,19 @@ export class FtpService {
 							const periodFolders: FtpRemoteFolderFiles[] = [];
 							let periodFiles = 0;
 							for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
+								if (await this.excludePatternService.shouldExclude(folderEntry.name, 'folder')) {
+									this.logger.debug(`  [EXCLUDED] Skip discovery folder ${category}/${periodEntry.name}/${folderEntry.name} (matched exclude pattern)`);
+									continue;
+								}
 								const folderPath = `${periodPath}/${folderEntry.name}`;
-								const files = await this.listFilesRecursive(client, folderPath, '', undefined, false);
+								const files = await this.listFilesRecursive(client, folderPath, '', undefined, true);
 								periodFiles += files.length;
 								periodFolders.push({
 									category, period: periodEntry.name, dspFolder: folderEntry.name,
 									files: files.sort(),
 								});
 							}
-							return { folderCount: folderEntries.filter((item) => item.isDirectory).length, periodFiles, periodFolders };
+							return { folderCount: periodFolders.length, periodFiles, periodFolders };
 						},
 					);
 					folders.push(...scan.periodFolders);
@@ -291,6 +296,15 @@ export class FtpService {
 		for (const item of list) {
 			const relativeName = prefix ? `${prefix}/${item.name}` : item.name;
 			if (item.isDirectory) {
+				if (
+					applyGlobalExcludes &&
+					await this.excludePatternService.shouldExclude(item.name, 'folder')
+				) {
+					this.logger.debug(
+						`  [EXCLUDED] Skip folder ${relativeName} (matched exclude pattern)`,
+					);
+					continue;
+				}
 				const subFiles = await this.listFilesRecursive(
 					client,
 					`${remotePath}/${item.name}`,

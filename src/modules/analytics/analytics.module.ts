@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Entities
 import { Artist } from 'src/modules/artist/entities/artist.entity';
 import { BucketModule2 } from 'src/modules/bucket2/bucket2.module';
 import { Channel } from 'src/modules/channel/entities/channel.entity';
+import { UserChannel } from 'src/modules/channel/entities/user-channel.entity';
 import { Dsp } from 'src/modules/dsp/entities/dsp.entity';
 import { ImportJobsModule } from 'src/modules/etl/import-jobs.module';
 import { Label } from 'src/modules/label/entities/label.entity';
@@ -33,8 +35,10 @@ import { TrackAnalyticsController } from './controllers/track-analytics.controll
 
 // Services
 import { DspSeedingService } from 'src/modules/dsp/services/dsp-seeding.service';
+import { AnalyticsVideoScopeInterceptor } from './interceptors/analytics-video-scope.interceptor';
 import { AnalyticsCacheService } from './services/analytics-cache.service';
 import { AnalyticsReportExportService } from './services/analytics-report-export.service';
+import { AnalyticsVideoScopeService } from './services/analytics-video-scope.service';
 import { ClickHouseSyncService } from './services/clickhouse-sync.service';
 import { DashboardAnalyticsService } from './services/dashboard-analytics.service';
 import { DspAnalyticsService } from './services/dsp-analytics.service';
@@ -43,8 +47,8 @@ import { ExportQueueService } from './services/export-queue.service';
 import { TimelineAnalyticsService } from './services/global-timeline.service';
 import { IsrcResolverService } from './services/isrc-resolver.service';
 import { RankingService } from './services/ranking.service';
-import { TerAnalyticsService } from './services/ter-analytics.service';
 import { SourceTypeConfigService } from './services/source-type-config.service';
+import { TerAnalyticsService } from './services/ter-analytics.service';
 import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 
 @Module({
@@ -61,6 +65,7 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 			Dsp,
 			Tenant,
 			Channel,
+			UserChannel,
 			Video,
 		]),
 	],
@@ -92,6 +97,11 @@ import { ExportWorkerPoolService } from './workers/export-worker-pool.service';
 		DspSeedingService,
 		DashboardAnalyticsService,
 		AnalyticsCacheService,
+		AnalyticsVideoScopeService,
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: AnalyticsVideoScopeInterceptor,
+		},
 		DspAnalyticsService,
 		TerAnalyticsService,
 		SourceTypeConfigService,

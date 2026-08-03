@@ -24,6 +24,10 @@ import {
 	getUniqueIdentifiersQuery,
 } from '../queries/analytics-report-export.queries';
 import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
+import {
 	GroupState,
 	SummaryAccumulator,
 	createEmptyAccumulator,
@@ -631,6 +635,16 @@ export class ExportRunner {
 			filters.push('t.is_deleted = 0');
 			filters.push('t.release_type = {releaseType:String}');
 			params.releaseType = dto.releaseType;
+		}
+
+		const scopedFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(dto),
+		);
+		if (scopedFilter) {
+			filters.push('t.is_deleted = 0');
+			filters.push(scopedFilter.trim().replace(/^AND\s+/i, ''));
 		}
 
 		if (trackIsrc) {

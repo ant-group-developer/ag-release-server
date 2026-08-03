@@ -54,6 +54,18 @@ class ResetFtpReportFileDiscoveryDto {
 	dryRun?: boolean = true;
 }
 
+class CanonicalizeFtpReportFileRulesDto {
+	@ApiProperty({ example: 'CANONICALIZE_FTP_FILE_RULES', description: 'Required only when applying rule consolidation.' })
+	@IsOptional()
+	@IsString()
+	confirmation?: string;
+
+	@ApiPropertyOptional({ default: true, description: 'When true, reports compatible rule merges and conflicts without writing.' })
+	@IsOptional()
+	@IsBoolean()
+	dryRun?: boolean = true;
+}
+
 @ApiTags('ftp-report-file-discovery')
 @Controller('ftp-report-file-discovery')
 export class FtpReportFileDiscoveryController {
@@ -70,6 +82,15 @@ export class FtpReportFileDiscoveryController {
 			throw new BadRequestException('confirmation must be RESET_FTP_DISCOVERY');
 		}
 		return new ResponseSuccess({ data: await this.service.resetFtpDiscoveryData(dto.dryRun ?? true) });
+	}
+
+	@Post('canonicalize-rules')
+	async canonicalizeRules(@Body() dto: CanonicalizeFtpReportFileRulesDto): Promise<ResponseSuccess<unknown>> {
+		const dryRun = dto.dryRun ?? true;
+		if (!dryRun && dto.confirmation !== 'CANONICALIZE_FTP_FILE_RULES') {
+			throw new BadRequestException('confirmation must be CANONICALIZE_FTP_FILE_RULES when dryRun is false');
+		}
+		return new ResponseSuccess({ data: await this.service.canonicalizeLegacyRules(dryRun) });
 	}
 
 	@Get('runs')
