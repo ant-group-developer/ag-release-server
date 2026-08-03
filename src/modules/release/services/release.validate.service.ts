@@ -227,18 +227,17 @@ export class ReleaseValidateService {
 		release: Release,
 		skipValidateBucket: boolean = false,
 	) {
+		if (release?.type === 'video') {
+			return [];
+		}
+
 		const result: FieldErrorDetails[] = [];
 		// if (skipValidateBucket) return result;
 
 		if (release) {
 			result.push(...this.validateRelease(release));
 			if (!release.isInstrumental) {
-				result.push(
-					...this.validateLanguage(
-						release.releaseLanguage,
-						release.type === 'video',
-					),
-				);
+				result.push(...this.validateLanguage(release.releaseLanguage));
 			}
 			result.push(...this.validateTracks(release.tracks));
 		}
