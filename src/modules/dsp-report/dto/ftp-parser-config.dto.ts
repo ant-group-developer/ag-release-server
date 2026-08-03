@@ -151,7 +151,7 @@ export class PreviewFtpParserConfigDto {
 export class SyncParserCatalogDto {
 	@ApiPropertyOptional({
 		description:
-			'False only creates parser catalog records that do not exist. True rewrites every parser catalog record and its default field mappings from source.',
+			'Rewrite the parser catalog and its default field mappings even when source hashes are unchanged.',
 		default: false,
 	})
 	@IsOptional()

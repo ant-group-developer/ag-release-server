@@ -1,42 +1,22 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-	ArrayNotEmpty,
-	IsArray,
-	IsEnum,
-	IsOptional,
-	IsString,
-	IsUUID,
-	MaxLength,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
-import {
-	YoutubeChannelSyncResult,
-	YoutubeChannelSyncReviewStatus,
-} from '../enum/youtube-channel-sync.enum';
 
-export class QueryYoutubeChannelSyncItemsDto extends BaseQueryDto {
-	@ApiPropertyOptional({ enum: YoutubeChannelSyncResult })
+export class SyncYoutubeChannelsDto {
+	@ApiPropertyOptional({
+		default: false,
+		description:
+			'false: chi fill field DB dang NULL. true: ghi de gia tri khac tu YouTube.',
+	})
 	@IsOptional()
-	@IsEnum(YoutubeChannelSyncResult)
-	syncResult?: YoutubeChannelSyncResult;
-
-	@ApiPropertyOptional({ enum: YoutubeChannelSyncReviewStatus })
-	@IsOptional()
-	@IsEnum(YoutubeChannelSyncReviewStatus)
-	reviewStatus?: YoutubeChannelSyncReviewStatus;
+	@Transform(({ value }) => value === true || value === 'true')
+	@IsBoolean()
+	force = false;
 }
 
-export class ApproveYoutubeChannelSyncItemsDto {
-	@IsArray()
-	@ArrayNotEmpty()
-	@IsUUID('4', { each: true })
-	itemIds: string[];
-}
-
-export class RejectYoutubeChannelSyncItemDto {
-	@ApiPropertyOptional({ maxLength: 1000 })
+export class QueryYoutubeChannelSyncLogsDto extends BaseQueryDto {
 	@IsOptional()
-	@IsString()
-	@MaxLength(1000)
-	note?: string;
+	@IsUUID('4')
+	channelId?: string;
 }

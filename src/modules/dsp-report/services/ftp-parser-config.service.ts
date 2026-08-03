@@ -338,6 +338,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				row.source_hash,
 			]),
 		);
+		const existingCatalogMappings = await this.findCatalogFieldMappings();
 		const existingCatalogMappingRows = await this.clickHouseService.query<{
 			parser_code: string;
 			source_category: string;
@@ -399,9 +400,6 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				];
 				for (const entry of catalogEntries) {
 					const catalogKey = `${entry.code}|${entry.category}`;
-					// Default sync is additive: preserve an existing catalog snapshot
-					// exactly as configured. `force=true` is the explicit overwrite path.
-					if (!force && existingHashes.has(catalogKey)) continue;
 					const explicitFieldMappings = this.getExplicitCatalogFieldMappings(
 						entry,
 					);
@@ -448,6 +446,21 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 							})),
 						);
 					}
+					const existingMappings =
+						existingCatalogMappingsByKey.get(catalogKey) || [];
+					const mappingsAreSafe =
+						existingMappings.length > 0 &&
+						existingMappings.every((mapping) =>
+							isSupportedFieldTransform(mapping.transform),
+						);
+					if (
+						!force &&
+						existingHashes.get(catalogKey) === sourceHash &&
+						(fieldMappings.length === 0 ||
+							(existingCatalogMappings.has(catalogKey) &&
+								mappingsAreSafe))
+					)
+						continue;
 					rows.push({
 						parser_code: entry.code,
 						source_category: entry.category,
@@ -525,7 +538,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			const alreadyStaged = rows.some(
 				(row) => row.parser_code === entry.code && row.source_category === entry.category && row.is_active === 1,
 			);
-			if ((!force && alreadyPersisted) || alreadyStaged) continue;
+			if (alreadyPersisted || alreadyStaged) continue;
 			const parserName = entry.factory().constructor.name;
 			const parserDefinition = parserDefinitionsByName.get(parserName);
 			if (!parserDefinition) {
