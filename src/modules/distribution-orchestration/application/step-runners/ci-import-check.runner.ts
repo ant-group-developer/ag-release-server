@@ -56,7 +56,20 @@ export class CiImportCheckRunner {
 			);
 		}
 
-		const batchId = `${dist.id}:${payload.channelId}`;
+		// batchExternalId = timestamp folder from SFTP upload path (e.g. "20260803104705024")
+		// packageUris["CI"] = "local/20260803104705024/701798205553" → split('/')[1]
+		const ciPackageUri = dist.packageUriFor('CI');
+		if (!ciPackageUri) {
+			throw new Error(
+				`CiImportCheckRunner: no CI package URI on distribution ${dist.id}`,
+			);
+		}
+		const batchId = ciPackageUri.split('/')[1];
+		if (!batchId) {
+			throw new Error(
+				`CiImportCheckRunner: cannot extract batchId from packageUri "${ciPackageUri}"`,
+			);
+		}
 		const status = await this.reader.read({
 			batchId,
 			upc,

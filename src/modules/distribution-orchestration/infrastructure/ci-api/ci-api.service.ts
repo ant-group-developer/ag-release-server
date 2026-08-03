@@ -23,12 +23,17 @@ export class CiApiService {
 		const timeout = config.timeout ?? 30000;
 
 		this.axiosInstance = axios.create({
-			baseURL: config.baseUrl,
 			timeout,
 			headers: {
-				Authorization: `Bearer ${config.token}`,
 				'Content-Type': 'application/json',
 			},
+		});
+
+		// Inject baseURL + token lazily (config uses getters → reads from AppConfigService at call time)
+		this.axiosInstance.interceptors.request.use((req) => {
+			req.baseURL = config.baseUrl;
+			req.headers.Authorization = `Bearer ${config.token}`;
+			return req;
 		});
 	}
 
