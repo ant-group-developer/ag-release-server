@@ -28,6 +28,7 @@ export const CLICKHOUSE_TABLES = {
 	FTP_REPORT_FILE_DISCOVERY_CONFIG: 'ftp_report_file_discovery_config',
 	FTP_REPORT_FILE_DISCOVERY_CHECKPOINTS: 'ftp_report_file_discovery_checkpoints',
 	FTP_REPORT_FILE_PERIOD_OBSERVATIONS: 'ftp_report_file_period_observations',
+	FTP_REPORT_SAMPLE_TASKS: 'ftp_report_sample_tasks',
 	METADATA_ENRICHMENT_LOG: 'metadata_enrichment_log',
 	ANALYTICS_SOURCE_TYPE_CONFIGS: 'analytics_source_type_configs',
 } as const;

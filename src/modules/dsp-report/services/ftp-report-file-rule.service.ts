@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../clickhouse';
+import { BucketR2Service } from '../../bucket2/services/bucket-r2.service';
 import { FtpSourceCategory } from '../dto/ftp-parser-config.dto';
 import {
 	FtpReportFileRuleStatus,
@@ -22,6 +23,7 @@ export interface FtpReportFileRule {
 	isActive: boolean;
 	createdAt: string;
 	updatedAt: string;
+	sampleFiles?: Array<{ ftpPath: string; key: string; fileName: string; url: string }>;
 }
 
 export interface ResolvedFtpReportFiles {
@@ -53,6 +55,7 @@ export class FtpReportFileRuleService {
 	constructor(
 		private readonly clickHouseService: ClickHouseService,
 		private readonly parserConfigService: FtpParserConfigService,
+		private readonly bucketR2Service: BucketR2Service,
 	) {}
 
 	async list(query: QueryFtpReportFileRulesDto): Promise<{
@@ -91,7 +94,7 @@ export class FtpReportFileRuleService {
 				params,
 			),
 		]);
-		return { items: rows.map(toRule), totalItems: Number(totals[0]?.total || 0) };
+		return { items: await this.attachSampleFiles(rows.map(toRule)), totalItems: Number(totals[0]?.total || 0) };
 	}
 
 	async findById(id: string): Promise<FtpReportFileRule | null> {
@@ -99,7 +102,7 @@ export class FtpReportFileRuleService {
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} FINAL WHERE id = {id:String} LIMIT 1`,
 			{ id },
 		);
-		return rows[0] ? toRule(rows[0]) : null;
+		return rows[0] ? (await this.attachSampleFiles([toRule(rows[0])]))[0] : null;
 	}
 
 	async upsert(dto: UpsertFtpReportFileRuleDto, id?: string): Promise<FtpReportFileRule> {
@@ -212,6 +215,24 @@ export class FtpReportFileRuleService {
 			if (this.matches(dto.dspFolderPattern, sample.dsp_folder) && this.matches(dto.fileNamePattern, file) && this.matches(rule.dsp_folder_pattern, sample.dsp_folder) && this.matches(rule.file_name_pattern, file))
 				throw new BadRequestException(`Rule overlaps existing rule ${rule.id} for observed file ${sample.dsp_folder}/${file}`);
 		}
+	}
+
+	private async attachSampleFiles(rules: FtpReportFileRule[]): Promise<FtpReportFileRule[]> {
+		if (!rules.length) return rules;
+		const catalog = await this.clickHouseService.query<any>(`SELECT source, source_category, dsp_folder, file_name_pattern, sample_file_refs FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = 'ftp'`);
+		const tasks = await this.clickHouseService.query<any>(`SELECT source, source_category, dsp_folder, file_name_pattern, ftp_path, r2_key FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL WHERE status = 'completed'`);
+		return Promise.all(rules.map(async (rule) => {
+			const row = catalog.find((item) => item.source === rule.source && item.source_category === rule.sourceCategory && item.dsp_folder === rule.dspFolderPattern.replace(/^\^|\$$/g, '') && item.file_name_pattern === rule.fileNamePattern);
+			const refs = (row?.sample_file_refs || []).flatMap((raw: string) => { try { return [JSON.parse(raw)]; } catch { return []; } });
+			if (!refs.length) refs.push(...tasks.filter((task) => task.source === rule.source && task.source_category === rule.sourceCategory && task.dsp_folder === rule.dspFolderPattern.replace(/^\^|\$$/g, '') && task.file_name_pattern === rule.fileNamePattern).slice(0, 2).map((task) => ({ ftpPath: task.ftp_path, r2Key: task.r2_key, fileName: task.ftp_path.split('/').pop() })));
+			return {
+				...rule,
+				sampleFiles: await Promise.all(refs.map(async (ref: { ftpPath: string; r2Key: string; fileName: string }) => ({
+					ftpPath: ref.ftpPath, key: ref.r2Key, fileName: ref.fileName,
+					url: await this.bucketR2Service.getSignedUrlDown({ key: ref.r2Key, isPublic: false, fileName: ref.fileName }),
+				}))),
+			};
+		}));
 	}
 
 	private assertRegex(pattern: string, field: string): void { try { new RegExp(pattern); } catch { throw new BadRequestException(`${field} must be a valid regular expression`); } }
