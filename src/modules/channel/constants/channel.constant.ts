@@ -62,4 +62,28 @@ export class ChannelException {
 			messageCode: 'channel.tenant_not_set',
 		});
 	}
+
+	static CHANNEL_NOT_FOUND() {
+		return new ResponseError({
+			statusCode: 404,
+			message: 'Kênh không tồn tại',
+			messageCode: 'channel.message.error.notFound',
+		});
+	}
+
+	static CHANNEL_WORKSPACE_MISMATCH() {
+		return new ResponseError({
+			statusCode: 403,
+			message: 'Bạn không thuộc Workspace sở hữu kênh này',
+			messageCode: 'channel.message.error.workspaceMismatch',
+		});
+	}
+
+	static USER_NOT_ASSIGNED_TO_CHANNEL() {
+		return new ResponseError({
+			statusCode: 403,
+			message: 'Bạn không có quyền truy cập vào kênh này',
+			messageCode: 'channel.message.error.userNotAssigned',
+		});
+	}
 }

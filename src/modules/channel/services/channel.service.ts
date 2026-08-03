@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { PageDto, ResponseError } from 'src/common/dtos/common.response.dto';
 import { AuthMessages } from 'src/modules/auth/constants/messages';
@@ -237,7 +237,7 @@ export class ChannelService {
 		const channel = await this.createDetailQuery()
 			.where('channel.id = :id', { id })
 			.getOne();
-		if (!channel) throw new NotFoundException('Channel not found');
+		if (!channel) throw ChannelException.CHANNEL_NOT_FOUND();
 		if (actorTenantId) {
 			const tenantIds = await this.getAccessibleTenantIds(actorTenantId);
 			this.ensureTenantAccessible(channel.tenantId, tenantIds);

@@ -1,15 +1,13 @@
-import {
-	CanActivate,
-	ExecutionContext,
-	ForbiddenException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TenantUser } from 'src/modules/user/entities/tenant-user.entity';
-import { TenantUserType, UserType } from 'src/modules/user/enum/user.enum';
-import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
+import { UserType } from 'src/modules/user/enum/user.enum';
+import {
+	checkIsNotSystemTenant,
+	checkIsTenantOwnerOrAdmin,
+} from 'src/modules/user/utils/user-type.util';
 import { Repository } from 'typeorm';
+import { ChannelException } from '../constants/channel.constant';
 import { Channel } from '../entities/channel.entity';
 import { UserChannel } from '../entities/user-channel.entity';
 
@@ -37,12 +35,10 @@ export class ChannelAccessGuard implements CanActivate {
 			where: { id: channelId },
 		});
 
-		if (!channel) throw new NotFoundException('Kênh không tồn tại');
+		if (!channel) throw ChannelException.CHANNEL_NOT_FOUND();
 
 		if (channel.tenantId && channel.tenantId !== user?.tenantId) {
-			throw new ForbiddenException(
-				'Bạn không thuộc Workspace sở hữu kênh này',
-			);
+			throw ChannelException.CHANNEL_WORKSPACE_MISMATCH();
 		}
 
 		const tenantUser = await this.tenantUserRepo.findOne({
@@ -50,21 +46,14 @@ export class ChannelAccessGuard implements CanActivate {
 		});
 
 		if (!tenantUser) {
-			throw new ForbiddenException(
-				'Bạn không thuộc Workspace sở hữu kênh này',
-			);
+			throw ChannelException.CHANNEL_WORKSPACE_MISMATCH();
 		}
 
 		// Owner và Admin workspace mặc định có full quyền xem kênh active
-		if (
-			tenantUser.type === TenantUserType.OWNER ||
-			tenantUser.type === TenantUserType.ADMIN
-		) {
-			return true;
-		}
+		if (checkIsTenantOwnerOrAdmin(tenantUser.type)) return true;
 
 		if (!channel.isActive) {
-			throw new NotFoundException('Kênh không tồn tại');
+			throw ChannelException.CHANNEL_NOT_FOUND();
 		}
 
 		// 4. Voz member thuong: Check xem user co duoc gan channel khong
@@ -73,9 +62,7 @@ export class ChannelAccessGuard implements CanActivate {
 		});
 
 		if (!isAssigned) {
-			throw new ForbiddenException(
-				'Bạn không có quyền truy cập vào kênh này',
-			);
+			throw ChannelException.USER_NOT_ASSIGNED_TO_CHANNEL();
 		}
 
 		return true;
