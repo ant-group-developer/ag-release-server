@@ -12,6 +12,7 @@ import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-repor
 import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-config.service';
 import { FtpService } from './ftp.service';
 import { BucketR2Service } from '../../../bucket2/services/bucket-r2.service';
+import { canonicalizeFtpReportFilePattern } from './ftp-report-file-pattern';
 
 const CATEGORIES = Object.values(FtpSourceCategory);
 const JOB_NAME = 'ftp-report-file-discovery';
@@ -69,6 +70,10 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			{ id },
 		);
 		return rows[0] || null;
+	}
+
+	async canonicalizeLegacyRules(dryRun = true): Promise<unknown> {
+		return this.ruleService.canonicalizeLegacyRules('ftp', dryRun);
 	}
 
 	/**
@@ -219,7 +224,10 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 				group.patterns.push({ pattern: item.pattern, samples: Array.from(item.files) });
 				byFolder.set(key, group);
 			}
-			for (const group of byFolder.values()) await this.ruleService.ensureDiscoveredRules('ftp', group.category, group.folder, group.patterns);
+			for (const group of byFolder.values()) {
+				const ruleResult = await this.ruleService.ensureDiscoveredRules('ftp', group.category, group.folder, group.patterns);
+				for (const warning of ruleResult.warnings) this.logger.warn(warning);
+			}
 			await this.saveCheckpoints(id, categoryScans, checkpoints);
 			const failedPaths = categoryScans.flatMap((scan) => scan.failedPaths);
 			const status = failedPaths.length ? 'completed_with_warnings' : 'completed';
@@ -444,10 +452,16 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 	}
 
 	private toFilePattern(fileName: string): string {
+		const isZipArchive = fileName.toLowerCase().endsWith('.zip');
+		const unarchivedFileName = isZipArchive
+			? fileName.slice(0, -4)
+			: fileName;
+		const hasOptionalZipArchive = /\.(csv|txt|tsv)$/i.test(unarchivedFileName);
+		const normalizedFileName = hasOptionalZipArchive ? unarchivedFileName : fileName;
 		// Date tokens can be surrounded by underscores, so word boundaries cannot
 		// be used here. Digit boundaries still prevent a date-like substring inside
 		// a long timestamp from being treated as a separate YYYYMM/DD token.
-		let value = fileName
+		let value = normalizedFileName
 			.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '__UUID__')
 			.replace(/(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8_DASH__')
 			.replace(/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)/g, '__DATE8__')
@@ -457,6 +471,7 @@ export class FtpReportFileDiscoveryService implements OnModuleInit, OnModuleDest
 			.replace(/(?<=[_/])(?:AD|AE|AF|AG|AI|AL|AM|AO|AR|AT|AU|AW|AX|AZ|BA|BB|BD|BE|BF|BG|BH|BI|BJ|BN|BO|BQ|BR|BS|BT|BW|BY|BZ|CA|CD|CF|CG|CH|CI|CL|CM|CN|CO|CR|CU|CV|CW|CY|CZ|DE|DJ|DK|DM|DO|DZ|EC|EE|EG|EH|ER|ES|ET|FI|FJ|FK|FM|FO|FR|GA|GB|GD|GE|GF|GG|GH|GI|GL|GM|GN|GP|GQ|GR|GS|GT|GU|GW|GY|HK|HM|HN|HR|HT|HU|ID|IE|IL|IM|IN|IO|IQ|IR|IS|IT|JE|JM|JO|JP|KE|KG|KH|KI|KM|KN|KP|KR|KW|KY|KZ|LA|LB|LC|LI|LK|LR|LS|LT|LU|LV|LY|MA|MC|MD|ME|MG|MH|MK|ML|MM|MN|MO|MP|MQ|MR|MS|MT|MU|MV|MW|MX|MY|MZ|NA|NC|NE|NF|NG|NI|NL|NO|NP|NR|NU|NZ|OM|PA|PE|PF|PG|PH|PK|PL|PM|PN|PR|PS|PT|PW|PY|QA|RE|RO|RS|RU|RW|SA|SB|SC|SD|SE|SG|SH|SI|SJ|SK|SL|SM|SN|SO|SR|SS|ST|SV|SX|SY|SZ|TC|TD|TF|TG|TH|TJ|TK|TL|TM|TN|TO|TR|TT|TV|TW|TZ|UA|UG|UM|US|UY|UZ|VA|VC|VE|VG|VI|VN|VU|WF|WS|YE|YT|ZA|ZM|ZW)(?=[_/])/g, '__COUNTRY_ISO2__')
 			.replace(/\d{4,}/g, '__NUMBER__');
 		value = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		return `^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__COUNTRY_ISO2__/g, '[A-Z]{2}').replace(/__NUMBER__/g, '\\d+')}$`;
+		if (hasOptionalZipArchive) value += '__OPTIONAL_ZIP__';
+		return canonicalizeFtpReportFilePattern(`^${value.replace(/__UUID__/g, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}').replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}').replace(/__DATE8__/g, '\\d{8}').replace(/__DATE6__/g, '\\d{6}').replace(/__COUNTRY_ISO2__/g, '[A-Z]{2}').replace(/__NUMBER__/g, '\\d+').replace(/__OPTIONAL_ZIP__/g, '(?:\\.zip)?')}$`);
 	}
 }

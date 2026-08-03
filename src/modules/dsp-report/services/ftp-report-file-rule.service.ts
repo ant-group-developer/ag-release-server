@@ -9,6 +9,7 @@ import {
 	UpsertFtpReportFileRuleDto,
 } from '../dto/ftp-report-file-rule.dto';
 import { FtpParserConfigService } from './ftp-parser-config.service';
+import { canonicalizeFtpReportFilePattern } from '../../etl/services/ftp/ftp-report-file-pattern';
 
 export interface FtpReportFileRule {
 	id: string;
@@ -31,6 +32,17 @@ export interface ResolvedFtpReportFiles {
 	pending: string[];
 	ignored: string[];
 	parserCode: string | null;
+}
+
+export interface EnsureDiscoveredRulesResult {
+	created: number;
+	warnings: string[];
+}
+
+export interface CanonicalizeFtpReportFileRulesResult {
+	dryRun: boolean;
+	merged: Array<{ canonicalPattern: string; keptRuleId: string; disabledRuleIds: string[] }>;
+	conflicts: Array<{ canonicalPattern: string; ruleIds: string[]; reason: string }>;
 }
 
 function toRule(row: any): FtpReportFileRule {
@@ -168,36 +180,141 @@ export class FtpReportFileRuleService {
 		category: FtpSourceCategory,
 		dspFolder: string,
 		patterns: Array<{ pattern: string; samples: string[] }>,
-	): Promise<number> {
+	): Promise<EnsureDiscoveredRulesResult> {
 		let created = 0;
+		const warnings: string[] = [];
 		let legacy: Awaited<ReturnType<FtpParserConfigService['resolve']>> | null = null;
-		try { legacy = await this.parserConfigService.resolve(dspFolder, category); } catch { /* leave unknown files pending */ }
+		let legacyError = '';
+		try {
+			legacy = await this.parserConfigService.resolve(dspFolder, category);
+		} catch (error) {
+			legacyError = error.message;
+		}
+		const existing = await this.clickHouseService.query<any>(
+			`SELECT id, file_name_pattern FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} FINAL
+			 WHERE source = {source:String} AND source_category = {category:String}
+			 AND dsp_folder_pattern = {folder:String} AND is_active = 1`,
+			{ source, category, folder: `^${this.escapeRegex(dspFolder)}$` },
+		);
+		const existingPatterns = new Set(existing.map((row) => canonicalizeFtpReportFilePattern(row.file_name_pattern)));
 		for (const item of patterns) {
-			const fileNamePattern = item.pattern;
-			const existing = await this.clickHouseService.query<any>(
-				`SELECT id FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} FINAL
-				 WHERE source = {source:String} AND source_category = {category:String}
-				 AND dsp_folder_pattern = {folder:String} AND file_name_pattern = {file:String} AND is_active = 1 LIMIT 1`,
-				{ source, category, folder: `^${this.escapeRegex(dspFolder)}$`, file: fileNamePattern },
-			);
-			if (existing.length) continue;
+			const fileNamePattern = canonicalizeFtpReportFilePattern(item.pattern);
+			if (existingPatterns.has(fileNamePattern)) continue;
 			const selections = legacy?.usesDatabaseConfig
 				? item.samples.map((sample) => legacy!.selectFile(sample))
 				: [];
-			const status = selections.length && selections.every(Boolean)
+			let status = !legacyError && selections.length && selections.every(Boolean)
 				? FtpReportFileRuleStatus.IMPORT
 				: selections.length && selections.every((value) => !value)
 					? FtpReportFileRuleStatus.IGNORE
 					: FtpReportFileRuleStatus.PENDING;
-			await this.upsert({
-				source, sourceCategory: category,
-				dspFolderPattern: `^${this.escapeRegex(dspFolder)}$`, fileNamePattern, status,
-				parserCode: status === FtpReportFileRuleStatus.IMPORT ? legacy?.parserCode : undefined,
-				description: status === FtpReportFileRuleStatus.PENDING ? 'Awaiting admin confirmation from FTP discovery' : 'Migrated from ftp_dsp_parser_configs',
-			});
+			let description = status === FtpReportFileRuleStatus.PENDING
+				? `Awaiting admin confirmation from FTP discovery${legacyError ? `: ${legacyError}` : ''}`
+				: 'Migrated from ftp_dsp_parser_configs';
+			try {
+				await this.upsert({
+					source, sourceCategory: category,
+					dspFolderPattern: `^${this.escapeRegex(dspFolder)}$`, fileNamePattern, status,
+					parserCode: status === FtpReportFileRuleStatus.IMPORT ? legacy?.parserCode : undefined,
+					description,
+				});
+			} catch (error) {
+				if (status !== FtpReportFileRuleStatus.IMPORT) {
+					warnings.push(`FTP rule creation failed for ${category}/${dspFolder}/${fileNamePattern}: ${error.message}`);
+					continue;
+				}
+				status = FtpReportFileRuleStatus.PENDING;
+				description = `Awaiting admin confirmation from FTP discovery: ${error.message}`;
+				try {
+					await this.upsert({ source, sourceCategory: category, dspFolderPattern: `^${this.escapeRegex(dspFolder)}$`, fileNamePattern, status, description });
+				} catch (pendingError) {
+					warnings.push(`FTP rule creation failed for ${category}/${dspFolder}/${fileNamePattern}: ${pendingError.message}`);
+					continue;
+				}
+				warnings.push(`FTP rule for ${category}/${dspFolder}/${fileNamePattern} was left pending: ${error.message}`);
+			}
+			existingPatterns.add(fileNamePattern);
 			created++;
 		}
-		return created;
+		return { created, warnings };
+	}
+
+	/**
+	 * Safely collapses legacy `.csv` / `.csv.zip` rules.  A group is changed only
+	 * when its import decision is identical and the optional zip rule would not
+	 * overlap a different observed rule.
+	 */
+	async canonicalizeLegacyRules(source = 'ftp', dryRun = true): Promise<CanonicalizeFtpReportFileRulesResult> {
+		const rows = await this.clickHouseService.query<any>(
+			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES} FINAL WHERE source = {source:String} AND is_active = 1`,
+			{ source },
+		);
+		const rules = rows.map(toRule);
+		const samples = await this.clickHouseService.query<{ source_category: string; dsp_folder: string; sample_file_paths: string[] }>(
+			`SELECT source_category, dsp_folder, sample_file_paths FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = {source:String}`,
+			{ source },
+		);
+		const groups = new Map<string, { category: string; folderPattern: string; canonicalPattern: string }>();
+		for (const rule of rules) {
+			const canonicalPattern = canonicalizeFtpReportFilePattern(rule.fileNamePattern);
+			if (canonicalPattern === rule.fileNamePattern) continue;
+			const group = { category: rule.sourceCategory, folderPattern: rule.dspFolderPattern, canonicalPattern };
+			groups.set(JSON.stringify([group.category, group.folderPattern, group.canonicalPattern]), group);
+		}
+
+		const result: CanonicalizeFtpReportFileRulesResult = { dryRun, merged: [], conflicts: [] };
+		for (const group of groups.values()) {
+			const { category, folderPattern, canonicalPattern } = group;
+			const equivalentRules = rules.filter((rule) =>
+				rule.sourceCategory === category &&
+				rule.dspFolderPattern === folderPattern &&
+				canonicalizeFtpReportFilePattern(rule.fileNamePattern) === canonicalPattern,
+			);
+			const ruleIds = equivalentRules.map((rule) => rule.id);
+			const decisions = new Set(equivalentRules.map((rule) => `${rule.status}|${rule.parserCode}`));
+			if (decisions.size !== 1) {
+				result.conflicts.push({ canonicalPattern, ruleIds, reason: 'equivalent rules have different status or parserCode' });
+				continue;
+			}
+			const groupIds = new Set(ruleIds);
+			const overlap = samples.some((sample) =>
+				sample.source_category === category &&
+				this.matches(folderPattern, sample.dsp_folder) &&
+				(sample.sample_file_paths || []).some((file) =>
+					this.matches(canonicalPattern, file) && rules.some((rule) =>
+						!groupIds.has(rule.id) &&
+						rule.sourceCategory === category &&
+						this.matches(rule.dspFolderPattern, sample.dsp_folder) &&
+						this.matches(rule.fileNamePattern, file),
+					),
+				),
+			);
+			if (overlap) {
+				result.conflicts.push({ canonicalPattern, ruleIds, reason: 'canonical rule overlaps another active rule for an observed file' });
+				continue;
+			}
+			const keeper = [...equivalentRules].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+			const disabled = equivalentRules.filter((rule) => rule.id !== keeper.id);
+			result.merged.push({ canonicalPattern, keptRuleId: keeper.id, disabledRuleIds: disabled.map((rule) => rule.id) });
+			if (dryRun) continue;
+
+			const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+			await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES, [
+				{
+					id: keeper.id, source, source_category: keeper.sourceCategory,
+					dsp_folder_pattern: keeper.dspFolderPattern, file_name_pattern: canonicalPattern,
+					status: keeper.status, parser_code: keeper.parserCode, description: keeper.description,
+					config_version: keeper.configVersion + 1, is_active: 1, created_at: keeper.createdAt, updated_at: now,
+				},
+				...disabled.map((rule) => ({
+					id: rule.id, source, source_category: rule.sourceCategory,
+					dsp_folder_pattern: rule.dspFolderPattern, file_name_pattern: rule.fileNamePattern,
+					status: rule.status, parser_code: rule.parserCode, description: rule.description,
+					config_version: rule.configVersion + 1, is_active: 0, created_at: rule.createdAt, updated_at: now,
+				})),
+			]);
+		}
+		return result;
 	}
 
 	private async assertNoObservedOverlap(dto: UpsertFtpReportFileRuleDto, id?: string): Promise<void> {

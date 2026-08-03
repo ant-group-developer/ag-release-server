@@ -365,6 +365,10 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const rows: Record<string, unknown>[] = [];
 		const mappingRows: Record<string, unknown>[] = [];
+		const parserDefinitionsByName = new Map<
+			string,
+			{ sourceFile: string; parserSource: string; sourceHash: string }
+		>();
 		for (const filePath of files) {
 			const source = fs.readFileSync(filePath, 'utf8');
 			const parserDefinitions = this.extractParserDefinitions(source);
@@ -375,6 +379,13 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				.createHash('sha256')
 				.update(source)
 				.digest('hex');
+			for (const parserDefinition of parserDefinitions) {
+				parserDefinitionsByName.set(parserDefinition.parserName, {
+					sourceFile,
+					parserSource: parserDefinition.parserSource,
+					sourceHash,
+				});
+			}
 
 			for (const parserDefinition of parserDefinitions) {
 				const { parserName, parserSource } = parserDefinition;
@@ -516,6 +527,48 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 					);
 				}
 			}
+		}
+
+		// A source scanner must never make a runtime parser disappear from the
+		// selectable catalog. This also repairs legacy deployments where a parser
+		// (notably Pandora) existed in the registry but had no persisted row.
+		for (const entry of this.catalog.values()) {
+			const catalogKey = `${entry.code}|${entry.category}`;
+			const alreadyPersisted = existingHashes.has(catalogKey);
+			const alreadyStaged = rows.some(
+				(row) => row.parser_code === entry.code && row.source_category === entry.category && row.is_active === 1,
+			);
+			if (alreadyPersisted || alreadyStaged) continue;
+			const parserName = entry.factory().constructor.name;
+			const parserDefinition = parserDefinitionsByName.get(parserName);
+			if (!parserDefinition) {
+				this.logger.warn(`Parser catalog sync could not locate source for runtime parser ${entry.code} (${parserName})`);
+				continue;
+			}
+			const explicitFieldMappings = this.getExplicitCatalogFieldMappings(entry);
+			const fieldMappings = explicitFieldMappings || this.extractFieldMappings(parserDefinition.parserSource);
+			rows.push({
+				parser_code: entry.code,
+				source_category: entry.category,
+				parser_name: parserName,
+				source_file: parserDefinition.sourceFile,
+				target_table: this.getTargetTable(entry.category),
+				parser_source: parserDefinition.parserSource,
+				source_hash: parserDefinition.sourceHash,
+				is_selectable: 1,
+				is_active: 1,
+				synced_at: now,
+			});
+			mappingRows.push(
+				...fieldMappings.map((mapping) => ({
+					mapping_scope: 'catalog', dsp_report_id: '', parser_code: entry.code,
+					source_category: entry.category, config_version: 0,
+					mapping_key: this.makeMappingKey(mapping), report_column: mapping.reportColumn,
+					parser_column: mapping.parserColumn || mapping.reportColumn,
+					target_column: mapping.targetColumn, transform: mapping.transform || 'trim',
+					is_active: 1, updated_at: now,
+				})),
+			);
 		}
 
 		if (rows.length > 0) {
