@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import {
+	YOUTUBE_CHANNELS_BATCH_SIZE,
+	YOUTUBE_CHANNELS_LIST_ENDPOINT,
 	YOUTUBE_INITIAL_BACKOFF_MS,
 	YOUTUBE_MAX_KEY_ROTATIONS_PER_CALL,
 	YOUTUBE_MAX_RETRIES_TRANSIENT,
+	YOUTUBE_QUOTA_COST_CHANNELS_LIST,
 	YOUTUBE_QUOTA_COST_SEARCH,
 	YOUTUBE_QUOTA_COST_VIDEOS_LIST,
 	YOUTUBE_SEARCH_ENDPOINT,
@@ -34,6 +37,12 @@ export interface YoutubeSearchResultItem {
 export interface YoutubeSearchResult {
 	items: YoutubeSearchResultItem[];
 	raw: unknown;
+}
+
+export interface YoutubeChannelSnippet {
+	channelId: string;
+	title: string;
+	thumbnailUrl: string | null;
 }
 
 /**
@@ -87,6 +96,55 @@ export class YoutubeApiClientService {
 				});
 			}
 		}
+		return result;
+	}
+
+	/**
+	 * Batch fetch public metadata for channels. Returns only fields that the
+	 * channel-sync workflow is allowed to propose for update.
+	 * Cost: ceil(channelIds/50) * 1 unit.
+	 */
+	async getChannelsById(
+		channelIds: string[],
+	): Promise<Map<string, YoutubeChannelSnippet>> {
+		const result = new Map<string, YoutubeChannelSnippet>();
+		if (channelIds.length === 0) return result;
+
+		const unique = Array.from(
+			new Set(channelIds.map((id) => id.trim()).filter(Boolean)),
+		);
+		for (let i = 0; i < unique.length; i += YOUTUBE_CHANNELS_BATCH_SIZE) {
+			const chunk = unique.slice(i, i + YOUTUBE_CHANNELS_BATCH_SIZE);
+			const response = await this.executeWithKeyRotation(
+				YOUTUBE_QUOTA_COST_CHANNELS_LIST,
+				(apiKey) =>
+					axios.get(YOUTUBE_CHANNELS_LIST_ENDPOINT, {
+						params: {
+							part: 'snippet',
+							id: chunk.join(','),
+							key: apiKey,
+						},
+						timeout: 15000,
+					}),
+			);
+
+			for (const item of response?.data?.items ?? []) {
+				const snippet = item?.snippet ?? {};
+				const thumbnails = snippet.thumbnails ?? {};
+				const thumbnailUrl =
+					thumbnails.high?.url ??
+					thumbnails.medium?.url ??
+					thumbnails.default?.url ??
+					null;
+				if (!item?.id) continue;
+				result.set(item.id, {
+					channelId: item.id,
+					title: snippet.title ?? '',
+					thumbnailUrl,
+				});
+			}
+		}
+
 		return result;
 	}
 
@@ -193,11 +251,9 @@ export class YoutubeApiClientService {
 			}
 		}
 
-		throw (
-			lastErr ??
-			new Error(
-				`YouTube API call failed after ${YOUTUBE_MAX_KEY_ROTATIONS_PER_CALL} key rotations`,
-			)
+		if (lastErr instanceof Error) throw lastErr;
+		throw new Error(
+			`YouTube API call failed after ${YOUTUBE_MAX_KEY_ROTATIONS_PER_CALL} key rotations`,
 		);
 	}
 

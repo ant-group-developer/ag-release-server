@@ -4,6 +4,7 @@
 export const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 export const YOUTUBE_VIDEOS_LIST_ENDPOINT = `${YOUTUBE_API_BASE_URL}/videos`;
 export const YOUTUBE_SEARCH_ENDPOINT = `${YOUTUBE_API_BASE_URL}/search`;
+export const YOUTUBE_CHANNELS_LIST_ENDPOINT = `${YOUTUBE_API_BASE_URL}/channels`;
 
 /**
  * Quota cost per call theo YouTube Data API v3.
@@ -11,11 +12,13 @@ export const YOUTUBE_SEARCH_ENDPOINT = `${YOUTUBE_API_BASE_URL}/search`;
  */
 export const YOUTUBE_QUOTA_COST_VIDEOS_LIST = 1; // videos.list: 1 unit / call (max 50 ids)
 export const YOUTUBE_QUOTA_COST_SEARCH = 100; // search.list: 100 units / call
+export const YOUTUBE_QUOTA_COST_CHANNELS_LIST = 1; // channels.list: 1 unit / call (max 50 ids)
 
 /**
  * YouTube videos.list ho tro batch tao 50 id trong 1 request.
  */
 export const YOUTUBE_VIDEOS_BATCH_SIZE = 50;
+export const YOUTUBE_CHANNELS_BATCH_SIZE = 50;
 
 /**
  * Max results tra ve tu search.list.

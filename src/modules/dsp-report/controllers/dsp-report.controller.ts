@@ -50,7 +50,7 @@ export class DspReportController {
 		});
 	}
 
-	/** Parser catalog sync also runs automatically at startup; pass force=true to rewrite unchanged source hashes. */
+	/** Default sync only fills missing parser catalog records; pass force=true to overwrite every record from source. */
 	@Post('parser-catalog/sync')
 	async syncParserCatalog(
 		@Query() query: SyncParserCatalogDto,

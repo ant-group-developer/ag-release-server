@@ -1,0 +1,22 @@
+export enum YoutubeChannelSyncRunStatus {
+	PENDING = 'PENDING',
+	RUNNING = 'RUNNING',
+	COMPLETED = 'COMPLETED',
+	PARTIAL = 'PARTIAL',
+	FAILED = 'FAILED',
+}
+
+export enum YoutubeChannelSyncResult {
+	CHANGE_DETECTED = 'CHANGE_DETECTED',
+	NO_CHANGE = 'NO_CHANGE',
+	MISSING_YOUTUBE_CHANNEL_ID = 'MISSING_YOUTUBE_CHANNEL_ID',
+	NOT_FOUND = 'NOT_FOUND',
+	FAILED = 'FAILED',
+}
+
+export enum YoutubeChannelSyncReviewStatus {
+	PENDING = 'PENDING',
+	APPROVED = 'APPROVED',
+	REJECTED = 'REJECTED',
+	STALE = 'STALE',
+}
