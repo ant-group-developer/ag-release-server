@@ -7,7 +7,6 @@ import { LogsService } from 'src/modules/log/services/logs.services';
 import { TelegramService } from 'src/modules/notification/services/notification.telegram-service';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { TenantUser } from 'src/modules/user/entities/tenant-user.entity';
-import { User } from 'src/modules/user/entities/user.entity';
 import { TenantUserType } from 'src/modules/user/enum/user.enum';
 import { checkIsNotSystemTenant } from 'src/modules/user/utils/user-type.util';
 import { DataSource, In, Not, Repository } from 'typeorm';
@@ -327,14 +326,19 @@ export class ChannelService {
 			throw ChannelException.TENANT_NOT_SET();
 		}
 
-		// 1. Kiểm tra danh sách User tồn tại trong hệ thống
-		const existingUsers = await this.dataSource.getRepository(User).find({
-			where: { id: In(userIds) },
+		// 1. Kiểm tra danh sách User thuộc Workspace của Channel
+		const tenantUsers = await this.tenantUserRepo.find({
+			where: {
+				tenantId: targetTenantId,
+				userId: In(userIds),
+			},
 		});
-		if (!existingUsers.length) return;
+		if (tenantUsers.length !== userIds.length) {
+			throw ChannelException.USER_NOT_IN_WORKSPACE();
+		}
 
 		// 2. Lấy danh sách các user đã được gán sẵn để tránh gán trùng
-		const validUserIds = existingUsers.map((u) => u.id);
+		const validUserIds = tenantUsers.map((tu) => tu.userId);
 		const alreadyAssigned = await this.userChannelRepo.find({
 			where: { channelId, userId: In(validUserIds) },
 		});

@@ -14,7 +14,10 @@ import {
 import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
-import { SystemAdminOnly } from '../../auth/decorators/auth.decorator';
+import {
+	SystemAdminOnly,
+	TenantOwnerOrAdminOnly,
+} from '../../auth/decorators/auth.decorator';
 
 import {
 	AssignUsersToChannelDto,
@@ -77,6 +80,7 @@ export class ChannelController {
 	}
 
 	@Get('users/:userId')
+	@TenantOwnerOrAdminOnly()
 	@ApiOperation({ summary: 'Get channels assigned to a specific user by ID' })
 	@ApiParam({ name: 'userId', format: 'uuid' })
 	async getUserChannels(
@@ -164,6 +168,7 @@ export class ChannelController {
 	}
 
 	@Delete('member/:id')
+	@TenantOwnerOrAdminOnly()
 	@ApiOperation({ summary: 'Remove a user from a channel' })
 	@ApiParam({ name: 'id', format: 'uuid' })
 	async removeUserFromChannel(
