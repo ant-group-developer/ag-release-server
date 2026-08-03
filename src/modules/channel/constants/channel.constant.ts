@@ -63,6 +63,14 @@ export class ChannelException {
 		});
 	}
 
+	static USER_NOT_IN_WORKSPACE() {
+		return new ResponseError({
+			statusCode: 403,
+			message: 'Người dùng không thuộc Workspace sở hữu kênh này.',
+			messageCode: 'channel.user_not_in_workspace',
+		});
+	}
+
 	static CHANNEL_NOT_FOUND() {
 		return new ResponseError({
 			statusCode: 404,
