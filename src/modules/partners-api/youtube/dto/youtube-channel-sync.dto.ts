@@ -16,7 +16,16 @@ export class SyncYoutubeChannelsDto {
 }
 
 export class QueryYoutubeChannelSyncLogsDto extends BaseQueryDto {
+	@ApiPropertyOptional({
+		description: 'Sync run ID. Defaults to the most recent run.',
+	})
+	@IsOptional()
+	@IsUUID('4')
+	runId?: string;
+
 	@IsOptional()
 	@IsUUID('4')
 	channelId?: string;
 }
+
+export class QueryYoutubeChannelSyncRunsDto extends BaseQueryDto {}

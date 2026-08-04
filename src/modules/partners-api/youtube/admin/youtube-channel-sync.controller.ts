@@ -5,6 +5,7 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { SystemAdminOnly } from 'src/modules/auth/decorators/auth.decorator';
 import {
 	QueryYoutubeChannelSyncLogsDto,
+	QueryYoutubeChannelSyncRunsDto,
 	SyncYoutubeChannelsDto,
 } from '../dto/youtube-channel-sync.dto';
 import { YoutubeChannelSyncService } from '../services/youtube-channel-sync.service';
@@ -27,9 +28,21 @@ export class YoutubeChannelSyncController {
 		return new ResponseSuccess({ data });
 	}
 
+	@Get()
+	@ApiOperation({
+		summary:
+			'List YouTube channel sync runs with their overview statistics',
+	})
+	async listRuns(@Query() query: QueryYoutubeChannelSyncRunsDto) {
+		const data = await this.syncService.listRuns(query);
+		return new ResponseSuccess({ data });
+	}
+
 	@Get('logs')
 	@ApiOperation({
 		summary: 'List per-field YouTube channel sync audit logs',
+		description:
+			'Each log includes its linked channel object (or null when the channel was deleted).',
 	})
 	async listLogs(@Query() query: QueryYoutubeChannelSyncLogsDto) {
 		const data = await this.syncService.listLogs(query);
