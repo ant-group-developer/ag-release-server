@@ -80,7 +80,7 @@ export class UpdateChannelDto extends PartialType(CreateChannelDto) {}
 export class QueryGetListChannelDto extends BaseQueryDto {
 	@IsOptional()
 	@IsString()
-	fieldOrder: string = 'name';
+	fieldOrder: string = 'channel.name';
 
 	@IsOptional()
 	@IsUUID()

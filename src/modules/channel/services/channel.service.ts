@@ -182,8 +182,7 @@ export class ChannelService {
 			qb.andWhere('channel.tenantId IN (:...tenantIds)', { tenantIds });
 		}
 
-		// 4. Order và Phân trang
-		qb.orderBy(`channel.${query.fieldOrder || 'name'}`, query.orderBy)
+		qb.orderBy(query.fieldOrder, query.orderBy)
 			.skip(query.skip)
 			.take(query.limit);
 
