@@ -5,9 +5,14 @@ import { Channel } from 'src/modules/channel/entities/channel.entity';
 import { DataSource, Repository } from 'typeorm';
 import {
 	QueryYoutubeChannelSyncLogsDto,
+	QueryYoutubeChannelSyncRunsDto,
 	SyncYoutubeChannelsDto,
 } from '../dto/youtube-channel-sync.dto';
 import { YoutubeChannelSyncLog } from '../entities/youtube-channel-sync-log.entity';
+import {
+	YoutubeChannelSyncRun,
+	YoutubeChannelSyncRunError,
+} from '../entities/youtube-channel-sync-run.entity';
 import {
 	YoutubeApiClientService,
 	YoutubeChannelSnippet,
@@ -20,6 +25,7 @@ type FieldChange = {
 };
 
 type SyncSummary = {
+	runId: string;
 	force: boolean;
 	totalChannels: number;
 	processedChannels: number;
@@ -29,7 +35,7 @@ type SyncSummary = {
 	missingYoutubeChannelId: number;
 	notFoundOnYoutube: number;
 	failedChannels: number;
-	errors: Array<{ youtubeChannelId: string; message: string }>;
+	errors: YoutubeChannelSyncRunError[];
 };
 
 @Injectable()
@@ -41,6 +47,8 @@ export class YoutubeChannelSyncService {
 		private readonly channelRepo: Repository<Channel>,
 		@InjectRepository(YoutubeChannelSyncLog)
 		private readonly logRepo: Repository<YoutubeChannelSyncLog>,
+		@InjectRepository(YoutubeChannelSyncRun)
+		private readonly runRepo: Repository<YoutubeChannelSyncRun>,
 		@InjectDataSource()
 		private readonly dataSource: DataSource,
 		private readonly youtubeApiClient: YoutubeApiClientService,
@@ -55,7 +63,15 @@ export class YoutubeChannelSyncService {
 		actorId: string,
 	): Promise<SyncSummary> {
 		const channels = await this.channelRepo.find({ order: { id: 'ASC' } });
+		const run = await this.runRepo.save(
+			this.runRepo.create({
+				actorId,
+				force: dto.force,
+				totalChannels: channels.length,
+			}),
+		);
 		const summary: SyncSummary = {
+			runId: run.id,
 			force: dto.force,
 			totalChannels: channels.length,
 			processedChannels: 0,
@@ -101,6 +117,7 @@ export class YoutubeChannelSyncService {
 								remote,
 								dto.force,
 								actorId,
+								run.id,
 							);
 							summary.processedChannels++;
 							if (result.changedFields > 0) {
@@ -141,19 +158,71 @@ export class YoutubeChannelSyncService {
 			}
 		}
 
+		await this.runRepo.update(run.id, {
+			processedChannels: summary.processedChannels,
+			updatedChannels: summary.updatedChannels,
+			updatedFields: summary.updatedFields,
+			noChangeChannels: summary.noChangeChannels,
+			missingYoutubeChannelId: summary.missingYoutubeChannelId,
+			notFoundOnYoutube: summary.notFoundOnYoutube,
+			failedChannels: summary.failedChannels,
+			errors: summary.errors,
+			completedAt: new Date(),
+		});
+
 		return summary;
 	}
 
-	async listLogs(
-		query: QueryYoutubeChannelSyncLogsDto,
-	): Promise<PageDto<YoutubeChannelSyncLog>> {
-		const qb = this.logRepo.createQueryBuilder('log');
+	async listLogs(query: QueryYoutubeChannelSyncLogsDto): Promise<
+		PageDto<YoutubeChannelSyncLog> & {
+			overview: YoutubeChannelSyncRun | null;
+		}
+	> {
+		const overview = query.runId
+			? await this.runRepo.findOneBy({ id: query.runId })
+			: await this.runRepo.findOne({ order: { createdAt: 'DESC' } });
+		const qb = this.logRepo
+			.createQueryBuilder('log')
+			.leftJoinAndSelect('log.channel', 'channel');
+		if (query.runId && !overview) qb.where('1 = 0');
+		else if (overview) {
+			qb.where('log.runId = :runId', { runId: overview.id });
+		}
 		if (query.channelId) {
-			qb.where('log.channelId = :channelId', {
+			qb.andWhere('log.channelId = :channelId', {
 				channelId: query.channelId,
 			});
 		}
 		qb.orderBy('log.createdAt', 'DESC').skip(query.skip).take(query.limit);
+		const [items, totalItems] = await qb.getManyAndCount();
+		return Object.assign(
+			new PageDto({
+				items,
+				metadata: {
+					page: query.page,
+					pageSize: query.pageSize,
+					totalItems,
+				},
+			}),
+			{ overview },
+		);
+	}
+
+	async listRuns(
+		query: QueryYoutubeChannelSyncRunsDto,
+	): Promise<PageDto<YoutubeChannelSyncRun>> {
+		const qb = this.runRepo.createQueryBuilder('run');
+		if (query.startCreatedAt) {
+			qb.andWhere('run.createdAt >= :startCreatedAt', {
+				startCreatedAt: query.startCreatedAt,
+			});
+		}
+		if (query.endCreatedAt) {
+			qb.andWhere('run.createdAt <= :endCreatedAt', {
+				endCreatedAt: query.endCreatedAt,
+			});
+		}
+		qb.orderBy('run.createdAt', 'DESC').skip(query.skip).take(query.limit);
 		const [items, totalItems] = await qb.getManyAndCount();
 		return new PageDto({
 			items,
@@ -170,6 +239,7 @@ export class YoutubeChannelSyncService {
 		remote: YoutubeChannelSnippet,
 		force: boolean,
 		actorId: string,
+		runId: string,
 	): Promise<{ changedFields: number; warning?: string }> {
 		return this.dataSource.transaction(async (manager) => {
 			const channel = await manager
@@ -233,6 +303,7 @@ export class YoutubeChannelSyncService {
 				YoutubeChannelSyncLog,
 				changes.map((change) =>
 					manager.create(YoutubeChannelSyncLog, {
+						runId,
 						channelId: channel.id,
 						youtubeChannelId: remote.channelId,
 						actorId,

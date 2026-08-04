@@ -5,6 +5,7 @@ import { YoutubeApiKeyAdminController } from './admin/youtube-api-key.controller
 import { YoutubeChannelSyncController } from './admin/youtube-channel-sync.controller';
 import { YoutubeApiKey } from './entities/youtube-api-key.entity';
 import { YoutubeChannelSyncLog } from './entities/youtube-channel-sync-log.entity';
+import { YoutubeChannelSyncRun } from './entities/youtube-channel-sync-run.entity';
 import { YoutubeSearchCache } from './entities/youtube-search-cache.entity';
 import { YoutubeApiClientService } from './services/youtube-api-client.service';
 import { YoutubeApiKeyPoolService } from './services/youtube-api-key-pool.service';
@@ -21,6 +22,7 @@ import { YoutubeSearchCacheService } from './services/youtube-search-cache.servi
 			YoutubeApiKey,
 			YoutubeSearchCache,
 			YoutubeChannelSyncLog,
+			YoutubeChannelSyncRun,
 			Channel,
 		]),
 	],
