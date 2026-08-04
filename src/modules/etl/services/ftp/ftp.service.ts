@@ -31,6 +31,13 @@ export interface FtpRemoteCategoryFiles {
 	failedPaths: string[];
 }
 
+export class FtpAuthenticationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'FtpAuthenticationError';
+	}
+}
+
 @Injectable()
 export class FtpService {
 	private readonly logger = new Logger(FtpService.name);
@@ -63,7 +70,8 @@ export class FtpService {
 
 	/**
 	 * Create and connect a new FTP client.
-	 * Retries up to 3 times with 2s delay on failure.
+	 * Retries transient connection failures up to 3 times. Authentication failures
+	 * are never retried because repeated 530 responses can lock the FTP account.
 	 * Caller is responsible for closing via client.close().
 	 */
 	async connect(): Promise<ftp.Client> {
@@ -93,6 +101,9 @@ export class FtpService {
 			} catch (err) {
 				client.close();
 				lastError = err as Error;
+				if (this.isAuthenticationError(lastError)) {
+					throw new FtpAuthenticationError(lastError.message);
+				}
 				this.logger.warn(
 					`FTPS connection attempt ${attempt}/${maxAttempts} failed: ${lastError.message}`,
 				);
@@ -133,6 +144,7 @@ export class FtpService {
 						}
 					}
 				} catch (err) {
+					if (this.isAuthenticationError(err as Error)) throw err;
 					this.logger.warn(
 						`Cannot list ${remotePath}: ${err.message}`,
 					);
@@ -160,6 +172,7 @@ export class FtpService {
 				.filter((item) => item.isDirectory)
 				.map((item) => item.name);
 		} catch (err) {
+			if (this.isAuthenticationError(err as Error)) throw err;
 			this.logger.warn(
 				`Cannot list DSP folders for ${category}/${period}: ${err.message}`,
 			);
@@ -194,6 +207,7 @@ export class FtpService {
 			);
 			return files.sort();
 		} catch (err) {
+			if (this.isAuthenticationError(err as Error)) throw err;
 			this.logger.warn(
 				`Cannot list files for ${category}/${period}/${dspFolder}: ${err.message}`,
 			);
@@ -217,7 +231,12 @@ export class FtpService {
 	): Promise<FtpRemoteCategoryFiles[]> {
 		const results: FtpRemoteCategoryFiles[] = [];
 		for (const category of categories) {
-			results.push(await this.listRemoteReportFilesForCategory(category, minimumPeriods[category]));
+			results.push(
+				await this.listRemoteReportFilesForCategory(
+					category,
+					minimumPeriods[category],
+				),
+			);
 		}
 		return results;
 	}
@@ -233,49 +252,90 @@ export class FtpService {
 			`discovery category ${category}`,
 			(client) => client.list(`${config.basePath}/${category}`),
 		);
-			const allPeriods = periodEntries
-				.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))
-				.sort((left, right) => right.name.localeCompare(left.name));
-			const periods = minimumPeriod
-				? allPeriods.filter((item) => item.name >= minimumPeriod)
-				: allPeriods;
-			this.logger.log(`FTP discovery: ${category} has ${allPeriods.length} periods; scanning ${periods.length}${minimumPeriod ? ` from ${minimumPeriod}` : ' (full history)'} newest first`);
-			for (const periodEntry of periods) {
-				const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
-				try {
-					const scan = await this.withFreshDiscoveryClientRetry(
-						`discovery period ${category}/${periodEntry.name}`,
-						async (client) => {
-							const folderEntries = await client.list(periodPath);
-							const periodFolders: FtpRemoteFolderFiles[] = [];
-							let periodFiles = 0;
-							for (const folderEntry of folderEntries.filter((item) => item.isDirectory)) {
-								if (await this.excludePatternService.shouldExclude(folderEntry.name, 'folder')) {
-									this.logger.debug(`  [EXCLUDED] Skip discovery folder ${category}/${periodEntry.name}/${folderEntry.name} (matched exclude pattern)`);
-									continue;
-								}
-								const folderPath = `${periodPath}/${folderEntry.name}`;
-								const files = await this.listFilesRecursive(client, folderPath, '', undefined, true);
-								periodFiles += files.length;
-								periodFolders.push({
-									category, period: periodEntry.name, dspFolder: folderEntry.name,
-									files: files.sort(),
-								});
+		const allPeriods = periodEntries
+			.filter((item) => item.isDirectory && /^\d{6}$/.test(item.name))
+			.sort((left, right) => right.name.localeCompare(left.name));
+		const periods = minimumPeriod
+			? allPeriods.filter((item) => item.name >= minimumPeriod)
+			: allPeriods;
+		this.logger.log(
+			`FTP discovery: ${category} has ${allPeriods.length} periods; scanning ${periods.length}${minimumPeriod ? ` from ${minimumPeriod}` : ' (full history)'} newest first`,
+		);
+		for (const periodEntry of periods) {
+			const periodPath = `${config.basePath}/${category}/${periodEntry.name}`;
+			try {
+				const scan = await this.withFreshDiscoveryClientRetry(
+					`discovery period ${category}/${periodEntry.name}`,
+					async (client) => {
+						const folderEntries = await client.list(periodPath);
+						const periodFolders: FtpRemoteFolderFiles[] = [];
+						let periodFiles = 0;
+						for (const folderEntry of folderEntries.filter(
+							(item) => item.isDirectory,
+						)) {
+							if (
+								await this.excludePatternService.shouldExclude(
+									folderEntry.name,
+									'folder',
+								)
+							) {
+								this.logger.debug(
+									`  [EXCLUDED] Skip discovery folder ${category}/${periodEntry.name}/${folderEntry.name} (matched exclude pattern)`,
+								);
+								continue;
 							}
-							return { folderCount: periodFolders.length, periodFiles, periodFolders };
-						},
-					);
-					folders.push(...scan.periodFolders);
-					this.logger.log(`FTP discovery: ${category}/${periodEntry.name} scanned ${scan.folderCount} folders, ${scan.periodFiles} files`);
-				} catch (error) {
-					this.logger.warn(`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`);
-					failedPaths.push(`${category}/${periodEntry.name}`);
-				}
+							const folderPath = `${periodPath}/${folderEntry.name}`;
+							const files = await this.listFilesRecursive(
+								client,
+								folderPath,
+								'',
+								undefined,
+								true,
+							);
+							periodFiles += files.length;
+							periodFolders.push({
+								category,
+								period: periodEntry.name,
+								dspFolder: folderEntry.name,
+								files: files.sort(),
+							});
+						}
+						return {
+							folderCount: periodFolders.length,
+							periodFiles,
+							periodFolders,
+						};
+					},
+				);
+				folders.push(...scan.periodFolders);
+				this.logger.log(
+					`FTP discovery: ${category}/${periodEntry.name} scanned ${scan.folderCount} folders, ${scan.periodFiles} files`,
+				);
+			} catch (error) {
+				if (this.isAuthenticationError(error as Error)) throw error;
+				this.logger.warn(
+					`Cannot list discovery period ${category}/${periodEntry.name}: ${error.message}`,
+				);
+				failedPaths.push(`${category}/${periodEntry.name}`);
 			}
-			const fileCount = folders.reduce((total, folder) => total + folder.files.length, 0);
-			const suffix = failedPaths.length ? `, ${failedPaths.length} path(s) failed after retries` : '';
-			this.logger.log(`FTP discovery: ${category} completed ${periods.length} periods, ${folders.length} folders, ${fileCount} files${suffix}`);
-			return { category, periodCount: periods.length, periods: periods.map((item) => item.name), folders, failedPaths };
+		}
+		const fileCount = folders.reduce(
+			(total, folder) => total + folder.files.length,
+			0,
+		);
+		const suffix = failedPaths.length
+			? `, ${failedPaths.length} path(s) failed after retries`
+			: '';
+		this.logger.log(
+			`FTP discovery: ${category} completed ${periods.length} periods, ${folders.length} folders, ${fileCount} files${suffix}`,
+		);
+		return {
+			category,
+			periodCount: periods.length,
+			periods: periods.map((item) => item.name),
+			folders,
+			failedPaths,
+		};
 	}
 
 	/**
@@ -290,7 +350,11 @@ export class FtpService {
 		fileSelector?: (relativePath: string) => boolean,
 		applyGlobalExcludes = true,
 	): Promise<string[]> {
-		const list = await this.listDirectoryWithRetry(client, remotePath, `directory ${remotePath}`);
+		const list = await this.listDirectoryWithRetry(
+			client,
+			remotePath,
+			`directory ${remotePath}`,
+		);
 		const files: string[] = [];
 
 		for (const item of list) {
@@ -298,7 +362,10 @@ export class FtpService {
 			if (item.isDirectory) {
 				if (
 					applyGlobalExcludes &&
-					await this.excludePatternService.shouldExclude(item.name, 'folder')
+					(await this.excludePatternService.shouldExclude(
+						item.name,
+						'folder',
+					))
 				) {
 					this.logger.debug(
 						`  [EXCLUDED] Skip folder ${relativeName} (matched exclude pattern)`,
@@ -317,10 +384,10 @@ export class FtpService {
 				if (fileSelector && !fileSelector(relativeName)) continue;
 				if (
 					applyGlobalExcludes &&
-					await this.excludePatternService.shouldExclude(
+					(await this.excludePatternService.shouldExclude(
 						item.name,
 						'file',
-					)
+					))
 				) {
 					this.logger.debug(
 						`  ⛔ [EXCLUDED] Skip file ${item.name} (matched exclude pattern)`,
@@ -346,10 +413,13 @@ export class FtpService {
 				return await client.list(remotePath);
 			} catch (error) {
 				lastError = error as Error;
+				if (this.isAuthenticationError(lastError)) throw lastError;
 				if (this.isDisconnected(lastError)) throw lastError;
 				if (attempt === maxAttempts) break;
 				const delayMs = attempt * 750;
-				this.logger.warn(`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; retrying in ${delayMs}ms`);
+				this.logger.warn(
+					`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; retrying in ${delayMs}ms`,
+				);
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 			}
 		}
@@ -369,9 +439,12 @@ export class FtpService {
 				return await action(client);
 			} catch (error) {
 				lastError = error as Error;
+				if (this.isAuthenticationError(lastError)) throw lastError;
 				if (attempt === maxAttempts) break;
 				const delayMs = attempt * 750;
-				this.logger.warn(`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; reconnecting in ${delayMs}ms`);
+				this.logger.warn(
+					`FTP ${label} failed (attempt ${attempt}/${maxAttempts}): ${lastError.message}; reconnecting in ${delayMs}ms`,
+				);
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 			} finally {
 				client?.close();
@@ -380,17 +453,38 @@ export class FtpService {
 		throw lastError || new Error(`Unable to list FTP ${label}`);
 	}
 
-	async downloadDiscoverySampleFile(category: string, period: string, dspFolder: string, relativePath: string, localPath: string): Promise<void> {
+	async downloadDiscoverySampleFile(
+		category: string,
+		period: string,
+		dspFolder: string,
+		relativePath: string,
+		localPath: string,
+	): Promise<void> {
 		const config = this.getConfig();
 		fs.mkdirSync(path.dirname(localPath), { recursive: true });
 		await this.withFreshDiscoveryClientRetry(
 			`discovery sample ${category}/${period}/${dspFolder}/${relativePath}`,
-			(client) => client.downloadTo(localPath, `${config.basePath}/${category}/${period}/${dspFolder}/${relativePath}`),
+			(client) =>
+				client.downloadTo(
+					localPath,
+					`${config.basePath}/${category}/${period}/${dspFolder}/${relativePath}`,
+				),
 		);
 	}
 
 	private isDisconnected(error: Error): boolean {
-		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(error.message);
+		return /ECONNRESET|control socket|client is closed|socket is closed|connection closed/i.test(
+			error.message,
+		);
+	}
+
+	private isAuthenticationError(error: Error): boolean {
+		return (
+			error instanceof FtpAuthenticationError ||
+			/\b530\b|login incorrect|not logged in|authentication failed/i.test(
+				error.message,
+			)
+		);
 	}
 
 	/**
@@ -450,6 +544,7 @@ export class FtpService {
 					}
 					fileCount++;
 				} catch (err) {
+					if (this.isAuthenticationError(err as Error)) throw err;
 					this.logger.error(
 						`Failed to download ${remoteItemPath}: ${err.message}`,
 					);
@@ -505,6 +600,7 @@ export class FtpService {
 						}
 					}
 				} catch (err) {
+					if (this.isAuthenticationError(err as Error)) throw err;
 					this.logger.warn(
 						`No ${category}/${period} on FTPS: ${err.message}`,
 					);

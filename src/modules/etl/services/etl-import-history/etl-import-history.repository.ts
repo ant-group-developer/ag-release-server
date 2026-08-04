@@ -12,7 +12,7 @@ export interface EtlImportHistoryRecord {
 	file_name: string;
 	file_directory?: string;
 	file_path: string;
-	status: 'processing' | 'done' | 'error';
+	status: 'processing' | 'done' | 'error' | 'ignored';
 	file_size_bytes?: number;
 	total_lines?: number;
 	processed_rows?: number;
@@ -84,6 +84,8 @@ export class EtlImportHistoryRepository {
       WHERE job_id = {jobId:String}
       ORDER BY started_at ASC
     `;
-		return this.clickHouseService.query<EtlImportHistoryRow>(sql, { jobId });
+		return this.clickHouseService.query<EtlImportHistoryRow>(sql, {
+			jobId,
+		});
 	}
 }

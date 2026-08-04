@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { FtpSourceCategory } from './ftp-parser-config.dto';
@@ -30,7 +30,7 @@ export class UpsertFtpReportFileRuleDto {
 	@IsEnum(FtpReportFileRuleStatus)
 	status: FtpReportFileRuleStatus;
 
-	@ApiPropertyOptional({ description: 'Required when status is import' })
+	@ApiPropertyOptional({ description: 'Required when status is import. Send an empty string in PATCH to explicitly clear it.' })
 	@IsOptional()
 	@IsString()
 	parserCode?: string;
@@ -40,6 +40,8 @@ export class UpsertFtpReportFileRuleDto {
 	@IsString()
 	description?: string;
 }
+
+export class UpdateFtpReportFileRuleDto extends PartialType(UpsertFtpReportFileRuleDto) {}
 
 export class QueryFtpReportFileRulesDto {
 	@ApiPropertyOptional({ example: 'ftp' })

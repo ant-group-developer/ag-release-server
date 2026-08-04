@@ -6,6 +6,7 @@ import { FtpSourceCategory } from '../dto/ftp-parser-config.dto';
 import {
 	FtpReportFileRuleStatus,
 	QueryFtpReportFileRulesDto,
+	UpdateFtpReportFileRuleDto,
 	UpsertFtpReportFileRuleDto,
 } from '../dto/ftp-report-file-rule.dto';
 import { FtpParserConfigService } from './ftp-parser-config.service';
@@ -133,12 +134,29 @@ export class FtpReportFileRuleService {
 		const row = {
 			id: id || uuidv4(), source: dto.source, source_category: dto.sourceCategory,
 			dsp_folder_pattern: dto.dspFolderPattern, file_name_pattern: dto.fileNamePattern,
-			status: dto.status, parser_code: dto.status === FtpReportFileRuleStatus.IMPORT ? dto.parserCode || '' : '',
+			status: dto.status, parser_code: dto.parserCode || '',
 			description: dto.description || '', config_version: (existing?.configVersion || 0) + 1,
 			is_active: 1, created_at: existing?.createdAt || now, updated_at: now,
 		};
 		await this.clickHouseService.insert(CLICKHOUSE_TABLES.FTP_REPORT_FILE_RULES, [row]);
 		return toRule(row);
+	}
+
+	async update(id: string, dto: UpdateFtpReportFileRuleDto): Promise<FtpReportFileRule> {
+		if (!Object.values(dto).some((value) => value !== undefined)) {
+			throw new BadRequestException('At least one field is required to update an FTP report file rule');
+		}
+		const existing = await this.findById(id);
+		if (!existing) throw new BadRequestException('FTP report file rule not found');
+		return this.upsert({
+			source: dto.source ?? existing.source,
+			sourceCategory: dto.sourceCategory ?? existing.sourceCategory,
+			dspFolderPattern: dto.dspFolderPattern ?? existing.dspFolderPattern,
+			fileNamePattern: dto.fileNamePattern ?? existing.fileNamePattern,
+			status: dto.status ?? existing.status,
+			parserCode: dto.parserCode ?? existing.parserCode,
+			description: dto.description ?? existing.description,
+		}, id);
 	}
 
 	async disable(id: string): Promise<void> {
