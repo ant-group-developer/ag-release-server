@@ -9,6 +9,27 @@ export class CubeRebuildService {
 
 	constructor(private readonly clickHouseService: ClickHouseService) {}
 
+	private async dropPartition(
+		table: string,
+		partition: string,
+	): Promise<void> {
+		try {
+			await this.clickHouseService.execute(
+				`ALTER TABLE music_analytics.${table} DROP PARTITION '${partition}'`,
+			);
+		} catch (error) {
+			if (
+				/no partition|does not exist|doesn't exist/i.test(error.message)
+			) {
+				this.logger.debug(
+					`No existing partition ${partition} in ${table}`,
+				);
+				return;
+			}
+			throw error;
+		}
+	}
+
 	/**
 	 * Rebuild sales cubes for a list of periods (e.g. ['2024-04', '2024-05'])
 	 */
@@ -25,35 +46,18 @@ export class CubeRebuildService {
 		for (const partition of uniquePeriods) {
 			try {
 				// 1. Drop partitions from all sales cubes (including export cube)
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_DSP_MONTHLY} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on sales dsp failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_TER_MONTHLY} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on sales ter failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on sales export failed: ${err.message}`,
-						),
-					);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.SALES_DSP_MONTHLY,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.SALES_TER_MONTHLY,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.SALES_EXPORT_MONTHLY,
+					partition,
+				);
 
 				// 2. Re-insert aggregated data for the partition into sales dsp cube
 				await this.clickHouseService.execute(`
@@ -123,6 +127,7 @@ export class CubeRebuildService {
 					`Failed to rebuild sales partition ${partition}: ${err.message}`,
 					err.stack,
 				);
+				throw err;
 			}
 		}
 	}
@@ -143,55 +148,26 @@ export class CubeRebuildService {
 		for (const partition of uniquePeriods) {
 			try {
 				// 1. Drop partitions from cubes
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on trends dsp monthly failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on trends ter monthly failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on trends dsp daily failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on trends ter daily failed: ${err.message}`,
-						),
-					);
-
-				await this.clickHouseService
-					.execute(
-						`ALTER TABLE music_analytics.${CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE} DROP PARTITION '${partition}'`,
-					)
-					.catch((err) =>
-						this.logger.debug(
-							`DROP PARTITION on trends isrc daily failed: ${err.message}`,
-						),
-					);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE,
+					partition,
+				);
+				await this.dropPartition(
+					CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+					partition,
+				);
 
 				// 2. Re-insert aggregated data for trends dsp monthly cube
 				await this.clickHouseService.execute(`
@@ -275,6 +251,7 @@ export class CubeRebuildService {
 					`Failed to rebuild trends partition ${partition}: ${err.message}`,
 					err.stack,
 				);
+				throw err;
 			}
 		}
 	}
@@ -378,5 +355,29 @@ export class CubeRebuildService {
 		);
 
 		return { dspRows, terRows, exportRows };
+	}
+
+	/** Rebuild every trends/usage cube from the canonical fact table. */
+	async rebuildAllTrendsCubes(): Promise<{ periods: string[] }> {
+		this.logger.log('Executing full rebuild of all trends cubes...');
+		for (const table of [
+			CLICKHOUSE_TABLES.TRENDS_DSP_MONTHLY,
+			CLICKHOUSE_TABLES.TRENDS_TER_MONTHLY,
+			CLICKHOUSE_TABLES.TRENDS_DSP_DAILY_CUBE,
+			CLICKHOUSE_TABLES.TRENDS_TER_DAILY_CUBE,
+			CLICKHOUSE_TABLES.TRENDS_ISRC_DAILY_CUBE,
+		]) {
+			await this.clickHouseService.execute(
+				`TRUNCATE TABLE IF EXISTS music_analytics.${table}`,
+			);
+		}
+		const rows = await this.clickHouseService.query<{ period: string }>(
+			`SELECT DISTINCT formatDateTime(reporting_period, '%Y-%m') AS period
+			 FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+			 WHERE reporting_period IS NOT NULL ORDER BY period ASC`,
+		);
+		const periods = rows.map((row) => row.period).filter(Boolean);
+		await this.rebuildTrendsCubesForPeriods(periods);
+		return { periods };
 	}
 }

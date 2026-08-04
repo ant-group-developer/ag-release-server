@@ -23,8 +23,8 @@ import {
 } from '../../etl/interfaces';
 import { SpotifyReportSalesParser } from '../../etl/parsers/sales/spotify-report-sales.parser';
 import { WmgSalesParser } from '../../etl/parsers/sales/wmg-sales.parser';
-import { CubeRebuildService } from '../../etl/services/cube-rebuild/cube-rebuild.service';
-import { ExchangeRateService } from '../../etl/services/exchange-rate/exchange-rate.service';
+import { AnalyticsProjectionRefreshService } from '../../etl/services/cube-rebuild/analytics-projection-refresh.service';
+import { EtlImportHistoryRepository } from '../../etl/services/etl-import-history/etl-import-history.repository';
 import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.service';
 import {
 	hasMeaningfulText,
@@ -35,7 +35,6 @@ import {
 	ExtractedRow,
 	ReportEntityExtractorService,
 } from '../../release/services/report-entity-extractor.service';
-import { EtlImportHistoryRepository } from '../../etl/services/etl-import-history/etl-import-history.repository';
 import { ReportImportQueueService } from './report-import-queue.service';
 
 type ReportImportStage =
@@ -75,11 +74,10 @@ export class ReportImportWorkerService
 		private readonly queueService: ReportImportQueueService,
 		private readonly r2Service: BucketR2Service,
 		private readonly importJobsService: ImportJobsService,
-		private readonly cubeRebuildService: CubeRebuildService,
+		private readonly analyticsProjectionRefreshService: AnalyticsProjectionRefreshService,
 		private readonly dspMappingService: DspMappingService,
 		private readonly clickHouseService: ClickHouseService,
 		private readonly reportEntityExtractorService: ReportEntityExtractorService,
-		private readonly exchangeRateService: ExchangeRateService,
 		@InjectRepository(Label)
 		private readonly labelRepo: Repository<Label>,
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
@@ -262,14 +260,26 @@ export class ReportImportWorkerService
 		factTable: string,
 		filename: string,
 		importSource: string,
-	): Promise<void> {
+	): Promise<string[]> {
 		const countRows = await this.clickHouseService.query<{ cnt: string }>(
 			`SELECT count() AS cnt FROM music_analytics.${factTable}
        WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
 			{ filename, source: importSource },
 		);
 
-		if (Number(countRows[0]?.cnt ?? 0) === 0) return;
+		if (Number(countRows[0]?.cnt ?? 0) === 0) return [];
+		const dateColumn =
+			factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT
+				? 'reporting_period_start'
+				: 'reporting_period';
+		const periodRows = await this.clickHouseService.query<{
+			period: string;
+		}>(
+			`SELECT DISTINCT formatDateTime(${dateColumn}, '%Y-%m') AS period
+			 FROM music_analytics.${factTable}
+			 WHERE source_file_name = {filename:String} AND import_source = {source:String}`,
+			{ filename, source: importSource },
+		);
 
 		this.logger.warn(
 			`Deleting existing fact rows for ${filename} (${importSource}) before import/resume`,
@@ -280,6 +290,7 @@ export class ReportImportWorkerService
          AND import_source = '${this.escapeSqlString(importSource)}'`,
 		);
 		await this.clickHouseService.waitForTableMutations(factTable);
+		return periodRows.map((row) => row.period).filter(Boolean);
 	}
 
 	private buildSourceFilter(checkpoints: ReportImportFileCheckpoint[]): {
@@ -350,8 +361,8 @@ export class ReportImportWorkerService
 
 	private async loadAffectedPeriodsFromClickHouse(
 		checkpoints: ReportImportFileCheckpoint[],
-	): Promise<string[]> {
-		const periods = new Set<string>();
+	): Promise<Array<{ factTable: string; period: string }>> {
+		const periods: Array<{ factTable: string; period: string }> = [];
 		const byTable = new Map<string, ReportImportFileCheckpoint[]>();
 
 		for (const checkpoint of checkpoints) {
@@ -362,9 +373,13 @@ export class ReportImportWorkerService
 
 		for (const [factTable, tableCheckpoints] of byTable) {
 			const { where, params } = this.buildSourceFilter(tableCheckpoints);
+			const dateColumn =
+				factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT
+					? 'reporting_period_start'
+					: 'reporting_period';
 			const rows = await this.clickHouseService.query<{ period: string }>(
 				`
-          SELECT DISTINCT substring(toString(reporting_period_start), 1, 7) AS period
+          SELECT DISTINCT substring(toString(${dateColumn}), 1, 7) AS period
           FROM music_analytics.${factTable}
           WHERE (${where})
             AND period != ''
@@ -373,11 +388,11 @@ export class ReportImportWorkerService
 				params,
 			);
 			for (const row of rows) {
-				if (row.period) periods.add(row.period);
+				if (row.period) periods.push({ factTable, period: row.period });
 			}
 		}
 
-		return Array.from(periods);
+		return periods;
 	}
 
 	private async cleanupR2Files(
@@ -396,6 +411,13 @@ export class ReportImportWorkerService
 	private async processJob(jobId: string) {
 		const tempDir = path.join(os.tmpdir(), 'report-imports', jobId);
 		let totalProcessedRows = 0;
+		const affectedSalesPeriods = new Set<string>();
+		const affectedTrendsPeriods = new Set<string>();
+		const addAffectedPeriod = (factTable: string, period: string) => {
+			if (factTable === CLICKHOUSE_TABLES.FACT_SALES_REPORT)
+				affectedSalesPeriods.add(period);
+			else affectedTrendsPeriods.add(period);
+		};
 
 		try {
 			const currentJob =
@@ -496,11 +518,13 @@ export class ReportImportWorkerService
 				const writeStream = fs.createWriteStream(localFilePath);
 				await pipeline(stream, writeStream);
 
-				await this.deleteFactRowsForFile(
+				const deletedPeriods = await this.deleteFactRowsForFile(
 					factTable,
 					filename,
 					importSource,
 				);
+				for (const period of deletedPeriods)
+					addAffectedPeriod(factTable, period);
 
 				// 2. Parse and batch stream import
 				this.logger.log(`Streaming import for file: ${filename}`);
@@ -638,30 +662,33 @@ export class ReportImportWorkerService
 				const firstPeriod = Array.from(fileAffectedPeriods)[0] ?? '';
 				const periodYYYYMM = firstPeriod.replace('-', '');
 				const fileCategory = file.reportType ?? 'sales';
-				await this.etlImportHistoryRepository.upsert({
-					job_id: jobId,
-					batch_id: jobId,
-					period: periodYYYYMM,
-					source_type: ImportJobSourceType.REPORT_UPLOAD,
-					category: fileCategory,
-					dsp_folder: file.parserCode ?? '',
-					file_name: filename,
-					file_directory: `${fileCategory}/${file.parserCode ?? ''}`,
-					file_path: `${fileCategory}/${file.parserCode ?? ''}/${filename}`,
-					status: 'done',
-					file_size_bytes: typeof file.size === 'number' ? file.size : 0,
-					total_lines: fileProcessedRows,
-					processed_rows: fileProcessedRows,
-					skipped_rows: 0,
-					error_rows: 0,
-					duration_ms: fileStartedAt
-						? Date.now() - new Date(fileStartedAt).getTime()
-						: 0,
-				}).catch((err) =>
-					this.logger.warn(
-						`Failed to write etl_import_history for ${filename}: ${(err as Error).message}`,
-					),
-				);
+				await this.etlImportHistoryRepository
+					.upsert({
+						job_id: jobId,
+						batch_id: jobId,
+						period: periodYYYYMM,
+						source_type: ImportJobSourceType.REPORT_UPLOAD,
+						category: fileCategory,
+						dsp_folder: file.parserCode ?? '',
+						file_name: filename,
+						file_directory: `${fileCategory}/${file.parserCode ?? ''}`,
+						file_path: `${fileCategory}/${file.parserCode ?? ''}/${filename}`,
+						status: 'done',
+						file_size_bytes:
+							typeof file.size === 'number' ? file.size : 0,
+						total_lines: fileProcessedRows,
+						processed_rows: fileProcessedRows,
+						skipped_rows: 0,
+						error_rows: 0,
+						duration_ms: fileStartedAt
+							? Date.now() - new Date(fileStartedAt).getTime()
+							: 0,
+					})
+					.catch((err) =>
+						this.logger.warn(
+							`Failed to write etl_import_history for ${filename}: ${(err as Error).message}`,
+						),
+					);
 
 				state.files[fileKey] = {
 					status: 'FACT_IMPORTED',
@@ -827,58 +854,40 @@ export class ReportImportWorkerService
 				);
 			}
 
-			const affectedPeriods = new Set<string>(
-				importedCheckpoints.flatMap(
-					(checkpoint) => checkpoint.affectedPeriods,
-				),
-			);
-			for (const period of await this.loadAffectedPeriodsFromClickHouse(
+			for (const checkpoint of importedCheckpoints) {
+				for (const period of checkpoint.affectedPeriods)
+					addAffectedPeriod(checkpoint.factTable, period);
+			}
+			for (const item of await this.loadAffectedPeriodsFromClickHouse(
 				importedCheckpoints,
 			)) {
-				affectedPeriods.add(period);
+				addAffectedPeriod(item.factTable, item.period);
 			}
+			const affectedPeriods = new Set([
+				...affectedSalesPeriods,
+				...affectedTrendsPeriods,
+			]);
 
-			// 3. Rebuild cubes for all affected month partitions
+			// Refresh only the fact partitions changed by this job, after all files
+			// have been imported. This also makes retries after DELETE mutations safe.
 			if (affectedPeriods.size > 0) {
-				const periods = Array.from(affectedPeriods);
-
-				// Auto-sync missing exchange rates before rebuilding cubes
 				this.logger.log(
-					`Syncing missing exchange rates for periods: ${periods.join(', ')}`,
-				);
-				state.stage = 'EXCHANGE_RATE';
-				await this.saveReportImportState(jobId, state);
-				await this.importJobsService.updateProgress(
-					jobId,
-					{
-						progressLabel: `Syncing exchange rates...`,
-					},
-					true,
-				);
-				await this.exchangeRateService
-					.syncMonthsForPeriods(periods)
-					.catch((err) => {
-						this.logger.error(
-							`Failed to sync exchange rates for periods: ${err.message}`,
-						);
-					});
-
-				this.logger.log(
-					`Rebuilding cubes for affected periods: ${periods.join(', ')}`,
+					`Refreshing analytics cubes for affected periods: ${Array.from(affectedPeriods).join(', ')}`,
 				);
 				state.stage = 'CUBE_REBUILD';
 				await this.saveReportImportState(jobId, state);
 				await this.importJobsService.updateProgress(
 					jobId,
 					{
-						progressLabel: `Rebuilding Cubes...`,
+						progressLabel: `Refreshing analytics cubes...`,
 					},
 					true,
 				);
-
-				// Sales report (WMG, Spotify)
-				await this.cubeRebuildService.rebuildSalesCubesForPeriods(
-					periods,
+				await this.analyticsProjectionRefreshService.refreshAfterFactImport(
+					{
+						salesPeriods: affectedSalesPeriods,
+						trendsPeriods: affectedTrendsPeriods,
+					},
 				);
 			}
 
@@ -908,6 +917,19 @@ export class ReportImportWorkerService
 				`Failed to process Job ${jobId}: ${err.message}`,
 				err.stack,
 			);
+			if (affectedSalesPeriods.size || affectedTrendsPeriods.size) {
+				await this.analyticsProjectionRefreshService
+					.refreshAfterFactImport({
+						salesPeriods: affectedSalesPeriods,
+						trendsPeriods: affectedTrendsPeriods,
+					})
+					.catch((refreshError) =>
+						this.logger.error(
+							`Failed to refresh analytics cubes after import failure: ${refreshError.message}`,
+							refreshError.stack,
+						),
+					);
+			}
 
 			// Update job status in database to FAILED
 			await this.importJobsService

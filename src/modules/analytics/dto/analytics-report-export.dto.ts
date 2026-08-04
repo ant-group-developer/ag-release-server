@@ -9,6 +9,7 @@ import {
 	IsUUID,
 	Matches,
 } from 'class-validator';
+import type { AnalyticsVideoScope } from '../services/analytics-video-scope.service';
 
 const normalizeOptionalReleaseType = (value: unknown): unknown => {
 	if (typeof value !== 'string') return value;
@@ -18,6 +19,8 @@ const normalizeOptionalReleaseType = (value: unknown): unknown => {
 };
 
 export class AnalyticsReportExportDto {
+	/** Server-only scope injected from the authenticated request. */
+	analyticsVideoScope?: AnalyticsVideoScope;
 	@ApiProperty({
 		description: 'Start month of the report range',
 		example: '2026-01',

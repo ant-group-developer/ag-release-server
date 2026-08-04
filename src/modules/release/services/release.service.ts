@@ -13,6 +13,7 @@ import {
 	CiExportService,
 } from 'src/modules/partners-api/ci/services/ci-export.service';
 import { CiReleaseService } from 'src/modules/partners-api/ci/services/ci-release.service';
+import { UserFromRequest } from 'src/modules/token/token.interface';
 import { TrackService } from 'src/modules/track/services/track.service';
 import { getCoverArtThumbnails } from 'src/utils/util';
 import {
@@ -182,11 +183,15 @@ export class ReleaseService {
 
 	async getList2(
 		query: QueryGetListReleaseDto2,
+		user: UserFromRequest,
 	): Promise<PageDto<IReleaseDetail>> {
 		const { page, pageSize } = query;
 
 		const { releases, totalItems } =
-			await this.releaseQueryService.getManyAndCountOptimized(query);
+			await this.releaseQueryService.getManyAndCountOptimized(
+				query,
+				user,
+			);
 
 		const enhancedRelease = enhanceReleasesDetails(releases);
 

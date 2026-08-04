@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { UserFromRequest } from 'src/modules/token/token.interface';
 import { Track } from 'src/modules/track/entities/track.entity';
+import { checkCanAccessTenantAll } from 'src/modules/user/utils/user-type.util';
 import { toSnakeCaseKeys } from 'src/utils/util';
 import {
 	Brackets,
@@ -109,10 +111,13 @@ export class ReleaseQueryService {
 		};
 	}
 
-	async getManyAndCountOptimized(query: QueryGetListReleaseDto) {
+	async getManyAndCountOptimized(
+		query: QueryGetListReleaseDto,
+		user: UserFromRequest,
+	) {
 		const qbId = this.releaseRepo.createQueryBuilder(this.mainAlias);
 
-		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query });
+		const { itemsToJoin } = this.filterByQuery2({ qb: qbId, query, user });
 
 		if (itemsToJoin.includes('release.ciData')) {
 			qbId.leftJoinAndSelect('release.ciData', 'releaseCiData');
@@ -234,24 +239,30 @@ export class ReleaseQueryService {
 		if (!fieldOrder) return;
 
 		switch (fieldOrder) {
-			case FieldOrderRelease.DSPS_LIVE:
+			case FieldOrderRelease.DSPS_LIVE as string:
 			case 'dsps_live_count':
-				qbId.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count');
-				break;
-			case FieldOrderRelease.TRACKS_COUNT:
 				qbId.addSelect(
-					this.countTracksSubQuery,
+					(qb) => this.countDspsLiveSubQuery(qb),
+					'dsps_live_count',
+				);
+				break;
+			case FieldOrderRelease.TRACKS_COUNT as string:
+				qbId.addSelect(
+					(qb) => this.countTracksSubQuery(qb),
 					FieldOrderRelease.TRACKS_COUNT,
 				);
 				break;
-			case FieldOrderRelease.TOTAL_DURATION:
+			case FieldOrderRelease.TOTAL_DURATION as string:
 				qbId.addSelect(
-					this.sumDurationSubQuery,
+					(qb) => this.sumDurationSubQuery(qb),
 					FieldOrderRelease.TOTAL_DURATION,
 				);
 				break;
 			case 'dsps_total_count':
-				qbId.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+				qbId.addSelect(
+					(qb) => this.countDspsTotalSubQuery(qb),
+					'dsps_total_count',
+				);
 				break;
 			default:
 				qbId.addSelect(`${this.mainAlias}.${fieldOrder}`);
@@ -368,8 +379,9 @@ export class ReleaseQueryService {
 			)
 			.leftJoin('release.timeZone', 'timeZone')
 			.leftJoin('release.releaseTerritory', 'releaseTerritory')
-			.leftJoin('release.video', 'video')
-			.leftJoin('video.channel', 'videoChannel')
+			.leftJoinAndSelect('release.video', 'video')
+			.leftJoinAndSelect('video.channel', 'videoChannel')
+			.leftJoinAndSelect('video.labelEntity', 'videoLabel')
 			.leftJoin('video.videoFile', 'videoFile')
 			.leftJoin('release.captions', 'releaseCaptions')
 			.leftJoin('releaseCaptions.file', 'releaseCaptionFile')
@@ -518,6 +530,7 @@ export class ReleaseQueryService {
 				'video.isrc',
 				'video.externalId',
 				'video.label',
+				'video.labelId',
 				'video.explicit',
 				'video.aiContent',
 				'video.channelId',
@@ -539,6 +552,7 @@ export class ReleaseQueryService {
 				'videoFile.fileSize',
 				'videoFile.contentType',
 			])
+			.addSelect(['videoLabel.id', 'videoLabel.name'])
 			.addSelect([
 				'releaseCaptions.id',
 				'releaseCaptions.releaseId',
@@ -964,9 +978,11 @@ export class ReleaseQueryService {
 	private filterByQuery2({
 		qb,
 		query,
+		user,
 	}: {
 		qb: SelectQueryBuilder<Release>;
 		query: QueryGetListReleaseDto;
+		user: UserFromRequest;
 	}) {
 		const {
 			keyword,
@@ -1188,6 +1204,25 @@ export class ReleaseQueryService {
 
 		if (type) {
 			qb.andWhere('release.type = :type', { type });
+		}
+
+		if (
+			type === 'video' &&
+			user &&
+			!checkCanAccessTenantAll(user.type, user.tenantUserType)
+		) {
+			// Chỉ lấy các release video thuộc kênh ACTIVE mà user được phân quyền trong user_channels
+			qb.andWhere(
+				`release.id IN (
+					SELECT v.release_id 
+					FROM videos v
+					JOIN channels c ON c.id = v.channel_id
+					JOIN user_channels uc ON uc.channel_id = c.id
+					WHERE uc.user_id = :userIdFilter 
+					AND c.is_active = true
+	)`,
+				{ userIdFilter: user.id },
+			);
 		}
 
 		if (primaryGenreId?.length) {
@@ -1619,13 +1654,22 @@ export class ReleaseQueryService {
 				'channel.youtubeChannelId',
 				'channel.thumbUrl',
 			])
-			.addSelect(this.countTracksSubQuery, FieldOrderRelease.TRACKS_COUNT)
 			.addSelect(
-				this.sumDurationSubQuery,
+				(qb) => this.countTracksSubQuery(qb),
+				FieldOrderRelease.TRACKS_COUNT,
+			)
+			.addSelect(
+				(qb) => this.sumDurationSubQuery(qb),
 				FieldOrderRelease.TOTAL_DURATION,
 			)
-			.addSelect(this.countDspsLiveSubQuery, 'dsps_live_count')
-			.addSelect(this.countDspsTotalSubQuery, 'dsps_total_count');
+			.addSelect(
+				(qb) => this.countDspsLiveSubQuery(qb),
+				'dsps_live_count',
+			)
+			.addSelect(
+				(qb) => this.countDspsTotalSubQuery(qb),
+				'dsps_total_count',
+			);
 
 		return { itemsToJoin };
 	}
@@ -1932,6 +1976,7 @@ export class ReleaseQueryService {
 			.leftJoinAndSelect('release.releaseCoverArts', 'releaseCoverArts')
 			.leftJoinAndSelect('release.video', 'video')
 			.leftJoinAndSelect('video.channel', 'videoChannel')
+			.leftJoinAndSelect('video.labelEntity', 'videoLabel')
 			.leftJoinAndSelect('video.videoFile', 'videoFile')
 			.leftJoinAndSelect('release.captions', 'releaseCaptions')
 			.leftJoinAndSelect('releaseCaptions.file', 'releaseCaptionFile')

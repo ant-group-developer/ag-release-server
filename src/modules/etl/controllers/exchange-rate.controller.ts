@@ -58,6 +58,19 @@ export class ExchangeRateController {
 		return new ResponseSuccess({ data: result });
 	}
 
+	@Post('rebuild-all-cubes')
+	@ApiOperation({
+		summary: 'Rebuild all sales and trends cubes from fact tables',
+		description:
+			'Rebuilds every analytics cube from canonical fact tables. Use after a historical data correction.',
+	})
+	@ApiResponse({ status: 201, description: 'All analytics cubes rebuilt.' })
+	async rebuildAllCubes() {
+		const result =
+			await this.exchangeRateService.rebuildAllAnalyticsCubes();
+		return new ResponseSuccess({ data: result });
+	}
+
 	@Get()
 	@ApiOperation({
 		summary: 'List exchange rates stored in ClickHouse',

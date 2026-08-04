@@ -1248,8 +1248,7 @@ export class ReleaseDdexService {
 					}));
 
 		const videoIsrc = video.isrc ?? '';
-		const videoLabelName =
-			video.label?.trim() || release.label?.name || 'label_video';
+		const videoLabelName = video.labelEntity?.name?.trim() ?? '';
 
 		return {
 			version: ernVersion,

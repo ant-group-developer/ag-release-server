@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { ChannelStatus } from '../enum/channel.enum';
 import { ChannelHistory } from './channel-history.entity';
+import { UserChannel } from './user-channel.entity';
 
 @Entity('channels', {
 	comment: 'Danh muc channel dung cho video distribution',
@@ -68,9 +69,20 @@ export class Channel extends BaseUUIDEntity {
 	@JoinColumn({ name: 'tenant_id' })
 	tenant: Tenant | null;
 
+	@Column({
+		type: 'boolean',
+		default: true,
+		name: 'is_active',
+		comment: 'Trạng thái hoạt động của kênh',
+	})
+	isActive: boolean;
+
 	@OneToMany(() => Video, (video) => video.channel)
 	videos: Video[];
 
 	@OneToMany(() => ChannelHistory, (history) => history.channelEntity)
 	histories: ChannelHistory[];
+
+	@OneToMany(() => UserChannel, (userChannel) => userChannel.channel)
+	userChannels: UserChannel[];
 }

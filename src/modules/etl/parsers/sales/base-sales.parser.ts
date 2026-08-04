@@ -13,6 +13,7 @@ import {
 	applyInputAliases,
 	ConfiguredFieldMapping,
 	readSourceValue,
+	suppressSkippedInputColumns,
 	transformMappedValue,
 } from '../field-mapping-overlay';
 import { ParseFileStats } from '../base.parser';
@@ -40,6 +41,11 @@ export abstract class BaseSalesParser {
 	setFieldMappingOverrides(mappings: ConfiguredFieldMapping[]): this {
 		this.fieldMappingOverrides = mappings;
 		return this;
+	}
+
+	protected prepareRecord(record: Record<string, string>): void {
+		applyInputAliases(record, this.fieldMappingOverrides);
+		suppressSkippedInputColumns(record, this.fieldMappingOverrides);
 	}
 
 	/**
@@ -203,7 +209,7 @@ export abstract class BaseSalesParser {
 				headers.forEach((h, i) => {
 					record[h.trim()] = (values[i] || '').trim();
 				});
-				applyInputAliases(record, this.fieldMappingOverrides);
+			this.prepareRecord(record);
 
 				const parsed = this.parseRow(record, batchId, filePath);
 				if (parsed) {
@@ -264,6 +270,7 @@ export abstract class BaseSalesParser {
 		record: Record<string, string>,
 	): FactSalesRow {
 		for (const mapping of this.fieldMappingOverrides) {
+			if (mapping.targetColumn === 'skip') continue;
 			const value = transformMappedValue(
 				readSourceValue(record, mapping.reportColumn),
 				mapping.transform,

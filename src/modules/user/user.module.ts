@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccessControlModule } from '../access-control/access-control.module';
 import { AppConfigModule } from '../app-config/app-config.module';
+import { UserChannel } from '../channel/entities/user-channel.entity';
 import { TenantModule } from '../tenant/tenant.module';
 import { TenantUser } from './entities/tenant-user.entity';
 import { User } from './entities/user.entity';
@@ -12,7 +13,7 @@ import { UserController } from './user.controller';
 
 @Module({
 	imports: [
-		TypeOrmModule.forFeature([User, TenantUser]),
+		TypeOrmModule.forFeature([User, TenantUser, UserChannel]),
 		forwardRef(() => AccessControlModule),
 		AppConfigModule,
 		forwardRef(() => TenantModule),

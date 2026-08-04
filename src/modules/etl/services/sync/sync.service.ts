@@ -11,12 +11,12 @@ import {
 	FtpParserConfigService,
 	ResolvedFtpParserConfig,
 } from '../../../dsp-report/services/ftp-parser-config.service';
+import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
 import { UpdateSyncConfigDto } from '../../dto/sync-config.dto';
 import { ImportJobSourceType } from '../../interfaces';
-import { CubeRebuildService } from '../cube-rebuild/cube-rebuild.service';
+import { AnalyticsProjectionRefreshService } from '../cube-rebuild/analytics-projection-refresh.service';
 import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
-import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
-import { FtpService } from '../ftp/ftp.service';
+import { FtpAuthenticationError, FtpService } from '../ftp/ftp.service';
 import { ImportService } from '../import/import.service';
 
 export interface SyncConfig {
@@ -39,6 +39,7 @@ export interface SyncPeriodResult {
 			rows: number;
 			files: number;
 			durationMs: number;
+			ignoredFilesCleaned?: number;
 			error?: string;
 			reason?: string;
 			releases?: {
@@ -98,10 +99,10 @@ export class SyncService {
 		private readonly importService: ImportService,
 		private readonly clickHouseService: ClickHouseService,
 		@InjectRedis() private readonly redis: Redis,
-		private readonly exchangeRateService: ExchangeRateService,
 		private readonly excludePatternService: ExcludePatternService,
-		private readonly cubeRebuildService: CubeRebuildService,
+		private readonly analyticsProjectionRefreshService: AnalyticsProjectionRefreshService,
 		private readonly ftpParserConfigService: FtpParserConfigService,
+		private readonly ftpReportFileRuleService: FtpReportFileRuleService,
 		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
 	) {}
 
@@ -143,8 +144,8 @@ export class SyncService {
 	/**
 	 * Get detailed import info for change detection.
 	 * Returns a Map of "period|category|dsp_folder" → { status, files_list }
-	 * Built from per-file records: aggregates file_name list per (job_id, period, category, dsp_folder).
-	 * Uses the latest completed job per folder (max job_id as proxy for recency).
+	 * Built from the latest state of each file. An `ignored` tombstone removes only
+	 * that file from the manifest, so a later automatic sync will not import it again.
 	 */
 	private async getImportedDetails(): Promise<
 		Map<
@@ -158,15 +159,25 @@ export class SyncService {
 		>
 	> {
 		const sql = `
+      WITH latest_file_state AS (
+        SELECT
+          period,
+          category,
+          dsp_folder,
+          file_name,
+          argMax(status, tuple(completed_at, started_at, id)) AS status
+        FROM etl_import_history FINAL
+        WHERE source_type IN ('FTP_SYNC_PERIOD', 'FTP_SYNC_ALL', 'FTP_RETRY', 'FTP_AUTO_CRON')
+        GROUP BY period, category, dsp_folder, file_name
+      )
       SELECT
         period,
         category,
         dsp_folder,
         'done' AS status,
         groupArray(file_name) AS files_list
-      FROM etl_import_history FINAL
+      FROM latest_file_state
       WHERE status = 'done'
-        AND source_type IN ('FTP_SYNC_PERIOD', 'FTP_SYNC_ALL', 'FTP_RETRY', 'FTP_AUTO_CRON')
       GROUP BY period, category, dsp_folder
     `;
 		const rows = await this.clickHouseService.query<{
@@ -200,13 +211,17 @@ export class SyncService {
 	/**
 	 * Delete fact data for a specific (period, category, dsp_folder) combination.
 	 * This allows precise re-import without affecting other folders.
-	 * Runs fact + cube deletions in parallel for speed.
+	 * Cube projections are refreshed once after the replacement import succeeds.
 	 */
-	private async deleteFolderData(
+	private escapeSqlString(value: string): string {
+		return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+	}
+
+	private async getFolderFactScope(
 		period: string,
 		category: string,
 		dspFolder: string,
-	): Promise<void> {
+	): Promise<{ table: string; where: string }> {
 		const periodStart = `${period.substring(0, 4)}-${period.substring(4, 6)}-01`;
 		const dspName = dspFolder.includes('-')
 			? dspFolder.split('-').slice(1).join('-')
@@ -237,7 +252,9 @@ export class SyncService {
 		const ids = new Set([dspFolder]);
 		if (dspName) ids.add(dspName);
 		if (resolvedDspId) ids.add(resolvedDspId);
-		const dspIdsInSql = [...ids].map((id) => `'${id}'`).join(', ');
+		const dspIdsInSql = [...ids]
+			.map((id) => `'${this.escapeSqlString(id)}'`)
+			.join(', ');
 
 		const table =
 			category === 'sales'
@@ -254,32 +271,135 @@ export class SyncService {
 
 		const dateRange = `>= '${periodStart}' AND ${dateCol} < addMonths(toDate('${periodStart}'), 1)`;
 
-		try {
-			// 1. Delete old data only in fact table
-			await this.clickHouseService.execute(
-				`ALTER TABLE music_analytics.${table} DELETE WHERE ${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
-			);
-			await this.clickHouseService.waitForTableMutations(table);
+		return {
+			table,
+			where: `${dateCol} ${dateRange} ${catFilter}AND dsp_id IN (${dspIdsInSql})`,
+		};
+	}
 
-			// 2. Rebuild cubes for the period partition
-			const formattedPeriod = `${period.substring(0, 4)}-${period.substring(4, 6)}`;
-			if (category === 'sales') {
-				await this.cubeRebuildService.rebuildSalesCubesForPeriods([
-					formattedPeriod,
-				]);
-			} else {
-				await this.cubeRebuildService.rebuildTrendsCubesForPeriods([
-					formattedPeriod,
-				]);
-			}
+	/**
+	 * Delete fact data for a specific (period, category, dsp_folder) combination.
+	 * FTP callers must pass their source marker so they cannot erase data imported
+	 * by WMG, Spotify, statements, or another source.
+	 */
+	private async deleteFolderData(
+		period: string,
+		category: string,
+		dspFolder: string,
+		importSources?: string[],
+	): Promise<void> {
+		const { table, where } = await this.getFolderFactScope(
+			period,
+			category,
+			dspFolder,
+		);
+		const sourceFilter = importSources?.length
+			? ` AND import_source IN (${importSources
+					.map((source) => `'${this.escapeSqlString(source)}'`)
+					.join(', ')})`
+			: '';
 
-			this.logger.log(
-				`  🗑️ Deleted old fact data for ${category}/${dspFolder} in ${period} and rebuilt affected cubes`,
-			);
-		} catch (err) {
-			this.logger.warn(
-				`  Failed to delete old data for ${category}/${dspFolder}: ${err.message}`,
-			);
+		await this.clickHouseService.execute(
+			`ALTER TABLE music_analytics.${table} DELETE WHERE ${where}${sourceFilter}`,
+		);
+		await this.clickHouseService.waitForTableMutations(table);
+		this.logger.log(
+			`  🗑️ Deleted old fact data for ${category}/${dspFolder} in ${period}`,
+		);
+	}
+
+	private async getFtpFolderFactFiles(
+		period: string,
+		category: string,
+		dspFolder: string,
+	): Promise<{ fileNames: string[]; unattributableRows: number }> {
+		const { table, where } = await this.getFolderFactScope(
+			period,
+			category,
+			dspFolder,
+		);
+		const rows = await this.clickHouseService.query<{
+			source_file_name: string;
+			row_count: string;
+		}>(`
+      SELECT source_file_name, count() AS row_count
+      FROM music_analytics.${table}
+      WHERE ${where} AND import_source IN ('ftp', '')
+      GROUP BY source_file_name
+    `);
+
+		return {
+			fileNames: rows
+				.map((row) => row.source_file_name)
+				.filter((fileName) => Boolean(fileName)),
+			unattributableRows: rows
+				.filter((row) => !row.source_file_name)
+				.reduce((total, row) => total + Number(row.row_count), 0),
+		};
+	}
+
+	private async deleteIgnoredFtpFolderFiles(
+		period: string,
+		category: string,
+		dspFolder: string,
+		fileNames: string[],
+	): Promise<number> {
+		const uniqueFileNames = [...new Set(fileNames)].filter(Boolean);
+		if (uniqueFileNames.length === 0) return 0;
+
+		const { table, where } = await this.getFolderFactScope(
+			period,
+			category,
+			dspFolder,
+		);
+		const fileNamesSql = uniqueFileNames
+			.map((fileName) => `'${this.escapeSqlString(fileName)}'`)
+			.join(', ');
+		const countRows = await this.clickHouseService.query<{
+			row_count: string;
+		}>(`
+      SELECT count() AS row_count
+      FROM music_analytics.${table}
+      WHERE ${where}
+        AND import_source IN ('ftp', '')
+        AND source_file_name IN (${fileNamesSql})
+    `);
+		const deletedRows = Number(countRows[0]?.row_count ?? 0);
+		if (deletedRows === 0) return 0;
+
+		await this.clickHouseService.execute(
+			`ALTER TABLE music_analytics.${table} DELETE WHERE ${where} AND import_source IN ('ftp', '') AND source_file_name IN (${fileNamesSql})`,
+		);
+		await this.clickHouseService.waitForTableMutations(table);
+		this.logger.log(
+			`  Removed ${deletedRows} FTP fact row(s) for ${uniqueFileNames.length} ignored file(s) in ${category}/${dspFolder}/${period}`,
+		);
+		return deletedRows;
+	}
+
+	private async writeIgnoredFileHistory(
+		period: string,
+		category: string,
+		dspFolder: string,
+		batchId: string,
+		jobId: string | undefined,
+		fileNames: string[],
+	): Promise<void> {
+		for (const fileName of [...new Set(fileNames)].filter(Boolean)) {
+			await this.etlImportHistoryRepository.upsert({
+				job_id: jobId ?? batchId,
+				batch_id: batchId,
+				period,
+				source_type: ImportJobSourceType.FTP_SYNC_PERIOD,
+				category,
+				dsp_folder: dspFolder,
+				file_name: fileName,
+				file_directory: `${category}/${period}/${dspFolder}`,
+				file_path: `${category}/${period}/${dspFolder}/${fileName}`,
+				status: 'ignored',
+				error_message:
+					'Removed by force sync because FTP report file rule is ignore',
+			});
 		}
 	}
 
@@ -345,6 +465,12 @@ export class SyncService {
 				pending: 0,
 			},
 		};
+		const affectedSalesPeriods = new Set<string>();
+		const affectedTrendsPeriods = new Set<string>();
+		const registerAffectedPeriod = (category: string) => {
+			if (category === 'sales') affectedSalesPeriods.add(period);
+			else affectedTrendsPeriods.add(period);
+		};
 
 		const categoriesToSync = resolvedCategories;
 
@@ -382,12 +508,100 @@ export class SyncService {
 				const key = `${period}|${category}|${dspFolder}`;
 				const existing = importedDetails.get(key);
 				let parserConfig: ResolvedFtpParserConfig;
+				let ignoredFilesCleaned = 0;
 				try {
-					parserConfig = await this.ftpParserConfigService.resolve(
-						dspFolder,
-						category as FtpSourceCategory,
-					);
+					const availableFiles =
+						await this.ftpService.listRemoteFiles(
+							category,
+							period,
+							dspFolder,
+						);
+					const ruleDecision =
+						await this.ftpReportFileRuleService.resolveFiles(
+							'ftp',
+							category as FtpSourceCategory,
+							dspFolder,
+							availableFiles,
+						);
+					if (ruleDecision.pending.length) {
+						this.logger.warn(
+							`FTP rules pending confirmation for ${category}/${dspFolder}: ${ruleDecision.pending.length} file(s)`,
+						);
+					}
+					// A rule may have changed from import to ignore after its file was
+					// already imported. During a force sync, reconcile those historical
+					// FTP rows before the normal early-return for "no import rule".
+					if (resolvedForce) {
+						const trackedFiles = await this.getFtpFolderFactFiles(
+							period,
+							category,
+							dspFolder,
+						);
+						if (trackedFiles.unattributableRows > 0) {
+							this.logger.warn(
+								`Cannot safely reconcile ${trackedFiles.unattributableRows} legacy FTP fact row(s) without source_file_name in ${category}/${dspFolder}/${period}`,
+							);
+						}
+						const historicalRuleDecision =
+							await this.ftpReportFileRuleService.resolveFiles(
+								'ftp',
+								category as FtpSourceCategory,
+								dspFolder,
+								trackedFiles.fileNames,
+							);
+						const ignoredHistoricalFiles =
+							historicalRuleDecision.ignored;
+						if (ignoredHistoricalFiles.length > 0) {
+							const deletedRows =
+								await this.deleteIgnoredFtpFolderFiles(
+									period,
+									category,
+									dspFolder,
+									ignoredHistoricalFiles,
+								);
+							await this.writeIgnoredFileHistory(
+								period,
+								category,
+								dspFolder,
+								batchId,
+								jobId,
+								ignoredHistoricalFiles,
+							);
+							ignoredFilesCleaned = ignoredHistoricalFiles.length;
+							if (deletedRows > 0)
+								registerAffectedPeriod(category);
+						}
+					}
+					if (
+						!ruleDecision.selected.length ||
+						!ruleDecision.parserCode
+					) {
+						categoryResult.folders.push({
+							dsp_folder: dspFolder,
+							status: 'skipped',
+							rows: 0,
+							files: 0,
+							durationMs: 0,
+							ignoredFilesCleaned:
+								ignoredFilesCleaned || undefined,
+							reason: ruleDecision.pending.length
+								? 'files pending admin confirmation'
+								: ignoredFilesCleaned
+									? `${ignoredFilesCleaned} ignored file(s) removed by force sync`
+									: 'no import rule matched files',
+						});
+						continue;
+					}
+					parserConfig =
+						await this.ftpParserConfigService.resolveForParserCode(
+							dspFolder,
+							category as FtpSourceCategory,
+							ruleDecision.parserCode,
+						);
+					const selectedNames = new Set(ruleDecision.selected);
+					parserConfig.selectFile = (path) => selectedNames.has(path);
 				} catch (err) {
+					if (err instanceof FtpAuthenticationError) throw err;
 					this.logger.error(
 						`Invalid parser config for ${category}/${dspFolder}: ${err.message}`,
 					);
@@ -430,7 +644,9 @@ export class SyncService {
 							period,
 							category,
 							dspFolder,
+							['ftp', ''],
 						);
+						registerAffectedPeriod(category);
 					} else {
 						const previousFiles = (
 							existing.file_manifest ||
@@ -472,7 +688,9 @@ export class SyncService {
 							period,
 							category,
 							dspFolder,
+							['ftp', ''],
 						);
+						registerAffectedPeriod(category);
 					}
 				}
 
@@ -525,26 +743,31 @@ export class SyncService {
 					// Write per-file records to etl_import_history
 					if (jobId && dspResult.fileStats?.length) {
 						for (const stat of dspResult.fileStats) {
-							await this.etlImportHistoryRepository.upsert({
-								job_id: jobId,
-								batch_id: batchId,
-								period,
-								source_type: ImportJobSourceType.FTP_SYNC_PERIOD,
-								category,
-								dsp_folder: dspFolder,
-								file_name: stat.fileName,
-								file_directory: `${category}/${period}/${dspFolder}`,
-								file_path: `${category}/${period}/${dspFolder}/${stat.fileName}`,
-								status: 'done',
-								file_size_bytes: stat.fileSizeBytes,
-								total_lines: stat.totalLines,
-								processed_rows: stat.processedRows,
-								skipped_rows: stat.skippedRows,
-								error_rows: stat.errorRows,
-								duration_ms: durationMs,
-							}).catch((err) =>
-								this.logger.warn(`Failed to write etl_import_history for ${stat.fileName}: ${err.message}`),
-							);
+							await this.etlImportHistoryRepository
+								.upsert({
+									job_id: jobId,
+									batch_id: batchId,
+									period,
+									source_type:
+										ImportJobSourceType.FTP_SYNC_PERIOD,
+									category,
+									dsp_folder: dspFolder,
+									file_name: stat.fileName,
+									file_directory: `${category}/${period}/${dspFolder}`,
+									file_path: `${category}/${period}/${dspFolder}/${stat.fileName}`,
+									status: 'done',
+									file_size_bytes: stat.fileSizeBytes,
+									total_lines: stat.totalLines,
+									processed_rows: stat.processedRows,
+									skipped_rows: stat.skippedRows,
+									error_rows: stat.errorRows,
+									duration_ms: durationMs,
+								})
+								.catch((err) =>
+									this.logger.warn(
+										`Failed to write etl_import_history for ${stat.fileName}: ${err.message}`,
+									),
+								);
 						}
 					}
 
@@ -585,12 +808,14 @@ export class SyncService {
 
 					result.totalRows += rows;
 					result.totalFiles += files;
+					if (rows > 0) registerAffectedPeriod(category);
 
 					this.logger.log(
 						`  ${isUpdate ? '🔄' : '✅'} ${category}/${dspFolder}: ${rows} rows, ${files} files (${durationMs}ms)` +
 							(isUpdate ? ' [UPDATED]' : ''),
 					);
 				} catch (err) {
+					if (err instanceof FtpAuthenticationError) throw err;
 					const durationMs = Date.now() - folderStart;
 
 					categoryResult.folders.push({
@@ -616,20 +841,15 @@ export class SyncService {
 			`Period ${period} sync done: ${result.totalRows} rows, ${result.totalFiles} files (${result.durationMs}ms)`,
 		);
 
-		// Invalidate analytics cache after successful import
-		// Sync rates and rebuild cubes if data was imported
-		if (result.totalRows > 0) {
-			try {
-				this.logger.log(
-					'Import detected new rows. Syncing missing exchange rates and rebuilding cubes...',
-				);
-				await this.exchangeRateService.backfillMissingRates();
-			} catch (err) {
-				this.logger.error(
-					`Failed to sync rates and rebuild cubes: ${err.message}`,
-					err.stack,
-				);
-			}
+		// Rebuild each affected partition only after every fact write for this period.
+		// This keeps cubes correct for both fresh imports and replacement imports.
+		if (affectedSalesPeriods.size || affectedTrendsPeriods.size) {
+			await this.analyticsProjectionRefreshService.refreshAfterFactImport(
+				{
+					salesPeriods: affectedSalesPeriods,
+					trendsPeriods: affectedTrendsPeriods,
+				},
+			);
 
 			try {
 				const keys = await this.redis.keys('analytics:*');
@@ -698,12 +918,18 @@ export class SyncService {
 
 		// Build history lookup: aggregate per (period|category|dsp_folder)
 		// sum processed_rows, use latest completed_at
-		const historyMap = new Map<string, ImportHistoryRow & { _totalRows: number }>();
+		const historyMap = new Map<
+			string,
+			ImportHistoryRow & { _totalRows: number }
+		>();
 		for (const row of history) {
 			const key = `${row.period}|${row.category}|${row.dsp_folder}`;
 			const existing = historyMap.get(key);
 			if (!existing) {
-				historyMap.set(key, { ...row, _totalRows: Number(row.processed_rows) });
+				historyMap.set(key, {
+					...row,
+					_totalRows: Number(row.processed_rows),
+				});
 			} else {
 				existing._totalRows += Number(row.processed_rows);
 				if (row.completed_at > existing.completed_at) {

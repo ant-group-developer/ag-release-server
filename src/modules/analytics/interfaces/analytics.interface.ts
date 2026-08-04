@@ -73,6 +73,7 @@ export interface RevenueOverviewResponse {
 export interface RevenueDspItem {
 	pgDspId: string | null;
 	dspReportId: string;
+	dspReportIds: string[];
 	dspName: string;
 	imageUrl: string | null;
 	revenueUsd: number;

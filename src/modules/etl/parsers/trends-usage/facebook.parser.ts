@@ -319,6 +319,7 @@ export class FacebookParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			let isrc = record['isrc']?.trim() || '';
 			const upc =
@@ -385,6 +386,7 @@ export class FacebookParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			let isrc = record['isrc']?.trim() || '';
 			const upc =
@@ -447,6 +449,7 @@ export class FacebookParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			let isrc = record['isrc']?.trim() || '';
 			const upc =

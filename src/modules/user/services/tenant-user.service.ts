@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { ResponseError } from 'src/common/dtos/common.response.dto';
 import { AccessControlService } from 'src/modules/access-control/access-control.service';
+import { UserChannel } from 'src/modules/channel/entities/user-channel.entity';
 import { TenantService } from 'src/modules/tenant/tenant.service';
 import { In, Repository } from 'typeorm';
 import { UserMessages } from '../constants/messages';
@@ -22,6 +23,8 @@ export class TenantUserService {
 		@InjectRepository(TenantUser)
 		private readonly tenantUserRepository: Repository<TenantUser>,
 		private readonly userService: UserService,
+		@InjectRepository(UserChannel)
+		private readonly userChannelRepo: Repository<UserChannel>,
 		@Inject(forwardRef(() => TenantService))
 		private readonly tenantService: TenantService,
 		@Inject(forwardRef(() => AccessControlService))
@@ -171,6 +174,8 @@ export class TenantUserService {
 				UserMessages.TENANT.DELETE.DECLINE_DELETE_TENANT_ADMIN,
 			);
 		}
+
+		await this.userChannelRepo.delete({ tenantId, userId });
 
 		return this.tenantUserRepository
 			.delete({ tenantId, userId })

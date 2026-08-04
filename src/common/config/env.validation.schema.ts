@@ -91,6 +91,7 @@ export const envValidationSchema = Joi.object({
 	FTP_BASE_PATH: Joi.string().default('/root'),
 	FTP_SYNC_MODE: Joi.string().valid('manual', 'auto').default('manual'),
 	FTP_SYNC_CRON: Joi.string().default('0 2 * * *'),
+	FTP_DISCOVERY_CRON: Joi.string().default('0 1 * * *'),
 
 	// Redis (bắt buộc — cache2.module inject trực tiếp process.env, không có fallback)
 	REDIS_HOST: Joi.string().required(),

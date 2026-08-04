@@ -26,6 +26,7 @@ import {
 	hasMeaningfulText,
 	normalizeFactRows,
 } from '../../utils/fact-row-normalizer.util';
+import { AnalyticsProjectionRefreshService } from '../cube-rebuild/analytics-projection-refresh.service';
 
 const REVELATOR_IMPORT_SOURCE = 'bombshelter';
 
@@ -66,6 +67,7 @@ export class ImportService {
 		private readonly excludePatternService: ExcludePatternService,
 		private readonly dspReportService: DspReportService,
 		private readonly reportEntityExtractorService: ReportEntityExtractorService,
+		private readonly analyticsProjectionRefreshService: AnalyticsProjectionRefreshService,
 	) {}
 
 	/**
@@ -348,6 +350,8 @@ export class ImportService {
 					d.isDirectory() &&
 					d.name !== 'trends' &&
 					d.name !== 'usage' &&
+					d.name !== 'sales' &&
+					d.name !== 'illegitimate_activity' &&
 					!d.name.startsWith('.'),
 			);
 		for (const d of rootDirs) {
@@ -386,6 +390,28 @@ export class ImportService {
 				result.totalRows += dspResult.rows;
 				result.totalFiles += dspResult.files;
 			}
+		}
+		if (result.totalRows > 0) {
+			const [salesPeriods, trendsPeriods] = await Promise.all([
+				this.clickHouseService.query<{ period: string }>(
+					`SELECT DISTINCT formatDateTime(reporting_period_start, '%Y-%m') AS period
+					 FROM music_analytics.${CLICKHOUSE_TABLES.FACT_SALES_REPORT}
+					 WHERE batch_id = {batchId:String}`,
+					{ batchId },
+				),
+				this.clickHouseService.query<{ period: string }>(
+					`SELECT DISTINCT formatDateTime(reporting_period, '%Y-%m') AS period
+					 FROM music_analytics.${CLICKHOUSE_TABLES.FACT_DSP_COMPREHENSIVE_REPORT}
+					 WHERE batch_id = {batchId:String}`,
+					{ batchId },
+				),
+			]);
+			await this.analyticsProjectionRefreshService.refreshAfterFactImport(
+				{
+					salesPeriods: salesPeriods.map((row) => row.period),
+					trendsPeriods: trendsPeriods.map((row) => row.period),
+				},
+			);
 		}
 
 		result.durationMs = Date.now() - startTime;
@@ -483,7 +509,10 @@ export class ImportService {
 
 		for (const filePath of files) {
 			try {
-				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(
+					filePath,
+					batchId,
+				);
 				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				for (const row of rows) {
@@ -517,6 +546,7 @@ export class ImportService {
 				this.logger.error(
 					`Bulk insert failed for ${folderName}: ${err.message}`,
 				);
+				throw err;
 			}
 
 			// Import metadata (Release/Track/Video) sang Postgres giống report-import.
@@ -580,7 +610,10 @@ export class ImportService {
 
 		for (const filePath of files) {
 			try {
-				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(
+					filePath,
+					batchId,
+				);
 				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report from dsps_report
@@ -599,9 +632,7 @@ export class ImportService {
 				}
 				allRows.push(...rows);
 			} catch (err) {
-				parseErrors.push(
-					`${path.basename(filePath)}: ${err.message}`,
-				);
+				parseErrors.push(`${path.basename(filePath)}: ${err.message}`);
 				this.logger.error(
 					`Error parsing sales ${path.basename(filePath)}: ${err.message}`,
 				);
@@ -631,6 +662,7 @@ export class ImportService {
 				this.logger.error(
 					`Sales bulk insert failed for ${folderName}: ${err.message}`,
 				);
+				throw err;
 			}
 
 			// Import metadata (Release/Track/Video) sang Postgres giống report-import.
@@ -699,7 +731,10 @@ export class ImportService {
 
 		for (const filePath of files) {
 			try {
-				const { rows, stats } = await parser.parseFileWithStats(filePath, batchId);
+				const { rows, stats } = await parser.parseFileWithStats(
+					filePath,
+					batchId,
+				);
 				allFileStats.push(stats);
 				const sourceFileName = path.basename(filePath);
 				// Replace dsp_id with id_dsps_report
@@ -731,6 +766,7 @@ export class ImportService {
 				this.logger.error(
 					`Illegitimate bulk insert failed for ${folderName}: ${err.message}`,
 				);
+				throw err;
 			}
 
 			// Import metadata (Release/Track/Video) sang Postgres giống report-import.

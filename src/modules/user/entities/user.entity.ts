@@ -1,4 +1,5 @@
 import { BaseUUIDEntity } from 'src/common/entities/base.entity';
+import { UserChannel } from 'src/modules/channel/entities/user-channel.entity';
 import { UserRole } from 'src/modules/user-role/user-role.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { UserType } from '../enum/user.enum';
@@ -44,6 +45,9 @@ export class User extends BaseUUIDEntity {
 
 	@OneToMany(() => TenantUser, (tenantUser) => tenantUser.user)
 	tenantUser: TenantUser[];
+
+	@OneToMany(() => UserChannel, (userChannel) => userChannel.user)
+	userChannels: UserChannel[];
 
 	@Column({ type: 'uuid', nullable: true })
 	creatorId: string | null;

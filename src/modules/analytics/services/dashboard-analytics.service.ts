@@ -6,6 +6,10 @@ import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { DashboardAnalyticsQueryDto } from '../dto/analytics-query.dto';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 import { IsrcResolverService } from './isrc-resolver.service';
 
 @Injectable()
@@ -47,6 +51,12 @@ export class DashboardAnalyticsService {
 			filterSql += ' AND t.release_type = {releaseType:String}';
 			params.releaseType = query.releaseType;
 		}
+
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			getAnalyticsVideoScope(query),
+		);
 
 		return { joinSql, filterSql, params };
 	}
@@ -179,6 +189,11 @@ export class DashboardAnalyticsService {
 			releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
 			params.releaseType = query.releaseType;
 		}
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(query),
+		);
 
 		let sql = '';
 		if (query.type === 'stream') {
@@ -195,6 +210,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
           ${releaseTypeFilter}
+						${videoScopeFilter}
         GROUP BY labelId
       `;
 		} else {
@@ -211,6 +227,7 @@ export class DashboardAnalyticsService {
           AND s.period <= toDate({to:String})
           ${tenantFilter}
           ${releaseTypeFilter}
+						${videoScopeFilter}
         GROUP BY labelId
       `;
 		}
@@ -287,6 +304,11 @@ export class DashboardAnalyticsService {
 			releaseTypeFilter = 'AND t.release_type = {releaseType:String}';
 			params.releaseType = query.releaseType;
 		}
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(query),
+		);
 
 		let sql = '';
 		if (query.type === 'stream') {
@@ -303,6 +325,7 @@ export class DashboardAnalyticsService {
           AND s.reporting_date <= toDate({to:String})
           ${tenantFilter}
           ${releaseTypeFilter}
+						${videoScopeFilter}
         GROUP BY artistId
       `;
 		} else {
@@ -319,6 +342,7 @@ export class DashboardAnalyticsService {
           AND s.period <= toDate({to:String})
           ${tenantFilter}
           ${releaseTypeFilter}
+						${videoScopeFilter}
         GROUP BY artistId
       `;
 		}

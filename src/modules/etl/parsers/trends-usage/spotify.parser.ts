@@ -119,6 +119,7 @@ export class SpotifyParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			const isrc = record['isrc'];
 			if (!isrc) continue;
@@ -183,6 +184,7 @@ export class SpotifyParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			const row = this.createBaseRow(batchId);
 			row.reporting_period = this.extractWeekDateFromFilename(filePath);
@@ -228,6 +230,7 @@ export class SpotifyParser extends BaseParser {
 			headers.forEach((h, idx) => {
 				record[h.trim()] = (values[idx] || '').trim();
 			});
+			this.prepareRecord(record);
 
 			const row = this.createBaseRow(batchId);
 			row.reporting_period = this.extractMonthDateFromFilename(filePath);

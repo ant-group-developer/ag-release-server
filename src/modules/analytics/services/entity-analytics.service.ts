@@ -10,17 +10,17 @@ import { toCountryFlagImageUrl } from 'src/utils/country-flag-image-url.util';
 import { normalizeDateToFirstOfMonth } from 'src/utils/util.date';
 import { EntityManager } from 'typeorm';
 import {
-	ChartQueryDto,
 	AnalyticsSummaryQueryDto,
+	ChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
 	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import {
+	AnalyticsSummaryResponse,
 	DspBarChartItem,
 	DspTopReleaseItem,
 	DspTopTrackItem,
-	AnalyticsSummaryResponse,
 	EntityOverviewResponse,
 	EntityTopDspItem,
 	EntityTopTerItem,
@@ -30,6 +30,11 @@ import {
 } from '../interfaces/analytics.interface';
 import { toDspImageUrl } from '../utils/dsp-image-url.util';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+	AnalyticsVideoScope,
+	appendAnalyticsVideoScopeFilter,
+	getAnalyticsVideoScope,
+} from './analytics-video-scope.service';
 import { SourceTypeConfigService } from './source-type-config.service';
 
 export type EntityType =
@@ -61,7 +66,9 @@ export class EntityAnalyticsService {
 
 	private validateSummaryDateRange(dto: AnalyticsSummaryQueryDto): void {
 		if (dto.fromDate > dto.toDate) {
-			throw new BadRequestException('fromDate must be before or equal to toDate');
+			throw new BadRequestException(
+				'fromDate must be before or equal to toDate',
+			);
 		}
 	}
 
@@ -114,6 +121,7 @@ export class EntityAnalyticsService {
 		entityId?: string,
 		releaseType?: 'audio' | 'video',
 		importSource?: string,
+		analyticsScope?: AnalyticsVideoScope,
 	): {
 		joinSql: string;
 		filterSql: string;
@@ -174,6 +182,12 @@ export class EntityAnalyticsService {
 			params.importSource = importSource;
 		}
 
+		filterSql = appendAnalyticsVideoScopeFilter(
+			filterSql,
+			params,
+			analyticsScope,
+		);
+
 		return { joinSql, filterSql, params };
 	}
 
@@ -233,11 +247,9 @@ export class EntityAnalyticsService {
 			const iso2 = item.territory?.trim().toUpperCase();
 			const isOther = !iso2 || iso2 === 'OTHER';
 			const country = iso2 ? countryByIso2.get(iso2) : undefined;
-			const territory = (
-				isOther
-					? item.territory
-					: (country?.name ?? item.territory)
-			) as string;
+			const territory = isOther
+				? item.territory
+				: (country?.name ?? item.territory);
 			return {
 				...item,
 				territory,
@@ -307,6 +319,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		const salesParams = {
 			...params,
@@ -371,6 +384,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -460,13 +474,14 @@ export class EntityAnalyticsService {
 		const sourceMeta =
 			entityType === 'sourceType'
 				? (() => {
-					const source = this.sourceTypeConfigService.resolve(entityId);
-					return {
-						sourceType: source.sourceType,
-						sourceLabel: source.label,
-						imageUrl: source.imageUrl,
-					};
-				})()
+						const source =
+							this.sourceTypeConfigService.resolve(entityId);
+						return {
+							sourceType: source.sourceType,
+							sourceLabel: source.label,
+							imageUrl: source.imageUrl,
+						};
+					})()
 				: null;
 
 		return {
@@ -512,6 +527,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -568,6 +584,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -631,6 +648,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -732,6 +750,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = dto.fromDate;
 		params.to = dto.toDate;
@@ -816,6 +835,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -938,6 +958,7 @@ export class EntityAnalyticsService {
 			entityId,
 			dto.releaseType,
 			dto.importSource,
+			getAnalyticsVideoScope(dto),
 		);
 		params.from = fromDate;
 		params.to = toDate;
@@ -1090,7 +1111,12 @@ export class EntityAnalyticsService {
 				} as Record<string, string>
 			)[entityType] ?? 'AND t.release_id = {entityId:String}';
 
-		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			baseParams,
+			getAnalyticsVideoScope(dto),
+		);
+		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
 
 		const countSql = `
 			SELECT uniq(t.release_id) AS total
@@ -1382,7 +1408,12 @@ export class EntityAnalyticsService {
 				} as Record<string, string>
 			)[entityType] ?? 'AND t.isrc = {entityId:String}';
 
-		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			baseParams,
+			getAnalyticsVideoScope(dto),
+		);
+		const whereConditions = `1 = 1 ${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
 
 		const countSql = `
 			SELECT uniq(t.isrc) AS total
@@ -1666,7 +1697,12 @@ export class EntityAnalyticsService {
 			)[entityType] ?? '';
 
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
-		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(dto),
+		);
+		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;
@@ -1905,7 +1941,12 @@ export class EntityAnalyticsService {
 			)[entityType] ?? '';
 
 		const trackJoin = `INNER JOIN (SELECT * FROM music_analytics.${CLICKHOUSE_TABLES.PG_TRACKS_SYNC} FINAL WHERE is_deleted = 0) t ON s.isrc = t.isrc`;
-		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter}`;
+		const videoScopeFilter = appendAnalyticsVideoScopeFilter(
+			'',
+			params,
+			getAnalyticsVideoScope(dto),
+		);
+		const whereTrack = `${tenantFilter} ${entityFilter} ${releaseTypeFilter} ${videoScopeFilter}`;
 
 		const useTopN = dto.topN != null;
 		const topNLimit = dto.topN ?? dto.limit;

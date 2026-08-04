@@ -365,6 +365,10 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const rows: Record<string, unknown>[] = [];
 		const mappingRows: Record<string, unknown>[] = [];
+		const parserDefinitionsByName = new Map<
+			string,
+			{ sourceFile: string; parserSource: string; sourceHash: string }
+		>();
 		for (const filePath of files) {
 			const source = fs.readFileSync(filePath, 'utf8');
 			const parserDefinitions = this.extractParserDefinitions(source);
@@ -375,6 +379,13 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				.createHash('sha256')
 				.update(source)
 				.digest('hex');
+			for (const parserDefinition of parserDefinitions) {
+				parserDefinitionsByName.set(parserDefinition.parserName, {
+					sourceFile,
+					parserSource: parserDefinition.parserSource,
+					sourceHash,
+				});
+			}
 
 			for (const parserDefinition of parserDefinitions) {
 				const { parserName, parserSource } = parserDefinition;
@@ -386,7 +397,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 								parserName,
 								sourceFile,
 							),
-						];
+				];
 				for (const entry of catalogEntries) {
 					const catalogKey = `${entry.code}|${entry.category}`;
 					const explicitFieldMappings = this.getExplicitCatalogFieldMappings(
@@ -518,6 +529,48 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			}
 		}
 
+		// A source scanner must never make a runtime parser disappear from the
+		// selectable catalog. This also repairs legacy deployments where a parser
+		// (notably Pandora) existed in the registry but had no persisted row.
+		for (const entry of this.catalog.values()) {
+			const catalogKey = `${entry.code}|${entry.category}`;
+			const alreadyPersisted = existingHashes.has(catalogKey);
+			const alreadyStaged = rows.some(
+				(row) => row.parser_code === entry.code && row.source_category === entry.category && row.is_active === 1,
+			);
+			if (alreadyPersisted || alreadyStaged) continue;
+			const parserName = entry.factory().constructor.name;
+			const parserDefinition = parserDefinitionsByName.get(parserName);
+			if (!parserDefinition) {
+				this.logger.warn(`Parser catalog sync could not locate source for runtime parser ${entry.code} (${parserName})`);
+				continue;
+			}
+			const explicitFieldMappings = this.getExplicitCatalogFieldMappings(entry);
+			const fieldMappings = explicitFieldMappings || this.extractFieldMappings(parserDefinition.parserSource);
+			rows.push({
+				parser_code: entry.code,
+				source_category: entry.category,
+				parser_name: parserName,
+				source_file: parserDefinition.sourceFile,
+				target_table: this.getTargetTable(entry.category),
+				parser_source: parserDefinition.parserSource,
+				source_hash: parserDefinition.sourceHash,
+				is_selectable: 1,
+				is_active: 1,
+				synced_at: now,
+			});
+			mappingRows.push(
+				...fieldMappings.map((mapping) => ({
+					mapping_scope: 'catalog', dsp_report_id: '', parser_code: entry.code,
+					source_category: entry.category, config_version: 0,
+					mapping_key: this.makeMappingKey(mapping), report_column: mapping.reportColumn,
+					parser_column: mapping.parserColumn || mapping.reportColumn,
+					target_column: mapping.targetColumn, transform: mapping.transform || 'trim',
+					is_active: 1, updated_at: now,
+				})),
+			);
+		}
+
 		if (rows.length > 0) {
 			await this.clickHouseService.insert(
 				CLICKHOUSE_TABLES.FTP_PARSER_CATALOG,
@@ -530,7 +583,6 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 				mappingRows,
 			);
 		}
-
 		this.logger.log(
 			`Synced ${rows.length} parser definitions from ${files.length} parser source files`,
 		);
@@ -689,6 +741,37 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 			0,
 			false,
 			false,
+			[],
+			[],
+		);
+	}
+
+	/** Resolve a parser selected by a report-file rule, without legacy file regexes. */
+	async resolveForParserCode(
+		folderName: string,
+		category: FtpSourceCategory,
+		parserCode: string,
+	): Promise<ResolvedFtpParserConfig> {
+		const dspReport = await this.dspMappingService.resolveOrCreateDspReport(
+			folderName,
+			'ftp_folder',
+		);
+		const entry = this.assertCatalogCode(parserCode, category);
+		const fieldMappings = await this.findParserOverrideFieldMappings(parserCode, category);
+		const usesDatabaseFieldMappings = fieldMappings.length > 0;
+		const resolvedMappings = usesDatabaseFieldMappings
+			? await this.resolveParserColumns(parserCode, category, fieldMappings)
+			: [];
+		return this.resolved(
+			dspReport,
+			category,
+			parserCode,
+			usesDatabaseFieldMappings
+				? this.applyDatabaseFieldMappings(entry.factory(), category, resolvedMappings)
+				: entry.factory(),
+			0,
+			true,
+			usesDatabaseFieldMappings,
 			[],
 			[],
 		);
@@ -971,6 +1054,32 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		return catalog;
 	}
 
+	/** Upsert one override row while retaining the remaining override snapshot. */
+	async upsertParserFieldMapping(
+		parserCode: string,
+		mapping: FtpParserFieldMapping,
+	): Promise<ParserCatalogRecord> {
+		const entry = this.catalog.get(parserCode);
+		if (!entry) throw new BadRequestException(`Unsupported parser code "${parserCode}"`);
+		const existing = await this.findParserOverrideFieldMappings(parserCode, entry.category);
+		const next = existing.filter((item) => item.reportColumn !== mapping.reportColumn);
+		next.push(mapping);
+		return this.updateParserFieldMappings(parserCode, next);
+	}
+
+	async removeParserFieldMapping(
+		parserCode: string,
+		reportColumn: string,
+	): Promise<ParserCatalogRecord> {
+		const entry = this.catalog.get(parserCode);
+		if (!entry) throw new BadRequestException(`Unsupported parser code "${parserCode}"`);
+		const existing = await this.findParserOverrideFieldMappings(parserCode, entry.category);
+		const next = existing.filter((item) => item.reportColumn !== reportColumn);
+		if (next.length === existing.length)
+			throw new BadRequestException(`No override mapping found for reportColumn "${reportColumn}"`);
+		return this.updateParserFieldMappings(parserCode, next);
+	}
+
 	private async resolveParserColumns(
 		parserCode: string,
 		category: FtpSourceCategory,
@@ -1036,12 +1145,12 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 					`Unsupported targetColumn: "${mapping.targetColumn}"`,
 				);
 			}
-			if (seenTargets.has(target)) {
+			if (target !== 'skip' && seenTargets.has(target)) {
 				throw new BadRequestException(
 					`Each targetColumn can be mapped only once: "${target}"`,
 				);
 			}
-			seenTargets.add(target);
+			if (target !== 'skip') seenTargets.add(target);
 			if (
 				mapping.transform &&
 				!isSupportedFieldTransform(mapping.transform)
@@ -1080,6 +1189,7 @@ export class FtpParserConfigService implements OnApplicationBootstrap {
 		category: FtpSourceCategory,
 		target: string,
 	): boolean {
+		if (target === 'skip') return true;
 		if (/^metadata\.[A-Za-z_][A-Za-z0-9_]*$/.test(target)) return true;
 		const dspColumns = [
 			'reporting_period',

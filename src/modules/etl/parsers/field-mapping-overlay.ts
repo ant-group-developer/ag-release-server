@@ -32,9 +32,22 @@ export function applyInputAliases(
 	mappings: ConfiguredFieldMapping[],
 ): void {
 	for (const mapping of mappings) {
+		if (mapping.targetColumn === 'skip') continue;
 		const parserColumn = mapping.parserColumn?.trim();
 		if (!parserColumn || parserColumn === mapping.reportColumn) continue;
 		record[parserColumn] = readSourceValue(record, mapping.reportColumn);
+	}
+}
+
+/** Remove source fields marked skip before legacy parser code can read them. */
+export function suppressSkippedInputColumns(
+	record: Record<string, string>,
+	mappings: ConfiguredFieldMapping[],
+): void {
+	for (const mapping of mappings) {
+		if (mapping.targetColumn !== 'skip') continue;
+		delete record[mapping.reportColumn];
+		if (mapping.parserColumn) delete record[mapping.parserColumn];
 	}
 }
 
