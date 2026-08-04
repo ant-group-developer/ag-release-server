@@ -226,6 +226,17 @@ export class ExchangeRateService {
 		return this.cubeRebuildService.rebuildAllSalesCubes();
 	}
 
+	async rebuildAllAnalyticsCubes(): Promise<{
+		sales: Awaited<ReturnType<CubeRebuildService['rebuildAllSalesCubes']>>;
+		trends: Awaited<
+			ReturnType<CubeRebuildService['rebuildAllTrendsCubes']>
+		>;
+	}> {
+		const sales = await this.cubeRebuildService.rebuildAllSalesCubes();
+		const trends = await this.cubeRebuildService.rebuildAllTrendsCubes();
+		return { sales, trends };
+	}
+
 	/**
 	 * List exchange rates từ ClickHouse (có filter).
 	 */

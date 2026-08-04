@@ -3,6 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ClickHouseMigrationService } from '../../../clickhouse';
 import { ImportJobSourceType } from '../../interfaces';
+import { FtpOperationLockService } from '../ftp/ftp-operation-lock.service';
 import { ImportJobsService } from '../import-jobs/import-jobs.service';
 import { SyncService } from '../sync/sync.service';
 
@@ -15,6 +16,7 @@ export class SchedulerService implements OnModuleInit {
 		private readonly importJobsService: ImportJobsService,
 		private readonly schedulerRegistry: SchedulerRegistry,
 		private readonly clickHouseMigrationService: ClickHouseMigrationService,
+		private readonly ftpOperationLockService: FtpOperationLockService,
 	) {}
 
 	onModuleInit() {
@@ -101,13 +103,19 @@ export class SchedulerService implements OnModuleInit {
 		}
 
 		this.logger.log('Auto-sync triggered by cron...');
+		const lockToken =
+			await this.ftpOperationLockService.tryAcquire('auto-sync');
+		if (!lockToken) return;
 
-		const job = await this.importJobsService.create({
-			sourceType: ImportJobSourceType.FTP_AUTO_CRON,
-			params: { trigger: 'cron', cronExpr: config.cron || '0 2 * * *' },
-		});
-
+		let job: Awaited<ReturnType<ImportJobsService['create']>> | null = null;
 		try {
+			job = await this.importJobsService.create({
+				sourceType: ImportJobSourceType.FTP_AUTO_CRON,
+				params: {
+					trigger: 'cron',
+					cronExpr: config.cron || '0 2 * * *',
+				},
+			});
 			await this.importJobsService.markProcessing(job.id);
 			const results = await this.syncService.syncAll(false);
 			const totalRows = results.reduce(
@@ -127,7 +135,9 @@ export class SchedulerService implements OnModuleInit {
 			});
 		} catch (err) {
 			this.logger.error(`Auto-sync failed: ${err.message}`, err.stack);
-			await this.importJobsService.markFailed(job.id, err);
+			if (job) await this.importJobsService.markFailed(job.id, err);
+		} finally {
+			await this.ftpOperationLockService.release(lockToken);
 		}
 	}
 }

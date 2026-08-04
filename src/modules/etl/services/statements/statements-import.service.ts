@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ImportJobSourceType } from '../../interfaces';
+import { AnalyticsProjectionRefreshService } from '../cube-rebuild/analytics-projection-refresh.service';
 import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
 import { ImportService } from '../import/import.service';
 import { SyncService } from '../sync/sync.service';
@@ -57,6 +58,7 @@ export class StatementsImportService {
 		private readonly importService: ImportService,
 		private readonly syncService: SyncService,
 		private readonly etlImportHistoryRepository: EtlImportHistoryRepository,
+		private readonly analyticsProjectionRefreshService: AnalyticsProjectionRefreshService,
 	) {}
 
 	async import(
@@ -68,6 +70,7 @@ export class StatementsImportService {
 
 		const startTime = Date.now();
 		const batchId = uuidv4();
+		const affectedSalesPeriods = new Set<string>();
 
 		const summary: StatementsSummary = {
 			totalFilesInFolder,
@@ -104,6 +107,7 @@ export class StatementsImportService {
 		const deletedKeys = new Set<string>();
 		let autoStep = 0;
 		for (const f of autoRevisions) {
+			affectedSalesPeriods.add(f.period);
 			const key = `${f.dspFolderName}|${f.period}`;
 			if (deletedKeys.has(key)) continue;
 			deletedKeys.add(key);
@@ -186,33 +190,44 @@ export class StatementsImportService {
 							durationMs: dspResult.durationMs,
 							fileNames: dspResult.fileNames,
 						});
+						if (dspResult.rows > 0) {
+							for (const file of dspFiles)
+								affectedSalesPeriods.add(file.period);
+						}
 
 						// Write per-file records to etl_import_history
 						if (jobId && dspResult.fileStats?.length) {
 							for (const stat of dspResult.fileStats) {
 								const fileCanonical = dspFiles.find(
-									(f) => path.basename(f.localPath) === stat.fileName,
+									(f) =>
+										path.basename(f.localPath) ===
+										stat.fileName,
 								);
-								await this.etlImportHistoryRepository.upsert({
-									job_id: jobId,
-									batch_id: batchId,
-									period: fileCanonical?.period ?? '',
-									source_type: ImportJobSourceType.STATEMENTS_UPLOAD,
-									category: 'sales',
-									dsp_folder: dspFolderName,
-									file_name: stat.fileName,
-									file_directory: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}`,
-									file_path: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}/${stat.fileName}`,
-									status: 'done',
-									file_size_bytes: stat.fileSizeBytes,
-									total_lines: stat.totalLines,
-									processed_rows: stat.processedRows,
-									skipped_rows: stat.skippedRows,
-									error_rows: stat.errorRows,
-									duration_ms: dspResult.durationMs,
-								}).catch((err) =>
-									this.logger.warn(`Failed to write etl_import_history for ${stat.fileName}: ${(err as Error).message}`),
-								);
+								await this.etlImportHistoryRepository
+									.upsert({
+										job_id: jobId,
+										batch_id: batchId,
+										period: fileCanonical?.period ?? '',
+										source_type:
+											ImportJobSourceType.STATEMENTS_UPLOAD,
+										category: 'sales',
+										dsp_folder: dspFolderName,
+										file_name: stat.fileName,
+										file_directory: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}`,
+										file_path: `sales/${fileCanonical?.period ?? ''}/${dspFolderName}/${stat.fileName}`,
+										status: 'done',
+										file_size_bytes: stat.fileSizeBytes,
+										total_lines: stat.totalLines,
+										processed_rows: stat.processedRows,
+										skipped_rows: stat.skippedRows,
+										error_rows: stat.errorRows,
+										duration_ms: dspResult.durationMs,
+									})
+									.catch((err) =>
+										this.logger.warn(
+											`Failed to write etl_import_history for ${stat.fileName}: ${(err as Error).message}`,
+										),
+									);
 							}
 						}
 					}
@@ -224,6 +239,13 @@ export class StatementsImportService {
 			}
 		} finally {
 			fs.rmSync(tempBase, { recursive: true, force: true });
+		}
+		if (affectedSalesPeriods.size) {
+			await this.analyticsProjectionRefreshService.refreshAfterFactImport(
+				{
+					salesPeriods: affectedSalesPeriods,
+				},
+			);
 		}
 
 		summary.totalDurationMs = Date.now() - startTime;

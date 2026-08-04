@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	QueryFtpReportFileRulesDto,
+	UpdateFtpReportFileRuleDto,
 	UpsertFtpReportFileRuleDto,
 } from '../dto/ftp-report-file-rule.dto';
 import { FtpReportFileRuleService } from '../services/ftp-report-file-rule.service';
@@ -27,9 +28,9 @@ export class FtpReportFileRuleController {
 		return new ResponseSuccess({ data: await this.service.upsert(dto) });
 	}
 
-	@Put(':id')
-	async update(@Param('id') id: string, @Body() dto: UpsertFtpReportFileRuleDto): Promise<ResponseSuccess<unknown>> {
-		return new ResponseSuccess({ data: await this.service.upsert(dto, id) });
+	@Patch(':id')
+	async update(@Param('id') id: string, @Body() dto: UpdateFtpReportFileRuleDto): Promise<ResponseSuccess<unknown>> {
+		return new ResponseSuccess({ data: await this.service.update(id, dto) });
 	}
 
 	@Delete(':id')
