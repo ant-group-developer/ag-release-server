@@ -77,6 +77,7 @@ export class TenantController {
 				orderBy: OrderDirection.ASC,
 			},
 			tenantId,
+			req.user?.sub,
 		);
 		return new ResponseSuccess({ data: result });
 	}

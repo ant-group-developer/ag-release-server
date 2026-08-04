@@ -69,6 +69,7 @@ export class TenantService {
 	async findAll(
 		query: FindTenantsDto,
 		tenantId: string,
+		userId?: string,
 	): Promise<PageDto<TreeNode<Tenant, 'children'>>> {
 		// Whitelist sortable fields
 		const orderable: Record<string, string> = {
@@ -109,13 +110,24 @@ export class TenantService {
 			]);
 
 		if (checkIsNotSystemTenant(tenantId)) {
-			queryBuilder.andWhere(
-				new Brackets((w) =>
-					w
-						.where('t.id = :tid', { tid: tenantId })
-						.orWhere('p.id = :tid', { tid: tenantId }),
-				),
-			);
+			if (!userId) {
+				// Lấy tất cả Workspace mà User hiện tại thuộc về
+				queryBuilder.andWhere(
+					new Brackets((w) =>
+						w
+							.where('t.id = :tid', { tid: tenantId })
+							.orWhere('p.id = :tid', { tid: tenantId }),
+					),
+				);
+			} else {
+				queryBuilder.andWhere(
+					`EXISTS (
+				SELECT 1 FROM tenant_user tu
+				WHERE tu.tenant_id = t.id AND tu.user_id = :userId
+			)`,
+					{ userId },
+				);
+			}
 		}
 
 		// Filter by isActive at SQL level
