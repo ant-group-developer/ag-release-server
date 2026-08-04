@@ -222,6 +222,7 @@ export class ChannelService {
 			select: {
 				id: true,
 				name: true,
+				tenantId: true,
 			},
 			where: query.tenantId
 				? { tenantId: query.tenantId }
