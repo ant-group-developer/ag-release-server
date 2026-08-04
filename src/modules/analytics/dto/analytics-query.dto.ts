@@ -209,9 +209,12 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
 	@IsUUID()
 	tenantId?: string;
 
-	@ApiPropertyOptional({ description: 'Filter by a specific artist UUID', format: 'uuid' })
+	@ApiPropertyOptional({
+		description:
+			'Filter by a specific artist ID (external IDs are supported).',
+	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	artistId?: string;
 
 	@ApiPropertyOptional({ description: 'Filter by a specific channel UUID', format: 'uuid' })
@@ -234,11 +237,10 @@ export class RankingQueryDto extends BaseAnalyticsQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId and dspId.',
-		format: 'uuid',
+			'Filter by mapped DSP ID. Takes precedence over dspReportId and supports non-UUID values.',
 	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	pgDspId?: string;
 }
 
@@ -653,6 +655,70 @@ export class AnalyticsSummaryQueryDto {
 	@IsOptional()
 	@IsString()
 	importSource?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by label ID.',
+		example: 'LBL_01',
+	})
+	@IsOptional()
+	@IsString()
+	labelId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Tenant/workspace UUID. Only system tenants may filter another tenant.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	tenantId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by artist ID (external IDs are supported).',
+	})
+	@IsOptional()
+	@IsString()
+	artistId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by channel UUID.',
+		format: 'uuid',
+	})
+	@IsOptional()
+	@IsUUID()
+	channelId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by exact ISRC.',
+		example: 'USUM72601234',
+	})
+	@IsOptional()
+	@IsString()
+	isrc?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by raw ClickHouse DSP report ID.',
+	})
+	@IsOptional()
+	@IsString()
+	dspReportId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			'Filter by mapped DSP ID. Takes precedence over dspReportId and supports non-UUID values.',
+	})
+	@IsOptional()
+	@IsString()
+	pgDspId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filter by release UUID.',
+		format: 'uuid',
+		example: '123e4567-e89b-12d3-a456-426614174000',
+	})
+	@IsOptional()
+	@IsUUID()
+	releaseId?: string;
 }
 
 /** Summary payload for a specific DSP. At least one DSP identifier is required. */
