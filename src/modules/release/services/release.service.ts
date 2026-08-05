@@ -1085,18 +1085,21 @@ export class ReleaseService {
 
 	private resolveReleaseStatusByDspDeliveries(
 		release: Release,
-
 		dataDsp?: ReleaseExecutionResultDto[],
 	): ReleaseStatus {
+		const activeDeliveries = release.releaseDspDeliveries?.filter(
+			(delivery) =>
+				delivery.isSelected &&
+				(delivery.isActive ?? delivery.dsp?.isActive ?? true),
+		) ?? [];
+
 		const statuses = dataDsp
-			? (release.releaseDspDeliveries
+			? (activeDeliveries
 					?.filter((delivery) =>
 						dataDsp.some((d) => d.dspCode === delivery.dsp?.code),
 					)
 					.map((delivery) => delivery.status) ?? [])
-			: (release.releaseDspDeliveries?.map(
-					(delivery) => delivery.status,
-				) ?? []);
+			: (activeDeliveries.map((delivery) => delivery.status) ?? []);
 
 		if (!statuses.length) {
 			return release.status;
