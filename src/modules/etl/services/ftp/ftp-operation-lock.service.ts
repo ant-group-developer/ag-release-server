@@ -28,6 +28,38 @@ export class FtpOperationLockService {
 		return null;
 	}
 
+	/**
+	 * Waits for the lock instead of skipping immediately. Use for user-triggered
+	 * work, where a silent skip reads as nothing having happened; background jobs
+	 * should keep using tryAcquire and drop the run.
+	 */
+	async tryAcquireWithWait(
+		operation: string,
+		{ maxWaitMs = 30_000, pollIntervalMs = 2_000 } = {},
+	): Promise<string | null> {
+		const deadline = Date.now() + maxWaitMs;
+		for (;;) {
+			const token = `${operation}:${process.pid}:${Date.now()}:${Math.random()}`;
+			const acquired = await this.redis.set(
+				LOCK_KEY,
+				token,
+				'PX',
+				LOCK_TTL_MS,
+				'NX',
+			);
+			if (acquired === 'OK') return token;
+			if (Date.now() + pollIntervalMs >= deadline) {
+				this.logger.warn(
+					`Gave up waiting ${maxWaitMs}ms for the FTP lock on behalf of ${operation}`,
+				);
+				return null;
+			}
+			await new Promise((resolve) =>
+				setTimeout(resolve, pollIntervalMs),
+			);
+		}
+	}
+
 	async release(token: string): Promise<void> {
 		await this.redis
 			.eval(

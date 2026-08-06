@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { ArrayUnique, IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import { CLICKHOUSE_TABLES, ClickHouseService } from '../../clickhouse';
 import { FtpSourceCategory } from '../../dsp-report/dto/ftp-parser-config.dto';
@@ -27,6 +27,30 @@ class UpdateFtpReportFileDiscoveryConfigDto {
 	@ArrayUnique()
 	@IsIn(DISCOVERY_CATEGORIES, { each: true })
 	categories?: string[];
+
+	@ApiPropertyOptional({ default: 30000, description: 'How often the sample-download worker polls, in ms. Lower values mean more FTP logins; the server answers 530 when logins arrive too fast.' })
+	@IsOptional()
+	@IsInt()
+	@Min(1000)
+	sampleWorkerIntervalMs?: number;
+
+	@ApiPropertyOptional({ default: 2, description: 'How many sample files each poll downloads, each one an FTP login.' })
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	sampleWorkerBatchSize?: number;
+
+	@ApiPropertyOptional({ default: 3, description: 'How many times a sample task is attempted before it is left failed.' })
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	sampleWorkerMaxAttempts?: number;
+
+	@ApiPropertyOptional({ default: 60000, description: 'How long a failed sample task waits before being retried, in ms.' })
+	@IsOptional()
+	@IsInt()
+	@Min(1000)
+	sampleWorkerRetryBackoffMs?: number;
 }
 
 class RunFtpReportFileDiscoveryDto {
@@ -114,7 +138,12 @@ export class FtpReportFileDiscoveryController {
 
 	@Put('config')
 	async updateConfig(@Body() dto: UpdateFtpReportFileDiscoveryConfigDto): Promise<ResponseSuccess<unknown>> {
-		return new ResponseSuccess({ data: await this.service.setConfig(dto.cron, dto.isEnabled ?? true, dto.force ?? false, dto.categories ?? []) });
+		return new ResponseSuccess({ data: await this.service.setConfig(dto.cron, dto.isEnabled ?? true, dto.force ?? false, dto.categories ?? [], {
+			intervalMs: dto.sampleWorkerIntervalMs,
+			batchSize: dto.sampleWorkerBatchSize,
+			maxAttempts: dto.sampleWorkerMaxAttempts,
+			retryBackoffMs: dto.sampleWorkerRetryBackoffMs,
+		}) });
 	}
 
 	@Get('catalog')
