@@ -15,6 +15,7 @@ import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 
 import { Transform, Type } from 'class-transformer';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { IsValidName } from 'src/common/decorators/common.decorator-validate';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
 
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
@@ -44,9 +45,12 @@ export class CreateArtistDto {
 		maxLength: 100,
 		example: 'John Doe',
 	})
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
-	// @IsNotEmpty()
+	@IsValidName(2)
 	name: string;
 
 	@ApiProperty({
@@ -107,9 +111,13 @@ class UpdateArtistProfileDto {
 }
 
 export class UpdateArtistDto extends PartialType(CreateArtistDto) {
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
+	@IsValidName(2)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 
