@@ -13,6 +13,7 @@ import {
 	MaxLength,
 } from 'class-validator';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
+import { IsValidName } from 'src/common/decorators/common.decorator-validate';
 import { ChannelStatus } from '../enum/channel.enum';
 
 export class CreateChannelDto {
@@ -24,6 +25,10 @@ export class CreateChannelDto {
 	})
 	@IsString()
 	@IsNotEmpty()
+	@Transform(({ value }) =>
+		typeof value === 'string' ? value.trim() : value,
+	)
+	@IsValidName(2)
 	@MaxLength(20)
 	@Matches(/^[A-Za-z0-9]+VEVO$/, {
 		message:

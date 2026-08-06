@@ -11,6 +11,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import { DEFAULT_LENGTH_NAME } from 'src/common/constants/common.default.constants';
+import { IsValidName } from 'src/common/decorators/common.decorator-validate';
 import { CsvUuidArray } from 'src/common/decorators/csv.decorators';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
@@ -29,6 +30,7 @@ export class CreateLabelDto {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(DEFAULT_LENGTH_NAME)
+	@IsValidName(2)
 	@Matches(/^[^_]+$/, {
 		message: 'Name must not contain underscore (_)',
 	})
@@ -63,6 +65,7 @@ export class UpdateLabelDto extends PartialType(CreateLabelDto) {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(DEFAULT_LENGTH_NAME)
+	@IsValidName(2)
 	@ValidateIf((_, value) => value !== undefined)
 	name: string;
 }

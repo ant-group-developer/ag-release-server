@@ -397,6 +397,18 @@ export class FtpReportFileDiscoveryService
 				);
 			const catalogRows =
 				await this.replaceCatalogFromPeriodObservations();
+			// A territory is encoded inside KKBOX report names (KKBOXHK, KKBOXTW,
+			// etc.). Collapse their legacy per-territory rules before discovery
+			// checks for existing patterns, so a new territory uses the shared
+			// KKBOX[A-Z]{2} import rule instead of becoming pending.
+			const canonicalization = await this.ruleService.canonicalizeLegacyRules(
+				'ftp',
+				false,
+			);
+			for (const conflict of canonicalization.conflicts)
+				this.logger.warn(
+					`FTP rule canonicalization skipped ${conflict.canonicalPattern}: ${conflict.reason}`,
+				);
 			const byFolder = new Map<
 				string,
 				{
@@ -987,9 +999,19 @@ export class FtpReportFileDiscoveryService
 				/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
 				'__UUID__',
 			)
+			// KKBOX encodes territory as a suffix of its own identifier, without
+			// a separator (for example KKBOXHK). It does not change the schema.
+			.replace(
+				/KKBOX[A-Z]{2}(?=_\d{6}_Monthly-Sales)/g,
+				'KKBOX__COUNTRY_ISO2__',
+			)
 			.replace(
 				/(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)/g,
 				'__DATE8_DASH__',
+			)
+			.replace(
+				/(?<!\d)(?:19|20)\d{2}-(?:0[1-9]|1[0-2])(?!\d)/g,
+				'__YEAR_MONTH__',
 			)
 			.replace(
 				/(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)/g,
@@ -1015,6 +1037,7 @@ export class FtpReportFileDiscoveryService
 					'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
 				)
 				.replace(/__DATE8_DASH__/g, '\\d{4}-\\d{2}-\\d{2}')
+				.replace(/__YEAR_MONTH__/g, '\\d{4}-\\d{2}')
 				.replace(/__DATE8__/g, '\\d{8}')
 				.replace(/__DATE6__/g, '\\d{6}')
 				.replace(/__COUNTRY_ISO2__/g, '[A-Z]{2}')

@@ -19,6 +19,7 @@ import {
 	DEFAULT_LENGTH_CODE,
 	DEFAULT_LENGTH_NAME,
 } from 'src/common/constants/common.default.constants';
+import { IsValidName } from 'src/common/decorators/common.decorator-validate';
 import { BaseQueryDto } from 'src/common/dtos/common.base-query.dto';
 import { LENGTH_PICTURE } from 'src/modules/database/constants/database.constants';
 import { ErnVersion2 } from 'src/modules/ern2/interfaces/ern-input.interface';
@@ -46,6 +47,7 @@ export class CreateDspDto {
 	@Transform(({ value }) =>
 		typeof value === 'string' ? value.trim() : value,
 	)
+	@IsValidName(2)
 	@Matches(/^[^_]+$/, {
 		message: 'Name must not contain underscore (_)',
 	})
@@ -144,6 +146,7 @@ export class UpdateDspDto extends PartialType(CreateDspDto) {
 	@IsString()
 	@MaxLength(DEFAULT_LENGTH_NAME)
 	@IsNotEmpty()
+	@IsValidName(2)
 	name: string;
 
 	@ValidateIf((_, value) => value !== undefined)
