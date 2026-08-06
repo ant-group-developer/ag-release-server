@@ -1083,7 +1083,10 @@ export class ReleaseDdexService {
 	}
 
 	/**
-	 * Get territories from release
+	 * Get territories from release.
+	 *
+	 * `selectedCountries` lưu UUID của country (xem ReleaseTerritory entity),
+	 * còn ERN cần mã ISO2 — nên phải map trước khi so sánh hay trả về.
 	 */
 	private getTerritoriesFromRelease(release: Release): string[] {
 		const territory = release.releaseTerritory;
@@ -1098,31 +1101,76 @@ export class ReleaseDdexService {
 			return ['Worldwide'];
 		}
 
-		const selectedCountries = territory.selectedCountries ?? [];
+		const selectedIds = territory.selectedCountries ?? [];
+		const allCountries = this.countryService.getListSimpleCache();
 
 		switch (territory.distributionType) {
-			case DistributionType.DISTRIBUTE_ONLY_IN:
+			case DistributionType.DISTRIBUTE_ONLY_IN: {
 				// Chỉ phân phối ở các nước này
-				return selectedCountries.length > 0
-					? selectedCountries
-					: ['Worldwide'];
+				if (selectedIds.length === 0) {
+					throw new Error(
+						'Cấu hình lãnh thổ là "chỉ phân phối ở quốc gia" nhưng không chọn quốc gia nào',
+					);
+				}
+
+				const idToIso2 = new Map(
+					allCountries.map((c) => [c.id, c.iso2]),
+				);
+
+				const iso2List = selectedIds
+					.map((id) => idToIso2.get(id))
+					.filter((iso2): iso2 is string => !!iso2);
+
+				// Không được âm thầm bỏ qua quốc gia không resolve được: thiếu
+				// vùng ở đây làm release phân phối lệch mà ERN vẫn hợp lệ cú pháp.
+				if (iso2List.length !== selectedIds.length) {
+					const missing = selectedIds.filter(
+						(id) => !idToIso2.has(id),
+					);
+					throw new Error(
+						`Không tìm thấy mã ISO2 cho các quốc gia: ${missing.join(', ')}`,
+					);
+				}
+
+				return iso2List;
+			}
 
 			case DistributionType.DISTRIBUTE_EVERYWHERE_EXCEPT: {
-				// Giả lập full list territories
-				const allCountries = this.countryService.getListSimpleCache();
+				if (selectedIds.length === 0) {
+					throw new Error(
+						'Cấu hình lãnh thổ là "phân phối mọi nơi trừ" nhưng không chọn quốc gia nào',
+					);
+				}
 
-				const allTerritories: string[] = allCountries.map(
-					(c) => c.iso2,
-				); // TODO: sau này thay bằng full ISO list
+				// Loại trừ theo id, không theo iso2: selectedIds là UUID.
+				const excludedIds = new Set(selectedIds);
 
-				// Trừ đi các nước bị exclude
-				const excluded = new Set(selectedCountries);
+				const remaining = allCountries.filter(
+					(c) => !excludedIds.has(c.id),
+				);
 
-				return allTerritories.filter((code) => !excluded.has(code));
+				// Mọi id được chọn phải khớp một country trong cache, nếu không
+				// thì nước đó vẫn nằm trong danh sách phân phối.
+				if (
+					remaining.length !==
+					allCountries.length - excludedIds.size
+				) {
+					const knownIds = new Set(allCountries.map((c) => c.id));
+					const missing = selectedIds.filter(
+						(id) => !knownIds.has(id),
+					);
+					throw new Error(
+						`Không tìm thấy mã ISO2 cho các quốc gia: ${missing.join(', ')}`,
+					);
+				}
+
+				return remaining.map((c) => c.iso2);
 			}
 
 			default:
-				return ['Worldwide'];
+				throw new Error(
+					'Release không phân phối toàn cầu nhưng thiếu loại phân phối theo lãnh thổ',
+				);
 		}
 	}
 
