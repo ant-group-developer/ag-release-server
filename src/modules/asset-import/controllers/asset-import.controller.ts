@@ -87,11 +87,13 @@ export class AssetImportController {
 	@ApiParam({ name: 'batchId' })
 	async getBatch(@Param('batchId', ParseUUIDPipe) batchId: string) {
 		const [batch, summary] = await Promise.all([
-			this.assetImportService.getBatchOrFail(batchId),
+			this.assetImportService.getBatchOrFail(batchId, true),
 			this.queryService.getBatchSummary(batchId),
 		]);
 
-		return new ResponseSuccess({ data: { ...batch, summary } });
+		return new ResponseSuccess({
+			data: { ...this.queryService.toBatchView(batch), summary },
+		});
 	}
 
 	@Get('batches/:batchId/items')

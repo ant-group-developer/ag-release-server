@@ -11,6 +11,20 @@ import {
 import { AssetImportBatch } from '../entities/asset-import-batch.entity';
 import { AssetImportItem } from '../entities/asset-import-item.entity';
 
+/** Workspace đích của batch, resolve sẵn để FE không phải gọi thêm API. */
+export interface AssetImportTenantView {
+	id: string;
+	name: string | null;
+	title: string | null;
+	code: string | null;
+	icon: string | null;
+}
+
+/** Batch kèm thông tin workspace đích đã join. */
+export type AssetImportBatchView = Omit<AssetImportBatch, 'targetTenant'> & {
+	targetTenant: AssetImportTenantView | null;
+};
+
 /** Item kèm dữ liệu hiện tại đã resolve tên, dạng trả về cho FE. */
 export interface AssetImportItemView {
 	id: string;
@@ -48,8 +62,10 @@ export class AssetImportQueryService {
 
 	async listBatches(
 		query: QueryAssetImportBatchDto,
-	): Promise<PageDto<AssetImportBatch>> {
-		const qb = this.batchRepo.createQueryBuilder('batch');
+	): Promise<PageDto<AssetImportBatchView>> {
+		const qb = this.batchRepo
+			.createQueryBuilder('batch')
+			.leftJoinAndSelect('batch.targetTenant', 'targetTenant');
 
 		if (query.status) {
 			qb.andWhere('batch.status = :status', { status: query.status });
@@ -77,13 +93,34 @@ export class AssetImportQueryService {
 			.getManyAndCount();
 
 		return new PageDto({
-			items,
+			items: items.map((batch) => this.toBatchView(batch)),
 			metadata: {
 				page: query.page,
 				pageSize: query.pageSize,
 				totalItems,
 			},
 		});
+	}
+
+	/**
+	 * Batch kèm workspace đích. Entity chỉ giữ targetTenantId nên FE phải gọi
+	 * thêm API tenant để hiện tên — join sẵn ở đây để đỡ một vòng.
+	 */
+	toBatchView(batch: AssetImportBatch): AssetImportBatchView {
+		const tenant = batch.targetTenant;
+
+		return {
+			...batch,
+			targetTenant: tenant
+				? {
+						id: tenant.id,
+						name: tenant.name ?? null,
+						title: tenant.title ?? null,
+						code: tenant.code ?? null,
+						icon: tenant.icon ?? null,
+					}
+				: null,
+		};
 	}
 
 	/**

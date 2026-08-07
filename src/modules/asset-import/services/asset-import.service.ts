@@ -436,8 +436,18 @@ export class AssetImportService {
 
 	// ── Helper ────────────────────────────────────────────────────────
 
-	async getBatchOrFail(batchId: string): Promise<AssetImportBatch> {
-		const batch = await this.batchRepo.findOne({ where: { id: batchId } });
+	/**
+	 * @param withTargetTenant load kèm workspace đích để trả thẳng cho FE.
+	 * Các luồng nội bộ (apply, cancel) không cần nên mặc định tắt.
+	 */
+	async getBatchOrFail(
+		batchId: string,
+		withTargetTenant = false,
+	): Promise<AssetImportBatch> {
+		const batch = await this.batchRepo.findOne({
+			where: { id: batchId },
+			...(withTargetTenant ? { relations: { targetTenant: true } } : {}),
+		});
 		if (!batch) {
 			throw new NotFoundException(`Không tìm thấy batch ${batchId}`);
 		}
