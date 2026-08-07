@@ -138,11 +138,10 @@ export class TimelineQueryDto extends BaseAnalyticsQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Filter by PostgreSQL DSP UUID. Takes precedence over dspReportId.',
-		format: 'uuid',
+			'Filter by mapped DSP ID. Takes precedence over dspReportId and supports non-UUID values.',
 	})
 	@IsOptional()
-	@IsUUID()
+	@IsString()
 	pgDspId?: string;
 
 	@ApiPropertyOptional({

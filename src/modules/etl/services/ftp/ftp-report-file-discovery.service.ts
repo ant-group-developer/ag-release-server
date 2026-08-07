@@ -37,6 +37,7 @@ export class FtpReportFileDiscoveryService
 	private scheduledCron = '';
 	private configRefreshTimer: NodeJS.Timeout | null = null;
 	private sampleWorkerTimer: NodeJS.Timeout | null = null;
+	private sampleWorkerIntervalMs = 0;
 	private activeLockToken: string | null = null;
 
 	constructor(
@@ -226,6 +227,10 @@ export class FtpReportFileDiscoveryService
 		isEnabled: boolean;
 		force: boolean;
 		categories: string[];
+		sampleWorkerIntervalMs: number;
+		sampleWorkerBatchSize: number;
+		sampleWorkerMaxAttempts: number;
+		sampleWorkerRetryBackoffMs: number;
 	}> {
 		const rows = await this.clickHouseService.query<any>(
 			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_DISCOVERY_CONFIG} FINAL WHERE id = 'default' LIMIT 1`,
@@ -235,6 +240,18 @@ export class FtpReportFileDiscoveryService
 			isEnabled: Number(rows[0]?.is_enabled ?? 1) === 1,
 			force: Number(rows[0]?.force ?? 0) === 1,
 			categories: (rows[0]?.source_categories || []) as string[],
+			sampleWorkerIntervalMs: Number(
+				rows[0]?.sample_worker_interval_ms || 30_000,
+			),
+			sampleWorkerBatchSize: Number(
+				rows[0]?.sample_worker_batch_size || 2,
+			),
+			sampleWorkerMaxAttempts: Number(
+				rows[0]?.sample_worker_max_attempts || 3,
+			),
+			sampleWorkerRetryBackoffMs: Number(
+				rows[0]?.sample_worker_retry_backoff_ms || 60_000,
+			),
 		};
 	}
 
@@ -243,11 +260,21 @@ export class FtpReportFileDiscoveryService
 		isEnabled: boolean,
 		force = false,
 		categories: string[] = [],
+		sampleWorker: {
+			intervalMs?: number;
+			batchSize?: number;
+			maxAttempts?: number;
+			retryBackoffMs?: number;
+		} = {},
 	): Promise<{
 		cron: string;
 		isEnabled: boolean;
 		force: boolean;
 		categories: string[];
+		sampleWorkerIntervalMs: number;
+		sampleWorkerBatchSize: number;
+		sampleWorkerMaxAttempts: number;
+		sampleWorkerRetryBackoffMs: number;
 	}> {
 		try {
 			new CronJob(cron, () => undefined);
@@ -256,6 +283,17 @@ export class FtpReportFileDiscoveryService
 				'cron must be a valid cron expression',
 			);
 		}
+		// The row is replaced wholesale, so unspecified sample-worker knobs have
+		// to be carried over from the current row or they reset to defaults.
+		const current = await this.getConfig();
+		const sampleWorkerIntervalMs =
+			sampleWorker.intervalMs ?? current.sampleWorkerIntervalMs;
+		const sampleWorkerBatchSize =
+			sampleWorker.batchSize ?? current.sampleWorkerBatchSize;
+		const sampleWorkerMaxAttempts =
+			sampleWorker.maxAttempts ?? current.sampleWorkerMaxAttempts;
+		const sampleWorkerRetryBackoffMs =
+			sampleWorker.retryBackoffMs ?? current.sampleWorkerRetryBackoffMs;
 		await this.clickHouseService.insert(
 			CLICKHOUSE_TABLES.FTP_REPORT_FILE_DISCOVERY_CONFIG,
 			[
@@ -265,6 +303,10 @@ export class FtpReportFileDiscoveryService
 					is_enabled: isEnabled ? 1 : 0,
 					force: force ? 1 : 0,
 					source_categories: categories,
+					sample_worker_interval_ms: sampleWorkerIntervalMs,
+					sample_worker_batch_size: sampleWorkerBatchSize,
+					sample_worker_max_attempts: sampleWorkerMaxAttempts,
+					sample_worker_retry_backoff_ms: sampleWorkerRetryBackoffMs,
 					updated_at: new Date()
 						.toISOString()
 						.slice(0, 19)
@@ -273,7 +315,17 @@ export class FtpReportFileDiscoveryService
 			],
 		);
 		await this.refreshSchedule();
-		return { cron, isEnabled, force, categories };
+		await this.scheduleSampleWorker();
+		return {
+			cron,
+			isEnabled,
+			force,
+			categories,
+			sampleWorkerIntervalMs,
+			sampleWorkerBatchSize,
+			sampleWorkerMaxAttempts,
+			sampleWorkerRetryBackoffMs,
+		};
 	}
 
 	private async execute(
@@ -508,17 +560,35 @@ export class FtpReportFileDiscoveryService
 			60_000,
 		);
 		this.configRefreshTimer.unref();
+		await this.scheduleSampleWorker();
+		void this.processSampleTasks();
+	}
+
+	/**
+	 * (Re)arms the sample-download poll at the configured cadence. Called again
+	 * whenever the config is refreshed so an operator can widen the interval
+	 * without a restart.
+	 */
+	private async scheduleSampleWorker(): Promise<void> {
+		if (process.env.APP_ROLE !== 'worker') return;
+		const config = await this.getConfig();
+		if (this.sampleWorkerIntervalMs === config.sampleWorkerIntervalMs) return;
+		this.sampleWorkerIntervalMs = config.sampleWorkerIntervalMs;
+		if (this.sampleWorkerTimer) clearInterval(this.sampleWorkerTimer);
 		this.sampleWorkerTimer = setInterval(
 			() => void this.processSampleTasks(),
-			5_000,
+			config.sampleWorkerIntervalMs,
 		);
 		this.sampleWorkerTimer.unref();
-		void this.processSampleTasks();
+		this.logger.log(
+			`FTP sample worker polling every ${config.sampleWorkerIntervalMs}ms`,
+		);
 	}
 
 	private async refreshSchedule(): Promise<void> {
 		if (process.env.APP_ROLE !== 'worker') return;
 		const config = await this.getConfig();
+		await this.scheduleSampleWorker();
 		const next = config.isEnabled ? config.cron : '';
 		if (next === this.scheduledCron) return;
 		if (this.schedulerRegistry.getCronJobs().has(JOB_NAME))
@@ -767,10 +837,46 @@ export class FtpReportFileDiscoveryService
 
 	private async processSampleTasks(): Promise<void> {
 		if (process.env.APP_ROLE !== 'worker') return;
-		const tasks = await this.clickHouseService.query<any>(
-			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL WHERE status IN ('pending','failed') AND attempt < 3 ORDER BY created_at LIMIT 2`,
+		const tasks = await this.getSampleTaskBatch();
+		if (tasks.length === 0) return;
+
+		// Sample downloads used to log in alongside a running sync or discovery
+		// scan, which is what pushed the server past its login threshold. This is
+		// best-effort work with nobody waiting on it, so a busy tick just drops.
+		const lockToken =
+			await this.ftpOperationLockService.tryAcquire('sample-worker');
+		if (!lockToken) return;
+		try {
+			await Promise.all(tasks.map((task) => this.processSampleTask(task)));
+		} finally {
+			await this.ftpOperationLockService.release(lockToken);
+		}
+	}
+
+	/**
+	 * Claims the next few sample tasks. Failed tasks are held back for a backoff
+	 * window: retrying them on the very next tick is what turned a throttled
+	 * server into a login storm.
+	 */
+	private async getSampleTaskBatch(): Promise<any[]> {
+		const config = await this.getConfig();
+		const backoffSeconds = Math.max(
+			1,
+			Math.round(config.sampleWorkerRetryBackoffMs / 1000),
 		);
-		await Promise.all(tasks.map((task) => this.processSampleTask(task)));
+		return this.clickHouseService.query<any>(
+			`SELECT * FROM ${CLICKHOUSE_TABLES.FTP_REPORT_SAMPLE_TASKS} FINAL
+			 WHERE status IN ('pending','failed')
+			   AND attempt < {maxAttempts:UInt8}
+			   AND (status = 'pending' OR updated_at <= now() - INTERVAL {backoffSeconds:UInt32} SECOND)
+			 ORDER BY created_at
+			 LIMIT {batchSize:UInt8}`,
+			{
+				maxAttempts: config.sampleWorkerMaxAttempts,
+				backoffSeconds,
+				batchSize: config.sampleWorkerBatchSize,
+			},
+		);
 	}
 
 	private async processSampleTask(task: any): Promise<void> {
@@ -840,109 +946,6 @@ export class FtpReportFileDiscoveryService
 				],
 			);
 		}
-	}
-
-	private async uploadRepresentativeSamples(
-		observations: Map<
-			string,
-			{
-				category: FtpSourceCategory;
-				folder: string;
-				pattern: string;
-				period: string;
-				files: Set<string>;
-			}
-		>,
-	): Promise<Map<string, string[]>> {
-		const selected = new Map<
-			string,
-			Array<{
-				periodKey: string;
-				category: FtpSourceCategory;
-				folder: string;
-				period: string;
-				file: string;
-			}>
-		>();
-		const existing = await this.clickHouseService.query<any>(
-			`SELECT source_category, dsp_folder, file_name_pattern, sample_file_refs FROM ${CLICKHOUSE_TABLES.FTP_REPORT_FILE_CATALOG} FINAL WHERE source = 'ftp'`,
-		);
-		const existingRefs = new Map(
-			existing.map((row) => [
-				`${row.source_category}|${row.dsp_folder}|${row.file_name_pattern}`,
-				row.sample_file_refs || [],
-			]),
-		);
-		const reused = new Set<string>();
-		const result = new Map<string, string[]>();
-		for (const item of Array.from(observations.values()).sort((a, b) =>
-			b.period.localeCompare(a.period),
-		)) {
-			const key = `${item.category}|${item.folder}|${item.pattern}`;
-			const priorRefs = existingRefs.get(key) || [];
-			if (priorRefs.length >= 2) {
-				if (!reused.has(key))
-					result.set(`${key}|${item.period}`, priorRefs.slice(0, 2));
-				reused.add(key);
-				continue;
-			}
-			const files = selected.get(key) || [];
-			for (const file of Array.from(item.files).sort()) {
-				if (files.length >= 2) break;
-				files.push({
-					periodKey: `${key}|${item.period}`,
-					category: item.category,
-					folder: item.folder,
-					period: item.period,
-					file,
-				});
-			}
-			selected.set(key, files);
-		}
-		const tempDir = await fs.promises.mkdtemp(
-			path.join(os.tmpdir(), 'ftp-sample-'),
-		);
-		try {
-			for (const samples of selected.values())
-				for (const sample of samples)
-					try {
-						const hash = createHash('sha1')
-							.update(
-								`${sample.category}/${sample.folder}/${sample.period}/${sample.file}`,
-							)
-							.digest('hex');
-						const localPath = path.join(tempDir, hash);
-						await this.ftpService.downloadDiscoverySampleFile(
-							sample.category,
-							sample.period,
-							sample.folder,
-							sample.file,
-							localPath,
-						);
-						const key = `ftp-report-samples/${sample.category}/${sample.folder}/${hash}/${encodeURIComponent(path.basename(sample.file))}`;
-						await this.bucketR2Service.uploadFileFromPath({
-							key,
-							filePath: localPath,
-							contentType: 'application/octet-stream',
-							isPublic: false,
-						});
-						result.set(sample.periodKey, [
-							...(result.get(sample.periodKey) || []),
-							JSON.stringify({
-								ftpPath: sample.file,
-								r2Key: key,
-								fileName: path.basename(sample.file),
-							}),
-						]);
-					} catch (error) {
-						this.logger.warn(
-							`Cannot upload FTP sample ${sample.file}: ${error.message}`,
-						);
-					}
-		} finally {
-			await fs.promises.rm(tempDir, { recursive: true, force: true });
-		}
-		return result;
 	}
 
 	private async finishRun(
