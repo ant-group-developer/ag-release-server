@@ -6,21 +6,29 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { Label } from 'src/modules/label/entities/label.entity';
+import { basename, extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
 import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { ImportJobSourceType } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import {
+	ASSET_IMPORT_ALLOWED_EXTENSIONS,
 	ASSET_IMPORT_ITEM_CHUNK_SIZE,
+	ASSET_IMPORT_PRESIGN_EXPIRES_IN,
+	ASSET_IMPORT_R2_PREFIX,
 	ASSET_IMPORT_SCAN_SYNC_THRESHOLD,
 } from '../constants/asset-import.constant';
-import { ApplyAssetImportDto, ScanAssetImportDto } from '../dto/asset-import.dto';
+import {
+	ApplyAssetImportDto,
+	PresignAssetImportDto,
+	ScanAssetImportDto,
+} from '../dto/asset-import.dto';
 import { AssetImportBatch } from '../entities/asset-import-batch.entity';
 import { AssetImportItem } from '../entities/asset-import-item.entity';
 import {
-	AssetImportAction,
 	AssetImportBatchStatus,
 	AssetImportItemStatus,
 } from '../enum/asset-import.enum';
@@ -55,9 +63,41 @@ export class AssetImportService {
 		private readonly scanService: AssetImportScanService,
 		private readonly applyService: AssetImportApplyService,
 		private readonly importJobsService: ImportJobsService,
+		private readonly r2Service: BucketR2Service,
 	) {}
 
 	// ── SCAN ──────────────────────────────────────────────────────────
+
+	/**
+	 * Cấp presigned URL để FE upload thẳng file lên R2, không đẩy qua body API.
+	 * File assets có thể rất nặng nên đi qua server sẽ phình payload.
+	 */
+	async presignUpload(
+		dto: PresignAssetImportDto,
+	): Promise<{ r2Key: string; uploadUrl: string; expiresIn: number }> {
+		const fileName = basename(dto.fileName.trim());
+		const ext = extname(fileName).toLowerCase();
+
+		if (!ASSET_IMPORT_ALLOWED_EXTENSIONS.includes(ext)) {
+			throw new BadRequestException(
+				`Chỉ chấp nhận file ${ASSET_IMPORT_ALLOWED_EXTENSIONS.join(', ')}`,
+			);
+		}
+
+		// uuid trong key để hai lần upload cùng tên file không đè lên nhau.
+		const r2Key = `${ASSET_IMPORT_R2_PREFIX}${uuidv4()}/${fileName}`;
+		const uploadUrl = await this.r2Service.getSignedUrlUpload({
+			key: r2Key,
+			isPublic: false,
+			contentType: dto.contentType || 'application/octet-stream',
+		});
+
+		return {
+			r2Key,
+			uploadUrl,
+			expiresIn: ASSET_IMPORT_PRESIGN_EXPIRES_IN,
+		};
+	}
 
 	/**
 	 * Parse file, tạo batch, đối chiếu với hệ thống và ghi từng dòng thành item.
@@ -66,7 +106,6 @@ export class AssetImportService {
 	 * batchId + jobId rồi quét nền, FE theo dõi qua SSE hoặc poll.
 	 */
 	async scan(
-		file: { originalname?: string; buffer: Buffer; size?: number },
 		dto: ScanAssetImportDto,
 		userId: string,
 	): Promise<{
@@ -75,10 +114,12 @@ export class AssetImportService {
 		status: AssetImportBatchStatus;
 		summary: AssetImportScanSummary | null;
 	}> {
-		const targetLabelId = dto.targetLabelId?.trim() || null;
-		await this.assertTargetsExist(dto.targetTenantId, targetLabelId);
+		await this.assertTenantExists(dto.targetTenantId);
 
-		const rows = this.parserService.parse(file.buffer);
+		const buffer = await this.readUploadedFile(dto.r2Key);
+		const fileName = basename(dto.r2Key);
+
+		const rows = this.parserService.parse(buffer);
 		const options: AssetImportOptions = {
 			...DEFAULT_OPTIONS,
 			...(dto.options ?? {}),
@@ -86,24 +127,26 @@ export class AssetImportService {
 
 		const job = await this.importJobsService.create({
 			sourceType: ImportJobSourceType.ASSET_IMPORT_SCAN,
-			fileName: file.originalname ?? '',
-			fileSizeBytes: file.size ?? file.buffer.length,
+			fileName,
+			fileSizeBytes: buffer.length,
 			progressTotal: rows.length,
 			tenantId: dto.targetTenantId,
 			createdBy: userId,
 			params: {
 				targetTenantId: dto.targetTenantId,
-				targetLabelId,
+				r2Key: dto.r2Key,
 				options,
 			},
 		});
 
 		const batch = await this.batchRepo.save(
 			this.batchRepo.create({
-				fileName: file.originalname ?? 'unknown',
-				fileHash: createHash('sha256').update(file.buffer).digest('hex'),
+				fileName,
+				fileHash: createHash('sha256').update(buffer).digest('hex'),
 				targetTenantId: dto.targetTenantId,
-				targetLabelId,
+				// Label luôn lấy theo cột Label Name trong file; cột này giữ lại
+				// cho dữ liệu batch cũ nên từ nay luôn null.
+				targetLabelId: null,
 				options,
 				status: AssetImportBatchStatus.SCANNING,
 				totalRows: rows.length,
@@ -116,7 +159,6 @@ export class AssetImportService {
 			await this.importJobsService.markProcessing(job.id);
 			const { items, summary } = await this.scanService.scan(rows, {
 				targetTenantId: dto.targetTenantId,
-				targetLabelId,
 				options,
 			});
 			await this.persistItems(batch.id, items, job.id);
@@ -402,10 +444,7 @@ export class AssetImportService {
 		return batch;
 	}
 
-	private async assertTargetsExist(
-		tenantId: string,
-		labelId?: string | null,
-	): Promise<void> {
+	private async assertTenantExists(tenantId: string): Promise<void> {
 		const tenantExists = await this.dataSource
 			.getRepository(Tenant)
 			.exists({ where: { id: tenantId } });
@@ -414,16 +453,36 @@ export class AssetImportService {
 				`Workspace ${tenantId} không tồn tại`,
 			);
 		}
+	}
 
-		if (!labelId) return;
+	/**
+	 * Tải file người dùng đã upload lên R2. Chỉ chấp nhận key trong thư mục
+	 * asset-import/ để không đọc được object tuỳ ý trong bucket.
+	 */
+	private async readUploadedFile(r2Key: string): Promise<Buffer> {
+		const key = r2Key.trim();
 
-		// Label phải thuộc đúng workspace đích, tránh gán chéo tenant.
-		const labelExists = await this.dataSource
-			.getRepository(Label)
-			.exists({ where: { id: labelId, tenantId } });
-		if (!labelExists) {
+		if (!key.startsWith(ASSET_IMPORT_R2_PREFIX) || key.includes('..')) {
 			throw new BadRequestException(
-				`Label ${labelId} không thuộc workspace ${tenantId}`,
+				`r2Key phải nằm trong thư mục ${ASSET_IMPORT_R2_PREFIX}`,
+			);
+		}
+
+		const ext = extname(key).toLowerCase();
+		if (!ASSET_IMPORT_ALLOWED_EXTENSIONS.includes(ext)) {
+			throw new BadRequestException(
+				`Chỉ chấp nhận file ${ASSET_IMPORT_ALLOWED_EXTENSIONS.join(', ')}`,
+			);
+		}
+
+		const bucketName = this.r2Service.getBucketName({ isPublic: false });
+
+		try {
+			return await this.r2Service.getObjectBuffer({ bucketName, key });
+		} catch (err: any) {
+			this.logger.warn(`Không đọc được ${key} trên R2: ${err.message}`);
+			throw new BadRequestException(
+				'Chưa upload file lên R2 hoặc r2Key sai',
 			);
 		}
 	}

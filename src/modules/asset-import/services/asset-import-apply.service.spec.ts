@@ -19,6 +19,13 @@ function makeBatch(partial: Partial<AssetImportBatch> = {}): AssetImportBatch {
 		targetTenantId: TARGET_TENANT,
 		targetLabelId: null,
 		applyJobId: 'job-1',
+		options: {
+			updateOwnership: true,
+			overwriteMetadata: false,
+			createIfNotFound: false,
+			fillEmptyOnly: false,
+			createLabelIfMissing: false,
+		},
 		...partial,
 	} as AssetImportBatch;
 }
@@ -303,6 +310,174 @@ describe('AssetImportApplyService', () => {
 			new_value: TARGET_TENANT,
 			enrichment_source: 'asset_import',
 			created_by: USER_ID,
+		});
+	});
+
+	// ── Label ─────────────────────────────────────────────────────────
+
+	const CREATE_LABEL_CHANGE = {
+		field: 'labelId',
+		label: 'Label',
+		oldValue: 'G4_9DtvlmL',
+		newValue: null,
+		newDisplay: 'Warner VN',
+		changeType: AssetImportChangeType.CREATE,
+	};
+
+	it('UPDATE ghi dòng audit riêng cho label vừa tạo', async () => {
+		const item = makeItem({
+			labelName: 'Warner VN',
+			changes: [CREATE_LABEL_CHANGE],
+		});
+
+		await service.applyItem(item, makeBatch(), USER_ID);
+
+		const [, rows] = clickHouse.insert.mock.calls[0];
+
+		// Dòng của field labelId phải mang id thật, không còn rỗng.
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
+			entity_type: 'release',
+			new_value: 'new-label',
+		});
+
+		expect(rows.find((r: any) => r.entity_type === 'label')).toMatchObject({
+			entity_id: 'new-label',
+			field_name: 'name',
+			new_value: 'Warner VN',
+			change_type: 'create',
+		});
+	});
+
+	it('không ghi dòng label khi dùng lại label đã có sẵn', async () => {
+		manager.createQueryBuilder.mockReturnValue({
+			where: jest.fn().mockReturnThis(),
+			andWhere: jest.fn().mockReturnThis(),
+			getOne: jest.fn().mockResolvedValue({ id: 'lbl_existing' }),
+		});
+
+		const item = makeItem({
+			labelName: 'Warner VN',
+			changes: [CREATE_LABEL_CHANGE],
+		});
+
+		await service.applyItem(item, makeBatch(), USER_ID);
+
+		const [, rows] = clickHouse.insert.mock.calls[0];
+		expect(manager.save).not.toHaveBeenCalled();
+		expect(rows.find((r: any) => r.entity_type === 'label')).toBeUndefined();
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
+			new_value: 'lbl_existing',
+		});
+	});
+
+	it('CREATE không cho importRelease tự tạo label khi option tắt', async () => {
+		const item = makeItem({
+			action: AssetImportAction.CREATE,
+			labelName: 'Sony Music',
+			changes: [
+				{
+					field: 'labelId',
+					label: 'Label',
+					oldValue: null,
+					newValue: 'lbl_default',
+					newDisplay: 'Universal Music VN',
+					changeType: AssetImportChangeType.AUTO_SELECT,
+				},
+			],
+		});
+
+		await service.applyItem(item, makeBatch(), USER_ID);
+
+		expect(releaseImport.importRelease).toHaveBeenCalledWith(
+			expect.objectContaining({
+				labelId: 'lbl_default',
+				labelName: undefined,
+			}),
+		);
+	});
+
+	it('CREATE truyền labelName để importRelease tạo label khi option bật', async () => {
+		releaseImport.importRelease.mockResolvedValueOnce({
+			id: 'rel-new',
+			labelId: 'lbl_created',
+		});
+
+		const item = makeItem({
+			action: AssetImportAction.CREATE,
+			labelName: 'Sony Music',
+			changes: [
+				{
+					field: 'labelId',
+					label: 'Label',
+					oldValue: null,
+					newValue: null,
+					newDisplay: 'Sony Music',
+					changeType: AssetImportChangeType.CREATE,
+				},
+			],
+		});
+
+		await service.applyItem(
+			item,
+			makeBatch({
+				options: {
+					updateOwnership: true,
+					overwriteMetadata: false,
+					createIfNotFound: true,
+					fillEmptyOnly: false,
+					createLabelIfMissing: true,
+				},
+			} as Partial<AssetImportBatch>),
+			USER_ID,
+		);
+
+		expect(releaseImport.importRelease).toHaveBeenCalledWith(
+			expect.objectContaining({ labelName: 'Sony Music', labelId: undefined }),
+		);
+	});
+
+	it('CREATE đọc lại labelId từ release vừa tạo thay vì ghi log rỗng', async () => {
+		releaseImport.importRelease.mockResolvedValueOnce({
+			id: 'rel-new',
+			labelId: 'lbl_created',
+		});
+
+		const item = makeItem({
+			action: AssetImportAction.CREATE,
+			labelName: 'Sony Music',
+			changes: [
+				{
+					field: 'labelId',
+					label: 'Label',
+					oldValue: null,
+					newValue: null,
+					newDisplay: 'Sony Music',
+					changeType: AssetImportChangeType.CREATE,
+				},
+			],
+		});
+
+		await service.applyItem(
+			item,
+			makeBatch({
+				options: {
+					updateOwnership: true,
+					overwriteMetadata: false,
+					createIfNotFound: true,
+					fillEmptyOnly: false,
+					createLabelIfMissing: true,
+				},
+			} as Partial<AssetImportBatch>),
+			USER_ID,
+		);
+
+		const [, rows] = clickHouse.insert.mock.calls[0];
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
+			new_value: 'lbl_created',
+		});
+		expect(rows.find((r: any) => r.entity_type === 'label')).toMatchObject({
+			entity_id: 'lbl_created',
+			new_value: 'Sony Music',
 		});
 	});
 });

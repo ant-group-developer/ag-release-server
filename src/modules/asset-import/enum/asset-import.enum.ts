@@ -44,6 +44,11 @@ export enum AssetImportChangeType {
 	FILL_EMPTY = 'fill_empty',
 	/** Tạo bản ghi mới */
 	CREATE = 'create',
+	/**
+	 * Hệ thống tự chọn giá trị vì file không cung cấp — hiện chỉ dùng cho label
+	 * khi dòng đổi workspace mà không có cột Label Name. Xem `note` để biết lý do.
+	 */
+	AUTO_SELECT = 'auto_select',
 }
 
 export enum FieldOrderAssetImportBatch {

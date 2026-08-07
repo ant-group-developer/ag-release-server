@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { MulterModule } from '@nestjs/platform-express';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BucketModule2 } from 'src/modules/bucket2/bucket2.module';
 import { ClickHouseModule } from 'src/modules/clickhouse/clickhouse.module';
 import { ImportJobsModule } from 'src/modules/etl/import-jobs.module';
 import { ReleaseModule } from 'src/modules/release/release.module';
@@ -15,10 +15,8 @@ import { AssetImportService } from './services/asset-import.service';
 
 @Module({
 	imports: [
-		MulterModule.register({
-			limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-		}),
 		TypeOrmModule.forFeature([AssetImportBatch, AssetImportItem]),
+		BucketModule2,
 		ClickHouseModule,
 		ImportJobsModule,
 		ReleaseModule,

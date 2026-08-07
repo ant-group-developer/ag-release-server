@@ -29,6 +29,8 @@ export interface AssetImportChange {
 	/** Tên hiển thị của newValue khi giá trị là ID */
 	newDisplay?: string | null;
 	changeType: AssetImportChangeType;
+	/** Giải thích vì sao có thay đổi này, dùng cho AUTO_SELECT. FE hiện làm tooltip. */
+	note?: string | null;
 }
 
 /** Một dòng file sau khi parse + normalize, trước khi match. */

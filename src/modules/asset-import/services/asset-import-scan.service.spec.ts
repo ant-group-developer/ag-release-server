@@ -65,7 +65,6 @@ function fakeDataSource(data: {
 describe('AssetImportScanService', () => {
 	const context = {
 		targetTenantId: TARGET_TENANT,
-		targetLabelId: null,
 		options: DEFAULT_OPTIONS,
 	};
 
@@ -352,5 +351,215 @@ describe('AssetImportScanService', () => {
 		expect(items).toHaveLength(3);
 		expect(summary.totalRows).toBe(3);
 		expect(items.map((i) => i.rowNumber)).toEqual([2, 3, 4]);
+	});
+
+	// ── Label ─────────────────────────────────────────────────────────
+
+	/** Tenant đích có sẵn 2 label; label cũ nhất là mục tiêu auto-select. */
+	function dataSourceWithLabels(release: Record<string, unknown>) {
+		return fakeDataSource({
+			tracks: [
+				{ id: 'trkL', isrc: 'VNA682200010', releaseId: 'relL' },
+			],
+			releases: [release],
+			tenants: [
+				{ id: WRONG_TENANT, name: 'ANT MUSIC LLC' },
+				{ id: TARGET_TENANT, name: 'Universal VN' },
+			],
+			labels: [
+				{ id: 'lbl_old', name: 'Universal Music VN' },
+				{ id: 'lbl_new', name: 'Warner VN' },
+			],
+		});
+	}
+
+	const RELEASE_WRONG_TENANT = {
+		id: 'relL',
+		tenantId: WRONG_TENANT,
+		labelId: 'G4_9DtvlmL',
+	};
+
+	it('dùng label khớp tên trong file thay vì label mặc định', async () => {
+		const service = new AssetImportScanService(
+			dataSourceWithLabels(RELEASE_WRONG_TENANT),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010', labelName: 'Warner VN' })],
+			context,
+		);
+
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+			newValue: 'lbl_new',
+			newDisplay: 'Warner VN',
+			changeType: AssetImportChangeType.OVERWRITE,
+		});
+	});
+
+	it('auto-select label cũ nhất của workspace khi dòng không có Label Name', async () => {
+		const service = new AssetImportScanService(
+			dataSourceWithLabels(RELEASE_WRONG_TENANT),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010' })],
+			context,
+		);
+
+		const change = items[0].changes.find((c) => c.field === 'labelId');
+		expect(change).toMatchObject({
+			newValue: 'lbl_old',
+			newDisplay: 'Universal Music VN',
+			changeType: AssetImportChangeType.AUTO_SELECT,
+		});
+		expect(change?.note).toContain('không có Label Name');
+	});
+
+	it('auto-select kèm ghi chú khi label trong file chưa có và option tạo mới tắt', async () => {
+		const service = new AssetImportScanService(
+			dataSourceWithLabels(RELEASE_WRONG_TENANT),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010', labelName: 'Sony Music' })],
+			context,
+		);
+
+		const change = items[0].changes.find((c) => c.field === 'labelId');
+		expect(change).toMatchObject({
+			newValue: 'lbl_old',
+			changeType: AssetImportChangeType.AUTO_SELECT,
+		});
+		expect(change?.note).toContain('Sony Music');
+		expect(change?.note).toContain('đang tắt');
+	});
+
+	it('báo tạo label mới khi bật createLabelIfMissing, không auto-select', async () => {
+		const service = new AssetImportScanService(
+			dataSourceWithLabels(RELEASE_WRONG_TENANT),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010', labelName: 'Sony Music' })],
+			{
+				...context,
+				options: { ...DEFAULT_OPTIONS, createLabelIfMissing: true },
+			},
+		);
+
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+			newValue: null,
+			newDisplay: 'Sony Music',
+			changeType: AssetImportChangeType.CREATE,
+		});
+	});
+
+	it('không auto-select khi bản ghi đã ở đúng workspace', async () => {
+		const service = new AssetImportScanService(
+			dataSourceWithLabels({
+				id: 'relL',
+				tenantId: TARGET_TENANT,
+				labelId: 'G4_9DtvlmL',
+			}),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010' })],
+			context,
+		);
+
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toBeUndefined();
+		expect(items[0].action).toBe(AssetImportAction.NO_CHANGE);
+		expect(items[0].errorMessage).toBeNull();
+	});
+
+	it('cảnh báo khi workspace đích chưa có label nào để auto-select', async () => {
+		const service = new AssetImportScanService(
+			fakeDataSource({
+				tracks: [
+					{ id: 'trkL', isrc: 'VNA682200010', releaseId: 'relL' },
+				],
+				releases: [RELEASE_WRONG_TENANT],
+				tenants: [
+					{ id: WRONG_TENANT, name: 'ANT MUSIC LLC' },
+					{ id: TARGET_TENANT, name: 'Universal VN' },
+				],
+				labels: [],
+			}),
+		);
+
+		const { items } = await service.scan(
+			[row({ isrc: 'VNA682200010' })],
+			context,
+		);
+
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toBeUndefined();
+		// Vẫn đổi được workspace, chỉ riêng label là giữ nguyên.
+		expect(items[0].changes.find((c) => c.field === 'tenantId')).toBeDefined();
+		expect(items[0].errorMessage).toContain('chưa có label nào');
+	});
+
+	it('CREATE không tạo label mới khi createLabelIfMissing tắt, dùng label mặc định', async () => {
+		const service = new AssetImportScanService(
+			fakeDataSource({
+				tenants: [{ id: TARGET_TENANT, name: 'Universal VN' }],
+				labels: [{ id: 'lbl_old', name: 'Universal Music VN' }],
+			}),
+		);
+
+		const { items } = await service.scan(
+			[
+				row({
+					isrc: 'VNA682200011',
+					upc: '8809633000042',
+					trackName: 'Bài mới',
+					labelName: 'Sony Music',
+				}),
+			],
+			{
+				...context,
+				options: { ...DEFAULT_OPTIONS, createIfNotFound: true },
+			},
+		);
+
+		expect(items[0].action).toBe(AssetImportAction.CREATE);
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+			newValue: 'lbl_old',
+			changeType: AssetImportChangeType.AUTO_SELECT,
+		});
+	});
+
+	it('CREATE để label chờ tạo mới khi bật createLabelIfMissing', async () => {
+		const service = new AssetImportScanService(
+			fakeDataSource({
+				tenants: [{ id: TARGET_TENANT, name: 'Universal VN' }],
+				labels: [{ id: 'lbl_old', name: 'Universal Music VN' }],
+			}),
+		);
+
+		const { items } = await service.scan(
+			[
+				row({
+					isrc: 'VNA682200011',
+					upc: '8809633000042',
+					trackName: 'Bài mới',
+					labelName: 'Sony Music',
+				}),
+			],
+			{
+				...context,
+				options: {
+					...DEFAULT_OPTIONS,
+					createIfNotFound: true,
+					createLabelIfMissing: true,
+				},
+			},
+		);
+
+		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+			newValue: null,
+			newDisplay: 'Sony Music',
+			changeType: AssetImportChangeType.CREATE,
+		});
 	});
 });

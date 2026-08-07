@@ -77,7 +77,33 @@ export class AssetImportOptionsDto {
 	createLabelIfMissing: boolean = false;
 }
 
+export class PresignAssetImportDto {
+	@ApiProperty({
+		description: 'Tên file gốc, dùng để kiểm tra đuôi và đặt tên trên R2',
+		example: 'assets-warner-2026.xlsx',
+	})
+	@IsNotEmpty()
+	@IsString()
+	fileName: string;
+
+	@ApiPropertyOptional({
+		description: 'Content-Type sẽ dùng khi PUT lên URL trả về',
+	})
+	@IsOptional()
+	@IsString()
+	contentType?: string;
+}
+
 export class ScanAssetImportDto {
+	@ApiProperty({
+		description:
+			'Key file đã upload lên R2 qua /asset-import/uploads/presign. Phải nằm trong thư mục asset-import/.',
+		example: 'asset-import/9f1c.../assets.xlsx',
+	})
+	@IsNotEmpty()
+	@IsString()
+	r2Key: string;
+
 	@ApiProperty({
 		description: 'Workspace (tenant) đích để gán asset về',
 		example: 'a91f0e5c-1b2d-4e3f-8a7b-9c0d1e2f3a4b',
@@ -86,25 +112,8 @@ export class ScanAssetImportDto {
 	@IsUUID()
 	targetTenantId: string;
 
-	@ApiPropertyOptional({
-		description:
-			'Label đích áp dụng cho toàn bộ file. Bỏ trống thì lấy theo cột label trong file.',
-	})
-	@IsOptional()
-	@IsString()
-	targetLabelId?: string;
-
 	@ApiPropertyOptional({ type: AssetImportOptionsDto })
 	@IsOptional()
-	// multipart gửi options dưới dạng chuỗi JSON; parse trước khi validate.
-	@Transform(({ value }) => {
-		if (typeof value !== 'string') return value;
-		try {
-			return JSON.parse(value);
-		} catch {
-			return value;
-		}
-	})
 	@ValidateNested()
 	@Type(() => AssetImportOptionsDto)
 	options?: AssetImportOptionsDto;

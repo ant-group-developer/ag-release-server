@@ -18,6 +18,7 @@ import { AssetImportBatch } from '../entities/asset-import-batch.entity';
 import { AssetImportItem } from '../entities/asset-import-item.entity';
 import {
 	AssetImportAction,
+	AssetImportChangeType,
 	AssetImportItemStatus,
 } from '../enum/asset-import.enum';
 import { AssetImportChange } from '../interfaces/asset-import.interface';
@@ -115,6 +116,7 @@ export class AssetImportApplyService {
 		const releasePatch: Partial<Release> = {};
 		const trackPatch: Partial<Track> = {};
 		const appliedChanges: AssetImportChange[] = [];
+		let labelCreated: { id: string; name: string } | null = null;
 
 		for (const change of item.changes) {
 			switch (change.field) {
@@ -124,16 +126,22 @@ export class AssetImportApplyService {
 					break;
 
 				case 'labelId': {
-					const labelId = await this.resolveLabelId(
+					const resolved = await this.resolveLabelId(
 						manager,
 						change,
 						item,
 						batch,
 						userId,
 					);
-					if (labelId) {
-						releasePatch.labelId = labelId;
-						appliedChanges.push({ ...change, newValue: labelId });
+					if (resolved.labelId) {
+						releasePatch.labelId = resolved.labelId;
+						appliedChanges.push({ ...change, newValue: resolved.labelId });
+						if (resolved.created) {
+							labelCreated = {
+								id: resolved.labelId,
+								name: resolved.name!,
+							};
+						}
 					}
 					break;
 				}
@@ -169,9 +177,23 @@ export class AssetImportApplyService {
 		// Track thuộc release nên đổi workspace ở release là đủ; track không có
 		// cột tenant riêng. Nhưng khi khớp bằng ISRC mà track nằm ở release khác
 		// thì đã bị chặn từ bước scan (CONFLICT).
-		return appliedChanges.map((change) =>
+		const logs = appliedChanges.map((change) =>
 			this.buildLogRow(change, item, batch, userId, item.matchedReleaseId!),
 		);
+
+		if (labelCreated) {
+			logs.push(
+				this.buildLabelCreatedLogRow(
+					labelCreated,
+					item,
+					batch,
+					userId,
+					item.matchedReleaseId!,
+				),
+			);
+		}
+
+		return logs;
 	}
 
 	// ── CREATE ────────────────────────────────────────────────────────
@@ -191,14 +213,25 @@ export class AssetImportApplyService {
 			throw new Error('Không có UPC lẫn ISRC để tạo release');
 		}
 
+		// Label đã được scan quyết sẵn: có id nghĩa là dùng label có sẵn hoặc
+		// label auto-select; null nghĩa là sẽ tạo mới theo tên. Chỉ cho phép
+		// importRelease tự tạo label khi option bật, nếu không truyền labelId
+		// tường minh để resolveOwnership() không sinh label ngoài ý muốn.
+		const labelChange = item.changes.find((c) => c.field === 'labelId');
+		const allowCreateLabel = batch.options?.createLabelIfMissing === true;
+		const resolvedLabelId = labelChange?.newValue ?? null;
+
 		// Truyền tenantId tường minh nên importRelease không rơi vào fallback
 		// ANT MUSIC LLC / AMG — đây chính là gốc của dữ liệu sai workspace.
 		const release = await this.releaseReportImportService.importRelease({
 			upc,
 			title: item.albumName ?? title,
 			tenantId: batch.targetTenantId,
-			labelId: batch.targetLabelId ?? undefined,
-			labelName: item.labelName ?? undefined,
+			labelId: resolvedLabelId ?? undefined,
+			labelName:
+				!resolvedLabelId && allowCreateLabel
+					? (labelChange?.newDisplay ?? item.labelName ?? undefined)
+					: undefined,
 			tracks: item.isrc ? [{ title, isrc: item.isrc }] : [],
 			importSourceType: ASSET_IMPORT_SOURCE_TYPE,
 			importParserCode: ASSET_IMPORT_PARSER_CODE,
@@ -206,16 +239,46 @@ export class AssetImportApplyService {
 			importJobId: batch.applyJobId ?? batch.id,
 		});
 
-		return item.changes.map((change) =>
-			this.buildLogRow(change, item, batch, userId, release.id),
+		// Lúc scan chưa biết id của label sẽ tạo, nên log sẽ ghi rỗng nếu không
+		// đọc lại từ release vừa tạo.
+		const logs = item.changes.map((change) =>
+			this.buildLogRow(
+				change.field === 'labelId' && !change.newValue
+					? { ...change, newValue: release.labelId }
+					: change,
+				item,
+				batch,
+				userId,
+				release.id,
+			),
 		);
+
+		// Label được importRelease tạo ra khi scan để newValue null mà release
+		// trả về vẫn có labelId.
+		if (labelChange && !labelChange.newValue && release.labelId) {
+			logs.push(
+				this.buildLabelCreatedLogRow(
+					{
+						id: release.labelId,
+						name: labelChange.newDisplay ?? item.labelName ?? '',
+					},
+					item,
+					batch,
+					userId,
+					release.id,
+				),
+			);
+		}
+
+		return logs;
 	}
 
 	// ── Label ─────────────────────────────────────────────────────────
 
 	/**
-	 * Trả về label id để gán. Diff kiểu `create` nghĩa là label chưa tồn tại ở
-	 * workspace đích — tạo mới với code duy nhất trong tenant đó.
+	 * Trả về label id để gán, kèm cờ `created` để biết có cần ghi dòng audit
+	 * riêng cho label mới hay không. Diff kiểu `create` nghĩa là label chưa tồn
+	 * tại ở workspace đích — tạo mới với code duy nhất trong tenant đó.
 	 */
 	private async resolveLabelId(
 		manager: EntityManager,
@@ -223,11 +286,13 @@ export class AssetImportApplyService {
 		item: AssetImportItem,
 		batch: AssetImportBatch,
 		userId: string,
-	): Promise<string | null> {
-		if (change.newValue) return change.newValue;
+	): Promise<{ labelId: string | null; created: boolean; name?: string }> {
+		if (change.newValue) {
+			return { labelId: change.newValue, created: false };
+		}
 
 		const name = (change.newDisplay ?? item.labelName)?.trim();
-		if (!name) return null;
+		if (!name) return { labelId: null, created: false };
 
 		// Có thể đã được tạo bởi item trước trong cùng batch.
 		const existing = await manager
@@ -237,7 +302,7 @@ export class AssetImportApplyService {
 				tenantId: batch.targetTenantId,
 			})
 			.getOne();
-		if (existing) return existing.id;
+		if (existing) return { labelId: existing.id, created: false };
 
 		const baseCode = stringToCode(name) || `ASSET_${nanoid(6)}`;
 		let code = baseCode;
@@ -261,7 +326,7 @@ export class AssetImportApplyService {
 			}),
 		);
 
-		return label.id;
+		return { labelId: label.id, created: true, name };
 	}
 
 	// ── Audit ─────────────────────────────────────────────────────────
@@ -295,6 +360,38 @@ export class AssetImportApplyService {
 			is_dry_run: 0,
 			created_at: new Date().toISOString().slice(0, 23).replace('T', ' '),
 			created_by: userId,
+		};
+	}
+
+	/**
+	 * Dòng audit riêng cho một Label vừa được tạo. Nếu chỉ ghi change của field
+	 * `labelId` thì đọc log không thể biết label nào là mới sinh ra.
+	 */
+	private buildLabelCreatedLogRow(
+		label: { id: string; name: string },
+		item: AssetImportItem,
+		batch: AssetImportBatch,
+		userId: string,
+		releaseId: string,
+	): EnrichmentLogRow {
+		return {
+			...this.buildLogRow(
+				{
+					field: 'name',
+					label: 'Label',
+					oldValue: null,
+					newValue: label.name,
+					changeType: AssetImportChangeType.CREATE,
+				},
+				item,
+				batch,
+				userId,
+				releaseId,
+			),
+			id: uuidv4(),
+			entity_type: 'label',
+			entity_id: label.id,
+			change_type: 'create',
 		};
 	}
 

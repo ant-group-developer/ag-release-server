@@ -21,7 +21,6 @@ import {
 
 interface ScanContext {
 	targetTenantId: string;
-	targetLabelId: string | null;
 	options: AssetImportOptions;
 }
 
@@ -30,6 +29,16 @@ interface MatchedRecord {
 	release: Release;
 	track: Track | null;
 	matchType: AssetImportMatchType;
+}
+
+/**
+ * Label của tenant đích: tra theo tên lấy từ file, cộng một label mặc định
+ * dùng khi dòng không có cột Label Name.
+ */
+interface LabelResolution {
+	byName: Map<string, Label>;
+	/** Label cũ nhất của tenant đích; null khi workspace chưa có label nào. */
+	autoSelected: Label | null;
 }
 
 @Injectable()
@@ -144,19 +153,16 @@ export class AssetImportScanService {
 
 	/**
 	 * Resolve label đích cho mỗi tên label xuất hiện trong file.
-	 * Trả về Map tên(lowercase) → label, cộng thêm label cố định của cả batch.
+	 *
+	 * Label luôn lấy từ cột Label Name; không còn label cố định cho cả batch.
+	 * Dòng nào không có tên label sẽ dùng `autoSelected` — label cũ nhất của
+	 * workspace đích, chọn theo createdAt nên mọi dòng ra cùng một label.
 	 */
-	private async resolveLabels(rows: ParsedAssetRow[], context: ScanContext) {
+	private async resolveLabels(
+		rows: ParsedAssetRow[],
+		context: ScanContext,
+	): Promise<LabelResolution> {
 		const labelRepo = this.dataSource.getRepository(Label);
-
-		const fixedLabel = context.targetLabelId
-			? await labelRepo.findOne({
-					where: {
-						id: context.targetLabelId,
-						tenantId: context.targetTenantId,
-					},
-				})
-			: null;
 
 		const names = [
 			...new Set(
@@ -166,21 +172,22 @@ export class AssetImportScanService {
 			),
 		];
 
+		// Một lần lấy toàn bộ label của tenant: vừa lọc theo tên trong bộ nhớ,
+		// vừa lấy được label cũ nhất cho auto-select mà không cần query thứ hai.
+		const labels = await labelRepo.find({
+			where: { tenantId: context.targetTenantId },
+			order: { createdAt: 'ASC' },
+		});
+
 		const byName = new Map<string, Label>();
-		if (names.length) {
-			// Lọc trong bộ nhớ theo tên lowercase thay vì n lần ILike.
-			const labels = await labelRepo.find({
-				where: { tenantId: context.targetTenantId },
-			});
-			for (const label of labels) {
-				const key = label.name?.trim().toLowerCase();
-				if (key && names.includes(key) && !byName.has(key)) {
-					byName.set(key, label);
-				}
+		for (const label of labels) {
+			const key = label.name?.trim().toLowerCase();
+			if (key && names.includes(key) && !byName.has(key)) {
+				byName.set(key, label);
 			}
 		}
 
-		return { fixedLabel, byName };
+		return { byName, autoSelected: labels[0] ?? null };
 	}
 
 	/** Tên tenant/label hiện tại để hiển thị trong diff. */
@@ -228,7 +235,7 @@ export class AssetImportScanService {
 			releaseById: Map<string, Release>;
 			releaseByUpc: Map<string, Release>;
 			conflictIsrcs: Set<string>;
-			labelResolution: { fixedLabel: Label | null; byName: Map<string, Label> };
+			labelResolution: LabelResolution;
 			displayNames: {
 				tenantNames: Map<string, string>;
 				labelNames: Map<string, string>;
@@ -277,6 +284,7 @@ export class AssetImportScanService {
 				...base,
 				action: AssetImportAction.CREATE,
 				changes: this.buildCreateChanges(row, context, lookups),
+				errorMessage: this.buildLabelWarning(row, context, lookups),
 			};
 		}
 
@@ -300,7 +308,36 @@ export class AssetImportScanService {
 			currentTenantId: release.tenantId,
 			currentLabelId: release.labelId,
 			changes,
+			errorMessage: changes.some((c) => c.field === 'labelId')
+				? null
+				: this.buildLabelWarning(row, context, lookups, release),
 		};
+	}
+
+	/**
+	 * Cảnh báo mức dòng khi không gán được label nào: workspace đích chưa có
+	 * label để auto-select. Release giữ nguyên labelId (cột nullable) nên đây
+	 * là thông tin để người dùng tự xử lý, không phải lỗi chặn apply.
+	 */
+	private buildLabelWarning(
+		row: ParsedAssetRow,
+		context: ScanContext,
+		lookups: { labelResolution: LabelResolution },
+		release?: Release,
+	): string | null {
+		const { byName, autoSelected } = lookups.labelResolution;
+		if (autoSelected) return null;
+		if (!context.options.updateOwnership) return null;
+		// Dòng đã ở đúng workspace thì không cần đụng tới label.
+		if (release && release.tenantId === context.targetTenantId) return null;
+
+		const name = row.labelName?.trim();
+		if (name) {
+			if (byName.has(name.toLowerCase())) return null;
+			if (context.options.createLabelIfMissing) return null;
+		}
+
+		return 'Workspace đích chưa có label nào để auto-select, label của bản ghi giữ nguyên';
 	}
 
 	/** ISRC trước (track-level, chính xác nhất), không có thì fallback UPC. */
@@ -344,7 +381,7 @@ export class AssetImportScanService {
 		track: Track | null,
 		context: ScanContext,
 		lookups: {
-			labelResolution: { fixedLabel: Label | null; byName: Map<string, Label> };
+			labelResolution: LabelResolution;
 			displayNames: {
 				tenantNames: Map<string, string>;
 				labelNames: Map<string, string>;
@@ -409,21 +446,21 @@ export class AssetImportScanService {
 		release: Release,
 		context: ScanContext,
 		lookups: {
-			labelResolution: { fixedLabel: Label | null; byName: Map<string, Label> };
+			labelResolution: LabelResolution;
 			displayNames: {
 				tenantNames: Map<string, string>;
 				labelNames: Map<string, string>;
 			};
 		},
 	): AssetImportChange | null {
-		const { fixedLabel, byName } = lookups.labelResolution;
+		const { byName, autoSelected } = lookups.labelResolution;
 		const { labelNames } = lookups.displayNames;
 		const oldDisplay = release.labelId
 			? (labelNames.get(release.labelId) ?? null)
 			: null;
 
-		const target =
-			fixedLabel ?? byName.get(row.labelName?.trim().toLowerCase() ?? '');
+		const name = row.labelName?.trim();
+		const target = name ? byName.get(name.toLowerCase()) : undefined;
 
 		if (target) {
 			if (release.labelId === target.id) return null;
@@ -438,37 +475,74 @@ export class AssetImportScanService {
 			};
 		}
 
-		// Chưa có label khớp trong tenant đích — chỉ báo tạo mới khi được bật.
-		if (row.labelName && context.options.createLabelIfMissing) {
+		// Có tên label nhưng workspace đích chưa có — tạo mới nếu được bật.
+		if (name && context.options.createLabelIfMissing) {
 			return {
 				field: 'labelId',
 				label: ASSET_IMPORT_FIELD_LABELS.labelId,
 				oldValue: release.labelId,
 				oldDisplay,
 				newValue: null,
-				newDisplay: row.labelName,
+				newDisplay: name,
 				changeType: AssetImportChangeType.CREATE,
 			};
 		}
 
-		return null;
+		// Còn lại là các trường hợp file không chỉ định được label dùng được:
+		// thiếu cột Label Name, hoặc có tên nhưng option tạo mới đang tắt.
+		// Chỉ auto-select khi dòng thực sự đổi workspace — đổi tenant mà giữ
+		// label của tenant cũ sẽ tạo ra ownership chéo.
+		if (release.tenantId === context.targetTenantId) return null;
+
+		return this.buildAutoSelectLabelChange(
+			name,
+			release.labelId,
+			oldDisplay,
+			autoSelected,
+		);
+	}
+
+	/**
+	 * Diff gán label mặc định của workspace đích. Trả null khi workspace chưa
+	 * có label nào — lúc đó release giữ nguyên labelId (cột này nullable) và
+	 * scanRow sẽ gắn errorMessage để người dùng biết mà tự xử lý.
+	 */
+	private buildAutoSelectLabelChange(
+		name: string | undefined,
+		currentLabelId: string | null,
+		oldDisplay: string | null,
+		autoSelected: Label | null,
+	): AssetImportChange | null {
+		if (!autoSelected) return null;
+		if (currentLabelId === autoSelected.id) return null;
+
+		const note = name
+			? `Auto select label — "${name}" chưa có trong workspace đích và option tạo label mới đang tắt`
+			: 'Auto select label — file không có Label Name cho dòng này';
+
+		return {
+			field: 'labelId',
+			label: ASSET_IMPORT_FIELD_LABELS.labelId,
+			oldValue: currentLabelId,
+			oldDisplay,
+			newValue: autoSelected.id,
+			newDisplay: autoSelected.name,
+			changeType: AssetImportChangeType.AUTO_SELECT,
+			note,
+		};
 	}
 
 	private buildCreateChanges(
 		row: ParsedAssetRow,
 		context: ScanContext,
 		lookups: {
-			labelResolution: { fixedLabel: Label | null; byName: Map<string, Label> };
+			labelResolution: LabelResolution;
 			displayNames: {
 				tenantNames: Map<string, string>;
 				labelNames: Map<string, string>;
 			};
 		},
 	): AssetImportChange[] {
-		const { fixedLabel, byName } = lookups.labelResolution;
-		const target =
-			fixedLabel ?? byName.get(row.labelName?.trim().toLowerCase() ?? '');
-
 		return [
 			{
 				field: 'tenantId',
@@ -480,15 +554,7 @@ export class AssetImportScanService {
 					lookups.displayNames.tenantNames.get(context.targetTenantId) ?? null,
 				changeType: AssetImportChangeType.CREATE,
 			},
-			{
-				field: 'labelId',
-				label: ASSET_IMPORT_FIELD_LABELS.labelId,
-				oldValue: null,
-				oldDisplay: null,
-				newValue: target?.id ?? null,
-				newDisplay: target?.name ?? row.labelName ?? null,
-				changeType: AssetImportChangeType.CREATE,
-			},
+			this.buildCreateLabelChange(row, context, lookups.labelResolution),
 			{
 				field: 'title',
 				label: ASSET_IMPORT_FIELD_LABELS.title,
@@ -498,7 +564,53 @@ export class AssetImportScanService {
 				newDisplay: null,
 				changeType: AssetImportChangeType.CREATE,
 			},
-		];
+		].filter((c): c is AssetImportChange => c !== null);
+	}
+
+	/**
+	 * Label cho bản ghi sắp tạo mới. Cùng quy tắc với nhánh UPDATE: chỉ để
+	 * newValue = null (nghĩa là sẽ tạo label lúc apply) khi createLabelIfMissing
+	 * bật, ngược lại rơi về label mặc định của workspace.
+	 */
+	private buildCreateLabelChange(
+		row: ParsedAssetRow,
+		context: ScanContext,
+		labelResolution: LabelResolution,
+	): AssetImportChange | null {
+		const { byName, autoSelected } = labelResolution;
+		const name = row.labelName?.trim();
+		const target = name ? byName.get(name.toLowerCase()) : undefined;
+
+		if (target) {
+			return {
+				field: 'labelId',
+				label: ASSET_IMPORT_FIELD_LABELS.labelId,
+				oldValue: null,
+				oldDisplay: null,
+				newValue: target.id,
+				newDisplay: target.name,
+				changeType: AssetImportChangeType.CREATE,
+			};
+		}
+
+		if (name && context.options.createLabelIfMissing) {
+			return {
+				field: 'labelId',
+				label: ASSET_IMPORT_FIELD_LABELS.labelId,
+				oldValue: null,
+				oldDisplay: null,
+				newValue: null,
+				newDisplay: name,
+				changeType: AssetImportChangeType.CREATE,
+			};
+		}
+
+		return this.buildAutoSelectLabelChange(
+			name,
+			null,
+			null,
+			autoSelected,
+		);
 	}
 
 	/**

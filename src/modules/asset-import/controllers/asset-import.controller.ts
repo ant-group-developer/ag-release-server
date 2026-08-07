@@ -1,5 +1,4 @@
 import {
-	BadRequestException,
 	Body,
 	Controller,
 	Delete,
@@ -12,13 +11,8 @@ import {
 	Query,
 	Req,
 	Sse,
-	UploadedFile,
-	UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
-	ApiBody,
-	ApiConsumes,
 	ApiOperation,
 	ApiParam,
 	ApiResponse,
@@ -34,10 +28,9 @@ import {
 	JobEvent,
 	JobEventsGateway,
 } from 'src/modules/etl/services/import-jobs/job-events.gateway';
-import { extname } from 'path';
-import { ASSET_IMPORT_ALLOWED_EXTENSIONS } from '../constants/asset-import.constant';
 import {
 	ApplyAssetImportDto,
+	PresignAssetImportDto,
 	QueryAssetImportBatchDto,
 	QueryAssetImportItemDto,
 	ScanAssetImportDto,
@@ -56,55 +49,27 @@ export class AssetImportController {
 		private readonly jobEvents: JobEventsGateway,
 	) {}
 
-	@Post('scan')
-	@UseInterceptors(FileInterceptor('file'))
-	@ApiConsumes('multipart/form-data')
+	@Post('uploads/presign')
 	@ApiOperation({
-		summary: 'Upload file assets và quét đối chiếu với hệ thống',
+		summary: 'Cấp presigned URL để upload file assets thẳng lên R2',
 		description:
-			'Trả về toàn bộ số dòng trong file kèm diff từng cột. Chưa thay đổi dữ liệu — cần gọi apply để convert.',
+			'FE PUT nội dung file vào uploadUrl trả về, rồi gọi POST /asset-import/scan với r2Key. ' +
+			'File assets có thể rất nặng nên không đẩy qua body API.',
 	})
-	@ApiBody({
-		required: true,
-		schema: {
-			type: 'object',
-			required: ['file', 'targetTenantId'],
-			properties: {
-				file: { type: 'string', format: 'binary' },
-				targetTenantId: { type: 'string', format: 'uuid' },
-				targetLabelId: { type: 'string' },
-				options: {
-					type: 'string',
-					description:
-						'JSON string, ví dụ {"updateOwnership":true,"createIfNotFound":false}',
-				},
-			},
-		},
+	async presignUpload(@Body() dto: PresignAssetImportDto) {
+		const result = await this.assetImportService.presignUpload(dto);
+		return new ResponseSuccess({ data: result });
+	}
+
+	@Post('scan')
+	@ApiOperation({
+		summary: 'Quét đối chiếu file đã upload lên R2 với hệ thống',
+		description:
+			'Trả về toàn bộ số dòng trong file kèm diff từng cột. Chưa thay đổi dữ liệu — cần gọi apply để convert. ' +
+			'Label lấy theo cột Label Name trong file; dòng không có label mà đổi workspace sẽ được auto-select label của workspace đích.',
 	})
-	async scan(
-		@UploadedFile()
-		file: { originalname?: string; buffer: Buffer; size?: number },
-		@Body() dto: ScanAssetImportDto,
-		@Req() req: Request,
-	) {
-		if (!file) {
-			throw new BadRequestException(
-				'Thiếu file. Dùng multipart/form-data với key = file',
-			);
-		}
-
-		const ext = extname(file.originalname ?? '').toLowerCase();
-		if (!ASSET_IMPORT_ALLOWED_EXTENSIONS.includes(ext)) {
-			throw new BadRequestException(
-				`Chỉ chấp nhận file ${ASSET_IMPORT_ALLOWED_EXTENSIONS.join(', ')}`,
-			);
-		}
-
-		const result = await this.assetImportService.scan(
-			file,
-			dto,
-			req.user!.sub,
-		);
+	async scan(@Body() dto: ScanAssetImportDto, @Req() req: Request) {
+		const result = await this.assetImportService.scan(dto, req.user!.sub);
 
 		return new ResponseSuccess({ data: result });
 	}

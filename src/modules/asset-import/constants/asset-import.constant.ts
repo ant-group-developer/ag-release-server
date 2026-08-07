@@ -84,6 +84,15 @@ export const ASSET_IMPORT_PARSER_CODE = 'asset-import';
 
 export const ASSET_IMPORT_ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 
+/**
+ * Thư mục trên R2 chứa file upload của luồng này. Scan chỉ chấp nhận key nằm
+ * trong prefix này để không đọc được object tuỳ ý trong bucket.
+ */
+export const ASSET_IMPORT_R2_PREFIX = 'asset-import/';
+
+/** Hạn dùng của presigned upload URL (giây) — khớp mặc định của BucketR2Service. */
+export const ASSET_IMPORT_PRESIGN_EXPIRES_IN = 60 * 60;
+
 /** Nhãn hiển thị cho từng field trong diff. */
 export const ASSET_IMPORT_FIELD_LABELS: Record<string, string> = {
 	tenantId: 'Workspace',
