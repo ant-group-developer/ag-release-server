@@ -38,6 +38,48 @@ export class FtpAuthenticationError extends Error {
 	}
 }
 
+/**
+ * Leases one FTP connection across several operations so a unit of work costs a
+ * single login instead of one per call. The server throttles repeated logins and
+ * answers with 530, so reuse is what keeps a sync under that threshold.
+ *
+ * The connection is opened lazily and reopened transparently: basic-ftp closes a
+ * client on timeout or connection error, and the control socket can also idle out
+ * between calls.
+ */
+export class FtpSession {
+	private client: ftp.Client | null = null;
+	private closed = false;
+
+	constructor(private readonly connectFn: () => Promise<ftp.Client>) {}
+
+	async getClient(): Promise<ftp.Client> {
+		if (this.closed) throw new Error('FtpSession is already closed');
+		if (!this.client || this.client.closed) {
+			this.client = await this.connectFn();
+		}
+		return this.client;
+	}
+
+	/** Drops the current connection so the next getClient() opens a fresh one. */
+	invalidate(): void {
+		if (this.client) {
+			try {
+				this.client.close();
+			} catch {
+				// Already dead; nothing to release.
+			}
+		}
+		this.client = null;
+	}
+
+	close(): void {
+		if (this.closed) return;
+		this.closed = true;
+		this.invalidate();
+	}
+}
+
 @Injectable()
 export class FtpService {
 	private readonly logger = new Logger(FtpService.name);
@@ -119,39 +161,90 @@ export class FtpService {
 	}
 
 	/**
+	 * Opens a session the caller owns. The caller must close it, normally from a
+	 * `finally`. Prefer `withSession` unless the work sits inside a loop that
+	 * relies on `continue`, which a callback cannot express.
+	 */
+	createSession(): FtpSession {
+		return new FtpSession(() => this.connect());
+	}
+
+	/**
+	 * Runs an action against a single leased connection. Every FtpService method
+	 * called with the supplied session shares that one login.
+	 */
+	async withSession<T>(
+		action: (session: FtpSession) => Promise<T>,
+	): Promise<T> {
+		const session = this.createSession();
+		try {
+			return await action(session);
+		} finally {
+			session.close();
+		}
+	}
+
+	/**
+	 * Runs a single FTP operation, either on the caller's session or on a
+	 * throwaway connection when no session is given. A session whose socket died
+	 * between calls is reconnected once; a second failure is left to the caller.
+	 */
+	private async withSessionRetry<T>(
+		session: FtpSession | undefined,
+		op: (client: ftp.Client) => Promise<T>,
+	): Promise<T> {
+		const client = session ? await session.getClient() : await this.connect();
+		try {
+			return await op(client);
+		} catch (error) {
+			const err = error as Error;
+			if (this.isAuthenticationError(err)) throw err;
+			if (session && this.isDisconnected(err)) {
+				this.logger.warn(
+					`FTP session lost (${err.message}); reconnecting once`,
+				);
+				session.invalidate();
+				return await op(await session.getClient());
+			}
+			throw err;
+		} finally {
+			if (!session) client.close();
+		}
+	}
+
+	/**
 	 * List all YYYYMM period folders available on FTPS.
 	 * Scans both /root/trends/ and /root/usage/.
 	 */
-	async listPeriods(): Promise<string[]> {
+	async listPeriods(session?: FtpSession): Promise<string[]> {
+		// All four categories share one login, so without a caller-supplied
+		// session this opens its own rather than reconnecting per category.
+		if (!session) return this.withSession((own) => this.listPeriods(own));
+
 		const config = this.getConfig();
-		const client = await this.connect();
 		const periods = new Set<string>();
 
-		try {
-			for (const category of [
-				'trends',
-				'usage',
-				'sales',
-				'illegitimate_activity',
-			]) {
-				const remotePath = `${config.basePath}/${category}`;
-				try {
-					const list = await client.list(remotePath);
-					for (const item of list) {
-						// Only YYYYMM folders (6 digits)
-						if (item.isDirectory && /^\d{6}$/.test(item.name)) {
-							periods.add(item.name);
-						}
+		for (const category of [
+			'trends',
+			'usage',
+			'sales',
+			'illegitimate_activity',
+		]) {
+			const remotePath = `${config.basePath}/${category}`;
+			try {
+				const list = await this.withSessionRetry(session, (client) =>
+					client.list(remotePath),
+				);
+				for (const item of list) {
+					// Only YYYYMM folders (6 digits)
+					if (item.isDirectory && /^\d{6}$/.test(item.name)) {
+						periods.add(item.name);
 					}
-				} catch (err) {
-					if (this.isAuthenticationError(err as Error)) throw err;
-					this.logger.warn(
-						`Cannot list ${remotePath}: ${err.message}`,
-					);
 				}
+			} catch (err) {
+				if (this.isAuthenticationError(err as Error)) throw err;
+				this.logger.warn(`Cannot list ${remotePath}: ${err.message}`);
 			}
-		} finally {
-			client.close();
 		}
 
 		return Array.from(periods).sort();
@@ -161,13 +254,18 @@ export class FtpService {
 	 * List DSP folders within a specific period+category.
 	 * e.g. listDspFolders('trends', '202401') → ['aum-audiomack', 'fbk-facebook', ...]
 	 */
-	async listDspFolders(category: string, period: string): Promise<string[]> {
+	async listDspFolders(
+		category: string,
+		period: string,
+		session?: FtpSession,
+	): Promise<string[]> {
 		const config = this.getConfig();
-		const client = await this.connect();
+		const remotePath = `${config.basePath}/${category}/${period}`;
 
 		try {
-			const remotePath = `${config.basePath}/${category}/${period}`;
-			const list = await client.list(remotePath);
+			const list = await this.withSessionRetry(session, (client) =>
+				client.list(remotePath),
+			);
 			return list
 				.filter((item) => item.isDirectory)
 				.map((item) => item.name);
@@ -177,8 +275,6 @@ export class FtpService {
 				`Cannot list DSP folders for ${category}/${period}: ${err.message}`,
 			);
 			return [];
-		} finally {
-			client.close();
 		}
 	}
 
@@ -192,18 +288,20 @@ export class FtpService {
 		dspFolder: string,
 		fileSelector?: (relativePath: string) => boolean,
 		applyGlobalExcludes = true,
+		session?: FtpSession,
 	): Promise<string[]> {
 		const config = this.getConfig();
-		const client = await this.connect();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 
 		try {
-			const files = await this.listFilesRecursive(
-				client,
-				remotePath,
-				'',
-				fileSelector,
-				applyGlobalExcludes,
+			const files = await this.withSessionRetry(session, (client) =>
+				this.listFilesRecursive(
+					client,
+					remotePath,
+					'',
+					fileSelector,
+					applyGlobalExcludes,
+				),
 			);
 			return files.sort();
 		} catch (err) {
@@ -212,8 +310,6 @@ export class FtpService {
 				`Cannot list files for ${category}/${period}/${dspFolder}: ${err.message}`,
 			);
 			return [];
-		} finally {
-			client.close();
 		}
 	}
 
@@ -556,64 +652,6 @@ export class FtpService {
 	}
 
 	/**
-	 * Download a specific period's data (both trends and usage) to local temp dir.
-	 * Returns the local path where files were saved.
-	 */
-	async downloadPeriod(
-		period: string,
-		tempDir: string,
-	): Promise<{ localPath: string; fileCount: number }> {
-		const config = this.getConfig();
-		const client = await this.connect();
-		const localPath = path.join(tempDir, period);
-		let totalFiles = 0;
-
-		try {
-			for (const category of ['trends', 'usage']) {
-				const remotePath = `${config.basePath}/${category}/${period}`;
-				const localCategoryPath = path.join(localPath, category);
-
-				try {
-					const dspFolders = await client.list(remotePath);
-					const dspDirs = dspFolders.filter((f) => f.isDirectory);
-
-					if (dspDirs.length > 0) {
-						this.logger.log(
-							`Downloading ${category}/${period}: ${dspDirs.length} DSP folders`,
-						);
-
-						for (const dsp of dspDirs) {
-							const remoteDir = `${remotePath}/${dsp.name}`;
-							const localDir = path.join(
-								localCategoryPath,
-								dsp.name,
-							);
-							const count = await this.downloadFolder(
-								client,
-								remoteDir,
-								localDir,
-							);
-							totalFiles += count;
-							this.logger.log(
-								`  Downloaded ${dsp.name}: ${count} files`,
-							);
-						}
-					}
-				} catch (err) {
-					if (this.isAuthenticationError(err as Error)) throw err;
-					this.logger.warn(
-						`No ${category}/${period} on FTPS: ${err.message}`,
-					);
-				}
-			}
-		} finally {
-			client.close();
-		}
-
-		return { localPath, fileCount: totalFiles };
-	}
-
-	/**
 	 * Download a single DSP folder for a specific period+category.
 	 */
 	async downloadDspFolder(
@@ -622,24 +660,22 @@ export class FtpService {
 		dspFolder: string,
 		tempDir: string,
 		fileSelector?: (relativePath: string) => boolean,
+		session?: FtpSession,
 	): Promise<{ localPath: string; fileCount: number }> {
 		const config = this.getConfig();
-		const client = await this.connect();
 		const remotePath = `${config.basePath}/${category}/${period}/${dspFolder}`;
 		const localPath = path.join(tempDir, period, category, dspFolder);
 
-		try {
-			const fileCount = await this.downloadFolder(
+		const fileCount = await this.withSessionRetry(session, (client) =>
+			this.downloadFolder(
 				client,
 				remotePath,
 				localPath,
 				'',
 				fileSelector,
-			);
-			return { localPath, fileCount };
-		} finally {
-			client.close();
-		}
+			),
+		);
+		return { localPath, fileCount };
 	}
 
 	/**

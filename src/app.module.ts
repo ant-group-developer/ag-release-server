@@ -17,6 +17,7 @@ import { AudioFileModule } from './modules/audio-file/audio-file.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PolicyGuard } from './modules/auth/guards/policy.guard';
+import { AssetImportModule } from './modules/asset-import/asset-import.module';
 import { BatchImportModule } from './modules/batch-import/batch-import.module';
 import { BucketModule2 } from './modules/bucket2/bucket2.module';
 import { CacheModule } from './modules/cache/cache.module';
@@ -197,6 +198,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 		PartnersApiModule,
 		WebhookModule,
 		VideoCsvImportModule,
+		AssetImportModule,
 		// ReleaseSubmitModule,
 	],
 	controllers: [AppController],

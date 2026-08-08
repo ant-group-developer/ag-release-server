@@ -1439,7 +1439,8 @@ export class ReleaseQueryService {
 			.leftJoin('release.label', 'label')
 			.leftJoin('release.video', 'video')
 			.leftJoin('video.channel', 'channel')
-			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre');
+			.leftJoinAndSelect('release.primaryGenre', 'primaryGenre')
+			.leftJoin('release.creator', 'creator');
 
 		if (relations?.includes('release.ciData')) {
 			qb.leftJoinAndSelect('release.ciData', 'releaseCiData');
@@ -1653,6 +1654,12 @@ export class ReleaseQueryService {
 				'channel.name',
 				'channel.youtubeChannelId',
 				'channel.thumbUrl',
+			])
+			.addSelect([
+				'creator.id',
+				'creator.name',
+				'creator.avatar',
+				'creator.email',
 			])
 			.addSelect(
 				(qb) => this.countTracksSubQuery(qb),
