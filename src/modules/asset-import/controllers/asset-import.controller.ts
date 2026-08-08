@@ -49,6 +49,25 @@ export class AssetImportController {
 		private readonly jobEvents: JobEventsGateway,
 	) {}
 
+	@Get('template/download')
+	@ApiOperation({
+		summary: 'Tải template Excel cho Asset Import',
+		description:
+			'Trả presigned URL của file template trong protected R2 bucket. Client mở downloadUrl để tải file.',
+	})
+	@ApiResponse({
+		status: 200,
+		description:
+			'Presigned URL để tải asset-import-template.xlsx.',
+	})
+	async downloadTemplate() {
+		return new ResponseSuccess({
+			data: {
+				downloadUrl: await this.assetImportService.getTemplateDownloadUrl(),
+			},
+		});
+	}
+
 	@Post('uploads/presign')
 	@ApiOperation({
 		summary: 'Cấp presigned URL để upload file assets thẳng lên R2',

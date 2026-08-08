@@ -90,6 +90,10 @@ export const ASSET_IMPORT_ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
  */
 export const ASSET_IMPORT_R2_PREFIX = 'asset-import/';
 
+/** Template Excel chuẩn, lưu cố định trong protected R2 bucket. */
+export const ASSET_IMPORT_TEMPLATE_FILE_NAME = 'asset-import-template.xlsx';
+export const ASSET_IMPORT_TEMPLATE_R2_KEY = `${ASSET_IMPORT_R2_PREFIX}templates/${ASSET_IMPORT_TEMPLATE_FILE_NAME}`;
+
 /** Hạn dùng của presigned upload URL (giây) — khớp mặc định của BucketR2Service. */
 export const ASSET_IMPORT_PRESIGN_EXPIRES_IN = 60 * 60;
 

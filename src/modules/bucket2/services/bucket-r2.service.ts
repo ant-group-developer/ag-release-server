@@ -115,8 +115,9 @@ export class BucketR2Service {
 		buffer: Buffer;
 		contentType: string;
 		isPublic?: boolean;
+		metadata?: Record<string, string>;
 	}): Promise<{ bucketName: string; key: string }> {
-		const { key, buffer, contentType, isPublic = false } = data;
+		const { key, buffer, contentType, isPublic = false, metadata } = data;
 		const bucketName = this.getBucketName({ isPublic });
 		const maxAttempts = 3;
 		let lastError: unknown;
@@ -130,6 +131,7 @@ export class BucketR2Service {
 						Body: buffer,
 						ContentType: contentType,
 						ContentLength: buffer.length,
+						Metadata: metadata,
 					}),
 				);
 				return { bucketName, key };
@@ -240,16 +242,20 @@ export class BucketR2Service {
 	}: {
 		bucketName: string;
 		key: string;
-	}): Promise<{ bucketName: string; key: string }> {
+	}): Promise<{
+		bucketName: string;
+		key: string;
+		metadata: Record<string, string>;
+	}> {
 		try {
-			await this.client.send(
+			const result = await this.client.send(
 				new HeadObjectCommand({
 					Bucket: bucketName,
 					Key: key,
 				}),
 			);
 
-			return { bucketName, key };
+			return { bucketName, key, metadata: result.Metadata ?? {} };
 		} catch (error) {
 			throw BucketException.FILE_NOT_FOUND_IN_STORAGE();
 		}
