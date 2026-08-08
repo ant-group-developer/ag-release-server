@@ -284,7 +284,9 @@ export class Ern43Builder2 {
 				.txt(`${defaultPath}${track.isrc}_${techRef}.wav`);
 		}
 
-		deliveryFile.ele('IsProvidedInDelivery').txt('true');
+		deliveryFile
+			.ele('IsProvidedInDelivery')
+			.txt(this.input.updateIndicator === 'UpdateMessage' ? 'false' : 'true');
 
 		// WorkId (ISWC)
 		if (track.iswc) {
@@ -407,7 +409,9 @@ export class Ern43Builder2 {
 				.ele('URI')
 				.txt(`${defaultPath}${video.isrc}_${techRef}.mp4`);
 		}
-		deliveryFile.ele('IsProvidedInDelivery').txt('true');
+		deliveryFile.ele('IsProvidedInDelivery').txt(
+			this.input.updateIndicator === 'UpdateMessage' ? 'false' : 'true',
+		);
 
 		// Title
 		const displayTitle = video.version

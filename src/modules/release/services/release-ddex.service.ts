@@ -186,6 +186,62 @@ export class ReleaseDdexService {
 		}
 	}
 
+	async createTakedownMetadataOnServer({
+		release,
+		ernVersion,
+		recipient,
+		sender,
+		dspCode,
+	}: {
+		release: Release;
+		ernVersion: ErnVersion2;
+		sender: { partyId: string; name: string };
+		recipient: { partyId: string; name: string };
+		dspCode?: string;
+	}) {
+		const batchId = genBatchId();
+		const upc = release.upc ?? 'new_upc';
+		const releaseReference =
+			release.type === 'video' ? release.video?.isrc : upc;
+
+		if (!releaseReference) {
+			throw new Error(
+				release.type === 'video'
+					? 'Không tìm thấy mã ISRC của video'
+					: 'Không tìm thấy mã UPC của release',
+			);
+		}
+
+		const baseDir =
+			process.env.RELEASE_PARSED_DIR || path.resolve('release_parsed');
+		const outputRoot = path.join(baseDir, batchId);
+		const releaseDir = path.join(outputRoot, releaseReference);
+
+		fs.mkdirSync(releaseDir, { recursive: true });
+
+		const xml = this.createErnFile({
+			release,
+			outputDir: releaseDir,
+			ernVersion,
+			recipient,
+			sender,
+			coverExtension: undefined,
+			updateIndicator: 'UpdateMessage',
+		});
+
+		if (dspCode?.toUpperCase() !== 'VEVO') {
+			this.createManifestFile({ batchId, upc, outputRoot, sender, recipient });
+		}
+
+		this.logger.log({
+			releaseId: release.id,
+			step: 'createTakedownMetadataOnServer',
+			message: `[ABS_PATH] ${path.resolve(releaseDir)}`,
+		});
+
+		return { outputDir: outputRoot, batchId, releaseReference, xml };
+	}
+
 	createErnFile({
 		release,
 		outputDir,
@@ -193,11 +249,13 @@ export class ReleaseDdexService {
 		sender,
 		recipient,
 		coverExtension,
+		updateIndicator,
 	}: {
 		release: Release;
 		outputDir: string;
 		ernVersion: ErnVersion2;
 		coverExtension?: string;
+		updateIndicator?: 'OriginalMessage' | 'UpdateMessage';
 		sender: {
 			partyId: string;
 			name: string;
@@ -214,6 +272,9 @@ export class ReleaseDdexService {
 			recipient,
 			coverExtension,
 		});
+		if (updateIndicator) {
+			input.updateIndicator = updateIndicator;
+		}
 		const xmlContent = this.ernService2.generate(input);
 
 		const releaseReference =
@@ -1381,20 +1442,20 @@ export class ReleaseDdexService {
 						codecType: 'MP4',
 					},
 					subtitles: (
-						release.captions?.map((caption) => ({
-							language: caption.language?.code ?? '',
-							fileId: caption.fileId,
-							type: caption.type,
-						})) ?? []
-					).map((sub, subIdx) => ({
-						language: sub.language,
-						fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
-						filePath: 'resources',
-						type:
-							sub.type === ReleaseCaptionType.SUBTITLE
-								? 'SubTitle'
-								: 'Caption',
-					})),
+							release.captions?.map((caption) => ({
+								language: caption.language?.code ?? '',
+								fileId: caption.fileId,
+								type: caption.type,
+							})) ?? []
+						).map((sub, subIdx) => ({
+							language: sub.language,
+							fileName: `${videoIsrc}_T${subIdx + 1}S.srt`,
+							filePath: 'resources',
+							type:
+								sub.type === ReleaseCaptionType.SUBTITLE
+									? 'SubTitle'
+									: 'Caption',
+						})),
 					channel: video.channel?.name ?? undefined,
 					languageOfPerformance:
 						release.releaseLanguage?.audioLanguage?.code ??
