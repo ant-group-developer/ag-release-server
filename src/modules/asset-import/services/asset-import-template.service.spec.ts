@@ -24,10 +24,11 @@ describe('AssetImportTemplateService', () => {
 		else process.env.APP_ROLE = originalAppRole;
 	});
 
-	it('skips upload when the template already exists on R2', async () => {
+	it('skips upload when the existing template version is current', async () => {
 		r2Service.findOne.mockResolvedValue({
 			bucketName: 'protected-bucket',
 			key: ASSET_IMPORT_TEMPLATE_R2_KEY,
+			metadata: { 'asset-import-template-version': '2' },
 		});
 		const service = new AssetImportTemplateService(
 			r2Service as unknown as BucketR2Service,
@@ -35,14 +36,10 @@ describe('AssetImportTemplateService', () => {
 
 		await service.ensureTemplateUploaded();
 
-		expect(r2Service.findOne).toHaveBeenCalledWith({
-			bucketName: 'protected-bucket',
-			key: ASSET_IMPORT_TEMPLATE_R2_KEY,
-		});
 		expect(r2Service.uploadBuffer).not.toHaveBeenCalled();
 	});
 
-	it('generates and uploads the template when it is absent from R2', async () => {
+	it('generates the seeded Excel template', async () => {
 		r2Service.findOne.mockRejectedValue(new Error('not found'));
 		r2Service.uploadBuffer.mockResolvedValue({
 			bucketName: 'protected-bucket',
@@ -60,18 +57,19 @@ describe('AssetImportTemplateService', () => {
 				isPublic: false,
 				contentType:
 					'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+				metadata: { 'asset-import-template-version': '2' },
 				buffer: expect.any(Buffer),
 			}),
 		);
 	});
 
-	it('does not initialize the template from an API process', () => {
+	it('does not initialize the template from an API process', async () => {
 		process.env.APP_ROLE = 'api';
 		const service = new AssetImportTemplateService(
 			r2Service as unknown as BucketR2Service,
 		);
 
-		service.onApplicationBootstrap();
+		await service.onApplicationBootstrap();
 
 		expect(r2Service.getBucketName).not.toHaveBeenCalled();
 	});

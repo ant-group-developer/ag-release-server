@@ -8,6 +8,8 @@ import {
 
 const TEMPLATE_CONTENT_TYPE =
 	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const TEMPLATE_VERSION = '2';
+const TEMPLATE_VERSION_METADATA_KEY = 'asset-import-template-version';
 
 @Injectable()
 export class AssetImportTemplateService implements OnApplicationBootstrap {
@@ -15,7 +17,7 @@ export class AssetImportTemplateService implements OnApplicationBootstrap {
 
 	constructor(private readonly r2Service: BucketR2Service) {}
 
-	onApplicationBootstrap(): void {
+	async onApplicationBootstrap(): Promise<void> {
 		if (process.env.APP_ROLE !== 'worker') {
 			this.logger.debug(
 				'Skipping Asset Import template upload (not worker role)',
@@ -23,25 +25,25 @@ export class AssetImportTemplateService implements OnApplicationBootstrap {
 			return;
 		}
 
-		void this.ensureTemplateUploaded().catch((err: Error) => {
-			this.logger.error(
-				`Failed to initialize Asset Import template: ${err.message}`,
-				err.stack,
-			);
-		});
+		await this.ensureTemplateUploaded();
 	}
 
 	async ensureTemplateUploaded(): Promise<void> {
 		const bucketName = this.r2Service.getBucketName({ isPublic: false });
 		try {
-			await this.r2Service.findOne({
+			const existingTemplate = await this.r2Service.findOne({
 				bucketName,
 				key: ASSET_IMPORT_TEMPLATE_R2_KEY,
 			});
-			this.logger.log(
-				`Asset Import template already exists at ${ASSET_IMPORT_TEMPLATE_R2_KEY}; skipping upload.`,
-			);
-			return;
+			if (
+				existingTemplate.metadata[TEMPLATE_VERSION_METADATA_KEY] ===
+				TEMPLATE_VERSION
+			) {
+				this.logger.log(
+					`Asset Import template is already version ${TEMPLATE_VERSION}; skipping upload.`,
+				);
+				return;
+			}
 		} catch {
 			// Object chưa tồn tại, tạo mới bên dưới. uploadBuffer sẽ ném lỗi nếu R2 không khả dụng.
 		}
@@ -52,9 +54,10 @@ export class AssetImportTemplateService implements OnApplicationBootstrap {
 			buffer,
 			contentType: TEMPLATE_CONTENT_TYPE,
 			isPublic: false,
+			metadata: { [TEMPLATE_VERSION_METADATA_KEY]: TEMPLATE_VERSION },
 		});
 		this.logger.log(
-			`Uploaded Asset Import template to ${ASSET_IMPORT_TEMPLATE_R2_KEY}.`,
+			`Uploaded Asset Import template version ${TEMPLATE_VERSION} to ${ASSET_IMPORT_TEMPLATE_R2_KEY}.`,
 		);
 	}
 
@@ -88,6 +91,16 @@ export class AssetImportTemplateService implements OnApplicationBootstrap {
 		assets.autoFilter = 'A1:E1';
 		assets.getColumn('isrc').numFmt = '@';
 		assets.getColumn('upc').numFmt = '@';
+		assets.addRow({
+			isrc: 'USRC17607839',
+			trackName: 'Example Song',
+			albumName: 'Example Album',
+			upc: '012345678901',
+			labelName: 'Example Label',
+		});
+		assets.getRow(2).eachCell((cell) => {
+			cell.font = { italic: true, color: { argb: 'FF666666' } };
+		});
 
 		const instructions = workbook.addWorksheet('Instructions', {
 			views: [{ showGridLines: false }],

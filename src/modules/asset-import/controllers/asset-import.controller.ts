@@ -9,7 +9,6 @@ import {
 	ParseUUIDPipe,
 	Post,
 	Query,
-	Redirect,
 	Req,
 	Sse,
 } from '@nestjs/common';
@@ -51,21 +50,22 @@ export class AssetImportController {
 	) {}
 
 	@Get('template/download')
-	@Redirect()
 	@ApiOperation({
 		summary: 'Tải template Excel cho Asset Import',
 		description:
-			'Trả redirect tới presigned URL của file template trong protected R2 bucket.',
+			'Trả presigned URL của file template trong protected R2 bucket. Client mở downloadUrl để tải file.',
 	})
 	@ApiResponse({
-		status: 302,
+		status: 200,
 		description:
-			'Redirect tới file asset-import-template.xlsx để trình duyệt tải về.',
+			'Presigned URL để tải asset-import-template.xlsx.',
 	})
 	async downloadTemplate() {
-		return {
-			url: await this.assetImportService.getTemplateDownloadUrl(),
-		};
+		return new ResponseSuccess({
+			data: {
+				downloadUrl: await this.assetImportService.getTemplateDownloadUrl(),
+			},
+		});
 	}
 
 	@Post('uploads/presign')
