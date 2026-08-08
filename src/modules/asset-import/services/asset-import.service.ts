@@ -20,6 +20,8 @@ import {
 	ASSET_IMPORT_PRESIGN_EXPIRES_IN,
 	ASSET_IMPORT_R2_PREFIX,
 	ASSET_IMPORT_SCAN_SYNC_THRESHOLD,
+	ASSET_IMPORT_TEMPLATE_FILE_NAME,
+	ASSET_IMPORT_TEMPLATE_R2_KEY,
 } from '../constants/asset-import.constant';
 import {
 	ApplyAssetImportDto,
@@ -65,6 +67,15 @@ export class AssetImportService {
 		private readonly importJobsService: ImportJobsService,
 		private readonly r2Service: BucketR2Service,
 	) {}
+
+	/** Trả presigned URL tải template Excel từ protected R2 bucket. */
+	async getTemplateDownloadUrl(): Promise<string> {
+		return this.r2Service.getSignedUrlDown({
+			key: ASSET_IMPORT_TEMPLATE_R2_KEY,
+			isPublic: false,
+			fileName: ASSET_IMPORT_TEMPLATE_FILE_NAME,
+		});
+	}
 
 	// ── SCAN ──────────────────────────────────────────────────────────
 

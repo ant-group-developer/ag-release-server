@@ -10,6 +10,7 @@ import { AssetImportItem } from './entities/asset-import-item.entity';
 import { AssetImportApplyService } from './services/asset-import-apply.service';
 import { AssetImportParserService } from './services/asset-import-parser.service';
 import { AssetImportScanService } from './services/asset-import-scan.service';
+import { AssetImportTemplateService } from './services/asset-import-template.service';
 import { AssetImportQueryService } from './services/asset-import.query.service';
 import { AssetImportService } from './services/asset-import.service';
 
@@ -27,6 +28,7 @@ import { AssetImportService } from './services/asset-import.service';
 		AssetImportScanService,
 		AssetImportApplyService,
 		AssetImportParserService,
+		AssetImportTemplateService,
 		AssetImportQueryService,
 	],
 	exports: [AssetImportService],
