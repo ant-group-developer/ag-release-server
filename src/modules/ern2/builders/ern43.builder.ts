@@ -565,21 +565,23 @@ export class Ern43Builder2 {
 			.ele('ParentalWarningType')
 			.txt(this.input.release.parentalWarning || 'NotExplicit');
 
-		// Technical details
-		const tech = image.ele('TechnicalDetails');
-		tech.ele('TechnicalResourceDetailsReference').txt(techRef);
-		const file = tech.ele('File');
+		// Technical details — skip for takedown (UpdateMessage)
+		if (this.input.updateIndicator !== 'UpdateMessage') {
+			const tech = image.ele('TechnicalDetails');
+			tech.ele('TechnicalResourceDetailsReference').txt(techRef);
+			const file = tech.ele('File');
 
-		const uri = coverArt.filePath
-			? `${coverArt.filePath}/${coverArt.fileName}`
-			: coverArt.fileName;
-		file.ele('URI').txt(uri);
-		if (coverArt.hashSum) {
-			const hash = file.ele('HashSum');
-			hash.ele('HashSum').txt(coverArt.hashSum);
-			hash.ele('HashSumAlgorithmType').txt(
-				coverArt.hashAlgorithm || 'MD5',
-			);
+			const uri = coverArt.filePath
+				? `${coverArt.filePath}/${coverArt.fileName}`
+				: coverArt.fileName;
+			file.ele('URI').txt(uri);
+			if (coverArt.hashSum) {
+				const hash = file.ele('HashSum');
+				hash.ele('HashSum').txt(coverArt.hashSum);
+				hash.ele('HashSumAlgorithmType').txt(
+					coverArt.hashAlgorithm || 'MD5',
+				);
+			}
 		}
 	}
 
