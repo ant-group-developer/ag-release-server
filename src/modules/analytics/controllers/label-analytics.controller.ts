@@ -8,9 +8,9 @@ import { EntityManager } from 'typeorm';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -85,10 +85,6 @@ export class LabelAnalyticsController {
 			tenant,
 		});
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a label' })
@@ -223,7 +219,9 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('top-tracks')
-	@ApiOperation({ summary: 'Top tracks của label (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top tracks của label (sortBy: views | usage | revenue)',
+	})
 	async topTracks(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -263,7 +261,9 @@ export class LabelAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của label (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của label (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('labelId') labelId: string,
 		@Body() dto: EntityRankingQueryDto,

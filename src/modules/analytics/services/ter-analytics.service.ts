@@ -123,7 +123,7 @@ export class TerAnalyticsService {
 		const params: Record<string, any> = { isoCode: isoCode.toUpperCase() };
 		let terFilter = 'AND s.territory_code = {isoCode:String}';
 
-		let trackJoin = '';
+		const trackJoin = '';
 		let trackFilter = '';
 		if (releaseType || importSource) {
 			// Use IN subquery instead of JOIN to avoid ClickHouse scope collapse on s.dsp_id
@@ -182,7 +182,12 @@ export class TerAnalyticsService {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
+			this.buildTerFilter(
+				isoCode,
+				dto.importSource,
+				dto.releaseType,
+				dto,
+			);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 
@@ -246,7 +251,12 @@ export class TerAnalyticsService {
 		dto: ChartQueryDto,
 	): Promise<TrendViewLineChartItem[]> {
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
+			this.buildTerFilter(
+				isoCode,
+				dto.importSource,
+				dto.releaseType,
+				dto,
+			);
 		params.fromDate = dto.fromDate;
 		params.toDate = dto.toDate;
 
@@ -293,7 +303,12 @@ export class TerAnalyticsService {
 		const fromMonth = normalizeDateToFirstOfMonth(dto.fromDate);
 		const toMonth = normalizeDateToFirstOfMonth(dto.toDate);
 		const { terFilter, trackJoin, trackFilter, params } =
-			this.buildTerFilter(isoCode, dto.importSource, dto.releaseType, dto);
+			this.buildTerFilter(
+				isoCode,
+				dto.importSource,
+				dto.releaseType,
+				dto,
+			);
 		params.fromMonth = fromMonth;
 		params.toMonth = toMonth;
 

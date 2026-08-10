@@ -7,13 +7,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { basename, extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
-import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { ImportJobSourceType } from 'src/modules/etl/interfaces';
 import { ImportJobsService } from 'src/modules/etl/services/import-jobs/import-jobs.service';
+import { Tenant } from 'src/modules/tenant/tenant.entity';
 import { DataSource, In, Not, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { v4 as uuidv4 } from 'uuid';
 import {
 	ASSET_IMPORT_ALLOWED_EXTENSIONS,
 	ASSET_IMPORT_ITEM_CHUNK_SIZE,
@@ -263,7 +263,9 @@ export class AssetImportService {
 		const batch = await this.getBatchOrFail(batchId);
 
 		if (batch.status === AssetImportBatchStatus.APPLYING) {
-			throw new BadRequestException('Batch đang được apply, chờ chạy xong');
+			throw new BadRequestException(
+				'Batch đang được apply, chờ chạy xong',
+			);
 		}
 		if (batch.status === AssetImportBatchStatus.SCANNING) {
 			throw new BadRequestException('Batch đang quét, chưa apply được');
@@ -318,7 +320,11 @@ export class AssetImportService {
 		let skipped = 0;
 
 		for (const [index, item] of items.entries()) {
-			const result = await this.applyService.applyItem(item, batch, userId);
+			const result = await this.applyService.applyItem(
+				item,
+				batch,
+				userId,
+			);
 
 			await this.itemRepo.update(item.id, {
 				status: result.status,
@@ -513,7 +519,10 @@ export class AssetImportService {
 		jobId: string,
 		err: Error,
 	): Promise<void> {
-		this.logger.error(`Batch ${batchId} thất bại: ${err.message}`, err.stack);
+		this.logger.error(
+			`Batch ${batchId} thất bại: ${err.message}`,
+			err.stack,
+		);
 		await this.batchRepo.update(batchId, {
 			status: AssetImportBatchStatus.FAILED,
 			errorMessage: err.message,

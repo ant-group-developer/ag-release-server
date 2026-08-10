@@ -416,9 +416,7 @@ export class IsrcResolverService {
 	/**
 	 * Lấy thông tin logo/ảnh đại diện cho danh sách tenantIds từ PostgreSQL
 	 */
-	async getTenantMetadata(
-		tenantIds: string[],
-	): Promise<
+	async getTenantMetadata(tenantIds: string[]): Promise<
 		Map<
 			string,
 			{

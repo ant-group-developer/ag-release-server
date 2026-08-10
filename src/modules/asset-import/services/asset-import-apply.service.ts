@@ -71,7 +71,10 @@ export class AssetImportApplyService {
 			item.action === AssetImportAction.CONFLICT ||
 			item.action === AssetImportAction.NO_CHANGE
 		) {
-			return { status: AssetImportItemStatus.SKIPPED, errorMessage: null };
+			return {
+				status: AssetImportItemStatus.SKIPPED,
+				errorMessage: null,
+			};
 		}
 
 		try {
@@ -89,7 +92,10 @@ export class AssetImportApplyService {
 			// Postgres, và lỗi ghi log không được phép làm hỏng thay đổi đã commit.
 			await this.writeAuditLogs(logs);
 
-			return { status: AssetImportItemStatus.APPLIED, errorMessage: null };
+			return {
+				status: AssetImportItemStatus.APPLIED,
+				errorMessage: null,
+			};
 		} catch (err: any) {
 			this.logger.warn(
 				`Apply item ${item.id} (row ${item.rowNumber}) failed: ${err.message}`,
@@ -135,7 +141,10 @@ export class AssetImportApplyService {
 					);
 					if (resolved.labelId) {
 						releasePatch.labelId = resolved.labelId;
-						appliedChanges.push({ ...change, newValue: resolved.labelId });
+						appliedChanges.push({
+							...change,
+							newValue: resolved.labelId,
+						});
 						if (resolved.created) {
 							labelCreated = {
 								id: resolved.labelId,
@@ -178,7 +187,13 @@ export class AssetImportApplyService {
 		// cột tenant riêng. Nhưng khi khớp bằng ISRC mà track nằm ở release khác
 		// thì đã bị chặn từ bước scan (CONFLICT).
 		const logs = appliedChanges.map((change) =>
-			this.buildLogRow(change, item, batch, userId, item.matchedReleaseId!),
+			this.buildLogRow(
+				change,
+				item,
+				batch,
+				userId,
+				item.matchedReleaseId!,
+			),
 		);
 
 		if (labelCreated) {
@@ -188,7 +203,7 @@ export class AssetImportApplyService {
 					item,
 					batch,
 					userId,
-					item.matchedReleaseId!,
+					item.matchedReleaseId,
 				),
 			);
 		}
@@ -342,7 +357,10 @@ export class AssetImportApplyService {
 			id: uuidv4(),
 			scan_id: batch.id,
 			entity_type: change.field === 'title' ? 'track' : 'release',
-			entity_id: change.field === 'title' ? (item.matchedTrackId ?? '') : releaseId,
+			entity_id:
+				change.field === 'title'
+					? (item.matchedTrackId ?? '')
+					: releaseId,
 			release_id: releaseId,
 			isrc: item.isrc ?? '',
 			upc: item.upc ?? '',

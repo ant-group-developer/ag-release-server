@@ -40,7 +40,8 @@ export class AssetImportOptionsDto {
 	updateOwnership: boolean = true;
 
 	@ApiPropertyOptional({
-		description: 'Đè track title / album title / UPC bằng giá trị trong file',
+		description:
+			'Đè track title / album title / UPC bằng giá trị trong file',
 		default: false,
 	})
 	@IsOptional()
@@ -49,7 +50,8 @@ export class AssetImportOptionsDto {
 	overwriteMetadata: boolean = false;
 
 	@ApiPropertyOptional({
-		description: 'ISRC/UPC chưa có trong hệ thống thì tạo Release + Track mới',
+		description:
+			'ISRC/UPC chưa có trong hệ thống thì tạo Release + Track mới',
 		default: false,
 	})
 	@IsOptional()
@@ -131,7 +133,8 @@ export class ApplyAssetImportDto {
 	selectAll: boolean = false;
 
 	@ApiPropertyOptional({
-		description: 'Danh sách item id muốn apply (dùng khi selectAll = false)',
+		description:
+			'Danh sách item id muốn apply (dùng khi selectAll = false)',
 		type: [String],
 	})
 	@IsOptional()

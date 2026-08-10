@@ -64,7 +64,9 @@ describe('AssetImportApplyService', () => {
 	beforeEach(() => {
 		manager = {
 			update: jest.fn().mockResolvedValue(undefined),
-			save: jest.fn().mockImplementation((_e, v) => ({ id: 'new-label', ...v })),
+			save: jest
+				.fn()
+				.mockImplementation((_e, v) => ({ id: 'new-label', ...v })),
 			create: jest.fn().mockImplementation((_e, v) => v),
 			exists: jest.fn().mockResolvedValue(false),
 			createQueryBuilder: jest.fn().mockReturnValue({
@@ -335,10 +337,12 @@ describe('AssetImportApplyService', () => {
 		const [, rows] = clickHouse.insert.mock.calls[0];
 
 		// Dòng của field labelId phải mang id thật, không còn rỗng.
-		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
-			entity_type: 'release',
-			new_value: 'new-label',
-		});
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject(
+			{
+				entity_type: 'release',
+				new_value: 'new-label',
+			},
+		);
 
 		expect(rows.find((r: any) => r.entity_type === 'label')).toMatchObject({
 			entity_id: 'new-label',
@@ -364,10 +368,14 @@ describe('AssetImportApplyService', () => {
 
 		const [, rows] = clickHouse.insert.mock.calls[0];
 		expect(manager.save).not.toHaveBeenCalled();
-		expect(rows.find((r: any) => r.entity_type === 'label')).toBeUndefined();
-		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
-			new_value: 'lbl_existing',
-		});
+		expect(
+			rows.find((r: any) => r.entity_type === 'label'),
+		).toBeUndefined();
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject(
+			{
+				new_value: 'lbl_existing',
+			},
+		);
 	});
 
 	it('CREATE không cho importRelease tự tạo label khi option tắt', async () => {
@@ -427,12 +435,15 @@ describe('AssetImportApplyService', () => {
 					fillEmptyOnly: false,
 					createLabelIfMissing: true,
 				},
-			} as Partial<AssetImportBatch>),
+			}),
 			USER_ID,
 		);
 
 		expect(releaseImport.importRelease).toHaveBeenCalledWith(
-			expect.objectContaining({ labelName: 'Sony Music', labelId: undefined }),
+			expect.objectContaining({
+				labelName: 'Sony Music',
+				labelId: undefined,
+			}),
 		);
 	});
 
@@ -467,14 +478,16 @@ describe('AssetImportApplyService', () => {
 					fillEmptyOnly: false,
 					createLabelIfMissing: true,
 				},
-			} as Partial<AssetImportBatch>),
+			}),
 			USER_ID,
 		);
 
 		const [, rows] = clickHouse.insert.mock.calls[0];
-		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject({
-			new_value: 'lbl_created',
-		});
+		expect(rows.find((r: any) => r.field_name === 'labelId')).toMatchObject(
+			{
+				new_value: 'lbl_created',
+			},
+		);
 		expect(rows.find((r: any) => r.entity_type === 'label')).toMatchObject({
 			entity_id: 'lbl_created',
 			new_value: 'Sony Music',

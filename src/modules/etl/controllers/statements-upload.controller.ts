@@ -32,7 +32,7 @@ import {
 import { JobEventsGateway } from '../services/import-jobs/job-events.gateway';
 import { StatementsImportService } from '../services/statements/statements-import.service';
 import { StatementsResolverService } from '../services/statements/statements-resolver.service';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const AdmZip = require('adm-zip');
 
 const STATEMENTS_R2_PREFIX = 'statements-uploads';

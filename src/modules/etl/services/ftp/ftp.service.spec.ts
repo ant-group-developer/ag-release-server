@@ -56,7 +56,9 @@ describe('FtpService', () => {
 				},
 				{
 					provide: ExcludePatternService,
-					useValue: { shouldExclude: jest.fn().mockResolvedValue(false) },
+					useValue: {
+						shouldExclude: jest.fn().mockResolvedValue(false),
+					},
 				},
 			],
 		}).compile();
@@ -250,6 +252,16 @@ describe('FtpService', () => {
 			await expect(service.listPeriods(session)).resolves.toEqual([
 				'202401',
 			]);
+		});
+	});
+
+	describe('discovery session reuse', () => {
+		it('uses one login for every requested category', async () => {
+			await service.listAllRemoteReportFiles(['trends', 'sales']);
+
+			expect(clients).toHaveLength(1);
+			expect(clients[0].list).toHaveBeenCalledTimes(2);
+			expect(clients[0].close).toHaveBeenCalledTimes(1);
 		});
 	});
 });

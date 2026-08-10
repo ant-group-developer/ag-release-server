@@ -12,12 +12,7 @@ import {
 	Req,
 	Sse,
 } from '@nestjs/common';
-import {
-	ApiOperation,
-	ApiParam,
-	ApiResponse,
-	ApiTags,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { concat, from, interval, merge, Observable, of } from 'rxjs';
 import { map, switchMap, takeWhile } from 'rxjs/operators';
@@ -57,13 +52,13 @@ export class AssetImportController {
 	})
 	@ApiResponse({
 		status: 200,
-		description:
-			'Presigned URL để tải asset-import-template.xlsx.',
+		description: 'Presigned URL để tải asset-import-template.xlsx.',
 	})
 	async downloadTemplate() {
 		return new ResponseSuccess({
 			data: {
-				downloadUrl: await this.assetImportService.getTemplateDownloadUrl(),
+				downloadUrl:
+					await this.assetImportService.getTemplateDownloadUrl(),
 			},
 		});
 	}
@@ -152,7 +147,8 @@ export class AssetImportController {
 	@Delete('batches/:batchId')
 	@ApiOperation({
 		summary: 'Huỷ batch chưa apply',
-		description: 'Batch đã apply item nào thì không huỷ được, để giữ lịch sử.',
+		description:
+			'Batch đã apply item nào thì không huỷ được, để giữ lịch sử.',
 	})
 	@ApiParam({ name: 'batchId' })
 	async cancel(@Param('batchId', ParseUUIDPipe) batchId: string) {
@@ -178,12 +174,19 @@ export class AssetImportController {
 					);
 				}
 
-				const initial$ = from(this.importJobsService.findById(jobId)).pipe(
+				const initial$ = from(
+					this.importJobsService.findById(jobId),
+				).pipe(
 					switchMap((job) => {
 						if (!job) {
-							throw new NotFoundException(`Không tìm thấy job ${jobId}`);
+							throw new NotFoundException(
+								`Không tìm thấy job ${jobId}`,
+							);
 						}
-						return of<MessageEvent>({ type: 'snapshot', data: job });
+						return of<MessageEvent>({
+							type: 'snapshot',
+							data: job,
+						});
 					}),
 				);
 

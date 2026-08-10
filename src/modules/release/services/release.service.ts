@@ -1087,11 +1087,12 @@ export class ReleaseService {
 		release: Release,
 		dataDsp?: ReleaseExecutionResultDto[],
 	): ReleaseStatus {
-		const activeDeliveries = release.releaseDspDeliveries?.filter(
-			(delivery) =>
-				delivery.isSelected &&
-				(delivery.isActive ?? delivery.dsp?.isActive ?? true),
-		) ?? [];
+		const activeDeliveries =
+			release.releaseDspDeliveries?.filter(
+				(delivery) =>
+					delivery.isSelected &&
+					(delivery.isActive ?? delivery.dsp?.isActive ?? true),
+			) ?? [];
 
 		const statuses = dataDsp
 			? (activeDeliveries
