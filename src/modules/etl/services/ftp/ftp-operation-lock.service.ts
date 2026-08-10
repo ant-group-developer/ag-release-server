@@ -32,11 +32,13 @@ export class FtpOperationLockService {
 	/**
 	 * Waits for the lock instead of skipping immediately. Use for user-triggered
 	 * work, where a silent skip reads as nothing having happened; background jobs
-	 * should keep using tryAcquire and drop the run.
+	 * should keep using tryAcquire and drop the run. The default wait exceeds one
+	 * full lease so a manual retry immediately after a process crash can acquire
+	 * the abandoned lock instead of being incorrectly marked failed after 30s.
 	 */
 	async tryAcquireWithWait(
 		operation: string,
-		{ maxWaitMs = 30_000, pollIntervalMs = 2_000 } = {},
+		{ maxWaitMs = LOCK_TTL_MS + 10_000, pollIntervalMs = 2_000 } = {},
 	): Promise<string | null> {
 		const deadline = Date.now() + maxWaitMs;
 		for (;;) {
