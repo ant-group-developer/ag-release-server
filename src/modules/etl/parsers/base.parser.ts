@@ -104,7 +104,9 @@ export abstract class BaseParser {
 		if (lowerPath.endsWith('.zip')) {
 			const rows = await this.parseZipFile(filePath, batchId);
 			let zipSize = 0;
-			try { zipSize = fs.statSync(filePath).size; } catch {}
+			try {
+				zipSize = fs.statSync(filePath).size;
+			} catch {}
 			const stats: ParseFileStats = {
 				filePath,
 				fileName: path.basename(filePath),
@@ -279,7 +281,11 @@ export abstract class BaseParser {
 			fileName: path.basename(filePath),
 			fileDirectory: path.dirname(filePath),
 			fileSizeBytes: (() => {
-				try { return fs.statSync(filePath).size; } catch { return 0; }
+				try {
+					return fs.statSync(filePath).size;
+				} catch {
+					return 0;
+				}
 			})(),
 			totalLines: lineNum,
 			processedRows: rows.length,

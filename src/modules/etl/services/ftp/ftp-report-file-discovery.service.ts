@@ -23,7 +23,7 @@ import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-
 import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
 import { FtpOperationLockService } from './ftp-operation-lock.service';
 import { canonicalizeFtpReportFilePattern } from './ftp-report-file-pattern';
-import { FtpService } from './ftp.service';
+import { FtpService, FtpSession } from './ftp.service';
 
 const CATEGORIES = Object.values(FtpSourceCategory);
 const JOB_NAME = 'ftp-report-file-discovery';
@@ -39,6 +39,7 @@ export class FtpReportFileDiscoveryService
 	private sampleWorkerTimer: NodeJS.Timeout | null = null;
 	private sampleWorkerIntervalMs = 0;
 	private activeLockToken: string | null = null;
+	private stopActiveLockHeartbeat: (() => void) | null = null;
 
 	constructor(
 		private readonly ftpService: FtpService,
@@ -64,6 +65,8 @@ export class FtpReportFileDiscoveryService
 	onModuleDestroy(): void {
 		if (this.configRefreshTimer) clearInterval(this.configRefreshTimer);
 		if (this.sampleWorkerTimer) clearInterval(this.sampleWorkerTimer);
+		this.stopActiveLockHeartbeat?.();
+		this.stopActiveLockHeartbeat = null;
 	}
 
 	async start(
@@ -87,6 +90,11 @@ export class FtpReportFileDiscoveryService
 		if (!lockToken)
 			throw new Error('Another FTP operation is already running');
 		this.activeLockToken = lockToken;
+		this.stopActiveLockHeartbeat =
+			this.ftpOperationLockService.startHeartbeat(
+				lockToken,
+				'rule-discovery',
+			);
 		this.running = true;
 		const id = uuidv4();
 		const startedAt = new Date()
@@ -117,6 +125,8 @@ export class FtpReportFileDiscoveryService
 		} catch (error) {
 			this.running = false;
 			this.activeLockToken = null;
+			this.stopActiveLockHeartbeat?.();
+			this.stopActiveLockHeartbeat = null;
 			await this.ftpOperationLockService.release(lockToken);
 			throw error;
 		}
@@ -339,11 +349,13 @@ export class FtpReportFileDiscoveryService
 				? new Map<string, string>()
 				: await this.getCheckpoints();
 			const minimumPeriods = Object.fromEntries(checkpoints.entries());
-			const categoryScans =
-				await this.ftpService.listAllRemoteReportFiles(
+			const categoryScans = await this.ftpService.withSession((session) =>
+				this.ftpService.listAllRemoteReportFiles(
 					categories,
 					minimumPeriods,
-				);
+					session,
+				),
+			);
 			const missingCategories = categories.filter(
 				(category) =>
 					!categoryScans.some((scan) => scan.category === category),
@@ -453,10 +465,8 @@ export class FtpReportFileDiscoveryService
 			// etc.). Collapse their legacy per-territory rules before discovery
 			// checks for existing patterns, so a new territory uses the shared
 			// KKBOX[A-Z]{2} import rule instead of becoming pending.
-			const canonicalization = await this.ruleService.canonicalizeLegacyRules(
-				'ftp',
-				false,
-			);
+			const canonicalization =
+				await this.ruleService.canonicalizeLegacyRules('ftp', false);
 			for (const conflict of canonicalization.conflicts)
 				this.logger.warn(
 					`FTP rule canonicalization skipped ${conflict.canonicalPattern}: ${conflict.reason}`,
@@ -544,6 +554,8 @@ export class FtpReportFileDiscoveryService
 			this.running = false;
 			const lockToken = this.activeLockToken;
 			this.activeLockToken = null;
+			this.stopActiveLockHeartbeat?.();
+			this.stopActiveLockHeartbeat = null;
 			if (lockToken)
 				await this.ftpOperationLockService.release(lockToken);
 		}
@@ -572,7 +584,8 @@ export class FtpReportFileDiscoveryService
 	private async scheduleSampleWorker(): Promise<void> {
 		if (process.env.APP_ROLE !== 'worker') return;
 		const config = await this.getConfig();
-		if (this.sampleWorkerIntervalMs === config.sampleWorkerIntervalMs) return;
+		if (this.sampleWorkerIntervalMs === config.sampleWorkerIntervalMs)
+			return;
 		this.sampleWorkerIntervalMs = config.sampleWorkerIntervalMs;
 		if (this.sampleWorkerTimer) clearInterval(this.sampleWorkerTimer);
 		this.sampleWorkerTimer = setInterval(
@@ -846,9 +859,18 @@ export class FtpReportFileDiscoveryService
 		const lockToken =
 			await this.ftpOperationLockService.tryAcquire('sample-worker');
 		if (!lockToken) return;
+		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
+			lockToken,
+			'sample-worker',
+		);
+		const session = this.ftpService.createSession();
 		try {
-			await Promise.all(tasks.map((task) => this.processSampleTask(task)));
+			for (const task of tasks) {
+				await this.processSampleTask(task, session);
+			}
 		} finally {
+			session.close();
+			stopLockHeartbeat();
 			await this.ftpOperationLockService.release(lockToken);
 		}
 	}
@@ -879,7 +901,10 @@ export class FtpReportFileDiscoveryService
 		);
 	}
 
-	private async processSampleTask(task: any): Promise<void> {
+	private async processSampleTask(
+		task: any,
+		session: FtpSession,
+	): Promise<void> {
 		const now = () =>
 			new Date().toISOString().slice(0, 19).replace('T', ' ');
 		try {
@@ -908,6 +933,7 @@ export class FtpReportFileDiscoveryService
 					task.dsp_folder,
 					task.ftp_path,
 					localPath,
+					session,
 				);
 				const key = `ftp-report-samples/${task.source_category}/${task.dsp_folder}/${task.id}/${encodeURIComponent(path.basename(task.ftp_path))}`;
 				await this.bucketR2Service.uploadFileFromPath({

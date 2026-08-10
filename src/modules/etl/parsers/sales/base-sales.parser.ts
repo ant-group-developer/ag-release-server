@@ -9,6 +9,7 @@ import {
 	normalizeFactRows,
 	normalizeTextValue,
 } from '../../utils/fact-row-normalizer.util';
+import { ParseFileStats } from '../base.parser';
 import {
 	applyInputAliases,
 	ConfiguredFieldMapping,
@@ -16,7 +17,6 @@ import {
 	suppressSkippedInputColumns,
 	transformMappedValue,
 } from '../field-mapping-overlay';
-import { ParseFileStats } from '../base.parser';
 
 const AdmZip = require('adm-zip');
 
@@ -80,7 +80,13 @@ export abstract class BaseSalesParser {
 				filePath,
 				fileName: path.basename(filePath),
 				fileDirectory: path.dirname(filePath),
-				fileSizeBytes: (() => { try { return fs.statSync(filePath).size; } catch { return 0; } })(),
+				fileSizeBytes: (() => {
+					try {
+						return fs.statSync(filePath).size;
+					} catch {
+						return 0;
+					}
+				})(),
 				totalLines: rows.length,
 				processedRows: rows.length,
 				skippedRows: 0,
@@ -209,7 +215,7 @@ export abstract class BaseSalesParser {
 				headers.forEach((h, i) => {
 					record[h.trim()] = (values[i] || '').trim();
 				});
-			this.prepareRecord(record);
+				this.prepareRecord(record);
 
 				const parsed = this.parseRow(record, batchId, filePath);
 				if (parsed) {

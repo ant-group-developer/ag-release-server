@@ -15,16 +15,24 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 	let service: FtpReportFileDiscoveryService;
 	let originalAppRole: string | undefined;
 
-	const ftpService = { downloadDiscoverySampleFile: jest.fn() };
+	const ftpService = {
+		createSession: jest.fn(),
+		downloadDiscoverySampleFile: jest.fn(),
+	};
 	const ruleService = {};
 	const parserConfigService = {};
 	const clickHouseService = { query: jest.fn(), insert: jest.fn() };
 	const migrationService = { waitForMigrations: jest.fn() };
-	const schedulerRegistry = { getCronJobs: jest.fn(), addCronJob: jest.fn(), deleteCronJob: jest.fn() };
+	const schedulerRegistry = {
+		getCronJobs: jest.fn(),
+		addCronJob: jest.fn(),
+		deleteCronJob: jest.fn(),
+	};
 	const bucketR2Service = { uploadFileFromPath: jest.fn() };
 	const ftpOperationLockService = {
 		tryAcquire: jest.fn(),
 		release: jest.fn(),
+		startHeartbeat: jest.fn(),
 	};
 
 	const SAMPLE_TASK = {
@@ -46,7 +54,10 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 				FtpReportFileDiscoveryService,
 				{ provide: FtpService, useValue: ftpService },
 				{ provide: FtpReportFileRuleService, useValue: ruleService },
-				{ provide: FtpParserConfigService, useValue: parserConfigService },
+				{
+					provide: FtpParserConfigService,
+					useValue: parserConfigService,
+				},
 				{ provide: ClickHouseService, useValue: clickHouseService },
 				{
 					provide: ClickHouseMigrationService,
@@ -63,6 +74,8 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 
 		service = moduleRef.get(FtpReportFileDiscoveryService);
 		jest.clearAllMocks();
+		ftpService.createSession.mockReturnValue({ close: jest.fn() });
+		ftpOperationLockService.startHeartbeat.mockReturnValue(jest.fn());
 	});
 
 	afterEach(() => {
@@ -119,10 +132,31 @@ describe('FtpReportFileDiscoveryService sample worker', () => {
 		expect(ftpOperationLockService.release).toHaveBeenCalledWith('token-1');
 	});
 
+	it('downloads a batch sequentially over one FTP session', async () => {
+		const secondTask = { ...SAMPLE_TASK, id: 'task-2' };
+		const session = { close: jest.fn() };
+		givenConfigAndTasks({}, [SAMPLE_TASK, secondTask]);
+		ftpOperationLockService.tryAcquire.mockResolvedValue('token-1');
+		ftpService.createSession.mockReturnValue(session);
+		clickHouseService.insert.mockResolvedValue(undefined);
+		ftpService.downloadDiscoverySampleFile.mockResolvedValue(undefined);
+		bucketR2Service.uploadFileFromPath.mockResolvedValue(undefined);
+
+		await runWorker();
+
+		expect(ftpService.downloadDiscoverySampleFile).toHaveBeenCalledTimes(2);
+		for (const call of ftpService.downloadDiscoverySampleFile.mock.calls) {
+			expect(call[5]).toBe(session);
+		}
+		expect(session.close).toHaveBeenCalledTimes(1);
+	});
+
 	it('releases the lock even when bookkeeping itself throws', async () => {
 		givenConfigAndTasks({}, [SAMPLE_TASK]);
 		ftpOperationLockService.tryAcquire.mockResolvedValue('token-1');
-		clickHouseService.insert.mockRejectedValue(new Error('clickhouse down'));
+		clickHouseService.insert.mockRejectedValue(
+			new Error('clickhouse down'),
+		);
 
 		await expect(runWorker()).rejects.toThrow('clickhouse down');
 

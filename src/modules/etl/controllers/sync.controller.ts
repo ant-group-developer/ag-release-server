@@ -14,7 +14,7 @@ import { ResponseSuccess } from '../../../common/dtos/common.response.dto';
 import { UpdateSyncConfigDto } from '../dto/sync-config.dto';
 import { ImportJobSourceType } from '../interfaces';
 import { FtpOperationLockService } from '../services/ftp/ftp-operation-lock.service';
-import { FtpService } from '../services/ftp/ftp.service';
+import { FtpService, FtpSession } from '../services/ftp/ftp.service';
 import { ImportJobsService } from '../services/import-jobs/import-jobs.service';
 import { SchedulerService } from '../services/scheduler/scheduler.service';
 import { SyncService } from '../services/sync/sync.service';
@@ -312,9 +312,14 @@ export class SyncController {
 			);
 			return;
 		}
+		const stopLockHeartbeat = this.ftpOperationLockService.startHeartbeat(
+			lockToken,
+			operation,
+		);
 		try {
 			await run();
 		} finally {
+			stopLockHeartbeat();
 			await this.ftpOperationLockService.release(lockToken);
 		}
 	}
@@ -371,7 +376,15 @@ export class SyncController {
 		// The lock covers every period in the range, not one per period, so the
 		// range job is a single FTP operation from the server's point of view.
 		await this.runFtpJobExclusively(jobId, 'manual-sync-range', () =>
-			this.executeSyncRangeJob(jobId, periods, force, categories),
+			this.ftpService.withSession((session) =>
+				this.executeSyncRangeJob(
+					jobId,
+					periods,
+					force,
+					categories,
+					session,
+				),
+			),
 		);
 	}
 
@@ -382,6 +395,7 @@ export class SyncController {
 		categories?: Array<
 			'trends' | 'usage' | 'sales' | 'illegitimate_activity'
 		>,
+		session?: FtpSession,
 	): Promise<void> {
 		try {
 			await this.importJobsService.markProcessing(jobId);
@@ -422,6 +436,7 @@ export class SyncController {
 						force,
 						categories,
 						jobId,
+						session,
 					);
 					results.push(result);
 					if (

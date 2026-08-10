@@ -54,7 +54,8 @@ function fakeDataSource(data: {
 	return {
 		getRepository: (entity: { name: string }) => {
 			const repo = repos[entity.name];
-			if (!repo) throw new Error(`Chưa fake repository cho ${entity.name}`);
+			if (!repo)
+				throw new Error(`Chưa fake repository cho ${entity.name}`);
 			// Release.find bị gọi 2 lần (theo UPC, rồi theo id của track);
 			// trả cùng danh sách cho cả hai là đủ cho các case test.
 			return { findOne: jest.fn().mockResolvedValue(null), ...repo };
@@ -283,11 +284,13 @@ describe('AssetImportScanService', () => {
 			},
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'title')).toMatchObject({
-			oldValue: 'Tên cũ',
-			newValue: 'Tên mới',
-			changeType: AssetImportChangeType.OVERWRITE,
-		});
+		expect(items[0].changes.find((c) => c.field === 'title')).toMatchObject(
+			{
+				oldValue: 'Tên cũ',
+				newValue: 'Tên mới',
+				changeType: AssetImportChangeType.OVERWRITE,
+			},
+		);
 	});
 
 	it('CREATE khi không khớp và bật createIfNotFound', async () => {
@@ -358,9 +361,7 @@ describe('AssetImportScanService', () => {
 	/** Tenant đích có sẵn 2 label; label cũ nhất là mục tiêu auto-select. */
 	function dataSourceWithLabels(release: Record<string, unknown>) {
 		return fakeDataSource({
-			tracks: [
-				{ id: 'trkL', isrc: 'VNA682200010', releaseId: 'relL' },
-			],
+			tracks: [{ id: 'trkL', isrc: 'VNA682200010', releaseId: 'relL' }],
 			releases: [release],
 			tenants: [
 				{ id: WRONG_TENANT, name: 'ANT MUSIC LLC' },
@@ -389,7 +390,9 @@ describe('AssetImportScanService', () => {
 			context,
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toMatchObject({
 			newValue: 'lbl_new',
 			newDisplay: 'Warner VN',
 			changeType: AssetImportChangeType.OVERWRITE,
@@ -447,7 +450,9 @@ describe('AssetImportScanService', () => {
 			},
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toMatchObject({
 			newValue: null,
 			newDisplay: 'Sony Music',
 			changeType: AssetImportChangeType.CREATE,
@@ -468,7 +473,9 @@ describe('AssetImportScanService', () => {
 			context,
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toBeUndefined();
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toBeUndefined();
 		expect(items[0].action).toBe(AssetImportAction.NO_CHANGE);
 		expect(items[0].errorMessage).toBeNull();
 	});
@@ -493,9 +500,13 @@ describe('AssetImportScanService', () => {
 			context,
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toBeUndefined();
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toBeUndefined();
 		// Vẫn đổi được workspace, chỉ riêng label là giữ nguyên.
-		expect(items[0].changes.find((c) => c.field === 'tenantId')).toBeDefined();
+		expect(
+			items[0].changes.find((c) => c.field === 'tenantId'),
+		).toBeDefined();
 		expect(items[0].errorMessage).toContain('chưa có label nào');
 	});
 
@@ -523,7 +534,9 @@ describe('AssetImportScanService', () => {
 		);
 
 		expect(items[0].action).toBe(AssetImportAction.CREATE);
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toMatchObject({
 			newValue: 'lbl_old',
 			changeType: AssetImportChangeType.AUTO_SELECT,
 		});
@@ -556,7 +569,9 @@ describe('AssetImportScanService', () => {
 			},
 		);
 
-		expect(items[0].changes.find((c) => c.field === 'labelId')).toMatchObject({
+		expect(
+			items[0].changes.find((c) => c.field === 'labelId'),
+		).toMatchObject({
 			newValue: null,
 			newDisplay: 'Sony Music',
 			changeType: AssetImportChangeType.CREATE,

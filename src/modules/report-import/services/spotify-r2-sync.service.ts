@@ -14,7 +14,7 @@ import { ImportJobsService } from '../../etl/services/import-jobs/import-jobs.se
 import { UpdateSpotifyR2SyncConfigDto } from '../dto/spotify-r2-sync-config.dto';
 import { ReportDetectorService } from './report-detector.service';
 import { ReportImportQueueService } from './report-import-queue.service';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const AdmZip = require('adm-zip');
 
 export interface SpotifyR2SyncConfig {

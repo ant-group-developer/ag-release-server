@@ -1,10 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { BucketR2Service } from 'src/modules/bucket2/services/bucket-r2.service';
-import {
-	ASSET_IMPORT_TEMPLATE_FILE_NAME,
-	ASSET_IMPORT_TEMPLATE_R2_KEY,
-} from '../constants/asset-import.constant';
+import { ASSET_IMPORT_TEMPLATE_R2_KEY } from '../constants/asset-import.constant';
 
 const TEMPLATE_CONTENT_TYPE =
 	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';

@@ -5,9 +5,9 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -35,8 +35,7 @@ export class SourceTypeAnalyticsController {
 
 	@Post('overview')
 	@ApiOperation({
-		summary:
-			'Overview stats for a configured raw import source type',
+		summary: 'Overview stats for a configured raw import source type',
 	})
 	async overview(
 		@Param('sourceType') sourceType: string,
@@ -52,10 +51,6 @@ export class SourceTypeAnalyticsController {
 			),
 		});
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a source type' })
@@ -182,7 +177,8 @@ export class SourceTypeAnalyticsController {
 
 	@Post('top-releases')
 	@ApiOperation({
-		summary: 'Top releases của source type (sortBy: views | usage | revenue)',
+		summary:
+			'Top releases của source type (sortBy: views | usage | revenue)',
 	})
 	async topReleases(
 		@Param('sourceType') sourceType: string,
@@ -220,7 +216,8 @@ export class SourceTypeAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của source type (sortBy: views | usage | revenue)',
+		summary:
+			'Top territories của source type (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('sourceType') sourceType: string,

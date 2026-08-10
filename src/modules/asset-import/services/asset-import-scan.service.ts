@@ -106,7 +106,8 @@ export class AssetImportScanService {
 		const trackByIsrc = new Map<string, Track>();
 		for (const track of tracks) {
 			if (!track.isrc) continue;
-			if (!trackByIsrc.has(track.isrc)) trackByIsrc.set(track.isrc, track);
+			if (!trackByIsrc.has(track.isrc))
+				trackByIsrc.set(track.isrc, track);
 			const set = releaseIdsByIsrc.get(track.isrc) ?? new Set<string>();
 			set.add(track.releaseId);
 			releaseIdsByIsrc.set(track.isrc, set);
@@ -203,7 +204,9 @@ export class AssetImportScanService {
 			]),
 		];
 		const labelIds = [
-			...new Set(releases.map((r) => r.labelId).filter((v): v is string => !!v)),
+			...new Set(
+				releases.map((r) => r.labelId).filter((v): v is string => !!v),
+			),
 		];
 
 		const [tenants, labels] = await Promise.all([
@@ -220,7 +223,9 @@ export class AssetImportScanService {
 		]);
 
 		return {
-			tenantNames: new Map(tenants.map((t) => [t.id, t.name ?? t.title ?? ''])),
+			tenantNames: new Map(
+				tenants.map((t) => [t.id, t.name ?? t.title ?? '']),
+			),
 			labelNames: new Map(labels.map((l) => [l.id, l.name])),
 		};
 	}
@@ -258,7 +263,8 @@ export class AssetImportScanService {
 			return {
 				...base,
 				action: AssetImportAction.INVALID,
-				errorMessage: 'Dòng thiếu cả ISRC lẫn UPC nên không đối chiếu được',
+				errorMessage:
+					'Dòng thiếu cả ISRC lẫn UPC nên không đối chiếu được',
 			};
 		}
 
@@ -277,7 +283,8 @@ export class AssetImportScanService {
 				return {
 					...base,
 					action: AssetImportAction.NO_CHANGE,
-					errorMessage: 'Không tìm thấy trong hệ thống và option tạo mới đang tắt',
+					errorMessage:
+						'Không tìm thấy trong hệ thống và option tạo mới đang tắt',
 				};
 			}
 			return {
@@ -405,7 +412,12 @@ export class AssetImportScanService {
 				});
 			}
 
-			const labelChange = this.buildLabelChange(row, release, context, lookups);
+			const labelChange = this.buildLabelChange(
+				row,
+				release,
+				context,
+				lookups,
+			);
 			if (labelChange) changes.push(labelChange);
 		}
 
@@ -551,7 +563,9 @@ export class AssetImportScanService {
 				oldDisplay: null,
 				newValue: context.targetTenantId,
 				newDisplay:
-					lookups.displayNames.tenantNames.get(context.targetTenantId) ?? null,
+					lookups.displayNames.tenantNames.get(
+						context.targetTenantId,
+					) ?? null,
 				changeType: AssetImportChangeType.CREATE,
 			},
 			this.buildCreateLabelChange(row, context, lookups.labelResolution),
@@ -605,12 +619,7 @@ export class AssetImportScanService {
 			};
 		}
 
-		return this.buildAutoSelectLabelChange(
-			name,
-			null,
-			null,
-			autoSelected,
-		);
+		return this.buildAutoSelectLabelChange(name, null, null, autoSelected);
 	}
 
 	/**

@@ -12,9 +12,9 @@ import { ResponseSuccess } from 'src/common/dtos/common.response.dto';
 import {
 	AnalyticsSummaryQueryDto,
 	ChartQueryDto,
-	RevenueChartQueryDto,
 	EntityOverviewQueryDto,
 	EntityRankingQueryDto,
+	RevenueChartQueryDto,
 } from '../dto/analytics-query.dto';
 import { EntityAnalyticsService } from '../services/entity-analytics.service';
 
@@ -57,10 +57,6 @@ export class ReleaseAnalyticsController {
 		);
 		return new ResponseSuccess({ data });
 	}
-
-
-
-
 
 	@Post('trend-view/line-chart')
 	@ApiOperation({ summary: 'Trend view line chart for a release' })
@@ -159,7 +155,9 @@ export class ReleaseAnalyticsController {
 	}
 
 	@Post('dsp')
-	@ApiOperation({ summary: 'Top DSPs của release (sortBy: views | usage | revenue)' })
+	@ApiOperation({
+		summary: 'Top DSPs của release (sortBy: views | usage | revenue)',
+	})
 	async topDsps(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,
 		@Body() dto: EntityRankingQueryDto,
@@ -176,7 +174,8 @@ export class ReleaseAnalyticsController {
 
 	@Post('ter')
 	@ApiOperation({
-		summary: 'Top territories của release (sortBy: views | usage | revenue)',
+		summary:
+			'Top territories của release (sortBy: views | usage | revenue)',
 	})
 	async topTerritories(
 		@Param('releaseId', ParseUUIDPipe) releaseId: string,

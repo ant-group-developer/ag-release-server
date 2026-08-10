@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
+import { ClickHouseService } from '../../../clickhouse';
 import { ExcludePatternService } from '../../../dsp-report/services/ftp-exclude-pattern.service';
 import { FtpParserConfigService } from '../../../dsp-report/services/ftp-parser-config.service';
 import { FtpReportFileRuleService } from '../../../dsp-report/services/ftp-report-file-rule.service';
-import { ClickHouseService } from '../../../clickhouse';
 import { AnalyticsProjectionRefreshService } from '../cube-rebuild/analytics-projection-refresh.service';
 import { EtlImportHistoryRepository } from '../etl-import-history/etl-import-history.repository';
 import { FtpAuthenticationError, FtpService } from '../ftp/ftp.service';
@@ -15,6 +15,7 @@ describe('SyncService', () => {
 
 	const ftpService = {
 		createSession: jest.fn(),
+		withSession: jest.fn(),
 		listDspFolders: jest.fn(),
 		listRemoteFiles: jest.fn(),
 		downloadDspFolder: jest.fn(),
@@ -22,7 +23,11 @@ describe('SyncService', () => {
 		cleanupTemp: jest.fn(),
 	};
 	const importService = { importDspFolder: jest.fn() };
-	const clickHouseService = { query: jest.fn(), insert: jest.fn(), command: jest.fn() };
+	const clickHouseService = {
+		query: jest.fn(),
+		insert: jest.fn(),
+		command: jest.fn(),
+	};
 	const redis = { keys: jest.fn().mockResolvedValue([]), del: jest.fn() };
 	const excludePatternService = { shouldExclude: jest.fn() };
 	const analyticsProjectionRefreshService = {
@@ -76,6 +81,14 @@ describe('SyncService', () => {
 			sessions.push(session);
 			return session;
 		});
+		ftpService.withSession.mockImplementation(async (action) => {
+			const session = ftpService.createSession();
+			try {
+				return await action(session);
+			} finally {
+				session.close();
+			}
+		});
 		// No sync_* rows and no import history: every folder looks brand new.
 		clickHouseService.query.mockResolvedValue([]);
 		excludePatternService.shouldExclude.mockResolvedValue(false);
@@ -108,28 +121,32 @@ describe('SyncService', () => {
 	};
 
 	describe('syncPeriod connection reuse', () => {
-		it('leases exactly one connection per DSP folder', async () => {
+		it('leases one connection for every DSP folder in the period', async () => {
 			ftpService.listDspFolders.mockResolvedValue(['dsp-a', 'dsp-b']);
 			givenImportableFolder();
 
 			await service.syncPeriod('202401', false, ['trends']);
 
-			expect(sessions).toHaveLength(2);
+			expect(sessions).toHaveLength(1);
 			for (const session of sessions) {
 				expect(session.close).toHaveBeenCalledTimes(1);
 			}
 		});
 
-		it('passes that session to every FTP call for the folder', async () => {
+		it('passes that session to every FTP call in the period', async () => {
 			ftpService.listDspFolders.mockResolvedValue(['dsp-a']);
 			givenImportableFolder();
 
 			await service.syncPeriod('202401', false, ['trends']);
 
 			const session = sessions[0];
-			// Both listings and the download must ride the same login, otherwise
-			// the folder still costs three of them.
-			expect(ftpService.listRemoteFiles).toHaveBeenCalledTimes(2);
+			expect(ftpService.listDspFolders).toHaveBeenCalledWith(
+				'trends',
+				'202401',
+				session,
+			);
+			// The DSP manifest is listed once, then filtered locally for its rule.
+			expect(ftpService.listRemoteFiles).toHaveBeenCalledTimes(1);
 			for (const call of ftpService.listRemoteFiles.mock.calls) {
 				expect(call[5]).toBe(session);
 			}
@@ -144,7 +161,9 @@ describe('SyncService', () => {
 				new Error('read timeout'),
 			);
 
-			const result = await service.syncPeriod('202401', false, ['trends']);
+			const result = await service.syncPeriod('202401', false, [
+				'trends',
+			]);
 
 			expect(sessions[0].close).toHaveBeenCalledTimes(1);
 			expect(result.categories[0].folders[0].status).toBe('error');
@@ -160,7 +179,9 @@ describe('SyncService', () => {
 				parserCode: '',
 			});
 
-			const result = await service.syncPeriod('202401', false, ['trends']);
+			const result = await service.syncPeriod('202401', false, [
+				'trends',
+			]);
 
 			expect(sessions[0].close).toHaveBeenCalledTimes(1);
 			expect(result.categories[0].folders[0].status).toBe('skipped');
@@ -175,7 +196,9 @@ describe('SyncService', () => {
 				.mockRejectedValueOnce(new Error('read timeout'))
 				.mockResolvedValue({ localPath: '/tmp/x', fileCount: 1 });
 
-			const result = await service.syncPeriod('202401', false, ['trends']);
+			const result = await service.syncPeriod('202401', false, [
+				'trends',
+			]);
 
 			const statuses = result.categories[0].folders.map((f) => f.status);
 			expect(statuses).toEqual(['error', 'done']);
@@ -192,9 +215,27 @@ describe('SyncService', () => {
 				service.syncPeriod('202401', false, ['trends']),
 			).rejects.toBeInstanceOf(FtpAuthenticationError);
 
-			// Only the first folder was attempted; its session was released.
+			// Only the first folder was attempted; the period session was released.
 			expect(sessions).toHaveLength(1);
 			expect(sessions[0].close).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('syncAll connection reuse', () => {
+		it('uses one session across every period while still checking every DSP', async () => {
+			ftpService.listPeriods.mockResolvedValue(['202401', '202402']);
+			ftpService.listDspFolders.mockResolvedValue(['dsp-a']);
+			givenImportableFolder();
+
+			await service.syncAll(false, ['trends']);
+
+			expect(sessions).toHaveLength(1);
+			expect(ftpService.listPeriods).toHaveBeenCalledWith(sessions[0]);
+			expect(ftpService.listDspFolders).toHaveBeenCalledTimes(2);
+			for (const call of ftpService.listDspFolders.mock.calls) {
+				expect(call[2]).toBe(sessions[0]);
+			}
+			expect(ftpService.listRemoteFiles).toHaveBeenCalledTimes(2);
 		});
 	});
 
